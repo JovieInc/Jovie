@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import {
   AUTONOMOUS_LINEAR_WORKER,
   assertAutonomousClaim,
+  assertAutonomousTerminal,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
@@ -53,6 +54,23 @@ describe('assertAutonomousClaim', () => {
     assert.throws(
       () => assertAutonomousClaim({ state: 'Todo', assignee: null }),
       /linear-claim-not-autonomous/
+    );
+  });
+});
+
+describe('assertAutonomousTerminal', () => {
+  it('rejects founder-named Done and leftover In Progress', () => {
+    assert.deepEqual(
+      assertAutonomousTerminal({ state: 'Done', assignee: null }),
+      { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER }
+    );
+    assert.throws(
+      () => assertAutonomousTerminal({ state: 'Done', assignee: 'Tim White' }),
+      /linear-terminal-not-autonomous/
+    );
+    assert.throws(
+      () => assertAutonomousTerminal({ state: 'In Progress', assignee: null }),
+      /linear-terminal-not-autonomous/
     );
   });
 });
@@ -183,6 +201,7 @@ describe('executeNativeQueueStarvation', () => {
 
   it('claims the Linear child and records a signed fail-closed terminal without mutating a PR', async () => {
     const claims = [];
+    const completes = [];
     const enrolls = [];
     const writes = [];
     const result = await executeNativeQueueStarvation({
@@ -202,6 +221,10 @@ describe('executeNativeQueueStarvation', () => {
         claims.push(input);
         return { state: 'In Progress', assignee: 'symphony-worker' };
       },
+      completeIssue: async input => {
+        completes.push(input);
+        return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
+      },
       enrollPr: async input => {
         enrolls.push(input);
         return { ok: true, head: 'd'.repeat(40) };
@@ -218,6 +241,11 @@ describe('executeNativeQueueStarvation', () => {
     assert.deepEqual(claims, [
       { identifier: 'JOV-6304', state: 'In Progress' },
     ]);
+    assert.deepEqual(completes, [{ identifier: 'JOV-6304', state: 'Done' }]);
+    assert.deepEqual(result.terminal, {
+      state: 'Done',
+      assignee: AUTONOMOUS_LINEAR_WORKER,
+    });
     assert.deepEqual(enrolls, []);
     assert.equal(writes.length, 1);
     assert.equal(writes[0].status, 'failed');
@@ -246,6 +274,10 @@ describe('executeNativeQueueStarvation', () => {
       claimIssue: async () => ({
         state: 'In Progress',
         assignee: 'symphony-worker',
+      }),
+      completeIssue: async () => ({
+        state: 'Done',
+        assignee: AUTONOMOUS_LINEAR_WORKER,
       }),
       enrollPr: async input => {
         enrolls.push(input);

@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gem_repo_registry import pr_drain_repos
+import publisher_self_repair
 import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
@@ -173,6 +174,64 @@ def run_native_queue_starvation_execute(stdout: str) -> int:
     return executed.returncode
 
 
+def maybe_restart_publisher(consumer_status: str | None) -> None:
+    """After 3 consecutive Gem publisher-missing holds, restart the allowlisted unit."""
+    workspace = Path(
+        os.environ.get("GEM_WORKSPACE", Path(__file__).resolve().parents[1])
+    )
+    fleet_path = workspace / "state/gem-priority-gate/latest.json"
+    attest_path = workspace / "state/gem-service-attestation.json"
+    streak_path = workspace / "state/publisher-self-repair-streak.json"
+    try:
+        fleet = json.loads(fleet_path.read_text())
+        attestation = json.loads(attest_path.read_text())
+        previous = (
+            json.loads(streak_path.read_text()) if streak_path.exists() else None
+        )
+    except (OSError, ValueError, TypeError):
+        fleet, attestation, previous = {}, {}, None
+    queue = fleet.get("signals", {}).get("queue", {}) if isinstance(fleet, dict) else {}
+    reason = publisher_self_repair.publisher_missing_reason(
+        attestation_healthy=(
+            isinstance(attestation, dict)
+            and attestation.get("schema") == "gem-service-attestation/v1"
+            and attestation.get("healthy") is True
+        ),
+        green_ready=queue.get("greenReadyPrs") if isinstance(queue, dict) else 0,
+        blocked_since=queue.get("blockedSince") if isinstance(queue, dict) else None,
+        consumer_status=consumer_status,
+    )
+    observed_at = (
+        fleet.get("observedAt")
+        if isinstance(fleet, dict) and isinstance(fleet.get("observedAt"), str)
+        else ""
+    )
+    streak = publisher_self_repair.next_streak(previous, reason, observed_at)
+    streak_path.parent.mkdir(parents=True, exist_ok=True)
+    streak_path.write_text(json.dumps(streak, indent=2, sort_keys=True) + "\n")
+    unit = streak.get("unit")
+    if streak.get("restart") is True and isinstance(unit, str) and unit in publisher_self_repair.PUBLISHER_UNITS:
+        subprocess.run(
+            ["systemctl", "--user", "restart", unit],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        print(
+            json.dumps(
+                {
+                    "schema": "jovie.summer-delivery-observation/v1",
+                    "stage": "publisher-self-repair",
+                    "reason": streak.get("reason"),
+                    "count": streak.get("count"),
+                    "unit": unit,
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+
+
 def run_summer_symphony_consumer() -> int:
     """Consume at most one verified Summer task, then execute native-queue."""
     consumer = subprocess.run(
@@ -185,6 +244,15 @@ def run_summer_symphony_consumer() -> int:
         check=False,
     )
     report_delivery("outbox-consumption", consumer)
+    status = None
+    if consumer.returncode == 0:
+        try:
+            payload = json.loads(consumer.stdout or "")
+        except (ValueError, TypeError):
+            payload = {}
+        if isinstance(payload, dict) and isinstance(payload.get("status"), str):
+            status = payload["status"]
+    maybe_restart_publisher(status)
     if consumer.returncode != 0:
         return consumer.returncode
     return run_native_queue_starvation_execute(consumer.stdout or "")

@@ -25,6 +25,15 @@ export function assertAutonomousClaim(claim) {
   return { state, assignee: assignee || AUTONOMOUS_LINEAR_WORKER };
 }
 
+export function assertAutonomousTerminal(claim) {
+  const state = claim?.state;
+  const assignee = claim?.assignee ?? null;
+  if (state !== 'Done' || assignee === FOUNDER_LINEAR_ASSIGNEE) {
+    throw new Error('linear-terminal-not-autonomous');
+  }
+  return { state, assignee: assignee || AUTONOMOUS_LINEAR_WORKER };
+}
+
 export function selectGreenReadyPrs(fleet) {
   const actions = fleet?.signals?.closureHealth?.lifecycleActions;
   if (Array.isArray(actions)) {
@@ -160,6 +169,7 @@ export async function executeNativeQueueStarvation({
   privateKeyPem,
   now = () => new Date().toISOString(),
   claimIssue,
+  completeIssue,
   enrollPr,
   writeExecution,
 }) {
@@ -221,12 +231,17 @@ export async function executeNativeQueueStarvation({
     privateKeyPem
   );
   const acknowledgement = await writeExecution(record);
+  const terminal = await completeIssue({
+    identifier: issueIdentifier,
+    state: 'Done',
+  });
   return {
     status: 'execution-recorded',
     taskKey,
     issueIdentifier,
     decision: finalDecision,
     claim,
+    terminal,
     record,
     acknowledgement,
   };

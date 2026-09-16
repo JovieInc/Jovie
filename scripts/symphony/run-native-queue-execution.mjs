@@ -3,11 +3,13 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
   assertAutonomousClaim,
+  assertAutonomousTerminal,
   executeNativeQueueStarvation,
   selectGreenReadyPrs,
 } from './native-queue-starvation-execute.mjs';
 
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
+const DONE = 'a95b08f1-61f8-438f-ba39-ebd8f8ae6471';
 
 function required(name) {
   const value = process.env[name]?.trim();
@@ -57,6 +59,32 @@ async function claimIssue({ identifier, state }) {
     throw new Error('linear-claim-rejected');
   }
   return assertAutonomousClaim({
+    state: next.state.name,
+    assignee: next.assignee?.name ?? null,
+  });
+}
+
+async function completeIssue({ identifier, state }) {
+  const looked = await linearGraphql(
+    `query($id: String!) { issue(id: $id) { id identifier state { name } } }`,
+    { id: identifier }
+  );
+  const issue = looked.issue;
+  if (!issue?.id) throw new Error('linear-issue-missing');
+  const updated = await linearGraphql(
+    `mutation($id: String!, $stateId: String!) {
+      issueUpdate(id: $id, input: { stateId: $stateId, assigneeId: null }) {
+        success
+        issue { identifier state { name } assignee { name } }
+      }
+    }`,
+    { id: issue.id, stateId: DONE }
+  );
+  const next = updated.issueUpdate?.issue;
+  if (updated.issueUpdate?.success !== true || next?.state?.name !== state) {
+    throw new Error('linear-terminal-rejected');
+  }
+  return assertAutonomousTerminal({
     state: next.state.name,
     assignee: next.assignee?.name ?? null,
   });
@@ -194,6 +222,7 @@ const result = await executeNativeQueueStarvation({
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
   ),
   claimIssue,
+  completeIssue,
   enrollPr,
   writeExecution,
 });
@@ -205,5 +234,6 @@ process.stdout.write(
     issueIdentifier: result.issueIdentifier,
     acknowledgement: result.acknowledgement,
     claim: result.claim,
+    terminal: result.terminal,
   })}\n`
 );

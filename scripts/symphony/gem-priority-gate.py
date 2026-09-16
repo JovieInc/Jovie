@@ -36,6 +36,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
     bounded_stack_health,
     build_product_closure_health,
     empty_stack_health,
+    issue_intake_allowed,
     observe_closure_health,
     project_product_admission,
 )
@@ -190,10 +191,8 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
         and candidate.get("remediationContinues") is True
         and isinstance(candidate.get("reasons"), list)
         and all(isinstance(reason, str) for reason in candidate.get("reasons", []))
-        and (
-            candidate.get("newIssueIntakeAllowed")
-            is (candidate.get("status") == "healthy")
-        )
+        and candidate.get("newIssueIntakeAllowed")
+        is issue_intake_allowed(candidate.get("status"), candidate.get("reasons"))
     )
     if valid:
         result = dict(candidate)
@@ -1035,6 +1034,42 @@ def valid_lane_capacity_receipt(value: object, now: datetime) -> bool:
     )
 
 
+def queue_starvation_blocked_since(
+    green_ready: object,
+    previous_blocked_since: object,
+    observed_at: str,
+) -> str | None:
+    """Stable empty-MQ clock for Summer ranking. Do not tick this every observe."""
+    if (
+        not isinstance(green_ready, int)
+        or isinstance(green_ready, bool)
+        or green_ready <= 0
+    ):
+        return None
+    if isinstance(previous_blocked_since, str) and previous_blocked_since.strip():
+        return previous_blocked_since
+    if isinstance(observed_at, str) and observed_at.strip():
+        return observed_at
+    return None
+
+
+def attach_queue_starvation_clock(
+    queue: dict[str, Any], observed_at: str
+) -> dict[str, Any]:
+    """Put signals.queue.blockedSince on starving CLEAN demand, else omit it."""
+    attached = dict(queue)
+    blocked = queue_starvation_blocked_since(
+        attached.get("greenReadyPrs"),
+        attached.get("blockedSince"),
+        observed_at,
+    )
+    if blocked is None:
+        attached.pop("blockedSince", None)
+    else:
+        attached["blockedSince"] = blocked
+    return attached
+
+
 def load_last_known_queue(
     path: Path, now: datetime, target: int, repo: str
 ) -> dict[str, Any] | None:
@@ -1067,7 +1102,7 @@ def load_last_known_queue(
         or lane_capacity.get("repositories", {}).get(repo, {}).get("budget") != target
     ):
         return None
-    return {
+    restored = {
         "status": "known",
         "repository": repo,
         "eligiblePrs": eligible,
@@ -1077,6 +1112,12 @@ def load_last_known_queue(
         "observedAt": data.get("observedAt"),
         "laneCapacity": lane_capacity,
     }
+    blocked = queue_starvation_blocked_since(
+        green_ready, data.get("blockedSince"), data.get("observedAt")
+    )
+    if blocked is not None:
+        restored["blockedSince"] = blocked
+    return restored
 
 
 def observe_queue(
@@ -1107,6 +1148,14 @@ def observe_queue(
             }.intersection({"queue-deferred"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
+        previous: dict[str, Any] = {}
+        if snapshot_path is not None and snapshot_path.exists():
+            try:
+                loaded = read_json(snapshot_path)
+                if isinstance(loaded, dict):
+                    previous = loaded
+            except (OSError, ValueError, json.JSONDecodeError):
+                previous = {}
         observed = {
             "status": "known",
             "repository": repo,
@@ -1123,6 +1172,13 @@ def observe_queue(
                 default_lane_budget,
             ),
         }
+        blocked = queue_starvation_blocked_since(
+            len(green_ready),
+            previous.get("blockedSince"),
+            observed["observedAt"],
+        )
+        if blocked is not None:
+            observed["blockedSince"] = blocked
         if snapshot_path is not None:
             write_queue_snapshot(
                 snapshot_path,
@@ -1177,7 +1233,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else {"status": "unknown"}
     )
     queue_value = signals.get("queue")
-    queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
+    queue = (
+        attach_queue_starvation_clock(queue_value, observed_at)
+        if isinstance(queue_value, dict)
+        else {"status": "unknown"}
+    )
     closure_health = validate_closure_health(signals.get("closureHealth"))
     product_closures = build_product_closure_health(
         closure_health, signals.get("productClosureHealth")
@@ -1204,6 +1264,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     }
     normalized_signals = {
         **signals,
+        "queue": queue,
         "closureHealth": closure_health,
         "productClosureHealth": product_closures,
         "concurrencyEvidence": concurrency_evidence,
@@ -1504,9 +1565,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
         work_activities = ["tests", "review"]
     else:
-        new_implementation_allowed = (
-            capacity_fresh and queue_shape_valid and repository_capacity_available
-        )
+        # Capacity evidence governs mutation seats, not Linear-child intake.
+        # Missing useful-turn proofs must not freeze Eve's v2 projection.
+        # Queue backpressure (ready >= budget) still holds new leases.
+        new_implementation_allowed = queue_shape_valid and repository_capacity_available
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [

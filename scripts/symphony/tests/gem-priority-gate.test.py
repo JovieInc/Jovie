@@ -729,7 +729,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
         self.assertEqual(queue_observer.call_args.args[2], 1)
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
@@ -944,8 +944,8 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["state"], "GREEN")
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
@@ -968,7 +968,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 receipt = self.evaluate(signals)
 
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
                 self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
@@ -1024,7 +1024,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "repository": "JovieInc/Jovie",
             "status": "red",
             "authority": "Summer",
-            "newIssueIntakeAllowed": False,
+            "newIssueIntakeAllowed": True,
             "promotionContinues": True,
             "remediationContinues": True,
             "reasons": [
@@ -1036,9 +1036,9 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         products = receipt["closureAdmission"]["products"]
 
-        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
         self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
@@ -1213,8 +1213,8 @@ class DeploymentBindingTests(unittest.TestCase):
                 signals["concurrencyEvidence"] = evidence
                 receipt = self.evaluate(signals)
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
@@ -1818,7 +1818,10 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["state"], "GREEN")
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertEqual(receipt["signals"]["queue"], signals["queue"])
+        queued = dict(receipt["signals"]["queue"])
+        self.assertIn("blockedSince", queued)
+        queued.pop("blockedSince")
+        self.assertEqual(queued, signals["queue"])
         self.assertNotIn(
             "queue-above-target",
             {reason["code"] for reason in receipt["reasons"]},
@@ -2532,6 +2535,41 @@ class LeaseSignalTests(unittest.TestCase):
             observed = MODULE.observe_lease(guard)
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["reason"], "lease-report-schema-mismatch")
+
+
+class QueueStarvationBlockedSinceTests(unittest.TestCase):
+    def test_starvation_clock_holds_previous_and_clears_when_not_starving(self):
+        first = MODULE.queue_starvation_blocked_since(
+            3, None, "2026-09-16T15:00:00Z"
+        )
+        self.assertEqual(first, "2026-09-16T15:00:00Z")
+        held = MODULE.queue_starvation_blocked_since(
+            4, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+        )
+        self.assertEqual(held, "2026-09-16T15:00:00Z")
+        self.assertIsNone(
+            MODULE.queue_starvation_blocked_since(
+                0, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+            )
+        )
+
+    def test_evaluate_emits_queue_blocked_since_for_clean_starvation(self):
+        now = MODULE.isoformat(MODULE.utc_now())
+        signals = json.loads(json.dumps(GREEN_SIGNALS))
+        signals["queue"]["greenReadyPrs"] = 3
+        signals["queue"]["eligiblePrs"] = 3
+        receipt = MODULE.evaluate(signals, now)
+        self.assertEqual(receipt["signals"]["queue"]["blockedSince"], now)
+        again = json.loads(json.dumps(signals))
+        again["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        held = MODULE.evaluate(again, now)
+        self.assertEqual(
+            held["signals"]["queue"]["blockedSince"], "2026-09-16T14:00:00Z"
+        )
+        cleared = json.loads(json.dumps(GREEN_SIGNALS))
+        cleared["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        healthy = MODULE.evaluate(cleared, now)
+        self.assertNotIn("blockedSince", healthy["signals"]["queue"])
 
 
 if __name__ == "__main__":
