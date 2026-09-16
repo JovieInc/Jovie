@@ -120,7 +120,10 @@ async function main() {
   const results = await eslint.lintFiles(files);
   const errors = [];
   for (const result of results) {
-    const rel = path.relative(webRoot, result.filePath).split(path.sep).join('/');
+    const rel = path
+      .relative(webRoot, result.filePath)
+      .split(path.sep)
+      .join('/');
     const count = result.messages.filter(
       message => message.ruleId === 'shadcn/no-restyle'
     ).length;
