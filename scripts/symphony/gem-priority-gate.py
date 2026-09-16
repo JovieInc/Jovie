@@ -1565,9 +1565,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
         work_activities = ["tests", "review"]
     else:
-        new_implementation_allowed = (
-            capacity_fresh and queue_shape_valid and repository_capacity_available
-        )
+        # Capacity evidence governs mutation seats, not Linear-child intake.
+        # Missing useful-turn proofs must not freeze Eve's v2 projection.
+        # Queue backpressure (ready >= budget) still holds new leases.
+        new_implementation_allowed = queue_shape_valid and repository_capacity_available
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [
