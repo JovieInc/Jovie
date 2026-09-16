@@ -40,4 +40,18 @@ describe('HudFullscreenControl', () => {
 
     expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
   });
+
+  it('returns from isolated fullscreen on Escape', () => {
+    render(<HudFullscreenControl action='exit' />);
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+
+    expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
+  });
+
+  it('closes packaged Mac HUD back to canonical /hud', () => {
+    render(<HudFullscreenControl action='close' />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
+  });
 });

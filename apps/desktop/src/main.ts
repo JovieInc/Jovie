@@ -123,7 +123,11 @@ import {
   type TrayAction,
   type TrayStatePayload,
 } from './tray';
-import type { WindowState } from './window-state';
+import {
+  persistNativeFullscreen,
+  shouldRestoreNativeFullscreen,
+  type WindowState,
+} from './window-state';
 import {
   createWindowStateStore,
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
@@ -738,12 +742,17 @@ function saveWindowState(win: BrowserWindow): void {
   // pre-fullscreen bounds so those transient states are never persisted.
   if (win.isMinimized()) return;
   const bounds = win.getNormalBounds();
-  windowStateStore.scheduleSave({
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-  });
+  windowStateStore.scheduleSave(
+    persistNativeFullscreen(
+      {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+      },
+      win.isFullScreen()
+    )
+  );
 }
 
 function showWindowNow(win: BrowserWindow): void {
@@ -1986,6 +1995,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       return;
     }
     showWindow(win);
+    if (shouldRestoreNativeFullscreen(windowState) && !win.isDestroyed()) {
+      win.setFullScreen(true);
+    }
   });
 
   mainWindow = win;
