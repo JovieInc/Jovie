@@ -43,7 +43,7 @@ describe('HudFullscreenControl', () => {
 
   it('returns from isolated fullscreen on Escape', () => {
     render(<HudFullscreenControl action='exit' />);
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
   });
