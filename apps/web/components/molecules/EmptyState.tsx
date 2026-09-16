@@ -267,13 +267,7 @@ export function EmptyState({
       )}
     >
       {icon && (
-        <div
-          className={cn(
-            'mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-subtle bg-surface-1',
-            styles.iconWrapper
-          )}
-          aria-hidden='true'
-        >
+        <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
           {icon}
         </div>
       )}

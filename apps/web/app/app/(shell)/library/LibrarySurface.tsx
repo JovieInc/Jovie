@@ -4,6 +4,7 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   Popover,
   PopoverContent,
@@ -33,6 +34,7 @@ import {
   Music2,
   Pause,
   PlayCircle,
+  Plus,
   RefreshCw,
   Shirt,
   Table2,
@@ -130,6 +132,8 @@ import {
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
 import {
+  LIBRARY_LIFECYCLE_STAGES,
+  LIBRARY_STAGE_LABELS,
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
@@ -756,6 +760,38 @@ function LibraryViewFilterChips({
   );
 }
 
+const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
+
+function LibraryStageTabs({
+  stage,
+  onStage,
+}: {
+  readonly stage: (typeof STAGE_TABS)[number];
+  readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
+}) {
+  return (
+    <div
+      role='tablist'
+      aria-label='Library Stages'
+      data-testid='library-stage-tabs'
+      className='flex shrink-0 flex-nowrap items-center gap-1'
+    >
+      {STAGE_TABS.map(tab => (
+        <PageToolbarTabButton
+          key={tab}
+          id={`library-stage-${tab}-tab`}
+          label={LIBRARY_STAGE_LABELS[tab]}
+          active={stage === tab}
+          role='tab'
+          tabIndex={stage === tab ? 0 : -1}
+          onClick={() => onStage(tab)}
+          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
+        />
+      ))}
+    </div>
+  );
+}
+
 function LibrarySavedViewRow({
   label,
   count,
@@ -794,6 +830,8 @@ function LibrarySavedViewRow({
 
 interface LibraryFilterPanelProps {
   readonly assets: readonly LibraryReleaseAsset[];
+  readonly preset: LibraryPresetId;
+  readonly onPreset: (preset: LibraryPresetId) => void;
   readonly savedView: LibrarySavedViewId;
   readonly onSavedView: (savedView: LibrarySavedViewId) => void;
   readonly filters: LibraryFilters;
@@ -804,6 +842,8 @@ interface LibraryFilterPanelProps {
 
 function LibraryFilterPanel({
   assets,
+  preset,
+  onPreset,
   savedView,
   onSavedView,
   filters,
@@ -857,6 +897,34 @@ function LibraryFilterPanel({
       <legend className='sr-only'>Library Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
+          <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
+            <p className='system-b-library-rail-title'>Kind</p>
+            {preset !== 'all' ? (
+              <Button
+                type='button'
+                variant='tertiary'
+                size='sm'
+                onClick={() => onPreset('all')}
+                className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
+              >
+                Reset
+              </Button>
+            ) : null}
+          </div>
+          <div className='space-y-px' data-testid='library-view-filter-chips'>
+            {PRESETS.map(view => (
+              <LibrarySavedViewRow
+                key={view.id}
+                label={view.label}
+                count={assets.filter(view.predicate).length}
+                active={preset === view.id}
+                onClick={() => onPreset(view.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className='pb-2'>
           <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
           <div className='space-y-px' data-testid='library-saved-filter-views'>
             {LIBRARY_SAVED_VIEWS.map(view => (
@@ -873,7 +941,7 @@ function LibraryFilterPanel({
 
         <div className='flex items-center justify-between gap-2 border-t border-subtle pb-1 pt-2'>
           <p className='system-b-library-rail-title'>Filters</p>
-          {hasActiveFilters(filters) ? (
+          {hasActiveFilters(filters) || preset !== 'all' ? (
             <Button
               type='button'
               variant='tertiary'
@@ -881,7 +949,7 @@ function LibraryFilterPanel({
               onClick={onClearFilters}
               className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
             >
-              Clear Filters ({activeFilterCount})
+              Clear Filters ({activeFilterCount + (preset === 'all' ? 0 : 1)})
             </Button>
           ) : null}
         </div>
@@ -1280,10 +1348,65 @@ function GridDensityToggle({
   );
 }
 
+function LibraryImportMenu({
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
+  youtubeConnected,
+  isImportingYouTube,
+  onImportYouTube,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly youtubeConnected: boolean;
+  readonly isImportingYouTube: boolean;
+  readonly onImportYouTube?: () => void;
+}) {
+  if (!onImportYouTube && !canSyncSpotify) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type='button'
+          size='sm'
+          disabled={isImportingYouTube || isSyncingSpotify}
+        >
+          <Plus className={PAGE_TOOLBAR_ICON_CLASS} aria-hidden='true' />
+          {isImportingYouTube ? 'Importing…' : 'Add'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align='end'
+        side='bottom'
+        sideOffset={6}
+        aria-label='Add Or Import'
+        className={TOOLBAR_MENU_CONTENT_CLASS}
+      >
+        {onImportYouTube ? (
+          <DropdownMenuItem onSelect={() => onImportYouTube()}>
+            {youtubeConnected ? 'Import YouTube' : 'Connect YouTube'}
+          </DropdownMenuItem>
+        ) : null}
+        {canSyncSpotify ? (
+          <DropdownMenuItem
+            onSelect={() => onSyncSpotify()}
+            disabled={isSyncingSpotify}
+          >
+            {isSyncingSpotify ? 'Syncing…' : 'Sync from Spotify'}
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function LibraryToolbar({
   assets,
   preset,
   onPreset,
+  stage,
+  onStage,
   sort,
   onSort,
   view,
@@ -1301,10 +1424,15 @@ function LibraryToolbar({
   canSyncSpotify,
   isSyncingSpotify,
   onSyncSpotify,
+  youtubeConnected,
+  isImportingYouTube,
+  onImportYouTube,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
   readonly onPreset: (preset: LibraryPresetId) => void;
+  readonly stage: (typeof STAGE_TABS)[number];
+  readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
   readonly sort: LibrarySortKey;
   readonly onSort: (sort: LibrarySortKey) => void;
   readonly view: LibraryViewMode;
@@ -1322,11 +1450,15 @@ function LibraryToolbar({
   readonly canSyncSpotify: boolean;
   readonly isSyncingSpotify: boolean;
   readonly onSyncSpotify: () => void;
+  readonly youtubeConnected: boolean;
+  readonly isImportingYouTube: boolean;
+  readonly onImportYouTube?: () => void;
 }) {
   return (
     <PageToolbar
       start={
         <div className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2'>
+          <LibraryStageTabs stage={stage} onStage={onStage} />
           <div className='group/toolbar-filters flex min-w-0 shrink-0 items-center gap-1'>
             <LibraryFiltersControl
               activeFilterCount={activeFilterCount}
@@ -1354,6 +1486,14 @@ function LibraryToolbar({
       }
       end={
         <>
+          <LibraryImportMenu
+            canSyncSpotify={canSyncSpotify}
+            isSyncingSpotify={isSyncingSpotify}
+            onSyncSpotify={onSyncSpotify}
+            youtubeConnected={youtubeConnected}
+            isImportingYouTube={isImportingYouTube}
+            onImportYouTube={onImportYouTube}
+          />
           <SortDropdown sort={sort} onSort={onSort} />
           {view === 'grid' ? (
             <GridDensityToggle
@@ -1777,7 +1917,6 @@ function EmptyCatalog({
         description='Releases, merch, images, videos, and audio will appear here as they land.'
         presentation='workspace'
         testId='library-workspace-empty-state'
-        className='min-h-90'
         actionSlot={
           <LibraryFirstAction
             canSyncSpotify={canSyncSpotify}
@@ -2429,6 +2568,9 @@ export function LibrarySurface({
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  youtubeConnected = false,
+  isImportingYouTube = false,
+  onImportYouTube,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
@@ -2437,6 +2579,9 @@ export function LibrarySurface({
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
+  readonly onImportYouTube?: () => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2713,6 +2858,22 @@ export function LibrarySurface({
     [router, searchParams]
   );
 
+  const handleStageChange = useCallback(
+    (next: (typeof STAGE_TABS)[number]) => {
+      setStage(next);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('section');
+      if (next === 'all') params.delete('stage');
+      else params.set('stage', next);
+      const query = params.toString();
+      router.replace(
+        query ? `${APP_ROUTES.LIBRARY}?${query}` : APP_ROUTES.LIBRARY,
+        { scroll: false }
+      );
+    },
+    [router, searchParams]
+  );
+
   const handleSavedViewChange = useCallback((next: LibrarySavedViewId) => {
     setSavedView(next);
     persistLibrarySavedView(next);
@@ -2720,6 +2881,7 @@ export function LibrarySurface({
 
   function resetView() {
     handlePresetChange('all');
+    handleStageChange('all');
     handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
@@ -2932,7 +3094,8 @@ export function LibrarySurface({
     filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
-    filters.providers.size;
+    filters.providers.size +
+    (preset === 'all' ? 0 : 1);
 
   const headerSearchAdapter = useMemo(
     () =>
@@ -2982,15 +3145,27 @@ export function LibrarySurface({
     () => (
       <LibraryFilterPanel
         assets={effectiveAssets}
+        preset={preset}
+        onPreset={handlePresetChange}
         savedView={savedView}
         onSavedView={handleSavedViewChange}
         filters={filters}
         onFilters={setFilters}
-        onClearFilters={() => setFilters(emptyFilters())}
+        onClearFilters={() => {
+          handlePresetChange('all');
+          setFilters(emptyFilters());
+        }}
         className='max-h-full flex-1'
       />
     ),
-    [effectiveAssets, filters, handleSavedViewChange, savedView]
+    [
+      effectiveAssets,
+      filters,
+      handlePresetChange,
+      handleSavedViewChange,
+      preset,
+      savedView,
+    ]
   );
 
   // Quick-apply suggestions surfaced next to the filter button (hover/focus
@@ -3175,9 +3350,8 @@ export function LibrarySurface({
       data-testid='library-surface'
       toolbar={
         <LibraryToolbar
-          assets={effectiveAssets}
-          preset={preset}
-          onPreset={handlePresetChange}
+          stage={stage}
+          onStage={handleStageChange}
           sort={sort}
           onSort={setSort}
           view={view}
@@ -3191,10 +3365,16 @@ export function LibrarySurface({
           activeFilterCount={activeFilterCount}
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
+          assets={effectiveAssets}
+          preset={preset}
+          onPreset={handlePresetChange}
           suggestedFilters={suggestedFilters}
           canSyncSpotify={canSyncSpotify}
           isSyncingSpotify={isSyncingSpotify}
           onSyncSpotify={handleSyncSpotify}
+          youtubeConnected={youtubeConnected}
+          isImportingYouTube={isImportingYouTube}
+          onImportYouTube={onImportYouTube}
         />
       }
     >

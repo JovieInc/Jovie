@@ -200,6 +200,9 @@ describe('settings shell normalization', () => {
     const layoutSource = readFileSync(SETTINGS_LAYOUT, 'utf8');
     expect(layoutSource).toContain('<PageShell');
     expect(layoutSource).toContain("data-testid='settings-shell-content'");
+    expect(layoutSource).toContain("maxWidth='form'");
+    expect(layoutSource).toContain("contentPadding='default'");
+    expect(layoutSource).toContain("className='mx-auto w-full space-y-6'");
   });
 
   it('centers every required settings route in the post-sidebar main pane', () => {
