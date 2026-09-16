@@ -111,9 +111,19 @@ def optional_blocked_since(
 
 
 def count(value: object, label: str) -> int:
+    if isinstance(value, list):
+        value = len(value)
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(f"{label} is not a nonnegative integer")
     return value
+
+
+def first_count(*values: object, label: str) -> int:
+    for value in values:
+        if value is None:
+            continue
+        return count(value, label)
+    raise ValueError(f"{label} is not a nonnegative integer")
 
 
 def exact_sha(value: object, label: str) -> str:
@@ -329,11 +339,13 @@ def compose_snapshot(
     closure_status = closure.get("status")
     if closure_status not in {"healthy", "grace", "red"}:
         raise ValueError("closure status is invalid")
-    open_prs = count(closure.get("openPrs"), "open PR count")
-    eligible = count(queue.get("greenReadyPrs"), "eligible clean PR count")
-    queued = count(
-        queue.get("nativeQueueCount", closure.get("nativeQueueCount")),
-        "queued PR count",
+    open_prs = first_count(closure.get("openPrs"), label="open PR count")
+    eligible = first_count(queue.get("greenReadyPrs"), label="eligible clean PR count")
+    queued = first_count(
+        queue.get("nativeQueueCount"),
+        closure.get("nativeQueueCount"),
+        0,
+        label="queued PR count",
     )
     capacity = record(lease.get("capacity"), "lease capacity")
     available = count(capacity.get("available"), "available capacity")
