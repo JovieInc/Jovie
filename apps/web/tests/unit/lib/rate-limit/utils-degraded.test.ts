@@ -6,7 +6,12 @@ vi.mock('@sentry/nextjs', () => ({
 
 import * as Sentry from '@sentry/nextjs';
 import type { RateLimitResult } from '@/lib/rate-limit/types';
-import { allowIfRateLimitBackendDegraded } from '@/lib/rate-limit/utils';
+import {
+  allowIfRateLimitBackendDegraded,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+  withDeniedRateLimitReason,
+} from '@/lib/rate-limit/utils';
 
 function denied(overrides?: Partial<RateLimitResult>): RateLimitResult {
   return {
@@ -56,5 +61,38 @@ describe('allowIfRateLimitBackendDegraded', () => {
     );
     expect(result.success).toBe(true);
     expect(result.unavailable).toBe(true);
+  });
+});
+
+describe('rate-limit denial helpers', () => {
+  it('maps unavailable denials to 503 and exhausted denials to 429', () => {
+    expect(rateLimitDenialStatus(denied({ unavailable: true }))).toBe(503);
+    expect(rateLimitDenialStatus(denied())).toBe(429);
+  });
+
+  it('does not report an outage as quota exhaustion', () => {
+    expect(
+      rateLimitDenialMessage(
+        denied({ unavailable: true }),
+        'Too many requests.',
+        'Temporarily unavailable.'
+      )
+    ).toBe('Temporarily unavailable.');
+    expect(rateLimitDenialMessage(denied(), 'Too many requests.')).toBe(
+      'Too many requests.'
+    );
+  });
+
+  it('preserves unavailable reasons when applying domain copy', () => {
+    const unavailable = denied({
+      unavailable: true,
+      reason: 'Tip Checkout rate limiter is temporarily unavailable',
+    });
+    expect(withDeniedRateLimitReason(unavailable, 'Too many checkouts.')).toBe(
+      unavailable
+    );
+    expect(
+      withDeniedRateLimitReason(denied(), 'Too many checkouts.').reason
+    ).toBe('Too many checkouts.');
   });
 });

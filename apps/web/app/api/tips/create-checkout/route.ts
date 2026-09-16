@@ -12,6 +12,8 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   createRateLimitHeaders,
   getClientIP,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
   tipCheckoutLimiter,
 } from '@/lib/rate-limit';
 import { stripe } from '@/lib/stripe/client';
@@ -47,9 +49,15 @@ export async function POST(req: NextRequest) {
     const rateLimitResult = await tipCheckoutLimiter.limit(ip);
     if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Too many checkout requests. Please try again later.' },
         {
-          status: 429,
+          error: rateLimitDenialMessage(
+            rateLimitResult,
+            'Too many checkout requests. Please try again later.',
+            'Checkout is temporarily unavailable. Please try again later.'
+          ),
+        },
+        {
+          status: rateLimitDenialStatus(rateLimitResult),
           headers: {
             ...NO_STORE_HEADERS,
             ...createRateLimitHeaders(rateLimitResult),
