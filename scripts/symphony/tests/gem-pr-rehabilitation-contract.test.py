@@ -212,6 +212,29 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(calls[1][0][-1], "--submit")
         self.assertIn("summer_bottleneck_producer.py", calls[1][0][1])
 
+    def test_repo_drain_failures_do_not_mask_successful_summer_delivery(self):
+        repos = [
+            SimpleNamespace(github="JovieInc/Jovie"),
+            SimpleNamespace(github="JovieInc/LogYourBody"),
+        ]
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if env.get("GEM_PR_DRAIN_REPO") == "JovieInc/Jovie":
+                return SimpleNamespace(returncode=1)
+            return SimpleNamespace(returncode=0)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
     def test_producer_failure_is_isolated_after_all_repository_cycles(self):
         repos = [
             SimpleNamespace(github="JovieInc/LogYourBody"),

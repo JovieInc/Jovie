@@ -235,10 +235,10 @@ def main() -> int:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
     print(f"Summer Symphony outbox consumer: rc={consumer_returncode}")
-    # Finish all independent paths first, then make delivery failure visible to
-    # the existing service monitor. Its timer owns the next bounded retry.
-    return 0 if (all(returncode == 0 for _, returncode in results)
-                 and summer_returncode == 0 and consumer_returncode == 0) else 1
+    # Repo rehabilitation failures stay printed above. The unit succeeds when
+    # the Jovie Summer snapshot and consumer/execute path succeed so an Eve
+    # terminal is not masked by an independent GateContractError on one repo.
+    return 0 if summer_returncode == 0 and consumer_returncode == 0 else 1
 
 
 if __name__ == "__main__":
