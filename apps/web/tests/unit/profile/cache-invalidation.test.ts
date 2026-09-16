@@ -38,6 +38,9 @@ vi.mock('@/lib/cache/tags', () => ({
   CACHE_TAGS: {
     DASHBOARD_DATA: 'dashboard-data',
     PUBLIC_PROFILE: 'profiles-all',
+    SITEMAP_CATALOG: 'sitemap-catalog',
+    FEATURED_CREATORS: 'featured-creators',
+    ARTISTS_DIRECTORY: 'artists-directory',
   },
   createProfileTag: (username: string) => `profile:${username}`,
   createSocialLinksTag: (profileId: string) => `social-links:${profileId}`,
@@ -60,8 +63,25 @@ describe('Profile Cache Invalidation', () => {
         'max'
       );
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
-      expect(mockRevalidateTag).not.toHaveBeenCalledWith('profiles-all', 'max');
+      expect(mockRevalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
       expect(mockInvalidateProfileEdgeCache).toHaveBeenCalledWith('testartist');
+    });
+
+    it('invalidates directory and featured caches on unpublication', async () => {
+      const { invalidateProfileCache } = await import('@/lib/cache/profile');
+      await invalidateProfileCache('testartist');
+
+      expect(mockRevalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
+      expect(mockRevalidateTag).toHaveBeenCalledWith('sitemap-catalog', 'max');
+      expect(mockRevalidateTag).toHaveBeenCalledWith(
+        'featured-creators',
+        'max'
+      );
+      expect(mockRevalidateTag).toHaveBeenCalledWith(
+        'artists-directory',
+        'max'
+      );
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/artists');
     });
 
     it('also invalidates old path on username change', async () => {
