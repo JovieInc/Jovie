@@ -139,6 +139,9 @@ export function validateRobotsTxtBody(body: string): RobotsHttpGuardResult {
 
 /**
  * Validate a fetched sitemap.xml body.
+ *
+ * lastmod is optional: omit it when the content revision is unknown rather
+ * than stamping request/build time. When present, the date must be parseable.
  */
 export function validateSitemapXmlBody(body: string): SitemapHttpGuardResult {
   const violations: string[] = [];
@@ -158,8 +161,9 @@ export function validateSitemapXmlBody(body: string): SitemapHttpGuardResult {
     if (!/<loc>[^<]+<\/loc>/.test(block)) {
       violations.push(`sitemap.xml url[${index}] is missing <loc>`);
     }
-    if (!/<lastmod>[^<]+<\/lastmod>/.test(block)) {
-      violations.push(`sitemap.xml url[${index}] is missing <lastmod>`);
+    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/)?.[1];
+    if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
+      violations.push(`sitemap.xml url[${index}] has an invalid <lastmod>`);
     }
   }
 
