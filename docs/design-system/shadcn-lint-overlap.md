@@ -58,7 +58,7 @@ canonicalization, rendered certification.
   disabling `shadcn/no-restyle` in config; removing plugin enrollment;
   restyling inside `*.test.*` / `*.stories.*` (those files are exempt because
   they are not production call sites). Grandfathered production files keep
-  their current restyle count; `scripts/shadcn-lint-changed.mjs` fails if a
+  their current restyle count; `apps/web/eslint-rules/__tests__/shadcn-lint-changed.mjs` fails if a
   changed file's count grows.
 
 Ship-time shrink-only ceiling: 239 files / 3264 `shadcn/no-restyle` messages

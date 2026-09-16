@@ -11,9 +11,10 @@ import { ESLint } from 'eslint';
 
 const webRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
+  '..',
   '..'
 );
-const repoRoot = path.resolve(webRoot, '..', '..');
+const repoRoot = path.resolve(webRoot, '..');
 const baseline = JSON.parse(
   readFileSync(
     path.join(
@@ -73,8 +74,8 @@ function changedWebTsx() {
         !file.includes('/tests/') &&
         !file.includes('.test.') &&
         !file.includes('.stories.') &&
-        !file.includes('/__fixtures__/shadcn-lint/invalid/') &&
-        !file.includes('/__fixtures__/shadcn-lint/enrollment/')
+        !file.includes('/__tests__/fixtures/shadcn-lint/invalid/') &&
+        !file.includes('/__tests__/fixtures/shadcn-lint/enrollment/')
     )
     .map(file => path.relative(webRoot, path.join(repoRoot, file)));
 }

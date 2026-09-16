@@ -4,15 +4,15 @@ import { ESLint } from 'eslint';
 
 const webRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
+  '..',
   '..'
 );
 
 export const WEB_ROOT = webRoot;
 export const ESLINT_CONFIG_PATH = path.join(webRoot, 'eslint.config.js');
 export const SHADCN_FIXTURES_DIR = path.join(
-  webRoot,
-  'eslint-rules',
-  '__fixtures__',
+  path.dirname(fileURLToPath(import.meta.url)),
+  'fixtures',
   'shadcn-lint'
 );
 

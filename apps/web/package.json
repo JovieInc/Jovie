@@ -29,7 +29,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "lint:eslint": "eslint --max-warnings=0 --cache --cache-location .cache/eslint --cache-strategy content .",
-    "lint:shadcn-contracts": "vitest run --config=vitest.config.mts eslint-rules/shadcn-no-restyle.test.ts eslint-rules/shadcn-lint-enrollment.test.ts tests/unit/design-system/shadcn-no-restyle-baseline.test.ts && node scripts/shadcn-lint-changed.mjs",
+    "lint:shadcn-contracts": "vitest run --config=vitest.config.mts eslint-rules/__tests__/shadcn-no-restyle.test.ts eslint-rules/__tests__/shadcn-lint-enrollment.test.ts tests/unit/design-system/shadcn-no-restyle-baseline.test.ts && node eslint-rules/__tests__/shadcn-lint-changed.mjs",
     "lint:server-boundaries": "node scripts/run-server-boundary-eslint.mjs",
     "lint:no-native-dialogs": "node scripts/lint-no-native-dialogs.mjs",
     "lint:contrast-ratchet": "node scripts/lint-contrast-ratchet.mjs && tsx scripts/lint-contrast-computed.ts",
