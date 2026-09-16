@@ -19,7 +19,10 @@ async function linearGraphql(query, variables) {
     },
     body: JSON.stringify({ query, variables }),
   });
-  const body = await response.json();
+  // scripts-typecheck (JOV-4327) runs checkJs: response.json() widens to
+  // unknown, so parse the text and validate the GraphQL envelope shape the
+  // same way summer-symphony-outbox-consumer.mjs does for Linear.
+  const body = JSON.parse(await response.text());
   if (!response.ok || body.errors) {
     throw new Error(
       `linear-graphql-failed:${JSON.stringify(body.errors ?? body).slice(0, 200)}`
