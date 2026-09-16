@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/atoms/DesktopTitlebar.test.tsx
+
 import { ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
