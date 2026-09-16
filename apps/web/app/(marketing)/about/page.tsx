@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
-import {
-  ABOUT_FAQ_ITEMS,
-  AboutPageContent,
-} from '@/components/organisms/AboutPageContent';
+import { AboutPageContent } from '@/components/organisms/AboutPageContent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
 import {
   buildBreadcrumbSchema,
   buildFaqSchema,
@@ -13,29 +11,15 @@ import {
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'About — The Release Platform for Independent Musicians',
-  description:
-    // ui-casing-allow: metadata sentence with brand names + acronym
-    'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White. Not affiliated with Jovie childcare.',
-  keywords: [
-    'Jovie',
-    'Jovie music',
-    'Jovie app',
-    'what is Jovie',
-    'Jovie Technology',
-    'Tim White Jovie',
-    'music release platform',
-    'smart links for musicians',
-    'link in bio for artists',
-  ],
+  title: ABOUT_COPY.metadataTitle,
+  description: ABOUT_COPY.metadataDescription,
+  keywords: [...ABOUT_COPY.keywords],
   alternates: {
     canonical: `${BASE_URL}/about`,
   },
   openGraph: {
-    title: `About ${APP_NAME} — The Release Platform for Independent Musicians`,
-    description:
-      // ui-casing-allow: metadata sentence with brand names + acronym
-      'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White.',
+    title: `About ${APP_NAME} — ${ABOUT_COPY.headline.replace(/\.$/, '')}`,
+    description: ABOUT_COPY.openGraphDescription,
     url: `${BASE_URL}/about`,
     type: 'website',
   },
@@ -43,8 +27,7 @@ export const metadata: Metadata = {
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: LEGAL_ENTITY_NAME,
-  description:
-    'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
+  description: ABOUT_COPY.organizationDescription,
 });
 
 const FAQ_SCHEMA = buildFaqSchema([...ABOUT_FAQ_ITEMS]);

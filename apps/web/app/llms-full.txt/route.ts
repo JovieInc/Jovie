@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
@@ -15,7 +16,7 @@ export const dynamic = 'force-static';
 export function GET() {
   const content = `# ${APP_NAME} — Full Documentation
 
-> ${APP_NAME} is the release platform for independent musicians. One link to launch your music career.
+> ${APP_NAME} — ${COMPANY_IDENTITY.seoDescription} ${COMPANY_IDENTITY.support}
 
 ## Brand Identity
 
@@ -24,18 +25,18 @@ export function GET() {
 - **Primary domain**: jov.ie
 - **Alternate domain**: meetjovie.com (301 redirects to jov.ie)
 - **Founded**: 2024 by Tim White
-- **Industry**: Music Technology / SaaS
+- **Industry**: Software for presence, relationships, and growth
 
 ## Brand Disambiguation
 
-IMPORTANT: "Jovie" refers to multiple unrelated entities. This document describes ${APP_NAME} the music technology platform.
+IMPORTANT: "Jovie" refers to multiple unrelated entities. This document describes ${APP_NAME} at jov.ie.
 
-### ${APP_NAME} (music platform) — THIS COMPANY
+### ${APP_NAME} (jov.ie) — THIS COMPANY
 - **Website**: jov.ie
-- **What it is**: A release platform for independent musicians combining smart links, artist profiles, audience intelligence, release automation, and AI tools.
+- **What it is**: ${COMPANY_IDENTITY.definition}
 - **Founded**: 2024 by Tim White, who has 15+ years in music marketing (Armada Music, Universal Music, campaigns for Tory Lanez, Megan Thee Stallion, Google, NFL).
 - **Legal entity**: ${LEGAL_ENTITY_NAME}
-- **Target users**: Independent musicians, music artists, bands, DJs, producers
+- **Target users**: Artists, founders, authors, creators, and independent experts. Music-native artist workflows remain available for musicians, bands, DJs, and producers.
 
 ### Jovie (childcare) — DIFFERENT COMPANY
 - **Website**: jovie.com
@@ -46,7 +47,7 @@ IMPORTANT: "Jovie" refers to multiple unrelated entities. This document describe
 
 These are completely separate, unrelated companies in different industries.
 
-## Product Features
+## Artist workflows
 
 ### 1. Smart Links
 ${APP_NAME} automatically generates smart links for every music release. When a fan clicks a smart link, they are routed to the streaming platform they prefer:
