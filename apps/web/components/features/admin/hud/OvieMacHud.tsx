@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/features/admin/hud/OvieMacHud.test.tsx
 import { Button } from '@jovie/ui';
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -17,6 +18,7 @@ import {
   ycBarLabel,
 } from '@/lib/hud/ovie-mac-hud';
 import { getDefaultStatusTone } from '@/lib/hud/tone-determination';
+import { HudFullscreenControl } from './HudFullscreenControl';
 
 function formatUsd(value: number | null): string {
   if (value == null) return '\u2014';
@@ -147,6 +149,7 @@ export function OvieMacHud({
         <header className='flex min-h-10 items-center justify-between gap-3'>
           <h1 className='text-lg font-semibold tracking-tight'>Ovie</h1>
           <div className='flex min-w-0 items-center gap-2'>
+            <HudFullscreenControl action='close' />
             <Button
               asChild
               variant='secondary'
