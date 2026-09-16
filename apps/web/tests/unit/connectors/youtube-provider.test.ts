@@ -111,6 +111,56 @@ describe('YouTube Library provider', () => {
     ).toHaveLength(2);
   });
 
+  it('returns one uploads page with a resume token', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/channels')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'channel-1',
+              snippet: { title: 'Artist channel' },
+              contentDetails: { relatedPlaylists: { uploads: 'uploads-1' } },
+            },
+          ],
+        });
+      }
+      if (url.pathname.endsWith('/playlistItems')) {
+        expect(url.searchParams.has('pageToken')).toBe(false);
+        return jsonResponse({
+          items: [{ contentDetails: { videoId: 'video-1' } }],
+          nextPageToken: 'page-2',
+        });
+      }
+      return jsonResponse({
+        items: [
+          {
+            id: 'video-1',
+            snippet: {
+              channelId: 'channel-1',
+              title: 'Video 1',
+              publishedAt: '2026-08-01T00:00:00.000Z',
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
+          },
+        ],
+      });
+    });
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      fetcher,
+    });
+    const page = await provider.listChannelVideosPage?.('channel-1');
+    expect(page).toMatchObject({
+      channelId: 'channel-1',
+      channelTitle: 'Artist channel',
+      nextPageToken: 'page-2',
+    });
+    expect(page?.videos).toHaveLength(1);
+  });
+
   it('fails closed when the authorized account does not own the channel', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({
