@@ -909,7 +909,6 @@ function LibraryFilterPanel({
                 variant='tertiary'
                 size='sm'
                 onClick={() => onPreset('all')}
-                className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
               >
                 Reset
               </Button>
