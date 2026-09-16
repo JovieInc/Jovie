@@ -1,4 +1,4 @@
-// @coverage-via apps/web/tests/unit/app/hud-page.test.ts
+// @coverage-via apps/web/components/features/admin/hud/OvieMacHud.test.tsx
 import { Button } from '@jovie/ui';
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
