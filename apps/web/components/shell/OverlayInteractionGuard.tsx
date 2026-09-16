@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/components/shell/OverlayInteractionGuard.test.tsx
-
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { restoreLeakedOverlayLocks } from '@/lib/a11y/overlay-interaction-lock';
