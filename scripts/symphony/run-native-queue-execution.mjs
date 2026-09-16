@@ -2,6 +2,8 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  assertAutonomousClaim,
+  AUTONOMOUS_LINEAR_WORKER,
   executeNativeQueueStarvation,
   selectGreenReadyPrs,
 } from './native-queue-starvation-execute.mjs';
@@ -35,6 +37,25 @@ async function linearGraphql(query, variables) {
   return body.data;
 }
 
+async function lookupAutonomousWorkerId() {
+  const wanted =
+    process.env.SUMMER_LINEAR_WORKER_NAME?.trim() || AUTONOMOUS_LINEAR_WORKER;
+  const looked = await linearGraphql(
+    `query($name: String!) {
+      users(first: 10, filter: { name: { eq: $name } }) {
+        nodes { id name }
+      }
+    }`,
+    { name: wanted }
+  );
+  const nodes = looked.users?.nodes;
+  const worker = Array.isArray(nodes)
+    ? nodes.find(node => node?.name === wanted && typeof node.id === 'string')
+    : null;
+  if (!worker?.id) throw new Error('linear-worker-missing');
+  return worker.id;
+}
+
 async function claimIssue({ identifier, state }) {
   const looked = await linearGraphql(
     `query($id: String!) { issue(id: $id) { id identifier state { name } } }`,
@@ -42,23 +63,24 @@ async function claimIssue({ identifier, state }) {
   );
   const issue = looked.issue;
   if (!issue?.id) throw new Error('linear-issue-missing');
+  const assigneeId = await lookupAutonomousWorkerId();
   const updated = await linearGraphql(
-    `mutation($id: String!, $stateId: String!) {
-      issueUpdate(id: $id, input: { stateId: $stateId }) {
+    `mutation($id: String!, $stateId: String!, $assigneeId: String!) {
+      issueUpdate(id: $id, input: { stateId: $stateId, assigneeId: $assigneeId }) {
         success
         issue { identifier state { name } assignee { name } }
       }
     }`,
-    { id: issue.id, stateId: IN_PROGRESS }
+    { id: issue.id, stateId: IN_PROGRESS, assigneeId }
   );
   const next = updated.issueUpdate?.issue;
   if (updated.issueUpdate?.success !== true || next?.state?.name !== state) {
     throw new Error('linear-claim-rejected');
   }
-  return {
+  return assertAutonomousClaim({
     state: next.state.name,
-    assignee: next.assignee?.name ?? 'symphony-worker',
-  };
+    assignee: next.assignee?.name ?? null,
+  });
 }
 
 async function writeExecution(record) {

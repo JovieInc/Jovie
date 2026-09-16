@@ -1448,6 +1448,9 @@ export async function runCycle({
     taskKey: task.taskKey,
     issueIdentifier: state.active.outcome.result.issueIdentifier,
     acknowledgement: acknowledgement.status,
+    action: task.action,
+    sourceVersion: task.source.sourceVersion,
+    snapshotDigest: task.source.snapshotDigest,
   };
 }
 

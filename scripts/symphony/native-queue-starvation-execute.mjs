@@ -13,6 +13,16 @@ export const MUTATION_AUTHORITY_UNAVAILABLE =
   'native-queue-mutation-authority-unavailable';
 export const NO_GREEN_READY_PR = 'native-queue-no-green-ready-pr';
 export const ENROLL_EXACT_HEAD = 'native-queue-enroll-exact-head';
+export const AUTONOMOUS_LINEAR_WORKER = 'Codex';
+
+export function assertAutonomousClaim(claim) {
+  const state = claim?.state;
+  const assignee = claim?.assignee;
+  if (state !== 'In Progress' || assignee !== AUTONOMOUS_LINEAR_WORKER) {
+    throw new Error('linear-claim-not-autonomous');
+  }
+  return { state, assignee };
+}
 
 export function selectGreenReadyPrs(fleet) {
   const actions = fleet?.signals?.closureHealth?.lifecycleActions;

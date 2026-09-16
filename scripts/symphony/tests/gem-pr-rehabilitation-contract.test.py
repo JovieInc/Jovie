@@ -332,6 +332,122 @@ class DeploymentContractTests(unittest.TestCase):
                 for key, item in expected.items():
                     self.assertEqual(value[key], item)
 
+    def test_native_queue_execution_binds_consumer_projection_and_skips_other_receipts(self):
+        fleet = pathlib.Path("/tmp/gem-workspace/state/gem-priority-gate/latest.json")
+        task_key = "a" * 64
+        source = "b" * 40
+        digest = "c" * 64
+        stdout = json.dumps({
+            "schema": "jovie.summer-symphony-consumer-cycle/v1",
+            "status": "projection-recorded",
+            "taskKey": task_key,
+            "issueIdentifier": "JOV-6329",
+            "acknowledgement": "recorded",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": source,
+            "snapshotDigest": digest,
+        })
+        argv = CYCLE.native_queue_execution_argv(stdout, fleet)
+        self.assertEqual(argv[0], "node")
+        self.assertTrue(argv[1].endswith("run-native-queue-execution.mjs"))
+        self.assertEqual(argv[2:], [task_key, "JOV-6329", source, digest, str(fleet)])
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({"status": "healthy-noop"}), fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-6329",
+                "action": "remediate-selected-ci-audit-class",
+                "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+        self.assertIsNone(CYCLE.native_queue_execution_argv("not-json", fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv("[]", fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-0",
+                "action": "reconcile-native-queue-starvation",
+                "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+
+    def test_consumer_success_runs_native_queue_execute_and_surfaces_its_failure(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if args[0] == "node" and str(args[1]).endswith("summer-symphony-outbox-consumer.mjs"):
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "status": "projection-recorded",
+                        "taskKey": "a" * 64,
+                        "issueIdentifier": "JOV-6401",
+                        "action": "reconcile-native-queue-starvation",
+                        "sourceVersion": "b" * 40,
+                        "snapshotDigest": "c" * 64,
+                    }),
+                    stderr="",
+                )
+            return SimpleNamespace(returncode=1, stdout="", stderr="execution-write-rejected")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), mock.patch.dict(
+            CYCLE.os.environ, {"GEM_WORKSPACE": "/tmp/gem-workspace"}, clear=False
+        ), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 1)
+
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+        self.assertTrue(str(calls[1][1]).endswith("run-native-queue-execution.mjs"))
+        self.assertEqual(calls[1][2], "a" * 64)
+        self.assertEqual(calls[1][3], "JOV-6401")
+        stages = [json.loads(line)["stage"] for line in output.getvalue().splitlines() if line.strip()]
+        self.assertEqual(stages, ["outbox-consumption", "native-queue-execution"])
+
+    def test_consumer_failure_does_not_spawn_execute(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=78, stdout="", stderr="SUMMER_SYMPHONY_CONSUMER_REJECTED")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 78)
+        self.assertEqual(len(calls), 1)
+
+    def test_execute_spawn_failure_is_typed(self):
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6402",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=OSError("exec format error")), mock.patch.dict(
+            CYCLE.os.environ, {"GEM_WORKSPACE": "/tmp/gem-workspace"}, clear=False
+        ):
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+
+    def test_consumer_healthy_noop_does_not_spawn_execute(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout='{"status":"healthy-noop"}', stderr="")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+
     def test_gate_failure_stops_publication_and_consumer_reports_its_own_result(self):
         with mock.patch.object(CYCLE.subprocess, "run", return_value=SimpleNamespace(
                 returncode=1, stderr="ValueError: invalid receipt")) as run, contextlib.redirect_stdout(io.StringIO()) as output:

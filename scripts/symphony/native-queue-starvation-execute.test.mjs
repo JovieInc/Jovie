@@ -3,6 +3,8 @@ import { generateKeyPairSync } from 'node:crypto';
 import { describe, it } from 'node:test';
 
 import {
+  assertAutonomousClaim,
+  AUTONOMOUS_LINEAR_WORKER,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
@@ -30,6 +32,28 @@ const SOURCE = {
   sourceVersion: '7'.repeat(40),
   snapshotDigest: 'c'.repeat(64),
 };
+
+describe('assertAutonomousClaim', () => {
+  it('rejects founder-named or unassigned In Progress claims', () => {
+    assert.equal(AUTONOMOUS_LINEAR_WORKER, 'Codex');
+    assert.deepEqual(
+      assertAutonomousClaim({ state: 'In Progress', assignee: 'Codex' }),
+      { state: 'In Progress', assignee: 'Codex' }
+    );
+    assert.throws(
+      () => assertAutonomousClaim({ state: 'In Progress', assignee: 'Tim White' }),
+      /linear-claim-not-autonomous/
+    );
+    assert.throws(
+      () => assertAutonomousClaim({ state: 'In Progress', assignee: 'symphony-worker' }),
+      /linear-claim-not-autonomous/
+    );
+    assert.throws(
+      () => assertAutonomousClaim({ state: 'Todo', assignee: 'Codex' }),
+      /linear-claim-not-autonomous/
+    );
+  });
+});
 
 describe('selectGreenReadyPrs', () => {
   it('binds promote lifecycle actions instead of inventing PR numbers from a count', () => {

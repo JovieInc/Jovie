@@ -16,6 +16,10 @@ from gem_repo_registry import pr_drain_repos
 import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
+TASK_KEY = re.compile(r"^[a-f0-9]{64}$")
+SOURCE_SHA = re.compile(r"^[a-f0-9]{40}$")
+ISSUE_ID = re.compile(r"^JOV-[1-9][0-9]*$")
+NATIVE_QUEUE_ACTION = "reconcile-native-queue-starvation"
 
 
 def report_delivery(stage: str, result) -> None:
@@ -109,8 +113,68 @@ def run_summer_bottleneck_producer() -> int:
     return producer.returncode
 
 
+def native_queue_execution_argv(stdout: str, fleet_path: Path) -> list[str] | None:
+    """Bind one consumer projection to the execute CLI, or skip."""
+    try:
+        value = json.loads(stdout)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    if value.get("status") != "projection-recorded":
+        return None
+    if value.get("action") != NATIVE_QUEUE_ACTION:
+        return None
+    task_key = value.get("taskKey")
+    issue = value.get("issueIdentifier")
+    source_version = value.get("sourceVersion")
+    snapshot_digest = value.get("snapshotDigest")
+    if not (
+        isinstance(task_key, str)
+        and TASK_KEY.fullmatch(task_key)
+        and isinstance(issue, str)
+        and ISSUE_ID.fullmatch(issue)
+        and isinstance(source_version, str)
+        and SOURCE_SHA.fullmatch(source_version)
+        and isinstance(snapshot_digest, str)
+        and TASK_KEY.fullmatch(snapshot_digest)
+    ):
+        return None
+    return [
+        "node",
+        str(Path(__file__).with_name("run-native-queue-execution.mjs")),
+        task_key,
+        issue,
+        source_version,
+        snapshot_digest,
+        str(fleet_path),
+    ]
+
+
+def run_native_queue_starvation_execute(stdout: str) -> int:
+    """Record the signed terminal for the just-projected native-queue child."""
+    workspace = Path(
+        os.environ.get("GEM_WORKSPACE", Path(__file__).resolve().parents[1])
+    )
+    fleet_path = workspace / "state/gem-priority-gate/latest.json"
+    argv = native_queue_execution_argv(stdout, fleet_path)
+    if argv is None:
+        return 0
+    try:
+        executed = subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 1
+    report_delivery("native-queue-execution", executed)
+    return executed.returncode
+
+
 def run_summer_symphony_consumer() -> int:
-    """Consume at most one verified Summer task on the existing timer cadence."""
+    """Consume at most one verified Summer task, then execute native-queue."""
     consumer = subprocess.run(
         [
             "node",
@@ -121,7 +185,9 @@ def run_summer_symphony_consumer() -> int:
         check=False,
     )
     report_delivery("outbox-consumption", consumer)
-    return consumer.returncode
+    if consumer.returncode != 0:
+        return consumer.returncode
+    return run_native_queue_starvation_execute(consumer.stdout or "")
 
 
 def main() -> int:
