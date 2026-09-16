@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { isReservedPublicProfileIdentity } from './public-profile-identity-policy';
 import {
+  filterPublicDiscoveryIdentities,
+  getPublicProfileDiscoveryExclusionReason,
   getPublicProfileIndexingExclusionReason,
   getPublicProfileRobots,
+  isPublicProfileDiscoveryEligible,
   isPublicProfileIndexable,
   PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE,
 } from './public-profile-indexing-policy';
@@ -99,13 +102,16 @@ describe('public profile indexing policy', () => {
   it.each([
     ['tmoc0g1x9dwmk71', 'gp moc+clerk test'],
     ['tmoc209131l1r6w', 'GP MOC+CLERK TEST'],
-  ])('excludes by Clerk-test display name even without the handle shape: %s', (handle, displayName) => {
-    expect(isPublicProfileIndexable(handle, displayName)).toBe(false);
-    expect(getPublicProfileRobots(handle, displayName)).toMatchObject({
-      index: false,
-      follow: false,
-    });
-  });
+  ])(
+    'excludes by Clerk-test display name even without the handle shape: %s',
+    (handle, displayName) => {
+      expect(isPublicProfileIndexable(handle, displayName)).toBe(false);
+      expect(getPublicProfileRobots(handle, displayName)).toMatchObject({
+        index: false,
+        follow: false,
+      });
+    }
+  );
 
   it('keeps legitimate creators indexable alongside the display-name check', () => {
     expect(isPublicProfileIndexable('tim', 'Tim White')).toBe(true);
@@ -125,5 +131,125 @@ describe('public profile indexing policy', () => {
     expect(isPublicProfileIndexable('tim', 'gp mock +clerk testing')).toBe(
       true
     );
+  });
+});
+
+describe('public profile discovery eligibility (JOV-6260)', () => {
+  const realisticTestAccount = {
+    handle: 'jordanmiles',
+    displayName: 'Jordan Miles',
+    isPublic: true,
+    ownerEmail: 'e2e+jordan@example.com',
+  } as const;
+
+  const privateProfile = {
+    handle: 'privateband',
+    displayName: 'Private Band',
+    isPublic: false,
+    ownerEmail: 'hello@privateband.com',
+  } as const;
+
+  const unpublishedProfile = {
+    handle: 'newrelease',
+    displayName: 'New Release',
+    isPublic: false,
+    ownerEmail: 'manager@newrelease.studio',
+  } as const;
+
+  const eligibleArtist = {
+    handle: 'tim',
+    displayName: 'Tim White',
+    isPublic: true,
+    ownerEmail: 'tim@timwhite.audio',
+  } as const;
+
+  const eligibleNonArtist = {
+    handle: 'truecrimedaily',
+    displayName: 'True Crime Daily',
+    isPublic: true,
+    ownerEmail: 'studio@truecrimedaily.com',
+  } as const;
+
+  it('excludes a test account with realistic fields by owner email, not handle prefix', () => {
+    expect(getPublicProfileIndexingExclusionReason('jordanmiles')).toBeNull();
+    expect(isPublicProfileIndexable('jordanmiles', 'Jordan Miles')).toBe(true);
+    expect(getPublicProfileDiscoveryExclusionReason(realisticTestAccount)).toBe(
+      'test_account_email'
+    );
+    expect(isPublicProfileDiscoveryEligible(realisticTestAccount)).toBe(false);
+  });
+
+  it('excludes private and newly unpublished profiles even with realistic fields', () => {
+    expect(isPublicProfileDiscoveryEligible(privateProfile)).toBe(false);
+    expect(getPublicProfileDiscoveryExclusionReason(privateProfile)).toBe(
+      'private_or_unpublished'
+    );
+    expect(isPublicProfileDiscoveryEligible(unpublishedProfile)).toBe(false);
+  });
+
+  it('keeps eligible real artists and eligible real non-artists discoverable', () => {
+    expect(isPublicProfileDiscoveryEligible(eligibleArtist)).toBe(true);
+    expect(
+      isPublicProfileDiscoveryEligible(eligibleNonArtist, {
+        requirePublication: true,
+      })
+    ).toBe(true);
+  });
+
+  it('fails closed when listing requires publication and the source omitted it', () => {
+    expect(
+      isPublicProfileDiscoveryEligible(
+        { handle: 'tim', displayName: 'Tim White' },
+        { requirePublication: true }
+      )
+    ).toBe(false);
+    expect(
+      getPublicProfileDiscoveryExclusionReason(null, {
+        requirePublication: true,
+      })
+    ).toBe('unknown_identity');
+  });
+
+  it('does not treat a similarly named real creator email as a test account', () => {
+    expect(
+      isPublicProfileDiscoveryEligible({
+        handle: 'e2estudio',
+        displayName: 'E2E Studio',
+        isPublic: true,
+        ownerEmail: 'booking@e2estudio.com',
+      })
+    ).toBe(true);
+  });
+
+  it('filters listing catalogs with one shared predicate', () => {
+    const catalog = filterPublicDiscoveryIdentities([
+      realisticTestAccount,
+      privateProfile,
+      unpublishedProfile,
+      eligibleArtist,
+      eligibleNonArtist,
+      {
+        handle: 'tmoc0g1x9dwmk71',
+        displayName: 'Jordan Miles',
+        isPublic: true,
+        ownerEmail: 'jordan@miles.audio',
+      },
+      {
+        handle: 'cleanhandle',
+        displayName: 'gp moc+clerk test',
+        isPublic: true,
+        ownerEmail: 'jordan@miles.audio',
+      },
+    ]);
+
+    expect(catalog.map(identity => identity.handle)).toEqual([
+      'tim',
+      'truecrimedaily',
+    ]);
+  });
+
+  it('returns no identities when the eligibility source is unavailable', () => {
+    expect(filterPublicDiscoveryIdentities(undefined)).toEqual([]);
+    expect(filterPublicDiscoveryIdentities(null)).toEqual([]);
   });
 });

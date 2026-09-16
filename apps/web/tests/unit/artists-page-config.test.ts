@@ -24,9 +24,17 @@ describe('/artists route segment config', () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const pagePath = resolve(__dirname, '../../app/artists/page.tsx');
+    const catalogPath = resolve(
+      __dirname,
+      '../../lib/profile/public-discovery-catalog.ts'
+    );
     const pageSource = readFileSync(pagePath, 'utf8');
+    const catalogSource = readFileSync(catalogPath, 'utf8');
 
-    expect(pageSource).toContain('eq(creatorProfiles.isPublic, true)');
-    expect(pageSource).toContain('eq(creatorProfiles.isClaimed, true)');
+    expect(pageSource).toContain('loadArtistsDirectoryProfiles');
+    expect(catalogSource).toContain('eq(creatorProfiles.isPublic, true)');
+    expect(catalogSource).toContain('eq(creatorProfiles.isClaimed, true)');
+    expect(catalogSource).toContain('filterPublicDiscoveryIdentities');
+    expect(catalogSource).toContain('CACHE_TAGS.ARTISTS_DIRECTORY');
   });
 });

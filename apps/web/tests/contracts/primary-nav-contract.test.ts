@@ -52,7 +52,7 @@ function routeFileExistsFor(href: string) {
 describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
     expect(MARKETING_NAV_LINKS.map(link => link.label)).toEqual([
-      'Customers',
+      'Artists',
       'Product',
       'Pricing',
     ]);

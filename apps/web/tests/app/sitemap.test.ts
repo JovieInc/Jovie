@@ -31,9 +31,19 @@ const queryMock = vi.fn();
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
 const innerJoinMock = vi.fn(() => ({
   innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
   where: whereMock,
 }));
-const fromMock = vi.fn(() => ({ where: whereMock, innerJoin: innerJoinMock }));
+const leftJoinMock = vi.fn(() => ({
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+  where: whereMock,
+}));
+const fromMock = vi.fn(() => ({
+  where: whereMock,
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+}));
 const selectMock = vi.fn(() => ({ from: fromMock }));
 
 vi.mock('@/lib/db', () => ({
@@ -83,6 +93,13 @@ vi.mock('@/lib/db/schema/playlists', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: {
+    id: 'id',
+    email: 'email',
+  },
+}));
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     username: 'username',
@@ -94,6 +111,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     displayName: 'displayName',
     settings: 'settings',
     id: 'id',
+    userId: 'userId',
   },
 }));
 
@@ -481,6 +499,53 @@ describe('sitemap', () => {
     const urls = (await sitemap()).map(entry => entry.url);
 
     expect(urls).toContain('https://jov.ie/tmoc-artist');
+  });
+
+  it('excludes a realistic test account and its URLs without a handle denylist', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'jordanmiles',
+          displayName: 'Jordan Miles',
+          updatedAt: new Date('2026-09-13'),
+          isClaimed: true,
+          settings: {},
+          ownerEmail: 'e2e+jordan@example.com',
+        },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-09-13'),
+          isClaimed: true,
+          settings: {},
+          ownerEmail: 'tim@timwhite.audio',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'jordanmiles',
+          slug: 'realistic-release',
+          updatedAt: new Date('2026-09-13'),
+          artworkUrl: null,
+        },
+        {
+          username: 'tim',
+          slug: 'never-say-a-word',
+          updatedAt: new Date('2026-09-13'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).not.toContain('https://jov.ie/jordanmiles');
+    expect(urls).not.toContain('https://jov.ie/jordanmiles/realistic-release');
+    expect(urls).toContain('https://jov.ie/tim');
+    expect(urls).toContain('https://jov.ie/tim/never-say-a-word');
   });
 
   it('is non-empty (at minimum static marketing pages are included)', async () => {

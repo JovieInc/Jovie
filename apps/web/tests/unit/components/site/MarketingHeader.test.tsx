@@ -70,7 +70,7 @@ describe('MarketingHeader', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.header
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );
@@ -105,7 +105,7 @@ describe('MarketingHeader', () => {
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Artists', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -162,7 +162,7 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );

@@ -11,6 +11,7 @@ import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   discogRecordings,
   discogReleases,
@@ -20,7 +21,7 @@ import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getPublishedEngineeringStories } from '@/lib/engineering-publication';
 import { env } from '@/lib/env-server';
-import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
+import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 
@@ -34,6 +35,7 @@ type SitemapCatalog = {
     isClaimed: boolean | null;
     displayName: string | null;
     settings: unknown;
+    ownerEmail: string | null;
   }>;
   releases: Array<{
     username: string;
@@ -69,8 +71,10 @@ const getSitemapCatalog = unstable_cache(
             isClaimed: creatorProfiles.isClaimed,
             displayName: creatorProfiles.displayName,
             settings: creatorProfiles.settings,
+            ownerEmail: users.email,
           })
           .from(creatorProfiles)
+          .leftJoin(users, eq(users.id, creatorProfiles.userId))
           .where(eq(creatorProfiles.isPublic, true)),
 
         db
@@ -136,18 +140,30 @@ const getSitemapCatalog = unstable_cache(
           ),
       ]);
 
+      const discoverableProfiles = filterPublicDiscoveryIdentities(
+        profiles.map(profile => ({
+          ...profile,
+          handle: profile.username,
+          isPublic: true,
+        }))
+      );
+      const eligibleUsernames = new Set(
+        discoverableProfiles.map(profile =>
+          profile.username.trim().toLowerCase()
+        )
+      );
+
       return {
-        profiles: profiles.filter(
+        profiles: discoverableProfiles.filter(
           profile =>
-            isPublicProfileIndexable(profile.username, profile.displayName) &&
-            (profile.isClaimed === true ||
-              !isUnclaimedStructuredCreditProfile(profile.settings))
+            profile.isClaimed === true ||
+            !isUnclaimedStructuredCreditProfile(profile.settings)
         ),
         releases: releases.filter(release =>
-          isPublicProfileIndexable(release.username)
+          eligibleUsernames.has(release.username.trim().toLowerCase())
         ),
         tracks: tracks.filter(track =>
-          isPublicProfileIndexable(track.username)
+          eligibleUsernames.has(track.username.trim().toLowerCase())
         ),
         playlists,
       };

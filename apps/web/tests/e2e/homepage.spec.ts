@@ -120,9 +120,10 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(
-      header.getByRole('link', { name: 'Customers' })
-    ).toHaveAttribute('href', '/artists');
+    await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'

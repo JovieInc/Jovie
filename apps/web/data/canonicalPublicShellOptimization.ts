@@ -41,10 +41,10 @@ export const CANONICAL_PUBLIC_SHELL_OPTIMIZATION_CONTRACT = {
     'content-variant',
   ],
   hypothesis:
-    'A three-item Customers, Product, and Pricing nav with Log in and waitlist-first Get started converts more marketing visitors into waitlist starts than For/Tools flyouts plus Find yourself.',
+    'A three-item Artists, Product, and Pricing nav with Log in and waitlist-first Get started converts more marketing visitors into waitlist starts than For/Tools flyouts plus Find yourself.',
   primaryMetric: 'waitlist_front_door_viewed / canonical_public_shell_exposed',
   guardrails: [
-    'Keep Customers, Product, and Pricing as the only public center-nav labels.',
+    'Keep Artists, Product, and Pricing as the only public center-nav labels.',
     'Do not restore For/Tools flyouts or Contact in the shared header.',
     'Header primary CTA follows getHomepageFrontDoorCtaContract; do not invent a second CTA.',
     'Do not persist search query text or inferred demographics in analytics properties.',

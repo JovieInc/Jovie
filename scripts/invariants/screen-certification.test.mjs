@@ -145,6 +145,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the public artists directory for changed-surface certification', () => {
+    const source = 'apps/web/app/artists/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artists');
+
+    assert.deepEqual(screen, {
+      id: 'web.artists',
+      platform: 'web',
+      owner: 'marketing-artists',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.artists', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
   it('registers public SmartLink release and track pages', () => {
     assert.equal(
       kindOf('apps/web/app/[username]/[slug]/page.tsx'),
