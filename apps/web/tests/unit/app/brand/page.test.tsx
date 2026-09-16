@@ -92,7 +92,7 @@ describe('app/brand/page', () => {
     expect(ldScript).not.toBeNull();
     expect(ldScript?.textContent).toContain('"@type":"WebPage"');
     expect(ldScript?.textContent).toContain(
-      '"Jovie Brand | The Closed-Loop Operating System for Music Artists"'
+      '"Jovie Brand | Presence, Relationships, And Growth"'
     );
   });
 });
