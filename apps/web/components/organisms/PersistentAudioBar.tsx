@@ -15,6 +15,12 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
+import {
+  readAudioBarDismissed,
+  shouldShowAudioBar,
+  subscribeAudioBarDismissal,
+  writeAudioBarDismissed,
+} from '@/components/shell/audio-bar-dismissal';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
@@ -66,6 +72,7 @@ export function PersistentAudioBar() {
   // Keep its idle slot mounted at zero height; the tray itself only opens on an
   // explicit player shortcut so route content never gains surprise chrome.
   const [idleTrayOpen, setIdleTrayOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(() => readAudioBarDismissed());
   const [waveformOn, setWaveformOn] = useState(true);
   // Cinematic reveal (JOV-3487): the shell bar lands into place from the
   // bottom on first play. Starts un-revealed so the CSS transition has an
@@ -140,6 +147,13 @@ export function PersistentAudioBar() {
     toggleTrack,
   ]);
 
+  const handleDismiss = useCallback(() => {
+    writeAudioBarDismissed(true);
+    stop();
+  }, [stop]);
+
+  useEffect(() => subscribeAudioBarDismissal(setDismissed), []);
+
   const handleCloseLyrics = useCallback(() => {
     router.push(
       resolveLyricsReturnRoute(
@@ -171,7 +185,12 @@ export function PersistentAudioBar() {
 
   const activeTrackId = playbackState.activeTrackId;
   const hasActiveTrack = Boolean(activeTrackId);
-  const compactPlayerVisible = Boolean(activeTrackId) && barCollapsed;
+  const showPlayerBar = shouldShowAudioBar({
+    dismissed,
+    hasActiveTrack,
+    explicitPlay: false,
+  });
+  const compactPlayerVisible = showPlayerBar && barCollapsed;
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -252,7 +271,7 @@ export function PersistentAudioBar() {
   ]);
 
   useEffect(() => {
-    if (!activeTrackId) {
+    if (!showPlayerBar || !activeTrackId) {
       resetAudioChromeSnapshot();
       return;
     }
@@ -262,13 +281,13 @@ export function PersistentAudioBar() {
       compactPlayerVisible,
       fullPlayerVisible: !compactPlayerVisible,
     });
-  }, [activeTrackId, compactPlayerVisible]);
+  }, [activeTrackId, compactPlayerVisible, showPlayerBar]);
 
   useEffect(() => {
     return resetAudioChromeSnapshot;
   }, []);
 
-  if (!activeTrackId) {
+  if (!showPlayerBar || !activeTrackId) {
     const isLibraryRoute = pathname === APP_ROUTES.LIBRARY;
     const idleTray = (testId: string, className?: string) => (
       <section
@@ -455,7 +474,7 @@ export function PersistentAudioBar() {
         {/* Dismiss button — 24px visible, 44px touch target via before pseudo-element */}
         <button
           type='button'
-          onClick={stop}
+          onClick={handleDismiss}
           className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss Player'
         >
@@ -528,7 +547,7 @@ export function PersistentAudioBar() {
                 : undefined
             }
             onCollapse={() => setBarCollapsed(true)}
-            onDismiss={stop}
+            onDismiss={handleDismiss}
             currentTime={playbackState.currentTime}
             duration={playbackState.duration}
             onSeek={seek}
