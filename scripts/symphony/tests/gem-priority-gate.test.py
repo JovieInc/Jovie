@@ -2534,5 +2534,40 @@ class LeaseSignalTests(unittest.TestCase):
         self.assertEqual(observed["reason"], "lease-report-schema-mismatch")
 
 
+class QueueStarvationBlockedSinceTests(unittest.TestCase):
+    def test_starvation_clock_holds_previous_and_clears_when_not_starving(self):
+        first = MODULE.queue_starvation_blocked_since(
+            3, None, "2026-09-16T15:00:00Z"
+        )
+        self.assertEqual(first, "2026-09-16T15:00:00Z")
+        held = MODULE.queue_starvation_blocked_since(
+            4, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+        )
+        self.assertEqual(held, "2026-09-16T15:00:00Z")
+        self.assertIsNone(
+            MODULE.queue_starvation_blocked_since(
+                0, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+            )
+        )
+
+    def test_evaluate_emits_queue_blocked_since_for_clean_starvation(self):
+        now = MODULE.isoformat(MODULE.utc_now())
+        signals = json.loads(json.dumps(GREEN_SIGNALS))
+        signals["queue"]["greenReadyPrs"] = 3
+        signals["queue"]["eligiblePrs"] = 3
+        receipt = MODULE.evaluate(signals, now)
+        self.assertEqual(receipt["signals"]["queue"]["blockedSince"], now)
+        again = json.loads(json.dumps(signals))
+        again["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        held = MODULE.evaluate(again, now)
+        self.assertEqual(
+            held["signals"]["queue"]["blockedSince"], "2026-09-16T14:00:00Z"
+        )
+        cleared = json.loads(json.dumps(GREEN_SIGNALS))
+        cleared["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        healthy = MODULE.evaluate(cleared, now)
+        self.assertNotIn("blockedSince", healthy["signals"]["queue"])
+
+
 if __name__ == "__main__":
     unittest.main()
