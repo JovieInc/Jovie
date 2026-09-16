@@ -15,8 +15,28 @@ import {
   adminImpersonateLimiter,
   createRateLimitHeaders,
   getClientIP,
+  type RateLimitResult,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
+
+function impersonationRateLimitResponse(result: RateLimitResult) {
+  return NextResponse.json(
+    {
+      error: rateLimitDenialMessage(
+        result,
+        'Too many impersonation attempts. Please try again later.',
+        'Impersonation is temporarily unavailable. Please try again later.'
+      ),
+      retryAfter: Math.ceil((result.reset.getTime() - Date.now()) / 1000),
+    },
+    {
+      status: rateLimitDenialStatus(result),
+      headers: createRateLimitHeaders(result),
+    }
+  );
+}
 
 const StartImpersonationSchema = z.object({
   targetClerkId: z.string().min(1, 'Target user ID is required'),
@@ -42,18 +62,7 @@ export async function GET() {
 
   const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        error: 'Too many impersonation attempts. Please try again later.',
-        retryAfter: Math.ceil(
-          (rateLimitResult.reset.getTime() - Date.now()) / 1000
-        ),
-      },
-      {
-        status: 429,
-        headers: createRateLimitHeaders(rateLimitResult),
-      }
-    );
+    return impersonationRateLimitResponse(rateLimitResult);
   }
 
   try {
@@ -120,18 +129,7 @@ export async function POST(request: Request) {
   const rateLimitKey = adminClerkId ?? `ip:${clientIp}`;
   const rateLimitResult = await adminImpersonateLimiter.limit(rateLimitKey);
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        error: 'Too many impersonation attempts. Please try again later.',
-        retryAfter: Math.ceil(
-          (rateLimitResult.reset.getTime() - Date.now()) / 1000
-        ),
-      },
-      {
-        status: 429,
-        headers: createRateLimitHeaders(rateLimitResult),
-      }
-    );
+    return impersonationRateLimitResponse(rateLimitResult);
   }
 
   if (!adminClerkId) {
@@ -221,18 +219,7 @@ export async function DELETE() {
 
   const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        error: 'Too many impersonation attempts. Please try again later.',
-        retryAfter: Math.ceil(
-          (rateLimitResult.reset.getTime() - Date.now()) / 1000
-        ),
-      },
-      {
-        status: 429,
-        headers: createRateLimitHeaders(rateLimitResult),
-      }
-    );
+    return impersonationRateLimitResponse(rateLimitResult);
   }
 
   try {

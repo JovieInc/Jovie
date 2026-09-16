@@ -64,6 +64,39 @@ export function allowIfRateLimitBackendDegraded(
 }
 
 /**
+ * HTTP status for a denied limiter result. Exhaustion is 429; a missing
+ * durable backend on a fail-closed limiter is controlled unavailability.
+ */
+export function rateLimitDenialStatus(result: RateLimitResult): 429 | 503 {
+  return result.unavailable === true ? 503 : 429;
+}
+
+/**
+ * Caller-facing copy for a denied limiter result. Preserve the unavailable
+ * reason so a Redis outage is not reported as quota exhaustion.
+ */
+export function rateLimitDenialMessage(
+  result: RateLimitResult,
+  exhaustedMessage: string,
+  unavailableMessage = 'This action is temporarily unavailable. Please try again later.'
+): string {
+  return result.unavailable === true ? unavailableMessage : exhaustedMessage;
+}
+
+/**
+ * Apply a domain-specific denial reason without masking backend unavailability.
+ */
+export function withDeniedRateLimitReason(
+  result: RateLimitResult,
+  reason: string
+): RateLimitResult {
+  if (result.success || result.unavailable === true) {
+    return result;
+  }
+  return { ...result, reason };
+}
+
+/**
  * Extract client IP address from request headers
  *
  * Tries multiple headers in order of preference to handle various proxy configurations.
