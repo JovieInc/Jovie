@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  assertAutonomousClaim,
   executeNativeQueueStarvation,
   selectGreenReadyPrs,
 } from './native-queue-starvation-execute.mjs';
@@ -44,7 +45,7 @@ async function claimIssue({ identifier, state }) {
   if (!issue?.id) throw new Error('linear-issue-missing');
   const updated = await linearGraphql(
     `mutation($id: String!, $stateId: String!) {
-      issueUpdate(id: $id, input: { stateId: $stateId }) {
+      issueUpdate(id: $id, input: { stateId: $stateId, assigneeId: null }) {
         success
         issue { identifier state { name } assignee { name } }
       }
@@ -55,10 +56,10 @@ async function claimIssue({ identifier, state }) {
   if (updated.issueUpdate?.success !== true || next?.state?.name !== state) {
     throw new Error('linear-claim-rejected');
   }
-  return {
+  return assertAutonomousClaim({
     state: next.state.name,
-    assignee: next.assignee?.name ?? 'symphony-worker',
-  };
+    assignee: next.assignee?.name ?? null,
+  });
 }
 
 async function writeExecution(record) {

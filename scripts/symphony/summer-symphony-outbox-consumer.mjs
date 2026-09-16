@@ -1448,6 +1448,9 @@ export async function runCycle({
     taskKey: task.taskKey,
     issueIdentifier: state.active.outcome.result.issueIdentifier,
     acknowledgement: acknowledgement.status,
+    action: task.action,
+    sourceVersion: task.source.sourceVersion,
+    snapshotDigest: task.source.snapshotDigest,
   };
 }
 
@@ -1513,6 +1516,12 @@ async function linearGraphql(config, query, variables, fetchImpl) {
   return payload.data;
 }
 
+function linearMarkdown(value) {
+  return String(value ?? '')
+    .replace(/\\\[/g, '[')
+    .replace(/\\\]/g, ']');
+}
+
 function validateProjectedIssue(issue, projection) {
   const labels = issue?.labels?.nodes?.map(label => label?.name);
   if (
@@ -1520,7 +1529,7 @@ function validateProjectedIssue(issue, projection) {
     !/^JOV-[1-9][0-9]*$/u.test(issue?.identifier ?? '') ||
     issue.identifier === projection.parentIssue ||
     issue.title !== projection.title ||
-    issue.description !== projection.description ||
+    linearMarkdown(issue.description) !== projection.description ||
     !validTimestamp(issue.createdAt) ||
     issue.parent?.identifier !== projection.parentIssue ||
     issue.team?.key !== projection.team ||

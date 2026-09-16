@@ -619,6 +619,9 @@ describe('bounded discovery and durable WIP=1 hold', () => {
       taskKey,
       issueIdentifier: 'JOV-6001',
       acknowledgement: 'recorded',
+      action: v2Task.action,
+      sourceVersion: v2Task.source.sourceVersion,
+      snapshotDigest: v2Task.source.snapshotDigest,
     });
     assert.ok(posted);
     assert.equal(posted.decisionFingerprint, taskKey);
