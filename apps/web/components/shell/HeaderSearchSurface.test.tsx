@@ -52,6 +52,33 @@ describe('HeaderSearchSurface', () => {
     expect(trigger.className).not.toContain('duration-cinematic');
   });
 
+  it('keeps hover chrome and keyboard focus rings inset so the compact trigger does not clip', () => {
+    render(
+      <HeaderSearchSurface
+        adapter={createAdapter()}
+        isOpen={false}
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Search' });
+    expect(trigger).toHaveClass(
+      'hover:border-default',
+      'hover:bg-surface-1',
+      'hover:text-primary-token',
+      'focus-visible:ring-inset',
+      'focus-ring-themed',
+      'rounded-xl'
+    );
+    expect(trigger.className).not.toContain('overflow-hidden');
+
+    const shortcut = trigger.querySelector('kbd');
+    expect(shortcut).not.toBeNull();
+    expect(shortcut).toHaveTextContent('/');
+    expect(shortcut).toHaveClass('hidden', 'sm:inline', 'text-tertiary-token');
+  });
+
   it('keeps the open search surface on the same compact header height', () => {
     const { container } = render(
       <HeaderSearchSurface

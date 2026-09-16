@@ -249,6 +249,58 @@ describe('UserButton billing actions', () => {
     expect(await screen.findByText('Settings')).toBeVisible();
   });
 
+  it('shows web build diagnostics in the account menu', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
+    expect(diagnostics).toHaveClass(
+      'min-h-8',
+      'text-2xs',
+      'text-tertiary-token',
+      'select-none'
+    );
+    expect(
+      screen.queryByTestId('electron-release-identity')
+    ).not.toBeInTheDocument();
+    expect(diagnostics.closest('[role="menuitem"]')).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows desktop release identity in account-menu diagnostics', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await flushMicrotasks();
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    const desktopIdentity = await screen.findByTestId(
+      'electron-release-identity'
+    );
+    expect(diagnostics).toContainElement(desktopIdentity);
+    expect(desktopIdentity).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+    expect(screen.queryByText(/^Version /u)).not.toBeInTheDocument();
+  });
+
   it('renders the compact trigger avatar on the canonical app frame size', () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
