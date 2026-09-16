@@ -308,6 +308,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'scripts-typecheck',
+      'shadcn-lint-contracts',
       'structural',
       'typecheck',
     ]);
@@ -642,6 +643,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes().map(lane => lane.id)).toEqual([
       'biome',
       'eslint-server-boundaries',
+      'shadcn-lint-contracts',
       'typecheck',
       'scripts-typecheck',
       'guardrails',
@@ -669,6 +671,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance': 'pnpm design:conformance:gate',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
+      'shadcn-lint-contracts':
+        'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
@@ -707,6 +711,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
+    expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
     expect(LANE_COMMANDS['design-conformance']).toBe(
       'pnpm design:conformance:gate'
     );
