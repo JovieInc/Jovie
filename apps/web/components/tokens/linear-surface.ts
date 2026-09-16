@@ -13,7 +13,7 @@
 export const LINEAR_SURFACE = {
   // Tier 1 — content containers inside <main>
   contentContainer:
-    'rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface) shadow-none',
+    'rounded-(--app-shell-radius-nested) border border-(--app-shell-border) bg-(--app-shell-content-surface) shadow-none',
   stickyHeader:
     'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
   toolbar: 'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',

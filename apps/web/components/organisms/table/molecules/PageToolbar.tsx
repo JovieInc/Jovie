@@ -12,7 +12,7 @@ export const PAGE_TOOLBAR_CONTAINER_CLASS =
   'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
-  'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-0.5 -m-0.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const PAGE_TOOLBAR_END_CLASS =
   'ml-auto flex shrink-0 items-center justify-end gap-1';
@@ -24,7 +24,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-tertiary-token tabular-nums';
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
-  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
 
@@ -161,27 +161,36 @@ export function PageToolbarBackLink({
 }
 
 interface PageToolbarTabButtonProps {
+  readonly id?: string;
   readonly label: ReactNode;
   readonly icon?: ReactNode;
   readonly active?: boolean;
   readonly onClick?: () => void;
   readonly className?: string;
   readonly ariaPressed?: boolean;
+  readonly role?: string;
+  readonly tabIndex?: number;
 }
 
 export function PageToolbarTabButton({
+  id,
   label,
   icon,
   active = false,
   onClick,
   className,
   ariaPressed,
+  role,
+  tabIndex,
 }: PageToolbarTabButtonProps) {
   return (
     <Button
+      id={id}
       type='button'
       variant='ghost'
       size='sm'
+      role={role}
+      tabIndex={tabIndex}
       onClick={onClick}
       className={cn(
         PAGE_TOOLBAR_TAB_BUTTON_CLASS,
@@ -189,6 +198,7 @@ export function PageToolbarTabButton({
         className
       )}
       aria-pressed={ariaPressed ?? active}
+      aria-selected={role === 'tab' ? active : undefined}
     >
       {icon}
       <span>{label}</span>

@@ -162,7 +162,6 @@ describe('LibraryPage private document boundary', () => {
       youtubeVideos: [],
       youtubeConnected: false,
       relationships: [],
-      initialArtistRules: [],
     });
     expect(mocks.fetchQuery).toHaveBeenCalled();
     expect(mocks.getLibraryMerchCardsForProfile).toHaveBeenCalled();
@@ -194,6 +193,6 @@ describe('LibraryPage private document boundary', () => {
       profileId
     );
     expect(mocks.listLibraryPostReleaseBundle).toHaveBeenCalledWith(profileId);
-    expect(mocks.listArtistRulesForProfile).toHaveBeenCalledWith(profileId);
+    expect(mocks.listArtistRulesForProfile).not.toHaveBeenCalled();
   });
 });

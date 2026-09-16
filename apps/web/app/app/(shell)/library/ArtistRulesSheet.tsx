@@ -65,9 +65,11 @@ function ruleAction(rule: ArtistRuleView): RuleAction | null {
 export function ArtistRulesSheet({
   creatorProfileId,
   initialRules,
+  defaultOpen = false,
 }: {
   readonly creatorProfileId: string;
   readonly initialRules: readonly ArtistRuleView[];
+  readonly defaultOpen?: boolean;
 }) {
   const router = useRouter();
   const [rules, setRules] = useState(initialRules);
@@ -164,7 +166,7 @@ export function ArtistRulesSheet({
   };
 
   return (
-    <Sheet>
+    <Sheet defaultOpen={defaultOpen}>
       <SheetTrigger asChild>
         <Button
           type='button'
