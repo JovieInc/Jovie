@@ -287,7 +287,7 @@ export function PersistentAudioBar() {
     return resetAudioChromeSnapshot;
   }, []);
 
-  if (!showPlayerBar) {
+  if (!showPlayerBar || !activeTrackId) {
     const isLibraryRoute = pathname === APP_ROUTES.LIBRARY;
     const idleTray = (testId: string, className?: string) => (
       <section
