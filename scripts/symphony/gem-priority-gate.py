@@ -36,6 +36,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
     bounded_stack_health,
     build_product_closure_health,
     empty_stack_health,
+    issue_intake_allowed,
     observe_closure_health,
     project_product_admission,
 )
@@ -190,10 +191,8 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
         and candidate.get("remediationContinues") is True
         and isinstance(candidate.get("reasons"), list)
         and all(isinstance(reason, str) for reason in candidate.get("reasons", []))
-        and (
-            candidate.get("newIssueIntakeAllowed")
-            is (candidate.get("status") == "healthy")
-        )
+        and candidate.get("newIssueIntakeAllowed")
+        is issue_intake_allowed(candidate.get("status"), candidate.get("reasons"))
     )
     if valid:
         result = dict(candidate)
