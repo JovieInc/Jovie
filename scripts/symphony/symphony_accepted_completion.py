@@ -373,6 +373,42 @@ def _rotated_enrollment(context_path: Path, *, attestation_dir: Path,
         return None
 
 
+def _current_enrollment(context_path: Path, *, attestation_dir: Path,
+                        binary: Path, workflow: Path, revision: str,
+                        now: datetime) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    """Restore seats when the runtime is unchanged but observedAt went stale."""
+    try:
+        raw = trust.private_json(context_path)
+        if not isinstance(raw, dict):
+            return None
+        raw_runtime = contract.v2_validate_runtime_identity(raw.get("runtime"))
+        if (raw_runtime is None
+            or raw_runtime["contractSha256"] != trust.digest(Path(contract.__file__))
+            or Path(raw["attestationDir"]).resolve() != attestation_dir.resolve()
+            or raw_runtime["sourceRevision"] != revision
+            or raw_runtime["binarySha256"] != trust.digest(binary)
+            or raw_runtime["workflowSha256"] != trust.digest(workflow)):
+            return None
+        raw_accounts = raw.get("accounts")
+        if not isinstance(raw_accounts, list):
+            return None
+        restored = []
+        seats = set()
+        for row in raw_accounts:
+            normalized = trust.validate_account_row(row, now)
+            if normalized.get("identityType", "codex-account") != "codex-account":
+                continue
+            seat = (normalized["provider"], normalized["profile"])
+            if seat in seats:
+                return None
+            seats.add(seat)
+            restored.append(normalized)
+        return restored, raw
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError,
+            subprocess.SubprocessError):
+        return None
+
+
 def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any]]], *,
                     source_root: Path, binary: Path, workflow: Path, attestation_dir: Path,
                     service_attestation: Path, now: datetime) -> dict[str, Any]:
@@ -409,6 +445,9 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
                 if row.get("identityType", "codex-account") == "codex-account"]
     if prior is None:
         restored = _rotated_enrollment(
+            context_path, attestation_dir=attestation_dir, binary=binary,
+            workflow=workflow, revision=revision, now=now,
+        ) or _current_enrollment(
             context_path, attestation_dir=attestation_dir, binary=binary,
             workflow=workflow, revision=revision, now=now,
         )
