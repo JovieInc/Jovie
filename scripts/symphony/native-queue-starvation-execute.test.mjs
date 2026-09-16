@@ -69,8 +69,7 @@ describe('assertAutonomousTerminal', () => {
       /linear-terminal-not-autonomous/
     );
     assert.throws(
-      () =>
-        assertAutonomousTerminal({ state: 'In Progress', assignee: null }),
+      () => assertAutonomousTerminal({ state: 'In Progress', assignee: null }),
       /linear-terminal-not-autonomous/
     );
   });
