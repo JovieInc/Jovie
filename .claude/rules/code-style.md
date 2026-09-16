@@ -246,10 +246,6 @@ useQuery({
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
 
-`shadcn/no-restyle` (from `@shadcn/lint`, not a `@jovie/*` custom rule) is
-error-enforced on `@jovie/ui` call sites. Use variants/sizes for appearance;
-`className` is for layout/placement. See `docs/design-system/shadcn-lint-overlap.md`.
-
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
 ## File Creation Patterns
