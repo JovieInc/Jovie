@@ -152,6 +152,12 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
+/* JOV-6340: route canvas/composer are never a window-drag region. */
+html[data-desktop-runtime="electron"] [data-app-shell-scroll],
+html[data-desktop-runtime="electron"] [data-testid="chat-composer-surface"] {
+  -webkit-app-region: no-drag;
+}
+
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   h1 {

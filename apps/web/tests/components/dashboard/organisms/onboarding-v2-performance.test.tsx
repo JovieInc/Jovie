@@ -177,6 +177,7 @@ function mockDiscoveryResponse(
 }
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/onboarding/checkout',
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -389,25 +390,28 @@ describe('Onboarding screen performance budgets', () => {
       SCREEN_BUDGETS.lateArrivals,
     ],
     ['profile-ready', 'Your Link Is Live', SCREEN_BUDGETS.profileReady],
-  ] as const)('%s screen renders within budget', async (initialResumeStep, heading, budgetMs) => {
-    const renderTime = await measureRenderTime(
-      () =>
-        render(
-          <OnboardingV2Form
-            initialDisplayName='Perf Budget'
-            initialHandle='perf-budget'
-            initialProfileId='profile-performance'
-            initialResumeStep={initialResumeStep}
-            isHydrated
-            userEmail='perf@example.com'
-            userId='user-performance'
-          />
-        ),
-      heading
-    );
+  ] as const)(
+    '%s screen renders within budget',
+    async (initialResumeStep, heading, budgetMs) => {
+      const renderTime = await measureRenderTime(
+        () =>
+          render(
+            <OnboardingV2Form
+              initialDisplayName='Perf Budget'
+              initialHandle='perf-budget'
+              initialProfileId='profile-performance'
+              initialResumeStep={initialResumeStep}
+              isHydrated
+              userEmail='perf@example.com'
+              userId='user-performance'
+            />
+          ),
+        heading
+      );
 
-    expect(renderTime).toBeLessThan(getBudgetThreshold(budgetMs));
-  });
+      expect(renderTime).toBeLessThan(getBudgetThreshold(budgetMs));
+    }
+  );
 
   it('spotify search results screen stays within budget', async () => {
     mockArtistSearch.results = [
