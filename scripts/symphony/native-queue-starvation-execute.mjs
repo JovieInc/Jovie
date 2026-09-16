@@ -13,15 +13,16 @@ export const MUTATION_AUTHORITY_UNAVAILABLE =
   'native-queue-mutation-authority-unavailable';
 export const NO_GREEN_READY_PR = 'native-queue-no-green-ready-pr';
 export const ENROLL_EXACT_HEAD = 'native-queue-enroll-exact-head';
-export const AUTONOMOUS_LINEAR_WORKER = 'Codex';
+export const AUTONOMOUS_LINEAR_WORKER = 'unassigned-machine';
+export const FOUNDER_LINEAR_ASSIGNEE = 'Tim White';
 
 export function assertAutonomousClaim(claim) {
   const state = claim?.state;
-  const assignee = claim?.assignee;
-  if (state !== 'In Progress' || assignee !== AUTONOMOUS_LINEAR_WORKER) {
+  const assignee = claim?.assignee ?? null;
+  if (state !== 'In Progress' || assignee === FOUNDER_LINEAR_ASSIGNEE) {
     throw new Error('linear-claim-not-autonomous');
   }
-  return { state, assignee };
+  return { state, assignee: assignee || AUTONOMOUS_LINEAR_WORKER };
 }
 
 export function selectGreenReadyPrs(fleet) {

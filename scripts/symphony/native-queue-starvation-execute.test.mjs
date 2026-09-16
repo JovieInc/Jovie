@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import {
   assertAutonomousClaim,
   AUTONOMOUS_LINEAR_WORKER,
+  FOUNDER_LINEAR_ASSIGNEE,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
@@ -34,8 +35,12 @@ const SOURCE = {
 };
 
 describe('assertAutonomousClaim', () => {
-  it('rejects founder-named or unassigned In Progress claims', () => {
-    assert.equal(AUTONOMOUS_LINEAR_WORKER, 'Codex');
+  it('rejects founder-named In Progress claims and accepts a cleared machine claim', () => {
+    assert.equal(FOUNDER_LINEAR_ASSIGNEE, 'Tim White');
+    assert.deepEqual(
+      assertAutonomousClaim({ state: 'In Progress', assignee: null }),
+      { state: 'In Progress', assignee: AUTONOMOUS_LINEAR_WORKER }
+    );
     assert.deepEqual(
       assertAutonomousClaim({ state: 'In Progress', assignee: 'Codex' }),
       { state: 'In Progress', assignee: 'Codex' }
@@ -45,11 +50,7 @@ describe('assertAutonomousClaim', () => {
       /linear-claim-not-autonomous/
     );
     assert.throws(
-      () => assertAutonomousClaim({ state: 'In Progress', assignee: 'symphony-worker' }),
-      /linear-claim-not-autonomous/
-    );
-    assert.throws(
-      () => assertAutonomousClaim({ state: 'Todo', assignee: 'Codex' }),
+      () => assertAutonomousClaim({ state: 'Todo', assignee: null }),
       /linear-claim-not-autonomous/
     );
   });
