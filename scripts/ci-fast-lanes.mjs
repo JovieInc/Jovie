@@ -79,6 +79,12 @@ const LANES = [
     run: runEslintServerBoundaries,
   },
   {
+    id: 'shadcn-lint-contracts',
+    name: 'shadcn lint contracts',
+    nextLocalCommand: 'pnpm --filter=@jovie/web run lint:shadcn-contracts',
+    run: runShadcnLintContracts,
+  },
+  {
     id: 'typecheck',
     name: 'Typecheck',
     nextLocalCommand: 'pnpm run typecheck',
@@ -162,6 +168,7 @@ export const LANE_GROUPS = Object.freeze({
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
+    'shadcn-lint-contracts',
     'scripts-typecheck',
     'guardrails',
     'design-system-source-ratchet',
@@ -417,6 +424,10 @@ function runBiome() {
     }
   }
   return shell('pnpm biome ci --reporter=github .');
+}
+
+function runShadcnLintContracts() {
+  return shell('pnpm --filter=@jovie/web run lint:shadcn-contracts');
 }
 
 function runEslintServerBoundaries() {
