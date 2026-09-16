@@ -22,7 +22,8 @@ export function selectGreenReadyPrs(fleet) {
       if (action?.sourceState !== 'promote') continue;
       const pr = Number.isInteger(action.pr) ? action.pr : null;
       const head =
-        typeof action.headSha === 'string' && /^[a-f0-9]{40}$/u.test(action.headSha)
+        typeof action.headSha === 'string' &&
+        /^[a-f0-9]{40}$/u.test(action.headSha)
           ? action.headSha
           : null;
       if (Number.isInteger(pr) && pr > 0) rows.push({ number: pr, head });
