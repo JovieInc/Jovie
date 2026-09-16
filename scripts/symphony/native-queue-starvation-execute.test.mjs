@@ -8,6 +8,7 @@ import {
   executeNativeQueueStarvation,
   MUTATION_AUTHORITY_UNAVAILABLE,
   NO_GREEN_READY_PR,
+  selectGreenReadyPrs,
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
 } from './native-queue-starvation-execute.mjs';
@@ -29,6 +30,37 @@ const SOURCE = {
   sourceVersion: '7'.repeat(40),
   snapshotDigest: 'c'.repeat(64),
 };
+
+describe('selectGreenReadyPrs', () => {
+  it('binds promote lifecycle actions instead of inventing PR numbers from a count', () => {
+    assert.deepEqual(
+      selectGreenReadyPrs({
+        signals: {
+          queue: { greenReadyPrs: 4 },
+          closureHealth: {
+            lifecycleActions: [
+              {
+                sourceState: 'held',
+                pr: 17001,
+                headSha: 'a'.repeat(40),
+              },
+              {
+                sourceState: 'promote',
+                pr: 17886,
+                headSha: 'e'.repeat(40),
+              },
+            ],
+          },
+        },
+      }),
+      [{ number: 17886, head: 'e'.repeat(40) }]
+    );
+    assert.deepEqual(
+      selectGreenReadyPrs({ signals: { queue: { greenReadyPrs: 4 } } }),
+      []
+    );
+  });
+});
 
 describe('decideNativeQueueExecution', () => {
   it('fail-closes when mutation/push/concurrency authority is missing', () => {

@@ -1,6 +1,10 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { executeNativeQueueStarvation } from './native-queue-starvation-execute.mjs';
+import {
+  executeNativeQueueStarvation,
+  selectGreenReadyPrs,
+} from './native-queue-starvation-execute.mjs';
 
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
 
@@ -87,17 +91,73 @@ function fleetAdmission(path) {
   const fleet = JSON.parse(readFileSync(path, 'utf8'));
   const gem = fleet.concurrency?.gem ?? {};
   const remediation = fleet.remediationAdmission ?? {};
-  const queue = fleet.signals?.queue ?? {};
   return {
     mutationAllowed: gem.newMutationAllowed === true,
     pushAllowed: remediation.pushAllowed === true,
     maxConcurrent: Number(gem.maxConcurrent ?? 0),
-    greenReadyPrs: Array.isArray(queue.greenReady)
-      ? queue.greenReady
-      : Number.isInteger(queue.greenReadyPrs)
-        ? Array.from({ length: queue.greenReadyPrs }, (_, i) => i + 1)
-        : [],
+    greenReadyPrs: selectGreenReadyPrs(fleet),
   };
+}
+
+function ghJson(args) {
+  const result = spawnSync('gh', args, { encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(
+      `gh-failed:${String(result.stderr || result.stdout || '').slice(0, 180)}`
+    );
+  }
+  return JSON.parse(result.stdout);
+}
+
+async function enrollPr({ pr, head }) {
+  const repo = 'JovieInc/Jovie';
+  let viewed;
+  try {
+    viewed = ghJson([
+      'pr',
+      'view',
+      String(pr),
+      '--repo',
+      repo,
+      '--json',
+      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName',
+    ]);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: String(error instanceof Error ? error.message : error).slice(0, 180),
+    };
+  }
+  if (
+    viewed.state !== 'OPEN' ||
+    viewed.isDraft === true ||
+    viewed.baseRefName !== 'main'
+  ) {
+    return { ok: false, reason: `native-queue-pr-not-enrollable:${viewed.state}` };
+  }
+  if (head && viewed.headRefOid !== head) {
+    return { ok: false, reason: 'native-queue-head-drift' };
+  }
+  if (viewed.mergeStateStatus !== 'CLEAN') {
+    return {
+      ok: false,
+      reason: `native-queue-not-clean:${viewed.mergeStateStatus}`,
+    };
+  }
+  const merged = spawnSync(
+    'gh',
+    ['pr', 'merge', String(pr), '--repo', repo, '--squash', '--auto'],
+    { encoding: 'utf8' }
+  );
+  if (merged.status !== 0) {
+    return {
+      ok: false,
+      reason: `native-queue-enroll-failed:${String(
+        merged.stderr || merged.stdout || ''
+      ).slice(0, 180)}`,
+    };
+  }
+  return { ok: true, head: viewed.headRefOid, pr: viewed.number };
 }
 
 const taskKey = process.argv[2];
@@ -127,10 +187,7 @@ const result = await executeNativeQueueStarvation({
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
   ),
   claimIssue,
-  enrollPr: async () => ({
-    ok: false,
-    reason: 'native-queue-enroll-not-attempted-without-authority',
-  }),
+  enrollPr,
   writeExecution,
 });
 process.stdout.write(`${JSON.stringify(result.decision)}\n`);

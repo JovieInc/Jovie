@@ -14,6 +14,25 @@ export const MUTATION_AUTHORITY_UNAVAILABLE =
 export const NO_GREEN_READY_PR = 'native-queue-no-green-ready-pr';
 export const ENROLL_EXACT_HEAD = 'native-queue-enroll-exact-head';
 
+export function selectGreenReadyPrs(fleet) {
+  const actions = fleet?.signals?.closureHealth?.lifecycleActions;
+  if (Array.isArray(actions)) {
+    const rows = [];
+    for (const action of actions) {
+      if (action?.sourceState !== 'promote') continue;
+      const pr = Number.isInteger(action.pr) ? action.pr : null;
+      const head =
+        typeof action.headSha === 'string' && /^[a-f0-9]{40}$/u.test(action.headSha)
+          ? action.headSha
+          : null;
+      if (Number.isInteger(pr) && pr > 0) rows.push({ number: pr, head });
+    }
+    if (rows.length > 0) return rows;
+  }
+  const ready = fleet?.signals?.queue?.greenReady;
+  return Array.isArray(ready) ? ready : [];
+}
+
 export function decideNativeQueueExecution(input) {
   if (input?.action !== 'reconcile-native-queue-starvation') {
     throw new Error('native-queue-action-required');

@@ -124,6 +124,14 @@ class ProducerTests(unittest.TestCase):
         )
         self.assertEqual(len(signals["ciAudit"]["classes"]), 6)
 
+    def test_composes_when_queue_native_queue_count_is_null(self):
+        fleet, runtime = sources()
+        fleet["signals"]["queue"]["nativeQueueCount"] = None
+        fleet["signals"]["closureHealth"]["nativeQueueCount"] = 0
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(snapshot["signals"]["queue"]["queuedPrs"], 0)
+        self.assertEqual(snapshot["signals"]["closure"]["openPullRequests"], 49)
+
     def test_copies_latest_merge_as_closure_blocked_since_when_merge_progress_stalled(self):
         fleet, runtime = sources()
         fleet["signals"]["closureHealth"]["reasons"] = ["no-merge-progress-over-1h"]
