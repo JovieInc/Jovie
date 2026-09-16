@@ -95,9 +95,11 @@ export async function GET(
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
-  const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
-    profile.username
-  );
+  const profileExclusion = getPublicProfileDiscoveryExclusionResponse({
+    handle: profile.username,
+    displayName: profile.displayName,
+    isPublic: profile.isPublic,
+  });
   if (profileExclusion) {
     return profileExclusion;
   }
@@ -137,7 +139,10 @@ export async function POST(
   if (!profile || !profile.isPublic) {
     return mcpError(-32602, 'Artist not found', 404);
   }
-  if (!isPublicProfileIndexable(profile.username)) {
+  if (
+    !isPublicProfileIndexable(profile.username, profile.displayName) ||
+    profile.isPublic !== true
+  ) {
     return mcpError(
       -32602,
       'Artist not found',

@@ -30,14 +30,14 @@ describe('canonical public shell optimization contract (JOV-INV-012)', () => {
       CANONICAL_PUBLIC_SHELL_OPTIMIZATION_CONTRACT.eligibleContextDimensions
     ).toContain('platform');
     expect(CANONICAL_PUBLIC_SHELL_OPTIMIZATION_CONTRACT.hypothesis).toMatch(
-      /Customers, Product, and Pricing/
+      /Artists, Product, and Pricing/
     );
     expect(
       CANONICAL_PUBLIC_SHELL_OPTIMIZATION_CONTRACT.primaryMetric
     ).toContain(CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE);
     expect(CANONICAL_PUBLIC_SHELL_OPTIMIZATION_CONTRACT.guardrails).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/Customers, Product, and Pricing/),
+        expect.stringMatching(/Artists, Product, and Pricing/),
         expect.stringMatching(/For\/Tools/),
       ])
     );
