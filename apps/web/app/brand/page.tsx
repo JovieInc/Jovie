@@ -3,31 +3,27 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { Mark, PALETTE, Wordmark } from '@/lib/brand';
 import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
 
-const BRAND_PAGE_TITLE =
-  'Jovie Brand | The Closed-Loop Operating System for Music Artists';
-const BRAND_PAGE_DESCRIPTION =
-  'Jovie is the closed-loop operating system for music artists: artist profiles, smart links, presaves, fan capture, release planning, music marketing automation, and AI-powered growth systems in one lean platform.';
+const BRAND_PAGE_TITLE = `Jovie Brand | ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
+const BRAND_PAGE_DESCRIPTION = COMPANY_IDENTITY.definition;
 
 export const metadata: Metadata = {
   title: BRAND_PAGE_TITLE,
   description: BRAND_PAGE_DESCRIPTION,
   keywords: [
-    'closed-loop operating system for music artists',
-    'artist operating system',
-    'music release planning',
-    'artist smart links',
-    'presave campaigns',
-    'fan CRM',
-    'music marketing automation',
-    'AI agent for artists',
+    'Jovie brand',
+    'public profile',
+    'personal presence',
+    'audience relationships',
+    'independent creators',
     'artist profile',
-    'release growth flywheel',
+    'smart links',
   ],
   openGraph: {
     title: BRAND_PAGE_TITLE,
@@ -56,15 +52,9 @@ const BRAND_SCHEMA = {
   about: {
     '@type': 'Organization',
     name: APP_NAME,
-    description:
-      'Closed-loop operating system for music artists with AI agents for release planning, fan capture, and marketing automation.',
+    description: COMPANY_IDENTITY.definition,
     url: BASE_URL,
-    knowsAbout: [
-      'AI agent for artists',
-      'artist operating system',
-      'music marketing automation',
-      'release growth flywheel',
-    ],
+    knowsAbout: [...COMPANY_IDENTITY.knowsAbout],
   },
   keywords: ['Jovie', 'artist OS', 'music marketing'],
   dateModified: new Date().toISOString(),
@@ -172,8 +162,8 @@ function HeroSection() {
           <h1 className='system-b-brand-title'>One loop. Every release.</h1>
           <div className='system-b-brand-hero-body'>
             <p className={proseStrong}>
-              Jovie is becoming the closed-loop operating system for music
-              artists.
+              Jovie is becoming one product for presence, relationships, and
+              growth.
             </p>
             <p className={prose}>
               A single surface where releases, fans, links, tasks, payments,
@@ -242,7 +232,8 @@ function ThesisSection() {
         </p>
         <div className='system-b-brand-copy-callout'>
           <p className={proseStrong}>
-            Jovie is building the vertical operating system for music artists.
+            Jovie is building one product for presence, relationships, and
+            growth.
           </p>
           <p className={prose}>
             The wedge is the artist profile: a high-conversion surface for

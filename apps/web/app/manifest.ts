@@ -1,12 +1,12 @@
 import type { MetadataRoute } from 'next';
 import { APP_NAME } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${APP_NAME} - Artist profiles for music artists`,
+    name: `${APP_NAME} — ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
     short_name: 'Jovie',
-    description:
-      'Connect your music, social media, and merch in one link. No design needed. Live in under 90 seconds.',
+    description: COMPANY_IDENTITY.seoDescription,
     id: '/',
     start_url: '/',
     display: 'standalone',
@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     scope: '/',
     lang: 'en',
-    categories: ['music', 'entertainment', 'social', 'productivity'],
+    categories: ['productivity', 'social', 'business', 'entertainment'],
     icons: [
       {
         src: '/favicon-96x96.png',
@@ -57,9 +57,9 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: 'Find Artist',
+        name: 'Find yourself',
         short_name: 'Search',
-        description: 'Search for an artist to claim their profile',
+        description: 'Search your name and see what the internet knows',
         url: '/',
         icons: [
           {

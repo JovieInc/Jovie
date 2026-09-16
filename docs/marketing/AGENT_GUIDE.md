@@ -276,6 +276,7 @@ for the selection order and rationale.
 ## Inherited invariants (NOT restated in the registry)
 
 These apply to EVERY composition; the registry does not restate them:
+- **General company identity** is one product for presence, relationships, and growth across artists, founders, authors, creators, and independent experts. General `/about`, metadata, structured data, auth defaults, and machine-readable identity must not define Jovie as artist-only. Labeled Artists solutions, founder biography, and specialist artist APIs keep exact music semantics. Do not replace every "artist" with "creator", and do not require Spotify, a catalog, or a follower threshold on shared templates.
 - **Dark-first editorial language** on the unified token system.
 - **Fully static** (`revalidate = false` — `.claude/rules/ui.md`).
 - **Copy-in-data files** (`apps/web/data/*Copy.ts` pattern — `.claude/rules/code-style.md`).

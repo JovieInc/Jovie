@@ -18,7 +18,7 @@ describe('AboutPageContent', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Release More Music. Do Less Release Work.',
+        name: 'Presence, Relationships, And Growth.',
       })
     ).toBeVisible();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
@@ -32,12 +32,12 @@ describe('AboutPageContent', () => {
     ]);
     expect(screen.getByText('— Tim White, Founder')).toBeVisible();
     for (const feature of [
-      'Smart Links',
-      'Artist Profiles',
-      'Audience Intelligence',
-      'Release Automation',
-      'AI Tools',
-      'Tipping & Payments',
+      'Living Profile',
+      'Relationships',
+      'Audience',
+      'Adaptive',
+      'For Artists',
+      'Payments',
     ]) {
       expect(
         screen.getByRole('heading', { level: 3, name: feature })
@@ -50,12 +50,12 @@ describe('AboutPageContent', () => {
       {
         question: 'What is Jovie?',
         answer:
-          'Jovie is a release platform for independent musicians. It combines smart links, artist profiles, audience intelligence, release automation, and AI tools to help artists release more music with less work. Jovie is available at jov.ie.',
+          'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships. Jovie is available at jov.ie.',
       },
       {
         question: 'Is Jovie related to Jovie childcare or babysitting?',
         answer:
-          'No. Jovie the music platform (jov.ie) and Jovie the childcare franchise (jovie.com) are completely separate, unrelated companies in different industries. Jovie the music platform is operated by Jovie Technology Inc. The childcare franchise is operated by Bright Horizons Family Solutions.',
+          'No. Jovie at jov.ie and Jovie the childcare franchise (jovie.com) are completely separate, unrelated companies in different industries. Jovie at jov.ie is operated by Jovie Technology Inc. The childcare franchise is operated by Bright Horizons Family Solutions.',
       },
       {
         question: 'Who founded Jovie?',
@@ -65,17 +65,17 @@ describe('AboutPageContent', () => {
       {
         question: 'What does Jovie do?',
         answer:
-          'Jovie gives independent musicians smart links that route fans to the right streaming platform, professional artist profiles, audience intelligence and fan CRM, automatic release notifications, and AI tools that know your actual career data — stream counts, tour dates, collaborations, and more.',
+          'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. For artists, that includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
       },
       {
         question: 'Is Jovie free?',
         answer:
-          'Yes, Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, release notifications, contact export, and more.',
+          'Yes, Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics, notifications, contact export, and more.',
       },
       {
         question: 'How is Jovie different from Linktree?',
         answer:
-          'Linktree is a general-purpose link-in-bio tool. Jovie is built specifically for musicians — it automatically generates smart links for music releases, routes fans to the right streaming platform, collects and manages fan contacts, sends automatic notifications when you drop new music, and includes AI tools that understand your career. Jovie optimizes for fan conversion, not just link display.',
+          'Linktree is a general-purpose link list. Jovie is a living profile for presence and relationships — work, links, and a next step in one place. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
       },
     ]);
 
@@ -220,16 +220,16 @@ describe('AboutPageContent', () => {
       return;
     }
 
-    // The extracted body must be byte-identical copy from the audited route:
-    // hero, both prose sections, and every FAQ question/answer appear verbatim.
+    // Historical audit SHA keeps the pre-JOV-6261 artist-only company copy.
+    // Current production copy is asserted separately against ABOUT_FAQ_ITEMS.
     expect(routeAtReceipt).toContain(
       'Release More Music. Do Less Release Work.'
     );
     expect(routeAtReceipt).toContain('Why Jovie Exists');
     expect(routeAtReceipt).toContain('What Jovie Does');
-    for (const { question, answer } of ABOUT_FAQ_ITEMS) {
-      expect(routeAtReceipt).toContain(question);
-      expect(routeAtReceipt).toContain(answer);
-    }
+    expect(routeAtReceipt).toContain('What is Jovie?');
+    expect(routeAtReceipt).toContain(
+      'Jovie is a release platform for independent musicians.'
+    );
   });
 });

@@ -23,9 +23,9 @@ export const Default: Story = {
     <MarketingContentShell>
       <h1 className='text-3xl font-semibold text-primary-token'>About Jovie</h1>
       <p className='mt-4'>
-        Jovie is the release platform for independent artists. One adaptive
-        profile keeps the next drop, the next fan, and the next action in the
-        same reading surface.
+        Jovie is one product for presence, relationships, and growth. A living
+        profile keeps your work, links, and next step in the same reading
+        surface.
       </p>
       <p className='mt-4'>
         Long-form marketing pages use this prose-width shell so about, support,
