@@ -7,16 +7,13 @@ export default function SettingsLayout({
 }>) {
   return (
     <PageShell
-      maxWidth='wide'
+      maxWidth='form'
       frame='none'
-      contentPadding='none'
+      contentPadding='default'
       scroll='page'
-      surfaceClassName='pb-10'
       data-testid='settings-shell-content'
     >
-      <div className='min-w-0 max-w-(--app-shell-content-max-form) space-y-6'>
-        {children}
-      </div>
+      <div className='mx-auto w-full space-y-6'>{children}</div>
     </PageShell>
   );
 }

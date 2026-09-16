@@ -235,7 +235,9 @@ These aliases keep current values but give public surfaces a single shared contr
 - `--app-shell-header-height`
 - `--app-shell-header-height-compact`
 - `--app-shell-gap`
+- `--app-shell-content-inset`
 - `--app-shell-radius`
+- `--app-shell-radius-nested`
 - `--app-shell-border`
 - `--app-shell-frame-seam`
 - `--app-shell-content-surface`

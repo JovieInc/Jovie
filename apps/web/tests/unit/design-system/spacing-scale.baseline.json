@@ -6,10 +6,10 @@
   },
   "conservative": {
     "armed": true,
-    "count": 739,
+    "count": 735,
     "perFamily": {
       "marketing": 113,
-      "web-shell": 296,
+      "web-shell": 292,
       "web-other": 319,
       "packages/ui": 11
     },
@@ -31,10 +31,10 @@
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 9,
-      "px-2.5": 246,
-      "px-3.5": 47,
-      "py-2.5": 131,
-      "py-3.5": 34,
+      "px-2.5": 245,
+      "px-3.5": 46,
+      "py-2.5": 130,
+      "py-3.5": 33,
       "space-y-2.5": 35,
       "space-y-3.5": 3
     }

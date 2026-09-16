@@ -1,6 +1,5 @@
 'use client';
 
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import {
   EmptyState,
   type EmptyStateProps,
@@ -64,11 +63,10 @@ export function TableEmptyState({
   const actionProps = action ? { action } : { actionSlot };
 
   return (
-    <DrawerSurfaceCard
-      variant='card'
-      testId={testId}
+    <div
+      data-testid={testId}
       className={cn(
-        'flex min-h-55 flex-1 flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-6 text-center',
+        'flex min-h-55 flex-1 flex-col items-center justify-center bg-(--app-shell-content-surface) px-4 py-6 text-center',
         className
       )}
     >
@@ -78,9 +76,10 @@ export function TableEmptyState({
         description={description}
         variant={variant}
         secondaryAction={secondaryAction}
+        presentation='workspace'
         className='py-4'
         {...actionProps}
       />
-    </DrawerSurfaceCard>
+    </div>
   );
 }

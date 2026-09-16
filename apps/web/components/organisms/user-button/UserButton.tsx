@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
+import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
@@ -351,11 +352,20 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
-          Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
+        <div
+          className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'
+          data-testid='app-build-diagnostics'
+        >
+          {isElectronRuntime ? (
+            <DesktopReleaseIdentity />
+          ) : (
+            <span>
+              Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+              {process.env.NEXT_PUBLIC_BUILD_SHA
+                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                : ''}
+            </span>
+          )}
         </div>
       ),
     },

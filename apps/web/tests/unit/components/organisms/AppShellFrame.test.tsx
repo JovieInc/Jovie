@@ -37,6 +37,10 @@ describe('AppShellFrame', () => {
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
+    const routeContent = mainContent.querySelector(
+      '[data-app-shell-main-content]'
+    );
+    expect(routeContent).toHaveClass('p-(--app-shell-content-inset)');
     expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
