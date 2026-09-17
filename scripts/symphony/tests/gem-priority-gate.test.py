@@ -822,7 +822,15 @@ class PersistedRefreshTests(unittest.TestCase):
 class LivePersistFenceTests(unittest.TestCase):
     def seed_last_good(self, state_dir: pathlib.Path) -> dict[str, object]:
         state_dir.mkdir(parents=True, exist_ok=True)
-        last_good = MODULE.evaluate(dict(GREEN_SIGNALS), "2026-01-01T00:00:00Z")
+        observed = MODULE.utc_now() - MODULE.timedelta(minutes=1)
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = capacity_evidence(observed_at=observed_at)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        last_good = MODULE.evaluate(signals, observed_at)
         (state_dir / "latest.json").write_text(
             json.dumps(last_good, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -885,6 +893,71 @@ class LivePersistFenceTests(unittest.TestCase):
         self.assertIn(MODULE.LIVE_PERSIST_WRITER, reason)
         self.assertIn("exact source/main identity", reason)
 
+    def persistable_receipt(self) -> dict[str, object]:
+        return MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+
+    def test_live_persist_rejection_reason_covers_malformed_shapes(self):
+        persistable = self.persistable_receipt()
+        self.assertIsNone(MODULE.live_persist_rejection_reason(persistable))
+
+        self.assertIn("malformed receipt schema", MODULE.live_persist_rejection_reason({"schema": "other"}))
+        self.assertIn(
+            "typed observedAt",
+            MODULE.live_persist_rejection_reason({"schema": MODULE.SCHEMA}),
+        )
+        self.assertIn(
+            "typed signals",
+            MODULE.live_persist_rejection_reason(
+                {"schema": MODULE.SCHEMA, "observedAt": persistable["observedAt"]}
+            ),
+        )
+
+        missing_closure = dict(persistable)
+        missing_closure["signals"] = {**persistable["signals"], "closureHealth": None}
+        self.assertIn("typed closure-health", MODULE.live_persist_rejection_reason(missing_closure))
+
+        wrong_authority = dict(persistable)
+        wrong_authority["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "authority": "Other"},
+        }
+        self.assertIn("closure-health authority", MODULE.live_persist_rejection_reason(wrong_authority))
+
+        untyped_status = dict(persistable)
+        untyped_status["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "status": "unknown"},
+        }
+        self.assertIn("untyped closure-health status", MODULE.live_persist_rejection_reason(untyped_status))
+
+        failed = dict(persistable)
+        failed["reasons"] = [{"code": MODULE.GATE_EVALUATION_FAILED_REASON}]
+        failed["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {
+                **persistable["signals"]["closureHealth"],
+                "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+            },
+        }
+        failed["closureAdmission"] = {
+            **persistable["closureAdmission"],
+            "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+        }
+        self.assertIn(MODULE.GATE_EVALUATION_FAILED_REASON, MODULE.live_persist_rejection_reason(failed))
+
+        no_work = dict(persistable)
+        no_work["workAdmission"] = {"activities": []}
+        self.assertIn("typed workAdmission", MODULE.live_persist_rejection_reason(no_work))
+
+        codes = MODULE._receipt_reason_codes(
+            {
+                "reasons": ["plain", {"code": "typed"}, {"no": "code"}, 3],
+                "signals": {"closureHealth": {"reasons": ["from-closure", 1]}},
+                "closureAdmission": {"reasons": ["from-admission", {"code": "ignored"}]},
+            }
+        )
+        self.assertEqual(codes, {"plain", "typed", "from-closure", "from-admission"})
+
     def test_typed_red_closure_still_persists(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
@@ -893,8 +966,11 @@ class LivePersistFenceTests(unittest.TestCase):
             signals["closureHealth"] = {
                 **GREEN_SIGNALS["closureHealth"],
                 "status": "red",
-                "newIssueIntakeAllowed": False,
-                "reasons": ["expired-held-prs"],
+                "newIssueIntakeAllowed": True,
+                "reasons": [
+                    "expired-held-prs",
+                    "internally-repairable-prs-open",
+                ],
             }
 
             exit_code, stdout, _stderr = run_main(
@@ -906,7 +982,10 @@ class LivePersistFenceTests(unittest.TestCase):
             printed = json.loads(stdout)
             self.assertEqual(exit_code, 0)
             self.assertEqual(persisted, printed)
-            self.assertEqual(persisted["signals"]["closureHealth"]["reasons"], ["expired-held-prs"])
+            self.assertEqual(
+                persisted["signals"]["closureHealth"]["reasons"],
+                ["expired-held-prs", "internally-repairable-prs-open"],
+            )
             self.assertIsNone(MODULE.live_persist_rejection_reason(persisted))
 
     def test_allow_override_hard_fails_and_does_not_write(self):
