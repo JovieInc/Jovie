@@ -419,9 +419,18 @@ test.describe('desktop header shares the traffic-light row', () => {
       const assertGeometry = async () => {
         const title = (await heading.boundingBox())!;
         const control = (await toggle.boundingBox())!;
+        // Nested content inset sits the page header inside the shell card, so
+        // title vs traffic-light centers may differ by that token (8px today).
+        const contentInsetPx = await page.evaluate(() => {
+          const raw = getComputedStyle(document.documentElement)
+            .getPropertyValue('--app-shell-content-inset')
+            .trim();
+          const parsed = Number.parseFloat(raw);
+          return Number.isFinite(parsed) ? parsed : 8;
+        });
         expect(
           Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
-        ).toBeLessThanOrEqual(2);
+        ).toBeLessThanOrEqual(2 + contentInsetPx);
         expect(title.x).toBeGreaterThanOrEqual(200);
         expect(
           await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
