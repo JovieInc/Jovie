@@ -988,7 +988,7 @@ class LivePersistFenceTests(unittest.TestCase):
             )
             self.assertIsNone(MODULE.live_persist_rejection_reason(persisted))
 
-    def test_allow_override_hard_fails_and_does_not_write(self):
+    def test_allow_override_skips_write_but_still_emits_receipt(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
             last_good = self.seed_last_good(state_dir)
@@ -999,8 +999,9 @@ class LivePersistFenceTests(unittest.TestCase):
                     [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
                 )
 
-            self.assertEqual(exit_code, 3)
-            self.assertEqual(stdout, "")
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["state"], "GREEN")
             self.assertIn(MODULE.LIVE_PERSIST_ALLOW_ENV, stderr)
             self.assertIn("refuse-closed", stderr)
             self.assertIn(MODULE.LIVE_PERSIST_WRITER, stderr)
@@ -1015,12 +1016,14 @@ class LivePersistFenceTests(unittest.TestCase):
             with mock.patch.dict(
                 os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "true"}, clear=False
             ):
-                exit_code, _stdout, stderr = run_main(
+                exit_code, stdout, stderr = run_main(
                     [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
                     signals=signals,
                 )
 
-            self.assertEqual(exit_code, 3)
+            printed = json.loads(stdout)
+            self.assertIn(exit_code, (0, 2))
+            self.assertTrue(printed)
             self.assertIn("refuse-closed", stderr)
             self.assertEqual(self.read_latest(state_dir), last_good)
 
@@ -2613,7 +2616,8 @@ class WorkflowContractTests(unittest.TestCase):
         wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("live persist is refuse-closed", wrapper)
+        self.assertIn("forcing dry-run", wrapper)
+        self.assertIn("refuse-closed", wrapper)
         self.assertIn("live_persist_override_nonzero", wrapper)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=1", wrapper)
         self.assertNotIn('FLEET_GATE_ALLOW_LIVE_PERSIST="1"', wrapper)

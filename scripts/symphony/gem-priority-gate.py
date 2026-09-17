@@ -1750,19 +1750,14 @@ def live_persist_override_is_nonzero(raw: str | None) -> bool:
     return value not in {"", "0", "false", "no", "off"}
 
 
-def refuse_unsafe_live_persist_override() -> None:
-    """Hard-fail before live state is read or written when the override is set.
+def refuse_unsafe_live_persist_override() -> bool:
+    """Return True when live persist must be skipped due to override env.
 
-    The env var is not an enable switch. Any nonzero spelling is refuse-closed
-    so it cannot silently authorize a live latest.json write.
+    The env var is not an enable switch. Any nonzero spelling refuse-closes the
+    *write* only — callers must still emit a schema-valid receipt on stdout.
     """
     raw = os.environ.get(LIVE_PERSIST_ALLOW_ENV)
-    if not live_persist_override_is_nonzero(raw):
-        return
-    raise LivePersistFenceError(
-        f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
-        "nonzero; live persist is refuse-closed"
-    )
+    return live_persist_override_is_nonzero(raw)
 
 
 def _receipt_reason_codes(receipt: dict[str, Any]) -> set[str]:
@@ -2098,7 +2093,14 @@ def persist_live_receipt(
     env override is not an enable switch: any nonzero spelling hard-fails
     before the writer lock is taken.
     """
-    refuse_unsafe_live_persist_override()
+    if refuse_unsafe_live_persist_override():
+        warn_live_receipt_not_persisted(
+            LivePersistFenceError(
+                f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
+                "nonzero; live persist is refuse-closed (evaluation still emitted)"
+            )
+        )
+        return receipt
     rejected = live_persist_rejection_reason(receipt)
     if rejected is not None:
         warn_live_receipt_not_persisted(LivePersistFenceError(rejected))
@@ -2249,16 +2251,11 @@ def main() -> int:
             # the competing-writer timeout, so only the fast compare-and-commit
             # section is serialized. A slower writer whose observation predates
             # the persisted receipt never overwrites fresher state.
-            refuse_unsafe_live_persist_override()
             now = utc_now()
             alarm_if_previous_receipt_stale(args.state_dir, now)
             receipt = evaluate(observe_signals(args, now), isoformat(now))
             receipt = persist_live_receipt(receipt, args.state_dir, now)
         return emit_receipt(receipt, args.consumer)
-    except LivePersistFenceError as error:
-        prefix = "::error::" if os.environ.get("GITHUB_ACTIONS") == "true" else "ERROR:"
-        print(f"{prefix} {error}", file=sys.stderr)
-        return 3
     except (OSError, ValueError, json.JSONDecodeError, TimeoutError) as error:
         return emit_receipt(failed_evaluation_receipt(error), "fleet")
 
@@ -2266,9 +2263,5 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except LivePersistFenceError as error:
-        prefix = "::error::" if os.environ.get("GITHUB_ACTIONS") == "true" else "ERROR:"
-        print(f"{prefix} {error}", file=sys.stderr)
-        raise SystemExit(3)
     except Exception as error:  # noqa: BLE001 - last-resort schema-valid blocked receipt
         raise SystemExit(emit_receipt(failed_evaluation_receipt(error), "fleet"))

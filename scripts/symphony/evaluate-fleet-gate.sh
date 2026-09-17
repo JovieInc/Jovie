@@ -14,7 +14,8 @@
 #   GITHUB_OUTPUT            optional Actions output file
 #
 # FLEET_GATE_ALLOW_LIVE_PERSIST is not an enable switch. Any nonzero spelling
-# in live mode (dry-run != 1) is refuse-closed before the gate is invoked.
+# in live mode forces dry-run so the gate still emits a schema-valid receipt;
+# live latest.json writes stay refuse-closed inside gem-priority-gate.py.
 #
 # Job-output `receipt_b64` is a bounded admission projection, not FLEET_GATE_RECEIPT.
 set -euo pipefail
@@ -44,8 +45,8 @@ live_persist_override_nonzero() {
 }
 
 if [[ "${FLEET_GATE_DRY_RUN:-0}" != "1" ]] && live_persist_override_nonzero; then
-  echo "::error::FLEET_GATE_ALLOW_LIVE_PERSIST is present and nonzero; live persist is refuse-closed." >&2
-  exit 2
+  echo "::warning::FLEET_GATE_ALLOW_LIVE_PERSIST is present and nonzero; forcing dry-run so evaluation still emits a schema-valid receipt (live write refuse-closed)." >&2
+  export FLEET_GATE_DRY_RUN=1
 fi
 
 args=(python3 "$gate" --consumer "$consumer")

@@ -287,15 +287,15 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(receipt, {})
 
-    def test_live_persist_override_is_refuse_closed_before_the_gate_runs(self):
+    def test_live_persist_override_forces_dry_run_and_still_evaluates(self):
         code, outputs, receipt = run_wrapper(
             signals(),
             dry_run="0",
             extra_env={"FLEET_GATE_ALLOW_LIVE_PERSIST": "1"},
         )
-        self.assertEqual(code, 2)
-        self.assertEqual(outputs, {})
-        self.assertEqual(receipt, {})
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(outputs["mode"], "normal")
 
     def test_dry_run_override_does_not_enable_persist_and_still_evaluates(self):
         code, outputs, receipt = run_wrapper(
