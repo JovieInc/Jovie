@@ -130,11 +130,11 @@ test.describe('Homepage', () => {
       'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+    await expect(header.getByRole('link', { name: 'About' })).toHaveAttribute(
       'href',
-      '/artists'
+      '/about'
     );
-    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    await expect(header.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
       'href',
       '/product'
     );
