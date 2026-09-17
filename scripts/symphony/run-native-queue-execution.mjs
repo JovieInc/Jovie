@@ -163,7 +163,12 @@ function fleetAdmission(path) {
     mutationAllowed: gem.newMutationAllowed === true,
     pushAllowed: remediation.pushAllowed === true,
     maxConcurrent: Number(gem.maxConcurrent ?? 0),
-    greenReadyPrs: fromFleet.length > 0 ? fromFleet : listCleanOpenPrs(),
+    greenReadyPrs: [
+      ...fromFleet,
+      ...listCleanOpenPrs().filter(
+        row => !fromFleet.some(existing => existing?.number === row.number)
+      ),
+    ],
   };
 }
 

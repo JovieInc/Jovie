@@ -250,6 +250,8 @@ describe('decideNativeQueueExecution', () => {
         pr: 17917,
         head: 'd'.repeat(40),
         candidates: [{ number: 17917, head: 'd'.repeat(40) }],
+        mergeQueueEntryId: null,
+        mergedAt: null,
       }
     );
   });
@@ -298,6 +300,8 @@ describe('decideNativeQueueExecution', () => {
         pr: 17540,
         head: 'd'.repeat(40),
         candidates: [{ number: 17540, head: 'd'.repeat(40) }, 17542],
+        mergeQueueEntryId: null,
+        mergedAt: null,
       }
     );
   });

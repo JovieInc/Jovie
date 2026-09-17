@@ -121,6 +121,13 @@ export function appendMergeQueueEntryBind(body, entryId) {
  * Occupancy is not a ship. Pass only when mergedAt is set, or the live
  * mergeQueueEntry.id is the previously captured id and the last timeline
  * event for that enrollment is not a github-merge-queue remove.
+ *
+ * @param {{
+ *   mergedAt?: string | null,
+ *   mergeQueueEntry?: { id?: string } | null,
+ *   timeline?: object[],
+ *   capturedEntryId?: string | null,
+ * }} [input]
  */
 export function assertDurableNativeQueueOracle({
   mergedAt,
@@ -149,6 +156,15 @@ export function assertDurableNativeQueueOracle({
   return { ok: false, detail: PR_CHURN_EJECT };
 }
 
+/**
+ * @param {{
+ *   mergeStateStatus?: string,
+ *   mergeQueueEntry?: { id?: string } | null,
+ *   mergedAt?: string | null,
+ *   timeline?: object[],
+ *   capturedEntryId?: string | null,
+ * }} [input]
+ */
 export function nativeQueueEnrollPlan({
   mergeStateStatus,
   mergeQueueEntry,
@@ -195,6 +211,8 @@ export function decideNativeQueueExecution(input) {
         'exact-source-ci-native-queue-production-gates-remain-required',
       pr: null,
       head: null,
+      mergeQueueEntryId: null,
+      mergedAt: null,
     };
   }
   for (const row of prs) {
@@ -218,6 +236,8 @@ export function decideNativeQueueExecution(input) {
       pr,
       head,
       candidates: prs,
+      mergeQueueEntryId: null,
+      mergedAt: null,
     };
   }
   return {
@@ -227,6 +247,8 @@ export function decideNativeQueueExecution(input) {
     authority: 'exact-source-ci-native-queue-production-gates-remain-required',
     pr: null,
     head: null,
+    mergeQueueEntryId: null,
+    mergedAt: null,
   };
 }
 
