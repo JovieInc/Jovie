@@ -1,18 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assertGatewayAllowlistedModel,
   GATEWAY_ALLOWLIST,
   GATEWAY_ALLOWLIST_REASON_PREFIX,
-  assertGatewayAllowlistedModel,
   isGatewayAllowlistedModel,
 } from '../gateway-allowlist.mjs';
 
 test('allowlist is exactly the three Tim STRICT models', () => {
-  assert.deepEqual([...GATEWAY_ALLOWLIST], [
-    'zai/glm-5.3',
-    'zai/glm-5.3-flash',
-    'typesafe-ai/jev',
-  ]);
+  assert.deepEqual(
+    [...GATEWAY_ALLOWLIST],
+    ['zai/glm-5.3', 'zai/glm-5.3-flash', 'typesafe-ai/jev']
+  );
 });
 
 test('allowlisted models pass', () => {
