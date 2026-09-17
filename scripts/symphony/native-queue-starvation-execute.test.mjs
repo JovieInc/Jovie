@@ -7,13 +7,13 @@ import {
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
-  nativeQueueEnrollPlan,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
   FOUNDER_LINEAR_ASSIGNEE,
   NATIVE_QUEUE_ACTION,
   NO_GREEN_READY_PR,
+  nativeQueueEnrollPlan,
   RELEASE_CERT_ACTION,
   SUMMER_ISSUE_BIND_MARKER,
   selectGreenReadyPrs,
@@ -130,7 +130,10 @@ describe('nativeQueueEnrollPlan', () => {
       { action: 'bind-existing-queue' }
     );
     assert.deepEqual(
-      nativeQueueEnrollPlan({ mergeStateStatus: 'CLEAN', mergeQueueEntry: null }),
+      nativeQueueEnrollPlan({
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: null,
+      }),
       { action: 'bind-and-await-bot' }
     );
     assert.equal(
