@@ -86,5 +86,4 @@ describe('lib/ai/sdk gateway routing', () => {
     expect(() => gateway('openai/gpt-6-astra')).toThrow('openai/gpt-6-astra');
     expect(mockGatewayModel).not.toHaveBeenCalled();
   });
-
 });
