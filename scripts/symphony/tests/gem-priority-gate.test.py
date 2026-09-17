@@ -819,6 +819,251 @@ class PersistedRefreshTests(unittest.TestCase):
                 MODULE.verify_persisted_receipt(state_dir, {"observedAt": MODULE.isoformat(MODULE.utc_now())})
 
 
+class LivePersistFenceTests(unittest.TestCase):
+    def seed_last_good(self, state_dir: pathlib.Path) -> dict[str, object]:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        observed = MODULE.utc_now() - MODULE.timedelta(minutes=1)
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = capacity_evidence(observed_at=observed_at)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        last_good = MODULE.evaluate(signals, observed_at)
+        (state_dir / "latest.json").write_text(
+            json.dumps(last_good, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return last_good
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def test_placeholder_closure_health_does_not_replace_latest_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals.pop("closureHealth")
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertIn(MODULE.CLOSURE_HEALTH_PLACEHOLDER_REASON, printed["closureAdmission"]["reasons"])
+            self.assertIn(MODULE.LIVE_PERSIST_WRITER, stderr)
+            self.assertIn(MODULE.CLOSURE_HEALTH_PLACEHOLDER_REASON, stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+            self.assertEqual(
+                self.read_latest(state_dir)["concurrency"]["gem"]["maxConcurrent"],
+                last_good["concurrency"]["gem"]["maxConcurrent"],
+            )
+
+    def test_failed_evaluation_keeps_the_prior_valid_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            with mock.patch.object(
+                MODULE, "evaluate", side_effect=ValueError("observe failed")
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(
+                {reason["code"] for reason in printed["reasons"]},
+                {MODULE.GATE_EVALUATION_FAILED_REASON},
+            )
+            self.assertEqual(printed["concurrency"]["gem"]["maxConcurrent"], 0)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+            self.assertNotEqual(
+                last_good["concurrency"]["gem"]["maxConcurrent"],
+                0,
+            )
+
+    def test_failed_evaluation_receipt_is_not_persistable(self):
+        receipt = MODULE.failed_evaluation_receipt(ValueError("observe failed"))
+        reason = MODULE.live_persist_rejection_reason(receipt)
+        self.assertIsNotNone(reason)
+        self.assertIn(MODULE.LIVE_PERSIST_WRITER, reason)
+        self.assertIn("exact source/main identity", reason)
+
+    def persistable_receipt(self) -> dict[str, object]:
+        return MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+
+    def test_live_persist_rejection_reason_covers_malformed_shapes(self):
+        persistable = self.persistable_receipt()
+        self.assertIsNone(MODULE.live_persist_rejection_reason(persistable))
+
+        self.assertIn("malformed receipt schema", MODULE.live_persist_rejection_reason({"schema": "other"}))
+        self.assertIn(
+            "typed observedAt",
+            MODULE.live_persist_rejection_reason({"schema": MODULE.SCHEMA}),
+        )
+        self.assertIn(
+            "typed signals",
+            MODULE.live_persist_rejection_reason(
+                {"schema": MODULE.SCHEMA, "observedAt": persistable["observedAt"]}
+            ),
+        )
+
+        missing_closure = dict(persistable)
+        missing_closure["signals"] = {**persistable["signals"], "closureHealth": None}
+        self.assertIn("typed closure-health", MODULE.live_persist_rejection_reason(missing_closure))
+
+        wrong_authority = dict(persistable)
+        wrong_authority["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "authority": "Other"},
+        }
+        self.assertIn("closure-health authority", MODULE.live_persist_rejection_reason(wrong_authority))
+
+        untyped_status = dict(persistable)
+        untyped_status["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "status": "unknown"},
+        }
+        self.assertIn("untyped closure-health status", MODULE.live_persist_rejection_reason(untyped_status))
+
+        failed = dict(persistable)
+        failed["reasons"] = [{"code": MODULE.GATE_EVALUATION_FAILED_REASON}]
+        failed["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {
+                **persistable["signals"]["closureHealth"],
+                "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+            },
+        }
+        failed["closureAdmission"] = {
+            **persistable["closureAdmission"],
+            "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+        }
+        self.assertIn(MODULE.GATE_EVALUATION_FAILED_REASON, MODULE.live_persist_rejection_reason(failed))
+
+        no_work = dict(persistable)
+        no_work["workAdmission"] = {"activities": []}
+        self.assertIn("typed workAdmission", MODULE.live_persist_rejection_reason(no_work))
+
+        codes = MODULE._receipt_reason_codes(
+            {
+                "reasons": ["plain", {"code": "typed"}, {"no": "code"}, 3],
+                "signals": {"closureHealth": {"reasons": ["from-closure", 1]}},
+                "closureAdmission": {"reasons": ["from-admission", {"code": "ignored"}]},
+            }
+        )
+        self.assertEqual(codes, {"plain", "typed", "from-closure", "from-admission"})
+
+    def test_typed_red_closure_still_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals["closureHealth"] = {
+                **GREEN_SIGNALS["closureHealth"],
+                "status": "red",
+                "newIssueIntakeAllowed": True,
+                "reasons": [
+                    "expired-held-prs",
+                    "internally-repairable-prs-open",
+                ],
+            }
+
+            exit_code, stdout, _stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(
+                persisted["signals"]["closureHealth"]["reasons"],
+                ["expired-held-prs", "internally-repairable-prs-open"],
+            )
+            self.assertIsNone(MODULE.live_persist_rejection_reason(persisted))
+
+    def test_allow_override_skips_write_but_still_emits_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["state"], "GREEN")
+            self.assertIn(MODULE.LIVE_PERSIST_ALLOW_ENV, stderr)
+            self.assertIn("refuse-closed", stderr)
+            self.assertIn(MODULE.LIVE_PERSIST_WRITER, stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+
+    def test_allow_override_cannot_enable_placeholder_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals.pop("closureHealth")
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "true"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                    signals=signals,
+                )
+
+            printed = json.loads(stdout)
+            self.assertIn(exit_code, (0, 2))
+            self.assertTrue(printed)
+            self.assertIn("refuse-closed", stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+
+    def test_allow_zero_does_not_block_typed_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "0"}, clear=False
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, json.loads(stdout))
+            self.assertEqual(persisted["state"], "GREEN")
+
+    def test_dry_run_with_override_still_never_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [
+                        str(GATE),
+                        "--state-dir",
+                        str(state_dir),
+                        "--consumer",
+                        "fleet",
+                        "--dry-run",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout)["state"], "GREEN")
+            self.assertFalse((state_dir / "latest.json").exists())
+
+
 class DeploymentBindingTests(unittest.TestCase):
     def evaluate(self, signals: dict[str, object]) -> dict[str, object]:
         return MODULE.evaluate(dict(signals), MODULE.isoformat(MODULE.utc_now()))
@@ -2362,6 +2607,20 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("dry-run: 'false'", content)
         self.assertIn("jovie-fixed", content)
         self.assertIn("cancel-in-progress: false", content)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=", action)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST:", action)
+        wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("forcing dry-run", wrapper)
+        self.assertIn("refuse-closed", wrapper)
+        self.assertIn("live_persist_override_nonzero", wrapper)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=1", wrapper)
+        self.assertNotIn('FLEET_GATE_ALLOW_LIVE_PERSIST="1"', wrapper)
         self.assertIn("github.event.workflow_run.conclusion != 'cancelled'", content)
         self.assertIn("github.event.pull_request.merged != true", content)
         self.assertIn("github.event.label.name == 'hold'", content)
