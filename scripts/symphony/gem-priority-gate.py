@@ -81,6 +81,14 @@ REPAIR_FEED_REASONS = frozenset(
     }
 )
 WRITER_LOCK_TIMEOUT_SECONDS = 60.0
+# Live-persist fence (61ced0b9 behavior, ported to main): an evaluation
+# failure or placeholder closure must never replace a valid persisted
+# latest.json. The env var is NOT an enable switch — any nonzero spelling
+# refuses the persist write while the live evaluation still prints.
+LIVE_PERSIST_ALLOW_ENV = "FLEET_GATE_ALLOW_LIVE_PERSIST"
+LIVE_PERSIST_WRITER = "gem-priority-gate.persist_live_receipt"
+PLACEHOLDER_CLOSURE_REASON = "closure-health-receipt-missing-or-malformed"
+GATE_EVALUATION_FAILED_CODE = "gate-evaluation-failed"
 SEVERE_REASONS = {
     "credential-compromise",
     "unsafe-migration-or-data-corruption",
@@ -1984,6 +1992,82 @@ def warn_live_receipt_not_persisted(error: BaseException) -> None:
     print(f"{prefix} fleet gate live receipt not persisted: {error}", file=sys.stderr)
 
 
+def _receipt_reason_codes(receipt: dict[str, Any]) -> set[str]:
+    """Union of typed reason codes across receipt, closure, and admission."""
+    codes: set[str] = set()
+    for item in receipt.get("reasons") or []:
+        if isinstance(item, str):
+            codes.add(item)
+        elif isinstance(item, dict):
+            code = item.get("code")
+            if isinstance(code, str):
+                codes.add(code)
+    signals = receipt.get("signals")
+    closure = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if isinstance(closure, dict):
+        codes.update(
+            reason for reason in closure.get("reasons") or [] if isinstance(reason, str)
+        )
+    admission = receipt.get("closureAdmission")
+    if isinstance(admission, dict):
+        codes.update(
+            reason for reason in admission.get("reasons") or [] if isinstance(reason, str)
+        )
+    return codes
+
+
+def live_persist_override_is_nonzero(raw: str | None) -> bool:
+    """True when FLEET_GATE_ALLOW_LIVE_PERSIST is a nonzero/truthy spelling."""
+    if raw is None:
+        return False
+    return raw.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
+    """Return why a candidate must not replace latest.json, or None if safe.
+
+    Live incident 2026-09-17: an ALLOW=1 Fleet Gate Refresh whose observation
+    failed replaced a GREEN persisted receipt with a schema-looking
+    placeholder carrying PLACEHOLDER_CLOSURE_REASON and maxConcurrent=0.
+    Failed-evaluation receipts, placeholder closure, and candidates without
+    exact main identity are never authoritative state; a valid prior receipt
+    stays in place and consumers fail closed on staleness instead.
+    """
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected malformed receipt schema"
+    if parse_time(receipt.get("observedAt")) is None:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without a typed observedAt"
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed signals"
+    main = signals.get("main")
+    sha = main.get("sha") if isinstance(main, dict) else None
+    if not valid_commit_sha(sha, exact=True) or sha == UNKNOWN_MAIN_SHA:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without exact source/main identity"
+    closure = signals.get("closureHealth")
+    if not isinstance(closure, dict) or closure.get("schema") != "jovie-closure-health/v1":
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed closure-health"
+    if closure.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without closure-health authority"
+    if closure.get("status") not in {"healthy", "grace", "red"}:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt with untyped closure-health status"
+    unsafe = _receipt_reason_codes(receipt)
+    if PLACEHOLDER_CLOSURE_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected placeholder closure-health "
+            f"({PLACEHOLDER_CLOSURE_REASON})"
+        )
+    if GATE_EVALUATION_FAILED_CODE in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected failed-evaluation receipt "
+            f"({GATE_EVALUATION_FAILED_CODE})"
+        )
+    work = receipt.get("workAdmission")
+    if not isinstance(work, dict) or not isinstance(work.get("allowed"), bool):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed workAdmission"
+    return None
+
+
 def persist_live_receipt(
     receipt: dict[str, Any], state_dir: Path, now: datetime
 ) -> dict[str, Any]:
@@ -1993,7 +2077,26 @@ def persist_live_receipt(
     cannot create the Gem state dir. Throwing there used to replace a complete
     live receipt with an incomplete stub. Consumers must still receive the
     live evaluation so Auto-Enroll can skip or admit from schema-valid JSON.
+
+    Live-persist fence (61ced0b9 behavior): placeholder, failed-evaluation,
+    and untyped candidates never replace latest.json — a prior valid receipt
+    stays in place. FLEET_GATE_ALLOW_LIVE_PERSIST is NOT an enable switch:
+    any nonzero spelling refuses the persist write while the live evaluation
+    still prints, so the shell contract (rc 0/2 with parseable stdout) holds.
     """
+    override_raw = os.environ.get(LIVE_PERSIST_ALLOW_ENV)
+    if live_persist_override_is_nonzero(override_raw):
+        warn_live_receipt_not_persisted(
+            RuntimeError(
+                f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
+                "nonzero; live persist refused (evaluation still printed)"
+            )
+        )
+        return receipt
+    rejected = live_persist_rejection_reason(receipt)
+    if rejected is not None:
+        warn_live_receipt_not_persisted(RuntimeError(rejected))
+        return receipt
     try:
         lock_fd = acquire_writer_lock(state_dir)
     except (OSError, TimeoutError) as error:

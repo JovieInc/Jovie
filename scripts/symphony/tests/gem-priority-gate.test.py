@@ -2273,6 +2273,257 @@ class WriterOrderingTests(unittest.TestCase):
             self.assertEqual(persisted["observedAt"], MODULE.isoformat(future))
 
 
+class LivePersistFenceTests(unittest.TestCase):
+    """61ced0b9 behavior on main: placeholders never clobber latest.json."""
+
+    def seed_green_receipt(self, state_dir: pathlib.Path) -> dict[str, object]:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        receipt = MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+        MODULE.write_receipt(receipt, state_dir)
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def test_placeholder_closure_never_replaces_a_green_receipt(self):
+        # Live incident 2026-09-17: an observation-failure refresh wrote a
+        # closure-health-receipt-missing-or-malformed placeholder with
+        # maxConcurrent=0 over a GREEN persisted receipt.
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            seeded = self.seed_green_receipt(state_dir)
+            self.assertEqual(seeded["state"], "GREEN")
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals={
+                    **dict(GREEN_SIGNALS),
+                    "closureHealth": {
+                        **dict(GREEN_SIGNALS["closureHealth"]),
+                        "status": "red",
+                        "newIssueIntakeAllowed": False,
+                        "reasons": ["closure-health-receipt-missing-or-malformed"],
+                    },
+                },
+            )
+
+            # The live evaluation still prints a schema-valid receipt...
+            self.assertIn(exit_code, (0, 2))
+            printed = json.loads(stdout)
+            self.assertEqual(printed["schema"], "jovie-fleet-gate/v1")
+            # ...but the fence keeps the seeded GREEN receipt in place.
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted["state"], "GREEN")
+            self.assertEqual(persisted["closureAdmission"]["status"], "healthy")
+            self.assertNotEqual(
+                persisted["closureAdmission"]["reasons"],
+                ["closure-health-receipt-missing-or-malformed"],
+            )
+            self.assertIn("not persisted", stderr)
+            self.assertIn("placeholder closure-health", stderr)
+
+    def test_failed_evaluation_receipt_never_replaces_a_green_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            seeded = self.seed_green_receipt(state_dir)
+
+            # Force the failed-evaluation path through the real main() by
+            # making observation fail before evaluate() returns.
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(
+                    MODULE,
+                    "observe_signals",
+                    side_effect=ValueError("observation exploded"),
+                ),
+                mock.patch.object(sys, "argv",
+                                  [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                failed_code = MODULE.main()
+
+            self.assertIn(failed_code, (0, 2))
+            # A schema-valid blocked receipt still prints for consumers.
+            printed = json.loads(stdout.getvalue())
+            self.assertEqual(printed["schema"], "jovie-fleet-gate/v1")
+            self.assertEqual(printed["state"], "RED")
+            # ...but the seeded GREEN receipt survives untouched.
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted["state"], "GREEN")
+            self.assertEqual(persisted["observedAt"], seeded["observedAt"])
+
+    def test_unknown_main_sha_receipt_never_replaces_a_green_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_green_receipt(state_dir)
+
+            exit_code, _stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals={
+                    **dict(GREEN_SIGNALS),
+                    "main": {"status": "unknown", "sha": MODULE.UNKNOWN_MAIN_SHA},
+                },
+            )
+
+            self.assertIn(exit_code, (0, 2))
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted["state"], "GREEN")
+            self.assertIn("exact source/main identity", stderr)
+
+    def test_nonzero_allow_env_refuses_the_write_but_still_prints(self):
+        # The env var is NOT an enable switch, and refusing it must never
+        # brick the fleet workflow: the live evaluation still prints with a
+        # schema-valid receipt and a 0/2 exit code (empty-stdout exit 3 is
+        # the #17939 defect this test pins against).
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_green_receipt(state_dir)
+
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            self.assertIn(exit_code, (0, 2))
+            printed = json.loads(stdout)
+            self.assertEqual(printed["schema"], "jovie-fleet-gate/v1")
+            self.assertIn("live persist refused", stderr)
+            # The write was refused: the seeded receipt is untouched.
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted["state"], "GREEN")
+
+    def test_unset_allow_env_still_persists_a_valid_green_receipt(self):
+        # Fence must not over-block: with ALLOW unset and a healthy live
+        # evaluation, the canonical refresh still persists (run_main seeds
+        # GREEN_SIGNALS by default).
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_green_receipt(state_dir)
+
+            exit_code, stdout, _stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+            self.assertEqual(exit_code, 0)
+            printed = json.loads(stdout)
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["state"], "GREEN")
+
+    def test_rejection_reason_classifies_every_unsafe_shape(self):
+        # Direct unit coverage of the fence classifier so every rejection
+        # branch is exercised, including shapes a full main() run cannot
+        # produce from GREEN_SIGNALS alone.
+        base = MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+        good = MODULE.live_persist_rejection_reason(base)
+        self.assertIsNone(good)
+
+        malformed_schema = {**base, "schema": "jovie-fleet-gate/v0"}
+        self.assertIn(
+            "malformed receipt schema",
+            MODULE.live_persist_rejection_reason(malformed_schema),
+        )
+        no_observed = {**base, "observedAt": "not-a-time"}
+        self.assertIn(
+            "typed observedAt",
+            MODULE.live_persist_rejection_reason(no_observed),
+        )
+        no_signals = {**base, "signals": "garbage"}
+        self.assertIn(
+            "typed signals",
+            MODULE.live_persist_rejection_reason(no_signals),
+        )
+        no_closure = {**base, "signals": {**base["signals"], "closureHealth": None}}
+        self.assertIn(
+            "typed closure-health",
+            MODULE.live_persist_rejection_reason(no_closure),
+        )
+        wrong_authority = {
+            **base,
+            "signals": {
+                **base["signals"],
+                "closureHealth": {
+                    **dict(base["signals"]["closureHealth"]),
+                    "authority": "Not-Summer",
+                },
+            },
+        }
+        self.assertIn(
+            "closure-health authority",
+            MODULE.live_persist_rejection_reason(wrong_authority),
+        )
+        bad_status = {
+            **base,
+            "signals": {
+                **base["signals"],
+                "closureHealth": {
+                    **dict(base["signals"]["closureHealth"]),
+                    "status": "unknown",
+                },
+            },
+        }
+        self.assertIn(
+            "untyped closure-health status",
+            MODULE.live_persist_rejection_reason(bad_status),
+        )
+        # A real failed-evaluation receipt carries the sentinel main SHA, so
+        # the identity check fires first (correct fail-closed ordering).
+        evaluation_failed = MODULE.failed_evaluation_receipt(RuntimeError("boom"))
+        self.assertIn(
+            "exact source/main identity",
+            MODULE.live_persist_rejection_reason(evaluation_failed),
+        )
+        # A receipt that is otherwise identity-valid but carries the
+        # gate-evaluation-failed code is rejected for exactly that reason.
+        staged_failure = json.loads(json.dumps(base))
+        staged_failure["reasons"] = [
+            {
+                "code": "gate-evaluation-failed",
+                "layer": "integrity",
+                "severity": "critical",
+                "detail": "staged",
+            }
+        ]
+        self.assertIn(
+            "failed-evaluation receipt",
+            MODULE.live_persist_rejection_reason(staged_failure),
+        )
+        no_work = {**base, "workAdmission": None}
+        self.assertIn(
+            "typed workAdmission",
+            MODULE.live_persist_rejection_reason(no_work),
+        )
+
+    def test_receipt_reason_codes_unions_every_typed_source(self):
+        receipt = {
+            "reasons": [
+                "plain-string-code",
+                {"code": "typed-code", "layer": "integrity", "severity": "warning"},
+                {"code": 42},
+            ],
+            "signals": {
+                "closureHealth": {"reasons": ["closure-code", 7]},
+            },
+            "closureAdmission": {"reasons": ["admission-code"]},
+        }
+        codes = MODULE._receipt_reason_codes(receipt)
+        self.assertEqual(
+            codes,
+            {"plain-string-code", "typed-code", "closure-code", "admission-code"},
+        )
+        # A non-dict, non-string entry (e.g. a bare number) is skipped.
+        self.assertEqual(
+            MODULE._receipt_reason_codes({"reasons": [42]}),
+            set(),
+        )
+        # Untyped shapes degrade to the typed subset only.
+        self.assertEqual(MODULE._receipt_reason_codes({}), set())
+        self.assertEqual(
+            MODULE._receipt_reason_codes({"signals": "x", "closureAdmission": 3}),
+            set(),
+        )
+
+
 class ScheduledFreshnessTests(unittest.TestCase):
     def run_at(self, state_dir: pathlib.Path, moment) -> tuple[int, str, str]:
         stdout = io.StringIO()
