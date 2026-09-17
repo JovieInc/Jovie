@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { writeAudioBarDismissed } from '@/components/shell/audio-bar-dismissal';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -493,7 +494,9 @@ export function useTrackAudioPlayer() {
       const audio = getAudio();
       if (!audio) return;
 
-      // Intentional play clears dictation/local-preview holds.
+      // Intentional play clears dictation/local-preview holds and reopens
+      // a user-dismissed shell audio bar.
+      writeAudioBarDismissed(false);
       if (_interruptionDepth > 0) {
         _interruptionDepth = 0;
         _wasPlayingBeforeInterruption = false;

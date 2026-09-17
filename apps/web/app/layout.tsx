@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 import './globals.css';
 // JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
@@ -45,24 +46,18 @@ export const metadata: Metadata = {
     default: APP_NAME,
     template: `%s | ${APP_NAME}`,
   },
-  description:
-    'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
+  description: COMPANY_IDENTITY.seoDescription,
   keywords: [
     'Jovie',
-    'link in bio for musicians',
-    'artist profile',
-    'music artist',
-    'smart links',
-    'spotify',
-    'social media',
-    'music promotion',
-    'creator profile',
-    'music marketing',
-    'streaming',
-    'music links',
-    'artist bio',
-    'music discovery',
-    'fan engagement',
+    'public profile',
+    'personal website',
+    'control your presence',
+    'name search',
+    'artists',
+    'founders',
+    'authors',
+    'creators',
+    'independent experts',
   ],
   authors: [{ name: APP_NAME }],
   creator: APP_NAME,
@@ -81,8 +76,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: BASE_URL,
     title: APP_NAME,
-    description:
-      'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
+    description: COMPANY_IDENTITY.seoDescription,
     siteName: APP_NAME,
     images: [
       {
@@ -96,8 +90,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: APP_NAME,
-    description:
-      'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
+    description: COMPANY_IDENTITY.seoDescription,
     images: [`${BASE_URL}/og/default.png`],
     creator: '@jovieapp',
     site: '@jovieapp',

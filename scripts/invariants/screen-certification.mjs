@@ -79,6 +79,7 @@ export const SCREEN_REGISTRY = Object.freeze(
     `
 web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
 web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
+web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
@@ -92,6 +93,8 @@ web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investo
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
+web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.brand|web|marketing-brand|apps/web/app/brand/page.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile

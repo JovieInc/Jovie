@@ -44,12 +44,12 @@ describe('robots-http-guard (#11043 regression)', () => {
 });
 
 describe('sitemap-http-guard', () => {
-  it('rejects sitemap entries without lastmod', () => {
+  it('accepts sitemap entries that omit lastmod when unknown', () => {
     const body = `<urlset>
   <url><loc>https://jov.ie/pricing</loc></url>
 </urlset>`;
     const result = validateSitemapXmlBody(body);
-    expect(result.ok).toBe(false);
-    expect(result.violations.join('\n')).toMatch(/lastmod/);
+    expect(result.ok).toBe(true);
+    expect(result.urlCount).toBe(1);
   });
 });

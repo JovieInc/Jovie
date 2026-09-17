@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+## [26.9.9] - 2026-09-16
+
 ## [26.9.8] - 2026-09-16
 
 ## [26.9.7] - 2026-09-15

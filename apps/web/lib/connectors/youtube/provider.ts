@@ -5,6 +5,7 @@ import { serverFetch } from '@/lib/http/server-fetch';
 import { parseYouTubeDuration } from '@/lib/youtube/metadata';
 import type {
   YouTubeChannelVideo,
+  YouTubeImportSkip,
   YouTubeLibraryProvider,
   YouTubeMetricWindow,
   YouTubeVideoMetrics,
@@ -68,10 +69,12 @@ export interface OwnedYouTubeChannel {
 
 export class YouTubeProviderError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  readonly reason: string | null;
+  constructor(message: string, status: number, reason?: string | null) {
     super(message);
     this.name = 'YouTubeProviderError';
     this.status = status;
+    this.reason = reason ?? null;
   }
 }
 
@@ -87,9 +90,16 @@ async function authorizedJson<T>(
     context,
   });
   if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      readonly error?: {
+        readonly status?: string;
+        readonly errors?: readonly { readonly reason?: string }[];
+      };
+    } | null;
     throw new YouTubeProviderError(
       `${context} failed with status ${response.status}`,
-      response.status
+      response.status,
+      payload?.error?.errors?.[0]?.reason ?? payload?.error?.status ?? null
     );
   }
   return (await response.json()) as T;
@@ -270,6 +280,80 @@ export function createYouTubeLibraryProvider(input: {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
   return {
+    async listChannelVideosPage(channelId, pageInput) {
+      const channels = await listOwnedYouTubeChannels({
+        accessToken: input.accessToken,
+        fetcher,
+      });
+      const channel = channels.find(item => item.id === channelId);
+      if (!channel) {
+        throw new YouTubeProviderError(
+          'The authorized account does not own the selected YouTube channel',
+          403,
+          'channelMismatch'
+        );
+      }
+      const url = new URL(`${YOUTUBE_DATA_API}/playlistItems`);
+      url.searchParams.set('part', 'contentDetails');
+      url.searchParams.set('playlistId', channel.uploadsPlaylistId);
+      url.searchParams.set('maxResults', '50');
+      if (pageInput?.pageToken) {
+        url.searchParams.set('pageToken', pageInput.pageToken);
+      }
+      const playlist = await authorizedJson<PlaylistItemsResponse>(
+        url,
+        input.accessToken,
+        fetcher,
+        'YouTube uploads page'
+      );
+      const skipped: YouTubeImportSkip[] = [];
+      const ids: string[] = [];
+      for (const item of playlist.items ?? []) {
+        const videoId = item.contentDetails?.videoId?.trim();
+        if (videoId) ids.push(videoId);
+        else skipped.push({ videoId: null, reason: 'missing_id' });
+      }
+      const videos: YouTubeChannelVideo[] = [];
+      const found = new Set<string>();
+      if (ids.length > 0) {
+        const details = new URL(`${YOUTUBE_DATA_API}/videos`);
+        details.searchParams.set('part', 'snippet,contentDetails,status');
+        details.searchParams.set('id', ids.join(','));
+        const data = await authorizedJson<VideosResponse>(
+          details,
+          input.accessToken,
+          fetcher,
+          'YouTube video details'
+        );
+        for (const item of data.items ?? []) {
+          const video = toChannelVideo(item, channelId);
+          const videoId = item.id?.trim() || null;
+          if (!video) {
+            skipped.push({
+              videoId,
+              reason: 'wrong_channel',
+            });
+            if (videoId) found.add(videoId);
+            continue;
+          }
+          found.add(video.videoId);
+          videos.push(video);
+        }
+      }
+      for (const videoId of ids) {
+        if (!found.has(videoId))
+          skipped.push({ videoId, reason: 'missing_id' });
+      }
+      return {
+        channelId: channel.id,
+        channelTitle: channel.title,
+        uploadsPlaylistId: channel.uploadsPlaylistId,
+        videos,
+        nextPageToken: playlist.nextPageToken ?? null,
+        skipped,
+      };
+    },
+
     async listChannelVideos(channelId) {
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,

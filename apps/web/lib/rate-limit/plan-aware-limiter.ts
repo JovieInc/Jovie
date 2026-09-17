@@ -140,8 +140,12 @@ export function createPlanAwareRateLimiter(
       }
     }
 
-    // Create new limiter
-    const limiter = createRateLimiter(config, { preferRedis });
+    // Create new limiter. Honor config.requireRedis so paid quotas cannot
+    // silently degrade to per-instance memory via this factory.
+    const limiter = createRateLimiter(config, {
+      preferRedis,
+      requireRedis: config.requireRedis,
+    });
     limiterCache.set(plan, limiter);
     return limiter;
   }
@@ -155,7 +159,10 @@ export function createPlanAwareRateLimiter(
       if (!result.success) {
         return {
           ...result,
-          reason: errorMessage(normalizedPlan),
+          reason:
+            result.unavailable === true
+              ? result.reason
+              : errorMessage(normalizedPlan),
         };
       }
 

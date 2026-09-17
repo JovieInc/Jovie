@@ -77,6 +77,6 @@
   },
   "sitemap": {
     "minEntries": 1,
-    "requireLastModified": true
+    "requireLastModified": false
   }
 }

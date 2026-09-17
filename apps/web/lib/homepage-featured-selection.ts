@@ -10,6 +10,7 @@ import {
   getFeaturedCreators,
 } from '@/lib/featured-creators';
 import { transformImageUrl } from '@/lib/images/versioning';
+import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-indexing-policy';
 
 export interface HomepageFeaturedSelectionOptions {
   readonly pinnedHandle?: string;
@@ -76,7 +77,13 @@ async function queryHomepageFeaturedCandidates(): Promise<
       .orderBy(creatorProfiles.displayName)
       .limit(50);
 
-    return rows.map(row => ({
+    return filterPublicDiscoveryIdentities(
+      rows.map(row => ({
+        ...row,
+        handle: row.username,
+        isPublic: true,
+      }))
+    ).map(row => ({
       id: row.id,
       handle: row.username,
       name: row.displayName || row.username,

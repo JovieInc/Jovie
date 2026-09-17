@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  artistNavigation,
-  primaryNavigation,
+  canonicalSidebarNavigation,
+  chatNavItem,
+  inboxNavItem,
 } from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
@@ -68,29 +69,35 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('keeps canonical navigation in warm-measurement parity', () => {
+  it('keeps desktop-visible navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
-    const canonicalNavigation = [...primaryNavigation, ...artistNavigation];
+    const desktopVisibleNavigation = [
+      inboxNavItem,
+      chatNavItem,
+      ...canonicalSidebarNavigation,
+    ];
     const warmRoutesByNavigationItem = new Map(
       routes
         .filter(
           route =>
             route.measureMode === 'warm-navigation' &&
             route.navigationItemId &&
-            route.navigationItemId !== 'profile'
+            route.navigationItemId !== 'profile' &&
+            route.navigationItemId !== 'tasks'
         )
         .map(route => [route.navigationItemId, route])
     );
 
     expect([...warmRoutesByNavigationItem.keys()].sort()).toEqual(
-      canonicalNavigation.map(item => item.id).sort()
+      desktopVisibleNavigation.map(item => item.id).sort()
     );
+    expect(warmRoutesByNavigationItem.has('calendar')).toBe(false);
 
-    for (const item of canonicalNavigation) {
+    for (const item of desktopVisibleNavigation) {
       const route = warmRoutesByNavigationItem.get(item.id);
       expect(
         route,
-        `canonical nav item "${item.id}" must have warm-navigation coverage`
+        `desktop-visible nav item "${item.id}" must have warm-navigation coverage`
       ).toBeDefined();
       expect(route?.path).toBe(item.href);
       expect(route?.warmupStrategy).toBe('authenticated-shell');

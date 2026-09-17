@@ -57,7 +57,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     (profile.settings as Record<string, unknown> | null) ?? null;
   const artistName = profile.display_name || profile.username;
   const handle = profile.username_normalized || profile.username.toLowerCase();
-  if (!isPublicProfileIndexable(handle)) {
+  if (!isPublicProfileIndexable(handle, artistName)) {
     return new NextResponse('Not found', {
       status: 404,
       headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
