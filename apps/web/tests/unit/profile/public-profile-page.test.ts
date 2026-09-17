@@ -1022,10 +1022,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('keeps the proxy duplicate-source allowlist aligned with alias slugs', () => {
-    const proxySource = readFileSync(
-      path.join(WEB_ROOT, 'proxy.ts'),
-      'utf8'
-    );
+    const proxySource = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
     const aliasBlock = proxySource.match(
       /const LEGACY_PROFILE_MODE_ALIASES = new Set\(\[([\s\S]*?)\]\)/
     )?.[1];
