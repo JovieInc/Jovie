@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -131,9 +132,33 @@ def exact_sha(value: object, label: str) -> str:
         not isinstance(value, str)
         or len(value) != 40
         or any(character not in SHA for character in value)
+        or set(value) == {"0"}
     ):
         raise ValueError(f"{label} is not an exact SHA")
     return value
+
+
+def resolve_main_sha(main: object) -> str:
+    """Fail closed on zeros; fall back to the Jovie mirror tip, never publish 0{40}."""
+    sha = main.get("sha") if isinstance(main, dict) else None
+    try:
+        return exact_sha(sha, "main SHA")
+    except ValueError:
+        pass
+    git_dir = os.environ.get(
+        "JOVIE_CONFIGURATION_SOURCE_ROOT", "/srv/git/mirrors/Jovie.git"
+    )
+    for ref in ("refs/heads/main", "origin/main", "HEAD"):
+        try:
+            out = subprocess.check_output(
+                ["git", "--git-dir", git_dir, "rev-parse", ref],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            return exact_sha(out, "main SHA")
+        except (OSError, subprocess.CalledProcessError, ValueError):
+            continue
+    raise ValueError("main-sha-unavailable")
 
 
 def exact_digest(value: object, label: str) -> str:
@@ -329,7 +354,7 @@ def compose_snapshot(
     runtime_revision = attested_runtime_revision(
         signals, runtime, now, attestation
     )
-    main_sha = exact_sha(main.get("sha"), "main SHA")
+    main_sha = resolve_main_sha(main)
     production_sha_raw = production.get("deployedSha")
     production_sha = (
         exact_sha(production_sha_raw, "production SHA")

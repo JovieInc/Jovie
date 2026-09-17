@@ -13,8 +13,17 @@ export const MUTATION_AUTHORITY_UNAVAILABLE =
   'native-queue-mutation-authority-unavailable';
 export const NO_GREEN_READY_PR = 'native-queue-no-green-ready-pr';
 export const ENROLL_EXACT_HEAD = 'native-queue-enroll-exact-head';
+export const PR_CHURN_EJECT = 'native-queue-pr-churn-eject';
+export const WAITING_DURABLE_ORACLE = 'native-queue-waiting-durable-oracle';
 export const AUTONOMOUS_LINEAR_WORKER = 'unassigned-machine';
 export const FOUNDER_LINEAR_ASSIGNEE = 'Tim White';
+export const NATIVE_QUEUE_ACTION = 'reconcile-native-queue-starvation';
+export const RELEASE_CERT_ACTION = 'reconcile-release-certification-starvation';
+export const ENROLLABLE_ACTIONS = Object.freeze([
+  NATIVE_QUEUE_ACTION,
+  RELEASE_CERT_ACTION,
+]);
+export const SUMMER_ISSUE_BIND_MARKER = '<!-- summer-issue-bind -->';
 
 export function assertAutonomousClaim(claim) {
   const state = claim?.state;
@@ -54,27 +63,144 @@ export function selectGreenReadyPrs(fleet) {
   return Array.isArray(ready) ? ready : [];
 }
 
+export function appendSummerIssueBind(body, issueIdentifier, taskKey) {
+  if (!/^JOV-[1-9][0-9]*$/u.test(issueIdentifier ?? '')) {
+    return typeof body === 'string' ? body : '';
+  }
+  const current = typeof body === 'string' ? body : '';
+  if (current.includes(issueIdentifier)) return current;
+  const taskLine =
+    typeof taskKey === 'string' && /^[a-f0-9]{64}$/u.test(taskKey)
+      ? `\ntaskKey:${taskKey}`
+      : '';
+  const bind = `${SUMMER_ISSUE_BIND_MARKER}\n${issueIdentifier}${taskLine}\n`;
+  return current.trimEnd() ? `${current.trimEnd()}\n\n${bind}` : bind;
+}
+
+export function lastMergeQueueTimelineEvent(timeline) {
+  const events = Array.isArray(timeline)
+    ? timeline.filter(
+        event =>
+          event?.__typename === 'AddedToMergeQueueEvent' ||
+          event?.__typename === 'RemovedFromMergeQueueEvent' ||
+          event?.__typename === 'MergedEvent'
+      )
+    : [];
+  return events.length > 0 ? events[events.length - 1] : null;
+}
+
+export function hasGithubMergeQueueRemove(timeline) {
+  return (
+    Array.isArray(timeline) &&
+    timeline.some(
+      event =>
+        event?.__typename === 'RemovedFromMergeQueueEvent' &&
+        (event?.actor?.login === 'github-merge-queue' || !event?.actor)
+    )
+  );
+}
+
+export function readCapturedMergeQueueEntryId(body) {
+  const match = String(body ?? '').match(
+    /mergeQueueEntryId:(MQE_[A-Za-z0-9]+)/u
+  );
+  return match ? match[1] : null;
+}
+
+export function appendMergeQueueEntryBind(body, entryId) {
+  if (typeof entryId !== 'string' || !entryId.startsWith('MQE_')) {
+    return typeof body === 'string' ? body : '';
+  }
+  const current = typeof body === 'string' ? body : '';
+  if (current.includes(`mergeQueueEntryId:${entryId}`)) return current;
+  const line = `mergeQueueEntryId:${entryId}\n`;
+  return current.trimEnd() ? `${current.trimEnd()}\n${line}` : line;
+}
+
+/**
+ * Occupancy is not a ship. Pass only when mergedAt is set, or the live
+ * mergeQueueEntry.id is the previously captured id and the last timeline
+ * event for that enrollment is not a github-merge-queue remove.
+ *
+ * @param {{
+ *   mergedAt?: string | null,
+ *   mergeQueueEntry?: { id?: string, enqueuedAt?: string, state?: string } | null,
+ *   timeline?: object[],
+ *   capturedEntryId?: string | null,
+ * }} [input]
+ */
+export function assertDurableNativeQueueOracle({
+  mergedAt,
+  mergeQueueEntry,
+  timeline,
+  capturedEntryId,
+} = {}) {
+  if (typeof mergedAt === 'string' && mergedAt.trim() !== '') {
+    return { ok: true, detail: 'merged' };
+  }
+  const liveId =
+    typeof mergeQueueEntry?.id === 'string' && mergeQueueEntry.id
+      ? mergeQueueEntry.id
+      : null;
+  const last = lastMergeQueueTimelineEvent(timeline);
+  if (last?.__typename === 'RemovedFromMergeQueueEvent') {
+    return { ok: false, detail: PR_CHURN_EJECT };
+  }
+  if (
+    typeof capturedEntryId === 'string' &&
+    capturedEntryId.startsWith('MQE_') &&
+    liveId === capturedEntryId
+  ) {
+    return { ok: true, detail: 'same-entry' };
+  }
+  return { ok: false, detail: PR_CHURN_EJECT };
+}
+
+/**
+ * @param {{
+ *   mergeStateStatus?: string,
+ *   mergeQueueEntry?: { id?: string, enqueuedAt?: string, state?: string } | null,
+ *   mergedAt?: string | null,
+ *   timeline?: object[],
+ *   capturedEntryId?: string | null,
+ * }} [input]
+ */
+export function nativeQueueEnrollPlan({
+  mergeStateStatus,
+  mergeQueueEntry,
+  mergedAt,
+  timeline,
+  capturedEntryId,
+} = {}) {
+  if (typeof mergedAt === 'string' && mergedAt.trim() !== '') {
+    return { action: 'bind-merged' };
+  }
+  const durable = assertDurableNativeQueueOracle({
+    mergedAt,
+    mergeQueueEntry,
+    timeline,
+    capturedEntryId,
+  });
+  if (durable.ok) return { action: 'bind-durable-queue' };
+  if (hasGithubMergeQueueRemove(timeline)) {
+    return { action: 'reject', detail: PR_CHURN_EJECT };
+  }
+  if (mergeStateStatus === 'CLEAN') {
+    return { action: 'bind-and-await-bot' };
+  }
+  return {
+    action: 'reject',
+    detail: `native-queue-not-clean:${mergeStateStatus}`,
+  };
+}
+
 export function decideNativeQueueExecution(input) {
-  if (input?.action !== 'reconcile-native-queue-starvation') {
+  if (!ENROLLABLE_ACTIONS.includes(input?.action)) {
     throw new Error('native-queue-action-required');
   }
-  const maxConcurrent = input.maxConcurrent;
-  const mutationAllowed =
-    input.mutationAllowed === true &&
-    input.pushAllowed === true &&
-    Number.isInteger(maxConcurrent) &&
-    !Number.isNaN(maxConcurrent) &&
-    maxConcurrent > 0;
-  if (!mutationAllowed) {
-    return {
-      status: 'failed',
-      detail: MUTATION_AUTHORITY_UNAVAILABLE,
-      mutationAttempted: false,
-      authority: MUTATION_AUTHORITY_UNAVAILABLE,
-      pr: null,
-      head: null,
-    };
-  }
+  // Enrolling an already-green PR into the native queue is the starvation
+  // repair for both native-queue-starvation and release-certification-starvation.
+  // New-branch mutation seats (maxConcurrent) do not gate that.
   const prs = input.greenReadyPrs;
   if (!Array.isArray(prs) || prs.length === 0) {
     return {
@@ -85,36 +211,44 @@ export function decideNativeQueueExecution(input) {
         'exact-source-ci-native-queue-production-gates-remain-required',
       pr: null,
       head: null,
+      mergeQueueEntryId: null,
+      mergedAt: null,
     };
   }
-  const first = prs[0];
-  const pr = Number.isInteger(first)
-    ? first
-    : Number.isInteger(first?.number)
-      ? first.number
-      : null;
-  const head =
-    typeof first?.head === 'string' && /^[a-f0-9]{40}$/u.test(first.head)
-      ? first.head
-      : null;
-  if (!Number.isInteger(pr) || pr <= 0) {
+  for (const row of prs) {
+    if (row?.churned === true) continue;
+    const pr = Number.isInteger(row)
+      ? row
+      : Number.isInteger(row?.number)
+        ? row.number
+        : null;
+    const head =
+      typeof row?.head === 'string' && /^[a-f0-9]{40}$/u.test(row.head)
+        ? row.head
+        : null;
+    if (!Number.isInteger(pr) || pr <= 0) continue;
     return {
-      status: 'failed',
-      detail: NO_GREEN_READY_PR,
-      mutationAttempted: false,
+      status: 'ready-to-enroll',
+      detail: ENROLL_EXACT_HEAD,
+      mutationAttempted: true,
       authority:
         'exact-source-ci-native-queue-production-gates-remain-required',
-      pr: null,
-      head: null,
+      pr,
+      head,
+      candidates: prs,
+      mergeQueueEntryId: null,
+      mergedAt: null,
     };
   }
   return {
-    status: 'ready-to-enroll',
-    detail: ENROLL_EXACT_HEAD,
-    mutationAttempted: true,
+    status: 'failed',
+    detail: PR_CHURN_EJECT,
+    mutationAttempted: false,
     authority: 'exact-source-ci-native-queue-production-gates-remain-required',
-    pr,
-    head,
+    pr: null,
+    head: null,
+    mergeQueueEntryId: null,
+    mergedAt: null,
   };
 }
 
@@ -124,7 +258,7 @@ export function unsignedNativeQueueExecution(input) {
     schema: EXECUTION_SCHEMA,
     taskKey: input.taskKey,
     issueIdentifier: input.issueIdentifier,
-    action: 'reconcile-native-queue-starvation',
+    action: NATIVE_QUEUE_ACTION,
     status: decision.status === 'succeeded' ? 'succeeded' : 'failed',
     detail: String(decision.detail).slice(0, 240),
     completedAt: input.completedAt,
@@ -139,7 +273,9 @@ export function unsignedNativeQueueExecution(input) {
       head: decision.head,
     },
     source: {
-      action: 'reconcile-native-queue-starvation',
+      action: ENROLLABLE_ACTIONS.includes(input.action)
+        ? input.action
+        : NATIVE_QUEUE_ACTION,
       snapshotDigest: input.source.snapshotDigest,
       sourceVersion: input.source.sourceVersion,
     },
@@ -179,46 +315,95 @@ export async function executeNativeQueueStarvation({
   if (!/^JOV-[1-9][0-9]*$/u.test(issueIdentifier ?? '')) {
     throw new Error('issue-identifier-invalid');
   }
+  const action = ENROLLABLE_ACTIONS.includes(admission?.action)
+    ? admission.action
+    : NATIVE_QUEUE_ACTION;
   const decision = decideNativeQueueExecution({
-    action: 'reconcile-native-queue-starvation',
     ...admission,
+    action,
   });
   const claim = await claimIssue({
     identifier: issueIdentifier,
     state: 'In Progress',
   });
+  const authority =
+    'exact-source-ci-native-queue-production-gates-remain-required';
   let finalDecision = decision;
+  const candidates = Array.isArray(decision.candidates)
+    ? decision.candidates
+    : decision.pr
+      ? [{ number: decision.pr, head: decision.head }]
+      : [];
   if (decision.status === 'ready-to-enroll') {
-    const enrolled = await enrollPr({
-      pr: decision.pr,
-      head: decision.head,
-    });
-    finalDecision = enrolled?.ok
-      ? {
-          status: 'succeeded',
-          detail: `enrolled PR #${decision.pr}`,
-          mutationAttempted: true,
-          authority:
-            'exact-source-ci-native-queue-production-gates-remain-required',
-          pr: decision.pr,
-          head: enrolled.head ?? decision.head,
+    let lastFail = null;
+    for (const candidate of candidates) {
+      const pr = Number.isInteger(candidate) ? candidate : candidate?.number;
+      if (!Number.isInteger(pr) || pr <= 0) continue;
+      try {
+        const enrolled = await enrollPr({
+          pr,
+          head: candidate?.head ?? decision.head,
+          issueIdentifier,
+          taskKey,
+        });
+        const durable =
+          enrolled?.ok === true &&
+          enrolled?.durable === true &&
+          (typeof enrolled.mergeQueueEntryId === 'string' ||
+            typeof enrolled.mergedAt === 'string');
+        if (durable) {
+          finalDecision = {
+            status: 'succeeded',
+            detail: `enrolled PR #${pr}`,
+            mutationAttempted: true,
+            authority,
+            pr,
+            head: enrolled.head ?? candidate?.head ?? decision.head,
+            mergeQueueEntryId: enrolled.mergeQueueEntryId ?? null,
+            mergedAt: enrolled.mergedAt ?? null,
+          };
+          lastFail = null;
+          break;
         }
-      : {
+        lastFail = {
           status: 'failed',
           detail: String(
             enrolled?.reason ?? 'native-queue-enroll-failed'
           ).slice(0, 240),
           mutationAttempted: true,
-          authority:
-            'exact-source-ci-native-queue-production-gates-remain-required',
-          pr: decision.pr,
-          head: enrolled?.head ?? decision.head,
+          authority,
+          pr,
+          head: enrolled?.head ?? candidate?.head ?? decision.head,
+          mergeQueueEntryId: enrolled?.mergeQueueEntryId ?? null,
+          mergedAt: enrolled?.mergedAt ?? null,
         };
+        if (enrolled?.reason !== PR_CHURN_EJECT) break;
+      } catch (error) {
+        lastFail = {
+          status: 'failed',
+          detail: String(error instanceof Error ? error.message : error).slice(
+            0,
+            240
+          ),
+          mutationAttempted: true,
+          authority,
+          pr,
+          head: candidate?.head ?? decision.head,
+          mergeQueueEntryId: null,
+          mergedAt: null,
+        };
+        break;
+      }
+    }
+    if (finalDecision.status !== 'succeeded' && lastFail) {
+      finalDecision = lastFail;
+    }
   }
   const record = signNativeQueueExecution(
     {
       taskKey,
       issueIdentifier,
+      action,
       source,
       decision: finalDecision,
       completedAt: now(),
@@ -230,11 +415,40 @@ export async function executeNativeQueueStarvation({
     },
     privateKeyPem
   );
-  const acknowledgement = await writeExecution(record);
-  const terminal = await completeIssue({
-    identifier: issueIdentifier,
-    state: 'Done',
-  });
+  let acknowledgement;
+  try {
+    acknowledgement = await writeExecution(record);
+  } catch (error) {
+    acknowledgement = {
+      status: 'execution-write-failed',
+      detail: String(error instanceof Error ? error.message : error).slice(
+        0,
+        240
+      ),
+    };
+    if (finalDecision.status === 'succeeded') {
+      finalDecision = {
+        ...finalDecision,
+        detail: `${finalDecision.detail};${acknowledgement.detail}`.slice(
+          0,
+          240
+        ),
+      };
+    }
+  }
+  let terminal = {
+    state: claim?.state ?? 'In Progress',
+    assignee: claim?.assignee ?? AUTONOMOUS_LINEAR_WORKER,
+  };
+  if (
+    finalDecision.status === 'succeeded' &&
+    (finalDecision.mergeQueueEntryId || finalDecision.mergedAt)
+  ) {
+    terminal = await completeIssue({
+      identifier: issueIdentifier,
+      state: 'Done',
+    });
+  }
   return {
     status: 'execution-recorded',
     taskKey,

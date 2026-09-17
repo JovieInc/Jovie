@@ -18,12 +18,14 @@ import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
 TASK_KEY = re.compile(r"^[a-f0-9]{64}$")
-SOURCE_SHA = re.compile(r"^[a-f0-9]{40}$")
+SOURCE_SHA = re.compile(r"^(?!0{40})[a-f0-9]{40}$")
 ISSUE_ID = re.compile(r"^JOV-[1-9][0-9]*$")
 NATIVE_QUEUE_ACTION = "reconcile-native-queue-starvation"
+RELEASE_CERT_ACTION = "reconcile-release-certification-starvation"
+ENROLLABLE_ACTIONS = frozenset({NATIVE_QUEUE_ACTION, RELEASE_CERT_ACTION})
 
 
-def report_delivery(stage: str, result) -> None:
+def report_delivery(stage: str, result, **extra) -> None:
     """Expose bounded correlation/error metadata, never raw child output or keys."""
     report = {"schema": "jovie.summer-delivery-observation/v1",
               "stage": stage, "returncode": result.returncode}
@@ -44,10 +46,16 @@ def report_delivery(stage: str, result) -> None:
         if isinstance(value, dict):
             receipt = value.get("eve", {})
             receipt = receipt.get("receipt", {}) if isinstance(receipt, dict) else {}
-            for key in ("eventId", "taskKey", "status", "state", "reason"):
+            for key in ("eventId", "taskKey", "status", "state", "reason", "detail"):
                 item = value.get(key) or (receipt.get(key) if isinstance(receipt, dict) else None)
-                if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", item):
+                if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:# /-]{1,240}", item):
                     report[key] = item
+        pr = value.get("pr") if isinstance(value, dict) else None
+        if isinstance(pr, int) and not isinstance(pr, bool) and pr > 0:
+            report["pr"] = pr
+    for key, item in extra.items():
+        if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:# /-]{1,240}", item):
+            report[key] = item
     print(json.dumps(report, sort_keys=True), flush=True)
 
 
@@ -124,7 +132,8 @@ def native_queue_execution_argv(stdout: str, fleet_path: Path) -> list[str] | No
         return None
     if value.get("status") != "projection-recorded":
         return None
-    if value.get("action") != NATIVE_QUEUE_ACTION:
+    action = value.get("action")
+    if action not in ENROLLABLE_ACTIONS:
         return None
     task_key = value.get("taskKey")
     issue = value.get("issueIdentifier")
@@ -149,6 +158,7 @@ def native_queue_execution_argv(stdout: str, fleet_path: Path) -> list[str] | No
         source_version,
         snapshot_digest,
         str(fleet_path),
+        action,
     ]
 
 
@@ -160,6 +170,30 @@ def run_native_queue_starvation_execute(stdout: str) -> int:
     fleet_path = workspace / "state/gem-priority-gate/latest.json"
     argv = native_queue_execution_argv(stdout, fleet_path)
     if argv is None:
+        try:
+            payload = json.loads(stdout or "")
+        except (ValueError, TypeError):
+            payload = {}
+        if (
+            isinstance(payload, dict)
+            and payload.get("status") == "projection-recorded"
+        ):
+            print(
+                json.dumps(
+                    {
+                        "schema": "jovie.summer-delivery-observation/v1",
+                        "stage": "native-queue-execution",
+                        "returncode": 1,
+                        "status": "executor-unbound-action",
+                        "action": payload.get("action"),
+                        "taskKey": payload.get("taskKey"),
+                    },
+                    sort_keys=True,
+                    default=str,
+                ),
+                flush=True,
+            )
+            return 1
         return 0
     try:
         executed = subprocess.run(
@@ -170,7 +204,17 @@ def run_native_queue_starvation_execute(stdout: str) -> int:
         )
     except (OSError, subprocess.SubprocessError):
         return 1
-    report_delivery("native-queue-execution", executed)
+    if executed.returncode:
+        err_path = workspace / "state/last-native-queue-execute.stderr"
+        err_path.parent.mkdir(parents=True, exist_ok=True)
+        err_path.write_text((executed.stderr or "")[-4000:])
+        detail = (executed.stderr or "").strip().splitlines()
+        detail = next((line for line in reversed(detail) if line.strip()), "")[:240]
+        # One stdout line per delivery stage: surface the execute failure detail
+        # as a bounded field on the native-queue-execution receipt itself.
+        report_delivery("native-queue-execution", executed, detail=detail)
+    else:
+        report_delivery("native-queue-execution", executed)
     return executed.returncode
 
 

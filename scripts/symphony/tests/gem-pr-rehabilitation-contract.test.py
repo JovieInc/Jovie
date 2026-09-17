@@ -373,7 +373,24 @@ class DeploymentContractTests(unittest.TestCase):
         argv = CYCLE.native_queue_execution_argv(stdout, fleet)
         self.assertEqual(argv[0], "node")
         self.assertTrue(argv[1].endswith("run-native-queue-execution.mjs"))
-        self.assertEqual(argv[2:], [task_key, "JOV-6329", source, digest, str(fleet)])
+        self.assertEqual(argv[2:], [
+            task_key, "JOV-6329", source, digest, str(fleet),
+            "reconcile-native-queue-starvation",
+        ])
+        release = json.dumps({
+            "schema": "jovie.summer-symphony-consumer-cycle/v1",
+            "status": "projection-recorded",
+            "taskKey": task_key,
+            "issueIdentifier": "JOV-6329",
+            "acknowledgement": "recorded",
+            "action": "reconcile-release-certification-starvation",
+            "sourceVersion": source,
+            "snapshotDigest": digest,
+        })
+        self.assertEqual(
+            CYCLE.native_queue_execution_argv(release, fleet)[7],
+            "reconcile-release-certification-starvation",
+        )
         self.assertIsNone(CYCLE.native_queue_execution_argv(
             json.dumps({"status": "healthy-noop"}), fleet))
         self.assertIsNone(CYCLE.native_queue_execution_argv(
@@ -383,6 +400,17 @@ class DeploymentContractTests(unittest.TestCase):
                 "issueIdentifier": "JOV-6329",
                 "action": "remediate-selected-ci-audit-class",
                 "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-6329",
+                "action": "reconcile-native-queue-starvation",
+                "sourceVersion": "0" * 40,
                 "snapshotDigest": digest,
             }),
             fleet,
@@ -458,6 +486,78 @@ class DeploymentContractTests(unittest.TestCase):
             CYCLE.os.environ, {"GEM_WORKSPACE": "/tmp/gem-workspace"}, clear=False
         ):
             self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+
+    def test_projection_recorded_unbound_action_is_named_not_silent_skip(self):
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6403",
+            "action": "remediate-selected-ci-audit-class",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["status"], "executor-unbound-action")
+        self.assertEqual(report["action"], "remediate-selected-ci-audit-class")
+
+    def test_projection_stdout_that_is_not_json_is_a_quiet_noop(self) -> None:
+        with mock.patch.object(CYCLE.subprocess, "run") as run:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute("not-json"), 0)
+            run.assert_not_called()
+
+    def test_execute_success_reports_a_single_native_queue_receipt(self) -> None:
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6404",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+
+        def run(args, **kwargs):
+            self.assertTrue(str(args[1]).endswith("run-native-queue-execution.mjs"))
+            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 0)
+        stages = [json.loads(line)["stage"] for line in output.getvalue().splitlines() if line.strip()]
+        self.assertEqual(stages, ["native-queue-execution"])
+
+    def test_consumer_non_json_stdout_still_records_the_stage_once(self) -> None:
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="not-json", stderr="")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+
+    def test_report_receipt_surfaces_positive_pr_binding(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            CYCLE.report_delivery(
+                "outbox-consumption",
+                SimpleNamespace(returncode=0, stdout=json.dumps({"status": "projection-recorded", "pr": 17923})),
+            )
+        value = json.loads(output.getvalue())
+        self.assertEqual(value["pr"], 17923)
+
+    def test_report_receipt_rejects_unbounded_detail_strings(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            CYCLE.report_delivery(
+                "native-queue-execution",
+                SimpleNamespace(returncode=1, stdout="", stderr="boom"),
+                detail="multi\nline\x01secret-token",
+            )
+        raw = output.getvalue()
+        self.assertNotIn("secret-token", raw)
+        value = json.loads(raw)
+        self.assertNotIn("detail", value)
 
     def test_consumer_healthy_noop_does_not_spawn_execute(self):
         calls = []
