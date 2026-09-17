@@ -12,7 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
+import {
+  resolveTrustedArtifactId,
+  resolveTrustedScreenProof,
+} from './screen-proof-resolver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
@@ -960,8 +963,54 @@ export function runScreenCertification(options = {}) {
   // rejections surface as specific issues and never as silent passes.
   const proofs = [...(options.proofs ?? [])];
   const requested = Array.isArray(options.proofRequests)
-    ? options.proofRequests
+    ? [...options.proofRequests]
     : [];
+  const artifactRequest = {
+    artifactId: Number(
+      options.artifactId ?? process.env.SCREEN_CERT_ARTIFACT_ID ?? ''
+    ),
+    artifactName:
+      options.marketingArtifactName ??
+      process.env.SCREEN_CERT_MARKETING_ARTIFACT ??
+      '',
+  };
+  const pendingScreens = [];
+  const seenPending = new Set();
+  for (const file of normalizeChanged(changedFiles)) {
+    const classified = classifyScreenPath(file.path, registry);
+    if (
+      classified.kind === 'registered' &&
+      !seenPending.has(classified.entry.id)
+    ) {
+      seenPending.add(classified.entry.id);
+      pendingScreens.push(classified.entry);
+    }
+  }
+  const wantsArtifact =
+    Number.isSafeInteger(artifactRequest.artifactId) &&
+    artifactRequest.artifactId > 0
+      ? artifactRequest.artifactId
+      : artifactRequest.artifactName
+        ? resolveTrustedArtifactId({
+            artifactName: artifactRequest.artifactName,
+            headSha,
+          })
+        : null;
+  if (
+    pendingScreens.length > 0 &&
+    requested.length === 0 &&
+    (artifactRequest.artifactName ||
+      (Number.isSafeInteger(artifactRequest.artifactId) &&
+        artifactRequest.artifactId > 0))
+  ) {
+    if (!wantsArtifact) {
+      issues.push('controlled GitHub artifact resolver is unavailable');
+    } else {
+      for (const screen of pendingScreens) {
+        requested.push({ artifactId: wantsArtifact, screenId: screen.id });
+      }
+    }
+  }
   for (const request of requested) {
     const resolved = resolveTrustedProofForScreen({
       ...request,
@@ -1087,6 +1136,12 @@ if (isMain) {
   const artifactRoot = process.argv
     .find(arg => arg.startsWith('--artifact-root='))
     ?.slice('--artifact-root='.length);
+  const artifactId = process.argv
+    .find(arg => arg.startsWith('--artifact-id='))
+    ?.slice('--artifact-id='.length);
+  const marketingArtifactName = process.argv
+    .find(arg => arg.startsWith('--marketing-artifact='))
+    ?.slice('--marketing-artifact='.length);
   const receiptOut = process.argv
     .find(arg => arg.startsWith('--receipt-out='))
     ?.slice('--receipt-out='.length);
@@ -1107,6 +1162,8 @@ if (isMain) {
     proofs,
     registrationOnly,
     artifactRoot,
+    ...(artifactId ? { artifactId: Number(artifactId) } : {}),
+    ...(marketingArtifactName ? { marketingArtifactName } : {}),
   });
   if (receiptOut) {
     // The receipt is the immutable machine record: exact head/base, per-screen

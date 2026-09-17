@@ -63,4 +63,27 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(workflow).toContain("- 'apps/web/lib/agent-os/visual-qa/**'");
     expect(workflow).toContain("- 'apps/web/tests/visual-qa/**'");
   });
+
+  it('certifies uploaded marketing captures through the trusted shipping gate', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const upload = getStepBlock(
+      workflow,
+      'Upload exact marketing route captures'
+    );
+    const certify = getStepBlock(workflow, 'Certify exact marketing captures');
+
+    expect(
+      stepIndex(workflow, 'Upload exact marketing route captures')
+    ).toBeLessThan(stepIndex(workflow, 'Certify exact marketing captures'));
+    expect(upload).toContain('id: marketing-captures');
+    expect(certify).toContain('pnpm screen-certification-gate');
+    expect(certify).toContain(
+      'SCREEN_CERT_MARKETING_ARTIFACT: marketing-route-screenshots-${{ github.sha }}'
+    );
+    expect(certify).toContain(
+      'SCREEN_CERT_ARTIFACT_ID: ${{ steps.marketing-captures.outputs.artifact-id }}'
+    );
+    expect(certify).toContain('SCREEN_CERT_DIFF_BASE');
+    expect(certify).toContain('working-directory: .');
+  });
 });
