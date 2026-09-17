@@ -65,8 +65,7 @@ export function ProductLanding() {
       <div className='product-hero relative overflow-hidden'>
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-0'
-          style={{ background: 'var(--linear-hero-backdrop)' }}
+          className='marketing-hero-backdrop pointer-events-none absolute inset-0'
         />
         <div className='hero-glow product-hero-glow pointer-events-none absolute inset-x-0 top-0' />
         <MarketingHero
@@ -79,7 +78,7 @@ export function ProductLanding() {
             <h1
               id='product-hero-heading'
               data-testid='product-hero-heading'
-              className='marketing-h1-linear marketing-h1-max-two-lines mt-6 text-primary-token'
+              className='marketing-h1-linear marketing-h1-max-two-lines line-clamp-2 mt-6 text-primary-token'
             >
               {hero.headline}
             </h1>

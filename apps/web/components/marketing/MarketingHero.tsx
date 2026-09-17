@@ -331,8 +331,7 @@ function MarketingHeroLanding({
     >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
-        style={{ background: 'var(--linear-hero-backdrop)' }}
+        className='marketing-hero-backdrop pointer-events-none absolute inset-0'
       />
       <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
