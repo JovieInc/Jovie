@@ -87,6 +87,11 @@ function getRlsSessionSetFallbackSql(userId: string) {
   return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`;
 }
 
+/** Read current RLS actor from the same handle that ran set_config. */
+export function getRlsIdentityReadSql() {
+  return drizzleSql`SELECT current_setting('app.clerk_user_id', true) AS clerk_user_id`;
+}
+
 /**
  * Clear any stale RLS identity left on a pooled connection.
  */
@@ -112,8 +117,8 @@ export async function applyRlsTransactionUser(
 }
 
 /**
- * Reset then set the RLS session user on a pooled connection (session-scoped).
- * Quarantined for non-transaction pooled use only.
+ * Session-scoped RLS identity. Quarantined: does not bind later queries.
+ * Protected SQL must use `applyRlsTransactionUser` on the same tx handle.
  */
 export async function applyRlsSessionUser(
   db: ExecuteClient,
@@ -142,6 +147,9 @@ export async function applyRlsSessionUser(
   }
 }
 
+/** Deliberate-red unpinned helper. Do not use for protected queries. */
+export const applyUnpinnedRlsSessionUser = applyRlsSessionUser;
+
 /**
  * Helper to safely execute database operations with error handling and retry logic
  */
@@ -159,10 +167,8 @@ export async function withDb<T>(
 }
 
 /**
- * Set session user ID for RLS policies with retry logic.
- *
- * Clears any stale identity on the pooled connection before setting the
- * current user's `app.clerk_user_id` via session-scoped set_config.
+ * Quarantined session-scoped RLS setup. New protected paths must use
+ * `withDbSessionTx` / `applyRlsTransactionUser`.
  */
 export async function setSessionUser(userId: string): Promise<void> {
   try {

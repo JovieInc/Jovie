@@ -27,6 +27,7 @@ export {
   // Session helpers
   applyRlsSessionUser,
   applyRlsTransactionUser,
+  applyUnpinnedRlsSessionUser,
   // Health checks
   checkDbHealth,
   checkDbPerformance,
@@ -39,6 +40,7 @@ export {
   getDb,
   getDbConfig,
   getPoolMetrics,
+  getRlsIdentityReadSql,
   getRlsSessionResetSql,
   getRlsSessionSetSql,
   getRlsTransactionSessionSetSql,

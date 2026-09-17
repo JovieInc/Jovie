@@ -68,6 +68,7 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
+import { requireOwnedReleaseProfile } from '@/lib/releases/owned-profile';
 import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
 import {
   archiveRelease,
@@ -1161,11 +1162,7 @@ export async function checkSpotifyConnectionForProfile(
 }> {
   noStore();
 
-  // Auth guard: verify caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   const settings = profile.settings;
   const artistName = (settings?.spotifyArtistName as string) ?? null;
@@ -1190,7 +1187,7 @@ export async function checkSpotifyConnectionForProfile(
       '[checkSpotifyConnectionForProfile] Spotify state inconsistency: artistName set but spotifyId is null',
       new Error('Spotify state inconsistency'),
       {
-        profileId: profile.profileId,
+        profileId: owned.profileId,
         artistName,
         spotifyImportStatus: spotifyImportStatus ?? 'none',
       }
@@ -1206,7 +1203,7 @@ export async function checkSpotifyConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.creatorProfileId, owned.profileId),
         eq(dspArtistMatches.providerId, 'spotify')
       )
     )
@@ -1705,11 +1702,7 @@ export async function checkAppleMusicConnectionForProfile(
 }> {
   noStore();
 
-  // Auth guard: verify caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   const [match] = await db
     .select({
@@ -1720,7 +1713,7 @@ export async function checkAppleMusicConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.creatorProfileId, owned.profileId),
         eq(dspArtistMatches.providerId, 'apple_music')
       )
     )
