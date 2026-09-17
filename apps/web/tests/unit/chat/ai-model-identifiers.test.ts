@@ -34,8 +34,8 @@ describe('AI Gateway model identifiers', () => {
     expect(identifier).not.toContain(':');
   });
 
-  it('CHAT_MODEL specifies the anthropic provider', () => {
-    expect(CHAT_MODEL.split('/')[0]).toBe('anthropic');
+  it('CHAT_MODEL specifies the zai provider', () => {
+    expect(CHAT_MODEL.split('/')[0]).toBe('zai');
   });
 
   it('TITLE_MODEL specifies the google provider', () => {
