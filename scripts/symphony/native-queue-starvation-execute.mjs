@@ -124,7 +124,7 @@ export function appendMergeQueueEntryBind(body, entryId) {
  *
  * @param {{
  *   mergedAt?: string | null,
- *   mergeQueueEntry?: { id?: string } | null,
+ *   mergeQueueEntry?: { id?: string, enqueuedAt?: string, state?: string } | null,
  *   timeline?: object[],
  *   capturedEntryId?: string | null,
  * }} [input]
@@ -159,7 +159,7 @@ export function assertDurableNativeQueueOracle({
 /**
  * @param {{
  *   mergeStateStatus?: string,
- *   mergeQueueEntry?: { id?: string } | null,
+ *   mergeQueueEntry?: { id?: string, enqueuedAt?: string, state?: string } | null,
  *   mergedAt?: string | null,
  *   timeline?: object[],
  *   capturedEntryId?: string | null,
@@ -374,6 +374,8 @@ export async function executeNativeQueueStarvation({
           authority,
           pr,
           head: enrolled?.head ?? candidate?.head ?? decision.head,
+          mergeQueueEntryId: enrolled?.mergeQueueEntryId ?? null,
+          mergedAt: enrolled?.mergedAt ?? null,
         };
         if (enrolled?.reason !== PR_CHURN_EJECT) break;
       } catch (error) {
@@ -387,6 +389,8 @@ export async function executeNativeQueueStarvation({
           authority,
           pr,
           head: candidate?.head ?? decision.head,
+          mergeQueueEntryId: null,
+          mergedAt: null,
         };
         break;
       }
