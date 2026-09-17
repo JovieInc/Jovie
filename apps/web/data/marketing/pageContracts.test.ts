@@ -63,8 +63,7 @@ describe('marketing language context', () => {
       contract =>
         [APP_ROUTES.BLOG, APP_ROUTES.COMPARE, APP_ROUTES.ALTERNATIVES].some(
           prefix =>
-            contract.url === prefix ||
-            contract.url.startsWith(`${prefix}/`)
+            contract.url === prefix || contract.url.startsWith(`${prefix}/`)
         )
     );
     expect(contracts.length).toBeGreaterThan(0);
