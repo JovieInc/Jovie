@@ -78,6 +78,13 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/joviewhite')).toBe('joviewhite');
       expect(getPublicProfileCandidate('/user_123')).toBe('user_123');
       expect(getPublicProfileCandidate('/a.b-c')).toBe('a.b-c');
+      expect(getPublicProfileCandidate('/you')).toBe('you');
+    });
+
+    it('returns null for GSC-dead marketing roots that are reserved handles', () => {
+      expect(getPublicProfileCandidate('/product')).toBeNull();
+      expect(getPublicProfileCandidate('/music')).toBeNull();
+      expect(getPublicProfileCandidate('/shows')).toBeNull();
     });
 
     it('rejects too-short or invalid usernames', () => {

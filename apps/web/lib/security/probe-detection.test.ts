@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createFastGoneResponse,
   createProbeDropResponse,
   isMaliciousProbePath,
 } from './probe-detection';
@@ -166,6 +167,16 @@ describe('createProbeDropResponse', () => {
     const res = createProbeDropResponse();
     expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(res.headers.get('X-Robots-Tag')).toBe('none');
+    expect(res.headers.get('Content-Length')).toBe('0');
+  });
+});
+
+describe('createFastGoneResponse', () => {
+  it('returns a crawlable 410 so GSC can drop dead public roots', () => {
+    const res = createFastGoneResponse();
+    expect(res.status).toBe(410);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400');
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex');
     expect(res.headers.get('Content-Length')).toBe('0');
   });
 });

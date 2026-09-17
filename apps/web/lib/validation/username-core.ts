@@ -48,6 +48,12 @@ export const RESERVED_USERNAMES = [
   'engagement-engine',
   'artist-profiles',
 
+  // GSC-dead marketing roots — not claimable handles. Status 410 via
+  // public-url-policy.ts. Do not add `you`; it is a locked claim-card target.
+  'product',
+  'music',
+  'shows',
+
   // Legal/company pages
   'about', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS
   'contact', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS

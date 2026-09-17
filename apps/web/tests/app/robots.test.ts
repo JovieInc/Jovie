@@ -311,6 +311,23 @@ describe('robots.ts — production behavior', () => {
     expect(disallows).toContain('/api/');
   });
 
+  it('does not hide GSC recovery roots from recrawl', async () => {
+    const { getSitemapExcludedPublicPaths } = await import(
+      '@/lib/seo/public-url-policy'
+    );
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const disallows = allDisallows(rules);
+
+    for (const path of [...getSitemapExcludedPublicPaths(), '/you']) {
+      expect(disallows, `robots must still allow recrawl of ${path}`).not.toContain(
+        path
+      );
+      expect(disallows).not.toContain(`${path}/`);
+    }
+  });
+
   it.each(
     REQUIRED_AI_CRAWLERS
   )('explicitly allows AI crawler "%s" in production', async crawler => {

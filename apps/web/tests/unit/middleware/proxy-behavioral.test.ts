@@ -407,6 +407,25 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBe(404);
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
     });
+
+    it('returns 410 for GSC-dead marketing roots instead of a username miss', async () => {
+      for (const pathname of ['/product', '/music', '/shows']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status, pathname).toBe(410);
+        expect(res.headers.get('x-robots-tag')).toBe('noindex');
+        expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+      }
+    });
+
+    it('leaves /you as a claimable profile candidate until Summer seeds it', async () => {
+      const req = createUnauthenticatedRequest({ pathname: '/you' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).not.toBe(410);
+      expect(res.status).not.toBe(308);
+    });
   });
 
   // ==========================================================================
