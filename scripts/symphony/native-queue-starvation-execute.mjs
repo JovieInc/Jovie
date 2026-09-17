@@ -268,7 +268,27 @@ export async function executeNativeQueueStarvation({
     },
     privateKeyPem
   );
-  const acknowledgement = await writeExecution(record);
+  let acknowledgement;
+  try {
+    acknowledgement = await writeExecution(record);
+  } catch (error) {
+    acknowledgement = {
+      status: 'execution-write-failed',
+      detail: String(error instanceof Error ? error.message : error).slice(
+        0,
+        240
+      ),
+    };
+    if (finalDecision.status === 'succeeded') {
+      finalDecision = {
+        ...finalDecision,
+        detail: `${finalDecision.detail};${acknowledgement.detail}`.slice(
+          0,
+          240
+        ),
+      };
+    }
+  }
   const terminal = await completeIssue({
     identifier: issueIdentifier,
     state: 'Done',

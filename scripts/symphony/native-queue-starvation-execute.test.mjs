@@ -336,6 +336,39 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(result.record.source.action, RELEASE_CERT_ACTION);
   });
 
+  it('still terminals Linear Done when execution write throws after enroll', async () => {
+    const completes = [];
+    const result = await executeNativeQueueStarvation({
+      taskKey: TASK_KEY,
+      issueIdentifier: 'JOV-6383',
+      source: SOURCE,
+      admission: {
+        action: RELEASE_CERT_ACTION,
+        greenReadyPrs: [{ number: 17918, head: 'e'.repeat(40) }],
+      },
+      signatureKeyId: 'symphony-outcome-2026-09',
+      privateKeyPem: host.privateKey,
+      now: () => '2026-09-17T04:43:32.000Z',
+      claimIssue: async () => ({
+        state: 'In Progress',
+        assignee: null,
+      }),
+      completeIssue: async input => {
+        completes.push(input);
+        return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
+      },
+      enrollPr: async () => ({ ok: true, head: 'e'.repeat(40) }),
+      writeExecution: async () => {
+        throw new Error('execution-write-rejected:schema');
+      },
+    });
+    assert.deepEqual(completes, [{ identifier: 'JOV-6383', state: 'Done' }]);
+    assert.equal(result.terminal.state, 'Done');
+    assert.equal(result.acknowledgement.status, 'execution-write-failed');
+    assert.match(result.acknowledgement.detail, /execution-write-rejected/);
+    assert.equal(result.decision.pr, 17918);
+  });
+
   it('signs a fail-closed execution that cannot claim a PR number', () => {
     const decision = decideNativeQueueExecution({
       action: NATIVE_QUEUE_ACTION,
