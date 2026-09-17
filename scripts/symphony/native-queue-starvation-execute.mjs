@@ -101,7 +101,9 @@ export function hasGithubMergeQueueRemove(timeline) {
 }
 
 export function readCapturedMergeQueueEntryId(body) {
-  const match = String(body ?? '').match(/mergeQueueEntryId:(MQE_[A-Za-z0-9]+)/u);
+  const match = String(body ?? '').match(
+    /mergeQueueEntryId:(MQE_[A-Za-z0-9]+)/u
+  );
   return match ? match[1] : null;
 }
 
@@ -222,8 +224,7 @@ export function decideNativeQueueExecution(input) {
     status: 'failed',
     detail: PR_CHURN_EJECT,
     mutationAttempted: false,
-    authority:
-      'exact-source-ci-native-queue-production-gates-remain-required',
+    authority: 'exact-source-ci-native-queue-production-gates-remain-required',
     pr: null,
     head: null,
   };
@@ -314,9 +315,7 @@ export async function executeNativeQueueStarvation({
   if (decision.status === 'ready-to-enroll') {
     let lastFail = null;
     for (const candidate of candidates) {
-      const pr = Number.isInteger(candidate)
-        ? candidate
-        : candidate?.number;
+      const pr = Number.isInteger(candidate) ? candidate : candidate?.number;
       if (!Number.isInteger(pr) || pr <= 0) continue;
       try {
         const enrolled = await enrollPr({
@@ -358,9 +357,10 @@ export async function executeNativeQueueStarvation({
       } catch (error) {
         lastFail = {
           status: 'failed',
-          detail: String(
-            error instanceof Error ? error.message : error
-          ).slice(0, 240),
+          detail: String(error instanceof Error ? error.message : error).slice(
+            0,
+            240
+          ),
           mutationAttempted: true,
           authority,
           pr,
