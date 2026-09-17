@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
+  aiCrawlerAnalyticsToEntityCard,
   chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
@@ -406,5 +407,50 @@ describe('showToEntityCard', () => {
       href: null,
       disabled: true,
     });
+  });
+});
+
+describe('aiCrawlerAnalyticsToEntityCard', () => {
+  it('renders crawler reads from the observed-visibility layer only', () => {
+    const model = aiCrawlerAnalyticsToEntityCard({
+      totalRequests: 1280,
+      weeklyRequests: 44,
+      crawlers: [
+        {
+          id: 'gptbot',
+          name: 'GPTBot',
+          requests: 800,
+          previousPeriodRequests: 100,
+        },
+        {
+          id: 'claude',
+          name: 'Claude',
+          requests: 480,
+          previousPeriodRequests: 40,
+        },
+      ],
+      isTeaser: false,
+    });
+
+    expect(model.kind).toBe('ai');
+    expect(model.eyebrow).toBe('AI Visibility');
+    expect(model.title).toBe('1,280 reads');
+    expect(model.meta).toBe('2 services tracked');
+    expect(model.secondaryMeta).toBe('44 this week');
+    expect(model.status).toEqual({ label: 'Active', tone: 'live' });
+  });
+
+  it('keeps a collecting state when observed reads are zero', () => {
+    const model = aiCrawlerAnalyticsToEntityCard({
+      totalRequests: 0,
+      weeklyRequests: 0,
+      crawlers: [],
+      isTeaser: false,
+    });
+
+    expect(model.title).toBe('0 reads');
+    expect(model.meta).toBe('Waiting for first AI crawl');
+    expect(model.secondaryMeta).toBe('Last 30 days');
+    expect(model.status).toEqual({ label: 'Collecting', tone: 'neutral' });
   });
 });
