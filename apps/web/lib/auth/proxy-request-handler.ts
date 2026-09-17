@@ -31,9 +31,9 @@ import {
   createFastGoneResponse,
   createFastNotFoundResponse,
 } from '@/lib/security/probe-detection';
-import { resolvePublicUrlGone } from '@/lib/seo/public-url-policy';
 import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 import { ensureSentry } from '@/lib/sentry/ensure';
+import { resolvePublicUrlGone } from '@/lib/seo/public-url-policy';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 import { isReservedUsername } from '@/lib/validation/username-core';
 
