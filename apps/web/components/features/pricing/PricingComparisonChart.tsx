@@ -1,8 +1,12 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
+import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+  hasPublicAnnualOffer,
+} from '@/lib/billing/offer-truth';
 import {
   type ComparisonFeature,
   ENTITLEMENT_REGISTRY,
@@ -116,32 +120,33 @@ function DesktopFeatureRow({
 }
 
 export function PricingComparisonChart() {
-  const [isAnnual, setIsAnnual] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
+  const annualOfferPublished = hasPublicAnnualOffer();
 
   const free = ENTITLEMENT_REGISTRY.free;
   const pro = ENTITLEMENT_REGISTRY.pro;
   const max = ENTITLEMENT_REGISTRY.max;
-
-  const proPrice =
-    isAnnual && pro.marketing.price?.yearly
-      ? Math.round(pro.marketing.price.yearly / 12)
-      : (pro.marketing.price?.monthly ?? 0);
-
-  const maxPrice =
-    isAnnual && max.marketing.price?.yearly
-      ? Math.round(max.marketing.price.yearly / 12)
-      : (max.marketing.price?.monthly ?? 0);
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
+  const maxClaim = getPublicPriceClaim('max');
 
   const planOptions: { id: PlanColumn; name: string; price: string }[] = [
-    { id: 'free', name: free.marketing.displayName, price: '$0' },
-    { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
+    {
+      id: 'free',
+      name: free.marketing.displayName,
+      price: formatPublicPriceDisplay(freeClaim),
+    },
+    {
+      id: 'pro',
+      name: pro.marketing.displayName,
+      price: formatPublicPriceDisplay(proClaim),
+    },
     ...(maxPlanEnabled
       ? [
           {
             id: 'max' as PlanColumn,
             name: max.marketing.displayName,
-            price: `$${maxPrice}/mo`,
+            price: formatPublicPriceDisplay(maxClaim),
           },
         ]
       : []),
@@ -151,28 +156,13 @@ export function PricingComparisonChart() {
 
   return (
     <div className='system-b-pricing-chart'>
-      <div className='system-b-pricing-billing'>
-        <span
-          className='system-b-pricing-billing-label'
-          data-active={isAnnual ? undefined : 'true'}
-        >
-          Monthly
-        </span>
-        <Switch
-          checked={isAnnual}
-          onCheckedChange={setIsAnnual}
-          aria-label='Toggle Annual Billing'
-        />
-        <span
-          className='system-b-pricing-billing-label'
-          data-active={isAnnual ? 'true' : undefined}
-        >
-          Annual
-          <span className='system-b-pricing-chart-badge' data-tone='success'>
-            Save ~20%
+      {annualOfferPublished ? (
+        <div className='system-b-pricing-billing'>
+          <span className='system-b-pricing-billing-label' data-active='true'>
+            Monthly
           </span>
-        </span>
-      </div>
+        </div>
+      ) : null}
 
       <div className='system-b-pricing-mobile-selector'>
         <select
@@ -204,7 +194,9 @@ export function PricingComparisonChart() {
                 <div className='system-b-pricing-plan-name'>
                   {free.marketing.displayName}
                 </div>
-                <div className='system-b-pricing-plan-price'>$0</div>
+                <div className='system-b-pricing-plan-price'>
+                  {formatPublicPriceDisplay(freeClaim)}
+                </div>
               </th>
               <th
                 className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
@@ -214,17 +206,8 @@ export function PricingComparisonChart() {
                   {pro.marketing.displayName}
                 </div>
                 <div className='system-b-pricing-plan-price'>
-                  ${proPrice}
-                  <span>/mo</span>
-                </div>
-                <div
-                  aria-hidden={isAnnual ? undefined : true}
-                  className='system-b-pricing-plan-annual'
-                  data-visible={isAnnual ? 'true' : undefined}
-                >
-                  {pro.marketing.price?.yearly
-                    ? `$${pro.marketing.price.yearly}/yr`
-                    : null}
+                  {proClaim.priceLabel}
+                  {proClaim.cadence ? <span>{proClaim.cadence}</span> : null}
                 </div>
               </th>
               {maxPlanEnabled ? (
@@ -238,17 +221,8 @@ export function PricingComparisonChart() {
                     </span>
                   </div>
                   <div className='system-b-pricing-plan-price'>
-                    ${maxPrice}
-                    <span>/mo</span>
-                  </div>
-                  <div
-                    aria-hidden={isAnnual ? undefined : true}
-                    className='system-b-pricing-plan-annual'
-                    data-visible={isAnnual ? 'true' : undefined}
-                  >
-                    {max.marketing.price?.yearly
-                      ? `$${max.marketing.price.yearly}/yr`
-                      : null}
+                    {maxClaim.priceLabel}
+                    {maxClaim.cadence ? <span>{maxClaim.cadence}</span> : null}
                   </div>
                 </th>
               ) : null}

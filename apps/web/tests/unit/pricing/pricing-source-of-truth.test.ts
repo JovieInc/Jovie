@@ -17,6 +17,7 @@ import {
   MARKETING_PRICING_PLAN_IDS,
   MARKETING_PRICING_PLANS,
 } from '@/data/marketingPricingPlans';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import {
   ENTITLEMENT_REGISTRY,
@@ -73,16 +74,26 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
     }
   });
 
-  it('derives pro price from PLAN_PRICES (no hardcoding)', () => {
+  it('derives pro price from public offer truth (no hardcoding)', () => {
     const proPlan = CANONICAL_PLANS.find(p => p.id === 'pro');
+    const proClaim = getPublicPriceClaim('pro');
+    expect(proPlan?.monthlyPriceUsd).toBe(proClaim.priceUsd);
+    expect(proPlan?.yearlyPriceUsd).toBe(proClaim.annualPriceUsd);
     expect(proPlan?.monthlyPriceUsd).toBe(PLAN_PRICES.pro.monthly);
-    expect(proPlan?.yearlyPriceUsd).toBe(PLAN_PRICES.pro.yearly);
+    expect(proPlan?.yearlyPriceUsd).toBeNull();
+    expect(proPlan?.ctaLabel).toBe(proClaim.ctaLabel);
+    expect(proPlan?.signupHref).toBe(proClaim.ctaHref);
   });
 
-  it('derives max price from PLAN_PRICES (no hardcoding)', () => {
+  it('does not publish a self-service Max price', () => {
     const maxPlan = CANONICAL_PLANS.find(p => p.id === 'max');
-    expect(maxPlan?.monthlyPriceUsd).toBe(PLAN_PRICES.max.monthly);
-    expect(maxPlan?.yearlyPriceUsd).toBe(PLAN_PRICES.max.yearly);
+    const maxClaim = getPublicPriceClaim('max');
+    expect(maxPlan?.monthlyPriceUsd).toBeNull();
+    expect(maxPlan?.yearlyPriceUsd).toBeNull();
+    expect(maxPlan?.monthlyPriceLabel).toBe(maxClaim.priceLabel);
+    expect(maxPlan?.ctaLabel).toBe(maxClaim.ctaLabel);
+    expect(maxPlan?.signupHref).toBe(maxClaim.ctaHref);
+    expect(maxPlan?.signupHref).not.toContain('/signup');
   });
 
   it('free plan has zero monthly price', () => {
@@ -90,17 +101,16 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
     expect(freePlan?.monthlyPriceUsd).toBe(0);
   });
 
-  it('self-serve signup hrefs include a plan query param; Max is contact sales', () => {
+  it('self-service signup hrefs include a plan query param', () => {
     for (const plan of CANONICAL_PLANS) {
-      if (plan.id === 'max') {
-        expect(plan.signupHref).toBe('mailto:support@jov.ie');
-        expect(plan.signupHref).not.toContain('plan=max');
-        continue;
+      const claim = getPublicPriceClaim(plan.id);
+      expect(plan.signupHref).toBe(claim.ctaHref);
+      if (claim.selfService) {
+        expect(
+          plan.signupHref,
+          `Plan "${plan.id}" signupHref must include ?plan= so onboarding can read intent`
+        ).toContain(`plan=${plan.id}`);
       }
-      expect(
-        plan.signupHref,
-        `Plan "${plan.id}" signupHref must include ?plan= so onboarding can read intent`
-      ).toContain(`plan=${plan.id}`);
     }
   });
 
@@ -173,34 +183,40 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
     }
   });
 
-  it('self-serve CTAs carry plan intent; Max is contact sales', () => {
+  it('derives CTA hrefs from public offer truth', () => {
     for (const plan of MARKETING_PRICING_PLANS) {
+      const claim = getPublicPriceClaim(plan.id);
+      expect(plan.ctaHref).toBe(claim.ctaHref);
+      expect(plan.ctaLabel).toBe(claim.ctaLabel);
       expect(getMarketingPlanHref(plan.id)).toBe(plan.ctaHref);
-      if (plan.id === 'max') {
-        expect(plan.ctaHref).toBe('mailto:support@jov.ie');
-        expect(plan.ctaHref).not.toContain('plan=max');
-        continue;
-      }
-      expect(
-        plan.ctaHref,
-        `Marketing plan "${plan.id}" ctaHref must include ?plan= so onboarding can read intent`
-      ).toContain(`plan=${plan.id}`);
 
-      const signupUrl = new URL(plan.ctaHref, 'https://jov.ie');
-      expect(resolveCanonicalPlanId(signupUrl.searchParams.get('plan'))).toBe(
-        plan.id
-      );
+      if (claim.selfService) {
+        expect(
+          plan.ctaHref,
+          `Marketing plan "${plan.id}" ctaHref must include ?plan= so onboarding can read intent`
+        ).toContain(`plan=${plan.id}`);
+        const signupUrl = new URL(plan.ctaHref, 'https://jov.ie');
+        expect(resolveCanonicalPlanId(signupUrl.searchParams.get('plan'))).toBe(
+          plan.id
+        );
+      } else {
+        expect(plan.ctaHref.startsWith('mailto:')).toBe(true);
+      }
     }
   });
 
-  it('pro plan price matches PLAN_PRICES', () => {
+  it('pro plan price matches public offer truth and PLAN_PRICES', () => {
     const proPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'pro');
+    const proClaim = getPublicPriceClaim('pro');
+    expect(proPlan?.price).toBe(proClaim.priceLabel);
     expect(proPlan?.price).toBe(`$${PLAN_PRICES.pro.monthly}`);
   });
 
-  it('max plan price matches PLAN_PRICES', () => {
+  it('max plan price stays custom instead of a self-service amount', () => {
     const maxPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'max');
-    expect(maxPlan?.price).toBe(`$${PLAN_PRICES.max.monthly}`);
+    const maxClaim = getPublicPriceClaim('max');
+    expect(maxPlan?.price).toBe(maxClaim.priceLabel);
+    expect(maxPlan?.price).not.toBe(`$${PLAN_PRICES.max.monthly}`);
   });
 
   it('does not include the legacy team or enterprise plan IDs', () => {

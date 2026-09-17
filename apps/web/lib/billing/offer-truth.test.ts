@@ -4,15 +4,22 @@ import {
   ARTIST_VISIBILITY_OFFER,
   FREE_PROFILE_TRUTH,
   formatAnnualMonthlyEquivalent,
+  formatPublicPriceDisplay,
   formatUsdAmount,
+  getContactSalesHref,
   getMaxOfferBadge,
   getMaxOfferStatus,
   getPaidPlanPriceUsd,
+  getPlanCtaHref,
   getPlanCtaLabel,
   getPlanOfferNote,
   getPlanSignupHref,
+  getPublicPriceClaim,
+  getPublicPriceClaims,
+  hasPublicAnnualOffer,
   isMaxPurchaseEnabled,
   isSelfServiceOffer,
+  PUBLIC_CUSTOM_PRICE_LABEL,
   validateBillingInterval,
 } from './offer-truth';
 
@@ -80,5 +87,46 @@ describe('Artist Visibility offer contract', () => {
     expect(validateBillingInterval('annual')).toBe('year');
     expect(validateBillingInterval('yearly')).toBe('year');
     expect(validateBillingInterval('weekly')).toBeNull();
+  });
+
+  it('owns public price and offer claims from one typed module', () => {
+    const free = getPublicPriceClaim('free');
+    const pro = getPublicPriceClaim('pro');
+    const max = getPublicPriceClaim('max');
+    const enterprise = getPublicPriceClaim('enterprise');
+
+    expect(getPublicPriceClaims().map(claim => claim.plan)).toEqual([
+      'free',
+      'pro',
+      'max',
+    ]);
+    expect(free).toMatchObject({
+      priceUsd: 0,
+      annualPriceUsd: null,
+      priceLabel: '$0',
+      selfService: true,
+      ctaHref: '/signup?plan=free',
+    });
+    expect(pro).toMatchObject({
+      priceUsd: getPaidPlanPriceUsd('pro', 'month'),
+      annualPriceUsd: null,
+      priceLabel: formatUsdAmount(getPaidPlanPriceUsd('pro', 'month')),
+      cadence: '/mo',
+      selfService: true,
+      ctaLabel: 'Start 14-day Pro trial',
+      ctaHref: '/signup?plan=pro&interval=month',
+    });
+    expect(formatPublicPriceDisplay(pro)).toBe(`${pro.priceLabel}/mo`);
+    expect(max).toMatchObject({
+      priceUsd: null,
+      annualPriceUsd: null,
+      priceLabel: PUBLIC_CUSTOM_PRICE_LABEL,
+      selfService: false,
+      ctaLabel: 'Contact sales',
+      ctaHref: getContactSalesHref(),
+    });
+    expect(enterprise.ctaHref).toBe(getContactSalesHref());
+    expect(getPlanCtaHref('max')).toBe(getContactSalesHref());
+    expect(hasPublicAnnualOffer()).toBe(false);
   });
 });

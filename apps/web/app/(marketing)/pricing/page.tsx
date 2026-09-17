@@ -7,6 +7,7 @@ import {
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -57,8 +58,27 @@ const pricingSchemaValidUntil = new Date(
   .toISOString()
   .slice(0, 10);
 
-function getPriceValue(plan: MarketingPricingPlan): string {
-  return plan.price.replace('$', '');
+function getPublicOfferSchema(plan: MarketingPricingPlan) {
+  const claim = getPublicPriceClaim(plan.id);
+  if (claim.priceUsd === null) {
+    return {
+      '@type': 'Offer',
+      url: claim.ctaHref,
+      availability: 'https://schema.org/LimitedAvailability',
+    };
+  }
+
+  return {
+    '@type': 'Offer',
+    price: String(claim.priceUsd),
+    priceCurrency: 'USD',
+    url: claim.ctaHref,
+    ...(claim.priceUsd > 0 && {
+      priceValidUntil: pricingSchemaValidUntil,
+      billingIncrement: 'P1M',
+    }),
+    availability: 'https://schema.org/InStock',
+  };
 }
 
 const PRICING_SCHEMA = {
@@ -71,8 +91,6 @@ const PRICING_SCHEMA = {
   mainEntity: {
     '@type': 'ItemList',
     itemListElement: VISIBLE_PRICING_PLANS.map((plan, index) => {
-      const price = getPriceValue(plan);
-
       return {
         '@type': 'ListItem',
         position: index + 1,
@@ -80,16 +98,7 @@ const PRICING_SCHEMA = {
           '@type': 'Product',
           name: `${APP_NAME} ${plan.name}`,
           description: plan.body,
-          offers: {
-            '@type': 'Offer',
-            price,
-            priceCurrency: 'USD',
-            ...(plan.price !== '$0' && {
-              priceValidUntil: pricingSchemaValidUntil,
-              billingIncrement: 'P1M',
-            }),
-            availability: 'https://schema.org/InStock',
-          },
+          offers: getPublicOfferSchema(plan),
         },
       };
     }),

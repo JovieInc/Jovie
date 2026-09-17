@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
-  it('renders named comparison tables and toggles annual billing', () => {
+  it('renders named comparison tables from monthly-only public offer truth', () => {
     render(<PricingComparisonChart />);
 
     const desktopTable = screen.getByRole('table', {
@@ -20,18 +20,12 @@ describe('PricingComparisonChart', () => {
       screen.getByText('All limits subject to fair-use guardrails.')
     ).toBeInTheDocument();
 
-    const billingSwitch = screen.getByRole('switch', {
-      name: 'Toggle Annual Billing',
-    });
-    expect(billingSwitch).toHaveAttribute('aria-checked', 'false');
-
-    fireEvent.click(billingSwitch);
-
-    expect(billingSwitch).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Annual', { exact: false })).toHaveAttribute(
-      'data-active',
-      'true'
-    );
+    expect(
+      screen.queryByRole('switch', { name: 'Toggle Annual Billing' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Save ~20%')).not.toBeInTheDocument();
+    expect(within(desktopTable).getByText('$199')).toBeInTheDocument();
+    expect(within(desktopTable).getByText('/mo')).toBeInTheDocument();
   });
 
   it('drives the system-b switch styling from Radix data-state', () => {

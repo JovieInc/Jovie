@@ -52,5 +52,8 @@ describe('GET /llms-full.txt', () => {
     );
     expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).not.toContain('**Instagram**: @meetjovie');
+    expect(body).not.toContain('$149');
+    expect(body).toContain('Pro tier ($199/mo)');
+    expect(body).toContain('Max tier (Custom)');
   });
 });

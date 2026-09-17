@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 describe('MarketingPricingPlans', () => {
   it('renders the canonical Free, Pro, and Max plans by default', () => {
@@ -23,23 +24,28 @@ describe('MarketingPricingPlans', () => {
   });
 
   it('stores selected plan ids in signup links', () => {
+    const freeClaim = getPublicPriceClaim('free');
+    const proClaim = getPublicPriceClaim('pro');
+    const maxClaim = getPublicPriceClaim('max');
     render(
       <MarketingPricingPlans mode='compact' variant='tier-cards-neutral' />
     );
 
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup?plan=free');
+      screen.getByRole('link', { name: freeClaim.ctaLabel })
+    ).toHaveAttribute('href', freeClaim.ctaHref);
     expect(
-      screen.getByRole('link', { name: 'Start Free Trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
-    expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
-      'href',
-      'mailto:support@jov.ie'
-    );
+      within(screen.getByTestId('marketing-pricing-plan-pro')).getByRole(
+        'link',
+        { name: proClaim.ctaLabel }
+      )
+    ).toHaveAttribute('href', proClaim.ctaHref);
     expect(
-      screen.getAllByRole('link').map(link => link.getAttribute('href'))
-    ).not.toContain('/signup?plan=max');
+      within(screen.getByTestId('marketing-pricing-plan-max')).getByRole(
+        'link',
+        { name: maxClaim.ctaLabel }
+      )
+    ).toHaveAttribute('href', maxClaim.ctaHref);
     expect(
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=team');
@@ -47,6 +53,9 @@ describe('MarketingPricingPlans', () => {
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=enterprise');
     expect(screen.queryByRole('link', { name: 'Request Access' })).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'Start Free Trial' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps default pricing plan cards neutral instead of plan-accented', () => {

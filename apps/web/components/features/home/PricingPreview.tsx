@@ -1,4 +1,5 @@
 import { Container } from '@/components/site/Container';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
@@ -38,7 +39,7 @@ export function PricingPreview() {
               className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              $0
+              {getPublicPriceClaim('free').priceLabel}
             </p>
             <p className='text-sm text-secondary-token'>Branded profile</p>
           </div>
@@ -55,7 +56,7 @@ export function PricingPreview() {
               className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              ${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}
+              {getPublicPriceClaim('pro').priceLabel}
             </p>
             <p className='text-sm text-secondary-token'>
               Your identity. Your data.
@@ -74,7 +75,7 @@ export function PricingPreview() {
                 className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
                 style={FONT_SYNTHESIS_STYLE}
               >
-                ${ENTITLEMENT_REGISTRY.max.marketing.price?.monthly ?? 0}
+                {getPublicPriceClaim('max').priceLabel}
               </p>
               <p className='text-sm text-secondary-token'>
                 {ENTITLEMENT_REGISTRY.max.marketing.tagline}

@@ -57,7 +57,7 @@ describe('PricingRecipeBody', () => {
     ).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Start Pro trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
+    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
     expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
       'href',
       'mailto:support@jov.ie'
@@ -94,9 +94,9 @@ describe('PricingRecipeBody', () => {
     expect(proPlan?.price).toBeDefined();
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');
-    expect(proCard?.textContent).toContain('Start Free Trial');
+    expect(proCard?.textContent).toContain(proPlan?.ctaLabel ?? '');
     expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
-      '/signup?plan=pro'
+      proPlan?.ctaHref
     );
   });
 
