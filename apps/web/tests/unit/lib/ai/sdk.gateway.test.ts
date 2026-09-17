@@ -74,4 +74,17 @@ describe('lib/ai/sdk gateway routing', () => {
       headers: undefined,
     });
   });
+
+  it('fails closed for non-allowlisted Gateway models before network', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    delete process.env.HELICONE_GATEWAY_BASE_URL;
+
+    const { gateway } = await import('@/lib/ai/sdk');
+    expect(() => gateway('openai/gpt-5.5-pro')).toThrow(
+      'gateway-allowlist:denied-model'
+    );
+    expect(() => gateway('openai/gpt-6-astra')).toThrow('openai/gpt-6-astra');
+    expect(mockGatewayModel).not.toHaveBeenCalled();
+  });
+
 });

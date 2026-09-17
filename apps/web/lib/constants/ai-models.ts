@@ -5,7 +5,12 @@
  * The Vercel AI Gateway requires this format — using a colon (`:`) instead
  * of a slash will result in a 404 GatewayModelNotFoundError.
  *
+ * Tim STRICT 2026-09-17: Gateway allowlist is ONLY
+ * `zai/glm-5.3`, `zai/glm-5.3-flash`, `typesafe-ai/jev`.
+ * Astra / OpenAI / Anthropic / Grok / Gemini must not use AI Gateway.
+ *
  * @see https://ai-sdk.dev/providers/ai-sdk-providers/ai-gateway
+ * @see https://github.com/JovieInc/Jovie/issues/17938
  */
 
 /** Primary chat model used for the Jovie AI assistant (complex tasks) */
@@ -17,15 +22,12 @@ export const CHAT_MODEL_LIGHT = 'zai/glm-5.3-flash';
 /**
  * Fallback chain for the 👎 model-rotation recovery loop (JOV-3362 / #11461).
  *
- * Index 0 is the default chat model. When a user thumbs-down a response, the
- * conversation's next turn is routed to the next entry. Google models are
- * proven working through the gateway (TITLE_MODEL); do not append providers
- * that are not enabled on the gateway account. Anthropic is not on the
- * Gateway allowlist (Tim lock 2026-09-17: Gateway = zai/typesafe/xai/google).
+ * Index 0 is the default chat model. Every entry must stay on the Gateway
+ * allowlist (Tim STRICT 2026-09-17).
  */
 export const CHAT_MODEL_ROTATION_CHAIN: readonly string[] = [
   CHAT_MODEL,
-  'google/gemini-2.5-pro',
+  CHAT_MODEL_LIGHT,
 ];
 
 /**
@@ -46,18 +48,22 @@ export function resolveRotatedChatModel(step: number | undefined): string {
   return chain[Math.min(step, chain.length - 1)] ?? CHAT_MODEL;
 }
 
-/** Model used for AI-generated analytics insights */
-export const INSIGHT_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+/** Model used for AI-generated analytics insights (Gateway allowlisted) */
+export const INSIGHT_MODEL = 'zai/glm-5.3-flash';
 
-/** Model used for AI-generated playlist pitches */
-export const PITCH_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+/** Model used for AI-generated playlist pitches (Gateway allowlisted) */
+export const PITCH_MODEL = 'zai/glm-5.3-flash';
 
-/** Lightweight model used for generating conversation titles */
-export const TITLE_MODEL = 'google/gemini-2.0-flash';
+/** Lightweight model used for generating conversation titles (Gateway allowlisted) */
+export const TITLE_MODEL = 'zai/glm-5.3-flash';
 
-/** Model used for YouTube packaging intelligence extraction */
-export const PACKAGING_INTELLIGENCE_MODEL =
-  'anthropic/claude-haiku-4-5-20251001';
+/** Model used for YouTube packaging intelligence extraction (Gateway allowlisted) */
+export const PACKAGING_INTELLIGENCE_MODEL = 'zai/glm-5.3-flash';
 
-/** Vision-capable model used for the golden-journey design-taste sweep */
-export const DESIGN_TASTE_SWEEP_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+/**
+ * Vision-capable design-taste sweep model.
+ * Image/vision on Gateway is not on the STRICT text allowlist yet — kept as
+ * GLM flash for any text-only sweep path; image Gateway use fails closed via
+ * `assertGatewayAllowlistedModel` until #17938 adds a sanctioned path.
+ */
+export const DESIGN_TASTE_SWEEP_MODEL = 'zai/glm-5.3-flash';

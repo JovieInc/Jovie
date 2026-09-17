@@ -1,3 +1,4 @@
+import { assertGatewayAllowlistedModel } from './gateway-allowlist.mjs';
 export const DEFAULT_REQUIRED_CHECKS = Object.freeze([
   'CI / PR Ready',
   'CI / Migration Guard',
@@ -13,6 +14,7 @@ export const CONFLICT_STEERING_EXCEPTION_SCHEMA =
   'jovie-conflict-steering-exception/v1';
 // Never openai/* via AI Gateway; Codex/Cursor subscriptions cover OpenAI separately.
 export const CONFLICT_FX_MODEL = 'zai/glm-5.3';
+assertGatewayAllowlistedModel(CONFLICT_FX_MODEL);
 export const CONFLICT_FX_MAX_ATTEMPTS = 2;
 export const CONFLICT_FX_CLAIM_TTL_MS = 20 * 60 * 1000;
 export const CONFLICT_FX_COHORT_TIERS = Object.freeze([2, 10, 40]);

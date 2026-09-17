@@ -1,5 +1,6 @@
 import 'server-only';
 import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
+import { assertGatewayAllowlistedModel } from '@/lib/ai/gateway-allowlist';
 import * as ai from 'ai';
 
 import { env } from '@/lib/env-server';
@@ -136,5 +137,10 @@ function getGatewayProvider(): GatewayModelSelector {
 }
 
 /** Env-gated Vercel AI Gateway selector (optionally routed through Helicone proxy). */
-export const gateway: GatewayModelSelector = ((...args) =>
-  getGatewayProvider()(...args)) as GatewayModelSelector;
+export const gateway: GatewayModelSelector = ((modelId: string, ...rest: unknown[]) => {
+  assertGatewayAllowlistedModel(modelId);
+  return (getGatewayProvider() as (...a: unknown[]) => unknown)(
+    modelId,
+    ...rest
+  );
+}) as GatewayModelSelector;
