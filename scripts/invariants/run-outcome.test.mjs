@@ -1,0 +1,531 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import {
+  SCREEN_CERT_GATE,
+  SCREEN_CERT_INVARIANT_ID,
+  SCREEN_CERT_SCHEMA,
+  runScreenCertification,
+} from './screen-certification.mjs';
+import {
+  applyCertifiedBit,
+  canSetCertified,
+  persistRunOutcome,
+  readRunOutcome,
+  RUN_OUTCOME_SCHEMA,
+  verifyRunOutcome,
+  verifyScreenCertRun,
+} from './run-outcome.mjs';
+
+const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const BASE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const DIGEST = `sha256:${'c'.repeat(64)}`;
+
+function harnessCertifiedReceipt(overrides = {}) {
+  return {
+    schema: SCREEN_CERT_SCHEMA,
+    gate: SCREEN_CERT_GATE,
+    invariant: SCREEN_CERT_INVARIANT_ID,
+    headSha: HEAD,
+    baseSha: BASE,
+    ok: true,
+    certified: true,
+    registrationOnly: false,
+    status: 'certified',
+    issues: [],
+    changedScreens: [
+      {
+        id: 'web.homepage',
+        verdict: 'pass',
+        findings: [],
+        artifactDigest: DIGEST,
+        rendererRunUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      },
+    ],
+    excludedChanges: [],
+    fixtures: [],
+    sweeps: [],
+    ...overrides,
+  };
+}
+
+function claim(overrides = {}) {
+  return {
+    statement: 'web.homepage is certified for this exact head',
+    kind: 'screen-certification',
+    expectedOutcome: 'pass',
+    expectedCertified: true,
+    screenIds: ['web.homepage'],
+    ...overrides,
+  };
+}
+
+describe('JOV-6051 per-run outcome verification', () => {
+  it('lets only the executable harness set certified:true', () => {
+    assert.equal(canSetCertified('harness'), true);
+    assert.equal(canSetCertified('jev'), false);
+    assert.equal(canSetCertified('model'), false);
+    assert.equal(
+      applyCertifiedBit({ certifier: 'harness', certified: true }),
+      true
+    );
+    assert.equal(
+      applyCertifiedBit({ certifier: 'jev', certified: true }),
+      false
+    );
+    assert.equal(
+      applyCertifiedBit({ certifier: 'harness', certified: false }),
+      false
+    );
+  });
+
+  it('records pass and certified:true from a harness-certified receipt', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-certified-1',
+      claim: claim(),
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(record.schema, RUN_OUTCOME_SCHEMA);
+    assert.equal(record.runId, 'run-certified-1');
+    assert.equal(record.outcome, 'pass');
+    assert.equal(record.certified, true);
+    assert.equal(record.certifier, 'harness');
+    assert.equal(record.shipBlocking, false);
+    assert.equal(record.shadow, null);
+    assert.equal(record.evidence.certified, true);
+    assert.equal(record.evidence.changedScreens[0].artifactDigest, DIGEST);
+    assert.equal(record.headSha, HEAD);
+    const inferred = verifyRunOutcome({
+      runId: 'run-certified-inferred-1',
+      claim: {
+        statement: 'web.homepage is certified for this exact head',
+        screenIds: ['web.homepage', ''],
+      },
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(inferred.outcome, 'pass');
+    assert.equal(inferred.certified, true);
+    assert.deepEqual(inferred.claim.screenIds, ['web.homepage']);
+  });
+
+  it('persists and reads exactly one run outcome', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-run-outcome-'));
+    const file = join(dir, 'run.json');
+    try {
+      const written = verifyRunOutcome({
+        runId: 'run-persist-1',
+        claim: claim(),
+        receipt: harnessCertifiedReceipt(),
+        persistTo: file,
+        includeShadow: false,
+      });
+      const read = readRunOutcome(file);
+      assert.equal(read.runId, 'run-persist-1');
+      assert.equal(read.outcome, 'pass');
+      assert.equal(read.certified, true);
+      assert.deepEqual(read.claim.screenIds, ['web.homepage']);
+      assert.equal(written.evidenceFingerprint, read.evidenceFingerprint);
+      const onDisk = JSON.parse(readFileSync(file, 'utf8'));
+      assert.equal(onDisk.schema, RUN_OUTCOME_SCHEMA);
+      assert.ok(!Array.isArray(onDisk));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses averaged or multi-run persistence and reads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-run-outcome-'));
+    try {
+      assert.throws(
+        () =>
+          persistRunOutcome(
+            { schema: RUN_OUTCOME_SCHEMA, runId: 'a', runs: [{}, {}] },
+            join(dir, 'avg.json')
+          ),
+        /average|multi-run/
+      );
+      assert.throws(
+        () => persistRunOutcome({ schema: 'nope', runId: 'a' }, join(dir, 'x')),
+        /run-outcome\/v1/
+      );
+      assert.throws(
+        () => persistRunOutcome({ schema: RUN_OUTCOME_SCHEMA }, join(dir, 'x')),
+        /runId/
+      );
+      writeFileSync(join(dir, 'list.json'), '[{},{}]\n');
+      assert.throws(() => readRunOutcome(join(dir, 'list.json')), /exactly one/);
+      writeFileSync(join(dir, 'bad.json'), '{"schema":"nope","runId":"a"}\n');
+      assert.throws(() => readRunOutcome(join(dir, 'bad.json')), /run-outcome/);
+      writeFileSync(
+        join(dir, 'norun.json'),
+        '{"schema":"run-outcome/v1"}\n'
+      );
+      assert.throws(() => readRunOutcome(join(dir, 'norun.json')), /runId/);
+      writeFileSync(
+        join(dir, 'runs.json'),
+        '{"schema":"run-outcome/v1","runId":"a","runs":[{},{}]}\n'
+      );
+      assert.throws(() => readRunOutcome(join(dir, 'runs.json')), /average/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to average multiple receipts into one green', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-avg-1',
+      claim: claim(),
+      receipts: [harnessCertifiedReceipt(), harnessCertifiedReceipt()],
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'unresolved');
+    assert.equal(record.certified, false);
+    assert.match(record.reason, /averaging/);
+  });
+
+  it('fails a success claim when the harness did not certify', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-fail-1',
+      claim: claim(),
+      receipt: harnessCertifiedReceipt({
+        ok: false,
+        certified: false,
+        status: 'blocked',
+        issues: ['missing exact-head proof for web.homepage'],
+        changedScreens: [
+          {
+            id: 'web.homepage',
+            verdict: 'block',
+            findings: ['missing exact-head proof for web.homepage'],
+          },
+        ],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'fail');
+    assert.equal(record.certified, false);
+    assert.equal(record.certifier, null);
+  });
+
+  it('fails closed when certified:true is inconsistent with ok:false', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-inconsistent-1',
+      claim: claim({ expectedCertified: null, expectedOutcome: null }),
+      receipt: harnessCertifiedReceipt({ ok: false, status: 'blocked' }),
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'fail');
+    assert.equal(record.certified, false);
+    assert.match(record.reason, /inconsistent/);
+  });
+
+  it('keeps generic ok-without-cert and not-applicable statuses unresolved', () => {
+    const generic = verifyRunOutcome({
+      runId: 'run-generic-ok-1',
+      claim: { statement: 'no-change audit', kind: 'screen-certification' },
+      receipt: harnessCertifiedReceipt({
+        certified: false,
+        status: 'reviewed',
+        changedScreens: [],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(generic.outcome, 'unresolved');
+    assert.match(generic.reason, /ok without certified/);
+    const na = verifyRunOutcome({
+      runId: 'run-na-1',
+      claim: { statement: 'no-change audit', kind: 'screen-certification' },
+      receipt: harnessCertifiedReceipt({
+        certified: false,
+        status: 'not-applicable',
+        changedScreens: [],
+      }),
+      includeShadow: false,
+    });
+    assert.match(na.reason, /not-applicable/);
+  });
+
+  it('does not treat harness ok without certification as silent green', () => {
+    const real = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: ['apps/web/app/(home)/page.tsx'],
+      registrationOnly: true,
+    });
+    assert.equal(real.ok, true);
+    assert.equal(real.receipt.certified, false);
+    const record = verifyScreenCertRun({
+      runId: 'run-reg-1',
+      claim: {
+        statement: 'registration-only homepage change',
+        kind: 'screen-certification',
+        screenIds: ['web.homepage'],
+      },
+      certOptions: {
+        headSha: HEAD,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        registrationOnly: true,
+      },
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'unresolved');
+    assert.equal(record.certified, false);
+    assert.match(record.reason, /not a certified acceptance|source-registered/);
+    assert.equal(record.evidence.status, 'source-registered');
+  });
+
+  it('leaves missing claim or receipt explicitly unresolved', () => {
+    const missingReceipt = verifyRunOutcome({
+      runId: 'run-missing-1',
+      claim: claim(),
+      includeShadow: false,
+    });
+    assert.equal(missingReceipt.outcome, 'unresolved');
+    assert.equal(missingReceipt.certified, false);
+    const missingClaim = verifyRunOutcome({
+      runId: 'run-missing-2',
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(missingClaim.outcome, 'unresolved');
+    assert.equal(missingClaim.certified, false);
+    const missingId = verifyRunOutcome({
+      claim: claim(),
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(missingId.outcome, 'unresolved');
+    assert.equal(missingId.runId, null);
+  });
+
+  it('does not retry unchanged evidence into a better verdict', () => {
+    const first = verifyRunOutcome({
+      runId: 'run-lock-1',
+      claim: claim({
+        expectedOutcome: null,
+        expectedCertified: null,
+        statement: 'homepage change without a certified claim',
+      }),
+      receipt: harnessCertifiedReceipt({
+        ok: true,
+        certified: false,
+        status: 'evidence-required',
+      }),
+      includeShadow: false,
+    });
+    assert.equal(first.outcome, 'unresolved');
+    const second = verifyRunOutcome({
+      runId: 'run-lock-1',
+      claim: claim({
+        expectedOutcome: 'pass',
+        expectedCertified: true,
+        statement: 'homepage change without a certified claim',
+      }),
+      receipt: harnessCertifiedReceipt({
+        ok: true,
+        certified: false,
+        status: 'evidence-required',
+      }),
+      previous: first,
+      includeShadow: false,
+    });
+    assert.equal(second.outcome, 'unresolved');
+    assert.equal(second.certified, false);
+    assert.match(second.issues.join('\n'), /unchanged evidence/);
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-run-outcome-lock-'));
+    try {
+      const lockedFile = join(dir, 'locked.json');
+      verifyRunOutcome({
+        runId: 'run-lock-1',
+        claim: {
+          statement: 'homepage change without a certified claim',
+          kind: 'screen-certification',
+        },
+        receipt: harnessCertifiedReceipt({
+          ok: true,
+          certified: false,
+          status: 'evidence-required',
+        }),
+        previous: first,
+        persistTo: lockedFile,
+        includeShadow: false,
+      });
+      assert.equal(readRunOutcome(lockedFile).outcome, 'unresolved');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a matching failure claim as pass without certifying', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-expected-fail-1',
+      claim: claim({
+        expectedOutcome: 'fail',
+        expectedCertified: false,
+        statement: 'homepage is not certified without trusted proof',
+      }),
+      receipt: harnessCertifiedReceipt({
+        ok: false,
+        certified: false,
+        status: 'blocked',
+        issues: ['missing exact-head proof'],
+        changedScreens: [
+          {
+            id: 'web.homepage',
+            verdict: 'block',
+            findings: ['missing exact-head proof'],
+          },
+        ],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'pass');
+    assert.equal(record.certified, false);
+  });
+
+  it('rejects a wrong receipt schema as unresolved', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-schema-1',
+      claim: claim(),
+      receipt: { ...harnessCertifiedReceipt(), schema: 'screen-certification/v1' },
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'unresolved');
+    assert.match(record.reason, /screen-certification\/v2/);
+  });
+
+  it('accepts a single receipts[] entry and honors an unresolved claim', () => {
+    const unresolved = verifyRunOutcome({
+      runId: 'run-unresolved-claim-1',
+      claim: claim({ expectedOutcome: 'unresolved', expectedCertified: false }),
+      receipts: [harnessCertifiedReceipt({ certified: false, status: 'evidence-required' })],
+      includeShadow: false,
+    });
+    assert.equal(unresolved.outcome, 'unresolved');
+    assert.equal(unresolved.certified, false);
+  });
+
+  it('fails when the claim expected the opposite certified bit', () => {
+    const unexpectedCert = verifyRunOutcome({
+      runId: 'run-unexpected-cert-1',
+      claim: claim({ expectedCertified: false, expectedOutcome: null }),
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(unexpectedCert.outcome, 'fail');
+    assert.equal(unexpectedCert.certified, false);
+    const unexpectedPass = verifyRunOutcome({
+      runId: 'run-unexpected-pass-1',
+      claim: claim({ expectedOutcome: 'fail', expectedCertified: false }),
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(unexpectedPass.outcome, 'fail');
+    assert.match(unexpectedPass.reason, /contradicted/);
+  });
+
+  it('fails registration-only receipts that still mint certified:true', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-reg-cert-1',
+      claim: claim({ expectedCertified: null, expectedOutcome: null }),
+      receipt: harnessCertifiedReceipt({ registrationOnly: true }),
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'fail');
+    assert.equal(record.certified, false);
+    assert.match(record.reason, /registration-only/);
+  });
+
+  it('stays unresolved when claimed screens are missing from the receipt', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-missing-screen-1',
+      claim: claim({ screenIds: ['web.start'] }),
+      receipt: harnessCertifiedReceipt(),
+      includeShadow: false,
+    });
+    assert.equal(record.outcome, 'unresolved');
+    assert.match(record.reason, /web\.start/);
+  });
+
+  it('fails a blocked claimed screen and an ok:false receipt with no issues', () => {
+    const blocked = verifyRunOutcome({
+      runId: 'run-blocked-screen-1',
+      claim: claim({ expectedCertified: null, expectedOutcome: null }),
+      receipt: harnessCertifiedReceipt({
+        ok: true,
+        certified: false,
+        status: 'blocked',
+        changedScreens: [
+          { id: 'web.homepage', verdict: 'block', findings: ['axe'] },
+        ],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(blocked.outcome, 'unresolved');
+    const noIssues = verifyRunOutcome({
+      runId: 'run-no-issues-1',
+      claim: {
+        statement: 'homepage evidence run',
+        kind: 'screen-certification',
+      },
+      receipt: harnessCertifiedReceipt({
+        ok: false,
+        certified: false,
+        status: 'blocked',
+        issues: [],
+        changedScreens: [],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(noIssues.outcome, 'fail');
+    assert.match(noIssues.reason, /blocked the run/);
+  });
+
+  it('attaches an unbound Jev shadow by default without certifying', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-default-shadow-1',
+      claim: claim(),
+      receipt: harnessCertifiedReceipt(),
+    });
+    assert.equal(record.certified, true);
+    assert.equal(record.certifier, 'harness');
+    assert.equal(record.shadow.certified, false);
+    assert.equal(record.shadow.blocking, false);
+    assert.equal(record.shadow.alignment, 'insufficient');
+    assert.equal(record.shipBlocking, false);
+  });
+
+  it('does not let Jev shadow flip a harness fail into certified:true', () => {
+    const record = verifyRunOutcome({
+      runId: 'run-shadow-hijack-1',
+      claim: claim(),
+      receipt: harnessCertifiedReceipt({
+        ok: false,
+        certified: false,
+        status: 'blocked',
+        issues: ['missing exact-head proof'],
+        changedScreens: [
+          {
+            id: 'web.homepage',
+            verdict: 'block',
+            findings: ['missing exact-head proof'],
+          },
+        ],
+      }),
+      evaluate: () => ({
+        alignment: 'supported',
+        certified: true,
+        reason: 'model self-certifies',
+      }),
+    });
+    assert.equal(record.outcome, 'fail');
+    assert.equal(record.certified, false);
+    assert.equal(record.shadow.certified, false);
+    assert.equal(record.shadow.blocking, false);
+    assert.equal(record.shadow.alignment, 'supported');
+    assert.match(record.shadow.issues.join('\n'), /attempted to set certified/);
+  });
+});
