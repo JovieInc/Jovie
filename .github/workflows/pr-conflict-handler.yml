@@ -427,7 +427,7 @@ jobs:
         env:
           FX_AUTO_UPGRADE: '0'
           FX_PERMISSION_MODE: ask
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
@@ -565,7 +565,7 @@ jobs:
           FX_AUTO_UPGRADE: '0'
           FX_DISABLE_KEYCHAIN: '1'
           FX_MAX_AGENT_STEPS: '12'
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           FX_PERMISSION_MODE: ask
           HOME: ${{ runner.temp }}/fx-home
         run: |
@@ -602,7 +602,7 @@ jobs:
         if: always()
         env:
           MODEL_STEP_OUTCOME: ${{ steps.model.outcome }}
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           SOURCE_HEAD: ${{ matrix.headRefOid }}
         run: |
           set -euo pipefail
@@ -732,7 +732,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
         run: |
           set -euo pipefail
           candidate_dir="$RUNNER_TEMP/conflict-fx-verified"
@@ -917,7 +917,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           VERIFICATION_OUTCOME: ${{ steps.verification.outcome }}
@@ -983,7 +983,7 @@ jobs:
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
           COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           DELIVERABLE: ${{ steps.prevalidate.outputs.deliverable }}

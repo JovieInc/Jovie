@@ -11,7 +11,8 @@ export const CONFLICT_FX_RECEIPT_SCHEMA = 'jovie-conflict-fx/v1';
 export const CONFLICT_FX_COHORT_SCHEMA = 'jovie-conflict-fx-cohort/v1';
 export const CONFLICT_STEERING_EXCEPTION_SCHEMA =
   'jovie-conflict-steering-exception/v1';
-export const CONFLICT_FX_MODEL = 'openai/gpt-5.6-sol';
+// Never openai/* via AI Gateway; Codex/Cursor subscriptions cover OpenAI separately.
+export const CONFLICT_FX_MODEL = 'zai/glm-5.3';
 export const CONFLICT_FX_MAX_ATTEMPTS = 2;
 export const CONFLICT_FX_CLAIM_TTL_MS = 20 * 60 * 1000;
 export const CONFLICT_FX_COHORT_TIERS = Object.freeze([2, 10, 40]);
