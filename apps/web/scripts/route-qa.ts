@@ -612,7 +612,9 @@ export async function expandDynamicRoute(
     route === '/[username]/shop' ||
     route === '/[username]/subscribe' ||
     route === '/[username]/tip' ||
-    route === '/[username]/tour'
+    route === '/[username]/tour' ||
+    route === '/[username]/shows' ||
+    route === '/[username]/events'
   ) {
     const suffix = route.replace('/[username]', '');
     return [
