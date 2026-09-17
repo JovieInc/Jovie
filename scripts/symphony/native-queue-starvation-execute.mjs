@@ -241,9 +241,10 @@ export async function executeNativeQueueStarvation({
     } catch (error) {
       finalDecision = {
         status: 'failed',
-        detail: String(
-          error instanceof Error ? error.message : error
-        ).slice(0, 240),
+        detail: String(error instanceof Error ? error.message : error).slice(
+          0,
+          240
+        ),
         mutationAttempted: true,
         authority:
           'exact-source-ci-native-queue-production-gates-remain-required',
