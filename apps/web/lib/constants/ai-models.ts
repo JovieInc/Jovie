@@ -9,10 +9,10 @@
  */
 
 /** Primary chat model used for the Jovie AI assistant (complex tasks) */
-export const CHAT_MODEL = 'anthropic/claude-sonnet-4-20250514';
+export const CHAT_MODEL = 'zai/glm-5.3';
 
 /** Lightweight chat model for simple tool-calling tasks (profile edits, link adds) */
-export const CHAT_MODEL_LIGHT = 'anthropic/claude-haiku-4-5-20251001';
+export const CHAT_MODEL_LIGHT = 'zai/glm-5.3-flash';
 
 /**
  * Fallback chain for the 👎 model-rotation recovery loop (JOV-3362 / #11461).
@@ -20,7 +20,8 @@ export const CHAT_MODEL_LIGHT = 'anthropic/claude-haiku-4-5-20251001';
  * Index 0 is the default chat model. When a user thumbs-down a response, the
  * conversation's next turn is routed to the next entry. Google models are
  * proven working through the gateway (TITLE_MODEL); do not append providers
- * that are not enabled on the gateway account.
+ * that are not enabled on the gateway account. Anthropic is not on the
+ * Gateway allowlist (Tim lock 2026-09-17: Gateway = zai/typesafe/xai/google).
  */
 export const CHAT_MODEL_ROTATION_CHAIN: readonly string[] = [
   CHAT_MODEL,
