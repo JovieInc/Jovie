@@ -4,20 +4,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
-  SCREEN_CERT_GATE,
-  SCREEN_CERT_INVARIANT_ID,
-  SCREEN_CERT_SCHEMA,
-  runScreenCertification,
-} from './screen-certification.mjs';
-import {
   applyCertifiedBit,
   canSetCertified,
   persistRunOutcome,
-  readRunOutcome,
   RUN_OUTCOME_SCHEMA,
+  readRunOutcome,
   verifyRunOutcome,
   verifyScreenCertRun,
 } from './run-outcome.mjs';
+import {
+  runScreenCertification,
+  SCREEN_CERT_GATE,
+  SCREEN_CERT_INVARIANT_ID,
+  SCREEN_CERT_SCHEMA,
+} from './screen-certification.mjs';
 
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const BASE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -157,13 +157,13 @@ describe('JOV-6051 per-run outcome verification', () => {
         /runId/
       );
       writeFileSync(join(dir, 'list.json'), '[{},{}]\n');
-      assert.throws(() => readRunOutcome(join(dir, 'list.json')), /exactly one/);
+      assert.throws(
+        () => readRunOutcome(join(dir, 'list.json')),
+        /exactly one/
+      );
       writeFileSync(join(dir, 'bad.json'), '{"schema":"nope","runId":"a"}\n');
       assert.throws(() => readRunOutcome(join(dir, 'bad.json')), /run-outcome/);
-      writeFileSync(
-        join(dir, 'norun.json'),
-        '{"schema":"run-outcome/v1"}\n'
-      );
+      writeFileSync(join(dir, 'norun.json'), '{"schema":"run-outcome/v1"}\n');
       assert.throws(() => readRunOutcome(join(dir, 'norun.json')), /runId/);
       writeFileSync(
         join(dir, 'runs.json'),
@@ -389,7 +389,10 @@ describe('JOV-6051 per-run outcome verification', () => {
     const record = verifyRunOutcome({
       runId: 'run-schema-1',
       claim: claim(),
-      receipt: { ...harnessCertifiedReceipt(), schema: 'screen-certification/v1' },
+      receipt: {
+        ...harnessCertifiedReceipt(),
+        schema: 'screen-certification/v1',
+      },
       includeShadow: false,
     });
     assert.equal(record.outcome, 'unresolved');
@@ -400,7 +403,12 @@ describe('JOV-6051 per-run outcome verification', () => {
     const unresolved = verifyRunOutcome({
       runId: 'run-unresolved-claim-1',
       claim: claim({ expectedOutcome: 'unresolved', expectedCertified: false }),
-      receipts: [harnessCertifiedReceipt({ certified: false, status: 'evidence-required' })],
+      receipts: [
+        harnessCertifiedReceipt({
+          certified: false,
+          status: 'evidence-required',
+        }),
+      ],
       includeShadow: false,
     });
     assert.equal(unresolved.outcome, 'unresolved');
