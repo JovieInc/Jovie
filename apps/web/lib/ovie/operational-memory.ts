@@ -155,9 +155,7 @@ export function buildOperationalMemoryRecord(
   }
 
   const createdAt = input.createdAt?.trim() || new Date().toISOString();
-  const id =
-    input.id?.trim() ||
-    `opsmem_${createdAt.replace(/[^0-9A-Za-z]/g, '').slice(0, 20)}_${Math.random().toString(36).slice(2, 10)}`;
+  const id = input.id?.trim() || `opsmem_${crypto.randomUUID()}`;
 
   return {
     schema: OPERATIONAL_MEMORY_SCHEMA,
