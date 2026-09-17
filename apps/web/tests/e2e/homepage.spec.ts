@@ -124,10 +124,9 @@ test.describe('Homepage', () => {
       'href',
       '/about'
     );
-    await expect(header.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
-      'href',
-      '/artist-profiles'
-    );
+    await expect(
+      header.getByRole('link', { name: 'For Artists' })
+    ).toHaveAttribute('href', '/artist-profiles');
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
