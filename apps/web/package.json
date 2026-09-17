@@ -298,7 +298,7 @@
     "remark-html": "^16.0.1",
     "resend": "^6.28.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "sonner": "^2.0.8",
     "streamdown": "^2.6.0",
     "stripe": "^22.6.2",
