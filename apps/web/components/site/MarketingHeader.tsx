@@ -31,28 +31,15 @@ export interface MarketingHeaderNavLink extends MarketingNavLink {
 }
 export type MarketingHeaderCta = HeaderNavCta;
 
-const NAV_LINK_BY_LABEL = Object.fromEntries(
-  MARKETING_NAV_LINKS.map(link => [link.label, link])
-) as Readonly<
-  Record<(typeof MARKETING_NAV_LINKS)[number]['label'], MarketingNavLink>
->;
-
+// Display copy is never a lookup key. Keep desktop and mobile destinations in
+// the same declared order; only the desktop shell adds visual treatment.
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  {
-    href: NAV_LINK_BY_LABEL.Artists.href,
-    label: NAV_LINK_BY_LABEL.Artists.label,
-    treatment: 'leading',
-  },
-  {
-    href: NAV_LINK_BY_LABEL.Product.href,
-    label: NAV_LINK_BY_LABEL.Product.label,
-  },
-  {
-    href: NAV_LINK_BY_LABEL.Pricing.href,
-    label: NAV_LINK_BY_LABEL.Pricing.label,
-  },
-] as const;
+  ...MARKETING_NAV_LINKS.map(
+    (link, index): MarketingHeaderNavLink =>
+      index === 0 ? { ...link, treatment: 'leading' } : link
+  ),
+];
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
