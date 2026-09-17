@@ -20,14 +20,6 @@ describe('alphaProviderOptions', () => {
   it('maps each native provider to its transparent option', () => {
     expect(
       alphaProviderOptions({
-        id: 'openai/gpt-image-1.5',
-        key: 'gpt-image-1.5',
-        alpha: 'native',
-        enabled: true,
-      })
-    ).toEqual({ openai: { background: 'transparent' } });
-    expect(
-      alphaProviderOptions({
         id: 'recraft/recraft-v3',
         key: 'recraft-v3',
         alpha: 'native',
@@ -44,13 +36,19 @@ describe('alphaProviderOptions', () => {
     ).toBeUndefined();
   });
 
-  it('has at least two enabled native-alpha models for a real A/B', () => {
+  it('has at least one enabled native-alpha model for a real A/B', () => {
     const enabledNative = MERCH_IMAGE_MODELS.filter(
       m => m.enabled && m.alpha === 'native'
     );
-    expect(enabledNative.length).toBeGreaterThanOrEqual(2);
+    expect(enabledNative.length).toBeGreaterThanOrEqual(1);
     for (const m of enabledNative) {
       expect(alphaProviderOptions(m)).toBeDefined();
+    }
+  });
+
+  it('does not route any roster model through the OpenAI Gateway', () => {
+    for (const m of MERCH_IMAGE_MODELS) {
+      expect(m.id.startsWith('openai/')).toBe(false);
     }
   });
 });
