@@ -122,10 +122,8 @@ describe('appendSummerIssueBind', () => {
   });
 });
 
-const CAPTURED_17917 =
-  'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeRvE';
-const REPLACEMENT_17917 =
-  'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeTSs';
+const CAPTURED_17917 = 'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeRvE';
+const REPLACEMENT_17917 = 'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeTSs';
 const TIMELINE_17917_CHURN = [
   {
     __typename: 'AddedToMergeQueueEvent',
