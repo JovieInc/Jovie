@@ -290,7 +290,7 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('does not launch any workflow from an unchanged ready transition', () => {
+  it('reacts to a ready transition only through the canonical admission controller', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
@@ -299,7 +299,13 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    expect(offenders).toEqual([]);
+    // A ready transition must never earn an unchanged head a second CI
+    // flight (trigger-hygiene rule 3, JOV-INV-029 intact). The sole
+    // exception is the canonical admission controller, which subscribes to
+    // re-evaluate exact-head admission without restarting CI; its Runner
+    // Heartbeat clock is the ownerless recovery wake. Every other workflow
+    // must keep ignoring the ready transition.
+    expect(offenders).toEqual(['merge-queue-autoenroll.yml']);
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
