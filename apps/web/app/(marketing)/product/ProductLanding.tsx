@@ -40,7 +40,7 @@ function ProductClaimCard() {
               asChild
               size='marketing'
               variant='primary'
-              className='homepage-name-search__submit shrink-0'
+              className='shrink-0'
             >
               <Link
                 href={PRODUCT_CLAIM_HREF}

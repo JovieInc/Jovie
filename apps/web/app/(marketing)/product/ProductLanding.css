@@ -30,3 +30,11 @@
   letter-spacing: -0.005em;
   line-height: var(--leading-tight);
 }
+
+.product-claim-card .homepage-name-search__field [data-size="marketing"] {
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-size: 14px;
+  font-weight: 510;
+  padding-inline: var(--space-4);
+}
