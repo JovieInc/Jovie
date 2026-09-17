@@ -20,8 +20,7 @@ export const GATEWAY_ALLOWLIST = Object.freeze([
 
 export type GatewayAllowlistedModel = (typeof GATEWAY_ALLOWLIST)[number];
 
-export const GATEWAY_ALLOWLIST_REASON_PREFIX =
-  'gateway-allowlist:denied-model';
+export const GATEWAY_ALLOWLIST_REASON_PREFIX = 'gateway-allowlist:denied-model';
 
 const ALLOWED = new Set<string>(GATEWAY_ALLOWLIST);
 
@@ -31,7 +30,9 @@ export function isGatewayAllowlistedModel(
   return ALLOWED.has(modelId);
 }
 
-export function assertGatewayAllowlistedModel(modelId: string): GatewayAllowlistedModel {
+export function assertGatewayAllowlistedModel(
+  modelId: string
+): GatewayAllowlistedModel {
   if (!isGatewayAllowlistedModel(modelId)) {
     throw new Error(
       `${GATEWAY_ALLOWLIST_REASON_PREFIX} ${modelId}; only ${GATEWAY_ALLOWLIST.join(', ')} may use Vercel AI Gateway (Tim STRICT 2026-09-17). Expensive models use subscriptions, never Gateway.`
