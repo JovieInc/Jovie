@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ALIGNMENT_CLASSES,
-  attachJevShadow,
   assertGatewayModel,
+  attachJevShadow,
   classifyJevShadow,
   GATEWAY_MODEL_ALLOWLIST,
   isPixelOrVisualClaim,
@@ -12,7 +12,8 @@ import {
 } from './jev-shadow.mjs';
 
 const CLAIM = {
-  statement: 'web.homepage harness receipt matches the claimed exact-head proof',
+  statement:
+    'web.homepage harness receipt matches the claimed exact-head proof',
   kind: 'screen-certification',
 };
 const EVIDENCE = {
@@ -78,7 +79,8 @@ describe('JOV-6051 calibrated Jev shadow', () => {
     let called = 0;
     const shadow = classifyJevShadow({
       claim: {
-        statement: 'the homepage pixels look correct against the screenshot bytes',
+        statement:
+          'the homepage pixels look correct against the screenshot bytes',
         kind: 'visual',
       },
       evidence: { pngBytes: 'iVBORw0KGgo=' },
@@ -88,7 +90,10 @@ describe('JOV-6051 calibrated Jev shadow', () => {
       },
     });
     assert.equal(called, 0);
-    assert.equal(isPixelOrVisualClaim({ kind: 'pixels', statement: 'ok' }), true);
+    assert.equal(
+      isPixelOrVisualClaim({ kind: 'pixels', statement: 'ok' }),
+      true
+    );
     assert.equal(shadow.alignment, 'needs-specialist');
     assert.equal(shadow.failureClass, 'needs-specialist');
     assert.equal(shadow.certified, false);
