@@ -1195,7 +1195,13 @@ def _admission_capacity_projection(gem: object) -> dict[str, Any]:
 def _admission_new_work_projection(
     work: object, products: object, product_id: str
 ) -> dict[str, Any]:
-    """Typed new-work evidence; absent workAdmission degrades to all-closed."""
+    """Typed new-work evidence; absent workAdmission degrades to all-closed.
+
+    The product flag mirrors the decision's missing-map semantics exactly: a
+    fleet receipt with no productNewIssueLeaseAllowed map projects the
+    product's own intake as allowed-by-omission (the decision's product_ok
+    treats the missing map as OK), never a contradicting False.
+    """
     if not isinstance(work, dict):
         return {
             "allowed": False,
@@ -1203,12 +1209,18 @@ def _admission_new_work_projection(
             "newImplementationAllowed": False,
             "productNewIssueLeaseAllowed": False,
         }
-    product_rows = products if isinstance(products, dict) else {}
+    if isinstance(products, dict):
+        product_flag = products.get(product_id) is True
+    elif "productNewIssueLeaseAllowed" not in work:
+        # Omitted map: the decision admits by omission; project the same.
+        product_flag = work.get("newIssueLeaseAllowed") is True
+    else:
+        product_flag = False
     return {
         "allowed": work.get("allowed") is True,
         "newIssueLeaseAllowed": work.get("newIssueLeaseAllowed") is True,
         "newImplementationAllowed": work.get("newImplementationAllowed") is True,
-        "productNewIssueLeaseAllowed": product_rows.get(product_id) is True,
+        "productNewIssueLeaseAllowed": product_flag,
     }
 
 

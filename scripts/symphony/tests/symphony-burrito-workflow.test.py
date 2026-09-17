@@ -310,9 +310,11 @@ class DispatchAdmissionTests(unittest.TestCase):
         self.assertNotIn("newWork", held_repair)
         self.assertNotIn("pushAllowed", held_repair)
 
-        # A systems-down closure reason holds the closure verdict, but the
-        # deliberate valid_reasons contract lets repair survive red closure:
-        # new work closes via the verdict hold, repair stays admitted.
+        # A systems-down closure reason passes the closure verdict (the
+        # deliberate valid_reasons contract keeps repair alive on red
+        # closure); new work still closes at the new-work gate, not at the
+        # verdict, because the fixture's workAdmission intake flags are
+        # closed for red status.
         systems_down = self.payload("red")
         systems_down["signals"]["closureHealth"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
         systems_down["closureAdmission"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
@@ -349,6 +351,28 @@ class DispatchAdmissionTests(unittest.TestCase):
         self.assertFalse(bad_mode["allowed"])
         self.assertEqual(bad_mode["reason"], "dispatch-gate-invalid")
         self.assertEqual(bad_mode["productId"], "not-a-product")
+
+    def test_new_work_projection_matches_decision_on_omitted_product_map(self):
+        # A fleet receipt without productNewIssueLeaseAllowed admits by
+        # omission (the decision's product_ok); the typed projection must
+        # mirror that, never contradict an allowed admission with False.
+        payload = self.payload()
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True}
+        admitted = self.check(payload)
+        self.assertTrue(admitted["allowed"])
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["productNewIssueLeaseAllowed"])
+
+        # An explicit empty product map is NOT omission: the product flag
+        # reads False from the map itself.
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True,
+                                    "productNewIssueLeaseAllowed": {}}
+        closed = self.check(payload)
+        self.assertFalse(closed["allowed"])
+        self.assertEqual(closed["reason"], "new-work-admission-closed")
+        self.assertFalse(closed["newWork"]["productNewIssueLeaseAllowed"])
 
     def test_capacity_unproven_admission_carries_typed_capacity_evidence(self):
         payload = self.payload()
