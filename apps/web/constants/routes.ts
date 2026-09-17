@@ -174,6 +174,7 @@ export const APP_ROUTES = {
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
+  /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
   INSTANT_MERCH: '/instant-merch',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',

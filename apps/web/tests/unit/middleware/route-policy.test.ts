@@ -43,6 +43,9 @@ describe('route-policy (proxy-routing)', () => {
       expect(isPublicProfileAudienceBlockCandidate('/cli')).toBe(false);
       expect(getPublicProfileCandidate('/developers')).toBeNull();
       expect(isPublicProfileAudienceBlockCandidate('/developers')).toBe(false);
+
+      expect(getPublicProfileCandidate('/product')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/product')).toBe(false);
     });
 
     it('returns null for other reserved APP_ROUTES and system segments', () => {

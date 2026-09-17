@@ -477,7 +477,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
       notes:
-        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
