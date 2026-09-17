@@ -122,6 +122,8 @@ const LEGACY_PROFILE_MODE_ALIASES = new Set([
   'subscribe',
   'tip',
   'tour',
+  'shows',
+  'events',
 ]);
 
 function getDuplicateAliasSourceRedirect(
