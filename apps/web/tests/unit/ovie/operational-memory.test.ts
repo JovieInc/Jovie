@@ -22,6 +22,9 @@ describe('Summer operational memory (E2/E5)', () => {
     expect(record.schema).toContain('operational-memory');
     expect(record.kind).toBe('observed');
     expect(record.sourceRefs).toHaveLength(1);
+    expect(record.id).toMatch(
+      /^opsmem_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
   });
 
   it('denies authority and policy slugs', () => {
