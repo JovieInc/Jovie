@@ -3038,5 +3038,37 @@ class QueueStarvationBlockedSinceTests(unittest.TestCase):
         self.assertNotIn("blockedSince", healthy["signals"]["queue"])
 
 
+class PerRepoStateIsolationTests(unittest.TestCase):
+    """Default state-dir and sibling sidecars stay isolated per repository."""
+
+    def test_default_state_dir_follows_repo_without_explicit_flag(self) -> None:
+        from gem_gate_contract import fleet_sidecar_path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(
+                os.environ,
+                {"GEM_WORKSPACE": tmp, "GEM_PRIORITY_GATE_REPO": "JovieInc/LogYourBody"},
+            ):
+                argv = ["gem-priority-gate.py", "--dry-run", "--evaluate-json", "{}"]
+                with mock.patch.object(sys, "argv", argv):
+                    args = MODULE.parse_args()
+            jovie_state = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.assertNotEqual(args.state_dir, jovie_state)
+            self.assertEqual(args.state_dir.parent, pathlib.Path(tmp) / "state")
+            # Sibling sidecars for a foreign repo never land on Jovie's files.
+            self.assertNotEqual(
+                fleet_sidecar_path(args.state_dir, "JovieInc/LogYourBody", "queue-snapshot.json"),
+                fleet_sidecar_path(jovie_state, "JovieInc/Jovie", "queue-snapshot.json"),
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"GEM_WORKSPACE": tmp, "GEM_PRIORITY_GATE_REPO": "JovieInc/Jovie"},
+            ):
+                argv = ["gem-priority-gate.py", "--dry-run", "--evaluate-json", "{}"]
+                with mock.patch.object(sys, "argv", argv):
+                    jovie_args = MODULE.parse_args()
+            self.assertEqual(jovie_args.state_dir, jovie_state)
+
+
 if __name__ == "__main__":
     unittest.main()
