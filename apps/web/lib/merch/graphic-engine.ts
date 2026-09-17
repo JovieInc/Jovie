@@ -10,7 +10,7 @@ import 'server-only';
  * for the mockup comp AND is the real print file.
  *
  * Proven in spikes (apps/web/scripts/merch-{image,alpha}-spike.ts): all roster
- * models clear the quality bar; gpt-image transparent output composites cleanly
+ * models clear the quality bar; recraft transparent output composites cleanly
  * onto a garment color.
  *
  * @see @/lib/constants/ai-models — gateway model id format (`provider/model`)
@@ -33,7 +33,7 @@ import { reviewMerchContent } from './content-review';
 
 /**
  * Alpha strategy per model:
- * - `native`: the provider returns a real transparent background (gpt-image).
+ * - `native`: the provider returns a real transparent background (recraft).
  * - `knockout`: opaque output; needs a background-removal pass before it is
  *   alpha-clean. Gated off until that pass lands (see knockoutBackground).
  */
@@ -51,24 +51,12 @@ export interface MerchImageModelConfig {
 
 export const MERCH_IMAGE_MODELS: readonly MerchImageModelConfig[] = [
   {
-    id: 'openai/gpt-image-1.5',
-    key: 'gpt-image-1.5',
-    alpha: 'native',
-    enabled: true,
-  },
-  {
     // Native transparent output, distinct clean-illustration aesthetic.
     // Verified alpha-clean in scripts/merch-knockout-spike.ts.
     id: 'recraft/recraft-v3',
     key: 'recraft-v3',
     alpha: 'native',
     enabled: true,
-  },
-  {
-    id: 'openai/gpt-image-1',
-    key: 'gpt-image-1',
-    alpha: 'native',
-    enabled: false,
   },
   {
     // Knockout via chroma-key proved unreliable (residual background blocks —
@@ -182,14 +170,11 @@ function toBuffer(image: RawImage): Buffer {
 
 /**
  * Provider-specific request options that yield a native transparent background.
- * gpt-image takes `background: transparent`; Recraft returns a transparent PNG.
+ * Recraft returns a transparent PNG when asked for the png response format.
  */
 export function alphaProviderOptions(
   model: MerchImageModelConfig
 ): Record<string, Record<string, string>> | undefined {
-  if (model.id.startsWith('openai/gpt-image')) {
-    return { openai: { background: 'transparent' } };
-  }
   if (model.id.startsWith('recraft/')) {
     return { recraft: { response_format: 'png' } };
   }
@@ -200,7 +185,7 @@ export function alphaProviderOptions(
  * Opaque output → alpha. Not yet implemented; `knockout` models stay disabled
  * until this lands so the roster never emits a white-boxed (non-alpha) graphic.
  */
-// ponytail: native-transparent (gpt-image) is the only alpha path today; add a
+// ponytail: native-transparent (recraft) is the only alpha path today; add a
 // background-removal step here (local @imgly/background-removal or a Bria model)
 // to enable flux/grok/imagen in the A/B. Tracked as the next merch task.
 function knockoutBackground(_opaquePng: Buffer): never {
