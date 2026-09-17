@@ -373,6 +373,33 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
 
 
 # Additive v2 substrate. Legacy admission entry points above remain unchanged.
+
+
+def fleet_sidecar_filename(filename: str, repo: str) -> str:
+    """Basename for a repo-scoped fleet sidecar next to the gate state dir.
+
+    Jovie keeps the historical singleton name so live readers stay stable.
+    Other repos get a namespaced sibling so they cannot clobber Jovie.
+    """
+    name = pathlib.Path(filename).name
+    if name != filename or name in {"", ".", ".."}:
+        raise GateContractError("fleet sidecar filename must be a basename")
+    if _is_jovie_repo(repo):
+        return name
+    return f"{pathlib.Path(name).stem}-{_repo_key(repo)}{pathlib.Path(name).suffix}"
+
+
+def fleet_sidecar_path(state_dir: pathlib.Path, repo: str, filename: str) -> pathlib.Path:
+    return state_dir.parent / fleet_sidecar_filename(filename, repo)
+
+
+def assert_repo_sidecar_path(path: pathlib.Path, repo: str, filename: str) -> None:
+    expected = fleet_sidecar_filename(filename, repo)
+    if path.name != expected:
+        raise ValueError(
+            f"refusing to use {filename} for {repo} at {path.name}; expected {expected}"
+        )
+
 V2_CAPACITY_SCHEMA = "gem-concurrency-evidence/v1"
 
 V2_PROOF_SCHEMA = "symphony-useful-turn-proof/v2"

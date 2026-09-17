@@ -44,6 +44,8 @@ from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
+    assert_repo_sidecar_path,
+    fleet_sidecar_path,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
@@ -878,6 +880,11 @@ def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
 
 
 def write_queue_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
+    if snapshot.get("schema") == QUEUE_SNAPSHOT_SCHEMA:
+        repository = snapshot.get("repository")
+        if not isinstance(repository, str) or not repository.strip():
+            raise ValueError("queue snapshot must name its repository")
+        assert_repo_sidecar_path(path, repository, "queue-snapshot.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(
@@ -1146,6 +1153,17 @@ def observe_queue(
     reuse a fresh last-known snapshot instead of emitting queue-unknown.
     """
     observed_at = now or utc_now()
+    if snapshot_path is not None:
+        try:
+            assert_repo_sidecar_path(snapshot_path, repo, "queue-snapshot.json")
+        except ValueError as error:
+            return {
+                "status": "unknown",
+                "repository": repo,
+                "eligiblePrs": None,
+                "target": target,
+                "error": f"queue-observation-failed: {error}",
+            }
     try:
         result = run_gh_queue_snapshot(repo)
         prs = json.loads(result.stdout)
@@ -1162,7 +1180,7 @@ def observe_queue(
         if snapshot_path is not None and snapshot_path.exists():
             try:
                 loaded = read_json(snapshot_path)
-                if isinstance(loaded, dict):
+                if isinstance(loaded, dict) and loaded.get("repository") == repo:
                     previous = loaded
             except (OSError, ValueError, json.JSONDecodeError):
                 previous = {}
@@ -2205,7 +2223,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     )
     review_path = (
         args.independent_review_receipt
-        or args.state_dir.parent / "independent-review.json"
+        or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
     closure = observe_closure_health(args.repo, previous_closure_health(args.state_dir), now)
     return {
@@ -2213,7 +2231,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "production": observe_production(args.production_url),
         "controller": observe_controller(
             args.symphony_url,
-            snapshot_path=args.state_dir.parent / "controller-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "controller-snapshot.json"
+            ),
             now=now,
         ),
         "integrity": observe_integrity(integrity_path),
@@ -2221,7 +2241,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.repo,
             args.queue_target,
             default_lane_budget,
-            snapshot_path=args.state_dir.parent / "queue-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "queue-snapshot.json"
+            ),
             now=now,
         ),
         "closureHealth": closure,
