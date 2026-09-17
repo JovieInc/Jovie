@@ -649,14 +649,14 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
         [
           { url: 'https://jov.ie/artist-profiles' },
           { url: 'https://jov.ie/youtube-thumbnails' },
-          { url: 'https://jov.ie/product' },
+          { url: 'https://jov.ie/music' },
           { url: 'https://jov.ie/privacy' },
         ],
         { manifest }
       )
     ).toEqual(
       expect.arrayContaining([
-        'non-indexable public url: /product',
+        'non-indexable public url: /music',
         'non-indexable public url: /privacy',
       ])
     );

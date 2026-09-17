@@ -49,8 +49,8 @@ export const RESERVED_USERNAMES = [
   'artist-profiles',
 
   // GSC-dead marketing roots — not claimable handles. Status 410 via
-  // public-url-policy.ts. Do not add `you`; it is a locked claim-card target.
-  'product',
+  // public-url-policy.ts. Do not add `product` or `you`: /product is
+  // DESIGN_READY and shipping; /you is the locked claim-card target.
   'music',
   'shows',
 

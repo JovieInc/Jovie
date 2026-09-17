@@ -79,10 +79,10 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/user_123')).toBe('user_123');
       expect(getPublicProfileCandidate('/a.b-c')).toBe('a.b-c');
       expect(getPublicProfileCandidate('/you')).toBe('you');
+      expect(getPublicProfileCandidate('/product')).toBe('product');
     });
 
     it('returns null for GSC-dead marketing roots that are reserved handles', () => {
-      expect(getPublicProfileCandidate('/product')).toBeNull();
       expect(getPublicProfileCandidate('/music')).toBeNull();
       expect(getPublicProfileCandidate('/shows')).toBeNull();
     });

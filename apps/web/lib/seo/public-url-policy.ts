@@ -4,8 +4,9 @@ import { APP_ROUTES } from '@/constants/routes';
  * Public URL decisions for GSC recovery.
  *
  * Keep this table exact-path and small. Do not invent marketing pages here.
- * /product stays gone until Design Ready ships a real route.
+ * /product is DESIGN_READY — Drive is shipping the real marketing route.
  * /you stays a claimable hold — never reserve it as a system handle.
+ * Root /music and /shows are 410 only; profile paths stay /{username}/music|shows.
  */
 
 export type PublicUrlOwner = 'web' | 'summer';
@@ -28,7 +29,7 @@ export type PublicUrlPolicyEntry =
     }
   | {
       readonly path: string;
-      readonly action: 'hold';
+      readonly action: 'hold' | 'shipping';
       readonly owner: PublicUrlOwner;
       readonly note: string;
     };
@@ -100,10 +101,9 @@ export const PUBLIC_URL_POLICY = [
   },
   {
     path: '/product',
-    action: 'gone',
-    status: 410,
+    action: 'shipping',
     owner: 'web',
-    note: 'Pen has /product; Next treated it as a username. Do not invent the page.',
+    note: 'DESIGN_READY 2026-09-17 ~12:10 PT. Drive is shipping the Pen→code marketing route (bc-3b4d93ba). Hero lock: Be found. Be understood. + jov.ie/you claim card. Do not 410 or reserve.',
   },
   {
     path: '/music',
@@ -117,7 +117,7 @@ export const PUBLIC_URL_POLICY = [
     action: 'gone',
     status: 410,
     owner: 'web',
-    note: 'No marketing /shows route. Root path was a username 404.',
+    note: 'Root /shows only. Profile shows/events stay at /{username}/shows. Aligns with #17942.',
   },
   {
     path: '/you',

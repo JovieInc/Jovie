@@ -40,12 +40,12 @@ describe('public URL policy (GSC recovery)', () => {
     });
   });
 
-  it('marks dead marketing roots gone and keeps /you as a claim hold', () => {
-    expect(resolvePublicUrlGone('/product')).toBe(true);
-    expect(resolvePublicUrlGone('/product/')).toBe(true);
-    expect(resolvePublicUrlGone('/Product?utm_source=gsc')).toBe(true);
+  it('marks only root /music and /shows gone and keeps /you claimable', () => {
     expect(resolvePublicUrlGone('/music')).toBe(true);
     expect(resolvePublicUrlGone('/shows')).toBe(true);
+    expect(resolvePublicUrlGone('/tim/music')).toBe(false);
+    expect(resolvePublicUrlGone('/tim/shows')).toBe(false);
+    expect(resolvePublicUrlGone('/product')).toBe(false);
     expect(resolvePublicUrlGone('/you')).toBe(false);
     expect(getPublicUrlPolicyEntry('/you')).toMatchObject({
       action: 'hold',
@@ -53,12 +53,17 @@ describe('public URL policy (GSC recovery)', () => {
     });
   });
 
-  it('does not invent a /product destination or reserve the /you handle', () => {
+  it('leaves /product Design Ready and does not reserve /product or /you', () => {
+    expect(getPublicUrlPolicyEntry('/product')).toMatchObject({
+      action: 'shipping',
+      owner: 'web',
+    });
     expect(getPublicUrlPolicyEntry('/product')).not.toHaveProperty(
       'destination'
     );
+    expect(isReservedUsername('product')).toBe(false);
     expect(isReservedUsername('you')).toBe(false);
-    expect(getGoneReservedHandles()).toEqual(['product', 'music', 'shows']);
+    expect(getGoneReservedHandles()).toEqual(['music', 'shows']);
     for (const handle of getGoneReservedHandles()) {
       expect(isReservedUsername(handle)).toBe(true);
     }
@@ -71,11 +76,11 @@ describe('public URL policy (GSC recovery)', () => {
         '/privacy',
         '/terms',
         '/cookies',
-        '/product',
         '/music',
         '/shows',
       ])
     );
+    expect(excluded).not.toContain('/product');
     expect(excluded).not.toContain('/you');
     expect(excluded).not.toContain(APP_ROUTES.LEGAL_PRIVACY);
   });

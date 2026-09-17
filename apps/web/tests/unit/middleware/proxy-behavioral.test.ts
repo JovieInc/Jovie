@@ -408,8 +408,8 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
     });
 
-    it('returns 410 for GSC-dead marketing roots instead of a username miss', async () => {
-      for (const pathname of ['/product', '/music', '/shows']) {
+    it('returns 410 for root /music and /shows only', async () => {
+      for (const pathname of ['/music', '/shows']) {
         const req = createUnauthenticatedRequest({ pathname });
         const res = await callMiddleware(req);
 
@@ -419,12 +419,14 @@ describe('proxy.ts middleware', () => {
       }
     });
 
-    it('leaves /you as a claimable profile candidate until Summer seeds it', async () => {
-      const req = createUnauthenticatedRequest({ pathname: '/you' });
-      const res = await callMiddleware(req);
+    it('leaves /product and /you claimable so Drive can ship the marketing route', async () => {
+      for (const pathname of ['/product', '/you']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
 
-      expect(res.status).not.toBe(410);
-      expect(res.status).not.toBe(308);
+        expect(res.status, pathname).not.toBe(410);
+        expect(res.status, pathname).not.toBe(308);
+      }
     });
   });
 
