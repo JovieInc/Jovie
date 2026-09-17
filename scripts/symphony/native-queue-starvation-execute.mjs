@@ -75,6 +75,15 @@ export function appendSummerIssueBind(body, issueIdentifier, taskKey) {
   return current.trimEnd() ? `${current.trimEnd()}\n\n${bind}` : bind;
 }
 
+export function nativeQueueEnrollPlan({ mergeStateStatus, mergeQueueEntry }) {
+  if (mergeQueueEntry) return { action: 'bind-existing-queue' };
+  if (mergeStateStatus === 'CLEAN') return { action: 'bind-and-await-bot' };
+  return {
+    action: 'reject',
+    detail: `native-queue-not-clean:${mergeStateStatus}`,
+  };
+}
+
 export function decideNativeQueueExecution(input) {
   if (!ENROLLABLE_ACTIONS.includes(input?.action)) {
     throw new Error('native-queue-action-required');

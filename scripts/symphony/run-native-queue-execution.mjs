@@ -2,11 +2,12 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  NATIVE_QUEUE_ACTION,
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
-  NATIVE_QUEUE_ACTION,
+  nativeQueueEnrollPlan,
   selectGreenReadyPrs,
 } from './native-queue-starvation-execute.mjs';
 
@@ -195,6 +196,20 @@ function bindLinearIdentifier({ pr, repo, issueIdentifier, taskKey, body }) {
   );
 }
 
+function mergeQueueEntry(pr) {
+  try {
+    const payload = ghJson([
+      'api',
+      'graphql',
+      '-f',
+      `query={ repository(owner:"JovieInc", name:"Jovie") { pullRequest(number:${Number(pr)}) { mergeQueueEntry { id state enqueuedAt } mergedAt } } }`,
+    ]);
+    return payload?.data?.repository?.pullRequest ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
   const repo = 'JovieInc/Jovie';
   let viewed;
@@ -206,7 +221,7 @@ async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
       '--repo',
       repo,
       '--json',
-      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName,body,autoMergeRequest',
+      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName,body',
     ]);
   } catch (error) {
     return {
@@ -230,30 +245,13 @@ async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
   if (head && viewed.headRefOid !== head) {
     return { ok: false, reason: 'native-queue-head-drift' };
   }
-  const alreadyQueued = Boolean(viewed.autoMergeRequest);
-  if (viewed.mergeStateStatus !== 'CLEAN' && !alreadyQueued) {
-    return {
-      ok: false,
-      reason: `native-queue-not-clean:${viewed.mergeStateStatus}`,
-    };
-  }
-  if (!alreadyQueued) {
-    const merged = spawnSync(
-      'gh',
-      ['pr', 'merge', String(pr), '--repo', repo, '--squash', '--auto'],
-      { encoding: 'utf8' }
-    );
-    const queuedAnyway = /already in the merge queue/i.test(
-      String(merged.stderr || merged.stdout || '')
-    );
-    if (merged.status !== 0 && !queuedAnyway) {
-      return {
-        ok: false,
-        reason: `native-queue-enroll-failed:${String(
-          merged.stderr || merged.stdout || ''
-        ).slice(0, 180)}`,
-      };
-    }
+  const live = mergeQueueEntry(viewed.number);
+  const plan = nativeQueueEnrollPlan({
+    mergeStateStatus: viewed.mergeStateStatus,
+    mergeQueueEntry: live?.mergeQueueEntry ?? null,
+  });
+  if (plan.action === 'reject') {
+    return { ok: false, reason: plan.detail };
   }
   bindLinearIdentifier({
     pr: viewed.number,
@@ -262,7 +260,23 @@ async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
     taskKey,
     body: viewed.body,
   });
-  return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+  if (live?.mergedAt || live?.mergeQueueEntry) {
+    return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+  }
+  // itstimwhite `gh pr merge --auto` is ejected in ~50s. Wait for jovie-bot.
+  for (let i = 0; i < 12; i += 1) {
+    spawnSync('sleep', ['20'], { encoding: 'utf8' });
+    const next = mergeQueueEntry(viewed.number);
+    if (next?.mergedAt || next?.mergeQueueEntry) {
+      return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+    }
+  }
+  return {
+    ok: false,
+    reason: 'native-queue-waiting-bot-enqueue',
+    pr: viewed.number,
+    head: viewed.headRefOid,
+  };
 }
 
 const taskKey = process.argv[2];

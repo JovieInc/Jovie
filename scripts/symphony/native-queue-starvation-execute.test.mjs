@@ -7,6 +7,7 @@ import {
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
+  nativeQueueEnrollPlan,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
@@ -116,6 +117,29 @@ describe('appendSummerIssueBind', () => {
     assert.match(first, new RegExp(`taskKey:${TASK_KEY}`));
     assert.equal(appendSummerIssueBind(first, 'JOV-6371', TASK_KEY), first);
     assert.equal(appendSummerIssueBind('x', 'JOV-0', TASK_KEY), 'x');
+  });
+});
+
+describe('nativeQueueEnrollPlan', () => {
+  it('never self-enqueues; binds an existing queue entry or waits for jovie-bot', () => {
+    assert.deepEqual(
+      nativeQueueEnrollPlan({
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: { id: 'MQE_1' },
+      }),
+      { action: 'bind-existing-queue' }
+    );
+    assert.deepEqual(
+      nativeQueueEnrollPlan({ mergeStateStatus: 'CLEAN', mergeQueueEntry: null }),
+      { action: 'bind-and-await-bot' }
+    );
+    assert.equal(
+      nativeQueueEnrollPlan({
+        mergeStateStatus: 'BLOCKED',
+        mergeQueueEntry: null,
+      }).action,
+      'reject'
+    );
   });
 });
 
