@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertGatewayAllowlistedModel,
   GATEWAY_ALLOWLIST,
   GATEWAY_ALLOWLIST_REASON_PREFIX,
-  assertGatewayAllowlistedModel,
   isGatewayAllowlistedModel,
 } from '@/lib/ai/gateway-allowlist';
 
