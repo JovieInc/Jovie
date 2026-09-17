@@ -59,10 +59,13 @@ describe('marketing language context', () => {
   });
 
   it('leaves comparison and editorial subjects to their own content', () => {
-    const contracts = Object.values(MARKETING_PAGE_CONTRACTS).filter(contract =>
-      [APP_ROUTES.BLOG, APP_ROUTES.COMPARE, APP_ROUTES.ALTERNATIVES].some(
-        prefix => contract.url === prefix || contract.url.startsWith(`${prefix}/`)
-      )
+    const contracts = Object.values(MARKETING_PAGE_CONTRACTS).filter(
+      contract =>
+        [APP_ROUTES.BLOG, APP_ROUTES.COMPARE, APP_ROUTES.ALTERNATIVES].some(
+          prefix =>
+            contract.url === prefix ||
+            contract.url.startsWith(`${prefix}/`)
+        )
     );
     expect(contracts.length).toBeGreaterThan(0);
     for (const contract of contracts) {
@@ -77,7 +80,9 @@ describe('marketing language context', () => {
         `${APP_ROUTES.HOME}?role=${encodeURIComponent(role)}`
       );
       expect(contract?.copyScope).toBe('shared');
-      expect(contract).toBe(getMarketingPageContractForPathname(APP_ROUTES.HOME));
+      expect(contract).toBe(
+        getMarketingPageContractForPathname(APP_ROUTES.HOME)
+      );
     }
   );
 
@@ -124,11 +129,13 @@ describe('marketing language context', () => {
     }
   });
 
-  it('does not substitute company, editorial, or directory pages for solutions', () => {
+  it('does not substitute company, editorial, or directory pages', () => {
     for (const link of MARKETING_FOR_FLYOUT_LINKS) {
-      expect([APP_ROUTES.ABOUT, APP_ROUTES.BLOG, APP_ROUTES.ARTISTS]).not.toContain(
-        link.href
-      );
+      expect([
+        APP_ROUTES.ABOUT,
+        APP_ROUTES.BLOG,
+        APP_ROUTES.ARTISTS,
+      ]).not.toContain(link.href);
     }
   });
 
