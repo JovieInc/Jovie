@@ -140,9 +140,7 @@ export function unsignedNativeQueueExecution(input) {
     schema: EXECUTION_SCHEMA,
     taskKey: input.taskKey,
     issueIdentifier: input.issueIdentifier,
-    action: ENROLLABLE_ACTIONS.includes(input.action)
-      ? input.action
-      : NATIVE_QUEUE_ACTION,
+    action: NATIVE_QUEUE_ACTION,
     status: decision.status === 'succeeded' ? 'succeeded' : 'failed',
     detail: String(decision.detail).slice(0, 240),
     completedAt: input.completedAt,
@@ -212,33 +210,47 @@ export async function executeNativeQueueStarvation({
   });
   let finalDecision = decision;
   if (decision.status === 'ready-to-enroll') {
-    const enrolled = await enrollPr({
-      pr: decision.pr,
-      head: decision.head,
-      issueIdentifier,
-      taskKey,
-    });
-    finalDecision = enrolled?.ok
-      ? {
-          status: 'succeeded',
-          detail: `enrolled PR #${decision.pr}`,
-          mutationAttempted: true,
-          authority:
-            'exact-source-ci-native-queue-production-gates-remain-required',
-          pr: decision.pr,
-          head: enrolled.head ?? decision.head,
-        }
-      : {
-          status: 'failed',
-          detail: String(
-            enrolled?.reason ?? 'native-queue-enroll-failed'
-          ).slice(0, 240),
-          mutationAttempted: true,
-          authority:
-            'exact-source-ci-native-queue-production-gates-remain-required',
-          pr: decision.pr,
-          head: enrolled?.head ?? decision.head,
-        };
+    try {
+      const enrolled = await enrollPr({
+        pr: decision.pr,
+        head: decision.head,
+        issueIdentifier,
+        taskKey,
+      });
+      finalDecision = enrolled?.ok
+        ? {
+            status: 'succeeded',
+            detail: `enrolled PR #${decision.pr}`,
+            mutationAttempted: true,
+            authority:
+              'exact-source-ci-native-queue-production-gates-remain-required',
+            pr: decision.pr,
+            head: enrolled.head ?? decision.head,
+          }
+        : {
+            status: 'failed',
+            detail: String(
+              enrolled?.reason ?? 'native-queue-enroll-failed'
+            ).slice(0, 240),
+            mutationAttempted: true,
+            authority:
+              'exact-source-ci-native-queue-production-gates-remain-required',
+            pr: decision.pr,
+            head: enrolled?.head ?? decision.head,
+          };
+    } catch (error) {
+      finalDecision = {
+        status: 'failed',
+        detail: String(
+          error instanceof Error ? error.message : error
+        ).slice(0, 240),
+        mutationAttempted: true,
+        authority:
+          'exact-source-ci-native-queue-production-gates-remain-required',
+        pr: decision.pr,
+        head: decision.head,
+      };
+    }
   }
   const record = signNativeQueueExecution(
     {

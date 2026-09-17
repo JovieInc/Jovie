@@ -332,7 +332,8 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(result.decision.status, 'succeeded');
     assert.equal(result.decision.pr, 17917);
     assert.equal(result.record.status, 'succeeded');
-    assert.equal(result.record.action, RELEASE_CERT_ACTION);
+    assert.equal(result.record.action, NATIVE_QUEUE_ACTION);
+    assert.equal(result.record.source.action, RELEASE_CERT_ACTION);
   });
 
   it('signs a fail-closed execution that cannot claim a PR number', () => {
