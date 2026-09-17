@@ -1,5 +1,16 @@
 <!-- Keep the initial Storybook theme outside React. The preview decorator uses
      the same script-free provider for interactive theme state after mount. -->
+<style>
+  /* Match the production root layout's existing localFont face so visual
+     review never silently falls back to a platform font. */
+  @font-face {
+    font-family: "Inter Variable";
+    src: url("/fonts/Inter-Latin.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+  }
+</style>
 <script>
   document.documentElement.classList.add('dark');
   document.documentElement.style.colorScheme = 'dark';

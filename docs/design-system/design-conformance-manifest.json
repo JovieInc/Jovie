@@ -53,6 +53,18 @@
       "testSources": ["packages/ui/atoms/input.test.tsx"],
       "penRootId": null,
       "sourceDigest": "baa12303f361963cfc88c69049bf7f08ec3fd47fb27cfa4eae3888f46c35d3aa"
+    },
+    {
+      "id": "atom.kbd",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/kbd.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/kbd.stories.tsx"],
+      "testSources": ["packages/ui/atoms/kbd.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "5b99bd08212904d5d02c76fc93e14fcb26e85e3faf27e5eb74afdf1fc452d7d8"
     }
   ],
   "legacy": {

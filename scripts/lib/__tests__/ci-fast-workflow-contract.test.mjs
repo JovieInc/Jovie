@@ -231,6 +231,139 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('runs the owned Spotify Storybook proof only for its changed surface', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/SPOTIFY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect.ts',
+      'apps/web/app/api/spotify/search/route.ts',
+      'apps/web/tests/e2e/storybook-spotify-connect.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    expect(remaining).toContain('tests/e2e/storybook-spotify-connect.spec.ts');
+    expect(remaining).toContain('playwright.config.storybook.ts');
+    expect(remaining).toContain('upload-safe-playwright-artifact');
+    expect(remaining).toContain('PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES');
+  });
+
+  it.each([
+    ['packages/ui/atoms/kbd.tsx', 'pull_request', false, true],
+    ['packages/ui/atoms/kbd.stories.tsx', 'pull_request', false, true],
+    ['apps/web/.storybook/motion-fixtures.ts', 'pull_request', false, true],
+    [
+      'apps/web/tests/e2e/storybook-kbd-motion.spec.ts',
+      'pull_request',
+      false,
+      true,
+    ],
+    [
+      'apps/web/tests/e2e/storybook-spotify-connect.spec.ts',
+      'pull_request',
+      true,
+      false,
+    ],
+    [
+      'apps/web/tests/e2e/storybook-spotify-connect.spec.ts\npackages/ui/atoms/kbd.tsx',
+      'pull_request',
+      true,
+      true,
+    ],
+    ['packages/ui/atoms/button.tsx', 'pull_request', false, false],
+    ['packages/ui/atoms/kbd.tsx', 'merge_group', false, false],
+  ])(
+    'selects existing browser proof for %s on %s',
+    (paths, event, spotify, kbd) => {
+      const remaining = jobBlock(
+        'ci-fast-remaining',
+        'ci-profile-admission-browser'
+      );
+      const selector = remaining
+        .split('id: spotify-storybook\n')[1]
+        .split('      - name: Run ci-fast lanes')[0];
+      const command = selector
+        .split('run: |\n')[1]
+        .replaceAll('${{ github.event_name }}', event)
+        .replaceAll('${{ github.base_ref }}', 'main');
+      const root = mkdtempSync(join(tmpdir(), 'storybook-selection-'));
+      try {
+        const output = join(root, 'output');
+        const result = spawnSync(
+          'bash',
+          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CHANGED_PATHS: paths,
+              RUNNER_TEMP: root,
+              GITHUB_OUTPUT: output,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const values = Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        );
+        expect(values).toEqual({
+          run: String(spotify || kbd),
+          spotify: String(spotify),
+          kbd: String(kbd),
+        });
+        const runner = remaining
+          .split('id: spotify-storybook-test')[1]
+          .split('      - name: Upload Spotify')[0];
+        const selection = runner.slice(
+          runner.indexOf('          specs=()'),
+          runner.indexOf('          pnpm exec storybook dev')
+        );
+        if (spotify || kbd) {
+          const chosen = spawnSync(
+            'bash',
+            ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+            {
+              encoding: 'utf8',
+              env: {
+                ...process.env,
+                RUN_SPOTIFY: String(spotify),
+                RUN_KBD: String(kbd),
+              },
+            }
+          );
+          expect(chosen.status, chosen.stderr).toBe(0);
+          expect(chosen.stdout.trim().split('\n')).toEqual([
+            ...(spotify ? ['tests/e2e/storybook-spotify-connect.spec.ts'] : []),
+            ...(kbd ? ['tests/e2e/storybook-kbd-motion.spec.ts'] : []),
+          ]);
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),
