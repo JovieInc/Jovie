@@ -25,7 +25,7 @@ RELEASE_CERT_ACTION = "reconcile-release-certification-starvation"
 ENROLLABLE_ACTIONS = frozenset({NATIVE_QUEUE_ACTION, RELEASE_CERT_ACTION})
 
 
-def report_delivery(stage: str, result) -> None:
+def report_delivery(stage: str, result, **extra) -> None:
     """Expose bounded correlation/error metadata, never raw child output or keys."""
     report = {"schema": "jovie.summer-delivery-observation/v1",
               "stage": stage, "returncode": result.returncode}
@@ -53,6 +53,9 @@ def report_delivery(stage: str, result) -> None:
         pr = value.get("pr") if isinstance(value, dict) else None
         if isinstance(pr, int) and not isinstance(pr, bool) and pr > 0:
             report["pr"] = pr
+    for key, item in extra.items():
+        if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:# /-]{1,240}", item):
+            report[key] = item
     print(json.dumps(report, sort_keys=True), flush=True)
 
 
@@ -201,26 +204,17 @@ def run_native_queue_starvation_execute(stdout: str) -> int:
         )
     except (OSError, subprocess.SubprocessError):
         return 1
-    report_delivery("native-queue-execution", executed)
     if executed.returncode:
         err_path = workspace / "state/last-native-queue-execute.stderr"
         err_path.parent.mkdir(parents=True, exist_ok=True)
         err_path.write_text((executed.stderr or "")[-4000:])
         detail = (executed.stderr or "").strip().splitlines()
         detail = next((line for line in reversed(detail) if line.strip()), "")[:240]
-        print(
-            json.dumps(
-                {
-                    "schema": "jovie.summer-delivery-observation/v1",
-                    "stage": "native-queue-execution",
-                    "status": "executor-stderr",
-                    "returncode": executed.returncode,
-                    "detail": detail,
-                },
-                sort_keys=True,
-            ),
-            flush=True,
-        )
+        # One stdout line per delivery stage: surface the execute failure detail
+        # as a bounded field on the native-queue-execution receipt itself.
+        report_delivery("native-queue-execution", executed, detail=detail)
+    else:
+        report_delivery("native-queue-execution", executed)
     return executed.returncode
 
 
