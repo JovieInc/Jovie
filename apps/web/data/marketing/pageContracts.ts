@@ -2,11 +2,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
 
 /**
- * Language scope describes the page's subject, never the visitor's identity.
- * Shared pages support unknown and multi-role visitors. Editorial pages scope
- * terminology to each article/comparison. This is not a capability or publishing
- * permission; those remain with the existing offer/publication contracts.
- * See docs/marketing/LANGUAGE.md before adding or changing customer-facing copy.
+ * Language scope describes the page's subject, never the visitor's
+ * identity. Shared pages support unknown and multi-role visitors.
+ * Editorial pages scope terminology to each article/comparison. This is
+ * not a capability or publishing permission; those remain with the
+ * existing offer/publication contracts.
+ * See docs/marketing/LANGUAGE.md before adding or changing
+ * customer-facing copy.
  */
 export type MarketingCopyScope = 'shared' | 'music' | 'video' | 'editorial';
 
@@ -38,7 +40,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'help visitors understand their public presence and start with their profile',
+    job:
+      'help visitors understand their public presence and start with their profile',
     proof: 'published profile and relationship examples',
     successEvent: 'visitor starts the onboarding handoff',
     primaryCta: START_CTA,
@@ -65,7 +68,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(marketing)/artist-profiles/page.tsx',
     copyScope: 'music',
     url: APP_ROUTES.ARTIST_PROFILES,
-    job: 'show artists how profiles connect music, links, and permissioned fan updates',
+    job:
+      'show artists how profiles connect music, links, and permissioned fan updates',
     proof: 'profile gallery, capture flow, and conversion sections',
     successEvent: 'artist claims a profile',
     primaryCta: CLAIM_PROFILE_CTA,
@@ -202,7 +206,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     url: APP_ROUTES.CLI,
     job: 'explain read-only command-line access to public artist data',
     proof: 'documented artist GET commands, FAQ, and policy links',
-    successEvent: 'developer reads the CLI installation and public artist command examples',
+    successEvent:
+      'developer reads the CLI installation and public artist command examples',
     primaryCta: START_CTA,
   },
   '(marketing)/compare/[slug]/page.tsx': {
