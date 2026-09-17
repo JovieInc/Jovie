@@ -242,6 +242,9 @@ function decodeMarketingProof(bytes, context, meta) {
     findings: [],
   };
 }
+/**
+ * @param {{ artifactId?: unknown, artifactName?: string, headSha?: string }} [request]
+ */
 export function resolveTrustedArtifactId({
   artifactId,
   artifactName,
@@ -391,7 +394,9 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       captured < started - SKEW ||
       captured > completed + SKEW ||
       proof.artifactDigest !== bundleDigest(captures) ||
-      captures.some(([, image]) => !validPlaywrightPng(image))
+      captures.some(
+        ([, image]) => !Buffer.isBuffer(image) || !validPlaywrightPng(image)
+      )
     )
       return fail(
         'candidate identity, capture, or decoded bundle is unavailable'
