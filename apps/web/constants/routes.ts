@@ -174,6 +174,7 @@ export const APP_ROUTES = {
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
+  PRODUCT: '/product',
   INSTANT_MERCH: '/instant-merch',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
 

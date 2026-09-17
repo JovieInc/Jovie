@@ -76,7 +76,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/artist-profiles'
+      '/product'
     );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',

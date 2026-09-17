@@ -467,6 +467,28 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/youtube-thumbnails',
   },
   {
+    glob: '(marketing)/product/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/product/ProductLanding.tsx',
+      'hero'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
+      notes:
+        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/product',
+    healthCheck: {
+      path: '/product',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(
