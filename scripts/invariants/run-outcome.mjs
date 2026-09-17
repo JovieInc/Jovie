@@ -9,25 +9,25 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  SCREEN_CERT_GATE,
-  SCREEN_CERT_INVARIANT_ID,
-  SCREEN_CERT_SCHEMA,
-  runScreenCertification,
-} from './screen-certification.mjs';
-import {
   attachJevShadow,
   classifyJevShadow,
   evidenceFingerprint,
 } from './jev-shadow.mjs';
+import {
+  runScreenCertification,
+  SCREEN_CERT_GATE,
+  SCREEN_CERT_INVARIANT_ID,
+  SCREEN_CERT_SCHEMA,
+} from './screen-certification.mjs';
 
 export const RUN_OUTCOME_SCHEMA = 'run-outcome/v1';
 export const RUN_OUTCOMES = Object.freeze(['pass', 'fail', 'unresolved']);
 export const CERTIFIER_HARNESS = 'harness';
 export {
+  ALIGNMENT_CLASSES,
+  GATEWAY_MODEL_ALLOWLIST,
   JEV_MODEL,
   JEV_SHADOW_SCHEMA,
-  GATEWAY_MODEL_ALLOWLIST,
-  ALIGNMENT_CLASSES,
 } from './jev-shadow.mjs';
 
 function isObject(value) {
