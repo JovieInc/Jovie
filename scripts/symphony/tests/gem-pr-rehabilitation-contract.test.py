@@ -1083,7 +1083,9 @@ class DeploymentContractTests(unittest.TestCase):
         with _consumer_workspace_env(), mock.patch.object(
             CYCLE.subprocess,
             "run",
-            return_value=SimpleNamespace(returncode=0, stdout='{"state":"healthy-noop"}'),
+            return_value=SimpleNamespace(
+                returncode=0, stdout='{"state":"healthy-noop"}', stderr=""
+            ),
         ), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
             self.assertEqual(json.loads(output.getvalue())["state"], "healthy-noop")
