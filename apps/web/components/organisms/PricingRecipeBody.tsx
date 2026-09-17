@@ -5,8 +5,8 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
-import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanCtaHref } from '@/lib/billing/offer-truth';
 
 const STORY_CARDS = [
   {
@@ -63,7 +63,7 @@ export function PricingRecipeBody({
         subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
         primaryCta={{
           label: 'Claim Your Profile',
-          href: `${APP_ROUTES.SIGNUP}?plan=free`,
+          href: getPlanCtaHref('free'),
         }}
         secondaryCta={{
           label: 'Explore Artist Profiles',
@@ -127,21 +127,21 @@ export function PricingRecipeBody({
             <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
             <div className='system-b-pricing-actions system-b-pricing-actions--center'>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                href={getPlanCtaHref('free')}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
                 Claim your profile
               </Link>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
+                href={getPlanCtaHref('pro')}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
                 Start Pro trial
               </Link>
               <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+                href={getPlanCtaHref('max')}
                 className='system-b-pricing-secondary-link'
               >
                 Contact sales

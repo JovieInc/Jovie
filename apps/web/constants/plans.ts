@@ -13,14 +13,17 @@
  * Hard rules:
  * - Never mention "waitlist" in any plan label, CTA, or description
  * - Plan IDs here must match `PlanId` in `@/lib/entitlements/registry`
- * - Prices must come from `PLAN_PRICES` in `@/lib/config/plan-prices`
+ * - Public prices and CTAs must come from `@/lib/billing/offer-truth`
  */
 
-import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 export { PLAN_PRICES } from '@/lib/config/plan-prices';
+
+const FREE_CLAIM = getPublicPriceClaim('free');
+const PRO_CLAIM = getPublicPriceClaim('pro');
+const MAX_CLAIM = getPublicPriceClaim('max');
 
 export type CanonicalPlanId = 'free' | 'pro' | 'max';
 
@@ -50,34 +53,34 @@ export const CANONICAL_PLANS: readonly CanonicalPlan[] = [
     id: 'free',
     displayName: ENTITLEMENT_REGISTRY.free.marketing.displayName,
     tagline: ENTITLEMENT_REGISTRY.free.marketing.tagline,
-    monthlyPriceUsd: 0,
-    yearlyPriceUsd: null,
-    monthlyPriceLabel: '$0',
+    monthlyPriceUsd: FREE_CLAIM.priceUsd,
+    yearlyPriceUsd: FREE_CLAIM.annualPriceUsd,
+    monthlyPriceLabel: FREE_CLAIM.priceLabel,
     features: ENTITLEMENT_REGISTRY.free.marketing.features,
-    ctaLabel: 'Claim your profile',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=free`,
+    ctaLabel: FREE_CLAIM.ctaLabel,
+    signupHref: FREE_CLAIM.ctaHref,
   },
   {
     id: 'pro',
     displayName: ENTITLEMENT_REGISTRY.pro.marketing.displayName,
     tagline: ENTITLEMENT_REGISTRY.pro.marketing.tagline,
-    monthlyPriceUsd: PLAN_PRICES.pro.monthly,
-    yearlyPriceUsd: PLAN_PRICES.pro.yearly,
-    monthlyPriceLabel: `$${PLAN_PRICES.pro.monthly}`,
+    monthlyPriceUsd: PRO_CLAIM.priceUsd,
+    yearlyPriceUsd: PRO_CLAIM.annualPriceUsd,
+    monthlyPriceLabel: PRO_CLAIM.priceLabel,
     features: ENTITLEMENT_REGISTRY.pro.marketing.features,
-    ctaLabel: 'Start Free Trial',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
+    ctaLabel: PRO_CLAIM.ctaLabel,
+    signupHref: PRO_CLAIM.ctaHref,
   },
   {
     id: 'max',
     displayName: ENTITLEMENT_REGISTRY.max.marketing.displayName,
     tagline: ENTITLEMENT_REGISTRY.max.marketing.tagline,
-    monthlyPriceUsd: PLAN_PRICES.max.monthly,
-    yearlyPriceUsd: PLAN_PRICES.max.yearly,
-    monthlyPriceLabel: `$${PLAN_PRICES.max.monthly}`,
+    monthlyPriceUsd: MAX_CLAIM.priceUsd,
+    yearlyPriceUsd: MAX_CLAIM.annualPriceUsd,
+    monthlyPriceLabel: MAX_CLAIM.priceLabel,
     features: ENTITLEMENT_REGISTRY.max.marketing.features,
-    ctaLabel: ARTIST_VISIBILITY_OFFER.enterprise.cta,
-    signupHref: ARTIST_VISIBILITY_OFFER.enterprise.href,
+    ctaLabel: MAX_CLAIM.ctaLabel,
+    signupHref: MAX_CLAIM.ctaHref,
   },
 ] as const;
 

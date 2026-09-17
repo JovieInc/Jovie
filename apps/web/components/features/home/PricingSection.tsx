@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { APP_ROUTES } from '@/constants/routes';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
@@ -34,6 +34,8 @@ const PRO_FEATURE_PREVIEW = [
 export function PricingSection() {
   const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
   const proPlan = ENTITLEMENT_REGISTRY.pro.marketing;
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
   const freeIncludes = freePlan.features.filter(feature =>
     FREE_FEATURE_PREVIEW.includes(
       feature as (typeof FREE_FEATURE_PREVIEW)[number]
@@ -59,7 +61,7 @@ export function PricingSection() {
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Request access for smart links and your artist profile. Upgrade
+              Claim your profile for smart links and your artist page. Upgrade
               when you want release notifications, deeper audience intelligence,
               and stronger fan ownership.
             </p>
@@ -82,9 +84,13 @@ export function PricingSection() {
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
-                  $0
+                  {freeClaim.priceLabel}
                 </span>
-                <span className='text-sm text-tertiary-token'>/mo</span>
+                {freeClaim.cadence ? (
+                  <span className='text-sm text-tertiary-token'>
+                    {freeClaim.cadence}
+                  </span>
+                ) : null}
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                 Smart links, your artist profile, and the core launch surface.
@@ -117,9 +123,7 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full'
               >
-                <Link href={`${APP_ROUTES.SIGNUP}?plan=free`}>
-                  Request Access
-                </Link>
+                <Link href={freeClaim.ctaHref}>{freeClaim.ctaLabel}</Link>
               </Button>
             </div>
 
@@ -141,9 +145,13 @@ export function PricingSection() {
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
-                  ${proPlan.price?.monthly ?? 0}
+                  {proClaim.priceLabel}
                 </span>
-                <span className='text-sm text-tertiary-token'>/mo</span>
+                {proClaim.cadence ? (
+                  <span className='text-sm text-tertiary-token'>
+                    {proClaim.cadence}
+                  </span>
+                ) : null}
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                 Release notifications, audience intelligence, contact export,
@@ -177,7 +185,7 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full'
               >
-                <Link href={`${APP_ROUTES.SIGNUP}?plan=pro`}>Choose Pro</Link>
+                <Link href={proClaim.ctaHref}>{proClaim.ctaLabel}</Link>
               </Button>
             </div>
           </div>

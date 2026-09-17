@@ -1,5 +1,4 @@
-import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 /**
  * Canonical plan IDs for the marketing pricing page.
@@ -36,12 +35,17 @@ export interface MarketingPricingPlan {
   readonly ctaHref: string;
 }
 
+const FREE_CLAIM = getPublicPriceClaim('free');
+const PRO_CLAIM = getPublicPriceClaim('pro');
+const MAX_CLAIM = getPublicPriceClaim('max');
+
 export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
   {
     id: 'free',
-    name: 'Free',
-    price: '$0',
-    badge: 'Free forever',
+    name: FREE_CLAIM.displayName,
+    price: FREE_CLAIM.priceLabel,
+    cadence: FREE_CLAIM.cadence ?? undefined,
+    badge: FREE_CLAIM.badge,
     body: 'Your artist profile, smart links, and public fan path stay free.',
     features: [
       'Artist profile',
@@ -52,15 +56,15 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'Manual release creation',
     ],
     accent: 'cyan',
-    ctaLabel: 'Claim your profile',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=free`,
+    ctaLabel: FREE_CLAIM.ctaLabel,
+    ctaHref: FREE_CLAIM.ctaHref,
   },
   {
     id: 'pro',
-    name: 'Pro',
-    price: `$${PLAN_PRICES.pro.monthly}`,
-    cadence: '/mo',
-    badge: 'Recommended',
+    name: PRO_CLAIM.displayName,
+    price: PRO_CLAIM.priceLabel,
+    cadence: PRO_CLAIM.cadence ?? undefined,
+    badge: PRO_CLAIM.badge,
     body: 'Fan notifications, presaves, and deeper release analytics.',
     features: [
       'Everything in Free',
@@ -75,14 +79,14 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'AI assistant (70 messages/week)',
     ],
     accent: 'blue',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
+    ctaLabel: PRO_CLAIM.ctaLabel,
+    ctaHref: PRO_CLAIM.ctaHref,
   },
   {
     id: 'max',
-    name: 'Max',
-    price: `$${PLAN_PRICES.max.monthly}`,
-    cadence: '/mo',
+    name: MAX_CLAIM.displayName,
+    price: MAX_CLAIM.priceLabel,
+    cadence: MAX_CLAIM.cadence ?? undefined,
     badge: 'Full stack',
     body: 'Your entire release operation, automated end to end.',
     features: [
@@ -95,16 +99,13 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'AI assistant (250 messages/week)',
     ],
     accent: 'violet',
-    ctaLabel: ARTIST_VISIBILITY_OFFER.enterprise.cta,
-    ctaHref: ARTIST_VISIBILITY_OFFER.enterprise.href,
+    ctaLabel: MAX_CLAIM.ctaLabel,
+    ctaHref: MAX_CLAIM.ctaHref,
   },
 ] as const;
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
-  if (planId === 'max') {
-    return ARTIST_VISIBILITY_OFFER.enterprise.href;
-  }
-  return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
+  return getPublicPriceClaim(planId).ctaHref;
 }
 
 export function isMarketingPlanActive(
@@ -126,5 +127,5 @@ export function getVisibleMarketingPricingPlans(): readonly MarketingPricingPlan
 }
 
 export function getMarketingPlanCtaLabel(plan: MarketingPricingPlan): string {
-  return plan.ctaLabel;
+  return getPublicPriceClaim(plan.id).ctaLabel;
 }

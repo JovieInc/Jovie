@@ -1,12 +1,17 @@
 /**
- * Published offer truth for pricing + auth handoff (JOV-6202).
+ * Published offer truth for pricing + auth handoff (JOV-6202 / JOV-5814).
  *
  * Derives from billing/entitlement config and the implemented Pro trial.
  * JOV-6218 supersedes the older public Pro/Max offer; retain helpers for auth compatibility.
+ * Public marketing/pricing surfaces must read claims from this module.
  */
 
 import { APP_ROUTES } from '@/constants/routes';
-import { PLAN_PRICES, toCents } from '@/lib/config/plan-prices';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  PLAN_PRICES,
+  toCents,
+} from '@/lib/config/plan-prices';
 
 import { formatAmount, formatAmountNoCents } from '@/lib/utils/format-number';
 
@@ -110,4 +115,104 @@ export function getPlanOfferNote(plan: PublicOfferPlan): string {
 
 export function getMaxOfferBadge(): string {
   return 'Contact sales';
+}
+
+/** Public merchandising plans. Max stays visible; checkout is contact-sales. */
+export const PUBLIC_PRICING_CLAIM_PLANS = ['free', 'pro', 'max'] as const;
+export type PublicPricingClaimPlan =
+  (typeof PUBLIC_PRICING_CLAIM_PLANS)[number];
+
+export const PUBLIC_CUSTOM_PRICE_LABEL = 'Custom';
+
+export type PublicPriceClaim = {
+  readonly plan: PublicOfferPlan;
+  readonly displayName: string;
+  readonly priceUsd: number | null;
+  readonly annualPriceUsd: number | null;
+  readonly priceLabel: string;
+  readonly cadence: string | null;
+  readonly badge: string;
+  readonly note: string;
+  readonly ctaLabel: string;
+  readonly ctaHref: string;
+  readonly selfService: boolean;
+};
+
+export function getContactSalesHref(): string {
+  return ARTIST_VISIBILITY_OFFER.enterprise.href;
+}
+
+export function getPlanCtaHref(
+  plan: PublicOfferPlan,
+  interval: BillingInterval = 'month'
+): string {
+  if (isSelfServiceOffer(plan, interval)) {
+    return getPlanSignupHref(plan, interval);
+  }
+  return getContactSalesHref();
+}
+
+export function formatPublicPriceDisplay(claim: PublicPriceClaim): string {
+  if (!claim.cadence) return claim.priceLabel;
+  return `${claim.priceLabel}${claim.cadence}`;
+}
+
+export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
+  if (plan === 'free') {
+    return {
+      plan,
+      displayName: ARTIST_VISIBILITY_OFFER.free.displayName,
+      priceUsd: 0,
+      annualPriceUsd: null,
+      priceLabel: formatUsdAmount(0),
+      cadence: null,
+      badge: 'Free forever',
+      note: FREE_PROFILE_TRUTH,
+      ctaLabel: getPlanCtaLabel(plan),
+      ctaHref: getPlanCtaHref(plan),
+      selfService: true,
+    };
+  }
+
+  if (plan === 'pro') {
+    const priceUsd = getPaidPlanPriceUsd('pro', 'month');
+    return {
+      plan,
+      displayName: ARTIST_VISIBILITY_OFFER.pro.displayName,
+      priceUsd,
+      annualPriceUsd: null,
+      priceLabel: formatUsdAmount(priceUsd),
+      cadence: '/mo',
+      badge: 'Recommended',
+      note: PRO_TRIAL_TRUTH,
+      ctaLabel: getPlanCtaLabel(plan),
+      ctaHref: getPlanCtaHref(plan),
+      selfService: true,
+    };
+  }
+
+  return {
+    plan,
+    displayName:
+      plan === 'enterprise'
+        ? ARTIST_VISIBILITY_OFFER.enterprise.displayName
+        : 'Max',
+    priceUsd: null,
+    annualPriceUsd: null,
+    priceLabel: PUBLIC_CUSTOM_PRICE_LABEL,
+    cadence: null,
+    badge: getMaxOfferBadge(),
+    note: getPlanOfferNote(plan),
+    ctaLabel: getPlanCtaLabel(plan),
+    ctaHref: getPlanCtaHref(plan),
+    selfService: false,
+  };
+}
+
+export function getPublicPriceClaims(): readonly PublicPriceClaim[] {
+  return PUBLIC_PRICING_CLAIM_PLANS.map(plan => getPublicPriceClaim(plan));
+}
+
+export function hasPublicAnnualOffer(): boolean {
+  return getPublicPriceClaims().some(claim => claim.annualPriceUsd !== null);
 }
