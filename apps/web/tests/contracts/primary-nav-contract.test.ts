@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  MARKETING_FOOTER_COLUMNS,
   MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
@@ -18,9 +19,7 @@ function readSource(relativePath: string) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
-function routeFileExistsFor(href: string) {
-  if (!href.startsWith('/')) return true;
-
+function collectActualRoutes() {
   const actualRoutes = new Set<string>();
 
   function visit(directory: string) {
@@ -46,14 +45,21 @@ function routeFileExistsFor(href: string) {
   }
 
   visit(appRoot);
-  return actualRoutes.has(href);
+  return actualRoutes;
+}
+
+const actualRoutes = collectActualRoutes();
+
+function routeFileExistsFor(href: string) {
+  if (!href.startsWith('/')) return true;
+  return actualRoutes.has(new URL(href, 'https://jovie.local').pathname);
 }
 
 describe('primary marketing navigation contract', () => {
-  it('keeps the top-level marketing nav labels exact and ordered', () => {
+  it('labels current destinations without implying a generic product page', () => {
     expect(MARKETING_NAV_LINKS.map(link => link.label)).toEqual([
-      'Artists',
-      'Product',
+      'About',
+      'For Artists',
       'Pricing',
     ]);
   });
@@ -68,9 +74,6 @@ describe('primary marketing navigation contract', () => {
   it('keeps audience and tools flyouts declared in marketing navigation data', () => {
     expect(MARKETING_FOR_FLYOUT_LINKS.map(link => link.label)).toEqual([
       'Artists',
-      'Founders',
-      'Creators',
-      'Authors',
     ]);
     expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
       'Fan Notifications',
@@ -80,12 +83,13 @@ describe('primary marketing navigation contract', () => {
     ]);
   });
 
-  it('keeps every primary nav link pointed at a route the app can serve', () => {
+  it('keeps primary, flyout and footer links pointed at concrete pages', () => {
     for (const link of [
       ...MARKETING_NAV_LINKS,
       ...MARKETING_NAV_UTILITIES,
       ...MARKETING_FOR_FLYOUT_LINKS,
       ...MARKETING_TOOLS_FLYOUT_LINKS,
+      ...MARKETING_FOOTER_COLUMNS.flatMap(column => column.links),
     ]) {
       expect(routeFileExistsFor(link.href), link.href).toBe(true);
     }
