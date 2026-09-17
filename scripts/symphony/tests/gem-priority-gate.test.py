@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import importlib.util
@@ -2001,6 +2002,207 @@ class DeploymentBindingTests(unittest.TestCase):
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
         )
+
+
+class QueueSnapshotIsolationTests(unittest.TestCase):
+    NOW = MODULE.datetime(2026, 9, 17, 18, 30, tzinfo=MODULE.UTC)
+
+    def completed(self, payload: list[dict[str, object]]) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout=json.dumps(payload), stderr=""
+        )
+
+    def test_fleet_sidecar_keeps_jovie_singleton_and_namespaces_other_repos(self):
+        from gem_gate_contract import fleet_sidecar_filename, fleet_sidecar_path
+
+        state_dir = pathlib.Path("/tmp/gem/state/gem-priority-gate")
+        jovie = fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json")
+        alias = fleet_sidecar_path(state_dir, "ItsTimWhite/Jovie", "queue-snapshot.json")
+        lyb = fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json")
+        self.assertEqual(jovie, pathlib.Path("/tmp/gem/state/queue-snapshot.json"))
+        self.assertEqual(alias, jovie)
+        self.assertNotEqual(lyb, jovie)
+        self.assertEqual(lyb.parent, jovie.parent)
+        self.assertTrue(lyb.name.startswith("queue-snapshot-"))
+        self.assertTrue(lyb.name.endswith(".json"))
+        self.assertNotEqual(
+            fleet_sidecar_filename("queue-snapshot.json", "foo/bar-baz"),
+            fleet_sidecar_filename("queue-snapshot.json", "foo-bar/baz"),
+        )
+
+    def test_parallel_repo_queue_writes_do_not_clobber_the_jovie_singleton(self):
+        from gem_gate_contract import fleet_sidecar_path
+
+        jovie_prs = [
+            {
+                "number": number,
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "CLEAN" if number <= 4 else "BLOCKED",
+            }
+            for number in range(1, 47)
+        ]
+        lyb_prs = [
+            {
+                "number": number,
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "BLOCKED",
+            }
+            for number in range(1, 10)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            jovie_path = fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json")
+            lyb_path = fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json")
+            with mock.patch.object(
+                MODULE.subprocess, "run", return_value=self.completed(jovie_prs)
+            ):
+                jovie = MODULE.observe_queue(
+                    "JovieInc/Jovie", 16, snapshot_path=jovie_path, now=self.NOW
+                )
+            with mock.patch.object(
+                MODULE.subprocess, "run", return_value=self.completed(lyb_prs)
+            ):
+                lyb = MODULE.observe_queue(
+                    "JovieInc/LogYourBody", 16, snapshot_path=lyb_path, now=self.NOW
+                )
+            jovie_written = json.loads(jovie_path.read_text(encoding="utf-8"))
+            lyb_written = json.loads(lyb_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(jovie_path.name, "queue-snapshot.json")
+        self.assertNotEqual(lyb_path, jovie_path)
+        self.assertEqual(jovie["eligiblePrs"], 46)
+        self.assertEqual(jovie["greenReadyPrs"], 4)
+        self.assertEqual(lyb["eligiblePrs"], 9)
+        self.assertEqual(lyb["greenReadyPrs"], 0)
+        self.assertEqual(jovie_written["repository"], "JovieInc/Jovie")
+        self.assertEqual(jovie_written["eligiblePrs"], 46)
+        self.assertEqual(jovie_written["greenReadyPrs"], 4)
+        self.assertEqual(lyb_written["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(lyb_written["eligiblePrs"], 9)
+        self.assertEqual(lyb_written["greenReadyPrs"], 0)
+
+    def test_foreign_repo_cannot_write_the_jovie_singleton_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            singleton = pathlib.Path(tmp) / "queue-snapshot.json"
+            singleton.write_text(
+                json.dumps(
+                    {
+                        "schema": "jovie-queue-snapshot/v2",
+                        "repository": "JovieInc/Jovie",
+                        "status": "known",
+                        "eligiblePrs": 46,
+                        "greenReadyPrs": 4,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            before = singleton.read_text(encoding="utf-8")
+            observed = MODULE.observe_queue(
+                "JovieInc/LogYourBody",
+                16,
+                snapshot_path=singleton,
+                now=self.NOW,
+            )
+            self.assertEqual(observed["status"], "unknown")
+            self.assertEqual(observed["repository"], "JovieInc/LogYourBody")
+            self.assertIn("refusing to use queue-snapshot.json", observed["error"])
+            self.assertEqual(singleton.read_text(encoding="utf-8"), before)
+            with self.assertRaisesRegex(ValueError, "refusing to use queue-snapshot.json"):
+                MODULE.write_queue_snapshot(
+                    singleton,
+                    {
+                        "schema": "jovie-queue-snapshot/v2",
+                        "repository": "JovieInc/LogYourBody",
+                        "status": "known",
+                        "eligiblePrs": 9,
+                        "greenReadyPrs": 0,
+                    },
+                )
+            self.assertEqual(singleton.read_text(encoding="utf-8"), before)
+            with self.assertRaisesRegex(ValueError, "must name its repository"):
+                MODULE.write_queue_snapshot(
+                    singleton,
+                    {"schema": "jovie-queue-snapshot/v2", "status": "known"},
+                )
+
+    def test_observe_signals_routes_sidecars_per_repository(self):
+        from gem_gate_contract import fleet_sidecar_path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            captured: dict[str, pathlib.Path] = {}
+
+            def capture_queue(*_args: object, **kwargs: object) -> dict[str, object]:
+                captured["queue"] = kwargs["snapshot_path"]  # type: ignore[assignment]
+                return {"status": "unknown", "repository": "JovieInc/LogYourBody"}
+
+            def capture_controller(*_args: object, **kwargs: object) -> dict[str, object]:
+                captured["controller"] = kwargs["snapshot_path"]  # type: ignore[assignment]
+                return {"status": "failed"}
+
+            def capture_review(path: pathlib.Path, *_args: object, **_kwargs: object) -> dict[str, object]:
+                captured["review"] = path
+                return {"accepted": False, "reason": "independent-review-receipt-missing"}
+
+            args = argparse.Namespace(
+                repo="JovieInc/LogYourBody",
+                state_dir=state_dir,
+                queue_target=15,
+                production_url="https://example.test/health",
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                lease_guard_bin="/bin/false",
+                integrity_receipt=None,
+                concurrency_evidence=None,
+                independent_review_receipt=None,
+            )
+            with (
+                mock.patch.object(
+                    MODULE, "observe_main", return_value={"status": "unknown", "sha": "0" * 40}
+                ),
+                mock.patch.object(MODULE, "observe_concurrency", return_value={"accepted": False}),
+                mock.patch.object(MODULE, "observe_closure_health", return_value={"lifecycleActions": []}),
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
+                mock.patch.object(MODULE, "observe_production", return_value={"status": "unknown"}),
+                mock.patch.object(MODULE, "observe_controller", side_effect=capture_controller),
+                mock.patch.object(MODULE, "observe_integrity", return_value={"status": "invalid"}),
+                mock.patch.object(MODULE, "observe_queue", side_effect=capture_queue),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value={}),
+                mock.patch.object(
+                    MODULE, "refresh_independent_review_receipt", side_effect=capture_review
+                ),
+                mock.patch.object(MODULE, "observe_lease", return_value={"status": "unknown"}),
+            ):
+                MODULE.observe_signals(args, self.NOW)
+                self.assertEqual(
+                    captured["queue"],
+                    fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json"),
+                )
+                self.assertEqual(
+                    captured["controller"],
+                    fleet_sidecar_path(
+                        state_dir, "JovieInc/LogYourBody", "controller-snapshot.json"
+                    ),
+                )
+                self.assertEqual(
+                    captured["review"],
+                    fleet_sidecar_path(
+                        state_dir, "JovieInc/LogYourBody", "independent-review.json"
+                    ),
+                )
+                self.assertNotEqual(captured["queue"].name, "queue-snapshot.json")
+                args.repo = "JovieInc/Jovie"
+                MODULE.observe_signals(args, self.NOW)
+                self.assertEqual(
+                    captured["queue"],
+                    fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json"),
+                )
+                self.assertEqual(captured["queue"].name, "queue-snapshot.json")
+                self.assertEqual(captured["controller"].name, "controller-snapshot.json")
+                self.assertEqual(captured["review"].name, "independent-review.json")
 
 
 class IndependentReviewTests(unittest.TestCase):

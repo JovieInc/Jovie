@@ -152,6 +152,32 @@ def drain_state_dir(root: pathlib.Path, repo: str) -> pathlib.Path:
     return base if _is_jovie_repo(repo) else base.with_name(f"{base.name}-{_repo_key(repo)}")
 
 
+def fleet_sidecar_filename(filename: str, repo: str) -> str:
+    """Basename for a repo-scoped fleet sidecar next to the gate state dir.
+
+    Jovie keeps the historical singleton name so live readers stay stable.
+    Other repos get a namespaced sibling so they cannot clobber Jovie.
+    """
+    name = pathlib.Path(filename).name
+    if name != filename or name in {"", ".", ".."}:
+        raise GateContractError("fleet sidecar filename must be a basename")
+    if _is_jovie_repo(repo):
+        return name
+    return f"{pathlib.Path(name).stem}-{_repo_key(repo)}{pathlib.Path(name).suffix}"
+
+
+def fleet_sidecar_path(state_dir: pathlib.Path, repo: str, filename: str) -> pathlib.Path:
+    return state_dir.parent / fleet_sidecar_filename(filename, repo)
+
+
+def assert_repo_sidecar_path(path: pathlib.Path, repo: str, filename: str) -> None:
+    expected = fleet_sidecar_filename(filename, repo)
+    if path.name != expected:
+        raise ValueError(
+            f"refusing to use {filename} for {repo} at {path.name}; expected {expected}"
+        )
+
+
 def _typed_allowed(receipt: dict[str, Any], consumer: str) -> bool:
     if consumer == "fleet":
         value = receipt.get("workAdmission", {}).get("allowed")
