@@ -65,6 +65,16 @@ CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
+CLOSURE_HEALTH_PLACEHOLDER_REASON = "closure-health-receipt-missing-or-malformed"
+GATE_EVALUATION_FAILED_REASON = "gate-evaluation-failed"
+LIVE_PERSIST_ALLOW_ENV = "FLEET_GATE_ALLOW_LIVE_PERSIST"
+LIVE_PERSIST_WRITER = "gem-priority-gate.persist_live_receipt"
+UNSAFE_LIVE_PERSIST_REASONS = frozenset(
+    {
+        CLOSURE_HEALTH_PLACEHOLDER_REASON,
+        GATE_EVALUATION_FAILED_REASON,
+    }
+)
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
@@ -220,7 +230,7 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "reasons": [CLOSURE_HEALTH_PLACEHOLDER_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -1728,6 +1738,95 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     }
 
 
+class LivePersistFenceError(RuntimeError):
+    """Refuse-closed live persist. Never converted into a persisted receipt."""
+
+
+def live_persist_override_is_nonzero(raw: str | None) -> bool:
+    """True when FLEET_GATE_ALLOW_LIVE_PERSIST is a nonzero/truthy spelling."""
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    return value not in {"", "0", "false", "no", "off"}
+
+
+def refuse_unsafe_live_persist_override() -> None:
+    """Hard-fail before live state is read or written when the override is set.
+
+    The env var is not an enable switch. Any nonzero spelling is refuse-closed
+    so it cannot silently authorize a live latest.json write.
+    """
+    raw = os.environ.get(LIVE_PERSIST_ALLOW_ENV)
+    if not live_persist_override_is_nonzero(raw):
+        return
+    raise LivePersistFenceError(
+        f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
+        "nonzero; live persist is refuse-closed"
+    )
+
+
+def _receipt_reason_codes(receipt: dict[str, Any]) -> set[str]:
+    codes: set[str] = set()
+    for item in receipt.get("reasons") or []:
+        if isinstance(item, str):
+            codes.add(item)
+        elif isinstance(item, dict):
+            code = item.get("code")
+            if isinstance(code, str):
+                codes.add(code)
+    signals = receipt.get("signals")
+    closure = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if isinstance(closure, dict):
+        for item in closure.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    admission = receipt.get("closureAdmission")
+    if isinstance(admission, dict):
+        for item in admission.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    return codes
+
+
+def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
+    """Return why a candidate must not replace latest.json, or None if safe."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected malformed receipt schema"
+    if parse_time(receipt.get("observedAt")) is None:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without a typed observedAt"
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed signals"
+    main = signals.get("main")
+    sha = main.get("sha") if isinstance(main, dict) else None
+    if not valid_commit_sha(sha, exact=True) or sha == UNKNOWN_MAIN_SHA:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected receipt without exact source/main identity"
+        )
+    closure = signals.get("closureHealth")
+    if not isinstance(closure, dict) or closure.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed closure-health"
+    if closure.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without closure-health authority"
+    if closure.get("status") not in {"healthy", "grace", "red"}:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt with untyped closure-health status"
+    unsafe = _receipt_reason_codes(receipt) & UNSAFE_LIVE_PERSIST_REASONS
+    if CLOSURE_HEALTH_PLACEHOLDER_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected placeholder closure-health "
+            f"({CLOSURE_HEALTH_PLACEHOLDER_REASON})"
+        )
+    if GATE_EVALUATION_FAILED_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected failed-evaluation receipt "
+            f"({GATE_EVALUATION_FAILED_REASON})"
+        )
+    work = receipt.get("workAdmission")
+    if not isinstance(work, dict) or not isinstance(work.get("allowed"), bool):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed workAdmission"
+    return None
+
+
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
     """Commit the hold first, then publish latest.json as the commit marker.
 
@@ -1859,7 +1958,7 @@ def failed_evaluation_receipt(
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["gate-evaluation-failed"],
+        "reasons": [GATE_EVALUATION_FAILED_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -1892,7 +1991,7 @@ def failed_evaluation_receipt(
         },
         "reasons": [
             typed_reason(
-                "gate-evaluation-failed",
+                GATE_EVALUATION_FAILED_REASON,
                 "integrity",
                 "critical",
                 str(error),
@@ -1916,7 +2015,7 @@ def failed_evaluation_receipt(
             "fallbackPrGenerationAllowed": False,
             "authority": CLOSURE_HEALTH_AUTHORITY,
             "status": "red",
-            "reasons": ["gate-evaluation-failed"],
+            "reasons": [GATE_EVALUATION_FAILED_REASON],
             "promotionContinues": True,
             "remediationContinues": True,
             "products": project_product_admission(product_closures),
@@ -1993,7 +2092,17 @@ def persist_live_receipt(
     cannot create the Gem state dir. Throwing there used to replace a complete
     live receipt with an incomplete stub. Consumers must still receive the
     live evaluation so Auto-Enroll can skip or admit from schema-valid JSON.
+
+    Placeholder, failed-evaluation, and untyped candidates never replace
+    latest.json. A prior valid receipt stays in place. The live-persist
+    env override is not an enable switch: any nonzero spelling hard-fails
+    before the writer lock is taken.
     """
+    refuse_unsafe_live_persist_override()
+    rejected = live_persist_rejection_reason(receipt)
+    if rejected is not None:
+        warn_live_receipt_not_persisted(LivePersistFenceError(rejected))
+        return receipt
     try:
         lock_fd = acquire_writer_lock(state_dir)
     except (OSError, TimeoutError) as error:
@@ -2140,11 +2249,16 @@ def main() -> int:
             # the competing-writer timeout, so only the fast compare-and-commit
             # section is serialized. A slower writer whose observation predates
             # the persisted receipt never overwrites fresher state.
+            refuse_unsafe_live_persist_override()
             now = utc_now()
             alarm_if_previous_receipt_stale(args.state_dir, now)
             receipt = evaluate(observe_signals(args, now), isoformat(now))
             receipt = persist_live_receipt(receipt, args.state_dir, now)
         return emit_receipt(receipt, args.consumer)
+    except LivePersistFenceError as error:
+        prefix = "::error::" if os.environ.get("GITHUB_ACTIONS") == "true" else "ERROR:"
+        print(f"{prefix} {error}", file=sys.stderr)
+        return 3
     except (OSError, ValueError, json.JSONDecodeError, TimeoutError) as error:
         return emit_receipt(failed_evaluation_receipt(error), "fleet")
 
@@ -2152,5 +2266,9 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except LivePersistFenceError as error:
+        prefix = "::error::" if os.environ.get("GITHUB_ACTIONS") == "true" else "ERROR:"
+        print(f"{prefix} {error}", file=sys.stderr)
+        raise SystemExit(3)
     except Exception as error:  # noqa: BLE001 - last-resort schema-valid blocked receipt
         raise SystemExit(emit_receipt(failed_evaluation_receipt(error), "fleet"))

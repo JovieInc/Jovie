@@ -7,7 +7,10 @@ description: >
 
 inputs:
   dry-run:
-    description: Pass --dry-run (do not persist latest.json).
+    description: >
+      Pass --dry-run (do not persist latest.json). Live persist stays
+      refuse-closed for placeholder/malformed receipts. Never set
+      FLEET_GATE_ALLOW_LIVE_PERSIST; any nonzero spelling fails the live path.
     required: false
     default: 'false'
   consumer:

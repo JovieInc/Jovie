@@ -13,6 +13,9 @@
 #   FLEET_GATE_RECEIPT       output path (default $RUNNER_TEMP/jovie-fleet-gate.json)
 #   GITHUB_OUTPUT            optional Actions output file
 #
+# FLEET_GATE_ALLOW_LIVE_PERSIST is not an enable switch. Any nonzero spelling
+# in live mode (dry-run != 1) is refuse-closed before the gate is invoked.
+#
 # Job-output `receipt_b64` is a bounded admission projection, not FLEET_GATE_RECEIPT.
 set -euo pipefail
 
@@ -29,6 +32,21 @@ case "$consumer" in
     exit 2
     ;;
 esac
+
+live_persist_override_nonzero() {
+  local raw="${FLEET_GATE_ALLOW_LIVE_PERSIST-}"
+  [[ -n "$raw" ]] || return 1
+  raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  case "$raw" in
+    "" | 0 | false | no | off) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+if [[ "${FLEET_GATE_DRY_RUN:-0}" != "1" ]] && live_persist_override_nonzero; then
+  echo "::error::FLEET_GATE_ALLOW_LIVE_PERSIST is present and nonzero; live persist is refuse-closed." >&2
+  exit 2
+fi
 
 args=(python3 "$gate" --consumer "$consumer")
 if [[ "${FLEET_GATE_DRY_RUN:-0}" == "1" ]]; then
