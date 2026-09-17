@@ -265,6 +265,108 @@ class DispatchAdmissionTests(unittest.TestCase):
             self.assertEqual(result.returncode, code, result.stderr)
             self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
 
+    def test_admission_object_is_typed_and_mode_scoped(self):
+        # symphony-dispatch-admission/v1: flat machine keys stay first-class,
+        # per-mode sub-objects carry typed evidence, and a held admission
+        # never leaks the other mode's fields.
+        admitted = self.check(self.payload())
+        self.assertEqual(admitted["schema"], "symphony-dispatch-admission/v1")
+        self.assertEqual(admitted["reason"], "dispatch-gate-prerequisite-passed")
+        self.assertEqual(admitted["mode"], "new-work")
+        self.assertEqual(admitted["productId"], "jovie")
+        self.assertEqual(admitted["maxConcurrent"], 1)
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["newIssueLeaseAllowed"])
+        self.assertTrue(admitted["newWork"]["newImplementationAllowed"])
+        self.assertNotIn("existingRepair", admitted)
+
+        repair = self.check(self.payload(), mode="existing-pr-repair")
+        self.assertTrue(repair["allowed"])
+        self.assertEqual(repair["existingRepair"]["authority"], "single-pr-writer-exact-head")
+        self.assertIn("isolated-pr-repair", repair["existingRepair"]["activities"])
+        self.assertFalse(repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", repair)
+        # The typed repair sub-object may carry pushAllowed; the top level
+        # must not (legacy contract).
+        self.assertNotIn("pushAllowed", repair)
+
+    def test_held_admissions_carry_typed_evidence_not_other_modes_fields(self):
+        # Red closure holds BOTH modes; each response carries the closure
+        # projection and only its own mode's fields when evaluated.
+        # Issue-blocked red passes the closure verdict (per-product feed
+        # semantics) but still closes new work at the workAdmission gate.
+        red = self.payload("red")
+        held_new = self.check(red, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertEqual(held_new["newWork"]["productNewIssueLeaseAllowed"], False)
+        self.assertFalse(held_new["newWork"]["newIssueLeaseAllowed"])
+        self.assertNotIn("existingRepair", held_new)
+        # Repair admission survives the same red closure (remediation is
+        # liveness), and carries only the typed repair evidence.
+        held_repair = self.check(red, "existing-pr-repair")
+        self.assertTrue(held_repair["allowed"])
+        self.assertFalse(held_repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", held_repair)
+        self.assertNotIn("pushAllowed", held_repair)
+
+        # A systems-down closure reason holds the closure verdict, but the
+        # deliberate valid_reasons contract lets repair survive red closure:
+        # new work closes via the verdict hold, repair stays admitted.
+        systems_down = self.payload("red")
+        systems_down["signals"]["closureHealth"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        systems_down["closureAdmission"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        held_new = self.check(systems_down, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertNotIn("existingRepair", held_new)
+        repair_survives = self.check(systems_down, "existing-pr-repair")
+        self.assertTrue(repair_survives["allowed"])
+
+        # A structurally invalid receipt (stale beyond the fail-closed window)
+        # holds BOTH modes at the verdict with the typed closure projection
+        # and no mode fields at all.
+        stale = self.payload()
+        stale["observedAt"] = "2020-01-01T00:00:00Z"
+        held_both = self.check(stale, "new-work")
+        self.assertFalse(held_both["allowed"])
+        self.assertEqual(held_both["reason"], "fleet-gate-receipt-stale")
+        self.assertEqual(held_both["closureHealth"]["holdReason"], "fleet-gate-receipt-stale")
+        self.assertNotIn("newWork", held_both)
+        self.assertNotIn("existingRepair", held_both)
+        held_both_repair = self.check(stale, "existing-pr-repair")
+        self.assertFalse(held_both_repair["allowed"])
+        self.assertNotIn("existingRepair", held_both_repair)
+        self.assertNotIn("newWork", held_both_repair)
+
+        # Missing file / invalid mode stay fail-closed typed skeletons.
+        self.path.unlink()
+        missing = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")
+        self.assertEqual(missing["schema"], "symphony-dispatch-admission/v1")
+        self.assertFalse(missing["allowed"])
+        self.assertEqual(missing["reason"], "dispatch-gate-invalid")
+        bad_mode = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="not-a-product")
+        self.assertFalse(bad_mode["allowed"])
+        self.assertEqual(bad_mode["reason"], "dispatch-gate-invalid")
+        self.assertEqual(bad_mode["productId"], "not-a-product")
+
+    def test_capacity_unproven_admission_carries_typed_capacity_evidence(self):
+        payload = self.payload()
+        payload["concurrency"] = {"gem": {"maxConcurrent": 0, "evidenceAccepted": False,
+                                          "newMutationAllowed": False}}
+        unproven = self.check(payload)
+        self.assertFalse(unproven["allowed"])
+        self.assertEqual(unproven["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(unproven["capacity"],
+                         {"evidenceAccepted": False, "newMutationAllowed": False,
+                          "maxConcurrent": 0})
+        self.assertNotIn("newWork", unproven)
+        # Malformed concurrency block degrades to the same typed shape.
+        payload["concurrency"] = "garbage"
+        degraded = self.check(payload)
+        self.assertEqual(degraded["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(degraded["capacity"]["maxConcurrent"], None)
+
 
 class OfficialSymphonyContractTests(unittest.TestCase):
     def test_shutdown_drains_child_output_for_parent_and_group_signals(self):

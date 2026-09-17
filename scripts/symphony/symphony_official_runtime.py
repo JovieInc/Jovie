@@ -71,6 +71,14 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+# Typed dispatch admission (dispatch-preflight output). The flat keys
+# (allowed/reason/mode/productId/maxConcurrent) remain the machine contract
+# consumed by the fallback pickup check (symphony-codex-exhausted); the
+# versioned envelope and per-mode sub-objects are additive so new consumers
+# can bind typed fields without stringly single-key coupling.
+DISPATCH_ADMISSION_SCHEMA = "symphony-dispatch-admission/v1"
+DISPATCH_ADMISSION_MODES = ("new-work", "existing-pr-repair")
+DISPATCH_ADMISSION_PRODUCTS = ("jovie", "ovie", "logyourbody")
 # Closure stop-line purposes. "admission" (default) is the new-issue stop-line:
 # every non-healthy closure holds new work. "controller-activation" is the
 # startup check for installing the repair controller itself: a grace/red
@@ -1081,12 +1089,18 @@ def read_dispatch_admission(
 
     The controller must separately verify tracker/repository identity, exact
     repair assignment and writer lease, and recheck before its one-use claim.
+
+    Returns a typed symphony-dispatch-admission/v1 object. The flat keys
+    (allowed/reason/mode/productId/maxConcurrent, optional observedAt) are the
+    legacy machine contract and stay first-class; the per-mode sub-objects
+    (newWork/existingRepair) carry the mode-specific evidence so consumers can
+    bind typed fields instead of re-deriving them from the fleet receipt.
+    A held admission never leaks the other mode's fields.
     """
-    result = {"allowed": False, "reason": "dispatch-gate-invalid", "maxConcurrent": 0,
-              "mode": mode, "productId": product_id}
+    result = _new_dispatch_admission(mode, product_id)
     if (not isinstance(mode, str) or not isinstance(product_id, str)
-            or mode not in {"new-work", "existing-pr-repair"}
-            or product_id not in {"jovie", "ovie", "logyourbody"}):
+            or mode not in DISPATCH_ADMISSION_MODES
+            or product_id not in DISPATCH_ADMISSION_PRODUCTS):
         return result
     try:
         # One read: closure and capacity must never come from different versions.
@@ -1097,6 +1111,7 @@ def read_dispatch_admission(
     result["reason"] = verdict["reason"]
     valid_reasons = {"closure-health-green", "closure-health-product-independent", "closure-health-not-green"}
     if verdict["reason"] not in valid_reasons:
+        result["closureHealth"] = _admission_closure_projection(verdict)
         return result
     result["observedAt"] = verdict["receiptObservedAt"]
     concurrency = payload.get("concurrency")
@@ -1107,6 +1122,7 @@ def read_dispatch_admission(
             or gem.get("evidenceAccepted") is not True or gem.get("newMutationAllowed") is not True
             or type(maximum) is not int or maximum <= 0):
         result["reason"] = "dispatch-capacity-unproven"
+        result["capacity"] = _admission_capacity_projection(gem)
         return result
     if mode == "new-work":
         work = payload.get("workAdmission")
@@ -1119,7 +1135,11 @@ def read_dispatch_admission(
                 or work.get("newIssueLeaseAllowed") is not True
                 or work.get("newImplementationAllowed") is not True or not product_ok):
             result["reason"] = "new-work-admission-closed"
+            result["newWork"] = _admission_new_work_projection(
+                work, products, product_id
+            )
             return result
+        result["newWork"] = _admission_new_work_projection(work, products, product_id)
     else:
         repair = payload.get("remediationAdmission")
         activities = repair.get("activities") if isinstance(repair, dict) else None
@@ -1132,9 +1152,86 @@ def read_dispatch_admission(
                 or type(repair.get("pushAllowed")) is not bool
                 or type(repair_max) is not int or repair_max != maximum):
             result["reason"] = "existing-pr-remediation-closed"
+            result["existingRepair"] = _admission_repair_projection(repair)
             return result
+        result["existingRepair"] = _admission_repair_projection(repair)
     result.update(allowed=True, reason="dispatch-gate-prerequisite-passed", maxConcurrent=maximum)
     return result
+
+
+def _new_dispatch_admission(mode: object, product_id: object) -> dict[str, Any]:
+    """Fail-closed typed skeleton for an unevaluable admission."""
+    return {
+        "schema": DISPATCH_ADMISSION_SCHEMA,
+        "allowed": False,
+        "reason": "dispatch-gate-invalid",
+        "maxConcurrent": 0,
+        "mode": mode,
+        "productId": product_id,
+    }
+
+
+def _admission_closure_projection(verdict: dict[str, Any]) -> dict[str, Any]:
+    """Typed closure evidence snapshot for a held admission."""
+    return {
+        "closureStatus": verdict.get("closureStatus"),
+        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
+        "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
+        "holdReason": verdict.get("reason"),
+    }
+
+
+def _admission_capacity_projection(gem: object) -> dict[str, Any]:
+    """Typed capacity evidence snapshot for an unproven admission."""
+    if not isinstance(gem, dict):
+        return {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": None}
+    return {
+        "evidenceAccepted": gem.get("evidenceAccepted") is True,
+        "newMutationAllowed": gem.get("newMutationAllowed") is True,
+        "maxConcurrent": gem.get("maxConcurrent") if type(gem.get("maxConcurrent")) is int else None,
+    }
+
+
+def _admission_new_work_projection(
+    work: object, products: object, product_id: str
+) -> dict[str, Any]:
+    """Typed new-work evidence; absent workAdmission degrades to all-closed."""
+    if not isinstance(work, dict):
+        return {
+            "allowed": False,
+            "newIssueLeaseAllowed": False,
+            "newImplementationAllowed": False,
+            "productNewIssueLeaseAllowed": False,
+        }
+    product_rows = products if isinstance(products, dict) else {}
+    return {
+        "allowed": work.get("allowed") is True,
+        "newIssueLeaseAllowed": work.get("newIssueLeaseAllowed") is True,
+        "newImplementationAllowed": work.get("newImplementationAllowed") is True,
+        "productNewIssueLeaseAllowed": product_rows.get(product_id) is True,
+    }
+
+
+def _admission_repair_projection(repair: object) -> dict[str, Any]:
+    """Typed existing-repair evidence; absent admission degrades to closed."""
+    if not isinstance(repair, dict):
+        return {
+            "allowed": False,
+            "localAllowed": False,
+            "pushAllowed": False,
+            "authority": None,
+            "activities": [],
+        }
+    activities = repair.get("activities")
+    return {
+        "allowed": repair.get("allowed") is True,
+        "localAllowed": repair.get("localAllowed") is True,
+        "pushAllowed": repair.get("pushAllowed") is True,
+        "authority": repair.get("authority") if isinstance(repair.get("authority"), str) else None,
+        "activities": [
+            activity for activity in (activities or []) if isinstance(activity, str)
+        ] if isinstance(activities, list) else [],
+    }
 
 
 def _read_stop_line(
