@@ -228,7 +228,7 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "reasons": [PLACEHOLDER_CLOSURE_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -2049,6 +2049,8 @@ def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
         return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed closure-health"
     if closure.get("authority") != CLOSURE_HEALTH_AUTHORITY:
         return f"{LIVE_PERSIST_WRITER}: rejected receipt without closure-health authority"
+    # Status allowlist must be updated in lockstep with the closure-health
+    # schema's status vocabulary (currently healthy/grace/red).
     if closure.get("status") not in {"healthy", "grace", "red"}:
         return f"{LIVE_PERSIST_WRITER}: rejected receipt with untyped closure-health status"
     unsafe = _receipt_reason_codes(receipt)

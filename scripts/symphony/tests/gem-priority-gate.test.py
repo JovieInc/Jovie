@@ -2410,6 +2410,57 @@ class LivePersistFenceTests(unittest.TestCase):
             self.assertEqual(persisted, printed)
             self.assertEqual(persisted["state"], "GREEN")
 
+    def test_issue_blocked_red_receipt_still_persists(self):
+        # #17903 semantics: issue-blocked closure red (intake open, reasons
+        # NOT systems-down) is legitimate live state — the fence must not
+        # over-block it the way it blocks the placeholder.
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_green_receipt(state_dir)
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals={
+                    **dict(GREEN_SIGNALS),
+                    "closureHealth": {
+                        **dict(GREEN_SIGNALS["closureHealth"]),
+                        "status": "red",
+                        "newIssueIntakeAllowed": True,
+                        "reasons": ["expired-held-prs", "internally-repairable-prs-open"],
+                    },
+                },
+            )
+
+            self.assertIn(exit_code, (0, 2))
+            printed = json.loads(stdout)
+            persisted = json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["closureAdmission"]["status"], "red")
+            self.assertEqual(persisted["closureAdmission"]["newIssueIntakeAllowed"], True)
+            self.assertNotIn("not persisted", stderr)
+
+    def test_placeholder_constant_matches_validate_closure_health_coercion(self):
+        # Drift guard: validate_closure_health's malformed-signal coercion is
+        # the source of the placeholder string the fence rejects. If either
+        # side drifts, the fence silently stops matching the incident shape.
+        coerced = MODULE.validate_closure_health(None)
+        self.assertIn(MODULE.PLACEHOLDER_CLOSURE_REASON, coerced["reasons"])
+        # And the coerced receipt itself is rejected by the fence classifier.
+        rejected = MODULE.live_persist_rejection_reason(
+            json.loads(json.dumps(self.seed_green_receipt(
+                pathlib.Path(tempfile.mkdtemp()) / "state" / "gem-priority-gate"
+            )))
+        )
+        self.assertIsNone(rejected)  # GREEN seed is safe; coercion case below.
+        base = MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+        coerced_receipt = json.loads(json.dumps(base))
+        coerced_receipt["signals"]["closureHealth"] = coerced
+        coerced_receipt["closureAdmission"]["reasons"] = coerced["reasons"]
+        self.assertIn(
+            "placeholder closure-health",
+            MODULE.live_persist_rejection_reason(coerced_receipt),
+        )
+
     def test_rejection_reason_classifies_every_unsafe_shape(self):
         # Direct unit coverage of the fence classifier so every rejection
         # branch is exercised, including shapes a full main() run cannot
