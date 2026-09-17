@@ -2,13 +2,16 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  appendMergeQueueEntryBind,
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
   NATIVE_QUEUE_ACTION,
   nativeQueueEnrollPlan,
+  readCapturedMergeQueueEntryId,
   selectGreenReadyPrs,
+  WAITING_DURABLE_ORACLE,
 } from './native-queue-starvation-execute.mjs';
 
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
@@ -174,14 +177,24 @@ function ghJson(args) {
   return JSON.parse(result.stdout);
 }
 
-function bindLinearIdentifier({ pr, repo, issueIdentifier, taskKey, body }) {
+function bindLinearIdentifier({
+  pr,
+  repo,
+  issueIdentifier,
+  taskKey,
+  body,
+  mergeQueueEntryId,
+}) {
   if (
     typeof issueIdentifier !== 'string' ||
     !/^JOV-[1-9][0-9]*$/u.test(issueIdentifier)
   ) {
-    return;
+    return body;
   }
-  const nextBody = appendSummerIssueBind(body, issueIdentifier, taskKey);
+  let nextBody = appendSummerIssueBind(body, issueIdentifier, taskKey);
+  if (mergeQueueEntryId) {
+    nextBody = appendMergeQueueEntryBind(nextBody, mergeQueueEntryId);
+  }
   if (nextBody !== (typeof body === 'string' ? body : '')) {
     spawnSync(
       'gh',
@@ -194,17 +207,24 @@ function bindLinearIdentifier({ pr, repo, issueIdentifier, taskKey, body }) {
     ['pr', 'comment', String(pr), '--repo', repo, '--body', issueIdentifier],
     { encoding: 'utf8' }
   );
+  return nextBody;
 }
 
-function mergeQueueEntry(pr) {
+function mergeQueueSnapshot(pr) {
   try {
     const payload = ghJson([
       'api',
       'graphql',
       '-f',
-      `query={ repository(owner:"JovieInc", name:"Jovie") { pullRequest(number:${Number(pr)}) { mergeQueueEntry { id state enqueuedAt } mergedAt } } }`,
+      `query={ repository(owner:"JovieInc", name:"Jovie") { pullRequest(number:${Number(pr)}) { mergedAt mergeQueueEntry { id state enqueuedAt } timelineItems(last:20, itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT, REMOVED_FROM_MERGE_QUEUE_EVENT, MERGED_EVENT]) { nodes { __typename ... on AddedToMergeQueueEvent { createdAt actor { login } } ... on RemovedFromMergeQueueEvent { createdAt actor { login } } ... on MergedEvent { createdAt } } } } } }`,
     ]);
-    return payload?.data?.repository?.pullRequest ?? null;
+    const pull = payload?.data?.repository?.pullRequest ?? null;
+    if (!pull) return null;
+    return {
+      mergedAt: pull.mergedAt ?? null,
+      mergeQueueEntry: pull.mergeQueueEntry ?? null,
+      timeline: pull.timelineItems?.nodes ?? [],
+    };
   } catch {
     return null;
   }
@@ -245,30 +265,73 @@ async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
   if (head && viewed.headRefOid !== head) {
     return { ok: false, reason: 'native-queue-head-drift' };
   }
-  const live = mergeQueueEntry(viewed.number);
+  const live = mergeQueueSnapshot(viewed.number);
+  const capturedEntryId = readCapturedMergeQueueEntryId(viewed.body);
   const plan = nativeQueueEnrollPlan({
     mergeStateStatus: viewed.mergeStateStatus,
     mergeQueueEntry: live?.mergeQueueEntry ?? null,
+    mergedAt: live?.mergedAt ?? null,
+    timeline: live?.timeline ?? [],
+    capturedEntryId,
   });
   if (plan.action === 'reject') {
-    return { ok: false, reason: plan.detail };
+    return { ok: false, reason: plan.detail, pr: viewed.number };
   }
-  bindLinearIdentifier({
+  let body = viewed.body;
+  body = bindLinearIdentifier({
     pr: viewed.number,
     repo,
     issueIdentifier,
     taskKey,
-    body: viewed.body,
+    body,
+    mergeQueueEntryId: live?.mergeQueueEntry?.id,
   });
-  if (live?.mergedAt || live?.mergeQueueEntry) {
-    return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+  if (plan.action === 'bind-merged') {
+    return {
+      ok: true,
+      durable: true,
+      mergedAt: live?.mergedAt,
+      pr: viewed.number,
+      head: viewed.headRefOid,
+    };
   }
-  // itstimwhite `gh pr merge --auto` is ejected in ~50s. Wait for jovie-bot.
+  if (plan.action === 'bind-durable-queue') {
+    return {
+      ok: true,
+      durable: true,
+      mergeQueueEntryId: live?.mergeQueueEntry?.id,
+      pr: viewed.number,
+      head: viewed.headRefOid,
+    };
+  }
   for (let i = 0; i < 12; i += 1) {
     spawnSync('sleep', ['20'], { encoding: 'utf8' });
-    const next = mergeQueueEntry(viewed.number);
-    if (next?.mergedAt || next?.mergeQueueEntry) {
-      return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+    const next = mergeQueueSnapshot(viewed.number);
+    if (next?.mergedAt) {
+      return {
+        ok: true,
+        durable: true,
+        mergedAt: next.mergedAt,
+        pr: viewed.number,
+        head: viewed.headRefOid,
+      };
+    }
+    if (next?.mergeQueueEntry?.id) {
+      bindLinearIdentifier({
+        pr: viewed.number,
+        repo,
+        issueIdentifier,
+        taskKey,
+        body,
+        mergeQueueEntryId: next.mergeQueueEntry.id,
+      });
+      return {
+        ok: false,
+        reason: WAITING_DURABLE_ORACLE,
+        mergeQueueEntryId: next.mergeQueueEntry.id,
+        pr: viewed.number,
+        head: viewed.headRefOid,
+      };
     }
   }
   return {
@@ -318,6 +381,8 @@ process.stdout.write(
     issueIdentifier: result.issueIdentifier,
     detail: result.decision?.detail,
     pr: result.decision?.pr ?? null,
+    mergeQueueEntryId: result.decision?.mergeQueueEntryId ?? null,
+    mergedAt: result.decision?.mergedAt ?? null,
     acknowledgement: result.acknowledgement,
     claim: result.claim,
     terminal: result.terminal,

@@ -7,6 +7,7 @@ import {
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
+  assertDurableNativeQueueOracle,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
@@ -14,6 +15,7 @@ import {
   NATIVE_QUEUE_ACTION,
   NO_GREEN_READY_PR,
   nativeQueueEnrollPlan,
+  PR_CHURN_EJECT,
   RELEASE_CERT_ACTION,
   SUMMER_ISSUE_BIND_MARKER,
   selectGreenReadyPrs,
@@ -120,28 +122,113 @@ describe('appendSummerIssueBind', () => {
   });
 });
 
-describe('nativeQueueEnrollPlan', () => {
-  it('never self-enqueues; binds an existing queue entry or waits for jovie-bot', () => {
+const CAPTURED_17917 =
+  'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeRvE';
+const REPLACEMENT_17917 =
+  'MQE_lQDOPXNGM88AAAABD124nc4ABAFUzgLeTSs';
+const TIMELINE_17917_CHURN = [
+  {
+    __typename: 'AddedToMergeQueueEvent',
+    createdAt: '2026-09-17T04:57:01Z',
+    actor: { login: 'jovie-bot' },
+  },
+  {
+    __typename: 'RemovedFromMergeQueueEvent',
+    createdAt: '2026-09-17T05:10:40Z',
+    actor: { login: 'github-merge-queue' },
+  },
+  {
+    __typename: 'AddedToMergeQueueEvent',
+    createdAt: '2026-09-17T05:14:12Z',
+    actor: { login: 'jovie-bot' },
+  },
+];
+
+describe('assertDurableNativeQueueOracle', () => {
+  it('rejects the JOV-6384/#17917 replacement enqueue and accepts same-id or mergedAt', () => {
     assert.deepEqual(
-      nativeQueueEnrollPlan({
-        mergeStateStatus: 'CLEAN',
-        mergeQueueEntry: { id: 'MQE_1' },
+      assertDurableNativeQueueOracle({
+        mergedAt: null,
+        mergeQueueEntry: {
+          id: REPLACEMENT_17917,
+          enqueuedAt: '2026-09-17T05:14:12Z',
+        },
+        timeline: TIMELINE_17917_CHURN,
+        capturedEntryId: CAPTURED_17917,
       }),
-      { action: 'bind-existing-queue' }
+      { ok: false, detail: PR_CHURN_EJECT }
     );
     assert.deepEqual(
-      nativeQueueEnrollPlan({
-        mergeStateStatus: 'CLEAN',
-        mergeQueueEntry: null,
+      assertDurableNativeQueueOracle({
+        mergedAt: null,
+        mergeQueueEntry: {
+          id: CAPTURED_17917,
+          enqueuedAt: '2026-09-17T04:57:01Z',
+        },
+        timeline: [
+          {
+            __typename: 'AddedToMergeQueueEvent',
+            createdAt: '2026-09-17T04:57:01Z',
+            actor: { login: 'jovie-bot' },
+          },
+        ],
+        capturedEntryId: CAPTURED_17917,
       }),
-      { action: 'bind-and-await-bot' }
+      { ok: true, detail: 'same-entry' }
+    );
+    assert.deepEqual(
+      assertDurableNativeQueueOracle({
+        mergedAt: '2026-09-17T05:20:00Z',
+        mergeQueueEntry: null,
+        timeline: TIMELINE_17917_CHURN,
+        capturedEntryId: CAPTURED_17917,
+      }),
+      { ok: true, detail: 'merged' }
     );
     assert.equal(
+      assertDurableNativeQueueOracle({
+        mergedAt: null,
+        mergeQueueEntry: { id: CAPTURED_17917 },
+        timeline: [],
+      }).ok,
+      false
+    );
+  });
+});
+
+describe('nativeQueueEnrollPlan', () => {
+  it('rejects github-merge-queue churn; occupancy without a captured id is not a ship', () => {
+    assert.deepEqual(
       nativeQueueEnrollPlan({
-        mergeStateStatus: 'BLOCKED',
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: { id: REPLACEMENT_17917 },
+        timeline: TIMELINE_17917_CHURN,
+        capturedEntryId: CAPTURED_17917,
+      }),
+      { action: 'reject', detail: PR_CHURN_EJECT }
+    );
+    assert.deepEqual(
+      nativeQueueEnrollPlan({
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: { id: CAPTURED_17917 },
+        timeline: [
+          {
+            __typename: 'AddedToMergeQueueEvent',
+            createdAt: '2026-09-17T04:57:01Z',
+            actor: { login: 'jovie-bot' },
+          },
+        ],
+        capturedEntryId: CAPTURED_17917,
+      }),
+      { action: 'bind-durable-queue' }
+    );
+    assert.deepEqual(
+      nativeQueueEnrollPlan({
+        mergeStateStatus: 'CLEAN',
         mergeQueueEntry: null,
-      }).action,
-      'reject'
+        timeline: [],
+      }),
+      { action: 'bind-and-await-bot' }
     );
   });
 });
@@ -164,6 +251,7 @@ describe('decideNativeQueueExecution', () => {
           'exact-source-ci-native-queue-production-gates-remain-required',
         pr: 17917,
         head: 'd'.repeat(40),
+        candidates: [{ number: 17917, head: 'd'.repeat(40) }],
       }
     );
   });
@@ -211,7 +299,31 @@ describe('decideNativeQueueExecution', () => {
           'exact-source-ci-native-queue-production-gates-remain-required',
         pr: 17540,
         head: 'd'.repeat(40),
+        candidates: [{ number: 17540, head: 'd'.repeat(40) }, 17542],
       }
+    );
+  });
+
+  it('skips churned PRs and fail-closes when every candidate is churned', () => {
+    assert.equal(
+      decideNativeQueueExecution({
+        action: NATIVE_QUEUE_ACTION,
+        greenReadyPrs: [
+          { number: 17917, head: 'd'.repeat(40), churned: true },
+          { number: 17918, head: 'e'.repeat(40), churned: true },
+        ],
+      }).detail,
+      PR_CHURN_EJECT
+    );
+    assert.equal(
+      decideNativeQueueExecution({
+        action: NATIVE_QUEUE_ACTION,
+        greenReadyPrs: [
+          { number: 17917, head: 'd'.repeat(40), churned: true },
+          { number: 17923, head: 'f'.repeat(40) },
+        ],
+      }).pr,
+      17923
     );
   });
 
@@ -276,10 +388,10 @@ describe('executeNativeQueueStarvation', () => {
     assert.deepEqual(claims, [
       { identifier: 'JOV-6304', state: 'In Progress' },
     ]);
-    assert.deepEqual(completes, [{ identifier: 'JOV-6304', state: 'Done' }]);
+    assert.deepEqual(completes, []);
     assert.deepEqual(result.terminal, {
-      state: 'Done',
-      assignee: AUTONOMOUS_LINEAR_WORKER,
+      state: 'In Progress',
+      assignee: 'symphony-worker',
     });
     assert.deepEqual(enrolls, []);
     assert.equal(writes.length, 1);
@@ -317,7 +429,12 @@ describe('executeNativeQueueStarvation', () => {
       }),
       enrollPr: async input => {
         enrolls.push(input);
-        return { ok: true, head: 'd'.repeat(40) };
+        return {
+          ok: true,
+          durable: true,
+          mergeQueueEntryId: CAPTURED_17917,
+          head: 'd'.repeat(40),
+        };
       },
       writeExecution: async () => ({ status: 'recorded' }),
     });
@@ -331,12 +448,47 @@ describe('executeNativeQueueStarvation', () => {
     ]);
     assert.equal(result.decision.status, 'succeeded');
     assert.equal(result.decision.pr, 17917);
+    assert.equal(result.decision.mergeQueueEntryId, CAPTURED_17917);
     assert.equal(result.record.status, 'succeeded');
     assert.equal(result.record.action, NATIVE_QUEUE_ACTION);
     assert.equal(result.record.source.action, RELEASE_CERT_ACTION);
   });
 
-  it('still terminals Linear Done when execution write throws after enroll', async () => {
+  it('does not terminal Done on occupancy-only enroll or churn eject', async () => {
+    const completes = [];
+    const occupancy = await executeNativeQueueStarvation({
+      taskKey: TASK_KEY,
+      issueIdentifier: 'JOV-6384',
+      source: SOURCE,
+      admission: {
+        action: RELEASE_CERT_ACTION,
+        greenReadyPrs: [{ number: 17917, head: 'd'.repeat(40) }],
+      },
+      signatureKeyId: 'symphony-outcome-2026-09',
+      privateKeyPem: host.privateKey,
+      now: () => '2026-09-17T05:00:11.000Z',
+      claimIssue: async () => ({
+        state: 'In Progress',
+        assignee: null,
+      }),
+      completeIssue: async input => {
+        completes.push(input);
+        return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
+      },
+      enrollPr: async () => ({
+        ok: false,
+        reason: PR_CHURN_EJECT,
+        pr: 17917,
+      }),
+      writeExecution: async () => ({ status: 'recorded' }),
+    });
+    assert.deepEqual(completes, []);
+    assert.equal(occupancy.decision.detail, PR_CHURN_EJECT);
+    assert.equal(occupancy.terminal.state, 'In Progress');
+    assert.equal(occupancy.record.status, 'failed');
+  });
+
+  it('still terminals Linear Done when execution write throws after durable enroll', async () => {
     const completes = [];
     const result = await executeNativeQueueStarvation({
       taskKey: TASK_KEY,
@@ -357,7 +509,12 @@ describe('executeNativeQueueStarvation', () => {
         completes.push(input);
         return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
       },
-      enrollPr: async () => ({ ok: true, head: 'e'.repeat(40) }),
+      enrollPr: async () => ({
+        ok: true,
+        durable: true,
+        mergeQueueEntryId: 'MQE_durable',
+        head: 'e'.repeat(40),
+      }),
       writeExecution: async () => {
         throw new Error('execution-write-rejected:schema');
       },
