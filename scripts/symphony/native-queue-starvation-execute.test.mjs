@@ -4,9 +4,6 @@ import { describe, it } from 'node:test';
 
 import {
   AUTONOMOUS_LINEAR_WORKER,
-  NATIVE_QUEUE_ACTION,
-  RELEASE_CERT_ACTION,
-  SUMMER_ISSUE_BIND_MARKER,
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
@@ -14,7 +11,10 @@ import {
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
   FOUNDER_LINEAR_ASSIGNEE,
+  NATIVE_QUEUE_ACTION,
   NO_GREEN_READY_PR,
+  RELEASE_CERT_ACTION,
+  SUMMER_ISSUE_BIND_MARKER,
   selectGreenReadyPrs,
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
