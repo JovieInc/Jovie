@@ -1618,10 +1618,29 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     const modelStep = workflowStep(
       'Run pinned stronger-model FX with no executable tools'
     );
+    const jevStep = workflowStep('Jev decision gate before generative FX');
     expect(modelStep).toContain(
       'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
     );
-    expect(WORKFLOW.replace(modelStep, '')).not.toContain('AI_GATEWAY_API_KEY');
+    // Only the Jev decision gate and the generative FX step may hold the
+    // Gateway secret; nothing else in the workflow can mint AI spend.
+    expect(WORKFLOW.replace(modelStep, '').replace(jevStep, '')).not.toContain(
+      'AI_GATEWAY_API_KEY'
+    );
+    expect(jevStep).toContain(
+      'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
+    );
+    // The Jev gate owns the strategy decision from trusted-main policy code;
+    // the generative FX step only runs when Jev selects the generative
+    // strategy at acceptable risk. PR-controlled policy code never executes.
+    expect(modelStep).toContain(
+      "if: steps.prepare.outputs.model_required == 'true' && steps.jev.outputs.jev_proceed == 'true'"
+    );
+    expect(jevStep).toContain(
+      'git show origin/main:scripts/lib/conflict-fx-jev-decision.mjs'
+    );
+    expect(jevStep).toContain('gateway.evaluationModel');
+    expect(jevStep).toContain("jq -r '.proceed'");
     expect(modelStep).toContain('HOME: ${{ runner.temp }}/fx-home');
     expect(modelStep).toContain('.session_permission_grants == 0');
     expect(modelStep).toContain('.mcp.connection_check == "not_checked"');
