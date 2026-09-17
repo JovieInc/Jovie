@@ -73,7 +73,9 @@ jobs:
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ steps.app-token.outputs.token }}
-          dry-run: 'false'
+          # pull_request_target must not write live latest.json (clobbers Gem capacity
+          # when main gate is unfenced). Persist only on main push / workflow_run / dispatch.
+          dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}
 
       # Source PR/fork workflow definitions never execute their code here.
       # Consume actions only after the reviewed CLI is present on main.

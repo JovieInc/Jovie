@@ -2604,7 +2604,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("ref: main", content)
         self.assertIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
-        self.assertIn("dry-run: 'false'", content)
+        # pull_request_target Refresh must be a dry run (no live latest.json
+        # write while the main gate is unfenced); every other event persists.
+        self.assertIn(
+            "dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}",
+            content,
+        )
         self.assertIn("jovie-fixed", content)
         self.assertIn("cancel-in-progress: false", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
