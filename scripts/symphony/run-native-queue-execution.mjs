@@ -2,6 +2,8 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  NATIVE_QUEUE_ACTION,
+  appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
@@ -116,15 +118,48 @@ async function writeExecution(record) {
   return parsed;
 }
 
+function listCleanOpenPrs() {
+  try {
+    const rows = ghJson([
+      'pr',
+      'list',
+      '--repo',
+      'JovieInc/Jovie',
+      '--base',
+      'main',
+      '--state',
+      'open',
+      '--limit',
+      '40',
+      '--json',
+      'number,isDraft,mergeStateStatus,headRefOid,baseRefName',
+    ]);
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter(
+        row =>
+          row?.isDraft !== true &&
+          row?.baseRefName === 'main' &&
+          row?.mergeStateStatus === 'CLEAN' &&
+          Number.isInteger(row?.number) &&
+          typeof row?.headRefOid === 'string'
+      )
+      .map(row => ({ number: row.number, head: row.headRefOid }));
+  } catch {
+    return [];
+  }
+}
+
 function fleetAdmission(path) {
   const fleet = JSON.parse(readFileSync(path, 'utf8'));
   const gem = fleet.concurrency?.gem ?? {};
   const remediation = fleet.remediationAdmission ?? {};
+  const fromFleet = selectGreenReadyPrs(fleet);
   return {
     mutationAllowed: gem.newMutationAllowed === true,
     pushAllowed: remediation.pushAllowed === true,
     maxConcurrent: Number(gem.maxConcurrent ?? 0),
-    greenReadyPrs: selectGreenReadyPrs(fleet),
+    greenReadyPrs: fromFleet.length > 0 ? fromFleet : listCleanOpenPrs(),
   };
 }
 
@@ -138,7 +173,29 @@ function ghJson(args) {
   return JSON.parse(result.stdout);
 }
 
-async function enrollPr({ pr, head }) {
+function bindLinearIdentifier({ pr, repo, issueIdentifier, taskKey, body }) {
+  if (
+    typeof issueIdentifier !== 'string' ||
+    !/^JOV-[1-9][0-9]*$/u.test(issueIdentifier)
+  ) {
+    return;
+  }
+  const nextBody = appendSummerIssueBind(body, issueIdentifier, taskKey);
+  if (nextBody !== (typeof body === 'string' ? body : '')) {
+    spawnSync(
+      'gh',
+      ['pr', 'edit', String(pr), '--repo', repo, '--body', nextBody],
+      { encoding: 'utf8' }
+    );
+  }
+  spawnSync(
+    'gh',
+    ['pr', 'comment', String(pr), '--repo', repo, '--body', issueIdentifier],
+    { encoding: 'utf8' }
+  );
+}
+
+async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
   const repo = 'JovieInc/Jovie';
   let viewed;
   try {
@@ -149,7 +206,7 @@ async function enrollPr({ pr, head }) {
       '--repo',
       repo,
       '--json',
-      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName',
+      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName,body,autoMergeRequest',
     ]);
   } catch (error) {
     return {
@@ -173,25 +230,38 @@ async function enrollPr({ pr, head }) {
   if (head && viewed.headRefOid !== head) {
     return { ok: false, reason: 'native-queue-head-drift' };
   }
-  if (viewed.mergeStateStatus !== 'CLEAN') {
+  const alreadyQueued = Boolean(viewed.autoMergeRequest);
+  if (viewed.mergeStateStatus !== 'CLEAN' && !alreadyQueued) {
     return {
       ok: false,
       reason: `native-queue-not-clean:${viewed.mergeStateStatus}`,
     };
   }
-  const merged = spawnSync(
-    'gh',
-    ['pr', 'merge', String(pr), '--repo', repo, '--squash', '--auto'],
-    { encoding: 'utf8' }
-  );
-  if (merged.status !== 0) {
-    return {
-      ok: false,
-      reason: `native-queue-enroll-failed:${String(
-        merged.stderr || merged.stdout || ''
-      ).slice(0, 180)}`,
-    };
+  if (!alreadyQueued) {
+    const merged = spawnSync(
+      'gh',
+      ['pr', 'merge', String(pr), '--repo', repo, '--squash', '--auto'],
+      { encoding: 'utf8' }
+    );
+    const queuedAnyway = /already in the merge queue/i.test(
+      String(merged.stderr || merged.stdout || '')
+    );
+    if (merged.status !== 0 && !queuedAnyway) {
+      return {
+        ok: false,
+        reason: `native-queue-enroll-failed:${String(
+          merged.stderr || merged.stdout || ''
+        ).slice(0, 180)}`,
+      };
+    }
   }
+  bindLinearIdentifier({
+    pr: viewed.number,
+    repo,
+    issueIdentifier,
+    taskKey,
+    body: viewed.body,
+  });
   return { ok: true, head: viewed.headRefOid, pr: viewed.number };
 }
 
@@ -200,6 +270,7 @@ const issueIdentifier = process.argv[3];
 const sourceVersion = process.argv[4];
 const snapshotDigest = process.argv[5];
 const fleetPath = process.argv[6];
+const action = process.argv[7] || NATIVE_QUEUE_ACTION;
 if (
   !taskKey ||
   !issueIdentifier ||
@@ -208,7 +279,7 @@ if (
   !fleetPath
 ) {
   throw new Error(
-    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json>'
+    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> [action]'
   );
 }
 
@@ -216,7 +287,7 @@ const result = await executeNativeQueueStarvation({
   taskKey,
   issueIdentifier,
   source: { sourceVersion, snapshotDigest },
-  admission: fleetAdmission(fleetPath),
+  admission: { ...fleetAdmission(fleetPath), action },
   signatureKeyId: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID'),
   privateKeyPem: required(
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
@@ -226,14 +297,16 @@ const result = await executeNativeQueueStarvation({
   enrollPr,
   writeExecution,
 });
-process.stdout.write(`${JSON.stringify(result.decision)}\n`);
 process.stdout.write(
   `${JSON.stringify({
     status: result.status,
     taskKey: result.taskKey,
     issueIdentifier: result.issueIdentifier,
+    detail: result.decision?.detail,
+    pr: result.decision?.pr ?? null,
     acknowledgement: result.acknowledgement,
     claim: result.claim,
     terminal: result.terminal,
+    decision: result.decision,
   })}\n`
 );

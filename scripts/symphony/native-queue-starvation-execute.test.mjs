@@ -4,13 +4,16 @@ import { describe, it } from 'node:test';
 
 import {
   AUTONOMOUS_LINEAR_WORKER,
+  NATIVE_QUEUE_ACTION,
+  RELEASE_CERT_ACTION,
+  SUMMER_ISSUE_BIND_MARKER,
+  appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
   executeNativeQueueStarvation,
   FOUNDER_LINEAR_ASSIGNEE,
-  MUTATION_AUTHORITY_UNAVAILABLE,
   NO_GREEN_READY_PR,
   selectGreenReadyPrs,
   signNativeQueueExecution,
@@ -106,51 +109,55 @@ describe('selectGreenReadyPrs', () => {
   });
 });
 
+describe('appendSummerIssueBind', () => {
+  it('appends the Linear identifier so is:pr search can bind, and is idempotent', () => {
+    const first = appendSummerIssueBind('PR body', 'JOV-6371', TASK_KEY);
+    assert.match(first, new RegExp(`${SUMMER_ISSUE_BIND_MARKER}\\nJOV-6371`));
+    assert.match(first, new RegExp(`taskKey:${TASK_KEY}`));
+    assert.equal(appendSummerIssueBind(first, 'JOV-6371', TASK_KEY), first);
+    assert.equal(appendSummerIssueBind('x', 'JOV-0', TASK_KEY), 'x');
+  });
+});
+
 describe('decideNativeQueueExecution', () => {
-  it('fail-closes when mutation/push/concurrency authority is missing', () => {
+  it('enrolls an existing green-ready PR even when new-mutation seats are closed', () => {
     assert.deepEqual(
       decideNativeQueueExecution({
-        action: 'reconcile-native-queue-starvation',
+        action: NATIVE_QUEUE_ACTION,
         mutationAllowed: false,
-        pushAllowed: true,
-        maxConcurrent: 4,
-        greenReadyPrs: [17540],
+        pushAllowed: false,
+        maxConcurrent: 0,
+        greenReadyPrs: [{ number: 17917, head: 'd'.repeat(40) }],
       }),
       {
-        status: 'failed',
-        detail: MUTATION_AUTHORITY_UNAVAILABLE,
-        mutationAttempted: false,
-        authority: MUTATION_AUTHORITY_UNAVAILABLE,
-        pr: null,
-        head: null,
+        status: 'ready-to-enroll',
+        detail: ENROLL_EXACT_HEAD,
+        mutationAttempted: true,
+        authority:
+          'exact-source-ci-native-queue-production-gates-remain-required',
+        pr: 17917,
+        head: 'd'.repeat(40),
       }
-    );
-    assert.equal(
-      decideNativeQueueExecution({
-        action: 'reconcile-native-queue-starvation',
-        mutationAllowed: true,
-        pushAllowed: false,
-        maxConcurrent: 4,
-        greenReadyPrs: [17540],
-      }).detail,
-      MUTATION_AUTHORITY_UNAVAILABLE
-    );
-    assert.equal(
-      decideNativeQueueExecution({
-        action: 'reconcile-native-queue-starvation',
-        mutationAllowed: true,
-        pushAllowed: true,
-        maxConcurrent: 0,
-        greenReadyPrs: [17540],
-      }).detail,
-      MUTATION_AUTHORITY_UNAVAILABLE
     );
   });
 
-  it('fail-closes when authority exists but no green-ready PR is bound', () => {
+  it('enrolls the same green-ready PR for release-certification-starvation', () => {
     assert.equal(
       decideNativeQueueExecution({
-        action: 'reconcile-native-queue-starvation',
+        action: RELEASE_CERT_ACTION,
+        mutationAllowed: false,
+        pushAllowed: false,
+        maxConcurrent: 0,
+        greenReadyPrs: [{ number: 17918, head: 'e'.repeat(40) }],
+      }).pr,
+      17918
+    );
+  });
+
+  it('fail-closes when no green-ready PR is bound', () => {
+    assert.equal(
+      decideNativeQueueExecution({
+        action: NATIVE_QUEUE_ACTION,
         mutationAllowed: true,
         pushAllowed: true,
         maxConcurrent: 1,
@@ -160,10 +167,10 @@ describe('decideNativeQueueExecution', () => {
     );
   });
 
-  it('selects the first green-ready PR only when mutation authority is live', () => {
+  it('selects the first green-ready PR', () => {
     assert.deepEqual(
       decideNativeQueueExecution({
-        action: 'reconcile-native-queue-starvation',
+        action: NATIVE_QUEUE_ACTION,
         mutationAllowed: true,
         pushAllowed: true,
         maxConcurrent: 2,
@@ -209,10 +216,11 @@ describe('executeNativeQueueStarvation', () => {
       issueIdentifier: 'JOV-6304',
       source: SOURCE,
       admission: {
+        action: NATIVE_QUEUE_ACTION,
         mutationAllowed: false,
         pushAllowed: false,
         maxConcurrent: 0,
-        greenReadyPrs: [17540],
+        greenReadyPrs: [],
       },
       signatureKeyId: 'symphony-outcome-2026-09',
       privateKeyPem: host.privateKey,
@@ -235,7 +243,7 @@ describe('executeNativeQueueStarvation', () => {
       },
     });
     assert.equal(result.status, 'execution-recorded');
-    assert.equal(result.decision.detail, MUTATION_AUTHORITY_UNAVAILABLE);
+    assert.equal(result.decision.detail, NO_GREEN_READY_PR);
     assert.equal(result.decision.mutationAttempted, false);
     assert.equal(result.decision.pr, null);
     assert.deepEqual(claims, [
@@ -256,17 +264,18 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(result.record.taskKey, TASK_KEY);
   });
 
-  it('enrolls the bound PR when mutation authority is live and records succeeded', async () => {
+  it('enrolls the bound PR even when new-mutation seats are closed', async () => {
     const enrolls = [];
     const result = await executeNativeQueueStarvation({
       taskKey: TASK_KEY,
-      issueIdentifier: 'JOV-6304',
+      issueIdentifier: 'JOV-6371',
       source: SOURCE,
       admission: {
-        mutationAllowed: true,
-        pushAllowed: true,
-        maxConcurrent: 1,
-        greenReadyPrs: [{ number: 17540, head: 'd'.repeat(40) }],
+        action: RELEASE_CERT_ACTION,
+        mutationAllowed: false,
+        pushAllowed: false,
+        maxConcurrent: 0,
+        greenReadyPrs: [{ number: 17917, head: 'd'.repeat(40) }],
       },
       signatureKeyId: 'symphony-outcome-2026-09',
       privateKeyPem: host.privateKey,
@@ -285,19 +294,27 @@ describe('executeNativeQueueStarvation', () => {
       },
       writeExecution: async () => ({ status: 'recorded' }),
     });
-    assert.deepEqual(enrolls, [{ pr: 17540, head: 'd'.repeat(40) }]);
+    assert.deepEqual(enrolls, [
+      {
+        pr: 17917,
+        head: 'd'.repeat(40),
+        issueIdentifier: 'JOV-6371',
+        taskKey: TASK_KEY,
+      },
+    ]);
     assert.equal(result.decision.status, 'succeeded');
-    assert.equal(result.decision.pr, 17540);
+    assert.equal(result.decision.pr, 17917);
     assert.equal(result.record.status, 'succeeded');
+    assert.equal(result.record.action, RELEASE_CERT_ACTION);
   });
 
   it('signs a fail-closed execution that cannot claim a PR number', () => {
     const decision = decideNativeQueueExecution({
-      action: 'reconcile-native-queue-starvation',
+      action: NATIVE_QUEUE_ACTION,
       mutationAllowed: false,
       pushAllowed: false,
       maxConcurrent: 0,
-      greenReadyPrs: [17540],
+      greenReadyPrs: [],
     });
     const unsigned = unsignedNativeQueueExecution({
       taskKey: TASK_KEY,

@@ -373,7 +373,24 @@ class DeploymentContractTests(unittest.TestCase):
         argv = CYCLE.native_queue_execution_argv(stdout, fleet)
         self.assertEqual(argv[0], "node")
         self.assertTrue(argv[1].endswith("run-native-queue-execution.mjs"))
-        self.assertEqual(argv[2:], [task_key, "JOV-6329", source, digest, str(fleet)])
+        self.assertEqual(argv[2:], [
+            task_key, "JOV-6329", source, digest, str(fleet),
+            "reconcile-native-queue-starvation",
+        ])
+        release = json.dumps({
+            "schema": "jovie.summer-symphony-consumer-cycle/v1",
+            "status": "projection-recorded",
+            "taskKey": task_key,
+            "issueIdentifier": "JOV-6329",
+            "acknowledgement": "recorded",
+            "action": "reconcile-release-certification-starvation",
+            "sourceVersion": source,
+            "snapshotDigest": digest,
+        })
+        self.assertEqual(
+            CYCLE.native_queue_execution_argv(release, fleet)[7],
+            "reconcile-release-certification-starvation",
+        )
         self.assertIsNone(CYCLE.native_queue_execution_argv(
             json.dumps({"status": "healthy-noop"}), fleet))
         self.assertIsNone(CYCLE.native_queue_execution_argv(
@@ -383,6 +400,17 @@ class DeploymentContractTests(unittest.TestCase):
                 "issueIdentifier": "JOV-6329",
                 "action": "remediate-selected-ci-audit-class",
                 "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-6329",
+                "action": "reconcile-native-queue-starvation",
+                "sourceVersion": "0" * 40,
                 "snapshotDigest": digest,
             }),
             fleet,
@@ -458,6 +486,21 @@ class DeploymentContractTests(unittest.TestCase):
             CYCLE.os.environ, {"GEM_WORKSPACE": "/tmp/gem-workspace"}, clear=False
         ):
             self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+
+    def test_projection_recorded_unbound_action_is_named_not_silent_skip(self):
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6403",
+            "action": "remediate-selected-ci-audit-class",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["status"], "executor-unbound-action")
+        self.assertEqual(report["action"], "remediate-selected-ci-audit-class")
 
     def test_consumer_healthy_noop_does_not_spawn_execute(self):
         calls = []
