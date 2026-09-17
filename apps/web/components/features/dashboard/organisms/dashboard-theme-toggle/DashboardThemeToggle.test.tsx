@@ -39,7 +39,7 @@ describe('DashboardThemeToggle', () => {
 
     const toggle = screen.getByRole('switch', { name: 'Switch to dark mode' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(toggle).toHaveClass('h-6', 'w-11');
+    expect(toggle).toHaveClass('h-4', 'w-7');
 
     fireEvent.click(toggle);
 

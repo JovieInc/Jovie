@@ -140,10 +140,6 @@ function ThemeToggleButton({
             ariaLabel={tooltipText}
             disabled={isUpdating}
             onClick={onToggle}
-            className={cn(
-              'h-8 w-8 rounded-full bg-surface-1 text-quaternary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-4 [&_svg]:w-4',
-              isUpdating && 'opacity-70'
-            )}
           >
             <ThemeIcon className='h-4 w-4 text-secondary-token' />
           </AppIconButton>
@@ -166,18 +162,6 @@ function ThemeToggleButton({
           onCheckedChange={() => onToggle()}
           disabled={isUpdating}
           aria-label={srText}
-          className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-subtle transition-colors duration-subtle ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-            isDark ? 'bg-(--linear-border-focus)' : 'bg-surface-0',
-            'p-0.5'
-          )}
-          stateStyling='owner'
-          thumbClassName={cn(
-            'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
-            isDark ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0',
-            isUpdating && 'animate-pulse motion-reduce:animate-none'
-          )}
-          thumbTranslation='owner'
           thumbChildren={<ThemeIcon className='h-3 w-3 text-primary-token' />}
         />
       </TooltipTrigger>

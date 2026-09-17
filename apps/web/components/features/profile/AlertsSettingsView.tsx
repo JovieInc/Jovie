@@ -32,21 +32,6 @@ function SettingsToggle({
       onCheckedChange={onCheckedChange}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
-      stateStyling='owner'
-      className={cn(
-        'relative h-7 w-11 shrink-0 items-center rounded-full border p-0.5 transition-colors duration-subtle',
-        checked
-          ? 'border-white/40 bg-white dark:bg-surface-1'
-          : 'border-white/14 bg-white/[0.08]',
-        disabled && 'opacity-45'
-      )}
-      thumbClassName={cn(
-        'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
-        checked
-          ? 'bg-(--color-text-tooltip) translate-x-4 rtl:-translate-x-4'
-          : 'bg-btn-primary translate-x-0'
-      )}
-      thumbTranslation='owner'
     />
   );
 }
