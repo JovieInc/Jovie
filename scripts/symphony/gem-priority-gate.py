@@ -46,6 +46,7 @@ from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
     assert_repo_sidecar_path,
     fleet_sidecar_path,
+    gate_state_dir,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
@@ -2193,9 +2194,19 @@ def parse_args() -> argparse.Namespace:
         "--state-dir",
         type=Path,
         default=Path(
-            os.environ.get(
-                "GEM_PRIORITY_GATE_STATE_DIR",
-                "/home/timwhite/gem-workspace/state/gem-priority-gate",
+            os.environ.get("GEM_PRIORITY_GATE_STATE_DIR")
+            # Per-repo isolation: non-Jovie repos resolve their own state dir
+            # so sibling singletons never collide with Jovie's (JOV-INV).
+            or gate_state_dir(
+                Path(
+                    os.environ.get(
+                        "GEM_WORKSPACE",
+                        "/home/timwhite/gem-workspace",
+                    )
+                ),
+                os.environ.get("GEM_PRIORITY_GATE_REPO")
+                or os.environ.get("GEM_PR_DRAIN_REPO")
+                or "JovieInc/Jovie",
             )
         ),
     )
