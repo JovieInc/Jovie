@@ -166,7 +166,7 @@ function releaseExpressions(overrides = {}) {
   };
 }
 
-function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA) {
+function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('release-result-');
   stubCommand(
     fixture.bin,
@@ -188,6 +188,7 @@ function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA) {
       Buffer.from(DEPLOYMENT_URL).toString('base64'),
     PREVIOUS_PRODUCTION_DEPLOYMENT_ID: 'dpl_previous_generation',
     STUB_MAIN_SHA: boundarySha,
+    ...env,
   });
   return { result, outputs: parseOutputs(fixture.output) };
 }
@@ -393,6 +394,17 @@ describe('production release supersession execution', () => {
     });
   });
 
+  it('keeps a proven pre-promotion supersession neutral after exact prior gates', () => {
+    const neutral = runReleaseResult({}, NEWER_SHA, {
+      PROMOTION_SHA: NEWER_SHA,
+    });
+    expect(neutral.result.status, neutral.result.stderr).toBe(0);
+    expect(neutral.outputs).toMatchObject({
+      released: 'false',
+      superseded_before_promotion: 'true',
+    });
+  });
+
   it('accepts only a gated post-promotion staging-refresh supersession', () => {
     const accepted = runReleaseResult({
       'needs.staging-deployment-receipt.outputs.staging_refresh_outcome':
@@ -519,7 +531,63 @@ describe('production release supersession execution', () => {
     expect(receipt.receiptExists).toBe(false);
   });
 
-  it('keeps the normal staging receipt and rejects contradictory supersession', () => {
+  it('accepts exact pre-promotion supersession at both staging boundaries without mutation', () => {
+    const proof = { PROMOTION_SHA: NEWER_SHA };
+    const reassert = runStagingStep(
+      'Reassert the exact preview after production settles',
+      NEWER_SHA,
+      proof
+    );
+    expect(reassert.result.status, reassert.result.stderr).toBe(0);
+    expect(reassert.outputs.staging_refresh_outcome).toBe(
+      'superseded_before_promotion'
+    );
+    expect(reassert.outputs.deployed).toBeUndefined();
+    expect(reassert.aliasCalled).toBe(false);
+    expect(reassert.receiptExists).toBe(false);
+
+    const receipt = runStagingStep(
+      'Write typed staging deployment receipt',
+      NEWER_SHA,
+      proof
+    );
+    expect(receipt.result.status, receipt.result.stderr).toBe(0);
+    expect(receipt.outputs.staging_refresh_outcome).toBe(
+      'superseded_before_promotion'
+    );
+    expect(receipt.outputs.deployed).toBeUndefined();
+    expect(receipt.aliasCalled).toBe(false);
+    expect(receipt.receiptExists).toBe(false);
+  });
+
+  it.each([
+    ['malformed promotion SHA', { PROMOTION_SHA: 'not-a-sha' }],
+    [
+      'failed promotion result',
+      { PROMOTION_SHA: NEWER_SHA, PROMOTION_RESULT: 'failure' },
+    ],
+    [
+      'completed rollback',
+      { PROMOTION_SHA: NEWER_SHA, ROLLBACK_RESULT: 'success' },
+    ],
+    [
+      'post-promotion evidence with rollback',
+      { PROMOTION_SHA: EXPECTED_SHA, ROLLBACK_RESULT: 'success' },
+    ],
+  ])('fails closed at both staging boundaries for %s', (_, evidence) => {
+    for (const stepName of [
+      'Reassert the exact preview after production settles',
+      'Write typed staging deployment receipt',
+    ]) {
+      const result = runStagingStep(stepName, NEWER_SHA, evidence);
+      expect(result.result.status).not.toBe(0);
+      expect(result.outputs.deployed).toBeUndefined();
+      expect(result.aliasCalled).toBe(false);
+      expect(result.receiptExists).toBe(false);
+    }
+  });
+
+  it('keeps the normal staging receipt', () => {
     const current = runStagingStep(
       'Write typed staging deployment receipt',
       EXPECTED_SHA
@@ -531,15 +599,6 @@ describe('production release supersession execution', () => {
       staging_refresh_outcome: 'current_receipt',
     });
     expect(current.receiptExists).toBe(true);
-
-    const wrongPromotion = runStagingStep(
-      'Write typed staging deployment receipt',
-      NEWER_SHA,
-      { PROMOTION_SHA: NEWER_SHA }
-    );
-    expect(wrongPromotion.result.status).not.toBe(0);
-    expect(wrongPromotion.outputs.deployed).toBeUndefined();
-    expect(wrongPromotion.receiptExists).toBe(false);
   });
 });
 
