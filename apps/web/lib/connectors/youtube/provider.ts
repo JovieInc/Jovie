@@ -4,6 +4,10 @@ import type { YouTubeThumbnailSet } from '@/lib/db/schema/youtube-library';
 import { serverFetch } from '@/lib/http/server-fetch';
 import { parseYouTubeDuration } from '@/lib/youtube/metadata';
 import type {
+  YouTubeSnippetWriter,
+  YouTubeVideoSnippetRecord,
+} from '@/lib/youtube-library/link-apply';
+import type {
   YouTubeChannelVideo,
   YouTubeImportSkip,
   YouTubeLibraryProvider,
@@ -42,13 +46,18 @@ interface PlaylistItemsResponse extends PageInfo {
 }
 
 interface VideosResponse {
+  readonly etag?: string;
   readonly items?: readonly {
     readonly id: string;
+    readonly etag?: string;
     readonly snippet?: {
       readonly channelId?: string;
       readonly title?: string;
       readonly description?: string;
       readonly publishedAt?: string;
+      readonly categoryId?: string;
+      readonly tags?: readonly string[];
+      readonly defaultLanguage?: string;
       readonly thumbnails?: YouTubeThumbnailSet;
     };
     readonly contentDetails?: { readonly duration?: string };
@@ -82,10 +91,16 @@ async function authorizedJson<T>(
   url: URL,
   accessToken: string,
   fetcher: ProviderFetch,
-  context: string
+  context: string,
+  init?: { readonly method?: string; readonly body?: string }
 ): Promise<T> {
   const response = await fetcher(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    method: init?.method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: init?.body,
     timeoutMs: 15_000,
     context,
   });
@@ -415,6 +430,85 @@ export function createYouTubeLibraryProvider(input: {
         }
       }
       return output;
+    },
+  };
+}
+
+type VideoRow = NonNullable<VideosResponse['items']>[number];
+
+function toSnippetRecord(item: VideoRow): YouTubeVideoSnippetRecord | null {
+  if (!item.id || !item.snippet?.title) return null;
+  return {
+    id: item.id,
+    etag: item.etag ?? null,
+    snippet: {
+      title: item.snippet.title.trim() || 'Untitled video',
+      description: item.snippet.description ?? '',
+      categoryId: item.snippet.categoryId ?? null,
+      tags: item.snippet.tags,
+      defaultLanguage: item.snippet.defaultLanguage,
+      channelId: item.snippet.channelId,
+    },
+  };
+}
+
+export function createYouTubeSnippetWriter(input: {
+  readonly accessToken: string;
+  readonly fetcher?: ProviderFetch;
+}): YouTubeSnippetWriter {
+  const fetcher = input.fetcher ?? serverFetch;
+  const videoUrl = (id?: string) => {
+    const url = new URL(`${YOUTUBE_DATA_API}/videos`);
+    url.searchParams.set('part', 'snippet');
+    if (id) url.searchParams.set('id', id);
+    return url;
+  };
+  return {
+    async getVideo(videoId) {
+      const data = await authorizedJson<VideosResponse>(
+        videoUrl(videoId),
+        input.accessToken,
+        fetcher,
+        'YouTube video snippet'
+      );
+      return data.items?.[0] ? toSnippetRecord(data.items[0]) : null;
+    },
+    async updateVideo(update) {
+      const snippet = {
+        title: update.snippet.title,
+        description: update.snippet.description,
+        ...(update.snippet.categoryId
+          ? { categoryId: update.snippet.categoryId }
+          : {}),
+        ...(update.snippet.tags ? { tags: update.snippet.tags } : {}),
+        ...(update.snippet.defaultLanguage
+          ? { defaultLanguage: update.snippet.defaultLanguage }
+          : {}),
+      };
+      const data = await authorizedJson<VideosResponse & VideoRow>(
+        videoUrl(),
+        input.accessToken,
+        fetcher,
+        'YouTube video update',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            id: update.videoId,
+            snippet,
+            ...(update.etag ? { etag: update.etag } : {}),
+          }),
+        }
+      );
+      const item = data.items?.[0] ?? (data.id ? data : null);
+      const record = item ? toSnippetRecord(item) : null;
+      if (!record) {
+        throw new YouTubeProviderError(
+          'YouTube video update returned no snippet',
+          502,
+          'ambiguousProviderResult'
+        );
+      }
+      return record;
     },
   };
 }
