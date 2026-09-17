@@ -2,11 +2,11 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
-  NATIVE_QUEUE_ACTION,
   appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
+  NATIVE_QUEUE_ACTION,
   selectGreenReadyPrs,
 } from './native-queue-starvation-execute.mjs';
 
