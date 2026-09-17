@@ -262,7 +262,6 @@ describe('JOV-6051 per-run outcome verification', () => {
       claim: {
         statement: 'registration-only homepage change',
         kind: 'screen-certification',
-        screenIds: ['web.homepage'],
       },
       certOptions: {
         headSha: HEAD,
@@ -419,12 +418,46 @@ describe('JOV-6051 per-run outcome verification', () => {
     assert.equal(unexpectedCert.certified, false);
     const unexpectedPass = verifyRunOutcome({
       runId: 'run-unexpected-pass-1',
-      claim: claim({ expectedOutcome: 'fail', expectedCertified: false }),
+      claim: claim({ expectedOutcome: 'fail', expectedCertified: null }),
       receipt: harnessCertifiedReceipt(),
       includeShadow: false,
     });
     assert.equal(unexpectedPass.outcome, 'fail');
     assert.match(unexpectedPass.reason, /contradicted/);
+  });
+
+  it('fails a pass/certified claim when the harness receipt is uncertified', () => {
+    const receipt = harnessCertifiedReceipt({
+      certified: false,
+      status: 'evidence-required',
+      changedScreens: [
+        {
+          id: 'web.homepage',
+          verdict: 'pass',
+          findings: [],
+          artifactDigest: DIGEST,
+        },
+      ],
+    });
+    const expectedCert = verifyRunOutcome({
+      runId: 'run-expected-cert-miss-1',
+      claim: claim({ expectedOutcome: null, screenIds: [] }),
+      receipt,
+      includeShadow: false,
+    });
+    assert.equal(expectedCert.outcome, 'fail');
+    assert.match(expectedCert.reason, /expected certified:true/);
+    const expectedPass = verifyRunOutcome({
+      runId: 'run-expected-pass-miss-1',
+      claim: {
+        statement: 'homepage should pass',
+        expectedOutcome: 'pass',
+      },
+      receipt,
+      includeShadow: false,
+    });
+    assert.equal(expectedPass.outcome, 'fail');
+    assert.match(expectedPass.reason, /expected pass/);
   });
 
   it('fails registration-only receipts that still mint certified:true', () => {

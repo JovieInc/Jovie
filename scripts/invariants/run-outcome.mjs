@@ -191,13 +191,6 @@ function decideOutcome({ claim, receipt, issues }) {
   }
 
   if (receipt.certified === true && receipt.ok === true) {
-    if (expectedOutcome && expectedOutcome !== 'pass') {
-      return {
-        outcome: 'fail',
-        certified: false,
-        reason: `claim expected ${expectedOutcome} but harness certified`,
-      };
-    }
     return {
       outcome: 'pass',
       certified: true,
