@@ -40,8 +40,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job:
-      'help visitors understand their public presence and start with their profile',
+    job: 'help visitors understand their public presence and start with their profile',
     proof: 'published profile and relationship examples',
     successEvent: 'visitor starts the onboarding handoff',
     primaryCta: START_CTA,
@@ -68,8 +67,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(marketing)/artist-profiles/page.tsx',
     copyScope: 'music',
     url: APP_ROUTES.ARTIST_PROFILES,
-    job:
-      'show artists how profiles connect music, links, and permissioned fan updates',
+    job: 'show artists how profiles connect music, links, and permissioned fan updates',
     proof: 'profile gallery, capture flow, and conversion sections',
     successEvent: 'artist claims a profile',
     primaryCta: CLAIM_PROFILE_CTA,

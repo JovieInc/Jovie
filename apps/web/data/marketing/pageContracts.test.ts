@@ -59,12 +59,11 @@ describe('marketing language context', () => {
   });
 
   it('leaves comparison and editorial subjects to their own content', () => {
-    const contracts = Object.values(MARKETING_PAGE_CONTRACTS).filter(
-      contract =>
-        [APP_ROUTES.BLOG, APP_ROUTES.COMPARE, APP_ROUTES.ALTERNATIVES].some(
-          prefix =>
-            contract.url === prefix || contract.url.startsWith(`${prefix}/`)
-        )
+    const contracts = Object.values(MARKETING_PAGE_CONTRACTS).filter(contract =>
+      [APP_ROUTES.BLOG, APP_ROUTES.COMPARE, APP_ROUTES.ALTERNATIVES].some(
+        prefix =>
+          contract.url === prefix || contract.url.startsWith(`${prefix}/`)
+      )
     );
     expect(contracts.length).toBeGreaterThan(0);
     for (const contract of contracts) {
@@ -139,8 +138,8 @@ describe('marketing language context', () => {
   });
 
   it('retains the artist directory without calling it customer proof', () => {
-    const directory = MARKETING_FOOTER_COLUMNS.flatMap(column =>
-      column.links
+    const directory = MARKETING_FOOTER_COLUMNS.flatMap(
+      column => column.links
     ).find(link => link.href === APP_ROUTES.ARTISTS);
     expect(directory?.label).toBe('Artist Directory');
   });
