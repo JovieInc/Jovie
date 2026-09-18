@@ -50,10 +50,7 @@ describe('independent application source export', () => {
           )
         ).toBe(true);
         expect(
-          readFileSync(
-            join(destination, 'scripts/check-built-app.mjs'),
-            'utf8'
-          )
+          readFileSync(join(destination, 'scripts/check-built-app.mjs'), 'utf8')
         ).toContain("status: 'uncommissioned'");
         if (identity === 'summer') {
           const contractDirectory = join(
