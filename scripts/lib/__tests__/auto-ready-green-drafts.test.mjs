@@ -207,6 +207,9 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain('github.event_name == \'workflow_dispatch\'');
     expect(workflow).toContain(
+      "github.event.workflow_run.event == 'pull_request'"
+    );
+    expect(workflow).toContain(
       'github.event.check_suite.head_branch != github.event.repository.default_branch'
     );
     expect(workflow).not.toContain('schedule:');
