@@ -15,6 +15,7 @@ const hoisted = vi.hoisted(() => ({
   mockLogFallback: vi.fn(),
   mockAttributeLeadPaidConversionByAppUserId: vi.fn(),
   mockExpireReferralOnChurn: vi.fn(),
+  mockEnqueuePaidWelcomeAfterEntitlement: vi.fn(),
 }));
 
 export const mockGetUserIdFromStripeCustomer =
@@ -27,6 +28,8 @@ export const mockLogFallback = hoisted.mockLogFallback;
 export const mockAttributeLeadPaidConversionByAppUserId =
   hoisted.mockAttributeLeadPaidConversionByAppUserId;
 export const mockExpireReferralOnChurn = hoisted.mockExpireReferralOnChurn;
+export const mockEnqueuePaidWelcomeAfterEntitlement =
+  hoisted.mockEnqueuePaidWelcomeAfterEntitlement;
 
 // Setup mocks
 vi.mock('@/lib/stripe/webhooks/utils', () => ({
@@ -64,7 +67,7 @@ vi.mock('@/lib/referrals/service', () => ({
 }));
 
 vi.mock('@/lib/email/paid-welcome', () => ({
-  enqueuePaidWelcomeAfterEntitlement: vi.fn(),
+  enqueuePaidWelcomeAfterEntitlement: mockEnqueuePaidWelcomeAfterEntitlement,
   maybeSendPaidWelcomeAfterEntitlement: vi.fn(),
 }));
 

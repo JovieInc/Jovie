@@ -7,7 +7,7 @@
  */
 
 import 'server-only';
-import { and, eq, lt, or, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lt, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { SUPPORT_EMAIL } from '@/constants/domains';

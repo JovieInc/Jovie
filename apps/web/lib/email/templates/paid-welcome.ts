@@ -7,7 +7,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { BASE_URL, SUPPORT_EMAIL, getAppUrl } from '@/constants/domains';
+import { BASE_URL, getAppUrl, SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { escapeHtml } from '../utils';
 
