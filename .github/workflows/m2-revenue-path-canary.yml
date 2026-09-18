@@ -92,29 +92,47 @@ jobs:
 
       - name: Slack alert on red
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          CANARY_TARGET: ${{ inputs.base_url || 'https://jov.ie' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          PAYLOAD=$(cat <<EOF)
-          {
-            "text": "M2 revenue-path canary failed — not generic uptime",
-            "attachments": [
-              {
-                "color": "danger",
-                "fields": [
-                  { "title": "Canary", "value": "signed-out → claim → \$199 Pro checkout → activation", "short": false },
-                  { "title": "Issue", "value": "JOV-6439", "short": true },
-                  { "title": "Target", "value": "${{ inputs.base_url || 'https://jov.ie' }}", "short": true },
-                  { "title": "Repro", "value": "pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url ${{ inputs.base_url || 'https://jov.ie' }}", "short": false },
-                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                ]
-              }
-            ]
-          }
-          EOF
-          )
-          curl -sS -X POST \
-            -H 'Content-type: application/json' \
-            --data "$PAYLOAD" \
+          node -e '
+            const target = process.env.CANARY_TARGET;
+            const runUrl = process.env.RUN_URL;
+            const payload = {
+              text: "M2 revenue-path canary failed — not generic uptime",
+              attachments: [
+                {
+                  color: "danger",
+                  fields: [
+                    {
+                      title: "Canary",
+                      value: "signed-out to claim to 199 USD Pro checkout to activation",
+                      short: false,
+                    },
+                    { title: "Issue", value: "JOV-6439", short: true },
+                    { title: "Target", value: target, short: true },
+                    {
+                      title: "Repro",
+                      value:
+                        "pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url " +
+                        target,
+                      short: false,
+                    },
+                    {
+                      title: "Run",
+                      value: "<" + runUrl + "|View logs>",
+                      short: false,
+                    },
+                  ],
+                },
+              ],
+            };
+            process.stdout.write(JSON.stringify(payload));
+          ' | curl -sS -X POST \
+            -H "Content-type: application/json" \
+            --data @- \
             "$SLACK_WEBHOOK_URL"
 
       - name: File Linear issue on red

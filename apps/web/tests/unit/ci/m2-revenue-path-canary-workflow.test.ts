@@ -34,7 +34,7 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
   it('is distinct from generic uptime and the existing canaries', () => {
     expect(workflow).toContain('Distinct from Canary Health Gate');
     expect(workflow).toContain(
-      'signed-out → claim → \\$199 Pro checkout → activation'
+      'signed-out to claim to 199 USD Pro checkout to activation'
     );
     expect(workflow).toContain('JOV-6439');
     expect(workflow).toContain(
