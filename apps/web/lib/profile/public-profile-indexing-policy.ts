@@ -27,6 +27,7 @@ export type PublicProfileDiscoveryExclusionReason =
   | PublicProfileIndexingExclusionReason
   | 'qa_display_name'
   | 'test_account_email'
+  | 'production_directory_junk'
   | 'private_or_unpublished'
   | 'unknown_identity';
 
@@ -70,6 +71,31 @@ const QA_CLERK_TEST_DISPLAY_NAME_PATTERN = /\+clerk test$/;
 const JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
 const CLERK_TEST_EMAIL_LOCAL_PART_PATTERN = /\+clerk_test(?:\+|$)/;
 
+/**
+ * Confirmed junk on production https://jov.ie/artists (JOV-6260, 2026-09-18).
+ * Discovery-only: these handles stay claimable later. Do not add them to the
+ * exact-handle reservation registry without a later ownership decision.
+ */
+export const PRODUCTION_DIRECTORY_JUNK_HANDLES = Object.freeze([
+  'hello',
+  'ti89m',
+  'tim1',
+  'timwhite1',
+  'ahmedgr',
+]);
+
+const PRODUCTION_DIRECTORY_JUNK_HANDLE_SET = new Set<string>(
+  PRODUCTION_DIRECTORY_JUNK_HANDLES
+);
+
+function getProductionDirectoryJunkExclusionReason(
+  handle: string
+): 'production_directory_junk' | null {
+  return PRODUCTION_DIRECTORY_JUNK_HANDLE_SET.has(handle.trim().toLowerCase())
+    ? 'production_directory_junk'
+    : null;
+}
+
 function getQaMachineHandleIndexingExclusionReason(
   handle: string
 ): 'qa_machine_handle' | null {
@@ -105,6 +131,9 @@ export function getPublicProfileDiscoveryExclusionReason(
 
   const handle = identity.handle?.trim() ?? '';
   if (!handle) return 'unknown_identity';
+
+  const directoryJunkReason = getProductionDirectoryJunkExclusionReason(handle);
+  if (directoryJunkReason) return directoryJunkReason;
 
   if (identity.isPublic === false) return 'private_or_unpublished';
   if (options.requirePublication && identity.isPublic !== true) {

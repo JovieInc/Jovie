@@ -103,6 +103,28 @@ describe('JOV-INV-033 done sprint invariants', () => {
     assert.ok(errors.some(error => error.includes('fail closed')));
   });
 
+  it('deliberate red: production artists HTML that still lists junk handles is a release blocker', async () => {
+    const errors = await rescanProduction({
+      env: { DONE_INVARIANT_PRODUCTION_BASE_URL: 'https://jov.ie' },
+      fetchImpl: async url => {
+        const path = new URL(url).pathname;
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            path === '/artists'
+              ? '<a href="/hello">hello</a><a href="/tim1">tim1</a>'
+              : '<html></html>',
+        };
+      },
+    });
+    assert.ok(
+      errors.some(
+        error => error.includes('JOV-6260') && error.includes('href="/hello"')
+      )
+    );
+  });
+
   it('deliberate red: production HTML that still offers Max signup is a release blocker', async () => {
     const errors = await rescanProduction({
       env: { DONE_INVARIANT_PRODUCTION_BASE_URL: 'https://jov.ie' },

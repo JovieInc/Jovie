@@ -7,6 +7,7 @@ import {
   getPublicProfileRobots,
   isPublicProfileDiscoveryEligible,
   isPublicProfileIndexable,
+  PRODUCTION_DIRECTORY_JUNK_HANDLES,
   PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE,
 } from './public-profile-indexing-policy';
 
@@ -221,6 +222,29 @@ describe('public profile discovery eligibility (JOV-6260)', () => {
     ).toBe(true);
   });
 
+  it.each([...PRODUCTION_DIRECTORY_JUNK_HANDLES])(
+    'excludes the live production junk handle from discovery: %s',
+    handle => {
+      expect(isReservedPublicProfileIdentity(handle)).toBe(false);
+      expect(
+        getPublicProfileDiscoveryExclusionReason({
+          handle,
+          displayName: handle,
+          isPublic: true,
+          ownerEmail: 'studio@example.com',
+        })
+      ).toBe('production_directory_junk');
+      expect(
+        isPublicProfileDiscoveryEligible({
+          handle,
+          displayName: handle,
+          isPublic: true,
+          ownerEmail: 'studio@example.com',
+        })
+      ).toBe(false);
+    }
+  );
+
   it('filters listing catalogs with one shared predicate', () => {
     const catalog = filterPublicDiscoveryIdentities([
       realisticTestAccount,
@@ -239,6 +263,18 @@ describe('public profile discovery eligibility (JOV-6260)', () => {
         displayName: 'gp moc+clerk test',
         isPublic: true,
         ownerEmail: 'jordan@miles.audio',
+      },
+      {
+        handle: 'hello',
+        displayName: 'hello',
+        isPublic: true,
+        ownerEmail: 'hello@example.net',
+      },
+      {
+        handle: 'timwhite1',
+        displayName: 'timwhite',
+        isPublic: true,
+        ownerEmail: 'tim@timwhite.audio',
       },
     ]);
 

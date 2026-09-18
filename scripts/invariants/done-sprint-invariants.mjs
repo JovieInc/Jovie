@@ -33,6 +33,11 @@ const FORBIDDEN_DIRECTORY_IDENTITIES = Object.freeze([
   'e2e+jordan@example.com',
   '+clerk_test',
   'tmoc0g1x9dwmk71',
+  'href="/hello"',
+  'href="/ti89m"',
+  'href="/tim1"',
+  'href="/timwhite1"',
+  'href="/ahmedgr"',
 ]);
 
 export const SEED_DONE_INVARIANTS = Object.freeze([
@@ -69,6 +74,8 @@ export const SEED_DONE_INVARIANTS = Object.freeze([
       'filterPublicDiscoveryIdentities',
       'test_account_email',
       'private_or_unpublished',
+      'production_directory_junk',
+      'PRODUCTION_DIRECTORY_JUNK_HANDLES',
       'ARTISTS_DIRECTORY',
       'artists directory catalog (JOV-6260)',
       'invalidateProfileCache discovery outputs (JOV-6260)',

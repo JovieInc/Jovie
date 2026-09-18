@@ -87,6 +87,26 @@ describe('artists directory catalog (JOV-6260)', () => {
         isPublic: true,
         ownerEmail: 'studio@truecrimedaily.com',
       },
+      {
+        id: 'live-junk-hello',
+        username: 'hello',
+        handle: 'hello',
+        displayName: 'hello',
+        avatarUrl: null,
+        bio: null,
+        isPublic: true,
+        ownerEmail: 'hello@example.net',
+      },
+      {
+        id: 'live-junk-tim1',
+        username: 'tim1',
+        handle: 'tim1',
+        displayName: 'tim1',
+        avatarUrl: null,
+        bio: null,
+        isPublic: true,
+        ownerEmail: 'tim@timwhite.audio',
+      },
     ]);
 
     expect(profiles.map(profile => profile.username)).toEqual([
