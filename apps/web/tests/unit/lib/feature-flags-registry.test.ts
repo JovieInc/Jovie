@@ -98,6 +98,7 @@ describe('feature flag registry integrity', () => {
             'INBOX_HOME',
             'PROFILES_WORKSPACE',
             'PROFILE_SEARCH_MONITORING',
+            'PAID_WELCOME_EMAIL',
           ].includes(name)
       )
       .map(([, value]) => value);
@@ -105,6 +106,7 @@ describe('feature flag registry integrity', () => {
     expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
+    expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {
