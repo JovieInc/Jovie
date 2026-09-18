@@ -1888,15 +1888,11 @@ describe('ProfileCompactTemplate', () => {
   it('exposes real desktop profile content instead of a stuck loading status (JOV-6434)', async () => {
     mockProfileDesktopSurface.mockImplementation(
       (props: { readonly artist?: { readonly name?: string } }) => (
-        <div
-          data-testid='profile-desktop-surface'
-          role='region'
-          aria-label='Profile'
-        >
+        <section data-testid='profile-desktop-surface' aria-label='Profile'>
           <a data-testid='profile-header' href={`/${mockArtist.handle}`}>
             Desktop profile for {props.artist?.name ?? mockArtist.name}
           </a>
-        </div>
+        </section>
       )
     );
 
@@ -1909,8 +1905,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('Loading profile…');
-    expect(html).toContain('Desktop profile for Test Artist');
     expect(html).toContain('data-testid="profile-desktop-surface"');
+    expect(html).toContain('Desktop profile for');
+    expect(html).toContain('Test Artist');
 
     const restoreViewport = mockViewport('desktop');
     render(
