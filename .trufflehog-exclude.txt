@@ -17,6 +17,10 @@ tests/lib/database-url-validation.test.ts
 apps/web/tests/lib/health-checks.test.ts
 tests/lib/health-checks.test.ts
 apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts
+# JOV-6439 canary unit test: TruffleHog URI detector bait for a credentialed
+# https target in the introducing commit. Later commits construct the URL
+# from parts; keep the path excluded so range scans do not fail on that blob.
+apps/web/lib/canaries/m2-revenue-path.test.ts
 .agents/skills/gstack/browse/test/sidebar-unit.test.ts
 .claude/skills/gstack/browse/test/sidebar-unit.test.ts
 .agents/skills/gstack/test/skill-e2e-cso.test.ts
