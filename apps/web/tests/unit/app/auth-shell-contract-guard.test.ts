@@ -75,13 +75,7 @@ describe('auth shell contract guard', () => {
       'utf8'
     );
     const signupClient = readFileSync(
-      join(
-        process.cwd(),
-        'app',
-        '(auth)',
-        'signup',
-        'SignUpPageClient.tsx'
-      ),
+      join(process.cwd(), 'app', '(auth)', 'signup', 'SignUpPageClient.tsx'),
       'utf8'
     );
     const signupModalPage = readFileSync(
@@ -89,23 +83,11 @@ describe('auth shell contract guard', () => {
       'utf8'
     );
     const signupModalClient = readFileSync(
-      join(
-        process.cwd(),
-        'app',
-        '@auth',
-        '(.)signup',
-        'SignupModalClient.tsx'
-      ),
+      join(process.cwd(), 'app', '@auth', '(.)signup', 'SignupModalClient.tsx'),
       'utf8'
     );
     const authShell = readFileSync(
-      join(
-        process.cwd(),
-        'components',
-        'features',
-        'auth',
-        'AuthShell.tsx'
-      ),
+      join(process.cwd(), 'components', 'features', 'auth', 'AuthShell.tsx'),
       'utf8'
     );
     const entryGuard = readFileSync(
