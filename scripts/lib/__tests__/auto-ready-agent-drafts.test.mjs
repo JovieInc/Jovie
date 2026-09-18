@@ -432,7 +432,7 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
-  it('keeps writer-proof recovery manual-only and out of source PR events', () => {
+  it('keeps workflow recovery manual-only and never source-event driven', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain(
       "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
