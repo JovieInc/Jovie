@@ -404,6 +404,17 @@ describe('@critical ChargeHandler', () => {
       expect(result.success).toBe(true);
     });
 
+    it('treats a concurrent cancel race as idempotent success', async () => {
+      mockStripeSubscriptionsCancel.mockRejectedValue({
+        code: 'subscription_already_canceled',
+        message: 'This subscription has already been canceled.',
+      });
+
+      const result = await handler.handle(refundContext(refundedCharge()));
+
+      expect(result.success).toBe(true);
+    });
+
     it('rethrows unexpected Stripe cancel failures after revoke', async () => {
       mockStripeSubscriptionsCancel.mockRejectedValue(
         new Error('stripe timeout')

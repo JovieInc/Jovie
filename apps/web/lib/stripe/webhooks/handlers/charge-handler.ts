@@ -400,6 +400,11 @@ export class ChargeHandler implements WebhookHandler {
   }
 }
 
+const ALREADY_CANCELED_ERROR_CODES = new Set([
+  'resource_missing',
+  'subscription_already_canceled',
+]);
+
 function isAlreadyCanceledError(error: unknown): boolean {
   if (!error || typeof error !== 'object') {
     return false;
@@ -413,8 +418,8 @@ function isAlreadyCanceledError(error: unknown): boolean {
       : '';
 
   return (
-    code === 'resource_missing' ||
-    /already canceled|no such subscription/i.test(message)
+    ALREADY_CANCELED_ERROR_CODES.has(code) ||
+    /already (?:been )?cancel+ed|no such subscription/i.test(message)
   );
 }
 
