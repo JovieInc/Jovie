@@ -5,11 +5,13 @@ import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 const {
   getOrMintOnboardingSessionIdMock,
   getWaitlistAccessMock,
+  isWaitlistGateEnabledMock,
   redirectMock,
   resolveUserStateMock,
 } = vi.hoisted(() => ({
   getOrMintOnboardingSessionIdMock: vi.fn(),
   getWaitlistAccessMock: vi.fn(),
+  isWaitlistGateEnabledMock: vi.fn(),
   redirectMock: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
@@ -41,11 +43,17 @@ vi.mock('@/lib/auth/gate', () => ({
   resolveUserState: resolveUserStateMock,
 }));
 
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: isWaitlistGateEnabledMock,
+}));
+
 describe('/start page', () => {
   beforeEach(() => {
     redirectMock.mockClear();
     getWaitlistAccessMock.mockReset();
     getWaitlistAccessMock.mockResolvedValue({ entryId: null, status: null });
+    isWaitlistGateEnabledMock.mockReset();
+    isWaitlistGateEnabledMock.mockResolvedValue(true);
     resolveUserStateMock.mockReset();
     resolveUserStateMock.mockResolvedValue({
       state: CanonicalUserState.UNAUTHENTICATED,
@@ -67,6 +75,24 @@ describe('/start page', () => {
     );
     expect(screen.getByTestId('onboarding-shell')).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('does not read waitlist when the launch gate is off (JOV-6449)', async () => {
+    resolveUserStateMock.mockResolvedValue({
+      state: CanonicalUserState.WAITLIST_PENDING,
+      context: { email: 'artist@example.com' },
+    });
+    isWaitlistGateEnabledMock.mockResolvedValue(false);
+    getWaitlistAccessMock.mockRejectedValue(
+      new Error('waitlist table unavailable')
+    );
+
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+
+    await expect(StartPage()).rejects.toThrow('NEXT_REDIRECT:/waitlist');
+    expect(isWaitlistGateEnabledMock).toHaveBeenCalledOnce();
+    expect(getWaitlistAccessMock).not.toHaveBeenCalled();
+    expect(redirectMock).toHaveBeenCalledExactlyOnceWith('/waitlist');
   });
 
   it('redirects WAITLIST_PENDING to the receipt only when a durable pending entry exists', async () => {
