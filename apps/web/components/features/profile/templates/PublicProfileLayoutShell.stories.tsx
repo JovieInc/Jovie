@@ -22,5 +22,5 @@ export default meta;
 export const Compact: StoryObj<typeof PublicProfileLayoutShell> = {};
 
 export const Desktop: StoryObj<typeof PublicProfileLayoutShell> = {
-  args: { isDesktopLayout: true },
+  args: { isDesktopLayout: true, desktopSurfaceReady: true },
 };

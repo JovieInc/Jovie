@@ -244,6 +244,26 @@ describe('ProfileDesktopSurface', () => {
     view.unmount();
     expect(screen.queryByTestId('profile-desktop-surface')).toBeNull();
   });
+
+  it('notifies the layout shell when the desktop surface is ready', () => {
+    const onReady = vi.fn();
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        onReady={onReady}
+      />
+    );
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
   it('renders the desktop shell and primary navigation', () => {
     render(
       <ProfileDesktopSurface

@@ -15,6 +15,28 @@ const commonProps = {
 describe('PublicProfileLayoutShell', () => {
   it('owns exactly the desktop surface in desktop layout', () => {
     render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={true}
+        desktopSurfaceReady
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+      'data-layout',
+      'desktop'
+    );
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+      'data-desktop-ready',
+      'true'
+    );
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('compact-content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('keeps compact content available to assistive tech until the desktop surface is ready', () => {
+    render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={true} />
     );
 
@@ -22,8 +44,9 @@ describe('PublicProfileLayoutShell', () => {
       'data-layout',
       'desktop'
     );
+    expect(screen.getByTestId('compact-content')).toBeInTheDocument();
     expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('compact-content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('owns exactly the compact surface below the desktop boundary', () => {
@@ -37,6 +60,11 @@ describe('PublicProfileLayoutShell', () => {
     );
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
     expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('labels an embedded compact surface as a preview with an exit', () => {
