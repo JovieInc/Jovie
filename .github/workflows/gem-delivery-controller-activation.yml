@@ -198,6 +198,7 @@ jobs:
           systemctl --user daemon-reload
           systemctl --user enable --now symphony-concurrency-controller.timer
           systemctl --user start symphony-concurrency-controller.service
+          systemctl --user reset-failed gem-disk-reclaim.service || true
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
         if: steps.marker.outputs.superseded != 'true'

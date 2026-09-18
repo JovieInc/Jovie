@@ -151,6 +151,7 @@ install_symlink "$pnpm_target" "$pnpm_link"
 systemctl daemon-reload
 "${user_systemctl[@]}" daemon-reload
 systemctl enable jovie-symphony-workspace-mounts.service jovie-symphony-workspace-cleanup.timer >/dev/null
+"${user_systemctl[@]}" reset-failed gem-disk-reclaim.service >/dev/null || true
 "${user_systemctl[@]}" enable --now gem-disk-reclaim.timer >/dev/null
 
 service_state_after="$("${user_systemctl[@]}" show symphony-elixir.service -p ActiveState --value)"

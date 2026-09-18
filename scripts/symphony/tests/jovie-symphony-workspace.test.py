@@ -87,6 +87,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         installer = INSTALLER.read_text()
         self.assertIn('reclaimer_source="$source_root/gem-disk-reclaim.py"', installer)
         self.assertIn('enable --now gem-disk-reclaim.timer', installer)
+        self.assertIn('reset-failed gem-disk-reclaim.service', installer)
         self.assertIn('migration_source="$source_root/gem-workspace-migrate.py"', installer)
         self.assertIn('migration_target="/usr/local/sbin/gem-workspace-migrate"', installer)
 
