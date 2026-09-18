@@ -1,6 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => false,
+}));
+
+vi.mock('@/lib/acquisition/proof-claim-client', () => ({
+  emitProofClaimEvent: vi.fn(),
+  rememberProofClaimAttribution: vi.fn(),
+}));
 
 const commonProps = {
   artistName: 'Unfazed',
@@ -56,5 +65,23 @@ describe('PublicProfileLayoutShell', () => {
       'href',
       '/unfazed'
     );
+  });
+
+  it('forwards the proof-to-claim footer without calling the profile unclaimed', () => {
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={true}
+        showClaimFooter
+        claimFooterHref='/waitlist?campaign=proof-to-claim'
+        claimFooterLabel='Request access'
+        proofClaim
+      />
+    );
+
+    const cta = screen.getByTestId('profile-claim-footer-cta');
+    expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
+    expect(cta).toHaveTextContent('Request access');
+    expect(screen.queryByText(/unclaimed/i)).toBeNull();
   });
 });
