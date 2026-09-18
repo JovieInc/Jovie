@@ -493,6 +493,18 @@ test('empty committed fingerprint slot stays fail-closed unless env/path public 
       }),
     /not a valid Ed25519 SPKI key/u
   );
+  assert.deepEqual(
+    resolveTrustedAttestationKeyFingerprints([], {
+      environment: {
+        SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH: join(
+          repositoryRoot,
+          'missing-probe-runner-public.pem'
+        ),
+        RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY: publicKeyPem,
+      },
+    }),
+    []
+  );
   const report = runCommissioning(
     emptyAllowlist,
     commissioningOptions(repositoryRoot, {
