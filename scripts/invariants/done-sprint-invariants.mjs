@@ -131,6 +131,13 @@ export function scanDoneSprintSources(repoRoot = DEFAULT_ROOT) {
   return errors;
 }
 
+/**
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   fetchImpl?: Function,
+ *   paths?: readonly string[],
+ * }} [options]
+ */
 export async function rescanProduction({
   env = process.env,
   fetchImpl = fetch,
@@ -198,6 +205,16 @@ export async function rescanProduction({
   return errors;
 }
 
+/**
+ * @param {{
+ *   repoRoot?: string,
+ *   registry?: ReturnType<typeof readInvariantRegistry>,
+ *   mode?: 'source' | 'release',
+ *   env?: NodeJS.ProcessEnv,
+ *   argv?: string[],
+ *   fetchImpl?: Function,
+ * }} [options]
+ */
 export async function validateDoneSprintInvariants({
   repoRoot = DEFAULT_ROOT,
   registry,

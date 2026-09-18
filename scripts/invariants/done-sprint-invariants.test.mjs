@@ -39,12 +39,18 @@ describe('JOV-INV-033 done sprint invariants', () => {
     assert.deepEqual(scanDoneSprintSources(), []);
   });
 
-  it('keeps deliberate-red fixtures outside Biome', () => {
-    const biome = readFileSync(path.join(HERE, '../../biome.json'), 'utf8');
+  it('keeps deliberate-red fixtures outside Biome and scripts typecheck', () => {
+    const repoRoot = path.join(HERE, '../..');
+    const biome = readFileSync(path.join(repoRoot, 'biome.json'), 'utf8');
     assert.match(
       biome,
       /"\!scripts\/invariants\/fixtures\/done-sprint-invariants\/\*\*"/
     );
+    const tsconfig = readFileSync(
+      path.join(repoRoot, 'scripts/tsconfig.json'),
+      'utf8'
+    );
+    assert.match(tsconfig, /invariants\/fixtures\/done-sprint-invariants/);
   });
 
   it('deliberate red: rejects a Max self-serve pricing regression', () => {
