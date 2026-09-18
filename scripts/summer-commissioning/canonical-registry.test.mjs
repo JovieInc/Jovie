@@ -12,6 +12,7 @@ import {
   REGISTRY_SCHEMA,
   registryDigest,
   runCommissioning,
+  validateRegistry,
   validateRuntimeReceipt,
 } from './commissioning.mjs';
 
@@ -84,6 +85,19 @@ async function fixtureDirectory() {
   writeFileSync(join(directory, 'fixture.txt'), 'canonical\n');
   return directory;
 }
+
+test('canonical registry validates and keeps COMM-006 fail-closed', () => {
+  const canonicalRegistry = validateRegistry(
+    loadRegistry(canonicalRegistryPath)
+  );
+  const linear = canonicalRegistry.capabilities.find(
+    item => item.id === 'SUMMER-COMM-006'
+  );
+  assert.equal(linear.implementationState, 'already_works');
+  assert.equal(linear.status, 'passing');
+  assert.equal(linear.probe.requiresRuntimeReceipt, true);
+  assert.deepEqual(canonicalRegistry.trustedAttestationKeyFingerprints, []);
+});
 
 test('direct commissioning rejects a noncanonical false-green registry', async t => {
   const repositoryRoot = await fixtureDirectory();

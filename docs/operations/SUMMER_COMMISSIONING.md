@@ -25,7 +25,7 @@ orchestration platform.
 | GBrain/Supabase query | already works | degraded | Read-only Ovie tools exist; live GBrain queries timed out. |
 | Neon/application query | missing | blocked | No least-privilege Summer tool exists. |
 | Stripe/business query | missing | blocked | No read-only Summer business tool or safe fixture exists. |
-| Linear read/update | in flight | blocked | Eve Summer refuses writes; PR #16396 carries durable delivery work. |
+| Linear read/update | already works | passing | Bounded Linear create/update with founder intent and mandatory readback exists in source and unit tests; the signed production-like runtime receipt is still required. |
 | Repo/PR/deploy lookup | in flight | blocked | Shipping-state sources exist but are not in the Summer safe-tool manifest. |
 | Intent → dispatch → observed result | in flight | degraded | One exact packaged source (`b315372…`) claimed/completed a real worker job and persisted the expected reply, but its root PRs are unlanded and it predates this receipt contract. |
 | Execution failure escalation | already works | untested | State and watchdog primitives exist; Summer-owned runtime proof is absent. |
@@ -170,11 +170,25 @@ as UTF-8 JSON with object keys recursively sorted and array order preserved. The
 receipt producer signs those bytes with its Ed25519 private key. The verifier is
 given only the corresponding trusted public key and rejects it unless its
 fingerprint is in `trustedAttestationKeyFingerprints`. The accepted fingerprint
-is recorded in the report. An empty allowlist is intentionally fail-closed.
-`registryDigest` is SHA-256 over the same canonical serialization of
-`registry.json`. The executable valid test fixture and signature generation live
-in `scripts/summer-commissioning/commissioning.test.mjs`; production private key
-material never belongs in this repository.
+is recorded in the report. The committed registry slot stays an empty array:
+that is intentionally fail-closed and does not embed a probe-runner private key
+or a guessed public-key fingerprint. Operators load the probe-runner **public**
+key from the same env/path names as Eve
+`runtime-commissioning-health`:
+
+- `SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY` or
+  `SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH`
+- `RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY` or
+  `RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH`
+
+The harness derives the SHA-256 SPKI fingerprint from that PEM at mint time and
+unions it with the committed allowlist. `--attestation-public-key` still wins
+when both are present. A missing env/path key leaves the allowlist empty, so an
+unlisted CLI key is rejected. Production private key material never belongs in
+this repository. `registryDigest` is SHA-256 over the same canonical
+serialization of `registry.json`. The executable valid test fixture and
+signature generation live in
+`scripts/summer-commissioning/commissioning.test.mjs`.
 
 For the heartbeat probe specifically, a scheduler reporting a completed turn is
 not evidence of liveness when the turn emitted no assistant message, tool
