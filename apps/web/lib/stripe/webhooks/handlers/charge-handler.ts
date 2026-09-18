@@ -280,7 +280,8 @@ export class ChargeHandler implements WebhookHandler {
     if (
       chargeField &&
       typeof chargeField === 'object' &&
-      'invoice' in chargeField
+      'object' in chargeField &&
+      chargeField.object === 'charge'
     ) {
       return chargeField;
     }
@@ -293,16 +294,48 @@ export class ChargeHandler implements WebhookHandler {
     return stripe.charges.retrieve(chargeId);
   }
 
+  /**
+   * Stripe SDK v22 dropped Charge.invoice from the typed surface, but
+   * webhook payloads and PaymentIntents still carry the invoice id.
+   * Read it without inventing a typed field that does not exist.
+   */
   private async resolveInvoice(
     charge: Stripe.Charge
   ): Promise<Stripe.Invoice | null> {
-    const invoiceField = charge.invoice;
+    const fromCharge = await this.coerceInvoice(Reflect.get(charge, 'invoice'));
+    if (fromCharge) {
+      return fromCharge;
+    }
+
+    const paymentIntentId = extractStripeObjectId(charge.payment_intent);
+    if (!paymentIntentId) {
+      return null;
+    }
+
+    const paymentIntent =
+      typeof charge.payment_intent === 'object' && charge.payment_intent
+        ? charge.payment_intent
+        : await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    return this.coerceInvoice(Reflect.get(paymentIntent, 'invoice'));
+  }
+
+  private async coerceInvoice(
+    invoiceField: unknown
+  ): Promise<Stripe.Invoice | null> {
     if (!invoiceField) {
       return null;
     }
 
-    if (typeof invoiceField === 'object' && 'id' in invoiceField) {
-      return invoiceField;
+    if (
+      typeof invoiceField === 'object' &&
+      invoiceField !== null &&
+      'object' in invoiceField &&
+      invoiceField.object === 'invoice' &&
+      'id' in invoiceField &&
+      typeof invoiceField.id === 'string'
+    ) {
+      return invoiceField as Stripe.Invoice;
     }
 
     const invoiceId = extractStripeObjectId(invoiceField);

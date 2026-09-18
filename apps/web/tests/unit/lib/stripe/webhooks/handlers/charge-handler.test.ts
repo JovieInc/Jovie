@@ -13,6 +13,7 @@ const {
   mockStripeSubscriptionsCancel,
   mockStripeInvoicesRetrieve,
   mockStripeChargesRetrieve,
+  mockStripePaymentIntentsRetrieve,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockUpdateUserBillingStatus,
@@ -25,6 +26,7 @@ const {
   mockStripeSubscriptionsCancel: vi.fn(),
   mockStripeInvoicesRetrieve: vi.fn(),
   mockStripeChargesRetrieve: vi.fn(),
+  mockStripePaymentIntentsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
   mockInvalidateBillingCache: vi.fn(),
   mockUpdateUserBillingStatus: vi.fn(),
@@ -57,6 +59,9 @@ vi.mock('@/lib/stripe/client', () => ({
     },
     charges: {
       retrieve: mockStripeChargesRetrieve,
+    },
+    paymentIntents: {
+      retrieve: mockStripePaymentIntentsRetrieve,
     },
   },
 }));
@@ -124,16 +129,20 @@ function activeSubscription(
   } as Stripe.Subscription;
 }
 
-function refundedCharge(overrides: Partial<Stripe.Charge> = {}): Stripe.Charge {
+function refundedCharge(
+  overrides: Partial<Stripe.Charge> & { invoice?: unknown } = {}
+): Stripe.Charge {
   return {
     id: 'ch_123',
+    object: 'charge',
     refunded: true,
     amount: 1999,
     amount_refunded: 1999,
     customer: 'cus_123',
+    payment_intent: 'pi_123',
     invoice: 'in_latest',
     ...overrides,
-  } as Stripe.Charge;
+  } as unknown as Stripe.Charge;
 }
 
 function refundContext(
@@ -195,6 +204,10 @@ describe('@critical ChargeHandler', () => {
     mockStripeInvoicesRetrieve.mockResolvedValue(subscriptionInvoice());
     mockStripeSubscriptionsRetrieve.mockResolvedValue(activeSubscription());
     mockStripeChargesRetrieve.mockResolvedValue(refundedCharge());
+    mockStripePaymentIntentsRetrieve.mockResolvedValue({
+      id: 'pi_123',
+      invoice: 'in_latest',
+    });
     mockCaptureCriticalError.mockResolvedValue(undefined);
   });
 
@@ -264,7 +277,7 @@ describe('@critical ChargeHandler', () => {
 
     it('skips one-time charges that have no invoice', async () => {
       const result = await handler.handle(
-        refundContext(refundedCharge({ invoice: null }))
+        refundContext(refundedCharge({ invoice: null, payment_intent: null }))
       );
 
       expect(result).toEqual({
@@ -406,14 +419,28 @@ describe('@critical ChargeHandler', () => {
       const result = await handler.handle(
         refundContext(
           refundedCharge({
-            invoice:
-              subscriptionInvoice() as unknown as Stripe.Charge['invoice'],
+            invoice: { ...subscriptionInvoice(), object: 'invoice' },
           })
         )
       );
 
       expect(result.success).toBe(true);
       expect(mockStripeInvoicesRetrieve).not.toHaveBeenCalled();
+    });
+
+    it('resolves the invoice from payment_intent when charge.invoice is absent', async () => {
+      const result = await handler.handle(
+        refundContext(
+          refundedCharge({
+            invoice: null,
+            payment_intent: 'pi_123',
+          })
+        )
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockStripePaymentIntentsRetrieve).toHaveBeenCalledWith('pi_123');
+      expect(mockStripeInvoicesRetrieve).toHaveBeenCalledWith('in_latest');
     });
 
     it('skips unhandled event types', async () => {
