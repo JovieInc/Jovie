@@ -143,12 +143,29 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'developer starts from the CLI surface',
     primaryCta: START_CTA,
   },
+  '(marketing)/compare/page.tsx': {
+    routeGlob: '(marketing)/compare/page.tsx',
+    url: APP_ROUTES.COMPARE,
+    job: 'help visitors pick a comparison guide from the footer',
+    proof: 'index of shipped Jovie vs competitor pages',
+    successEvent: 'visitor opens a comparison that matches their current tool',
+    primaryCta: START_CTA,
+  },
   '(marketing)/compare/[slug]/page.tsx': {
     routeGlob: '(marketing)/compare/[slug]/page.tsx',
     url: `${APP_ROUTES.COMPARE}/*`,
     job: 'compare Jovie against a known alternative',
     proof: 'comparison table, FAQ, and fit criteria',
     successEvent: 'visitor chooses whether Jovie fits',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/alternatives/page.tsx': {
+    routeGlob: '(marketing)/alternatives/page.tsx',
+    url: APP_ROUTES.ALTERNATIVES,
+    job: 'help visitors pick an alternatives guide from the footer',
+    proof: 'index of shipped alternative-category pages',
+    successEvent:
+      'visitor opens the alternative guide that matches their stack',
     primaryCta: START_CTA,
   },
   '(marketing)/alternatives/[slug]/page.tsx': {

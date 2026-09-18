@@ -16,7 +16,11 @@ import { describe, expect, it } from 'vitest';
  * not visual, so it is intentionally out of scope.
  */
 
-const sources = ['app/(marketing)/alternatives/[slug]/page.tsx'] as const;
+const sources = [
+  'app/(marketing)/alternatives/page.tsx',
+  'app/(marketing)/alternatives/[slug]/page.tsx',
+  'components/marketing/MarketingCatalogPage.tsx',
+] as const;
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,

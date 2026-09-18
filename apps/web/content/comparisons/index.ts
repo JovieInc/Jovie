@@ -16,3 +16,9 @@ export function getComparison(slug: string): ComparisonData | undefined {
 export function getComparisonSlugs(): string[] {
   return Object.keys(comparisons);
 }
+
+export function getComparisons(): ComparisonData[] {
+  return getComparisonSlugs()
+    .map(slug => comparisons[slug])
+    .filter((comparison): comparison is ComparisonData => comparison != null);
+}

@@ -75,6 +75,14 @@ describe('MarketingFooter', () => {
       'href',
       '/investors'
     );
+    expect(screen.getByRole('link', { name: 'Compare' })).toHaveAttribute(
+      'href',
+      '/compare'
+    );
+    expect(screen.getByRole('link', { name: 'Alternatives' })).toHaveAttribute(
+      'href',
+      '/alternatives'
+    );
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );

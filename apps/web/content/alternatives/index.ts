@@ -20,3 +20,11 @@ export function getAlternative(slug: string): AlternativeData | undefined {
 export function getAlternativeSlugs(): string[] {
   return Object.keys(alternatives);
 }
+
+export function getAlternatives(): AlternativeData[] {
+  return getAlternativeSlugs()
+    .map(slug => alternatives[slug])
+    .filter(
+      (alternative): alternative is AlternativeData => alternative != null
+    );
+}

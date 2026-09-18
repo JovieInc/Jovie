@@ -16,7 +16,11 @@ import { describe, expect, it } from 'vitest';
  * only governs the page's own files.
  */
 
-const sources = ['app/(marketing)/compare/[slug]/page.tsx'] as const;
+const sources = [
+  'app/(marketing)/compare/page.tsx',
+  'app/(marketing)/compare/[slug]/page.tsx',
+  'components/marketing/MarketingCatalogPage.tsx',
+] as const;
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,

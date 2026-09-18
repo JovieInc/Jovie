@@ -621,6 +621,27 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/compare/page.tsx',
+    recipeId: 'comparison',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/compare/page.tsx',
+      'hero',
+      'feature-grid',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'JOV-1650 footer compare index',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/compare',
+    healthCheck: {
+      path: '/compare',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
     renderedSections: approvedBindings(
@@ -639,6 +660,27 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/compare/*',
     healthCheck: {
       path: '/compare/linktree',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/alternatives/page.tsx',
+    recipeId: 'comparison',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/alternatives/page.tsx',
+      'hero',
+      'feature-grid',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'JOV-1650 footer alternatives index',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/alternatives',
+    healthCheck: {
+      path: '/alternatives',
       expected: 'page',
     },
   },

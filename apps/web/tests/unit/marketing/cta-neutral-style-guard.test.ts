@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sourcePaths = {
   alternatives: 'app/(marketing)/alternatives/[slug]/page.tsx',
+  alternativesIndex: 'components/marketing/MarketingCatalogPage.tsx',
   checkout: 'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
   compare: 'components/organisms/ComparisonPageContent.tsx',
 } as const;
@@ -48,6 +49,7 @@ describe('central conversion CTA neutral styling', () => {
   it('keeps static marketing CTAs on neutral primary button tokens', () => {
     for (const sourcePath of [
       sourcePaths.alternatives,
+      sourcePaths.alternativesIndex,
       sourcePaths.compare,
     ] as const) {
       expectCentralCtaUsesNeutralPrimary(sourcePath, readSource(sourcePath));
