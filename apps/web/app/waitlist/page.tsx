@@ -10,6 +10,7 @@ import {
   resolveRequestAuthIdentity,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 function canUseE2ETestAuthFallback(): boolean {
@@ -81,6 +82,20 @@ export default async function WaitlistPage() {
     return (
       <WaitlistRouteWithContract>
         <WaitlistPublicLanding />
+      </WaitlistRouteWithContract>
+    );
+  }
+
+  // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
+  // Canonical WAITLIST_PENDING is enough to render the receipt.
+  const waitlistGateEnabled = await isWaitlistGateEnabled();
+  if (
+    authResult.state === CanonicalUserState.WAITLIST_PENDING &&
+    !waitlistGateEnabled
+  ) {
+    return (
+      <WaitlistRouteWithContract>
+        <WaitlistSuccessView email={authResult.context.email} />
       </WaitlistRouteWithContract>
     );
   }
