@@ -4,15 +4,18 @@ import {
   CANONICAL_CRITICAL_CAPABILITY_COUNT,
   CERTIFICATION_CONTRACT,
   COMMISSIONING_REPORT_SCHEMA,
-  resolveRuntimeHealthStatus,
   RUNTIME_HEALTH_COMMISSIONED,
   RUNTIME_HEALTH_UNCOMMISSIONED,
+  resolveRuntimeHealthStatus,
   SUMMER_COMMISSIONING_ISSUE,
   verifySignedCommissioningReceipt,
 } from '../agent/lib/runtime-commissioning-health';
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
+const publicKeyPem = publicKey.export({
+  type: 'spki',
+  format: 'pem',
+}) as string;
 const publicKeyFingerprint = createHash('sha256')
   .update(publicKey.export({ type: 'spki', format: 'der' }))
   .digest('hex');
@@ -270,7 +273,8 @@ describe('runtime commissioning health', () => {
           SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH: '/tmp/key.pem',
         },
         readFile: path => {
-          if (path === '/tmp/signed-report.json') return JSON.stringify(receipt);
+          if (path === '/tmp/signed-report.json')
+            return JSON.stringify(receipt);
           if (path === '/tmp/key.pem') return publicKeyPem;
           throw new Error(`unexpected path ${path}`);
         },
