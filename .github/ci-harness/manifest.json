@@ -53,7 +53,7 @@
     {
       "id": "post-deploy",
       "name": "Post-deploy Verification",
-      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
+      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
     },
     {
       "id": "scheduled-cleanup",
