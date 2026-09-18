@@ -45,6 +45,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
+    CAPACITY_MAX_TARGET,
     V2_PROOF_SCHEMA,
     assert_repo_sidecar_path,
     fleet_sidecar_path,
@@ -116,6 +117,12 @@ SEVERE_REASONS = {
 }
 DEFAULT_GEM_CONCURRENCY = 4
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
+# JOV-6462 / concurrency-ratchet-v1: after a sticky useful prove at N,
+# raise the approved capacity target to N+1 toward the gate baseline,
+# never past the useful-turn envelope. Remint-from-zero is recovery only.
+CONCURRENCY_RATCHET_SCHEMA = "concurrency-ratchet/v1"
+CONCURRENCY_RATCHET_POLICY = "concurrency-ratchet-v1"
+CAPACITY_ENVELOPE = CAPACITY_MAX_TARGET
 # JOV-5913: production-unbound is a deploy hold only (deploymentsAllowed stays
 # False). Unbound-repair concurrency follows live Grok/Kimi OAuth seats, never
 # Codex account state: an exhausted Codex pool must not serialize the fallback
@@ -2208,6 +2215,168 @@ def _read_persisted_receipt(state_dir: Path) -> dict[str, Any] | None:
     return persisted
 
 
+def ratchet_ceiling(
+    baseline: int = DEFAULT_GEM_CONCURRENCY, envelope: int = CAPACITY_ENVELOPE
+) -> int:
+    """Highest automatic target: gate baseline, never past the proof envelope."""
+    return min(baseline, envelope)
+
+
+def useful_proof_fingerprint(
+    receipt: dict[str, Any] | None,
+) -> frozenset[tuple[str, str]]:
+    """Stable marks for accepted useful-turn rows on a fleet receipt."""
+    if not isinstance(receipt, dict):
+        return frozenset()
+    evidence = (receipt.get("signals") or {}).get("concurrencyEvidence")
+    rows = evidence.get("acceptedEvidence") if isinstance(evidence, dict) else None
+    if not isinstance(rows, list):
+        return frozenset()
+    marks: set[tuple[str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        digest = row.get("outputDigest")
+        completed = row.get("completedAt")
+        if (
+            isinstance(digest, str)
+            and digest
+            and isinstance(completed, str)
+            and completed
+        ):
+            marks.add((digest, completed))
+    return frozenset(marks)
+
+
+def approved_capacity_target(receipt: dict[str, Any] | None) -> int | None:
+    """Persisted approved target, or the live approved seat count."""
+    if not isinstance(receipt, dict):
+        return None
+    gem = (receipt.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict):
+        return None
+    target = gem.get("approvedCapacityTarget")
+    if isinstance(target, bool) or not isinstance(target, int) or target < 1:
+        return approved_dispatch_concurrency(receipt)
+    return target
+
+
+def has_new_sticky_useful_proof(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """True when live accepted proofs are not a subset of the last persist."""
+    live_marks = useful_proof_fingerprint(live)
+    if not live_marks:
+        return False
+    return not live_marks.issubset(useful_proof_fingerprint(persisted))
+
+
+def should_raise_approved_capacity_target(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> int | None:
+    """Return N+1 after a sticky useful prove at approved N, else None.
+
+    Fail closed: never raise while evidenceAccepted=false, maxConcurrent=0,
+    unproven, or remint-from-zero. First persist and same-proof refreshes
+    stay at the current target. Ceiling is min(baseline, envelope).
+    """
+    live_n = approved_dispatch_concurrency(live)
+    if live_n is None or live_n < LOCAL_REMEDIATION_CONCURRENCY_FLOOR:
+        return None
+    if persisted is None:
+        return None
+    if approved_dispatch_concurrency(persisted) is None:
+        return None
+    if _persisted_max_concurrent(persisted) == 0:
+        return None
+    gem = (persisted.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict) or gem.get("evidenceAccepted") is not True:
+        return None
+    if live_persist_rejection_reason(live) is not None:
+        return None
+    current = approved_capacity_target(persisted)
+    if current is None or current < LOCAL_REMEDIATION_CONCURRENCY_FLOOR:
+        return None
+    ceiling = ratchet_ceiling()
+    if current >= ceiling:
+        return None
+    if not has_new_sticky_useful_proof(live, persisted):
+        return None
+    return min(current + 1, ceiling)
+
+
+def apply_approved_capacity_target(
+    receipt: dict[str, Any],
+    target: int,
+    *,
+    apply_seats: bool,
+    raised_from: int | None = None,
+) -> dict[str, Any]:
+    """Stamp the approved target; optionally raise live mutation seats with it."""
+    updated = json.loads(json.dumps(receipt))
+    gem = updated.setdefault("concurrency", {}).setdefault("gem", {})
+    gem["approvedCapacityTarget"] = target
+    ratchet = {
+        "schema": CONCURRENCY_RATCHET_SCHEMA,
+        "policy": CONCURRENCY_RATCHET_POLICY,
+        "ceiling": ratchet_ceiling(),
+    }
+    if raised_from is not None:
+        ratchet["raisedFrom"] = raised_from
+        ratchet["raisedTo"] = target
+    gem["ratchet"] = ratchet
+    if apply_seats:
+        gem["maxConcurrent"] = target
+        remediation = updated.get("remediationAdmission")
+        if isinstance(remediation, dict):
+            remediation["maxConcurrent"] = target
+    return updated
+
+
+def apply_concurrency_ratchet(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> tuple[dict[str, Any], str | None]:
+    """Restore or raise the approved target. Never opens seats while unproven."""
+    ceiling = ratchet_ceiling()
+    persisted_target = approved_capacity_target(persisted)
+    live_n = approved_dispatch_concurrency(live)
+    if live_n is None:
+        if persisted_target is None:
+            return live, None
+        return (
+            apply_approved_capacity_target(
+                live, min(persisted_target, ceiling), apply_seats=False
+            ),
+            None,
+        )
+    raised = should_raise_approved_capacity_target(live, persisted)
+    target = live_n
+    if persisted_target is not None:
+        target = max(target, persisted_target)
+    if raised is not None:
+        target = max(target, raised)
+    target = min(target, ceiling)
+    if raised is not None and target > live_n:
+        return (
+            apply_approved_capacity_target(
+                live, target, apply_seats=True, raised_from=live_n
+            ),
+            (
+                f"fleet gate raised approved capacity target {live_n} -> {target} "
+                f"after sticky useful prove ({CONCURRENCY_RATCHET_POLICY})"
+            ),
+        )
+    if target > live_n:
+        return (
+            apply_approved_capacity_target(live, target, apply_seats=True),
+            (
+                f"fleet gate restored approved capacity target {target} "
+                f"above measured {live_n} ({CONCURRENCY_RATCHET_POLICY})"
+            ),
+        )
+    return apply_approved_capacity_target(live, target, apply_seats=False), None
+
+
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
     """Commit the hold first, then publish latest.json as the commit marker.
 
@@ -2536,6 +2705,12 @@ def persist_live_receipt(
                 f"{seats} from approved capacity evidence",
                 file=sys.stderr,
             )
+        receipt, ratchet_notice = apply_concurrency_ratchet(receipt, persisted)
+        if ratchet_notice:
+            prefix = (
+                "::notice::" if os.environ.get("GITHUB_ACTIONS") == "true" else "INFO:"
+            )
+            print(f"{prefix} {ratchet_notice}", file=sys.stderr)
         write_receipt(receipt, state_dir)
         verify_persisted_receipt(state_dir, receipt)
         return receipt

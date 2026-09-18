@@ -1775,6 +1775,191 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
             self.assertNotEqual(persisted, last_good)
 
 
+class ConcurrencyRatchetTests(unittest.TestCase):
+    """JOV-6462: raise approved capacity N→N+1 after sticky useful prove."""
+
+    def approved_at(
+        self, target: int, observed, *, digest_salt: str = ""
+    ) -> dict[str, object]:
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        evidence = capacity_evidence(target, observed_at)
+        if digest_salt:
+            for index, proof in enumerate(evidence["acceptedEvidence"], start=1):
+                proof["outputDigest"] = hashlib.sha256(
+                    f"{digest_salt}-{index}".encode()
+                ).hexdigest()
+                proof["completedAt"] = observed_at
+        signals["concurrencyEvidence"] = evidence
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        self.assertEqual(MODULE.approved_dispatch_concurrency(receipt), target)
+        return receipt
+
+    def write_latest(self, state_dir: pathlib.Path, receipt: dict[str, object]) -> None:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "latest.json").write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def persistable_max0(self, observed_at: str) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            "schema": MODULE.CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-trust-context-unavailable",
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        receipt["signals"]["concurrencyEvidence"]["reason"] = (
+            "capacity-evidence-trust-context-unavailable"
+        )
+        receipt["concurrency"]["gem"]["reason"] = (
+            "capacity-evidence-trust-context-unavailable"
+        )
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        return receipt
+
+    def test_predicates_raise_only_after_new_sticky_useful_proof(self):
+        now = MODULE.utc_now()
+        proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(
+            1, now - MODULE.timedelta(minutes=1), digest_salt="landed"
+        )
+        same = json.loads(json.dumps(proven))
+        unproven = self.persistable_max0(MODULE.isoformat(now))
+        self.assertEqual(
+            MODULE.should_raise_approved_capacity_target(sticky, proven), 2
+        )
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(same, proven))
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(sticky, None))
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, unproven)
+        )
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(unproven, proven)
+        )
+
+    def test_predicates_never_raise_when_unproven_or_max0(self):
+        now = MODULE.utc_now()
+        proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(1, now, digest_salt="later")
+        unproven = self.persistable_max0(MODULE.isoformat(now))
+        self.assertFalse(unproven["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(unproven["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(unproven, proven)
+        )
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, unproven)
+        )
+        closed = json.loads(json.dumps(sticky))
+        closed["concurrency"]["gem"]["evidenceAccepted"] = False
+        closed["concurrency"]["gem"]["maxConcurrent"] = 0
+        closed["signals"]["concurrencyEvidence"]["accepted"] = False
+        self.assertIsNone(MODULE.approved_dispatch_concurrency(closed))
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(closed, proven))
+
+    def test_predicates_stop_at_baseline_ceiling(self):
+        now = MODULE.utc_now()
+        baseline = self.approved_at(4, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(4, now, digest_salt="still-busy")
+        self.assertEqual(MODULE.ratchet_ceiling(), 4)
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, baseline)
+        )
+
+    def test_persist_raises_target_after_sticky_useful_landing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            MODULE.write_receipt(proven, state_dir)
+            sticky_at = now - MODULE.timedelta(seconds=30)
+            sticky = self.approved_at(1, sticky_at, digest_salt="merged")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(sticky, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(returned, persisted)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 2)
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["approvedCapacityTarget"], 2
+            )
+            self.assertEqual(persisted["remediationAdmission"]["maxConcurrent"], 2)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["ratchet"]["policy"],
+                "concurrency-ratchet-v1",
+            )
+            self.assertIn(
+                "raised approved capacity target 1 -> 2 after sticky useful prove",
+                stderr.getvalue(),
+            )
+
+    def test_persist_does_not_raise_on_same_proofs_or_remint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            self.write_latest(state_dir, proven)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                refreshed = MODULE.persist_live_receipt(
+                    json.loads(json.dumps(proven)), state_dir, now
+                )
+            self.assertEqual(refreshed["concurrency"]["gem"]["maxConcurrent"], 1)
+            self.assertEqual(
+                refreshed["concurrency"]["gem"]["approvedCapacityTarget"], 1
+            )
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
+
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    MODULE.isoformat(now - MODULE.timedelta(minutes=1))
+                ),
+            )
+            live = self.approved_at(1, now, digest_salt="remint-recovery")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                reminted = MODULE.persist_live_receipt(live, state_dir, now)
+            self.assertEqual(reminted["concurrency"]["gem"]["maxConcurrent"], 1)
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
+            self.assertIn("reminted lagging maxConcurrent=0 to 1", stderr.getvalue())
+
+    def test_persist_restores_ratcheted_target_above_measured_proofs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            ratcheted = MODULE.apply_approved_capacity_target(
+                proven, 2, apply_seats=True, raised_from=1
+            )
+            MODULE.write_receipt(ratcheted, state_dir)
+            live = json.loads(json.dumps(proven))
+            live["observedAt"] = MODULE.isoformat(now - MODULE.timedelta(seconds=20))
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(returned, persisted)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 2)
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["approvedCapacityTarget"], 2
+            )
+            self.assertIn("restored approved capacity target 2", stderr.getvalue())
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
+
+
 class DeploymentBindingTests(unittest.TestCase):
     def evaluate(self, signals: dict[str, object]) -> dict[str, object]:
         return MODULE.evaluate(dict(signals), MODULE.isoformat(MODULE.utc_now()))
