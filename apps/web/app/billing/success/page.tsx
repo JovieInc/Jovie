@@ -3,13 +3,16 @@
 import { Button } from '@jovie/ui';
 import {
   BarChart3,
-  Bell,
+  CircleCheck,
+  Eye,
+  Loader2,
   PartyPopper,
+  Radar,
   Rocket,
   ShieldCheck,
-  Sparkles,
-  Upload,
   Workflow,
+  Wrench,
+  XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -17,44 +20,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
-import {
-  getPlanDisplayName,
-  type PlanId,
-  resolveCanonicalPlanId,
-} from '@/lib/entitlements/registry';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { useBillingStatusQuery } from '@/lib/queries';
+import {
+  ARTIST_VISIBILITY_ACTIVATION_COPY,
+  ARTIST_VISIBILITY_ACTIVATION_STEPS,
+  CHECKOUT_PENDING_COPY,
+  CHECKOUT_RECOVERY_COPY,
+  getPaidSuccessPrimaryHref,
+  getPaidSuccessPrimaryLabel,
+  isArtistVisibilityPlan,
+  type PaidPlanId,
+  resolveCanonicalPlan,
+  resolveCheckoutSuccessView,
+  resolvePaidPlan,
+  shouldCelebratePaidSuccess,
+} from './checkout-success-state';
 
-interface UnlockTile {
-  readonly icon: typeof Bell;
-  readonly title: string;
-  readonly description: string;
-}
-
-type PaidPlanId = Exclude<PlanId, 'free'>;
-
-const PRO_UNLOCK_TILES: readonly UnlockTile[] = [
-  {
-    icon: Bell,
-    title: 'Release Notifications',
-    description: 'Reach fans automatically when your next release goes live.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Advanced Analytics',
-    description: 'See 90-day trends, audience demographics, and more.',
-  },
-  {
-    icon: Upload,
-    title: 'Contact Export',
-    description: 'Download your fan list and use it anywhere.',
-  },
-];
-
-const MAX_UNLOCK_TILES: readonly UnlockTile[] = [
+const MAX_UNLOCK_TILES = [
   {
     icon: Workflow,
     title: 'Release Plan Generation',
@@ -70,51 +57,14 @@ const MAX_UNLOCK_TILES: readonly UnlockTile[] = [
     title: 'Unlimited Analytics',
     description: 'No retention cap. Full history across every release.',
   },
-];
+] as const;
 
-const GENERIC_UNLOCK_TILES: readonly UnlockTile[] = [
-  {
-    icon: Sparkles,
-    title: 'Your plan is active',
-    description: 'New capabilities are unlocked and ready to use.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Track what works',
-    description: 'Analytics and audience insights refresh automatically.',
-  },
-  {
-    icon: Upload,
-    title: 'Own your audience',
-    description: 'Contacts, exports, and smart links stay in your control.',
-  },
-];
-
-function resolveCanonicalPlan(
-  billingPlan: string | null | undefined,
-  rawPlanIdParam: string | null,
-  validatedSessionPlan: PaidPlanId | null
-): {
-  readonly canonical: PaidPlanId | null;
-  readonly displayName: string | null;
-} {
-  const fromBilling = resolvePaidPlan(billingPlan ?? null);
-  const fromParam = resolvePaidPlan(rawPlanIdParam);
-  const validatedParam =
-    fromParam &&
-    (fromParam === validatedSessionPlan ||
-      (!validatedSessionPlan && fromParam === fromBilling))
-      ? fromParam
-      : null;
-  const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
-  if (canonicalPlan) {
-    return {
-      canonical: canonicalPlan,
-      displayName: getPlanDisplayName(canonicalPlan),
-    };
-  }
-  return { canonical: null, displayName: null };
-}
+const ARTIST_VISIBILITY_STEP_ICONS = {
+  monitor: Eye,
+  surface: Radar,
+  approve: CircleCheck,
+  fix: Wrench,
+} as const;
 
 async function fetchValidatedSessionPlan(
   sessionId: string,
@@ -129,34 +79,33 @@ async function fetchValidatedSessionPlan(
   return resolvePaidPlan(body.plan ?? null);
 }
 
-function resolveUnlockTiles(
-  canonicalPlan: PaidPlanId | null
-): readonly UnlockTile[] {
-  if (canonicalPlan === 'max') return MAX_UNLOCK_TILES;
-  if (canonicalPlan === 'pro' || canonicalPlan === 'trial')
-    return PRO_UNLOCK_TILES;
-  return GENERIC_UNLOCK_TILES;
-}
-
-function resolvePaidPlan(plan: string | null | undefined): PaidPlanId | null {
-  const canonical = resolveCanonicalPlanId(plan);
-  return canonical && canonical !== 'free' ? canonical : null;
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  status,
+}: {
+  readonly icon: typeof Eye;
+  readonly title: string;
+  readonly description: string;
+  readonly status?: string;
+}) {
+  return (
+    <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
+      <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
+      <p className='text-app font-semibold text-primary-token'>{title}</p>
+      <p className='text-xs leading-5 text-tertiary-token'>{description}</p>
+      {status ? (
+        <p className='text-2xs font-medium text-secondary-token'>{status}</p>
+      ) : null}
+    </ContentSurfaceCard>
+  );
 }
 
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';
   if (state === 'submitting') return 'Sending request...';
   return 'Request Verification';
-}
-
-function FeatureCard({ icon: Icon, title, description }: UnlockTile) {
-  return (
-    <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
-      <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-      <p className='text-app font-semibold text-primary-token'>{title}</p>
-      <p className='text-xs leading-5 text-tertiary-token'>{description}</p>
-    </ContentSurfaceCard>
-  );
 }
 
 export default function CheckoutSuccessPage() {
@@ -167,7 +116,12 @@ export default function CheckoutSuccessPage() {
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
-  const { data: billingData } = useBillingStatusQuery();
+  const {
+    data: billingData,
+    isLoading: isBillingLoading,
+    isFetched: isBillingFetched,
+    error: billingError,
+  } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasHydratedMotion, setHasHydratedMotion] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -178,6 +132,15 @@ export default function CheckoutSuccessPage() {
     useState<PaidPlanId | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
+  const isBillingPending =
+    !checkoutSessionId &&
+    isBillingLoading === true &&
+    billingData === undefined &&
+    isBillingFetched !== true &&
+    billingError == null;
+  const conversionTrackedRef = useRef(false);
+  const onboardingTrackedRef = useRef(false);
+  const celebrationTrackedRef = useRef(false);
 
   useEffect(() => {
     setHasHydratedMotion(true);
@@ -215,32 +178,35 @@ export default function CheckoutSuccessPage() {
     return () => controller.abort();
   }, [checkoutSessionId]);
 
+  const view = useMemo(
+    () =>
+      resolveCheckoutSuccessView({
+        checkoutSessionId,
+        isSessionPlanPending,
+        validatedSessionPlan,
+        billingPlan: billingData?.plan,
+        isBillingPending,
+      }),
+    [
+      billingData?.plan,
+      checkoutSessionId,
+      isBillingPending,
+      isSessionPlanPending,
+      validatedSessionPlan,
+    ]
+  );
+
   const resolvedPlan = useMemo(
     () =>
-      resolveCanonicalPlan(
-        billingData?.plan,
-        rawPlanIdParam,
-        validatedSessionPlan
-      ),
-    [billingData?.plan, rawPlanIdParam, validatedSessionPlan]
+      view.kind === 'success'
+        ? resolveCanonicalPlan(
+            billingData?.plan,
+            rawPlanIdParam,
+            validatedSessionPlan
+          )
+        : { canonical: null, displayName: null },
+    [billingData?.plan, rawPlanIdParam, validatedSessionPlan, view.kind]
   );
-
-  const unlockTiles = useMemo(
-    () => resolveUnlockTiles(resolvedPlan.canonical),
-    [resolvedPlan.canonical]
-  );
-
-  useEffect(() => {
-    track('subscription_success', {
-      flow_type: 'checkout',
-      page: 'success',
-    });
-    page('checkout_success', {
-      page_type: 'billing',
-      section: 'success',
-      conversion: true,
-    });
-  }, []);
 
   useEffect(() => {
     if (!hasHydratedMotion) return;
@@ -255,25 +221,34 @@ export default function CheckoutSuccessPage() {
     return () => cancelAnimationFrame(frame);
   }, [hasHydratedMotion, prefersReducedMotion]);
 
-  const onboardingTrackedRef = useRef(false);
-  const celebrationTrackedRef = useRef(false);
   useEffect(() => {
-    if (!resolvedPlan.canonical) return;
+    if (!shouldCelebratePaidSuccess(view) || conversionTrackedRef.current) {
+      return;
+    }
+    conversionTrackedRef.current = true;
+    track('subscription_success', {
+      flow_type: 'checkout',
+      page: 'success',
+    });
+    page('checkout_success', {
+      page_type: 'billing',
+      section: 'success',
+      conversion: true,
+    });
+  }, [view]);
+
+  useEffect(() => {
+    if (!shouldCelebratePaidSuccess(view)) return;
     if (checkoutSessionId && isSessionPlanPending) return;
     if (!celebrationTrackedRef.current) {
       celebrationTrackedRef.current = true;
-      track('checkout_celebration_shown', { planType: resolvedPlan.canonical });
+      track('checkout_celebration_shown', { planType: view.plan });
     }
     if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
       onboardingTrackedRef.current = true;
-      track('onboarding_upgrade_success', { plan: resolvedPlan.canonical });
+      track('onboarding_upgrade_success', { plan: view.plan });
     }
-  }, [
-    checkoutSessionId,
-    isOnboardingUpgrade,
-    isSessionPlanPending,
-    resolvedPlan.canonical,
-  ]);
+  }, [checkoutSessionId, isOnboardingUpgrade, isSessionPlanPending, view]);
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
@@ -311,13 +286,38 @@ export default function CheckoutSuccessPage() {
     }
   };
 
+  const paidDisplayName =
+    resolvedPlan.displayName ??
+    (view.kind === 'success' ? view.displayName : null);
+  const isArtistVisibilitySuccess =
+    view.kind === 'success' && isArtistVisibilityPlan(view.plan);
   let successTitle: string;
-  if (isOnboardingUpgrade) {
+  if (view.kind !== 'success') {
+    successTitle =
+      view.kind === 'pending'
+        ? CHECKOUT_PENDING_COPY.title
+        : CHECKOUT_RECOVERY_COPY.title;
+  } else if (isOnboardingUpgrade) {
     successTitle = 'Your profile is live and upgraded';
-  } else if (resolvedPlan.displayName) {
-    successTitle = `Welcome to ${resolvedPlan.displayName}!`;
+  } else if (paidDisplayName) {
+    successTitle = `Welcome to ${paidDisplayName}!`;
   } else {
-    successTitle = 'Welcome to your new plan!';
+    successTitle = CHECKOUT_RECOVERY_COPY.title;
+  }
+
+  let successSubtitle: string;
+  if (view.kind === 'pending') {
+    successSubtitle = CHECKOUT_PENDING_COPY.subtitle;
+  } else if (view.kind === 'recovery') {
+    successSubtitle = CHECKOUT_RECOVERY_COPY.subtitle;
+  } else if (isOnboardingUpgrade) {
+    successSubtitle = isArtistVisibilitySuccess
+      ? "You're all set. Artist Visibility is ready to start."
+      : "You're all set. Here's what you just unlocked.";
+  } else if (isArtistVisibilitySuccess) {
+    successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
+  } else {
+    successSubtitle = "Your plan is active. Here's what you just unlocked.";
   }
 
   let contentClassName: string;
@@ -331,9 +331,16 @@ export default function CheckoutSuccessPage() {
       'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-[opacity,transform] duration-cinematic ease-out sm:px-6';
   }
 
-  const successSubtitle = isOnboardingUpgrade
-    ? "You're all set. Here's what you just unlocked."
-    : "Your plan is active. Here's what you just unlocked.";
+  const showConfetti =
+    shouldCelebratePaidSuccess(view) &&
+    !shouldSuppressMotion &&
+    hasHydratedMotion;
+  const viewTestId =
+    view.kind === 'pending'
+      ? 'checkout-success-pending'
+      : view.kind === 'recovery'
+        ? 'checkout-success-recovery'
+        : 'checkout-success-paid';
 
   return (
     <StandaloneProductPage
@@ -342,11 +349,13 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      {!shouldSuppressMotion && hasHydratedMotion ? (
-        <ConfettiOverlay viewport />
-      ) : null}
+      {showConfetti ? <ConfettiOverlay viewport /> : null}
 
-      <ContentSurfaceCard surface='details' className='overflow-hidden'>
+      <ContentSurfaceCard
+        surface='details'
+        className='overflow-hidden'
+        data-testid={viewTestId}
+      >
         <ContentSectionHeader
           density='compact'
           title={successTitle}
@@ -354,56 +363,128 @@ export default function CheckoutSuccessPage() {
         />
 
         <div className={contentClassName}>
-          <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
-            <PartyPopper className='h-8 w-8 text-success' />
+          <div
+            className={
+              view.kind === 'pending'
+                ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-2'
+                : view.kind === 'recovery'
+                  ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--app-shell-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--app-shell-content-surface))]'
+                  : 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'
+            }
+            aria-live={view.kind === 'pending' ? 'polite' : undefined}
+            aria-busy={view.kind === 'pending' ? true : undefined}
+          >
+            {view.kind === 'pending' ? (
+              <Loader2
+                className='h-8 w-8 animate-spin text-secondary-token'
+                aria-hidden='true'
+              />
+            ) : view.kind === 'recovery' ? (
+              <XCircle
+                className='h-8 w-8 text-(--linear-warning)'
+                aria-hidden='true'
+              />
+            ) : (
+              <PartyPopper className='h-8 w-8 text-success' />
+            )}
           </div>
 
-          <div className='grid gap-4 sm:grid-cols-3'>
-            {unlockTiles.map(tile => (
-              <FeatureCard key={tile.title} {...tile} />
-            ))}
-          </div>
+          {view.kind === 'success' && isArtistVisibilitySuccess ? (
+            <div
+              className='space-y-4'
+              data-testid='artist-visibility-activation'
+            >
+              <p className='text-app font-semibold text-primary-token'>
+                {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
+              </p>
+              <div className='grid gap-4 sm:grid-cols-2'>
+                {ARTIST_VISIBILITY_ACTIVATION_STEPS.map(step => (
+                  <FeatureCard
+                    key={step.key}
+                    icon={ARTIST_VISIBILITY_STEP_ICONS[step.key]}
+                    title={step.title}
+                    description={step.description}
+                    status={step.status}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {view.kind === 'success' && !isArtistVisibilitySuccess ? (
+            <div className='grid gap-4 sm:grid-cols-3'>
+              {MAX_UNLOCK_TILES.map(tile => (
+                <FeatureCard key={tile.title} {...tile} />
+              ))}
+            </div>
+          ) : null}
 
           <div className='flex flex-col items-center gap-3'>
-            <Button asChild size='lg'>
-              <Link
-                href={
-                  isOnboardingUpgrade ? APP_ROUTES.DASHBOARD : APP_ROUTES.CHAT
-                }
-              >
-                {isOnboardingUpgrade ? 'Explore your dashboard' : 'Go to chat'}
-              </Link>
-            </Button>
-            {isOnboardingUpgrade ? null : (
-              <Button asChild variant='ghost' size='sm'>
-                <Link href={APP_ROUTES.RELEASES}>View your releases</Link>
-              </Button>
+            {view.kind === 'recovery' ? (
+              <>
+                <UpgradeButton
+                  className='w-full sm:w-auto [&_button]:w-full'
+                  size='lg'
+                >
+                  Retry checkout
+                </UpgradeButton>
+                <Button asChild variant='secondary' size='lg'>
+                  <Link href={APP_ROUTES.SUPPORT}>Contact support</Link>
+                </Button>
+                <Button asChild variant='ghost' size='sm'>
+                  <Link href={APP_ROUTES.HOME}>Go home</Link>
+                </Button>
+              </>
+            ) : view.kind === 'success' ? (
+              <>
+                <Button asChild size='lg'>
+                  <Link
+                    href={getPaidSuccessPrimaryHref({
+                      plan: view.plan,
+                      isOnboardingUpgrade,
+                    })}
+                  >
+                    {getPaidSuccessPrimaryLabel({
+                      plan: view.plan,
+                      isOnboardingUpgrade,
+                    })}
+                  </Link>
+                </Button>
+                {isOnboardingUpgrade || isArtistVisibilitySuccess ? null : (
+                  <Button asChild variant='ghost' size='sm'>
+                    <Link href={APP_ROUTES.RELEASES}>View your releases</Link>
+                  </Button>
+                )}
+                {billingData?.isPro ? (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    onClick={handleRequestVerification}
+                    disabled={
+                      requestState === 'submitting' ||
+                      requestState === 'success'
+                    }
+                  >
+                    <ShieldCheck className='h-4 w-4' aria-hidden='true' />
+                    {getVerificationButtonLabel(requestState)}
+                  </Button>
+                ) : null}
+                {feedback ? (
+                  <output
+                    className='text-app text-secondary-token'
+                    aria-live='polite'
+                    aria-atomic='true'
+                  >
+                    {feedback}
+                  </output>
+                ) : null}
+              </>
+            ) : (
+              <p className='text-app text-secondary-token'>
+                Confirming your checkout session. This usually takes a few
+                seconds.
+              </p>
             )}
-
-            {billingData?.isPro ? (
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={handleRequestVerification}
-                disabled={
-                  requestState === 'submitting' || requestState === 'success'
-                }
-              >
-                <ShieldCheck className='h-4 w-4' aria-hidden='true' />
-                {getVerificationButtonLabel(requestState)}
-              </Button>
-            ) : null}
-
-            {feedback ? (
-              <output
-                className='text-app text-secondary-token'
-                aria-live='polite'
-                aria-atomic='true'
-              >
-                {feedback}
-              </output>
-            ) : null}
           </div>
         </div>
       </ContentSurfaceCard>
