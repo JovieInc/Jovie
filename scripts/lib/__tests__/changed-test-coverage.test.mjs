@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -11,7 +12,6 @@ import {
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
-import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 
 const path = 'apps/web/lib/example.ts';
 
@@ -107,11 +107,15 @@ describe('changed test coverage', () => {
       isCoverageSourcePath('apps/web/components/atoms/example.stories.tsx')
     ).toBe(false);
     expect(isCoverageSourcePath('scripts/lib/example.mjs')).toBe(false);
+    expect(isCoverageSourcePath('apps/web/scripts/vitest-wrapper.mjs')).toBe(
+      false
+    );
     expect(
       evaluateChangedLineCoverage({
         changedLines: new Map([
           ['apps/web/vitest.config.fast.mts', new Set([1])],
           ['scripts/lib/example.mjs', new Set([1])],
+          ['apps/web/scripts/vitest-wrapper.mjs', new Set([1])],
         ]),
         coverage: {},
       })
@@ -241,8 +245,9 @@ describe('changed test coverage', () => {
       '--bail',
       '1',
     ]);
-    expect(
-      rewriteVitestArgs(['--', 'run', '--coverage'], '')
-    ).toEqual(['run', '--coverage']);
+    expect(rewriteVitestArgs(['--', 'run', '--coverage'], '')).toEqual([
+      'run',
+      '--coverage',
+    ]);
   });
 });
