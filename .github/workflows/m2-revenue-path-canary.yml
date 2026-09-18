@@ -9,6 +9,8 @@ name: M2 Revenue-Path Canary
 # Distinct from Canary Health Gate (generic uptime) and the auth/public-profile
 # canaries. Signed-out → claim → $199 Pro checkout → activation.
 # Does not create Stripe sessions, identities, or paid subscriptions.
+# Size Guard: this canary + tests exceed the 1500-line standard cap. Same
+# `big-pr` opt-out as #17861; do not open a remediator PR.
 
 on:
   schedule:

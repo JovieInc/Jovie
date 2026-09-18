@@ -21,6 +21,7 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
     expect(workflow).toContain('# accountable-writer: Gem');
     expect(workflow).toContain('# necessary-trust-boundary:');
     expect(workflow).toContain('# removal-trigger:');
+    expect(workflow).toContain('`big-pr` opt-out as #17861');
     expect(workflow).toContain("- cron: '37 6 * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_call:');
