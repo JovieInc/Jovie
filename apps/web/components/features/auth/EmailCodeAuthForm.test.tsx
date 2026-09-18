@@ -22,8 +22,13 @@ vi.mock('@/lib/auth/client', () => ({
   },
 }));
 
+const authState = vi.hoisted(() => ({
+  isLoaded: true,
+  isSignedIn: false,
+}));
+
 vi.mock('@/hooks/useClerkSafe', () => ({
-  useAuthSafe: () => ({ isLoaded: true, isSignedIn: false }),
+  useAuthSafe: () => authState,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -79,6 +84,8 @@ function expectAuthEntryCta(button: HTMLElement) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authState.isLoaded = true;
+  authState.isSignedIn = false;
   vi.stubGlobal('location', { assign: locationAssign } as unknown as Location);
 });
 
@@ -117,6 +124,19 @@ describe('EmailCodeAuthForm', () => {
       name: /request a new code/i,
     });
     expectAuthEntryCta(lockedButton);
+  });
+
+  it('stays mounted when a session is confirmed — the route guard owns the redirect (JOV-6450)', () => {
+    authState.isSignedIn = true;
+    renderForm();
+
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeEnabled();
+    expect(
+      document.querySelector('[data-auth-email-code-step="email"]')
+    ).toBeTruthy();
+    expect(locationAssign).not.toHaveBeenCalled();
   });
 
   it('stays on the email step and shows an error when send returns an error result', async () => {
