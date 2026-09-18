@@ -84,14 +84,19 @@ function normalizeAlignment(value) {
  * discarded.
  *
  * @param {{
- *   claim: object,
- *   evidence: unknown,
+ *   claim?: object,
+ *   evidence?: unknown,
  *   evaluate?: (input: { claim: object, evidence: unknown, model: string }) =>
- *     | { alignment?: string, certified?: unknown, reason?: string }
+ *     | {
+ *         alignment?: string,
+ *         certified?: unknown,
+ *         reason?: string,
+ *         then?: Function,
+ *       }
  *     | null,
  *   model?: string,
  *   previousShadow?: object | null,
- * }} input
+ * }} [input]
  */
 export function classifyJevShadow({
   claim,
