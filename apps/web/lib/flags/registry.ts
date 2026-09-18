@@ -63,6 +63,7 @@ export const APP_FLAG_REGISTRY = {
   PROFILES_WORKSPACE: buildBooleanFlag('PROFILES_WORKSPACE'),
   PROFILE_SEARCH_MONITORING: buildBooleanFlag('PROFILE_SEARCH_MONITORING'),
   ONBOARDING_WOW_TASK_QUEUE: buildBooleanFlag('ONBOARDING_WOW_TASK_QUEUE'),
+  PAID_WELCOME_EMAIL: buildBooleanFlag('PAID_WELCOME_EMAIL'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

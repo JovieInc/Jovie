@@ -63,6 +63,11 @@ vi.mock('@/lib/referrals/service', () => ({
   expireReferralOnChurn: mockExpireReferralOnChurn,
 }));
 
+vi.mock('@/lib/email/paid-welcome', () => ({
+  enqueuePaidWelcomeAfterEntitlement: vi.fn(),
+  maybeSendPaidWelcomeAfterEntitlement: vi.fn(),
+}));
+
 // Mock heavy dependencies to prevent slow module resolution timeouts
 vi.mock('@/lib/db', () => ({
   db: {
