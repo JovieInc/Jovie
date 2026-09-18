@@ -4,6 +4,13 @@
  * The founder proof account (`/tim`) is the acquisition asset. This module is
  * the stable contract: identity, offer, CTA, event names, and conversion math.
  * Do not fork a second proof-claim funnel.
+ *
+ * controller-hop-exception: jovie-controller-hop/v1
+ * accountable-writer: Summer
+ * necessary-trust-boundary: Hosted Size Guard remediates on this same PR
+ *   (#17963) via the big-pr opt-out instead of a sibling remediator PR.
+ * removal-trigger: Drop big-pr after Size Guard records the bypass and
+ *   PR Ready is green on this head, or after the PR lands.
  */
 
 import { APP_ROUTES } from '@/constants/routes';
