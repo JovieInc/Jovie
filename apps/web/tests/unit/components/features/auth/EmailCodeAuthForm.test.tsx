@@ -108,6 +108,26 @@ describe('EmailCodeAuthForm', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the form interactive on a failed send so recovery is possible', async () => {
+    authState.isSignedIn = false;
+    const user = userEvent.setup();
+    mockSendVerificationOtp.mockRejectedValueOnce({
+      code: 'otp_expired',
+    });
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
+
+    await user.type(screen.getByLabelText('Email'), 'artist@example.com');
+    await user.click(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    );
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeInTheDocument();
+    expect(mockSendVerificationOtp).toHaveBeenCalledTimes(1);
+  });
+
   describe('send-code error mapping (readErrorCode / getSendErrorMessage)', () => {
     it('shows the rate-limit copy for a rate_limit_exceeded send error', async () => {
       const user = userEvent.setup();
