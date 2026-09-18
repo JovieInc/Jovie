@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
@@ -42,8 +42,9 @@ function WaitlistRouteWithContract({
  * states recover to /start chat. They must not render the retired
  * seven-field waitlist questionnaire.
  *
- * WAITLIST_PENDING stays here. A real pending row is the only success
- * condition; missing receipts fail closed without false confirmation.
+ * WAITLIST_PENDING with a durable row renders the receipt. Missing receipts
+ * recover to the public splash-B handoff instead of a dead /waitlist 404
+ * (JOV-6436). Do not invent a confirmation without a pending row.
  *
  * /start is rewrite-exempt for waitlist users, so recovering to /start does
  * not re-enter the JOV-2161 proxy rewrite loop.
@@ -111,5 +112,9 @@ export default async function WaitlistPage() {
     );
   }
 
-  notFound();
+  return (
+    <WaitlistRouteWithContract>
+      <WaitlistPublicLanding />
+    </WaitlistRouteWithContract>
+  );
 }
