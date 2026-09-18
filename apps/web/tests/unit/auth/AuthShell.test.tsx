@@ -337,7 +337,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
   });
 
-  it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
+  it('keeps signed-in visitors on the auth UI until the route guard redirects', async () => {
     authState.isSignedIn = true;
 
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
@@ -345,6 +345,12 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(serverMarkup).toContain('Send sign-in code');
 
     const { container } = render(<AuthShell mode='sign-in' />);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    await waitFor(() => {
+      expect(
+        container.querySelector('[data-auth-shell-ready="true"]')
+      ).not.toBeNull();
+    });
+    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
   });
 });

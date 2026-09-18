@@ -1,12 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useSearchParams } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   AUTH_EMAIL_CHANGE_LABEL,
   AUTH_EMAIL_EMPTY_ERROR,
@@ -126,12 +124,7 @@ export function EmailCodeAuthForm({
   initialEmailAddress,
   onOtpStepChange,
 }: EmailCodeAuthFormProps) {
-  const searchParams = useSearchParams();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
-  // Match SSR on the first client pass. Better Auth can expose a cached
-  // session before hydration, but returning null here would replace the form
-  // that the server rendered and trigger a hydration mismatch.
-  const [hasHydrated, setHasHydrated] = useState(false);
   const [step, setStep] = useState<EmailCodeStep>('email');
   const [emailAddress, setEmailAddress] = useState(initialEmailAddress ?? '');
   const [code, setCode] = useState('');
@@ -139,15 +132,6 @@ export function EmailCodeAuthForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const _redirectSignedInVisitor = useCallback(() => {
-    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
-    globalThis.location?.assign(destination);
-  }, [searchParams]);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
 
   // Notify the parent when the OTP code-entry/lockout step is active so One
   // Tap can be suppressed (plan design row 20). `'email'` = inactive; `'code'`
@@ -319,10 +303,6 @@ export function EmailCodeAuthForm({
       cooldownTimerRef.current = null;
     }
   }, []);
-
-  if (hasHydrated && isAuthLoaded && isSignedIn) {
-    return null;
-  }
 
   if (step === 'locked') {
     return (

@@ -6,8 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   AUTH_TROUBLE_SIGNING_IN_LABEL,
   type AuthShellBackLink,
@@ -143,11 +141,9 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     back: backProp,
   } = props;
   const searchParams = useSearchParams();
-  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
-  // `useAuthSafe` can resolve a cached Better Auth session synchronously in
-  // the browser while SSR has no session. Keep the first client render equal
-  // to the server tree, then let the route-level entry guard own the signed-in
-  // redirect after hydration.
+  // Route-level entry guards own signed-in redirects. This shell stays mounted
+  // after hydration so a cached/stale session cannot blank the auth UI
+  // (JOV-6450).
   const [hasHydrated, setHasHydrated] = useState(false);
   const [pendingProvider, setPendingProvider] =
     useState<PrimaryAuthOAuthProvider | null>(null);
@@ -197,11 +193,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     globalThis.addEventListener('pageshow', restoreAuthActions);
     return () => globalThis.removeEventListener('pageshow', restoreAuthActions);
   }, []);
-
-  const _redirectSignedInVisitor = useCallback(() => {
-    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
-    globalThis.location?.assign(destination);
-  }, [searchParams]);
 
   const handleProviderSelect = useCallback(
     async (provider: PrimaryAuthOAuthProvider) => {
@@ -260,10 +251,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     },
     [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
   );
-
-  if (hasHydrated && isAuthLoaded && isSignedIn) {
-    return null;
-  }
 
   const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
 

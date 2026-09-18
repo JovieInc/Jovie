@@ -78,7 +78,7 @@ describe('EmailCodeAuthForm', () => {
     authState.isSignedIn = false;
   });
 
-  it('keeps signed-in initial markup deterministic, then hides after hydration', async () => {
+  it('keeps the email form visible for signed-in visitors so auth entry cannot blank', async () => {
     authState.isSignedIn = true;
 
     const serverMarkup = renderToStaticMarkup(
@@ -86,10 +86,11 @@ describe('EmailCodeAuthForm', () => {
     );
     expect(serverMarkup).toContain('Email');
 
-    const { container } = render(
-      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
-    );
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeInTheDocument();
   });
 
   describe('send-code error mapping (readErrorCode / getSendErrorMessage)', () => {

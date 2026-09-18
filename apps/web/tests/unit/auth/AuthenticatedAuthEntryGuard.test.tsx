@@ -50,20 +50,21 @@ describe('AuthenticatedAuthEntryGuard', () => {
     });
   });
 
-  it('redirects authenticated Clerk users before rendering auth flows', async () => {
+  it('redirects authenticated users without blanking the auth form', async () => {
     authState.isSignedIn = true;
 
-    const { queryByText } = render(
+    const { getByText } = render(
       <AuthenticatedAuthEntryGuard>
         <div>Sign-in form</div>
       </AuthenticatedAuthEntryGuard>
     );
 
-    expect(queryByText('Sign-in form')).not.toBeInTheDocument();
+    expect(getByText('Sign-in form')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
     });
+    expect(getByText('Sign-in form')).toBeInTheDocument();
   });
 
   it('sends authenticated native handoffs to /auth/callback instead of the dashboard', async () => {
@@ -99,18 +100,18 @@ describe('AuthenticatedAuthEntryGuard', () => {
     });
   });
 
-  it('waits for Clerk when only the activity cookie is present', async () => {
+  it('keeps the auth form visible while a leftover cookie waits for session load', async () => {
     document.cookie = '__client_uat=1700000000';
     authState.isLoaded = false;
     authState.isSignedIn = false;
 
-    const { queryByText } = render(
+    const { getByText } = render(
       <AuthenticatedAuthEntryGuard>
         <div>Sign-in form</div>
       </AuthenticatedAuthEntryGuard>
     );
 
-    expect(queryByText('Sign-in form')).not.toBeInTheDocument();
+    expect(getByText('Sign-in form')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(replaceMock).not.toHaveBeenCalled();

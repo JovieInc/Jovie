@@ -68,4 +68,67 @@ describe('auth shell contract guard', () => {
     expect(modal).toContain('<AuthModalShell');
     expect(modal).not.toContain('<AuthLayout');
   });
+
+  it('keeps signup auth entry on the same signed-in gates as signin (JOV-6450)', () => {
+    const signupPage = readFileSync(
+      join(process.cwd(), 'app', '(auth)', 'signup', 'page.tsx'),
+      'utf8'
+    );
+    const signupClient = readFileSync(
+      join(
+        process.cwd(),
+        'app',
+        '(auth)',
+        'signup',
+        'SignUpPageClient.tsx'
+      ),
+      'utf8'
+    );
+    const signupModalPage = readFileSync(
+      join(process.cwd(), 'app', '@auth', '(.)signup', 'page.tsx'),
+      'utf8'
+    );
+    const signupModalClient = readFileSync(
+      join(
+        process.cwd(),
+        'app',
+        '@auth',
+        '(.)signup',
+        'SignupModalClient.tsx'
+      ),
+      'utf8'
+    );
+    const authShell = readFileSync(
+      join(
+        process.cwd(),
+        'components',
+        'features',
+        'auth',
+        'AuthShell.tsx'
+      ),
+      'utf8'
+    );
+    const entryGuard = readFileSync(
+      join(
+        process.cwd(),
+        'components',
+        'features',
+        'auth',
+        'AuthenticatedAuthEntryGuard.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(signupPage).toContain('resolveUserState');
+    expect(signupPage).toContain('getAuthenticatedAuthRouteRedirect');
+    expect(signupClient).toContain('<AuthenticatedAuthEntryGuard>');
+    expect(signupModalPage).toContain('resolveUserState');
+    expect(signupModalPage).toContain('<AuthFormSkeleton');
+    expect(signupModalClient).toContain('<AuthenticatedAuthEntryGuard>');
+    expect(authShell).not.toContain(
+      'if (hasHydrated && isAuthLoaded && isSignedIn)'
+    );
+    expect(entryGuard).not.toContain('isRedirecting');
+    expect(entryGuard).toContain('return children;');
+  });
 });
