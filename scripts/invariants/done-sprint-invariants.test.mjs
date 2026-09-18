@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +37,14 @@ describe('JOV-INV-033 done sprint invariants', () => {
 
   it('accepts the checked-in pricing and directory sources', () => {
     assert.deepEqual(scanDoneSprintSources(), []);
+  });
+
+  it('keeps deliberate-red fixtures outside Biome', () => {
+    const biome = readFileSync(path.join(HERE, '../../biome.json'), 'utf8');
+    assert.match(
+      biome,
+      /"\!scripts\/invariants\/fixtures\/done-sprint-invariants\/\*\*"/
+    );
   });
 
   it('deliberate red: rejects a Max self-serve pricing regression', () => {
