@@ -14,6 +14,11 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  PROOF_CLAIM_CAMPAIGN_KEY,
+  PROOF_CLAIM_FUNNEL_EVENTS,
+  proofClaimAttribution,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
 
@@ -443,6 +448,35 @@ export async function attributeLeadPaidConversionByAppUserId(
     },
     { idempotent: true, required: true }
   );
+
+  const [proofAttributed] = await db
+    .select({ id: leadFunnelEvents.id })
+    .from(leadFunnelEvents)
+    .where(
+      and(
+        eq(leadFunnelEvents.leadId, lead.id),
+        eq(leadFunnelEvents.campaignKey, PROOF_CLAIM_CAMPAIGN_KEY)
+      )
+    )
+    .limit(1);
+
+  if (proofAttributed) {
+    const proofAttribution = proofClaimAttribution();
+    await recordLeadFunnelEvent(
+      {
+        leadId: lead.id,
+        eventType: PROOF_CLAIM_FUNNEL_EVENTS.ACTIVATION,
+        campaignKey: proofAttribution.campaignKey,
+        variantKey: proofAttribution.variantKey,
+        metadata: {
+          signupUserId: appUserId,
+          stripeSubscriptionId: subscriptionId,
+          experimentId: proofAttribution.experimentId,
+        },
+      },
+      { idempotent: true, required: true }
+    );
+  }
 }
 
 export async function countLeadEventsSince(

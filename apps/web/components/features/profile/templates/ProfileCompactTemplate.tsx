@@ -125,6 +125,8 @@ interface ProfileCompactTemplateProps {
   /** Desktop spare-space claim footer (JOV-3544). */
   readonly showClaimFooter?: boolean;
   readonly claimFooterHref?: string | null;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
   /** True when this template is embedded in another page (marketing/demo
    *  preview) rather than serving as the outer profile document. Forwarded
    *  to the layout shell so the global viewport scroll lock skips embedded
@@ -274,6 +276,8 @@ export function ProfileCompactTemplate({
   visualVariant = 'default',
   showClaimFooter = false,
   claimFooterHref = null,
+  claimFooterLabel,
+  proofClaim = false,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
@@ -867,6 +871,8 @@ export function ProfileCompactTemplate({
         profileAccentStyle={profileAccentStyle}
         showClaimFooter={showClaimFooter}
         claimFooterHref={claimFooterHref}
+        claimFooterLabel={claimFooterLabel}
+        proofClaim={proofClaim}
         embedded={embeddedPreview}
         previewExitHref={profileHref}
         compactSurface={

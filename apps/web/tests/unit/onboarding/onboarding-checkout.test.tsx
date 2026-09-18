@@ -111,6 +111,7 @@ describe('OnboardingCheckoutClient', () => {
     vi.clearAllMocks();
     fetchMock.mockReset();
     hrefState.current = 'http://localhost/onboarding/checkout';
+    window.sessionStorage.clear();
     vi.stubGlobal('fetch', fetchMock);
     Object.defineProperty(globalThis, 'location', {
       configurable: true,
@@ -256,5 +257,27 @@ describe('OnboardingCheckoutClient', () => {
       })
     );
     expect(hrefState.current).toBe('/app/chat?from=onboarding&panel=profile');
+  });
+
+  it('emits proof-to-claim checkout when session attribution is present', () => {
+    window.sessionStorage.setItem('jovie_proof_claim', '1');
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+
+    expect(trackMock).toHaveBeenCalledWith(
+      'checkout',
+      expect.objectContaining({
+        campaignKey: 'proof-to-claim',
+        plan: 'pro',
+        source: 'onboarding_checkout',
+      })
+    );
+  });
+
+  it('does not emit proof-to-claim checkout without attribution', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+    expect(trackMock).not.toHaveBeenCalledWith(
+      'checkout',
+      expect.anything()
+    );
   });
 });

@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
+import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import { normalizePlatformKey } from '@/lib/dsp-registry';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { publicLinkAriaLabel } from '@/lib/utils/public-url';
@@ -11,11 +12,19 @@ import { EntityMentionText } from './EntityMentionText';
 interface ProfileAeoContentProps {
   readonly content: ProfileAeoContentModel;
   readonly claimHref?: string;
+  readonly claimLabel?: string;
+  readonly claimNote?: string;
+  readonly claimAriaLabel?: string;
+  readonly proofClaim?: boolean;
 }
 
 export function ProfileAeoContent({
   content,
   claimHref,
+  claimLabel = 'Claim artist profile',
+  claimNote = 'Free · Claim with Spotify',
+  claimAriaLabel,
+  proofClaim = false,
 }: ProfileAeoContentProps) {
   return (
     <section
@@ -184,18 +193,37 @@ export function ProfileAeoContent({
 
               <div className='flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between'>
                 <p className='profile-aeo-claim-card__note text-xs font-medium'>
-                  Free · Claim with Spotify
+                  {claimNote}
                 </p>
-                <Link
-                  href={claimHref}
-                  prefetch={false}
-                  className='profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-6 text-sm font-semibold transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-claim-ink) focus-visible:ring-offset-2'
-                  aria-label={`Claim the ${content.artistName} profile and sign up for Jovie`}
-                  data-testid='profile-aeo-claim-cta'
-                >
-                  Claim artist profile
-                  <ArrowRight className='size-4' aria-hidden='true' />
-                </Link>
+                {proofClaim ? (
+                  <ProofClaimCtaLink
+                    href={claimHref}
+                    label={claimLabel}
+                    ariaLabel={
+                      claimAriaLabel ??
+                      `${claimLabel} — get your Jovie from the ${content.artistName} profile`
+                    }
+                    testId='profile-aeo-claim-cta'
+                    className='profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-6 text-sm font-semibold transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-claim-ink) focus-visible:ring-offset-2'
+                  >
+                    {claimLabel}
+                    <ArrowRight className='size-4' aria-hidden='true' />
+                  </ProofClaimCtaLink>
+                ) : (
+                  <Link
+                    href={claimHref}
+                    prefetch={false}
+                    className='profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-6 text-sm font-semibold transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-claim-ink) focus-visible:ring-offset-2'
+                    aria-label={
+                      claimAriaLabel ??
+                      `Claim the ${content.artistName} profile and sign up for Jovie`
+                    }
+                    data-testid='profile-aeo-claim-cta'
+                  >
+                    {claimLabel}
+                    <ArrowRight className='size-4' aria-hidden='true' />
+                  </Link>
+                )}
               </div>
             </div>
           </aside>

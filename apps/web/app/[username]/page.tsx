@@ -17,6 +17,10 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import {
+  isProofProfileHandle,
+  resolveProofClaimCta,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,
@@ -301,6 +305,8 @@ async function ArtistPageContent({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
   const isClaimed = creatorClerkId !== null;
+  const isProofProfile = isProofProfileHandle(artist.handle);
+  const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
   // Structured-credit profiles still expose a claim path when an exact
@@ -510,8 +516,16 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!isClaimed && directClaimSupported}
-        claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
+        showClaimFooter={
+          (!isClaimed && directClaimSupported) || isProofProfile
+        }
+        claimFooterHref={
+          isProofProfile
+            ? proofClaim.href
+            : `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+        }
+        claimFooterLabel={isProofProfile ? proofClaim.label : undefined}
+        proofClaim={isProofProfile}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
@@ -523,10 +537,15 @@ async function ArtistPageContent({
       <ProfileAeoContent
         content={aeoContent}
         claimHref={
-          !isClaimed && directClaimSupported
-            ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
-            : undefined
+          isProofProfile
+            ? proofClaim.href
+            : !isClaimed && directClaimSupported
+              ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+              : undefined
         }
+        claimLabel={isProofProfile ? proofClaim.label : undefined}
+        claimNote={isProofProfile ? proofClaim.note : undefined}
+        proofClaim={isProofProfile}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />

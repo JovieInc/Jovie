@@ -56,6 +56,8 @@ export interface StaticArtistPageProps {
   readonly hideMoreMenu?: boolean;
   readonly showClaimFooter?: boolean;
   readonly claimFooterHref?: string | null;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
 }
 
 export function StaticArtistPage({
@@ -94,6 +96,8 @@ export function StaticArtistPage({
   hideMoreMenu = false,
   showClaimFooter = false,
   claimFooterHref = null,
+  claimFooterLabel,
+  proofClaim = false,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -160,6 +164,8 @@ export function StaticArtistPage({
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
+      claimFooterLabel={claimFooterLabel}
+      proofClaim={proofClaim}
       embeddedPreview={presentation === 'compact-preview'}
     />
   );

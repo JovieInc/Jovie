@@ -295,4 +295,22 @@ describe('ProfileViewTracker', () => {
       source: 'qr-code',
     });
   });
+
+  it('emits proof_viewed for the M1 proof profile', () => {
+    renderWithQueryClient(
+      <ProfileViewTracker handle='tim' artistId='artist-tim' />
+    );
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'proof_viewed',
+      expect.objectContaining({
+        campaignKey: 'proof-to-claim',
+        profile_handle: 'tim',
+      })
+    );
+    expect(mockSendBeacon).toHaveBeenCalledWith(
+      '/api/acquisition/proof-claim',
+      expect.any(Blob)
+    );
+  });
 });
