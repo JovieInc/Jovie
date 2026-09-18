@@ -1,6 +1,6 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
-  "registryVersion": "2026-09-02.1",
+  "registryVersion": "2026-09-18.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
@@ -245,8 +245,8 @@
         "apps/web/lib/ovie/linear-coordination.ts",
         "apps/web/lib/ovie/mcp/tools.ts"
       ],
-      "implementationState": "implemented",
-      "status": "certified_local",
+      "implementationState": "already_works",
+      "status": "passing",
       "critical": true,
       "evidence": [
         {
@@ -281,7 +281,7 @@
         "version": "1.1.0",
         "fixture": "linear-explicit-update-reversible-fixture/v1",
         "expectedState": "durable_linear_readback_observed",
-        "requiresRuntimeReceipt": false,
+        "requiresRuntimeReceipt": true,
         "sourceAssertions": [
           {
             "kind": "file_contains",
