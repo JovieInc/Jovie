@@ -3,12 +3,14 @@ import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
   mockGetWaitlistAccess,
+  mockIsWaitlistGateEnabled,
   mockNotFound,
   mockRedirect,
   mockResolveRequestAuthIdentity,
   mockResolveUserState,
 } = vi.hoisted(() => ({
   mockGetWaitlistAccess: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn(),
   mockNotFound: vi.fn(),
   mockRedirect: vi.fn(),
   mockResolveRequestAuthIdentity: vi.fn(),
@@ -33,9 +35,15 @@ vi.mock('@/lib/auth/gate', () => ({
   resolveUserState: mockResolveUserState,
 }));
 
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
+}));
+
 describe('WaitlistPage', () => {
   beforeEach(() => {
     mockGetWaitlistAccess.mockReset();
+    mockIsWaitlistGateEnabled.mockReset();
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
     mockNotFound.mockClear();
     mockRedirect.mockClear();
     mockResolveRequestAuthIdentity.mockReset();
@@ -63,24 +71,24 @@ describe('WaitlistPage', () => {
       state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
       expectedRedirect: '/start',
     },
-  ])('server-side redirects $state users to $expectedRedirect', async ({
-    state,
-    expectedRedirect,
-  }) => {
-    mockRedirect.mockClear();
-    mockNotFound.mockClear();
-    mockResolveUserState.mockResolvedValue({
-      state,
-      context: { email: 'artist@example.com' },
-    });
+  ])(
+    'server-side redirects $state users to $expectedRedirect',
+    async ({ state, expectedRedirect }) => {
+      mockRedirect.mockClear();
+      mockNotFound.mockClear();
+      mockResolveUserState.mockResolvedValue({
+        state,
+        context: { email: 'artist@example.com' },
+      });
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+      const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
-    await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
-    expect(mockRedirect).toHaveBeenCalledTimes(1);
-    expect(mockRedirect).toHaveBeenCalledWith(expectedRedirect);
-    expect(mockNotFound).not.toHaveBeenCalled();
-  });
+      await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith(expectedRedirect);
+      expect(mockNotFound).not.toHaveBeenCalled();
+    }
+  );
 
   test('renders the public waitlist entry for signed-out visitors', async () => {
     mockRedirect.mockClear();
@@ -130,6 +138,31 @@ describe('WaitlistPage', () => {
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
+  test('renders the waitlist receipt without reading waitlist when the gate is off (JOV-6449)', async () => {
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.WAITLIST_PENDING,
+      context: { email: 'artist@example.com' },
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(false);
+    mockGetWaitlistAccess.mockRejectedValue(
+      new Error('waitlist table unavailable')
+    );
+
+    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+    const { WaitlistSuccessView } = await import(
+      '@/components/features/waitlist/WaitlistSuccessView'
+    );
+
+    const result = await WaitlistPage();
+
+    expect(mockIsWaitlistGateEnabled).toHaveBeenCalledOnce();
+    expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(mockNotFound).not.toHaveBeenCalled();
+    expect(result.type.name).toBe('WaitlistRouteWithContract');
+    expect(result.props.children.type).toBe(WaitlistSuccessView);
+  });
+
   test('renders the waitlist confirmation view without redirecting for WAITLIST_PENDING', async () => {
     mockRedirect.mockClear();
     mockNotFound.mockClear();
@@ -167,26 +200,29 @@ describe('WaitlistPage', () => {
     CanonicalUserState.WAITLIST_PENDING,
     CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
     CanonicalUserState.NEEDS_DB_USER,
-  ])('never renders saved confirmation for %s without a durable pending entry', async state => {
-    mockRedirect.mockClear();
-    mockNotFound.mockClear();
-    mockResolveUserState.mockResolvedValue({
-      state,
-      context: { email: 'artist@example.com' },
-    });
-    mockGetWaitlistAccess.mockResolvedValue({ entryId: null, status: null });
+  ])(
+    'never renders saved confirmation for %s without a durable pending entry',
+    async state => {
+      mockRedirect.mockClear();
+      mockNotFound.mockClear();
+      mockResolveUserState.mockResolvedValue({
+        state,
+        context: { email: 'artist@example.com' },
+      });
+      mockGetWaitlistAccess.mockResolvedValue({ entryId: null, status: null });
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+      const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
-    if (state === CanonicalUserState.WAITLIST_PENDING) {
-      await expect(WaitlistPage()).rejects.toThrow('NEXT_NOT_FOUND');
-      expect(mockRedirect).not.toHaveBeenCalled();
-      expect(mockNotFound).toHaveBeenCalledTimes(1);
-      return;
+      if (state === CanonicalUserState.WAITLIST_PENDING) {
+        await expect(WaitlistPage()).rejects.toThrow('NEXT_NOT_FOUND');
+        expect(mockRedirect).not.toHaveBeenCalled();
+        expect(mockNotFound).toHaveBeenCalledTimes(1);
+        return;
+      }
+
+      await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirect).toHaveBeenCalledWith('/start');
+      expect(mockNotFound).not.toHaveBeenCalled();
     }
-
-    await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
-    expect(mockRedirect).toHaveBeenCalledWith('/start');
-    expect(mockNotFound).not.toHaveBeenCalled();
-  });
+  );
 });

@@ -426,8 +426,10 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     assert "is-enabled --quiet gem-disk-reclaim.timer" in activation
     assert "is-active --quiet gem-disk-reclaim.timer" in activation
     assert "$HOME/.local/bin/gem-disk-reclaim" in activation
+    assert "reset-failed gem-disk-reclaim.service" in activation
     installer = INSTALLER.read_text()
     assert "enable --now gem-disk-reclaim.timer" in installer
+    assert "reset-failed gem-disk-reclaim.service" in installer
     assert "restart symphony-ui-pilot.service" not in installer
 
 def test_disk_reclaim_systemd_unit_is_bounded_and_source_owned() -> None:
@@ -949,6 +951,7 @@ def test_installer_enables_reconciler_timer_without_restarting_main_service(
     commands = log.read_text().splitlines()
     assert "command=--user daemon-reload" in commands
     assert "command=--user enable --now symphony-reconciler.timer" in commands
+    assert "command=--user reset-failed gem-disk-reclaim.service" in commands
     assert "command=--user enable --now gem-disk-reclaim.timer" in commands
     assert all("symphony-ui-pilot.service" not in line for line in commands)
     assert "TIMER_ENABLED symphony-reconciler.timer" in result.stdout
