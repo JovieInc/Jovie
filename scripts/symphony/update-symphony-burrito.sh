@@ -7,10 +7,41 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET_HOME="${SYMPHONY_ELIXIR_HOME:-${SYMPHONY_BURRITO_HOME:-$HOME}}"
-SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"
+# JOV-5822: v0.0.2-jovie.2 still POSTs SymphonyLinearIssuesById($projectSlug: String!)
+# while official WORKFLOW has only team_key. Linear returns HTTP 400
+# (issue_state_refresh_failed / running=0). JovieInc/symphony#10
+# (dae31f823850) adds SymphonyLinearTeamIssuesById + Adapter.scope_for.
+# GitHub release tag is symphony-build-<sha>; binary infix is the sha.
+# Semver overrides (v0.0.2-jovie.2) keep tag == version.
+SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"
 ASSET_NAME_NEEDLE="${SYMPHONY_ASSET_NEEDLE:-linux_x86_64}"
-RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_VERSION}}"
-BIN_NAME="symphony-${SYMPHONY_VERSION}-${ASSET_NAME_NEEDLE}"
+
+symphony_release_tag() {
+  local version="$1"
+  case "$version" in
+    symphony-build-*) printf '%s' "$version" ;;
+    v*) printf '%s' "$version" ;;
+    *)
+      if [[ "$version" =~ ^[0-9a-f]{40}$ ]]; then
+        printf 'symphony-build-%s' "$version"
+      else
+        printf '%s' "$version"
+      fi
+      ;;
+  esac
+}
+
+symphony_bin_infix() {
+  local version="$1"
+  case "$version" in
+    symphony-build-*) printf '%s' "${version#symphony-build-}" ;;
+    *) printf '%s' "$version" ;;
+  esac
+}
+
+SYMPHONY_RELEASE_TAG="${SYMPHONY_RELEASE_TAG:-$(symphony_release_tag "$SYMPHONY_VERSION")}"
+RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_RELEASE_TAG}}"
+BIN_NAME="symphony-$(symphony_bin_infix "$SYMPHONY_VERSION")-${ASSET_NAME_NEEDLE}"
 SUM_NAME="${BIN_NAME}.sha256"
 BIN_DST="${TARGET_HOME}/.local/bin/symphony"
 SERVICE_NAME="${SYMPHONY_SERVICE_NAME:-symphony-elixir.service}"
@@ -443,6 +474,7 @@ SUM_URL="${RELEASE_URL}/${SUM_NAME}"
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "DRY_RUN official OpenAI Symphony"
   echo "RELEASE ${SYMPHONY_VERSION}"
+  echo "RELEASE_TAG ${SYMPHONY_RELEASE_TAG}"
   echo "ASSET ${BIN_NAME}"
   echo "SHA256 ${SUM_NAME}"
   echo "DRY_RUN $BIN_URL"
@@ -492,6 +524,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
 fi
 
 echo "RELEASE ${SYMPHONY_VERSION}"
+echo "RELEASE_TAG ${SYMPHONY_RELEASE_TAG}"
 echo "ASSET ${BIN_NAME}"
 echo "SHA256 ${SUM_NAME}"
 
