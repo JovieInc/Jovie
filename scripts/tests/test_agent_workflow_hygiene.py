@@ -806,6 +806,8 @@ def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
         encoding="utf-8"
     )
+    assert "controller-hop-exception: jovie-controller-hop/v1" in auto_ready
+    assert "accountable-writer: Gem" in auto_ready
     assert "workflow_dispatch:" in auto_ready
     assert "workflow_run:" in auto_ready
     assert "pull_request:" not in auto_ready

@@ -199,6 +199,16 @@ describe('green-source controller contract', () => {
     );
   });
 
+  it('declares the JOV-INV-022 hop exception for the restored CI wakes', () => {
+    expect(workflow).toContain(
+      '# controller-hop-exception: jovie-controller-hop/v1'
+    );
+    expect(workflow).toContain('# accountable-writer: Gem');
+    expect(workflow).toContain('# necessary-trust-boundary:');
+    expect(workflow).toContain('# removal-trigger:');
+    expect(workflow).toContain('never enables auto-merge or enrolls the merge queue');
+  });
+
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_run:');

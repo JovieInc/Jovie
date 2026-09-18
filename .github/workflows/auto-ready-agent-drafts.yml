@@ -1,4 +1,8 @@
 name: Auto-Ready Agent Drafts
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Hosted GitHub App token undrafts same-repo green-source drafts after PR Ready and required checks succeed CLEAN; this hop never enables auto-merge or enrolls the merge queue.
+# removal-trigger: Remove the workflow_run and check_suite wakes when GitHub natively undrafts same-repo drafts that already satisfy required SUCCESS and CLEAN without a hosted App-token hop.
 
 # Two controllers share this workflow:
 #
