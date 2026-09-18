@@ -214,9 +214,9 @@ describe('WaitlistPage', () => {
       const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
       if (state === CanonicalUserState.WAITLIST_PENDING) {
-        await expect(WaitlistPage()).rejects.toThrow('NEXT_NOT_FOUND');
-        expect(mockRedirect).not.toHaveBeenCalled();
-        expect(mockNotFound).toHaveBeenCalledTimes(1);
+        await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
+        expect(mockRedirect).toHaveBeenCalledWith('/signup');
+        expect(mockNotFound).not.toHaveBeenCalled();
         return;
       }
 
