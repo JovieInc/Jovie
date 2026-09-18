@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly SYMPHONY_VERSION="v0.0.2-jovie.2"
+# JOV-5822: team-scoped Linear intake (JovieInc/symphony#10).
+readonly SYMPHONY_VERSION="dae31f823850c9ef2dea121433e5b60f09af26fa"
+readonly SYMPHONY_RELEASE_TAG="symphony-build-${SYMPHONY_VERSION}"
 readonly SYMPHONY_ASSET="symphony-${SYMPHONY_VERSION}-macos_arm64"
-readonly SYMPHONY_RELEASE_URL="https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_VERSION}"
+readonly SYMPHONY_RELEASE_URL="https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_RELEASE_TAG}"
 readonly SYMPHONY_INSTALL_DIR="${1:-$HOME/.local/bin}"
 
 if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then

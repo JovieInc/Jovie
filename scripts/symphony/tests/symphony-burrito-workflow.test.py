@@ -1847,6 +1847,160 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "linear_api_status=200 issue_identifier=JOV-4195", now=now
             )
         )
+        # JOV-5822: query-class refresh 400 is not a per-issue dead-letter.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "event=issue_state_refresh_failed linear_api_status=400 "
+                "issue_identifier=JOV-4195 attempt=3 running=0",
+                now=now,
+            )
+        )
+
+    def test_issue_state_refresh_failed_storm_never_dead_letters(self):
+        helper = _load_helper()
+        lines = "".join(
+            "event=issue_state_refresh_failed linear_api_status=400 "
+            f"issue_identifier=JOV-4195 attempt={attempt} running=0\n"
+            for attempt in range(1, 6)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            result = subprocess.run(
+                _runtime_command(["run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ]),
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse((dead / "JOV-4195.json").exists())
+            self.assertNotIn("issue_dead_letter", result.stdout)
+
+    def test_linear_issue_state_refresh_avoids_project_slug_400_class(self):
+        helper = _load_helper()
+        uuid = "11111111-2222-3333-4444-555555555555"
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=[])
+        )
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=["", "  "])
+        )
+        with self.assertRaises(ValueError) as first_zero:
+            helper.build_linear_issue_state_refresh_request(
+                issue_ids=[uuid], page_size=0
+            )
+        self.assertIn("page_size must be positive", str(first_zero.exception))
+        with self.assertRaises(ValueError) as identifier:
+            helper.build_linear_issue_state_refresh_request(issue_ids=["JOV-5822"])
+        self.assertIn(
+            "linear_issue_state_refresh_identifier_not_id:JOV-5822",
+            str(identifier.exception),
+        )
+        with self.assertRaises(ValueError):
+            helper.build_linear_issue_state_refresh_request(team_key="jov")
+        payload = helper.build_linear_issue_state_refresh_request(
+            issue_ids=[uuid, uuid.upper(), ""]
+        )
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["operationName"], "SymphonyLinearTeamIssuesById")
+        self.assertIn("team: {key: {eq: $teamKey}}", payload["query"])
+        self.assertNotIn("projectSlug", payload["query"])
+        self.assertNotIn("project_slug", payload["query"])
+        self.assertEqual(payload["variables"]["teamKey"], helper.OFFICIAL_TEAM_KEY)
+        self.assertEqual(payload["variables"]["ids"], [uuid])
+        self.assertEqual(payload["variables"]["first"], 1)
+        self.assertNotIn("projectSlug", payload["variables"])
+        self.assertNotIn("projectId", payload["variables"])
+        self.assertGreater(payload["variables"]["first"], 0)
+
+        calls = []
+
+        class FakeResponse:
+            status = 200
+            headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {
+                        "data": {
+                            "issues": {
+                                "nodes": [
+                                    {
+                                        "id": uuid,
+                                        "identifier": "JOV-5822",
+                                        "state": {"name": "In Progress"},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ).encode("utf-8")
+
+        def fake_urlopen(request, timeout):
+            del timeout
+            calls.append(json.loads(request.data.decode("utf-8")))
+            return FakeResponse()
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fake_urlopen):
+            empty = helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[])
+            refreshed = helper.refresh_linear_issue_states(
+                api_key="lin_test", issue_ids=[uuid]
+            )
+
+        self.assertEqual(empty, {"kind": "skipped", "reason": "empty_running", "issues": []})
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("projectSlug", calls[0]["variables"])
+        self.assertEqual(calls[0]["variables"]["teamKey"], "JOV")
+        self.assertEqual(refreshed["kind"], "refreshed")
+        self.assertEqual(refreshed["issues"][0]["identifier"], "JOV-5822")
+        self.assertEqual(
+            helper.official_symphony_release_tag(),
+            "symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_bin_infix(),
+            "dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_release_tag("v0.0.2-jovie.2"),
+            "v0.0.2-jovie.2",
+        )
+
+        error = helper.urllib.error.HTTPError(
+            "https://api.linear.app/graphql",
+            400,
+            "Bad Request",
+            {"Content-Type": "application/json"},
+            io.BytesIO(b'{"errors":[{"extensions":{"code":"INPUT_ERROR"}}]}'),
+        )
+
+        def fail_urlopen(request, timeout):
+            del request, timeout
+            raise error
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fail_urlopen):
+            with self.assertRaises(RuntimeError) as http_400:
+                helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[uuid])
+        self.assertIn(
+            "linear_issue_state_refresh_http_status:400",
+            str(http_400.exception),
+        )
 
     def test_linear_429_storm_never_dead_letters(self):
         helper = _load_helper()
@@ -1928,7 +2082,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER)
+        self.assertIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"',
+            UPDATER,
+        )
+        self.assertIn("symphony_release_tag", UPDATER)
+        self.assertIn("symphony-build-", UPDATER)
+        self.assertNotIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER
+        )
         self.assertIn("sha256", UPDATER)
         self.assertIn("symphony-elixir.service", UPDATER)
         self.assertNotIn("enable symphony-burrito.service", UPDATER)
@@ -1952,6 +2114,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
+        self.assertIn(
+            "RELEASE_TAG symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+            dry.stdout,
+        )
+        self.assertIn(
+            "symphony-dae31f823850c9ef2dea121433e5b60f09af26fa-linux_x86_64",
+            dry.stdout,
+        )
+        self.assertNotIn("v0.0.2-jovie.2", dry.stdout)
         self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)
