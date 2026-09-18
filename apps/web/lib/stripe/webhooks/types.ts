@@ -18,7 +18,9 @@ export type SupportedEventType =
   | 'customer.subscription.updated'
   | 'customer.subscription.deleted'
   | 'invoice.payment_succeeded'
-  | 'invoice.payment_failed';
+  | 'invoice.payment_failed'
+  | 'charge.refunded'
+  | 'charge.dispute.created';
 
 /**
  * Context passed to webhook handlers containing event metadata.
@@ -96,6 +98,8 @@ export function isSupportedEventType(
     'customer.subscription.deleted',
     'invoice.payment_succeeded',
     'invoice.payment_failed',
+    'charge.refunded',
+    'charge.dispute.created',
   ];
   return supportedTypes.includes(eventType);
 }

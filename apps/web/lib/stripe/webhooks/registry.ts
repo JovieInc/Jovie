@@ -13,6 +13,7 @@
  */
 
 import { captureWarning } from '@/lib/error-tracking';
+import { chargeHandler } from './handlers/charge-handler';
 import { checkoutSessionHandler } from './handlers/checkout-handler';
 import { paymentHandler } from './handlers/payment-handler';
 import { subscriptionHandler } from './handlers/subscription-handler';
@@ -26,6 +27,7 @@ const handlers: readonly WebhookHandler[] = [
   checkoutSessionHandler,
   subscriptionHandler,
   paymentHandler,
+  chargeHandler,
 ] as const;
 
 /**

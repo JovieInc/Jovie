@@ -135,6 +135,8 @@ export type BillingAuditEventType =
   | 'subscription_downgraded'
   | 'payment_succeeded'
   | 'payment_failed'
+  | 'charge_refunded'
+  | 'charge_disputed'
   | 'reconciliation_fix'
   | 'customer_created'
   | 'customer_linked';
