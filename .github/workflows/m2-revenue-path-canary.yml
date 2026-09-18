@@ -94,7 +94,7 @@ jobs:
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         run: |
           set -euo pipefail
-          PAYLOAD=$(cat <<EOF
+          PAYLOAD=$(cat <<'EOF')
           {
             "text": "M2 revenue-path canary failed — not generic uptime",
             "attachments": [
