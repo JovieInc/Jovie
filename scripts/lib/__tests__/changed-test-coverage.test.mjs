@@ -11,6 +11,7 @@ import {
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
+import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 
 const path = 'apps/web/lib/example.ts';
 
@@ -164,7 +165,9 @@ describe('changed test coverage', () => {
       'utf8'
     );
     expect(wrapper).toContain("rawArgs[0] === '--'");
-    expect(wrapper).toContain('rawArgs.slice(1)');
+    expect(wrapper).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(wrapper).toContain("args[index] === '--changed'");
+    expect(wrapper).toContain("'related'");
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
     expect(coverage).toContain(
       'pnpm --filter @jovie/web test:coverage --changed'
@@ -221,5 +224,25 @@ describe('changed test coverage', () => {
     }
     expect(mergeReady).toContain('Exact-head Coverage:$COVERAGE_RESULT');
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
+  });
+
+  it('maps Exact-head --changed onto planned related files only', () => {
+    expect(
+      rewriteVitestArgs(
+        ['run', '--coverage', '--changed', 'abc123', '--bail', '1'],
+        'constants/plans.ts\ndata/marketingPricingPlans.ts'
+      )
+    ).toEqual([
+      'related',
+      'constants/plans.ts',
+      'data/marketingPricingPlans.ts',
+      '--run',
+      '--coverage',
+      '--bail',
+      '1',
+    ]);
+    expect(
+      rewriteVitestArgs(['--', 'run', '--coverage'], '')
+    ).toEqual(['run', '--coverage']);
   });
 });
