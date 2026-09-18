@@ -3,9 +3,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
   formatM2RevenuePathSummary,
+  type M2RevenuePathReceipt,
   normalizeCanaryBaseUrl,
   runM2RevenuePathCanary,
-  type M2RevenuePathReceipt,
 } from '@/lib/canaries/m2-revenue-path';
 
 interface CliOptions {

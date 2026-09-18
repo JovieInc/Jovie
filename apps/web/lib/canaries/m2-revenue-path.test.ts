@@ -226,7 +226,9 @@ describe('evaluateProCheckout199', () => {
         pricingStatus: 200,
         pricingBody: livePricing,
         checkoutPostStatus: 200,
-        checkoutPostBody: JSON.stringify({ url: 'https://checkout.stripe.com/c' }),
+        checkoutPostBody: JSON.stringify({
+          url: 'https://checkout.stripe.com/c',
+        }),
         checkoutGetStatus: 405,
       }).ok
     ).toBe(false);
@@ -379,7 +381,8 @@ describe('runM2RevenuePathCanary', () => {
         }
         if (url.includes('/api/stripe/checkout')) {
           return jsonResponse(init?.method === 'POST' ? 401 : 405, {
-            error: init?.method === 'POST' ? 'Unauthorized' : 'Method not allowed',
+            error:
+              init?.method === 'POST' ? 'Unauthorized' : 'Method not allowed',
           });
         }
         if (url.includes('/api/billing/checkout-session')) {
@@ -402,7 +405,9 @@ describe('runM2RevenuePathCanary', () => {
     });
 
     expect(receipt.pass).toBe(false);
-    const checkout = receipt.steps.find(step => step.name === 'pro_checkout_199');
+    const checkout = receipt.steps.find(
+      step => step.name === 'pro_checkout_199'
+    );
     expect(checkout?.ok).toBe(false);
     expect(checkout?.detail).toMatch(/19900/);
     expect(formatM2RevenuePathSummary(receipt)).toContain('FAIL');

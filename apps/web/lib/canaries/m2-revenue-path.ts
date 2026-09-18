@@ -187,7 +187,9 @@ export function evaluateSignedOutSurface(input: {
       evidence,
     };
   }
-  const marker = M2_SIGNED_OUT_MARKERS.find(value => input.body.includes(value));
+  const marker = M2_SIGNED_OUT_MARKERS.find(value =>
+    input.body.includes(value)
+  );
   if (!marker) {
     return {
       ok: false,
@@ -308,7 +310,10 @@ export function evaluateProCheckout199(input: {
       evidence,
     };
   }
-  let parsed: { pricingOptions?: M2PricingOption[]; options?: M2PricingOption[] };
+  let parsed: {
+    pricingOptions?: M2PricingOption[];
+    options?: M2PricingOption[];
+  };
   try {
     parsed = JSON.parse(input.pricingBody) as {
       pricingOptions?: M2PricingOption[];
@@ -362,7 +367,9 @@ export function evaluateProCheckout199(input: {
   return { ok: true, statusCode: input.pricingStatus, evidence };
 }
 
-export function isGatedActivationRedirect(location: string | null | undefined): boolean {
+export function isGatedActivationRedirect(
+  location: string | null | undefined
+): boolean {
   if (!location) return false;
   let parsed: URL;
   try {
@@ -447,9 +454,7 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${normalizeCanaryBaseUrl(baseUrl)}${path}`;
 }
 
-async function readResponse(
-  response: Response
-): Promise<{
+async function readResponse(response: Response): Promise<{
   status: number;
   body: string;
   finalUrl: string;
@@ -478,7 +483,7 @@ export async function runM2RevenuePathCanary(
     'Cache-Control': 'no-store',
   } as const;
 
-    const request = async (
+  const request = async (
     path: string,
     init: RequestInit = {}
   ): Promise<{
@@ -557,7 +562,10 @@ export async function runM2RevenuePathCanary(
     });
     const checkoutPost = await request(M2_REVENUE_PATH_ROUTES.checkout, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
       body: JSON.stringify({
         priceId: 'price_m2_revenue_path_canary_unsigned',
       }),
@@ -606,7 +614,9 @@ export async function runM2RevenuePathCanary(
   };
 }
 
-export function formatM2RevenuePathSummary(receipt: M2RevenuePathReceipt): string {
+export function formatM2RevenuePathSummary(
+  receipt: M2RevenuePathReceipt
+): string {
   const status = receipt.pass ? 'PASS' : 'FAIL';
   const failed = receipt.steps.filter(step => !step.ok).map(step => step.name);
   const failedStr = failed.length > 0 ? ` | failed: ${failed.join(', ')}` : '';
