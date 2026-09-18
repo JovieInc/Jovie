@@ -15,6 +15,7 @@
     "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
+    "canary:m2-revenue-path": "tsx scripts/m2-revenue-path-canary.ts",
     "seo:ratchet": "vitest run tests/unit/seo --config=vitest.config.mts",
     "seo:ratchet:live": "tsx scripts/seo-ratchet-live-check.ts",
     "check:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
