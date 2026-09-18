@@ -30,7 +30,7 @@ export function formatFailedM2Steps(receipt) {
 
 export async function fileM2RevenuePathLinearIssue({
   receipt,
-  runUrl,
+  runUrl = '',
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
