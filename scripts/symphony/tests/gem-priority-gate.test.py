@@ -1594,6 +1594,187 @@ class LivePersistFenceTests(unittest.TestCase):
             self.assertFalse((state_dir / "latest.json").exists())
 
 
+class LaggingConcurrencyRemintTests(unittest.TestCase):
+    """JOV-6461: remint latest.json when evidence is approved and gate is max0."""
+
+    def persistable_max0(self, observed_at: str, *, reason: str) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            "schema": MODULE.CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": reason,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        receipt["signals"]["concurrencyEvidence"]["reason"] = reason
+        receipt["concurrency"]["gem"]["reason"] = reason
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertIsNone(MODULE.live_persist_rejection_reason(receipt))
+        return receipt
+
+    def write_latest(self, state_dir: pathlib.Path, receipt: dict[str, object]) -> None:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "latest.json").write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def test_predicates_detect_flap_class_and_ignore_unrelated_closes(self):
+        now = MODULE.isoformat(MODULE.utc_now())
+        approved = MODULE.evaluate(dict(GREEN_SIGNALS), now)
+        flap_max0 = self.persistable_max0(
+            now, reason="capacity-evidence-trust-context-unavailable"
+        )
+        stale_max0 = self.persistable_max0(
+            now, reason="capacity-evidence-stale-or-future"
+        )
+        self.assertEqual(MODULE.approved_dispatch_concurrency(approved), 4)
+        self.assertIsNone(MODULE.approved_dispatch_concurrency(flap_max0))
+        self.assertTrue(MODULE.should_remint_lagging_zero_concurrency(approved, flap_max0))
+        self.assertFalse(MODULE.should_remint_lagging_zero_concurrency(flap_max0, approved))
+        self.assertTrue(MODULE.should_preserve_approved_concurrency(flap_max0, approved))
+        self.assertFalse(MODULE.should_preserve_approved_concurrency(stale_max0, approved))
+        self.assertFalse(MODULE.should_preserve_approved_concurrency(approved, flap_max0))
+
+    def test_flap_era_max0_remints_when_capacity_is_already_approved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            flap_at = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(minutes=1))
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    flap_at, reason="capacity-evidence-trust-context-unavailable"
+                ),
+            )
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+            printed = json.loads(stdout)
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def test_future_observed_max0_still_remints_after_clock_flap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            future = MODULE.isoformat(MODULE.utc_now() + MODULE.timedelta(minutes=5))
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    future, reason="capacity-evidence-trust-context-unavailable"
+                ),
+            )
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertNotEqual(persisted["observedAt"], future)
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def test_allow_override_does_not_block_flap_class_remint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(minutes=1)),
+                    reason="capacity-evidence-trust-context-unavailable",
+                ),
+            )
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def approved_receipt(self, observed) -> dict[str, object]:
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = capacity_evidence(observed_at=observed_at)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        self.assertEqual(MODULE.approved_dispatch_concurrency(receipt), 4)
+        return receipt
+
+    def test_flap_close_keeps_last_good_approved_concurrency(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            last_good = self.approved_receipt(now - MODULE.timedelta(minutes=1))
+            MODULE.write_receipt(last_good, state_dir)
+            seeded = self.read_latest(state_dir)
+            live = self.persistable_max0(
+                MODULE.isoformat(now),
+                reason="capacity-evidence-trust-context-unavailable",
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(persisted, seeded)
+            self.assertEqual(returned, seeded)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("kept last-good approved concurrency", stderr.getvalue())
+
+    def test_genuine_stale_evidence_still_persists_max0(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.approved_receipt(
+                MODULE.utc_now() - MODULE.timedelta(minutes=1)
+            )
+            self.write_latest(state_dir, last_good)
+            stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
+            signals = dict(GREEN_SIGNALS)
+            signals["concurrencyEvidence"] = {
+                **GREEN_SIGNALS["concurrencyEvidence"],
+                "observedAt": stale,
+                "acceptedEvidence": [
+                    {**proof, "completedAt": stale}
+                    for proof in GREEN_SIGNALS["concurrencyEvidence"]["acceptedEvidence"]
+                ],
+            }
+
+            exit_code, stdout, _stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 0)
+            self.assertFalse(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertNotEqual(persisted, last_good)
+
+
 class DeploymentBindingTests(unittest.TestCase):
     def evaluate(self, signals: dict[str, object]) -> dict[str, object]:
         return MODULE.evaluate(dict(signals), MODULE.isoformat(MODULE.utc_now()))

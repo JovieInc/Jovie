@@ -80,6 +80,17 @@ UNSAFE_LIVE_PERSIST_REASONS = frozenset(
         GATE_EVALUATION_FAILED_REASON,
     }
 )
+# Transient trust-context loss after a mac.lan / host flap. These close
+# dispatch in the live evaluation but must not pin latest.json at max0
+# when a persistable approved receipt is already on disk, and they must
+# remint once approved evidence is live again.
+FLAP_CAPACITY_REASONS = frozenset(
+    {
+        "capacity-evidence-trust-context-unavailable",
+        "capacity-evidence-trust-context-missing",
+        "capacity-evidence-trust-context-invalid",
+    }
+)
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
@@ -2115,6 +2126,88 @@ def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
     return None
 
 
+def approved_dispatch_concurrency(receipt: dict[str, Any] | None) -> int | None:
+    """Return approved mutation seats, or None when dispatch is unproven."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return None
+    concurrency = receipt.get("concurrency")
+    signals = receipt.get("signals")
+    if not isinstance(concurrency, dict) or not isinstance(signals, dict):
+        return None
+    gem = concurrency.get("gem")
+    evidence = signals.get("concurrencyEvidence")
+    if not isinstance(gem, dict) or not isinstance(evidence, dict):
+        return None
+    maximum = gem.get("maxConcurrent")
+    if (
+        gem.get("evidenceAccepted") is True
+        and evidence.get("accepted") is True
+        and isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+    ):
+        return maximum
+    return None
+
+
+def _persisted_max_concurrent(receipt: dict[str, Any] | None) -> int | None:
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return None
+    gem = (receipt.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict):
+        return None
+    maximum = gem.get("maxConcurrent")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
+        return None
+    return maximum
+
+
+def should_remint_lagging_zero_concurrency(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """True when approved live seats must replace a stale persisted max0 gate.
+
+    After a mac.lan flap the persisted receipt can stay at maxConcurrent=0
+    even though capacity evidence is already accepted. A newer-or-equal
+    observedAt on that max0 receipt must not block the remint.
+    """
+    if approved_dispatch_concurrency(live) is None:
+        return False
+    if live_persist_rejection_reason(live) is not None:
+        return False
+    return _persisted_max_concurrent(persisted) == 0
+
+
+def should_preserve_approved_concurrency(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """Keep last-good approved seats when a flap only closes live dispatch.
+
+    Genuine stale/missing evidence and RED integrity still replace latest.json.
+    """
+    if approved_dispatch_concurrency(live) is not None:
+        return False
+    if approved_dispatch_concurrency(persisted) is None:
+        return False
+    if live.get("state") == "RED":
+        return False
+    if live_persist_rejection_reason(persisted) is not None:
+        return False
+    evidence = (live.get("signals") or {}).get("concurrencyEvidence")
+    reason = evidence.get("reason") if isinstance(evidence, dict) else None
+    return reason in FLAP_CAPACITY_REASONS
+
+
+def _read_persisted_receipt(state_dir: Path) -> dict[str, Any] | None:
+    try:
+        persisted = read_json(state_dir / "latest.json")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if persisted.get("schema") != SCHEMA:
+        return None
+    return persisted
+
+
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
     """Commit the hold first, then publish latest.json as the commit marker.
 
@@ -2384,9 +2477,19 @@ def persist_live_receipt(
     Placeholder, failed-evaluation, and untyped candidates never replace
     latest.json. A prior valid receipt stays in place. The live-persist
     env override is not an enable switch: any nonzero spelling hard-fails
-    before the writer lock is taken.
+    before the writer lock is taken, except the flap remint class: when
+    persisted latest.json is maxConcurrent=0 and the live receipt already
+    holds approved capacity, remint without a manual ALLOW dance.
     """
-    if refuse_unsafe_live_persist_override():
+    remint = False
+    persisted = None
+    try:
+        persisted = _read_persisted_receipt(state_dir)
+        remint = should_remint_lagging_zero_concurrency(receipt, persisted)
+    except (OSError, ValueError, json.JSONDecodeError):
+        persisted = None
+        remint = False
+    if refuse_unsafe_live_persist_override() and not remint:
         warn_live_receipt_not_persisted(
             LivePersistFenceError(
                 f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
@@ -2404,13 +2507,35 @@ def persist_live_receipt(
         warn_live_receipt_not_persisted(error)
         return receipt
     try:
-        persisted_at = persisted_observed_at(state_dir)
-        if persisted_at is not None and persisted_at >= now:
+        persisted = _read_persisted_receipt(state_dir)
+        remint = should_remint_lagging_zero_concurrency(receipt, persisted)
+        if should_preserve_approved_concurrency(receipt, persisted):
+            warn_live_receipt_not_persisted(
+                LivePersistFenceError(
+                    f"{LIVE_PERSIST_WRITER}: kept last-good approved concurrency "
+                    "after flap-class dispatch close"
+                )
+            )
+            return persisted
+        persisted_at = (
+            parse_time(persisted.get("observedAt")) if persisted is not None else None
+        )
+        if persisted_at is not None and persisted_at >= now and not remint:
             try:
                 return read_json(state_dir / "latest.json")
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 warn_live_receipt_not_persisted(error)
                 return receipt
+        if remint:
+            seats = approved_dispatch_concurrency(receipt)
+            prefix = (
+                "::notice::" if os.environ.get("GITHUB_ACTIONS") == "true" else "INFO:"
+            )
+            print(
+                f"{prefix} fleet gate reminted lagging maxConcurrent=0 to "
+                f"{seats} from approved capacity evidence",
+                file=sys.stderr,
+            )
         write_receipt(receipt, state_dir)
         verify_persisted_receipt(state_dir, receipt)
         return receipt
