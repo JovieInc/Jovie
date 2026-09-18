@@ -11,10 +11,12 @@ describe('auth front-door contract', () => {
   it('keeps waitlist-on homepage CTAs in request-access mode', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
+    expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.WAITLIST);
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: PUBLIC_WAITLIST_URL,
+      href: APP_ROUTES.WAITLIST,
     });
+    expect(contract.primary.href.startsWith('/')).toBe(true);
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'

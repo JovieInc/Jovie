@@ -50,12 +50,12 @@ describe('HeaderNav flyout interactions', () => {
     const loginLink = screen.getByRole('link', { name: 'Log in' });
     expect(loginLink).toHaveAttribute('href', '/signin');
     expect(loginLink.parentElement).toHaveClass('gap-2');
-    // Default public CTA (no publicCta override) remains Request Access.
-    // MarketingHeader supplies route-specific CTA labels separately.
-    expect(
-      screen.getByRole('link', { name: 'Request Access' })
-    ).toHaveAttribute('href', '/signup');
-    const publicCta = screen.getByRole('link', { name: 'Request Access' });
+    // Default public CTA follows the shared waitlist-first acquisition contract.
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/waitlist'
+    );
+    const publicCta = screen.getByRole('link', { name: 'Get started' });
     expect(publicCta).not.toHaveAttribute('data-pen-contract');
     expect(publicCta).toHaveAttribute('data-variant', 'primary');
     expect(publicCta).toHaveAttribute('data-size', 'marketing');

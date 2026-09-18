@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 
 // Enable center nav here so this test can assert the canonical public nav.
 vi.mock('@/lib/flags/marketing-static', async importOriginal => {
@@ -24,7 +25,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
       <h1>Make every release feel bigger.</h1>
       <Link
         data-testid='homepage-v2-hero-primary-cta'
-        href='https://jov.ie/waitlist'
+        href={PUBLIC_WAITLIST_URL}
       >
         Get started
       </Link>
@@ -80,7 +81,7 @@ describe('NewLandingPage', () => {
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      PUBLIC_WAITLIST_URL
     );
 
     render(<NewLandingPage />);
@@ -93,7 +94,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      PUBLIC_WAITLIST_URL
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })

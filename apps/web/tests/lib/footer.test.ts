@@ -54,7 +54,7 @@ describe('generateFooterHTML', () => {
     // We can't easily mock the feature flag here, but we can test that the link structure is correct
     const html = await generateFooterHTML({ artist: mockArtist });
 
-    expect(html).toContain('/sign-up?utm_source=listen&utm_artist=test-artist');
+    expect(html).toContain('/waitlist?utm_source=listen&utm_artist=test-artist');
   });
 
   it('includes logo SVG', async () => {

@@ -201,7 +201,7 @@ describe('WaitlistPage', () => {
     CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
     CanonicalUserState.NEEDS_DB_USER,
   ])(
-    'never renders saved confirmation for %s without a durable pending entry',
+    'recovers %s without a durable pending entry instead of a /waitlist 404',
     async state => {
       mockRedirect.mockClear();
       mockNotFound.mockClear();
@@ -214,9 +214,15 @@ describe('WaitlistPage', () => {
       const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
       if (state === CanonicalUserState.WAITLIST_PENDING) {
-        await expect(WaitlistPage()).rejects.toThrow('NEXT_NOT_FOUND');
+        const result = await WaitlistPage();
+        const { WaitlistPublicLanding } = await import(
+          '@/components/features/waitlist/WaitlistPublicLanding'
+        );
+
         expect(mockRedirect).not.toHaveBeenCalled();
-        expect(mockNotFound).toHaveBeenCalledTimes(1);
+        expect(mockNotFound).not.toHaveBeenCalled();
+        expect(result.type.name).toBe('WaitlistRouteWithContract');
+        expect(result.props.children.type).toBe(WaitlistPublicLanding);
         return;
       }
 

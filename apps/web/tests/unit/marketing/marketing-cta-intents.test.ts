@@ -36,7 +36,8 @@ describe('marketing CTA intent registry', () => {
 
     expect(intent).toBe(MARKETING_CTA_INTENTS.claimProfile);
     expect(intent.label).toBe('Get started');
-    expect(intent.href).toBe(PUBLIC_WAITLIST_URL);
+    expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.WAITLIST);
+    expect(intent.href).toBe(APP_ROUTES.WAITLIST);
     expect(intent.eventName).toBe('landing_cta_claim_profile');
     expect(intent.support.toLowerCase()).toContain('limited prelaunch access');
   });
@@ -56,6 +57,9 @@ describe('marketing CTA intent registry', () => {
     expect(buildClaimProfileStartHref()).toBe(
       MARKETING_CTA_INTENTS.claimProfile.href
     );
+    expect(buildClaimProfileStartHref('@river-signal')).toBe(
+      '/waitlist?starter_prompt=I+want+to+claim+jov.ie%2Friver-signal.&handle=river-signal'
+    );
     const withHandle = new URL(
       buildClaimProfileStartHref('@river-signal'),
       'https://jov.ie'
@@ -65,6 +69,9 @@ describe('marketing CTA intent registry', () => {
     expect(withHandle.searchParams.get('handle')).toBe('river-signal');
     expect(withHandle.searchParams.get('starter_prompt')).toContain(
       'jov.ie/river-signal'
+    );
+    expect(buildClaimProfileStartHref('@river-signal')).not.toContain(
+      'https://jov.ie'
     );
   });
 });

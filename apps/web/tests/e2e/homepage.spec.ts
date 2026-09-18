@@ -147,7 +147,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Get started' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
   });
 
   test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
@@ -853,7 +853,7 @@ test.describe('Homepage', () => {
     ).toHaveAttribute('href', '/signin');
     await expect(
       mobileNav.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
   });
 
   test('has no horizontal overflow across common viewports', async ({
