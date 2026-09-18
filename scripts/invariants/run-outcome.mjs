@@ -51,7 +51,7 @@ export function canSetCertified(certifier) {
 /**
  * The only writable certification path. Models, including Jev, always get false.
  *
- * @param {{ certifier: string, certified?: boolean }} input
+ * @param {{ certifier?: string, certified?: boolean }} [input]
  */
 export function applyCertifiedBit({ certifier, certified } = {}) {
   return canSetCertified(certifier) && certified === true;
@@ -235,16 +235,18 @@ function decideOutcome({ claim, receipt, issues }) {
  * better outcome.
  *
  * @param {{
- *   runId: string,
- *   claim: object,
+ *   runId?: string,
+ *   claim?: object,
  *   receipt?: object,
  *   receipts?: object[],
  *   persistTo?: string,
  *   includeShadow?: boolean,
- *   evaluate?: Function,
+ *   evaluate?: (input: { claim: object, evidence: unknown, model: string }) =>
+ *     | { alignment?: string, certified?: unknown, reason?: string }
+ *     | null,
  *   model?: string,
  *   previous?: object | null,
- * }} input
+ * }} [input]
  */
 export function verifyRunOutcome({
   runId,
@@ -389,6 +391,19 @@ export function readRunOutcome(filePath) {
 
 /**
  * Run the existing screen-certification harness, then verify that one receipt.
+ *
+ * @param {{
+ *   runId?: string,
+ *   claim?: object,
+ *   certOptions?: object,
+ *   persistTo?: string,
+ *   includeShadow?: boolean,
+ *   evaluate?: (input: { claim: object, evidence: unknown, model: string }) =>
+ *     | { alignment?: string, certified?: unknown, reason?: string }
+ *     | null,
+ *   model?: string,
+ *   previous?: object | null,
+ * }} [input]
  */
 export function verifyScreenCertRun({
   runId,
