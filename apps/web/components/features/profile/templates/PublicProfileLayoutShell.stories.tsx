@@ -4,7 +4,14 @@ import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 const meta: Meta<typeof PublicProfileLayoutShell> = {
   title: 'Profile/PublicProfileLayoutShell',
   component: PublicProfileLayoutShell,
-  parameters: { layout: 'fullscreen' },
+  // `loading` is not a prop of PublicProfileLayoutShell — the loading
+  // hand-off is driven by `desktopSurfaceReady` (JOV-6434): compact stays
+  // in the accessibility tree until the desktop surface reports ready, so
+  // there is no separate loading state for the story to exercise.
+  parameters: {
+    layout: 'fullscreen',
+    jovie: { uncoveredProps: ['loading'] },
+  },
   args: {
     artistName: 'Artist Name',
     heroImageUrl: null,
