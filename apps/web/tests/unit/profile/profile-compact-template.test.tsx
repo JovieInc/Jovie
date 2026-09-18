@@ -166,6 +166,14 @@ vi.mock('@/features/profile/templates/ProfileDesktopSurface', () => ({
     mockProfileDesktopSurface(props),
 }));
 
+vi.mock(
+  '../../../components/features/profile/templates/ProfileDesktopSurface',
+  () => ({
+    ProfileDesktopSurface: (props: Record<string, unknown>) =>
+      mockProfileDesktopSurface(props),
+  })
+);
+
 const mockArtist: Artist = {
   id: 'artist-1',
   name: 'Test Artist',
@@ -1859,8 +1867,8 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('data-interactive-ready="true"');
-    expect(html).toContain('data-testid="profile-desktop-loading"');
-    expect(html).toContain('aria-busy="true"');
+    expect(html).not.toContain('data-testid="profile-desktop-loading"');
+    expect(html).not.toContain('Loading profile…');
     const view = render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1875,6 +1883,57 @@ describe('ProfileCompactTemplate', () => {
 
     view.unmount();
     expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
+  });
+
+  it('exposes real desktop profile content instead of a stuck loading status (JOV-6434)', async () => {
+    mockProfileDesktopSurface.mockImplementation(
+      (props: { readonly artist?: { readonly name?: string } }) => (
+        <div
+          data-testid='profile-desktop-surface'
+          role='region'
+          aria-label='Profile'
+        >
+          <a data-testid='profile-header' href={`/${mockArtist.handle}`}>
+            Desktop profile for {props.artist?.name ?? mockArtist.name}
+          </a>
+        </div>
+      )
+    );
+
+    const html = renderToString(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    expect(html).not.toContain('Loading profile…');
+    expect(html).toContain('Desktop profile for Test Artist');
+    expect(html).toContain('data-testid="profile-desktop-surface"');
+
+    const restoreViewport = mockViewport('desktop');
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading profile…')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('status', { name: /loading profile/i })
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Profile' })).toHaveTextContent(
+        'Desktop profile for Test Artist'
+      );
+    });
+
+    restoreViewport();
+    mockProfileDesktopSurface.mockReset();
   });
 
   it('keeps desktop variants on the desktop surface', async () => {

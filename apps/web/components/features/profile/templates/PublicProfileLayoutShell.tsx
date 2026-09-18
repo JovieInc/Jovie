@@ -124,18 +124,11 @@ export function PublicProfileLayoutShell({
                 {desktopBanner}
               </div>
             ) : null}
-            {isDesktopLayout ? (
-              desktopSurface
-            ) : (
-              <div
-                className='public-profile-layout-desktop-placeholder'
-                data-testid='profile-desktop-loading'
-                role='status'
-                aria-busy='true'
-              >
-                <span className='text-secondary-token'>Loading profile…</span>
-              </div>
-            )}
+            {/* CSS shows this shell at 1180px+ before React hydrates
+                `isDesktopLayout`. A loading status here would be the only
+                accessible desktop content (JOV-6434). Embedded previews stay
+                compact and never mount the desktop tree. */}
+            {embedded ? null : desktopSurface}
           </div>
           {showClaimFooter && claimFooterHref ? (
             <ProfileClaimFooter href={claimFooterHref} enabled />

@@ -26,7 +26,7 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.queryByTestId('compact-content')).not.toBeInTheDocument();
   });
 
-  it('owns exactly the compact surface below the desktop boundary', () => {
+  it('keeps desktop content mounted below the JS desktop boundary so CSS cannot trap AT on loading', () => {
     render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
     );
@@ -36,7 +36,12 @@ describe('PublicProfileLayoutShell', () => {
       'compact'
     );
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-desktop-loading')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading profile…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('labels an embedded compact surface as a preview with an exit', () => {
@@ -56,5 +61,6 @@ describe('PublicProfileLayoutShell', () => {
       'href',
       '/unfazed'
     );
+    expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
   });
 });
