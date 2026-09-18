@@ -142,9 +142,7 @@ function isCommissionedReport(report: unknown): boolean {
   );
 }
 
-function extractSignedReport(
-  value: unknown
-): Record<string, unknown> | null {
+function extractSignedReport(value: unknown): Record<string, unknown> | null {
   if (!isRecord(value)) return null;
   if (isCommissionedReport(value)) return value;
   if (
@@ -191,10 +189,7 @@ export function resolveRuntimeHealthStatus(
     const readFile = input.readFile ?? (path => readFileSync(path, 'utf8'));
     const receiptNames =
       input.identity === 'summer'
-        ? [
-            'SUMMER_COMMISSIONING_RECEIPT',
-            'RUNTIME_COMMISSIONING_RECEIPT',
-          ]
+        ? ['SUMMER_COMMISSIONING_RECEIPT', 'RUNTIME_COMMISSIONING_RECEIPT']
         : ['RUNTIME_COMMISSIONING_RECEIPT'];
     const keyNames =
       input.identity === 'summer'
