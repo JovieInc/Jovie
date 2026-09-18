@@ -91,10 +91,7 @@ pnpm exec playwright test tests/e2e/golden-path.spec.ts --ui
 
 ```bash
 # Daily / deploy-hook money path against prod (or staging that mirrors checkout)
-pnpm --filter=@jovie/web run canary:m2-revenue-path -- --base-url https://jov.ie --receipt /tmp/m2-revenue-path-receipt.json
-
-# Same runner the workflow uses
-pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url https://jov.ie
+pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url https://jov.ie --receipt /tmp/m2-revenue-path-receipt.json
 ```
 
 Red runs write Slack + a Linear issue with the receipt repro. This canary does not replace generic uptime (`canary-health-gate.yml`).
