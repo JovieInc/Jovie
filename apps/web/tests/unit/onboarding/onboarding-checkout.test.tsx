@@ -110,9 +110,17 @@ describe('OnboardingCheckoutClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
     hrefState.current = 'http://localhost/onboarding/checkout';
     window.sessionStorage.clear();
     vi.stubGlobal('fetch', fetchMock);
+    Object.defineProperty(navigator, 'sendBeacon', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(true),
+    });
     Object.defineProperty(globalThis, 'location', {
       configurable: true,
       value: {
