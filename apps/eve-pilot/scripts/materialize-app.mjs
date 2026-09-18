@@ -13,6 +13,8 @@ const common = [
   '.gitignore',
   'agent/channels/photon.ts',
   'agent/lib/imessage-allowlist.ts',
+  'agent/lib/runtime-commissioning-health.ts',
+  'tests/runtime-commissioning-health.test.ts',
 ];
 const summer = [
   'agent/lib/summer-web-conversation.ts',
@@ -121,14 +123,18 @@ import { assertRuntimeEnvironment } from './lib/application-boundary';
 assertRuntimeEnvironment();
 export default defineAgent({ model: 'zai/glm-5.3-flash' });\n`
   );
+  // Health status comes from a verified signed receipt, never a hardcoded
+  // commissioned literal. Isolated built proof stays uncommissioned.
   put(
     'agent/channels/runtime-health.ts',
     `import { defineChannel, GET } from 'eve/channels';
+import { resolveRuntimeHealthStatus } from '../lib/runtime-commissioning-health';
 import { APPLICATION_IDENTITY } from '../runtime-identity';
 import { bindEvePilotIdentity } from '../select-identity';
 export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
   const identity = bindEvePilotIdentity(APPLICATION_IDENTITY);
-  return Response.json({ identity: identity.pack.id, status: 'uncommissioned',
+  const status = resolveRuntimeHealthStatus({ identity: identity.pack.id });
+  return Response.json({ identity: identity.pack.id, status,
     instructionsAvailable: identity.instructions.length > 0 }, { headers: { 'cache-control': 'no-store' } });
 })] });\n`
   );
@@ -208,7 +214,7 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
         )
         .replace(
           "'agent/instructions/summer-shadow.ts',",
-          "'agent/lib/application-boundary.ts',\n        'agent/select-identity.ts',\n        'agent/instructions/summer-shadow.ts',"
+          "'agent/lib/application-boundary.ts',\n        'agent/lib/runtime-commissioning-health.ts',\n        'agent/select-identity.ts',\n        'agent/instructions/summer-shadow.ts',"
         )
     );
     put(
@@ -220,7 +226,7 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
       'vitest.config.ts',
       `import { defineConfig } from 'vitest/config';
 export default defineConfig({test: {include: ['tests/**/*.test.ts'], environment: 'node',
-coverage: {provider: 'v8', include: ['agent/lib/application-boundary.ts', 'agent/select-identity.ts',
+coverage: {provider: 'v8', include: ['agent/lib/application-boundary.ts', 'agent/lib/runtime-commissioning-health.ts', 'agent/select-identity.ts',
 'agent/channels/eve.ts', 'agent/tools/jovie_capability_manifest.ts', 'scripts/jovie-release.mjs'], reporter: ['text', 'json-summary'],
 thresholds: {statements: 85, branches: 75, functions: 85, lines: 85}}}});\n`
     );
