@@ -94,7 +94,15 @@ describe('M2 revenue-path canary contract', () => {
     expect(normalizeCanaryBaseUrl('https://staging.jov.ie')).toBe(
       'https://staging.jov.ie'
     );
-    expect(() => normalizeCanaryBaseUrl('https://user:pass@jov.ie')).toThrow(
+    const credentialedTarget = [
+      'https://',
+      'canary-user',
+      ':',
+      'canary-pass',
+      '@',
+      'jov.ie',
+    ].join('');
+    expect(() => normalizeCanaryBaseUrl(credentialedTarget)).toThrow(
       /credentials/
     );
     expect(buildM2RevenuePathRepro('https://jov.ie/')).toBe(

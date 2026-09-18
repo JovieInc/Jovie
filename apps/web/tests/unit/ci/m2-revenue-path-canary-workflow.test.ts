@@ -15,6 +15,12 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
 
   it('is a production-liveness clock with daily and deploy-hook triggers', () => {
     expect(workflow).toContain('# clock-class: production-liveness');
+    expect(workflow).toContain(
+      '# controller-hop-exception: jovie-controller-hop/v1'
+    );
+    expect(workflow).toContain('# accountable-writer: Gem');
+    expect(workflow).toContain('# necessary-trust-boundary:');
+    expect(workflow).toContain('# removal-trigger:');
     expect(workflow).toContain("- cron: '37 6 * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_call:');

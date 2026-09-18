@@ -1,5 +1,9 @@
 name: M2 Revenue-Path Canary
 # clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted production-liveness clock probes signed-out claim, $199 Pro checkout, and activation on prod without Stripe credentials or session creation; Slack and Linear secrets stay in the hosted job.
+# removal-trigger: Remove this hop when Production Controller or a first-party checkout monitor emits the same four-step receipt and files Linear plus Slack on red without a separate scheduled workflow.
 #
 # JOV-6439: daily + deploy-hook money-path probe.
 # Distinct from Canary Health Gate (generic uptime) and the auth/public-profile
