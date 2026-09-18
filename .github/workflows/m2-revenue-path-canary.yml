@@ -94,14 +94,14 @@ jobs:
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         run: |
           set -euo pipefail
-          PAYLOAD=$(cat <<'EOF')
+          PAYLOAD=$(cat <<EOF)
           {
             "text": "M2 revenue-path canary failed — not generic uptime",
             "attachments": [
               {
                 "color": "danger",
                 "fields": [
-                  { "title": "Canary", "value": "signed-out → claim → $199 Pro checkout → activation", "short": false },
+                  { "title": "Canary", "value": "signed-out → claim → \$199 Pro checkout → activation", "short": false },
                   { "title": "Issue", "value": "JOV-6439", "short": true },
                   { "title": "Target", "value": "${{ inputs.base_url || 'https://jov.ie' }}", "short": true },
                   { "title": "Repro", "value": "pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url ${{ inputs.base_url || 'https://jov.ie' }}", "short": false },
