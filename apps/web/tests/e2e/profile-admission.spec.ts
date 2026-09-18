@@ -315,12 +315,16 @@ test.describe('public profile browser admission', () => {
 
       const audit = await auditPublicProfileLayout(page);
       expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
-      await expect(page.getByTestId('profile-compact-shell')).toHaveCount(
-        fixture.layout === 'compact' ? 1 : 0
-      );
-      await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
-        fixture.layout === 'desktop' ? 1 : 0
-      );
+      // JOV-6434 keeps the desktop tree mounted (CSS-hidden below 1180px) so
+      // the a11y tree is never trapped on a loading status: assert CSS
+      // visibility ownership, not DOM absence.
+      if (fixture.layout === 'desktop') {
+        await expect(page.getByTestId('profile-desktop-surface')).toBeVisible();
+        await expect(page.getByTestId('profile-compact-shell')).toBeHidden();
+      } else {
+        await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+        await expect(page.getByTestId('profile-desktop-surface')).toBeHidden();
+      }
       if (fixture.layout === 'desktop') {
         await expect(
           page.getByRole('button', { name: 'Alerts', exact: true })
