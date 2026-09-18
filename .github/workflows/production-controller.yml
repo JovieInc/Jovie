@@ -1034,6 +1034,10 @@ jobs:
           fi
 
           bash .github/scripts/verify-production-alias.sh
+          echo "Rescanning Done sprint invariants against exact production deployment (JOV-INV-033)."
+          DONE_INVARIANT_RESCAN=release \
+            DONE_INVARIANT_PRODUCTION_BASE_URL="$production_deployment_url" \
+            node scripts/invariants/done-sprint-invariants.mjs --release
           {
             echo "canonical_verified=true"
             echo "canonical_deployment_id=$EXPECTED_PRODUCTION_DEPLOYMENT_ID"

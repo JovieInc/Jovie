@@ -17,7 +17,7 @@
  */
 
 import { APP_ROUTES } from '@/constants/routes';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 export { PLAN_PRICES } from '@/lib/config/plan-prices';
@@ -76,8 +76,8 @@ export const CANONICAL_PLANS: readonly CanonicalPlan[] = [
     yearlyPriceUsd: PLAN_PRICES.max.yearly,
     monthlyPriceLabel: `$${PLAN_PRICES.max.monthly}`,
     features: ENTITLEMENT_REGISTRY.max.marketing.features,
-    ctaLabel: 'Start Free Trial',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=max`,
+    ctaLabel: ARTIST_VISIBILITY_OFFER.enterprise.cta,
+    signupHref: ARTIST_VISIBILITY_OFFER.enterprise.href,
   },
 ] as const;
 
