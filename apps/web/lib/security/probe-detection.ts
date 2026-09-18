@@ -147,3 +147,19 @@ export function createFastNotFoundResponse(): Response {
     },
   });
 }
+
+/**
+ * Minimal 410 for public roots that must leave the index and must never
+ * render as a missing username. Google needs to recrawl this, so the
+ * response stays crawlable and cacheable.
+ */
+export function createFastGoneResponse(): Response {
+  return new Response(null, {
+    status: 410,
+    headers: {
+      'Cache-Control': 'public, max-age=86400',
+      'X-Robots-Tag': 'noindex',
+      'Content-Length': '0',
+    },
+  });
+}

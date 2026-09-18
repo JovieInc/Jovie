@@ -356,11 +356,57 @@ run_trufflehog_ci_pr() {
   return "$classify_status"
 }
 
+# Schedule/full-history (run 35215186887) still reports an unverified Vercel
+# finding with no File path. The match is the commit message of this SHA;
+# path excludes cannot suppress commit messages. Allowlist that exact SHA
+# only — do not drop the Vercel detector and do not rewrite history.
+TRUFFLEHOG_FULL_ALLOW_COMMITS='304e0d95ae1b5f80f58c27b4ca6b7939b3a04584'
+
+classify_trufflehog_full_findings() {
+  local scan_log="$1" status="$2"
+  local finding_commits allow_file remaining
+
+  if grep -q 'encountered errors during scan' "$scan_log"; then
+    echo "::error title=Secret scan incomplete::trufflehog aborted its git scan before completion; failing closed instead of accepting an empty result." >&2
+    return 1
+  fi
+
+  finding_commits="$(
+    grep -oE '^Commit: [0-9a-f]{40}$' "$scan_log" | awk '{print $2}' | sort -u
+  )"
+  if [[ -z "$finding_commits" ]]; then
+    return "$status"
+  fi
+  if [[ "$status" -ne 0 && "$status" -ne 183 ]]; then
+    return "$status"
+  fi
+
+  allow_file="$(mktemp)"
+  # shellcheck disable=SC2086
+  printf '%s\n' $TRUFFLEHOG_FULL_ALLOW_COMMITS >"$allow_file"
+  remaining="$(grep -vxF -f "$allow_file" <<<"$finding_commits" || true)"
+  rm -f "$allow_file"
+  if [[ -z "$remaining" ]]; then
+    echo "::warning title=Secret scan allowlisted historical commit::trufflehog reported findings only in allowlisted commit(s): $(paste -sd, - <<<"$finding_commits"). These are known non-credential matches (commit-message detector bait with no file path) and cannot fail the schedule scan." >&2
+    return 0
+  fi
+  return 183
+}
+
 run_trufflehog_full() {
+  local scan_log status classify_status
   echo "Running trufflehog git on full history..."
+  scan_log="$(mktemp)"
+  status=0
   run_trufflehog_git \
     --no-verification \
-    --fail
+    --fail >"$scan_log" 2>&1 || status=$?
+  cat "$scan_log"
+  classify_status=0
+  classify_trufflehog_full_findings "$scan_log" "$status" \
+    || classify_status=$?
+  rm -f "$scan_log"
+  return "$classify_status"
 }
 
 usage() {

@@ -91,6 +91,12 @@ cat ~/.hermes/state/queue-snapshot.json
 cat ~/.hermes/state/independent-review.json
 ```
 
+Jovie keeps those singleton snapshot filenames. Other repos write
+`queue-snapshot-<repo-key>.json`, `controller-snapshot-<repo-key>.json`, and
+`independent-review-<repo-key>.json` beside the same `state/` directory so a
+LogYourBody refresh cannot clobber Jovie's queue or review receipts.
+Host-level `integrity.json` and `concurrency.json` stay shared.
+
 Check the recent GitHub Actions runs:
 
 ```bash

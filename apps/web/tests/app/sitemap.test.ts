@@ -252,6 +252,11 @@ describe('sitemap', () => {
       'https://jov.ie/renders',
       'https://jov.ie/product',
       'https://jov.ie/solutions',
+      'https://jov.ie/music',
+      'https://jov.ie/shows',
+      'https://jov.ie/you',
+      'https://jov.ie/privacy',
+      'https://jov.ie/terms',
     ]) {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }
@@ -612,18 +617,18 @@ describe('sitemap', () => {
 describe('sitemap publication inventory fixtures (JOV-6263)', () => {
   const generatedAt = new Date('2026-09-16T20:30:02.784Z');
   const manifest: SitemapManifestRoute[] = [
-    { url: '/product', status: 'active', recipeId: 'feature' },
+    { url: '/youtube-thumbnails', status: 'active', recipeId: 'feature' },
     { url: '/artist-profiles', status: 'active', recipeId: 'artist-lp' },
   ];
   const hubs = [
     { url: 'https://jov.ie/artist-profiles' },
-    { url: 'https://jov.ie/product' },
+    { url: 'https://jov.ie/youtube-thumbnails' },
   ];
 
   it('flags an omitted commercial page, QA identity, and request-time lastmod', () => {
     expect(
       collectSitemapInventoryViolations(hubs.slice(0, 1), { manifest })
-    ).toContain('omitted commercial page: /product');
+    ).toContain('omitted commercial page: /youtube-thumbnails');
     expect(
       collectSitemapInventoryViolations(
         [...hubs, { url: 'https://jov.ie/tmoc0g1x9dwmk71' }],
@@ -636,5 +641,24 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
         { generatedAt, manifest }
       )
     ).toContain('request-time lastmod on unchanged page: /artist-profiles');
+  });
+
+  it('flags gone and alias public roots if they leak into the sitemap', () => {
+    expect(
+      collectSitemapInventoryViolations(
+        [
+          { url: 'https://jov.ie/artist-profiles' },
+          { url: 'https://jov.ie/youtube-thumbnails' },
+          { url: 'https://jov.ie/music' },
+          { url: 'https://jov.ie/privacy' },
+        ],
+        { manifest }
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'non-indexable public url: /music',
+        'non-indexable public url: /privacy',
+      ])
+    );
   });
 });

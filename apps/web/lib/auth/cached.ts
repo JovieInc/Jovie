@@ -31,6 +31,7 @@ import { attachSentryContext } from '@/lib/sentry/set-user-context';
  * signed-out — build-safe, functionally inert until the cutover merge.
  */
 
+/** `userId` is `users.id`, never Better Auth or `users.clerkId`. */
 interface AuthResult {
   userId: string | null;
   sessionId: string | null;

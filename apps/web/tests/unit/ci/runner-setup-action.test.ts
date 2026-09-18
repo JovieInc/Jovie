@@ -302,20 +302,23 @@ describe('baked runner prerequisite contract', () => {
       writeFileSync(executablePath, '#!/bin/sh\n', { mode: 0o755 });
     }
     const fixtureRequirementsPath = resolve(directory, 'requirements.json');
-    writeFileSync(
-      fixtureRequirementsPath,
-      JSON.stringify({
-        ...requirements,
-        pnpmStorePath: storePath,
-        installedTreeRoot,
-        playwrightBrowsersPath: browsersPath,
-      })
-    );
+    // Exercise marker behavior on the runtime under test. The separate pin
+    // contract still validates the production image requirements unchanged.
+    const fixtureRequirements = {
+      ...requirements,
+      nodeMajor: Number(process.versions.node.split('.')[0]),
+      nodeMinimum: process.versions.node,
+      pnpmStorePath: storePath,
+      installedTreeRoot,
+      playwrightBrowsersPath: browsersPath,
+    };
+    writeFileSync(fixtureRequirementsPath, JSON.stringify(fixtureRequirements));
     return {
       browsersPath,
       installedTreeArchivePath,
       markerPath: resolve(directory, 'manifest.json'),
       requirementsPath: fixtureRequirementsPath,
+      requirements: fixtureRequirements,
     };
   }
 
@@ -855,7 +858,10 @@ describe('baked runner prerequisite contract', () => {
 
     writeFileSync(
       fixture.requirementsPath,
-      JSON.stringify({ ...requirements, nodeMajor: requirements.nodeMajor + 1 })
+      JSON.stringify({
+        ...fixture.requirements,
+        nodeMajor: fixture.requirements.nodeMajor + 1,
+      })
     );
     const nodeDrift = spawnSync(
       process.execPath,
@@ -866,7 +872,10 @@ describe('baked runner prerequisite contract', () => {
     expect(nodeDrift.stdout).toContain('dependencies_warm=false');
     expect(nodeDrift.stderr).toContain('does not satisfy');
 
-    writeFileSync(fixture.requirementsPath, JSON.stringify(requirements));
+    writeFileSync(
+      fixture.requirementsPath,
+      JSON.stringify(fixture.requirements)
+    );
     const marker = JSON.parse(readFileSync(fixture.markerPath, 'utf8')) as {
       readonly playwrightVersion: string;
     };

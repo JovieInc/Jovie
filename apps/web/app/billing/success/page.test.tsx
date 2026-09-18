@@ -42,6 +42,12 @@ vi.mock('@/components/atoms/Confetti', () => ({
   ),
 }));
 
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { readonly children?: string }) => (
+    <button type='button'>{children}</button>
+  ),
+}));
+
 vi.mock('@/lib/analytics', () => ({
   page: pageMock,
   track: trackMock,
@@ -63,20 +69,26 @@ function setSearchParams(query: string) {
 
 function mockBilling(
   plan: string | null,
-  opts: { readonly isPro?: boolean } = {}
+  opts: { readonly isPro?: boolean; readonly isLoading?: boolean } = {}
 ) {
   const derivedIsPro = plan === 'pro' || plan === 'max' || plan === 'trial';
+  const isLoading = opts.isLoading ?? false;
   useBillingStatusQueryMock.mockReturnValue({
-    data: {
-      isPro: opts.isPro ?? derivedIsPro,
-      plan,
-    },
+    data: isLoading
+      ? undefined
+      : {
+          isPro: opts.isPro ?? derivedIsPro,
+          plan,
+        },
+    isLoading,
+    isFetched: !isLoading,
+    error: null,
   });
 }
 
-function mockValidatedSessionPlan(plan: string | null) {
+function mockValidatedSessionPlan(plan: string | null, ok = true) {
   fetchMock.mockResolvedValue({
-    ok: true,
+    ok,
     json: vi.fn().mockResolvedValue({ plan }),
   });
 }
@@ -156,21 +168,27 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     render(<CheckoutSuccessPage />);
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: /welcome to your new plan/i })
+        screen.getByRole('heading', { name: /checkout not confirmed/i })
       ).toBeInTheDocument();
     });
     expect(
       screen.queryByRole('heading', { name: /welcome to max/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /welcome to your new plan/i })
+    ).not.toBeInTheDocument();
   });
 
-  it('falls back to generic "Welcome to your new plan!" when plan_id is invalid AND billing is missing', () => {
+  it('shows recovery instead of generic paid success when plan_id is invalid AND billing is missing', () => {
     setSearchParams('plan_id=not-a-real-plan');
     mockBilling(null);
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('heading', { name: /welcome to your new plan/i })
+      screen.getByRole('heading', { name: /checkout not confirmed/i })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /welcome to your new plan/i })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: /welcome to free/i })
     ).not.toBeInTheDocument();
@@ -183,7 +201,10 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
       screen.queryByRole('heading', { name: /welcome to free/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /welcome to your new plan/i })
+      screen.queryByRole('heading', { name: /welcome to your new plan/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /checkout not confirmed/i })
     ).toBeInTheDocument();
   });
 
@@ -238,16 +259,18 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('shows Pro tiles when the validated plan is pro', async () => {
+  it('shows Artist Visibility activation instead of legacy Pro unlock tiles', async () => {
     setSearchParams('session_id=cs_test&plan_id=pro');
     mockValidatedSessionPlan('pro');
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      await screen.findByText('Release Notifications')
+      await screen.findByTestId('artist-visibility-activation')
     ).toBeInTheDocument();
-    expect(screen.getByText('Advanced Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Contact Export')).toBeInTheDocument();
+    expect(screen.getByText('Monitor')).toBeInTheDocument();
+    expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.queryByText('Release Notifications')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact Export')).not.toBeInTheDocument();
   });
 
   it('shows Max tiles when the validated plan is max', async () => {
@@ -261,11 +284,12 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     expect(screen.getByText('Metadata Submission Agent')).toBeInTheDocument();
   });
 
-  it('shows generic tiles when plan cannot be resolved', () => {
+  it('does not show generic paid tiles when plan cannot be resolved', () => {
     setSearchParams('plan_id=not-a-real-plan');
     mockBilling(null);
     render(<CheckoutSuccessPage />);
-    expect(screen.getByText('Your plan is active')).toBeInTheDocument();
+    expect(screen.queryByText('Your plan is active')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-success-recovery')).toBeInTheDocument();
   });
 });
 
@@ -281,19 +305,16 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary CTA routes to /app/chat', () => {
-    setSearchParams('plan_id=pro');
+  it('primary Pro CTA routes to Artist Visibility', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
-    expect(screen.getByRole('link', { name: /go to chat/i })).toHaveAttribute(
-      'href',
-      '/app/chat'
-    );
+    expect(
+      screen.getByRole('link', { name: /open artist visibility/i })
+    ).toHaveAttribute('href', '/app/profiles');
   });
 
-  it('secondary CTA routes to /app/releases', () => {
-    setSearchParams('plan_id=pro');
-    mockBilling('pro');
+  it('secondary CTA routes to /app/releases on Max', () => {
+    mockBilling('max');
     render(<CheckoutSuccessPage />);
     expect(
       screen.getByRole('link', { name: /view your releases/i })
@@ -301,7 +322,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
   });
 
   it('hides the secondary CTA on onboarding flow and shows "Explore your dashboard"', () => {
-    setSearchParams('source=onboarding&plan_id=pro');
+    setSearchParams('source=onboarding');
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
@@ -313,7 +334,6 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
   });
 
   it('shows verification button when isPro is true', () => {
-    setSearchParams('plan_id=pro');
     mockBilling('pro', { isPro: true });
     render(<CheckoutSuccessPage />);
     expect(
@@ -322,8 +342,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
   });
 
   it('hides verification button when isPro is false', () => {
-    setSearchParams('plan_id=pro');
-    mockBilling('free', { isPro: false });
+    mockBilling('pro', { isPro: false });
     render(<CheckoutSuccessPage />);
     expect(
       screen.queryByRole('button', { name: /request verification/i })
@@ -343,8 +362,7 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('emits subscription_success + checkout_success on mount', () => {
-    setSearchParams('plan_id=pro');
+  it('emits subscription_success + checkout_success after paid entitlement is reconciled', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(trackMock).toHaveBeenCalledWith(
@@ -383,6 +401,11 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     expect(trackMock).not.toHaveBeenCalledWith('checkout_celebration_shown', {
       planType: 'pro',
     });
+    expect(trackMock).not.toHaveBeenCalledWith(
+      'subscription_success',
+      expect.any(Object)
+    );
+    expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
 
     deferredPlan.resolve({
       ok: true,
@@ -401,8 +424,7 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     ).toHaveLength(1);
   });
 
-  it('emits mount analytics once even when reduced motion resolves after first render', async () => {
-    setSearchParams('plan_id=pro');
+  it('emits paid-success analytics once even when reduced motion resolves after first render', async () => {
     useReducedMotionMock.mockReturnValueOnce(true).mockReturnValue(false);
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
@@ -420,20 +442,51 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
   });
 
   it('skips confetti when reduced motion is enabled', () => {
-    setSearchParams('plan_id=pro');
     useReducedMotionMock.mockReturnValue(true);
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
   });
 
-  it('renders viewport confetti when motion is allowed', () => {
-    setSearchParams('plan_id=pro');
+  it('renders viewport confetti when motion is allowed and paid success is verified', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
       'data-viewport',
       'true'
     );
+  });
+
+  it('does not declare paid success when checkout-session fetch fails', async () => {
+    setSearchParams('session_id=cs_test&plan_id=pro');
+    mockValidatedSessionPlan(null, false);
+    mockBilling('pro');
+    render(<CheckoutSuccessPage />);
+    expect(
+      await screen.findByTestId('checkout-success-recovery')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /welcome to your new plan/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
+    expect(trackMock).not.toHaveBeenCalledWith(
+      'subscription_success',
+      expect.any(Object)
+    );
+    expect(
+      screen.getByRole('button', { name: /retry checkout/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go home/i })).toHaveAttribute(
+      'href',
+      '/'
+    );
+  });
+
+  it('keeps pending chrome and no conversion events while billing is still loading', () => {
+    mockBilling(null, { isLoading: true });
+    render(<CheckoutSuccessPage />);
+    expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
+    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
+    expect(pageMock).not.toHaveBeenCalled();
   });
 });

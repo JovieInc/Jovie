@@ -519,5 +519,76 @@ class ProducerTests(unittest.TestCase):
                     MODULE.read_sources(None)
 
 
+    def test_resolve_main_sha_falls_back_to_refs_heads_main_not_zeros(self):
+        with tempfile.TemporaryDirectory() as directory:
+            git_dir = pathlib.Path(directory) / "mirror.git"
+            subprocess = __import__("subprocess")
+            subprocess.check_call(
+                ["git", "init", "--bare", str(git_dir)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            work = pathlib.Path(directory) / "work"
+            work.mkdir()
+            subprocess.check_call(
+                ["git", "clone", str(git_dir), str(work)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                ["git", "-C", str(work), "checkout", "-b", "main"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            (work / "README").write_text("x\n")
+            subprocess.check_call(
+                ["git", "-C", str(work), "add", "README"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                [
+                    "git",
+                    "-C",
+                    str(work),
+                    "-c",
+                    "user.email=ci@example.com",
+                    "-c",
+                    "user.name=ci",
+                    "commit",
+                    "-m",
+                    "init",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                ["git", "-C", str(work), "push", "origin", "HEAD:refs/heads/main"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            expected = subprocess.check_output(
+                ["git", "--git-dir", str(git_dir), "rev-parse", "refs/heads/main"],
+                text=True,
+            ).strip()
+            with mock.patch.dict(
+                MODULE.os.environ,
+                {"JOVIE_CONFIGURATION_SOURCE_ROOT": str(git_dir)},
+                clear=False,
+            ):
+                self.assertEqual(
+                    MODULE.resolve_main_sha({"sha": "0" * 40}), expected
+                )
+                self.assertEqual(MODULE.resolve_main_sha({}), expected)
+            with mock.patch.dict(
+                MODULE.os.environ,
+                {"JOVIE_CONFIGURATION_SOURCE_ROOT": str(pathlib.Path(directory) / "missing.git")},
+                clear=False,
+            ):
+                with self.assertRaisesRegex(ValueError, "main-sha-unavailable"):
+                    MODULE.resolve_main_sha({"sha": "0" * 40})
+        self.assertEqual(MODULE.resolve_main_sha({"sha": MAIN_SHA}), MAIN_SHA)
+
+
 if __name__ == "__main__":
     unittest.main()

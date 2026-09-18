@@ -2,10 +2,16 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
+  appendMergeQueueEntryBind,
+  appendSummerIssueBind,
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
+  NATIVE_QUEUE_ACTION,
+  nativeQueueEnrollPlan,
+  readCapturedMergeQueueEntryId,
   selectGreenReadyPrs,
+  WAITING_DURABLE_ORACLE,
 } from './native-queue-starvation-execute.mjs';
 
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
@@ -116,15 +122,53 @@ async function writeExecution(record) {
   return parsed;
 }
 
+function listCleanOpenPrs() {
+  try {
+    const rows = ghJson([
+      'pr',
+      'list',
+      '--repo',
+      'JovieInc/Jovie',
+      '--base',
+      'main',
+      '--state',
+      'open',
+      '--limit',
+      '40',
+      '--json',
+      'number,isDraft,mergeStateStatus,headRefOid,baseRefName',
+    ]);
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter(
+        row =>
+          row?.isDraft !== true &&
+          row?.baseRefName === 'main' &&
+          row?.mergeStateStatus === 'CLEAN' &&
+          Number.isInteger(row?.number) &&
+          typeof row?.headRefOid === 'string'
+      )
+      .map(row => ({ number: row.number, head: row.headRefOid }));
+  } catch {
+    return [];
+  }
+}
+
 function fleetAdmission(path) {
   const fleet = JSON.parse(readFileSync(path, 'utf8'));
   const gem = fleet.concurrency?.gem ?? {};
   const remediation = fleet.remediationAdmission ?? {};
+  const fromFleet = selectGreenReadyPrs(fleet);
   return {
     mutationAllowed: gem.newMutationAllowed === true,
     pushAllowed: remediation.pushAllowed === true,
     maxConcurrent: Number(gem.maxConcurrent ?? 0),
-    greenReadyPrs: selectGreenReadyPrs(fleet),
+    greenReadyPrs: [
+      ...fromFleet,
+      ...listCleanOpenPrs().filter(
+        row => !fromFleet.some(existing => existing?.number === row.number)
+      ),
+    ],
   };
 }
 
@@ -138,7 +182,60 @@ function ghJson(args) {
   return JSON.parse(result.stdout);
 }
 
-async function enrollPr({ pr, head }) {
+function bindLinearIdentifier({
+  pr,
+  repo,
+  issueIdentifier,
+  taskKey,
+  body,
+  mergeQueueEntryId,
+}) {
+  if (
+    typeof issueIdentifier !== 'string' ||
+    !/^JOV-[1-9][0-9]*$/u.test(issueIdentifier)
+  ) {
+    return body;
+  }
+  let nextBody = appendSummerIssueBind(body, issueIdentifier, taskKey);
+  if (mergeQueueEntryId) {
+    nextBody = appendMergeQueueEntryBind(nextBody, mergeQueueEntryId);
+  }
+  if (nextBody !== (typeof body === 'string' ? body : '')) {
+    spawnSync(
+      'gh',
+      ['pr', 'edit', String(pr), '--repo', repo, '--body', nextBody],
+      { encoding: 'utf8' }
+    );
+  }
+  spawnSync(
+    'gh',
+    ['pr', 'comment', String(pr), '--repo', repo, '--body', issueIdentifier],
+    { encoding: 'utf8' }
+  );
+  return nextBody;
+}
+
+function mergeQueueSnapshot(pr) {
+  try {
+    const payload = ghJson([
+      'api',
+      'graphql',
+      '-f',
+      `query={ repository(owner:"JovieInc", name:"Jovie") { pullRequest(number:${Number(pr)}) { mergedAt mergeQueueEntry { id state enqueuedAt } timelineItems(last:20, itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT, REMOVED_FROM_MERGE_QUEUE_EVENT, MERGED_EVENT]) { nodes { __typename ... on AddedToMergeQueueEvent { createdAt actor { login } } ... on RemovedFromMergeQueueEvent { createdAt actor { login } } ... on MergedEvent { createdAt } } } } } }`,
+    ]);
+    const pull = payload?.data?.repository?.pullRequest ?? null;
+    if (!pull) return null;
+    return {
+      mergedAt: pull.mergedAt ?? null,
+      mergeQueueEntry: pull.mergeQueueEntry ?? null,
+      timeline: pull.timelineItems?.nodes ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function enrollPr({ pr, head, issueIdentifier, taskKey }) {
   const repo = 'JovieInc/Jovie';
   let viewed;
   try {
@@ -149,7 +246,7 @@ async function enrollPr({ pr, head }) {
       '--repo',
       repo,
       '--json',
-      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName',
+      'number,state,isDraft,mergeStateStatus,headRefOid,baseRefName,body',
     ]);
   } catch (error) {
     return {
@@ -173,26 +270,81 @@ async function enrollPr({ pr, head }) {
   if (head && viewed.headRefOid !== head) {
     return { ok: false, reason: 'native-queue-head-drift' };
   }
-  if (viewed.mergeStateStatus !== 'CLEAN') {
+  const live = mergeQueueSnapshot(viewed.number);
+  const capturedEntryId = readCapturedMergeQueueEntryId(viewed.body);
+  const plan = nativeQueueEnrollPlan({
+    mergeStateStatus: viewed.mergeStateStatus,
+    mergeQueueEntry: live?.mergeQueueEntry ?? null,
+    mergedAt: live?.mergedAt ?? null,
+    timeline: live?.timeline ?? [],
+    capturedEntryId,
+  });
+  if (plan.action === 'reject') {
+    return { ok: false, reason: plan.detail, pr: viewed.number };
+  }
+  let body = viewed.body;
+  body = bindLinearIdentifier({
+    pr: viewed.number,
+    repo,
+    issueIdentifier,
+    taskKey,
+    body,
+    mergeQueueEntryId: live?.mergeQueueEntry?.id,
+  });
+  if (plan.action === 'bind-merged') {
     return {
-      ok: false,
-      reason: `native-queue-not-clean:${viewed.mergeStateStatus}`,
+      ok: true,
+      durable: true,
+      mergedAt: live?.mergedAt,
+      pr: viewed.number,
+      head: viewed.headRefOid,
     };
   }
-  const merged = spawnSync(
-    'gh',
-    ['pr', 'merge', String(pr), '--repo', repo, '--squash', '--auto'],
-    { encoding: 'utf8' }
-  );
-  if (merged.status !== 0) {
+  if (plan.action === 'bind-durable-queue') {
     return {
-      ok: false,
-      reason: `native-queue-enroll-failed:${String(
-        merged.stderr || merged.stdout || ''
-      ).slice(0, 180)}`,
+      ok: true,
+      durable: true,
+      mergeQueueEntryId: live?.mergeQueueEntry?.id,
+      pr: viewed.number,
+      head: viewed.headRefOid,
     };
   }
-  return { ok: true, head: viewed.headRefOid, pr: viewed.number };
+  for (let i = 0; i < 12; i += 1) {
+    spawnSync('sleep', ['20'], { encoding: 'utf8' });
+    const next = mergeQueueSnapshot(viewed.number);
+    if (next?.mergedAt) {
+      return {
+        ok: true,
+        durable: true,
+        mergedAt: next.mergedAt,
+        pr: viewed.number,
+        head: viewed.headRefOid,
+      };
+    }
+    if (next?.mergeQueueEntry?.id) {
+      bindLinearIdentifier({
+        pr: viewed.number,
+        repo,
+        issueIdentifier,
+        taskKey,
+        body,
+        mergeQueueEntryId: next.mergeQueueEntry.id,
+      });
+      return {
+        ok: false,
+        reason: WAITING_DURABLE_ORACLE,
+        mergeQueueEntryId: next.mergeQueueEntry.id,
+        pr: viewed.number,
+        head: viewed.headRefOid,
+      };
+    }
+  }
+  return {
+    ok: false,
+    reason: 'native-queue-waiting-bot-enqueue',
+    pr: viewed.number,
+    head: viewed.headRefOid,
+  };
 }
 
 const taskKey = process.argv[2];
@@ -200,6 +352,7 @@ const issueIdentifier = process.argv[3];
 const sourceVersion = process.argv[4];
 const snapshotDigest = process.argv[5];
 const fleetPath = process.argv[6];
+const action = process.argv[7] || NATIVE_QUEUE_ACTION;
 if (
   !taskKey ||
   !issueIdentifier ||
@@ -208,7 +361,7 @@ if (
   !fleetPath
 ) {
   throw new Error(
-    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json>'
+    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> [action]'
   );
 }
 
@@ -216,7 +369,7 @@ const result = await executeNativeQueueStarvation({
   taskKey,
   issueIdentifier,
   source: { sourceVersion, snapshotDigest },
-  admission: fleetAdmission(fleetPath),
+  admission: { ...fleetAdmission(fleetPath), action },
   signatureKeyId: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID'),
   privateKeyPem: required(
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
@@ -226,14 +379,18 @@ const result = await executeNativeQueueStarvation({
   enrollPr,
   writeExecution,
 });
-process.stdout.write(`${JSON.stringify(result.decision)}\n`);
 process.stdout.write(
   `${JSON.stringify({
     status: result.status,
     taskKey: result.taskKey,
     issueIdentifier: result.issueIdentifier,
+    detail: result.decision?.detail,
+    pr: result.decision?.pr ?? null,
+    mergeQueueEntryId: result.decision?.mergeQueueEntryId ?? null,
+    mergedAt: result.decision?.mergedAt ?? null,
     acknowledgement: result.acknowledgement,
     claim: result.claim,
     terminal: result.terminal,
+    decision: result.decision,
   })}\n`
 );

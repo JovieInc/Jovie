@@ -44,6 +44,9 @@ from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
+    assert_repo_sidecar_path,
+    fleet_sidecar_path,
+    gate_state_dir,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
@@ -65,6 +68,16 @@ CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
+CLOSURE_HEALTH_PLACEHOLDER_REASON = "closure-health-receipt-missing-or-malformed"
+GATE_EVALUATION_FAILED_REASON = "gate-evaluation-failed"
+LIVE_PERSIST_ALLOW_ENV = "FLEET_GATE_ALLOW_LIVE_PERSIST"
+LIVE_PERSIST_WRITER = "gem-priority-gate.persist_live_receipt"
+UNSAFE_LIVE_PERSIST_REASONS = frozenset(
+    {
+        CLOSURE_HEALTH_PLACEHOLDER_REASON,
+        GATE_EVALUATION_FAILED_REASON,
+    }
+)
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
@@ -220,7 +233,7 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "reasons": [CLOSURE_HEALTH_PLACEHOLDER_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -868,6 +881,11 @@ def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
 
 
 def write_queue_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
+    if snapshot.get("schema") == QUEUE_SNAPSHOT_SCHEMA:
+        repository = snapshot.get("repository")
+        if not isinstance(repository, str) or not repository.strip():
+            raise ValueError("queue snapshot must name its repository")
+        assert_repo_sidecar_path(path, repository, "queue-snapshot.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(
@@ -1136,6 +1154,17 @@ def observe_queue(
     reuse a fresh last-known snapshot instead of emitting queue-unknown.
     """
     observed_at = now or utc_now()
+    if snapshot_path is not None:
+        try:
+            assert_repo_sidecar_path(snapshot_path, repo, "queue-snapshot.json")
+        except ValueError as error:
+            return {
+                "status": "unknown",
+                "repository": repo,
+                "eligiblePrs": None,
+                "target": target,
+                "error": f"queue-observation-failed: {error}",
+            }
     try:
         result = run_gh_queue_snapshot(repo)
         prs = json.loads(result.stdout)
@@ -1152,7 +1181,7 @@ def observe_queue(
         if snapshot_path is not None and snapshot_path.exists():
             try:
                 loaded = read_json(snapshot_path)
-                if isinstance(loaded, dict):
+                if isinstance(loaded, dict) and loaded.get("repository") == repo:
                     previous = loaded
             except (OSError, ValueError, json.JSONDecodeError):
                 previous = {}
@@ -1728,6 +1757,90 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     }
 
 
+class LivePersistFenceError(RuntimeError):
+    """Refuse-closed live persist. Never converted into a persisted receipt."""
+
+
+def live_persist_override_is_nonzero(raw: str | None) -> bool:
+    """True when FLEET_GATE_ALLOW_LIVE_PERSIST is a nonzero/truthy spelling."""
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    return value not in {"", "0", "false", "no", "off"}
+
+
+def refuse_unsafe_live_persist_override() -> bool:
+    """Return True when live persist must be skipped due to override env.
+
+    The env var is not an enable switch. Any nonzero spelling refuse-closes the
+    *write* only — callers must still emit a schema-valid receipt on stdout.
+    """
+    raw = os.environ.get(LIVE_PERSIST_ALLOW_ENV)
+    return live_persist_override_is_nonzero(raw)
+
+
+def _receipt_reason_codes(receipt: dict[str, Any]) -> set[str]:
+    codes: set[str] = set()
+    for item in receipt.get("reasons") or []:
+        if isinstance(item, str):
+            codes.add(item)
+        elif isinstance(item, dict):
+            code = item.get("code")
+            if isinstance(code, str):
+                codes.add(code)
+    signals = receipt.get("signals")
+    closure = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if isinstance(closure, dict):
+        for item in closure.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    admission = receipt.get("closureAdmission")
+    if isinstance(admission, dict):
+        for item in admission.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    return codes
+
+
+def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
+    """Return why a candidate must not replace latest.json, or None if safe."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected malformed receipt schema"
+    if parse_time(receipt.get("observedAt")) is None:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without a typed observedAt"
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed signals"
+    main = signals.get("main")
+    sha = main.get("sha") if isinstance(main, dict) else None
+    if not valid_commit_sha(sha, exact=True) or sha == UNKNOWN_MAIN_SHA:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected receipt without exact source/main identity"
+        )
+    closure = signals.get("closureHealth")
+    if not isinstance(closure, dict) or closure.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed closure-health"
+    if closure.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without closure-health authority"
+    if closure.get("status") not in {"healthy", "grace", "red"}:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt with untyped closure-health status"
+    unsafe = _receipt_reason_codes(receipt) & UNSAFE_LIVE_PERSIST_REASONS
+    if CLOSURE_HEALTH_PLACEHOLDER_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected placeholder closure-health "
+            f"({CLOSURE_HEALTH_PLACEHOLDER_REASON})"
+        )
+    if GATE_EVALUATION_FAILED_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected failed-evaluation receipt "
+            f"({GATE_EVALUATION_FAILED_REASON})"
+        )
+    work = receipt.get("workAdmission")
+    if not isinstance(work, dict) or not isinstance(work.get("allowed"), bool):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed workAdmission"
+    return None
+
+
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
     """Commit the hold first, then publish latest.json as the commit marker.
 
@@ -1859,7 +1972,7 @@ def failed_evaluation_receipt(
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["gate-evaluation-failed"],
+        "reasons": [GATE_EVALUATION_FAILED_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -1892,7 +2005,7 @@ def failed_evaluation_receipt(
         },
         "reasons": [
             typed_reason(
-                "gate-evaluation-failed",
+                GATE_EVALUATION_FAILED_REASON,
                 "integrity",
                 "critical",
                 str(error),
@@ -1916,7 +2029,7 @@ def failed_evaluation_receipt(
             "fallbackPrGenerationAllowed": False,
             "authority": CLOSURE_HEALTH_AUTHORITY,
             "status": "red",
-            "reasons": ["gate-evaluation-failed"],
+            "reasons": [GATE_EVALUATION_FAILED_REASON],
             "promotionContinues": True,
             "remediationContinues": True,
             "products": project_product_admission(product_closures),
@@ -1993,7 +2106,24 @@ def persist_live_receipt(
     cannot create the Gem state dir. Throwing there used to replace a complete
     live receipt with an incomplete stub. Consumers must still receive the
     live evaluation so Auto-Enroll can skip or admit from schema-valid JSON.
+
+    Placeholder, failed-evaluation, and untyped candidates never replace
+    latest.json. A prior valid receipt stays in place. The live-persist
+    env override is not an enable switch: any nonzero spelling hard-fails
+    before the writer lock is taken.
     """
+    if refuse_unsafe_live_persist_override():
+        warn_live_receipt_not_persisted(
+            LivePersistFenceError(
+                f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
+                "nonzero; live persist is refuse-closed (evaluation still emitted)"
+            )
+        )
+        return receipt
+    rejected = live_persist_rejection_reason(receipt)
+    if rejected is not None:
+        warn_live_receipt_not_persisted(LivePersistFenceError(rejected))
+        return receipt
     try:
         lock_fd = acquire_writer_lock(state_dir)
     except (OSError, TimeoutError) as error:
@@ -2064,9 +2194,19 @@ def parse_args() -> argparse.Namespace:
         "--state-dir",
         type=Path,
         default=Path(
-            os.environ.get(
-                "GEM_PRIORITY_GATE_STATE_DIR",
-                "/home/timwhite/gem-workspace/state/gem-priority-gate",
+            os.environ.get("GEM_PRIORITY_GATE_STATE_DIR")
+            # Per-repo isolation: non-Jovie repos resolve their own state dir
+            # so sibling singletons never collide with Jovie's (JOV-INV).
+            or gate_state_dir(
+                Path(
+                    os.environ.get(
+                        "GEM_WORKSPACE",
+                        "/home/timwhite/gem-workspace",
+                    )
+                ),
+                os.environ.get("GEM_PRIORITY_GATE_REPO")
+                or os.environ.get("GEM_PR_DRAIN_REPO")
+                or "JovieInc/Jovie",
             )
         ),
     )
@@ -2094,7 +2234,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     )
     review_path = (
         args.independent_review_receipt
-        or args.state_dir.parent / "independent-review.json"
+        or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
     closure = observe_closure_health(args.repo, previous_closure_health(args.state_dir), now)
     return {
@@ -2102,7 +2242,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "production": observe_production(args.production_url),
         "controller": observe_controller(
             args.symphony_url,
-            snapshot_path=args.state_dir.parent / "controller-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "controller-snapshot.json"
+            ),
             now=now,
         ),
         "integrity": observe_integrity(integrity_path),
@@ -2110,7 +2252,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.repo,
             args.queue_target,
             default_lane_budget,
-            snapshot_path=args.state_dir.parent / "queue-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "queue-snapshot.json"
+            ),
             now=now,
         ),
         "closureHealth": closure,

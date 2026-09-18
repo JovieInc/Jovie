@@ -1995,6 +1995,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          # Tags are unused by the guard/skip path and can exhaust the 3m job
+          # budget on this large repo (hundreds of release tags).
+          fetch-tags: false
       - name: Check for relevant changes
         id: check_changes
         shell: bash
@@ -2241,6 +2244,7 @@ jobs:
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
+                  tests/e2e/storybook-separator.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi

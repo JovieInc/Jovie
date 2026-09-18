@@ -1,6 +1,6 @@
 {
   "name": "@jovie/desktop",
-  "version": "26.9.9",
+  "version": "26.9.10",
   "description": "Jovie desktop app",
   "author": "Jovie Technology Inc.",
   "private": true,
@@ -62,7 +62,7 @@
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3",
     "esbuild": "0.28.2",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "typescript": "^5.7.0"
   }
 }

@@ -15,6 +15,7 @@ import {
 } from '@/lib/discography/queries';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { buildProviderLabels } from '@/lib/discography/view-models';
+import { requireOwnedReleaseProfile } from './owned-profile';
 import type { ReleaseProfileContext } from './release-types';
 import { mapReleaseToViewModel } from './release-view-models';
 
@@ -151,22 +152,14 @@ export async function loadReleaseEntity(params: {
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
-    [
-      'releases-matrix',
-      profile.userId,
-      profile.profileId,
-      profile.profileHandle,
-    ],
+    () => fetchReleaseMatrixCore(owned.profileId, profile.profileHandle),
+    ['releases-matrix', owned.userId, owned.profileId, profile.profileHandle],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${profile.userId}:${profile.profileId}`],
+      tags: [`releases:${owned.userId}:${owned.profileId}`],
     }
   )();
 }
@@ -174,27 +167,24 @@ export async function loadReleaseMatrixForProfile(
 export async function loadArchivedReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   return unstable_cache(
     () =>
       fetchReleaseMatrixCore(
-        profile.profileId,
+        owned.profileId,
         profile.profileHandle,
         'archived'
       ),
     [
       'releases-matrix-archived',
-      profile.userId,
-      profile.profileId,
+      owned.userId,
+      owned.profileId,
       profile.profileHandle,
     ],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${profile.userId}:${profile.profileId}`],
+      tags: [`releases:${owned.userId}:${owned.profileId}`],
     }
   )();
 }
