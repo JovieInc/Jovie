@@ -936,9 +936,10 @@ html[data-profile-initial-mode]
 }
 
 @media (min-width: 1180px) {
-  /* Public desktop owns a deliberate wide composition. CSS owns the boundary
-     so the compact surface is already absent before the responsive client
-     state hydrates. Embedded editor/demo previews remain compact. */
+  /* Public desktop owns a deliberate wide composition. CSS hides the compact
+     surface visually before hydration so the phone card never flashes.
+     Compact stays in the accessibility tree until JS marks the desktop
+     surface ready (JOV-6434). Embedded editor/demo previews remain compact. */
   .profile-viewport:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
@@ -948,6 +949,19 @@ html[data-profile-initial-mode]
   }
 
   .profile-viewport:not(.profile-viewport--embedded)
+    .public-profile-layout-compact-slot {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]
     .public-profile-layout-compact-slot {
     display: none;
   }
