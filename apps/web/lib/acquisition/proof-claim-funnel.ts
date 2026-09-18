@@ -122,7 +122,7 @@ export function buildProofClaimHref(waitlistEnabled: boolean): string {
 }
 
 export function resolveProofClaimCta(
-  waitlistEnabled = FEATURE_FLAGS.WAITLIST_ENABLED
+  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
 ): ProofClaimCta {
   const offer = getProofClaimOffer();
   if (waitlistEnabled) {
