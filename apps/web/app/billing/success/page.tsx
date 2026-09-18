@@ -368,7 +368,7 @@ export default function CheckoutSuccessPage() {
               view.kind === 'pending'
                 ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-2'
                 : view.kind === 'recovery'
-                  ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--app-shell-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--app-shell-content-surface))]'
+                  ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-warning/20 bg-warning-subtle'
                   : 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'
             }
             aria-live={view.kind === 'pending' ? 'polite' : undefined}
@@ -380,10 +380,7 @@ export default function CheckoutSuccessPage() {
                 aria-hidden='true'
               />
             ) : view.kind === 'recovery' ? (
-              <XCircle
-                className='h-8 w-8 text-(--linear-warning)'
-                aria-hidden='true'
-              />
+              <XCircle className='h-8 w-8 text-warning' aria-hidden='true' />
             ) : (
               <PartyPopper className='h-8 w-8 text-success' />
             )}
