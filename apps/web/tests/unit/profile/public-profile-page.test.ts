@@ -341,14 +341,12 @@ describe('Public Profile Page Logic', () => {
 
     it('offers the editorial AEO claim card for unclaimed direct-claim or proof profiles', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '!isClaimed && directClaimSupported'
+        '!isProofProfile && !isClaimed && directClaimSupported'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('isProofProfile');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('resolveProofClaimCta');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'isProofProfile\n            ? proofClaim.href'
-      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('ProfileAeoProofClaimCard');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'claimFooterLabel={isProofProfile ? proofClaim.label : undefined}'
       );

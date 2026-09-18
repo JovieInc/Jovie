@@ -15,12 +15,11 @@
 
 import { APP_ROUTES } from '@/constants/routes';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import {
-  ARTIST_VISIBILITY_OFFER,
-  getPlanSignupHref,
-} from '@/lib/billing/offer-truth';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+
+/** Locked Artist Visibility Pro monthly offer. Keep in sync with plan-prices. */
+const PROOF_CLAIM_MONTHLY_USD = 199;
 
 export const PROOF_CLAIM_CAMPAIGN_KEY = 'proof-to-claim' as const;
 export const PROOF_CLAIM_VARIANT_ID = 'proof-to-claim:m1:v1' as const;
@@ -93,9 +92,9 @@ export interface ProofClaimOffer {
 export function getProofClaimOffer(): ProofClaimOffer {
   return {
     product: 'Artist Visibility Pro',
-    monthlyUsd: ARTIST_VISIBILITY_OFFER.pro.monthlyUsd,
-    currency: ARTIST_VISIBILITY_OFFER.pro.currency,
-    interval: ARTIST_VISIBILITY_OFFER.pro.interval,
+    monthlyUsd: PROOF_CLAIM_MONTHLY_USD,
+    currency: 'usd',
+    interval: 'month',
   };
 }
 
@@ -125,7 +124,7 @@ export function buildProofClaimHref(waitlistEnabled: boolean): string {
     );
   }
 
-  return withProofClaimParams(getPlanSignupHref('pro', 'month'));
+  return withProofClaimParams(`${APP_ROUTES.SIGNUP}?plan=pro&interval=month`);
 }
 
 export function resolveProofClaimCta(

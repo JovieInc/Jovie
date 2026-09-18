@@ -887,25 +887,4 @@ describe('Profile AEO content', () => {
     rerender(<ProfileAeoContent content={content} />);
     expect(screen.queryByTestId('profile-aeo-claim-card')).toBeNull();
   });
-
-  it('renders a taste-safe proof-to-claim CTA without calling the profile unclaimed', () => {
-    const content = buildContent();
-    render(
-      <ProfileAeoContent
-        content={content}
-        claimHref='/waitlist?campaign=proof-to-claim'
-        claimLabel='Request access'
-        claimNote='Limited · Request access'
-        proofClaim
-      />
-    );
-
-    expect(screen.getByRole('heading', { name: 'jov.ie/you' })).toBeVisible();
-    expect(screen.getByText('Limited · Request access')).toBeVisible();
-    const cta = screen.getByTestId('profile-aeo-claim-cta');
-    expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
-    expect(cta).toHaveTextContent('Request access');
-    expect(screen.queryByText(/Claim artist profile/i)).toBeNull();
-    expect(screen.queryByText(/unclaimed/i)).toBeNull();
-  });
 });

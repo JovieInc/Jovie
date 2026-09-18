@@ -12,6 +12,7 @@ import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfi
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
+import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
@@ -535,16 +536,19 @@ async function ArtistPageContent({
       <ProfileAeoContent
         content={aeoContent}
         claimHref={
-          isProofProfile
-            ? proofClaim.href
-            : !isClaimed && directClaimSupported
-              ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
-              : undefined
+          !isProofProfile && !isClaimed && directClaimSupported
+            ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+            : undefined
         }
-        claimLabel={isProofProfile ? proofClaim.label : undefined}
-        claimNote={isProofProfile ? proofClaim.note : undefined}
-        proofClaim={isProofProfile}
       />
+      {isProofProfile ? (
+        <ProfileAeoProofClaimCard
+          artistName={aeoContent.artistName}
+          href={proofClaim.href}
+          label={proofClaim.label}
+          note={proofClaim.note}
+        />
+      ) : null}
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
