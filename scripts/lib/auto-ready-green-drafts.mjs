@@ -13,8 +13,8 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { hasControlledProofMarker } from './auto-ready-provenance.mjs';
+import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
 
 export const GREEN_SOURCE_PROTECTED_PRS = Object.freeze([

@@ -81,16 +81,20 @@ describe('green-source draft classifier', () => {
     }
   );
 
-  it.each(['hold', 'gated', 'incident', 'security', 'queue-deferred', ...TIM_HOLD_LABELS])(
-    'refuses Tim/machine hold label %s',
-    label => {
-      expect(classifyGreenSourceDraft(draft({ labels: [label] }))).toEqual({
-        eligible: false,
-        reason: 'held',
-      });
-      expect(hasGreenSourceHold([label])).toBe(true);
-    }
-  );
+  it.each([
+    'hold',
+    'gated',
+    'incident',
+    'security',
+    'queue-deferred',
+    ...TIM_HOLD_LABELS,
+  ])('refuses Tim/machine hold label %s', label => {
+    expect(classifyGreenSourceDraft(draft({ labels: [label] }))).toEqual({
+      eligible: false,
+      reason: 'held',
+    });
+    expect(hasGreenSourceHold([label])).toBe(true);
+  });
 
   it.each(['human-review-required', 'needs-human', 'no-auto', 'taste'])(
     'ignores the legacy %s label',
@@ -103,11 +107,14 @@ describe('green-source draft classifier', () => {
   );
 
   it('refuses controlled-proof markers', () => {
+    expect(classifyGreenSourceDraft(draft({ labels: ['canary'] }))).toEqual({
+      eligible: false,
+      reason: 'controlled-proof',
+    });
     expect(
-      classifyGreenSourceDraft(draft({ labels: ['canary'] }))
-    ).toEqual({ eligible: false, reason: 'controlled-proof' });
-    expect(
-      classifyGreenSourceDraft(draft({ title: 'fix(ci): [deliberate-red] fixture' }))
+      classifyGreenSourceDraft(
+        draft({ title: 'fix(ci): [deliberate-red] fixture' })
+      )
     ).toEqual({ eligible: false, reason: 'controlled-proof' });
   });
 
@@ -206,16 +213,20 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain('# accountable-writer: Gem');
     expect(workflow).toContain('# necessary-trust-boundary:');
     expect(workflow).toContain('# removal-trigger:');
-    expect(workflow).toContain('never enables auto-merge or enrolls the merge queue');
+    expect(workflow).toContain(
+      'never enables auto-merge or enrolls the merge queue'
+    );
   });
 
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_run:');
     expect(workflow).toContain('check_suite:');
-    expect(workflow).toContain("workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']");
+    expect(workflow).toContain(
+      "workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']"
+    );
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
-    expect(workflow).toContain('github.event_name == \'workflow_dispatch\'');
+    expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).toContain(
       "github.event.workflow_run.event == 'pull_request'"
     );
@@ -234,7 +245,9 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain(
       'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1'
     );
-    expect(workflow).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+    expect(workflow).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(workflow).toContain('id: green-source');
     expect(workflow).toContain('TARGET_PR');
     expect(workflow).toContain('TARGET_HEAD');

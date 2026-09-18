@@ -279,17 +279,15 @@ describe('Auto-Ready provenance selector', () => {
     });
   });
 
-  it.each([
-    'security',
-    'hold',
-    'gated',
-    'queue-deferred',
-  ])('never mutates a hard-held PR labeled %s', label => {
-    expect(
-      promotion({ authorLogin: 'jovie-bot[bot]', labels: [label] })
-    ).toEqual({ eligible: false, reason: 'held' });
-    expect(AUTO_READY_HOLD_LABELS).toEqual(expect.arrayContaining([label]));
-  });
+  it.each(['security', 'hold', 'gated', 'queue-deferred'])(
+    'never mutates a hard-held PR labeled %s',
+    label => {
+      expect(
+        promotion({ authorLogin: 'jovie-bot[bot]', labels: [label] })
+      ).toEqual({ eligible: false, reason: 'held' });
+      expect(AUTO_READY_HOLD_LABELS).toEqual(expect.arrayContaining([label]));
+    }
+  );
 
   it.each([
     'human-review-required',
