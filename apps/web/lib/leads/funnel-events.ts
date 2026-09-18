@@ -21,6 +21,11 @@ import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
+import {
+  type CheckoutCorrelation,
+  hasCheckoutCorrelation,
+  toCheckoutCorrelationReceiptFields,
+} from '@/lib/stripe/checkout-correlation';
 
 const LEAD_ATTRIBUTION_COOKIE = 'jovie_lead_attribution';
 const LEAD_ATTRIBUTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -455,7 +460,8 @@ export async function attributeLeadPaidConversionByClerkUserId(
  */
 export async function attributeLeadPaidConversionByAppUserId(
   appUserId: string,
-  subscriptionId: string
+  subscriptionId: string,
+  correlation?: CheckoutCorrelation
 ): Promise<void> {
   const [lead] = await db
     .select({
@@ -487,6 +493,9 @@ export async function attributeLeadPaidConversionByAppUserId(
   }
 
   const outcomeAttribution = claimPayOutcomeAttribution();
+  const correlationFields = hasCheckoutCorrelation(correlation)
+    ? toCheckoutCorrelationReceiptFields(correlation)
+    : {};
   await recordLeadFunnelEvent(
     {
       leadId: lead.id,
@@ -497,6 +506,7 @@ export async function attributeLeadPaidConversionByAppUserId(
         signupUserId: appUserId,
         stripeSubscriptionId: subscriptionId,
         experimentId: outcomeAttribution.experimentId,
+        ...correlationFields,
       },
     },
     { idempotent: true, required: true }
