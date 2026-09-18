@@ -434,12 +434,15 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
-  it('keeps workflow recovery manual-only and never source-event driven', () => {
+  it('keeps writer-proof recovery manual-only and out of source PR events', () => {
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain(
+      "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
+    );
     expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('workflow_run:');
     expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
+    expect(workflow).not.toContain('schedule:');
   });
 });

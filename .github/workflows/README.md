@@ -163,9 +163,11 @@ The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches
 after a push. It enforces the same 5 open-agent-PR capacity cap before creating
 new draft PRs; downstream verification and agent pipeline jobs decide when a
 draft is ready and whether auto-merge is eligible. For provenance-authorized
-agent PRs, Auto-Ready immediately pairs the ready transition with native
-auto-merge intent while the first source CI flight is still pending. An
-unchanged `ready_for_review` event never launches another CI flight.
+agent PRs, manual Auto-Ready recovery can still pair the ready transition with
+native auto-merge intent. Green-source Auto-Ready undrafts a draft only after
+PR Ready + required checks are SUCCESS and mergeability is CLEAN; Auto-Enroll
+then consumes `ready_for_review`. An unchanged `ready_for_review` event never
+launches another CI flight.
 
 <!-- ci-harness:start -->
 ## CI Agent Harness
