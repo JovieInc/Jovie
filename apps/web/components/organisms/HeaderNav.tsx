@@ -13,8 +13,11 @@ import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
+
+const DEFAULT_PUBLIC_CTA = HOMEPAGE_FRONT_DOOR_CTA.primary;
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
@@ -77,10 +80,7 @@ function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
   minimalLabel = 'Sign in',
-  publicCta = {
-    href: APP_ROUTES.SIGNUP,
-    label: 'Request Access',
-  },
+  publicCta = DEFAULT_PUBLIC_CTA,
 }: PublicAuthActionsProps = {}) {
   if (minimal) {
     if (minimalVariant === 'pill') {
@@ -136,10 +136,7 @@ function HeaderPrimaryAuthLink({
 }
 
 function GlassAuthActions({
-  publicCta = {
-    href: APP_ROUTES.SIGNUP,
-    label: 'Request Access',
-  },
+  publicCta = DEFAULT_PUBLIC_CTA,
   showContactLink = true,
 }: Readonly<{
   publicCta?: HeaderNavCta;

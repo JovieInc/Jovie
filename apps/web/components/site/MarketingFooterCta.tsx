@@ -2,7 +2,7 @@
 'use client';
 
 import { useId } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingTerminalCta } from './MarketingTerminalCta';
@@ -34,7 +34,7 @@ export function MarketingFooterCta({
   title = 'Request Access to Jovie.',
   body,
   ctaLabel = HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel,
-  ctaHref = APP_ROUTES.SIGNUP,
+  ctaHref = HOMEPAGE_FRONT_DOOR_CTA.primary.href,
   ctaAnalyticsEvent,
   ctaAnalyticsSource,
   prefetch,

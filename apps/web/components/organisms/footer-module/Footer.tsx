@@ -5,6 +5,7 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { cn } from '@/lib/utils';
 
 const FOOTER_COLUMNS = [
@@ -30,7 +31,10 @@ const FOOTER_COLUMNS = [
     heading: 'Account',
     links: [
       { href: APP_ROUTES.SIGNIN, label: 'Log In' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
+      {
+        href: HOMEPAGE_FRONT_DOOR_CTA.primary.href,
+        label: HOMEPAGE_FRONT_DOOR_CTA.primary.label,
+      },
     ],
   },
   {

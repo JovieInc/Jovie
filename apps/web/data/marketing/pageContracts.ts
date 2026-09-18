@@ -1,4 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export interface MarketingPageContract {
   readonly routeGlob: string;
@@ -17,9 +19,15 @@ const START_CTA = {
   label: 'Find yourself',
 } as const;
 
+const PUBLIC_ACQUISITION_CTA = getHomepageFrontDoorCtaContract(
+  FEATURE_FLAGS.WAITLIST_ENABLED
+).primary;
+
 const CLAIM_PROFILE_CTA = {
-  href: 'https://jov.ie/waitlist',
-  label: 'Claim your profile',
+  href: PUBLIC_ACQUISITION_CTA.href,
+  label: FEATURE_FLAGS.WAITLIST_ENABLED
+    ? PUBLIC_ACQUISITION_CTA.label
+    : 'Claim your profile',
 } as const;
 
 export const MARKETING_PAGE_CONTRACTS = {

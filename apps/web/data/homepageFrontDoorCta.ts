@@ -4,8 +4,30 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
-/** Founder-locked public waitlist destination for the prelaunch front door. */
-export const PUBLIC_WAITLIST_URL = 'https://jov.ie/waitlist';
+/**
+ * Same-origin waitlist acquisition path.
+ *
+ * Keep this relative so Instinct/preview/dogfood CTAs stay on the current
+ * host. Hardcoding https://jov.ie/waitlist sent preview "Get started" clicks
+ * at production and left leftover /waitlist links looking like a dead 404.
+ */
+export const PUBLIC_WAITLIST_URL = APP_ROUTES.WAITLIST;
+
+/** Append query params to a same-origin acquisition path without leaving the host. */
+export function buildPublicAcquisitionHref(
+  path: string,
+  params?: Readonly<Record<string, string>>
+): string {
+  if (!params) return path;
+
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+
+  const query = search.toString();
+  return query ? `${path}?${query}` : path;
+}
 
 /** Stable variant identity for the splash-B waitlist-first handoff. */
 export const WAITLIST_FRONT_DOOR_VARIANT_ID =

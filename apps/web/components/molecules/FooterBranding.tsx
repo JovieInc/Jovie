@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { Logo } from '@/components/atoms/Logo';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { cn } from '@/lib/utils';
 
 interface FooterBrandingProps {
@@ -72,7 +73,10 @@ export function FooterBranding({
   size = 'md',
   mark = 'icon',
 }: FooterBrandingProps) {
-  const signUpLink = buildUtmLink('/waitlist', artistHandle);
+  const signUpLink = buildUtmLink(
+    HOMEPAGE_FRONT_DOOR_CTA.primary.href,
+    artistHandle
+  );
   const logoHref = buildUtmLink('/', artistHandle);
 
   const isLinear = variant === 'linear';

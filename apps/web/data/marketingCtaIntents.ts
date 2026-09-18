@@ -1,5 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  buildPublicAcquisitionHref,
+  PUBLIC_WAITLIST_URL,
+} from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -78,12 +81,10 @@ export function buildClaimProfileStartHref(
     return CLAIM_PROFILE_WAITLIST_INTENT.href;
   }
 
-  const destination = new URL(PUBLIC_WAITLIST_URL);
-  destination.search = new URLSearchParams({
+  return buildPublicAcquisitionHref(PUBLIC_WAITLIST_URL, {
     starter_prompt: `I want to claim jov.ie/${trimmed}.`,
     handle: trimmed,
-  }).toString();
-  return destination.toString();
+  });
 }
 
 export function getClaimProfileIntent(

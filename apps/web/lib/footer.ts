@@ -1,5 +1,6 @@
 import { APP_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { Artist } from '@/types/db';
 
 interface FooterOptions {
@@ -33,7 +34,8 @@ export async function generateFooterHTML({
     </svg>
   `;
 
-  const signUpLink = `/sign-up?utm_source=${utmSource}&utm_artist=${artist.handle}`;
+  const acquisitionPath = HOMEPAGE_FRONT_DOOR_CTA.primary.href;
+  const signUpLink = `${acquisitionPath}?utm_source=${utmSource}&utm_artist=${artist.handle}`;
 
   return `
     <footer class="mt-8 border-t border-gray-200 pt-6">

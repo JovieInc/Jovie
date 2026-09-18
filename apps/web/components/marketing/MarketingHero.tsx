@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
@@ -308,7 +308,7 @@ function MarketingHeroLanding({
   titleTestId = 'hero-heading',
   sectionTestId = 'marketing-hero-section',
   primaryCtaLabel = 'Get started',
-  primaryCtaHref = APP_ROUTES.SIGNUP,
+  primaryCtaHref = HOMEPAGE_FRONT_DOOR_CTA.primary.href,
   ctaEventName = 'landing_cta_get_started',
   primaryCtaTestId,
   secondaryCtaLabel,

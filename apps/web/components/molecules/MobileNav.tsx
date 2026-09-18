@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 
 import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { cn } from '@/lib/utils';
@@ -77,8 +78,8 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
-  publicCtaHref = APP_ROUTES.WAITLIST,
-  publicCtaLabel = 'Sign up',
+  publicCtaHref = HOMEPAGE_FRONT_DOOR_CTA.primary.href,
+  publicCtaLabel = HOMEPAGE_FRONT_DOOR_CTA.primary.label,
 }: Readonly<{
   showAuthenticatedAction: boolean;
   close: () => void;
