@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { recordProofClaimFunnelEvent } from '@/lib/acquisition/proof-claim-funnel.server';
 import {
   isProofClaimFunnelEvent,
   PROOF_CLAIM_FUNNEL_EVENTS,
 } from '@/lib/acquisition/proof-claim-funnel';
+import { recordProofClaimFunnelEvent } from '@/lib/acquisition/proof-claim-funnel.server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import {
   createRateLimitHeaders,
@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
       profileHandle: parsed.data.profile_handle,
     });
 
-    return NextResponse.json({ ok: true }, { status: 202, headers: NO_STORE_HEADERS });
+    return NextResponse.json(
+      { ok: true },
+      { status: 202, headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     await captureError('Failed to record proof-claim event', error, {
       route: '/api/acquisition/proof-claim',

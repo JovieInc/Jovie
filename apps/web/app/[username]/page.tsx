@@ -516,9 +516,7 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={
-          (!isClaimed && directClaimSupported) || isProofProfile
-        }
+        showClaimFooter={(!isClaimed && directClaimSupported) || isProofProfile}
         claimFooterHref={
           isProofProfile
             ? proofClaim.href

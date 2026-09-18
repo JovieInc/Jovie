@@ -3,6 +3,11 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, desc, sql as drizzleSql, eq, gt, isNull, or } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import {
+  PROOF_CLAIM_CAMPAIGN_KEY,
+  PROOF_CLAIM_FUNNEL_EVENTS,
+  proofClaimAttribution,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -14,11 +19,6 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import {
-  PROOF_CLAIM_CAMPAIGN_KEY,
-  PROOF_CLAIM_FUNNEL_EVENTS,
-  proofClaimAttribution,
-} from '@/lib/acquisition/proof-claim-funnel';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
 

@@ -283,9 +283,6 @@ describe('OnboardingCheckoutClient', () => {
 
   it('does not emit proof-to-claim checkout without attribution', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(trackMock).not.toHaveBeenCalledWith(
-      'checkout',
-      expect.anything()
-    );
+    expect(trackMock).not.toHaveBeenCalledWith('checkout', expect.anything());
   });
 });

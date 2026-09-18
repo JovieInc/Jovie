@@ -47,7 +47,9 @@ describe('GET /api/admin/acquisition/proof-claim-funnel', () => {
       isAdmin: false,
     });
     const unauthorized = await GET(
-      new NextRequest('http://localhost/api/admin/acquisition/proof-claim-funnel')
+      new NextRequest(
+        'http://localhost/api/admin/acquisition/proof-claim-funnel'
+      )
     );
     expect(unauthorized.status).toBe(401);
 
@@ -56,7 +58,9 @@ describe('GET /api/admin/acquisition/proof-claim-funnel', () => {
       isAdmin: false,
     });
     const forbidden = await GET(
-      new NextRequest('http://localhost/api/admin/acquisition/proof-claim-funnel')
+      new NextRequest(
+        'http://localhost/api/admin/acquisition/proof-claim-funnel'
+      )
     );
     expect(forbidden.status).toBe(403);
     expect(mockReport).not.toHaveBeenCalled();

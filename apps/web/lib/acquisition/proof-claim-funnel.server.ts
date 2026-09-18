@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, gte, inArray, lte, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { dailyProfileViews } from '@/lib/db/schema/analytics';
 import { leadFunnelEvents } from '@/lib/db/schema/leads';
@@ -17,9 +17,9 @@ import {
   PROOF_CLAIM_CAMPAIGN_KEY,
   PROOF_CLAIM_CHECKOUT_ALIASES,
   PROOF_CLAIM_FUNNEL_EVENTS,
+  PROOF_PROFILE,
   type ProofClaimFunnelEvent,
   type ProofClaimFunnelReport,
-  PROOF_PROFILE,
   proofClaimAttribution,
   rateProofClaimFunnel,
 } from './proof-claim-funnel';
@@ -38,10 +38,14 @@ export async function incrementProofClaimCounter(
   try {
     return await redis.incr(redisCounterKey(eventType));
   } catch (error) {
-    await captureError('Failed to increment proof-claim funnel counter', error, {
-      route: 'lib/acquisition/proof-claim-funnel.server',
-      contextData: { eventType },
-    });
+    await captureError(
+      'Failed to increment proof-claim funnel counter',
+      error,
+      {
+        route: 'lib/acquisition/proof-claim-funnel.server',
+        contextData: { eventType },
+      }
+    );
     return null;
   }
 }
@@ -93,8 +97,7 @@ export async function recordProofClaimFunnelEvent(
     leadId: attribution.leadId,
     eventType,
     campaignKey,
-    variantKey:
-      attribution.variantKey ?? proofClaimAttribution().variantKey,
+    variantKey: attribution.variantKey ?? proofClaimAttribution().variantKey,
     channel: attribution.channel,
     provider: attribution.provider,
     metadata: {
