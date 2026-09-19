@@ -22,6 +22,38 @@ const HUMAN_FIRE_RE =
 
 const LIVE_SOURCE = 'github-live';
 
+/**
+ * @typedef {{
+ *   source?: string,
+ *   exists?: boolean,
+ *   prNumber?: number | null,
+ *   isInMergeQueue?: boolean,
+ *   prReadyEnrolled?: boolean,
+ *   mergeable?: string | null,
+ *   mergeStateStatus?: string | null,
+ * }} LiveGithubPr
+ *
+ * @typedef {{
+ *   intent?: string | null,
+ *   exactQuestion?: string | null,
+ *   reason?: string | null,
+ *   failure?: string | null,
+ *   claim?: string | null,
+ *   message?: string | null,
+ *   livePr?: LiveGithubPr | null,
+ *   hostJson?: unknown,
+ *   gbrain?: unknown,
+ *   handoff?: { exactQuestion?: string | null } | null,
+ * }} HumanFireInput
+ *
+ * @typedef {{
+ *   livePr?: LiveGithubPr | null,
+ *   mode?: string,
+ *   authorityBudget?: number,
+ *   [key: string]: unknown,
+ * }} LoopRecordLike
+ */
+
 function text(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
@@ -40,6 +72,7 @@ function humanFacingText(value) {
   return normalized;
 }
 
+/** @param {HumanFireInput} [input] */
 export function inferHumanFireIntent(input = {}) {
   const explicit = text(input.intent);
   if (explicit && HUMAN_FIRE_INTENTS.includes(explicit)) return explicit;
@@ -138,6 +171,9 @@ function liveStateReceipt({
  *
  * Host JSON and GBrain-only snapshots cannot satisfy live evidence.
  */
+/**
+ * @param {HumanFireInput & { now?: string }} [args]
+ */
 export function evaluateHumanFire({
   intent = null,
   reason = null,
@@ -215,6 +251,14 @@ export function evaluateHumanFire({
   });
 }
 
+/**
+ * @param {{
+ *   record?: LoopRecordLike | null,
+ *   reason?: string | null,
+ *   now?: string,
+ *   input?: HumanFireInput,
+ * }} [args]
+ */
 export function gateHumanFireEscalation({
   record,
   reason,
