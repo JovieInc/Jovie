@@ -1,1 +1,136 @@
-aW1wb3J0IHsgcmVhZEZpbGVTeW5jIH0gZnJvbSAnbm9kZTpmcyc7CmltcG9ydCB7IHJlc29sdmUgfSBmcm9tICdub2RlOnBhdGgnOwoKaW1wb3J0IHsgZGVzY3JpYmUsIGV4cGVjdCwgaXQgfSBmcm9tICd2aXRlc3QnOwoKY29uc3Qgd29ya2Zsb3cgPSByZWFkRmlsZVN5bmMoCiAgcmVzb2x2ZShpbXBvcnQubWV0YS5kaXJuYW1lLCAnLi4vLi4vLi4vLmdpdGh1Yi93b3JrZmxvd3MvbnBtLXB1Ymxpc2gueW1sJyksCiAgJ3V0ZjgnCik7CgpmdW5jdGlvbiBhc3NlcnRQdWJsaXNoV29ya2Zsb3dDb250cmFjdChzb3VyY2U6IHN0cmluZyk6IHZvaWQgewogIGV4cGVjdChzb3VyY2UpLnRvTWF0Y2goL15vbjpcbiAgd29ya2Zsb3dfZGlzcGF0Y2g6XHMqJC9tKTsKICBleHBlY3Qoc291cmNlKS5ub3QudG9NYXRjaCgKICAgIC9eXHMrKHB1c2h8cHVsbF9yZXF1ZXN0fHNjaGVkdWxlfHdvcmtmbG93X3J1bnxyZXBvc2l0b3J5X2Rpc3BhdGNoKTovbQogICk7CiAgZXhwZWN0KHNvdXJjZSkudG9NYXRjaCgvcGVybWlzc2lvbnM6XG4gIGNvbnRlbnRzOiByZWFkLyk7CiAgZXhwZWN0KHNvdXJjZSkudG9NYXRjaCgvaWQtdG9rZW46IHdyaXRlLyk7CiAgZXhwZWN0KHNvdXJjZSkudG9NYXRjaCgvcnVucy1vbjogdWJ1bnR1LWxhdGVzdC8pOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigndGltZW91dC1taW51dGVzOiAyNScpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigKICAgICdhY3Rpb25zL2NoZWNrb3V0QDNkM2M0MmU1YWFjNWJhODA1ODI1ZGE3NjQxMGMxODEyNzNiYTkwYjEnCiAgKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oCiAgICAncG5wbS9hY3Rpb24tc2V0dXBAZWExN2M2OGRmODkxMmVmNTQzMzUyNzIzYzE0OWE4NGY1NmUzZDQxMycKICApOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigKICAgICdhY3Rpb25zL3NldHVwLW5vZGVAODIwNzYyNzg2MDI2NzQwYzc2ZjM2MDg1YjBlZmM0N2EzMWZlNTAyMCcKICApOwogIGV4cGVjdChzb3VyY2UpLnRvTWF0Y2goL25vZGUtdmVyc2lvbi1maWxlOiAubnZtcmMvKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJ3JlZ2lzdHJ5LXVybDogaHR0cHM6Ly9yZWdpc3RyeS5ucG1qcy5vcmcnKTsKICBleHBlY3Qoc291cmNlKS50b01hdGNoKC9ub2RlIC0tdmVyc2lvbi4qdjI0XC4yMVwuMC9zKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJ3BucG0gaW5zdGFsbCAtLWZyb3plbi1sb2NrZmlsZScpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigncG5wbSAtLWZpbHRlciBAam92aWUvY2xpIHJ1biB0ZXN0OmNvdmVyYWdlJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCdwbnBtIC0tZmlsdGVyIEBqb3ZpZS9jbGkgcnVuIHR5cGVjaGVjaycpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigncG5wbSAtLWZpbHRlciBAam92aWUvY2xpIHJ1biBidWlsZCcpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigncG5wbSAtLWZpbHRlciBAam92aWUvY2xpIHJ1biBwYWNrOmRyeScpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigndGVzdCAiJEdJVEhVQl9SRUYiID0gcmVmcy9oZWFkcy9tYWluJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCdnaXQgcmV2LXBhcnNlIG9yaWdpbi9tYWluJyk7CiAgZXhwZWN0KAogICAgc291cmNlLm1hdGNoKC90ZXN0ICJcJGNoZWNrZWRfb3V0X3NoYSIgPSAiXCRjdXJyZW50X21haW5fc2hhIi9nKQogICkudG9IYXZlTGVuZ3RoKDIpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigKICAgICdDaGVja291dCBkcmlmdGVkIGZyb20gY3VycmVudCBvcmlnaW4vbWFpbiBpbW1lZGlhdGVseSBiZWZvcmUgcHVibGljYXRpb24uJwogICk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCJ0ciAtZCAnWzpzcGFjZTpdJyA8IFZFUlNJT04iKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oCiAgICAibWFuaWZlc3QucmVwb3NpdG9yeT8udXJsID09PSAnZ2l0K2h0dHBzOi8vZ2l0aHViLmNvbS9Kb3ZpZUluYy9Kb3ZpZS5naXQnIgogICk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKAogICAgIm1hbmlmZXN0LnJlcG9zaXRvcnk/LmRpcmVjdG9yeSA9PT0gJ3BhY2thZ2VzL2pvdmllLWNsaSciCiAgKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJ1JFR0lTVFJZX1VSTDogaHR0cHM6Ly9yZWdpc3RyeS5ucG1qcy5vcmcnKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJy0tY29ubmVjdC10aW1lb3V0IDEwJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCctLW1heC10aW1lIDMwJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCctLXJldHJ5IDInKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJy0tcmV0cnktZGVsYXkgMScpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbignLS1yZXRyeS1tYXgtdGltZSA0MCcpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbignY2FzZSAiJHJlZ2lzdHJ5X3N0YXR1cyIgaW4nKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJzQwNCknKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJzIwMCknKTsKICBleHBlY3Qoc291cmNlKS50b01hdGNoKAogICAgL05PREVfQVVUSF9UT0tFTjpccypcJFx7XHtccypzZWNyZXRzXC5OUE1fVE9LRU5ccypcfVx9LwogICk7CiAgZXhwZWN0KHNvdXJjZSkubm90LnRvQ29udGFpbignTlBNX0NPTkZJR19VU0VSQ09ORklHOicpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbigKICAgICducG0gcHVibGlzaCAtLXByb3ZlbmFuY2UgLS1hY2Nlc3MgcHVibGljICIkUEFDS0FHRV9ESVIiJwogICk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCctIG5hbWU6IFByb3ZlIHB1YmxpYyByZWdpc3RyeSByZWxlYXNlJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCdmb3IgYXR0ZW1wdCBpbiB7MS4uMTJ9Jyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCdtZXRhZGF0YS5kaXN0Py5hdHRlc3RhdGlvbnM/LnVybCcpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbignbWV0YWRhdGEuZGlzdD8uYXR0ZXN0YXRpb25zPy5wcm92ZW5hbmNlJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCdBcnJheS5pc0FycmF5KG1ldGFkYXRhLm1haW50YWluZXJzKScpOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbignbnBtIGFjY2VzcyBsaXN0IGNvbGxhYm9yYXRvcnMgIiRQQUNLQUdFX05BTUUiJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKAogICAgIk9iamVjdC52YWx1ZXMoY29sbGFib3JhdG9ycykuaW5jbHVkZXMoJ3JlYWQtd3JpdGUnKSIKICApOwogIGV4cGVjdChzb3VyY2UpLnRvQ29udGFpbignIiRQQUNLQUdFX05BTUVAJFJFTEVBU0VfVkVSU0lPTiInKTsKICBleHBlY3Qoc291cmNlKS50b0NvbnRhaW4oJyIkaW5zdGFsbGVkX2NsaSIgLS12ZXJzaW9uJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCciJGluc3RhbGxlZF9jbGkiIGFwaSBvcGVuYXBpJyk7CiAgZXhwZWN0KHNvdXJjZSkudG9Db250YWluKCJjb250cmFjdC5pbmZvPy50aXRsZSAhPT0gJ0pvdmllIEFydGlzdCBBUEknIik7Cn0KCmRlc2NyaWJlKCdtYW51YWwgbnBtIHByb3ZlbmFuY2Ugd29ya2Zsb3cnLCAoKSA9PiB7CiAgaXQoJ2xvY2tzIHRoZSByZWxlYXNlIHdvcmtmbG93IHRvIHRoZSBleGFjdCwgdGVzdGVkLCB1bnB1Ymxpc2hlZCBtYWluIHBhY2thZ2UnLCAoKSA9PiB7CiAgICBhc3NlcnRQdWJsaXNoV29ya2Zsb3dDb250cmFjdCh3b3JrZmxvdyk7CiAgfSk7CgogIGl0LmVhY2goWwogICAgWwogICAgICAnYXV0b21hdGljIHRyaWdnZXInLAogICAgICB3b3JrZmxvdy5yZXBsYWNlKAogICAgICAgICcgIHdvcmtmbG93X2Rpc3BhdGNoOlxuJywKICAgICAgICAnICB3b3JrZmxvd19kaXNwYXRjaDpcbiAgcHVzaDpcbicKICAgICAgKSwKICAgIF0sCiAgICBbCiAgICAgICdwcm92ZW5hbmNlIHBlcm1pc3Npb24nLAogICAgICB3b3JrZmxvdy5yZXBsYWNlKCcgICAgICBpZC10b2tlbjogd3JpdGUnLCAnICAgICAgaWQtdG9rZW46IHJlYWQnKSwKICAgIF0sCiAgICBbCiAgICAgICd1bnB1Ymxpc2hlZCB2ZXJzaW9uIGd1YXJkJywKICAgICAgd29ya2Zsb3cucmVwbGFjZSgnICAgICAgICAgICAgNDA0KVxuJywgJyAgICAgICAgICAgIDIwNClcbicpLAogICAgXSwKICAgIFsKICAgICAgJ3Byb3ZlbmFuY2UgcHVibGlzaCBmbGFnJywKICAgICAgd29ya2Zsb3cucmVwbGFjZSgnLS1wcm92ZW5hbmNlIC0tYWNjZXNzIHB1YmxpYycsICctLWFjY2VzcyBwdWJsaWMnKSwKICAgIF0sCiAgICBbCiAgICAgICdmaW5hbCBjdXJyZW50LW1haW4gcHVibGljYXRpb24gcmVjaGVjaycsCiAgICAgIHdvcmtmbG93LnJlcGxhY2UoCiAgICAgICAgJyAgICAgICAgICB0ZXN0ICIkY2hlY2tlZF9vdXRfc2hhIiA9ICIkY3VycmVudF9tYWluX3NoYSIgfHwge1xuICAgICAgICAgICAgZWNobyAiOjplcnJvcjo6Q2hlY2tvdXQgZHJpZnRlZCBmcm9tIGN1cnJlbnQgb3JpZ2luL21haW4gaW1tZWRpYXRlbHkgYmVmb3JlIHB1YmxpY2F0aW9uLiJcbiAgICAgICAgICAgIGV4aXQgMVxuICAgICAgICAgIH1cbiAgICAgICAgICBucG0gcHVibGlzaCcsCiAgICAgICAgJyAgICAgICAgICBucG0gcHVibGlzaCcKICAgICAgKSwKICAgIF0sCiAgICBbCiAgICAgICdwdWJsaXNoIGF1dGggY29uZmlnIG92ZXJyaWRlJywKICAgICAgd29ya2Zsb3cucmVwbGFjZSgKICAgICAgICAnICAgICAgICAgIE5PREVfQVVUSF9UT0tFTjogJHt7IHNlY3JldHMuTlBNX1RPS0VOIH19JywKICAgICAgICAnICAgICAgICAgIE5QTV9DT05GSUdfVVNFUkNPTkZJRzogJHt7IGdpdGh1Yi53b3Jrc3BhY2UgfX0vLm5wbXJjXG4gICAgICAgICAgTk9ERV9BVVRIX1RPS0VOOiAke3sgc2VjcmV0cy5OUE1fVE9LRU4gfX0nCiAgICAgICksCiAgICBdLAogICAgWwogICAgICAncHVibGljIHByb3ZlbmFuY2UgcmVjZWlwdCcsCiAgICAgIHdvcmtmbG93LnJlcGxhY2UoCiAgICAgICAgIlsnZGlzdC5hdHRlc3RhdGlvbnMudXJsJywgdHlwZW9mIG1ldGFkYXRhLmRpc3Q/LmF0dGVzdGF0aW9ucz8udXJsID09PSAnc3RyaW5nJ10iLAogICAgICAgICJbJ2Rpc3QuYXR0ZXN0YXRpb25zLnVybCcsIHRydWVdIgogICAgICApLAogICAgXSwKICAgIFsKICAgICAgJ2ZyZXNoIGluc3RhbGwgcnVudGltZSByZWNlaXB0JywKICAgICAgd29ya2Zsb3cucmVwbGFjZSgnIiRpbnN0YWxsZWRfY2xpIiBhcGkgb3BlbmFwaScsICdlY2hvIGFwaSBvcGVuYXBpJyksCiAgICBdLAogIF0pKCdmYWlscyBjbG9zZWQgd2hlbiB0aGUgJXMgaXMgd2Vha2VuZWQnLCAoXywgdW5zYWZlV29ya2Zsb3cpID0+IHsKICAgIGV4cGVjdCgoKSA9PiBhc3NlcnRQdWJsaXNoV29ya2Zsb3dDb250cmFjdCh1bnNhZmVXb3JrZmxvdykpLnRvVGhyb3coKTsKICB9KTsKfSk7Cg==
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+const workflow = readFileSync(
+  resolve(import.meta.dirname, '../../../.github/workflows/npm-publish.yml'),
+  'utf8'
+);
+
+function assertPublishWorkflowContract(source: string): void {
+  expect(source).toMatch(/^on:\n  workflow_dispatch:\s*$/m);
+  expect(source).not.toMatch(
+    /^\s+(push|pull_request|schedule|workflow_run|repository_dispatch):/m
+  );
+  expect(source).toMatch(/permissions:\n  contents: read/);
+  expect(source).toMatch(/id-token: write/);
+  expect(source).toMatch(/runs-on: ubuntu-latest/);
+  expect(source).toContain('timeout-minutes: 25');
+  expect(source).toContain(
+    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+  );
+  expect(source).toContain(
+    'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
+  );
+  expect(source).toContain(
+    'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+  );
+  expect(source).toMatch(/node-version-file: .nvmrc/);
+  expect(source).toContain('registry-url: https://registry.npmjs.org');
+  expect(source).toMatch(/node --version.*v24\.21\.0/s);
+  expect(source).toContain('pnpm install --frozen-lockfile');
+  expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
+  expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
+  expect(source).toContain('pnpm --filter @jovie/cli run build');
+  expect(source).toContain('pnpm --filter @jovie/cli run pack:dry');
+  expect(source).toContain('test "$GITHUB_REF" = refs/heads/main');
+  expect(source).toContain('git rev-parse origin/main');
+  expect(
+    source.match(/test "\$checked_out_sha" = "\$current_main_sha"/g)
+  ).toHaveLength(2);
+  expect(source).toContain(
+    'Checkout drifted from current origin/main immediately before publication.'
+  );
+  expect(source).toContain("tr -d '[:space:]' < VERSION");
+  expect(source).toContain(
+    "manifest.repository?.url === 'git+https://github.com/JovieInc/Jovie.git'"
+  );
+  expect(source).toContain(
+    "manifest.repository?.directory === 'packages/jovie-cli'"
+  );
+  expect(source).toContain('REGISTRY_URL: https://registry.npmjs.org');
+  expect(source).toContain('--connect-timeout 10');
+  expect(source).toContain('--max-time 30');
+  expect(source).toContain('--retry 2');
+  expect(source).toContain('--retry-delay 1');
+  expect(source).toContain('--retry-max-time 40');
+  expect(source).toContain('case "$registry_status" in');
+  expect(source).toContain('404)');
+  expect(source).toContain('200)');
+  expect(source).toMatch(
+    /NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.NPM_TOKEN\s*\}\}/
+  );
+  expect(source).not.toContain('NPM_CONFIG_USERCONFIG:');
+  expect(source).toContain(
+    'npm publish --provenance --access public "$PACKAGE_DIR"'
+  );
+  expect(source).toContain('- name: Prove public registry release');
+  expect(source).toContain('for attempt in {1..12}');
+  expect(source).toContain('metadata.dist?.attestations?.url');
+  expect(source).toContain('metadata.dist?.attestations?.provenance');
+  expect(source).toContain('Array.isArray(metadata.maintainers)');
+  expect(source).toContain('npm access list collaborators "$PACKAGE_NAME"');
+  expect(source).toContain(
+    "Object.values(collaborators).includes('read-write')"
+  );
+  expect(source).toContain('"$PACKAGE_NAME@$RELEASE_VERSION"');
+  expect(source).toContain('"$installed_cli" --version');
+  expect(source).toContain('"$installed_cli" api openapi');
+  expect(source).toContain("contract.info?.title !== 'Jovie Artist API'");
+}
+
+describe('manual npm provenance workflow', () => {
+  it('locks the release workflow to the exact, tested, unpublished main package', () => {
+    assertPublishWorkflowContract(workflow);
+  });
+
+  it.each([
+    [
+      'automatic trigger',
+      workflow.replace(
+        '  workflow_dispatch:\n',
+        '  workflow_dispatch:\n  push:\n'
+      ),
+    ],
+    [
+      'provenance permission',
+      workflow.replace('      id-token: write', '      id-token: read'),
+    ],
+    [
+      'unpublished version guard',
+      workflow.replace('            404)\n', '            204)\n'),
+    ],
+    [
+      'provenance publish flag',
+      workflow.replace('--provenance --access public', '--access public'),
+    ],
+    [
+      'final current-main publication recheck',
+      workflow.replace(
+        '          test "$checked_out_sha" = "$current_main_sha" || {\n            echo "::error::Checkout drifted from current origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
+        '          npm publish'
+      ),
+    ],
+    [
+      'publish auth config override',
+      workflow.replace(
+        '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',
+        '          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc\n          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}'
+      ),
+    ],
+    [
+      'public provenance receipt',
+      workflow.replace(
+        "['dist.attestations.url', typeof metadata.dist?.attestations?.url === 'string']",
+        "['dist.attestations.url', true]"
+      ),
+    ],
+    [
+      'fresh install runtime receipt',
+      workflow.replace('"$installed_cli" api openapi', 'echo api openapi'),
+    ],
+  ])('fails closed when the %s is weakened', (_, unsafeWorkflow) => {
+    expect(() => assertPublishWorkflowContract(unsafeWorkflow)).toThrow();
+  });
+});
