@@ -1,7 +1,9 @@
-# Jev evaluation integration (JOV-6412)
+# Jev evaluation integration (JOV-6465)
 
-Decision: compose the existing `jev-shadow/v1` and `run-outcome/v1` from
-PR #17944 with the official AI SDK evaluation API. The existing executor still
+Decision: compose deterministic `run-outcome/v1` from PR #17944 with the
+optional `jev-shadow/v1` and official AI SDK evaluation API in PR #18006.
+The core never imports or calls a model and leaves `shadow: null`; this layer
+reuses its pure evidence fingerprint helper. The existing executor still
 owns admission, persistence, deduplication, retries and delivery. This increment
 implements an explicit advisory text review, not autonomous model selection or
 a production rollout.
@@ -71,10 +73,14 @@ reflects the selected Gateway instance; it is not independent backend attestatio
 Unknown billed cost remains null. Timeouts, aborts, stale state and invalid output
 cannot produce an evaluated result. SDK retries are zero; no fallback is used.
 
-For existing run outcomes, attach the returned `.shadow` using
+Persist the deterministic run outcome before requesting optional advice. For
+existing run outcomes, attach the returned `.shadow` using
 `attachJevShadow(outcome, evaluation.shadow)` only after `status === 'evaluated'`;
 retain the full evaluation receipt alongside it. A shadow cannot set certification.
 `evaluated` and `supported` are advisory results, never human certification.
+The synchronous shadow classifier also turns evaluator exceptions into
+`insufficient` without exposing the raw error. Optional advice cannot prevent
+the deterministic result from being returned or persisted.
 
 ## Design and landing review sequence
 
@@ -94,17 +100,21 @@ retain the full evaluation receipt alongside it. A shadow cannot set certificati
 
 ## Evidence and limits
 
-On 2026-09-19, existing FX/Doppler credits reported $27.897700038. One initial
+On 2026-09-19, existing FX/Doppler credits reported $27.741510768 before the
+final synthetic check on commit `bfaf5d045206d87dfeba8650c58ecdf9a14ceef9`.
+These are historical observations before the functional layer separation.
+One initial
 request to the wrong legacy endpoint failed and was retained. After checking
 the pinned provider source, the corrected `/v4/ai` request evaluated a fictional
-refund-success claim against a failure receipt as `contradicted`: 1,380 ms,
+refund-success claim against a failure receipt as `contradicted`: 858 ms,
 457 input and 56 output tokens. No image/private artifact was transmitted.
 The official model page lists $0.04 per million input tokens; exact billed cost
 was not returned. One synthetic example is transport proof, not calibration or
 an economic benchmark.
 
 `pnpm run-outcome:check`, already called by the structural `invariants:check`
-lane, exercises the existing outcome/shadow tests and the new bounded transport
+lane, exercises the outcome/shadow tests, explicit attachment and persistence
+regressions, and the bounded transport
 with the real pinned SDK against fake HTTP. New transport enforcement is 100%
 line/function and at least 90% branch coverage. Tests do not make paid calls.
 
