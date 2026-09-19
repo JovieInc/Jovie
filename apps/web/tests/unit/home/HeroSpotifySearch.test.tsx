@@ -195,6 +195,21 @@ describe('HeroSpotifySearch', () => {
       expect(container?.querySelector('svg')).toBeInTheDocument();
     });
 
+    it('keeps the canonical 20px search icon in the editorial field', () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+
+      const icon = document.querySelector('.homepage-name-search__icon');
+      expect(icon).toHaveAttribute('width', '20');
+      expect(icon).toHaveAttribute('height', '20');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    });
+
     it('records the certified search-submit outcome without the query text', async () => {
       mockHookReturn.results = ARTISTS;
       mockHookReturn.state = 'success';
@@ -294,7 +309,7 @@ describe('HeroSpotifySearch', () => {
       await user.type(input, 'tim white');
 
       expect(screen.getByRole('alert')).toHaveTextContent('Search failed.');
-      await user.click(screen.getByRole('button', { name: 'Try again' }));
+      await user.click(screen.getByRole('button', { name: 'Try Again' }));
 
       expect(mockSearchImmediate).toHaveBeenCalledTimes(1);
       expect(mockSearchImmediate).toHaveBeenCalledWith('tim white');

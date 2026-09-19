@@ -378,7 +378,14 @@ export function HeroSpotifySearch({
         className={isEditorial ? 'rounded-full' : undefined}
       >
         <div className={fieldClassName}>
-          {isEditorial ? null : (
+          {isEditorial ? (
+            <Search
+              aria-hidden='true'
+              className='homepage-name-search__icon shrink-0 text-tertiary-token'
+              size={20}
+              strokeWidth={1.8}
+            />
+          ) : (
             <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
               <SocialIcon
                 platform='spotify'
@@ -525,7 +532,7 @@ export function HeroSpotifySearch({
                   className='mt-2'
                   onClick={handleRetry}
                 >
-                  Try again
+                  Try Again
                 </Button>
               </div>
             )}
