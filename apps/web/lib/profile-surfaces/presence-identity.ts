@@ -314,7 +314,7 @@ export function getPresenceObservation(
       detail: 'Last check is older than two weeks.',
     };
   }
-  if (!subject.lastObservedAt && subject.rank === null) {
+  if (!subject.lastObservedAt && subject.rank == null) {
     return {
       status: 'pending',
       label: 'Not Measured',
@@ -377,7 +377,7 @@ export interface PresenceOutcomeSummary {
   readonly value: string;
   readonly detail: string;
   readonly attentionCount: number;
-  readonly status: PresenceObservationStatus | 'healthy';
+  readonly status: PresenceObservationStatus | 'inventory';
 }
 
 export function summarizePresenceOutcomes(input: {
@@ -403,23 +403,6 @@ export function summarizePresenceOutcomes(input: {
     ),
   } as const;
 
-  const attentionIn = (rows: readonly PresenceIdentitySubject[]) =>
-    rows.filter(row => {
-      const observation = getPresenceObservation(row, {
-        providerAvailable: input.providerAvailable,
-        now,
-      });
-      return (
-        observation.status === 'plan-restricted' ||
-        observation.status === 'stale' ||
-        observation.status === 'unavailable' ||
-        row.monitoringState === 'paused'
-      );
-    }).length;
-
-  const identityAttention = attentionIn(byGroup.identity);
-  const profileAttention = attentionIn(byGroup.profiles);
-  const catalogAttention = attentionIn(byGroup.catalog);
   const searchStatus = !input.providerAvailable
     ? 'unavailable'
     : isPresenceObservationStale(input.lastObservedAt, now)
@@ -429,58 +412,20 @@ export function summarizePresenceOutcomes(input: {
         : 'pending';
 
   return [
-    {
-      group: 'identity',
-      label: 'Identity',
-      value:
-        identityAttention > 0
-          ? `${identityAttention} Need Attention`
-          : input.artistIsPublic
-            ? 'Published'
-            : 'Draft',
-      detail: input.artistIsPublic
-        ? 'Public artist identity and site'
-        : 'Publish the Jovie profile to answer as this artist',
-      attentionCount: identityAttention,
-      status: identityAttention > 0 ? 'stale' : 'healthy',
-    },
-    {
-      group: 'profiles',
-      label: 'Profiles',
-      value:
-        profileAttention > 0
-          ? `${profileAttention} Need Attention`
-          : byGroup.profiles.length === 0
-            ? 'None Yet'
-            : 'Up to Date',
-      detail:
-        byGroup.profiles.length === 0
-          ? 'No DSP or social profiles to compare'
-          : 'Compare profile photos and pages that need a fix',
-      attentionCount: profileAttention,
-      status: profileAttention > 0 ? 'stale' : 'healthy',
-    },
-    {
-      group: 'catalog',
-      label: 'Catalog',
-      value:
-        catalogAttention > 0
-          ? `${catalogAttention} Need Attention`
-          : byGroup.catalog.length === 0
-            ? 'Not Measured'
-            : 'Up to Date',
-      detail:
-        byGroup.catalog.length === 0
-          ? 'No directory pages are being measured'
-          : 'Authority and directory pages',
-      attentionCount: catalogAttention,
-      status:
-        byGroup.catalog.length === 0
-          ? 'pending'
-          : catalogAttention > 0
-            ? 'stale'
-            : 'healthy',
-    },
+    ...(['identity', 'profiles', 'catalog'] as const).map(group => ({
+      group,
+      label: { identity: 'Identity', profiles: 'Profiles', catalog: 'Catalog' }[
+        group
+      ],
+      value: `${byGroup[group].length} ${byGroup[group].length === 1 ? 'Page' : 'Pages'}`,
+      detail: {
+        identity: 'Artist profile and websites',
+        profiles: 'DSP and social pages',
+        catalog: 'Authority and directory pages',
+      }[group],
+      attentionCount: 0,
+      status: 'inventory' as const,
+    })),
     {
       group: 'search',
       label: 'Search',
