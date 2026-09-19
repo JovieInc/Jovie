@@ -204,12 +204,12 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
 
     await expect(search.getByRole('alert')).toHaveText('Search failed.');
     await expect(
-      search.getByRole('button', { name: 'Try again' })
+      search.getByRole('button', { name: 'Try Again' })
     ).toBeVisible();
     await expect(input).toHaveValue('Taylor Swift');
     expect(attempts).toBe(3);
 
-    await search.getByRole('button', { name: 'Try again' }).click();
+    await search.getByRole('button', { name: 'Try Again' }).click();
 
     await expect(visibleArtistButton(page, TAYLOR_SWIFT.name)).toBeVisible();
     await expect(search.getByRole('alert')).toHaveCount(0);
@@ -228,7 +228,7 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
 
     await expect(search.getByText('No artists found')).toBeVisible();
     await expect(search.getByRole('alert')).toHaveCount(0);
-    await expect(search.getByRole('button', { name: 'Try again' })).toHaveCount(
+    await expect(search.getByRole('button', { name: 'Try Again' })).toHaveCount(
       0
     );
     await expect(input).toHaveValue('Nobody By This Name');
@@ -306,4 +306,71 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
       TAYLOR_SWIFT
     );
   });
+});
+
+test.describe('Homepage overlay and closing action invariants', () => {
+  for (const width of [1440, 390]) {
+    test(`keeps search geometry stable through invalid, loading, empty and failed results at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoHomepage(page);
+      const search = heroSearch(page);
+      const input = search.getByRole('combobox', { name: 'Search your name' });
+      const field = search.locator('.homepage-name-search__field');
+      await input.scrollIntoViewIfNeeded();
+      const before = await field.boundingBox();
+      expect(before).not.toBeNull();
+      let requests = 0;
+      let releaseLoading: (() => void) | undefined;
+      const loadingGate = new Promise<void>(resolve => {
+        releaseLoading = resolve;
+      });
+      await page.route(SEARCH_ROUTE, async route => {
+        requests++;
+        const query = new URL(route.request().url()).searchParams.get('q');
+        if (query === 'Loading Artist') await loadingGate;
+        await fulfillJson(
+          route,
+          query === 'Failed Artist' ? { error: 'Unavailable' } : [],
+          query === 'Failed Artist' ? 503 : 200
+        );
+      });
+      await input.fill('/');
+      await expect(input).toHaveAttribute('aria-invalid', 'true');
+      await expect(search.getByRole('status')).toBeVisible();
+      expect(requests).toBe(0);
+      await expect(search.getByRole('alert')).toHaveCount(0);
+      const after = await field.boundingBox();
+      expect(after).toEqual(before);
+      const overlay = await search
+        .locator('.homepage-name-search__results')
+        .boundingBox();
+      expect(overlay).not.toBeNull();
+      expect(overlay!.x).toBeGreaterThanOrEqual(0);
+      expect(overlay!.x + overlay!.width).toBeLessThanOrEqual(width);
+      expect(overlay!.y).toBeGreaterThanOrEqual(before!.y + before!.height);
+      await input.press('Escape');
+      await expect(input).toHaveAttribute('aria-expanded', 'false');
+      await expect(input).toBeFocused();
+      await input.fill('Loading Artist');
+      await expect(search.locator('.animate-pulse').first()).toBeVisible();
+      expect(await field.boundingBox()).toEqual(before);
+      releaseLoading?.();
+      await expect(search.getByText('No artists found')).toBeVisible();
+      await input.fill('Failed Artist');
+      await expect(search.getByRole('alert')).toBeVisible();
+      expect(await field.boundingBox()).toEqual(before);
+      await input.fill('Nobody By This Name');
+      await expect(search.getByText('No artists found')).toBeVisible();
+      expect(await field.boundingBox()).toEqual(before);
+      await input.press('Tab');
+      await expect(input).toHaveAttribute('aria-expanded', 'false');
+      const close = page.getByTestId('homepage-close-cta');
+      await close.click();
+      await expect(input).toBeFocused();
+      await expect(input).toHaveValue('Nobody By This Name');
+      expect(new URL(page.url()).pathname).toBe('/');
+    });
+  }
 });
