@@ -77,4 +77,20 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).toContain('Simple Pricing.');
     expect(source).not.toContain('ui-casing-allow');
   });
+
+  it('derives PricingSection offer claims from the typed offer-truth module', () => {
+    const source = readSource('components/features/home/PricingSection.tsx');
+
+    // Pricing copy, plan names, prices, and CTAs resolve through the typed
+    // offer-truth module instead of the retired entitlement-marketing lookup.
+    expect(source).toContain("getPublicPriceClaim('free')");
+    expect(source).toContain("getPublicPriceClaim('pro')");
+    expect(source).not.toContain('ENTITLEMENT_REGISTRY');
+    expect(source).not.toMatch(/APP_ROUTES\.SIGNUP/);
+    for (const claimKey of ['displayName', 'priceLabel', 'ctaLabel']) {
+      expect(source).toContain(`freeClaim.${claimKey}`);
+      expect(source).toContain(`proClaim.${claimKey}`);
+    }
+    expect(source).toContain('formatMonthlyPrice');
+  });
 });
