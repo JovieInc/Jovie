@@ -772,6 +772,8 @@ function runStructural() {
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [
+    // Shared profile evaluator must retain package coverage for web-only edits.
+    'pnpm --filter @jovie/jev-evaluation test',
     // JOV-6104: measured marketing contracts must run for registry-only edits.
     MARKETING_CERTIFICATION_COMMAND,
     'pnpm next:proxy-guard',
