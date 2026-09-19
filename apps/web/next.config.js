@@ -452,6 +452,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/directory',
+        destination: '/artists',
+        permanent: true,
+      },
+      {
         source: '/engagement-engine',
         destination: '/artist-notifications',
         permanent: true,

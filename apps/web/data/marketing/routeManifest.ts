@@ -621,6 +621,54 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/compare/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 compare hub',
+      notes:
+        'Hub index listing comparison slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'compare hub index listing comparison slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/compare',
+    healthCheck: {
+      path: '/compare',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/alternatives/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 alternatives hub',
+      notes:
+        'Hub index listing alternative slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'alternatives hub index listing alternative slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/alternatives',
+    healthCheck: {
+      path: '/alternatives',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
     renderedSections: approvedBindings(
