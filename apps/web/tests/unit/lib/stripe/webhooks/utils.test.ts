@@ -37,10 +37,14 @@ vi.mock('next/cache', () => ({
 
 // Import after mocks
 import {
+  extractStripeObjectId,
+  extractSubscriptionIdFromInvoice,
   getCustomerId,
   getStripeObjectId,
   getUserIdFromStripeCustomer,
   invalidateBillingCache,
+  isFullyRefundedCharge,
+  isLatestSubscriptionInvoice,
   stripeTimestampToDate,
 } from '@/lib/stripe/webhooks/utils';
 
@@ -313,6 +317,101 @@ describe('Stripe webhook utils', () => {
       await invalidateBillingCache('user_123');
 
       expect(mockRedis.del).toHaveBeenCalledWith('billing:status:v1:user_123');
+    });
+  });
+
+  describe('extractStripeObjectId', () => {
+    it('returns a string id', () => {
+      expect(extractStripeObjectId('in_123')).toBe('in_123');
+    });
+
+    it('extracts id from an expanded object', () => {
+      expect(extractStripeObjectId({ id: 'ch_123' })).toBe('ch_123');
+    });
+
+    it('returns null for empty or invalid values', () => {
+      expect(extractStripeObjectId('')).toBeNull();
+      expect(extractStripeObjectId(null)).toBeNull();
+      expect(extractStripeObjectId({ id: 12 })).toBeNull();
+    });
+  });
+
+  describe('extractSubscriptionIdFromInvoice', () => {
+    it('reads subscription from parent.subscription_details', () => {
+      const invoice = {
+        id: 'in_new',
+        parent: {
+          subscription_details: { subscription: 'sub_parent' },
+        },
+      } as Stripe.Invoice;
+
+      expect(extractSubscriptionIdFromInvoice(invoice)).toBe('sub_parent');
+    });
+
+    it('falls back to the legacy top-level subscription field', () => {
+      const invoice = {
+        id: 'in_legacy',
+        subscription: 'sub_legacy',
+      } as unknown as Stripe.Invoice;
+
+      expect(extractSubscriptionIdFromInvoice(invoice)).toBe('sub_legacy');
+    });
+
+    it('returns null when the invoice has no subscription', () => {
+      const invoice = { id: 'in_one_time' } as Stripe.Invoice;
+      expect(extractSubscriptionIdFromInvoice(invoice)).toBeNull();
+    });
+  });
+
+  describe('isFullyRefundedCharge', () => {
+    it('treats Stripe refunded=true as a full refund', () => {
+      expect(
+        isFullyRefundedCharge({
+          refunded: true,
+          amount: 1999,
+          amount_refunded: 1999,
+        })
+      ).toBe(true);
+    });
+
+    it('treats amount_refunded covering amount as a full refund', () => {
+      expect(
+        isFullyRefundedCharge({
+          refunded: false,
+          amount: 1999,
+          amount_refunded: 1999,
+        })
+      ).toBe(true);
+    });
+
+    it('does not treat a partial refund as fully refunded', () => {
+      expect(
+        isFullyRefundedCharge({
+          refunded: false,
+          amount: 1999,
+          amount_refunded: 500,
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isLatestSubscriptionInvoice', () => {
+    it('matches the subscription latest_invoice id', () => {
+      expect(
+        isLatestSubscriptionInvoice(
+          { id: 'in_latest' },
+          { latest_invoice: 'in_latest' }
+        )
+      ).toBe(true);
+    });
+
+    it('rejects historical invoices', () => {
+      expect(
+        isLatestSubscriptionInvoice(
+          { id: 'in_old' },
+          { latest_invoice: { id: 'in_latest' } }
+        )
+      ).toBe(false);
     });
   });
 });

@@ -111,6 +111,22 @@ def optional_blocked_since(
     return parsed.isoformat().replace("+00:00", "Z")
 
 
+def adverse_blocked_since(
+    existing: object,
+    *,
+    adverse: bool,
+    observed_at: str,
+    label: str,
+    now: datetime,
+) -> str | None:
+    """Copy a measured clock; if the signal is adverse and none exists, use observe time."""
+    if existing is not None:
+        return optional_blocked_since(existing, label, now)
+    if not adverse:
+        return None
+    return optional_blocked_since(observed_at, label, now)
+
+
 def count(value: object, label: str) -> int:
     if isinstance(value, list):
         value = len(value)
@@ -481,15 +497,17 @@ def compose_snapshot(
                     source_value=closure_value,
                 ),
                 "status": closure_status,
-                "blockedSince": optional_blocked_since(
+                "blockedSince": adverse_blocked_since(
                     closure.get("blockedSince")
                     or (
                         closure.get("latestMergeAt")
                         if "no-merge-progress-over-1h" in (closure.get("reasons") or [])
                         else None
                     ),
-                    "closure authority",
-                    now,
+                    adverse=closure_status in {"red", "grace"},
+                    observed_at=fleet_at,
+                    label="closure authority",
+                    now=now,
                 ),
                 "openPullRequests": open_prs,
             },
@@ -522,8 +540,12 @@ def compose_snapshot(
                     source_revision=main_sha,
                     source_value=release_value,
                 ),
-                "blockedSince": optional_blocked_since(
-                    production.get("blockedSince"), "production authority", now
+                "blockedSince": adverse_blocked_since(
+                    production.get("blockedSince"),
+                    adverse=main_sha != production_sha,
+                    observed_at=fleet_at,
+                    label="production authority",
+                    now=now,
                 ),
                 "mainSha": main_sha,
                 "productionSha": production_sha,

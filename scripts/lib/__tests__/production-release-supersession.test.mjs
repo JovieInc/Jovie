@@ -166,7 +166,7 @@ function releaseExpressions(overrides = {}) {
   };
 }
 
-function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA) {
+function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('release-result-');
   stubCommand(
     fixture.bin,
@@ -188,6 +188,7 @@ function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA) {
       Buffer.from(DEPLOYMENT_URL).toString('base64'),
     PREVIOUS_PRODUCTION_DEPLOYMENT_ID: 'dpl_previous_generation',
     STUB_MAIN_SHA: boundarySha,
+    ...env,
   });
   return { result, outputs: parseOutputs(fixture.output) };
 }
@@ -209,13 +210,27 @@ function controllerVerifyExpressions(overrides = {}) {
   };
 }
 
-function runControllerVerify(overrides = {}, aliasStatus = 0) {
+function runControllerVerify(
+  overrides = {},
+  aliasStatus = 0,
+  { doneSprintStatus = 0 } = {}
+) {
   const fixture = makeFixture('controller-verify-');
   const aliasMarker = join(fixture.root, 'alias-called');
+  const doneSprintMarker = join(fixture.root, 'done-sprint-called');
   stubCommand(
     fixture.bin,
     'gh',
     '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+  );
+  stubCommand(
+    fixture.bin,
+    'node',
+    `#!/bin/sh
+printf '%s\\n' "$*" > "$STUB_DONE_SPRINT_MARKER"
+printf 'rescan=%s\\nurl=%s\\n' "$DONE_INVARIANT_RESCAN" "$DONE_INVARIANT_PRODUCTION_BASE_URL" >> "$STUB_DONE_SPRINT_MARKER"
+exit "$STUB_DONE_SPRINT_STATUS"
+`
   );
   const aliasScript = join(
     fixture.root,
@@ -241,10 +256,15 @@ function runControllerVerify(overrides = {}, aliasStatus = 0) {
       Buffer.from(DEPLOYMENT_URL).toString('base64'),
     STUB_ALIAS_MARKER: aliasMarker,
     STUB_ALIAS_STATUS: String(aliasStatus),
+    STUB_DONE_SPRINT_MARKER: doneSprintMarker,
+    STUB_DONE_SPRINT_STATUS: String(doneSprintStatus),
     STUB_MAIN_SHA: NEWER_SHA,
   });
   return {
     aliasCalled: existsSync(aliasMarker),
+    doneSprintCalled: existsSync(doneSprintMarker)
+      ? readFileSync(doneSprintMarker, 'utf8')
+      : '',
     result,
     outputs: parseOutputs(fixture.output),
   };
@@ -393,6 +413,17 @@ describe('production release supersession execution', () => {
     });
   });
 
+  it('keeps a proven pre-promotion supersession neutral after exact prior gates', () => {
+    const neutral = runReleaseResult({}, NEWER_SHA, {
+      PROMOTION_SHA: NEWER_SHA,
+    });
+    expect(neutral.result.status, neutral.result.stderr).toBe(0);
+    expect(neutral.outputs).toMatchObject({
+      released: 'false',
+      superseded_before_promotion: 'true',
+    });
+  });
+
   it('accepts only a gated post-promotion staging-refresh supersession', () => {
     const accepted = runReleaseResult({
       'needs.staging-deployment-receipt.outputs.staging_refresh_outcome':
@@ -439,18 +470,25 @@ describe('production release supersession execution', () => {
     expect(neutral.result.status, neutral.result.stderr).toBe(0);
     expect(neutral.outputs.canonical_verified).toBe('false');
     expect(neutral.aliasCalled).toBe(false);
+    expect(neutral.doneSprintCalled).toBe('');
 
     const failure = runControllerVerify({
       'needs.production-release.outputs.released': 'false',
     });
     expect(failure.result.status).not.toBe(0);
     expect(failure.aliasCalled).toBe(false);
+    expect(failure.doneSprintCalled).toBe('');
   });
 
   it('requires the real canonical bind before recording exact verification', () => {
     const verified = runControllerVerify({}, 0);
     expect(verified.result.status, verified.result.stderr).toBe(0);
     expect(verified.aliasCalled).toBe(true);
+    expect(verified.doneSprintCalled).toContain(
+      'scripts/invariants/done-sprint-invariants.mjs --release'
+    );
+    expect(verified.doneSprintCalled).toContain(`rescan=release`);
+    expect(verified.doneSprintCalled).toContain(`url=${DEPLOYMENT_URL}`);
     expect(verified.outputs).toMatchObject({
       canonical_deployment_id: DEPLOYMENT_ID,
       canonical_sha: EXPECTED_SHA,
@@ -460,7 +498,16 @@ describe('production release supersession execution', () => {
     const wrongCanonical = runControllerVerify({}, 17);
     expect(wrongCanonical.result.status).not.toBe(0);
     expect(wrongCanonical.aliasCalled).toBe(true);
+    expect(wrongCanonical.doneSprintCalled).toBe('');
     expect(wrongCanonical.outputs.canonical_verified).toBe('false');
+  });
+
+  it('fails closed when the Done-sprint production rescan is red', () => {
+    const blocked = runControllerVerify({}, 0, { doneSprintStatus: 1 });
+    expect(blocked.result.status).not.toBe(0);
+    expect(blocked.aliasCalled).toBe(true);
+    expect(blocked.doneSprintCalled).toContain('rescan=release');
+    expect(blocked.outputs.canonical_verified).toBe('false');
   });
 
   it('writes an older exact marker only after canonical and gate proof', () => {
@@ -519,7 +566,63 @@ describe('production release supersession execution', () => {
     expect(receipt.receiptExists).toBe(false);
   });
 
-  it('keeps the normal staging receipt and rejects contradictory supersession', () => {
+  it('accepts exact pre-promotion supersession at both staging boundaries without mutation', () => {
+    const proof = { PROMOTION_SHA: NEWER_SHA };
+    const reassert = runStagingStep(
+      'Reassert the exact preview after production settles',
+      NEWER_SHA,
+      proof
+    );
+    expect(reassert.result.status, reassert.result.stderr).toBe(0);
+    expect(reassert.outputs.staging_refresh_outcome).toBe(
+      'superseded_before_promotion'
+    );
+    expect(reassert.outputs.deployed).toBeUndefined();
+    expect(reassert.aliasCalled).toBe(false);
+    expect(reassert.receiptExists).toBe(false);
+
+    const receipt = runStagingStep(
+      'Write typed staging deployment receipt',
+      NEWER_SHA,
+      proof
+    );
+    expect(receipt.result.status, receipt.result.stderr).toBe(0);
+    expect(receipt.outputs.staging_refresh_outcome).toBe(
+      'superseded_before_promotion'
+    );
+    expect(receipt.outputs.deployed).toBeUndefined();
+    expect(receipt.aliasCalled).toBe(false);
+    expect(receipt.receiptExists).toBe(false);
+  });
+
+  it.each([
+    ['malformed promotion SHA', { PROMOTION_SHA: 'not-a-sha' }],
+    [
+      'failed promotion result',
+      { PROMOTION_SHA: NEWER_SHA, PROMOTION_RESULT: 'failure' },
+    ],
+    [
+      'completed rollback',
+      { PROMOTION_SHA: NEWER_SHA, ROLLBACK_RESULT: 'success' },
+    ],
+    [
+      'post-promotion evidence with rollback',
+      { PROMOTION_SHA: EXPECTED_SHA, ROLLBACK_RESULT: 'success' },
+    ],
+  ])('fails closed at both staging boundaries for %s', (_, evidence) => {
+    for (const stepName of [
+      'Reassert the exact preview after production settles',
+      'Write typed staging deployment receipt',
+    ]) {
+      const result = runStagingStep(stepName, NEWER_SHA, evidence);
+      expect(result.result.status).not.toBe(0);
+      expect(result.outputs.deployed).toBeUndefined();
+      expect(result.aliasCalled).toBe(false);
+      expect(result.receiptExists).toBe(false);
+    }
+  });
+
+  it('keeps the normal staging receipt', () => {
     const current = runStagingStep(
       'Write typed staging deployment receipt',
       EXPECTED_SHA
@@ -531,15 +634,6 @@ describe('production release supersession execution', () => {
       staging_refresh_outcome: 'current_receipt',
     });
     expect(current.receiptExists).toBe(true);
-
-    const wrongPromotion = runStagingStep(
-      'Write typed staging deployment receipt',
-      NEWER_SHA,
-      { PROMOTION_SHA: NEWER_SHA }
-    );
-    expect(wrongPromotion.result.status).not.toBe(0);
-    expect(wrongPromotion.outputs.deployed).toBeUndefined();
-    expect(wrongPromotion.receiptExists).toBe(false);
   });
 });
 

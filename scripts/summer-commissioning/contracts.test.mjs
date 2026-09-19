@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   EVALUATION_RECEIPT_SCHEMA,
+  loadRegistry,
   REGISTRY_SCHEMA,
   REPORT_SCHEMA,
   validateRegistry,
@@ -122,6 +124,19 @@ function reportArtifact(receipts) {
   };
 }
 
+test('canonical registry.json satisfies validateRegistry', () => {
+  const canonical = loadRegistry(
+    fileURLToPath(new URL('./registry.json', import.meta.url))
+  );
+  assert.equal(validateRegistry(canonical), canonical);
+  const linear = canonical.capabilities.find(
+    capability => capability.id === 'SUMMER-COMM-006'
+  );
+  assert.equal(linear.implementationState, 'already_works');
+  assert.equal(linear.status, 'passing');
+  assert.equal(linear.probe.requiresRuntimeReceipt, true);
+});
+
 test('rejects duplicate probe IDs before evaluation', () => {
   assert.throws(
     () =>
@@ -189,7 +204,15 @@ test('validates every registry boundary before reading source', () => {
       value => (value.capabilities[0].implementationState = 'unknown'),
       /implementationState/u,
     ],
+    [
+      value => (value.capabilities[0].implementationState = 'implemented'),
+      /implementationState/u,
+    ],
     [value => (value.capabilities[0].status = 'green'), /status is invalid/u],
+    [
+      value => (value.capabilities[0].status = 'certified_local'),
+      /status is invalid/u,
+    ],
     [
       value => (value.capabilities[0].critical = 'yes'),
       /critical must be boolean/u,

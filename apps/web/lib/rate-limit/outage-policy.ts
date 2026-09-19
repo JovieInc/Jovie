@@ -190,7 +190,9 @@ export function unpinnedLimiterPolicies(
   limiterNames: readonly string[],
   policies: Readonly<Record<string, RedisLimiterOutagePolicy>>
 ): string[] {
-  return limiterNames.filter(name => policies[name] === undefined).sort();
+  return limiterNames
+    .filter(name => policies[name] === undefined)
+    .sort((a, b) => a.localeCompare(b));
 }
 
 export function mandatoryLimitersMissingRequireRedis(
@@ -201,7 +203,7 @@ export function mandatoryLimitersMissingRequireRedis(
     .filter(name => policies[name].class === 'mandatory')
     .filter(name => name !== 'musicBrainzLookup')
     .filter(name => !limiterRequiresRedis(configs[name]))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }
 
 export function wrongPolicyLimiters(
@@ -220,5 +222,5 @@ export function wrongPolicyLimiters(
       }
       return false;
     })
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }

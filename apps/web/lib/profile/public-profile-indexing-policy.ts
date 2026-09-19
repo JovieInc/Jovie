@@ -28,7 +28,8 @@ export type PublicProfileDiscoveryExclusionReason =
   | 'qa_display_name'
   | 'test_account_email'
   | 'private_or_unpublished'
-  | 'unknown_identity';
+  | 'unknown_identity'
+  | 'placeholder_identity';
 
 export interface PublicProfileDiscoveryIdentity {
   readonly handle?: string | null;
@@ -82,6 +83,11 @@ function matchesQaClerkTestDisplayName(displayName: string): boolean {
   );
 }
 
+function isPlaceholderIdentity(handle: string, displayName: string): boolean {
+  if (displayName === '') return true;
+  return displayName.toLowerCase() === handle.toLowerCase();
+}
+
 function isDiscoveryTestAccountEmail(
   email: string | null | undefined
 ): boolean {
@@ -121,6 +127,15 @@ export function getPublicProfileDiscoveryExclusionReason(
 
   if (isDiscoveryTestAccountEmail(identity.ownerEmail)) {
     return 'test_account_email';
+  }
+
+  // Directory/sitemap only. Direct profile access stays independent.
+  // DATA unpublish of existing placeholder rows is a separate follow-up.
+  if (
+    options.requirePublication &&
+    isPlaceholderIdentity(handle, displayName)
+  ) {
+    return 'placeholder_identity';
   }
 
   return null;

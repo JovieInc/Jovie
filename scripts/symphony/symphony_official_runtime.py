@@ -71,6 +71,14 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+# Typed dispatch admission (dispatch-preflight output). The flat keys
+# (allowed/reason/mode/productId/maxConcurrent) remain the machine contract
+# consumed by the fallback pickup check (symphony-codex-exhausted); the
+# versioned envelope and per-mode sub-objects are additive so new consumers
+# can bind typed fields without stringly single-key coupling.
+DISPATCH_ADMISSION_SCHEMA = "symphony-dispatch-admission/v1"
+DISPATCH_ADMISSION_MODES = ("new-work", "existing-pr-repair")
+DISPATCH_ADMISSION_PRODUCTS = ("jovie", "ovie", "logyourbody")
 # Closure stop-line purposes. "admission" (default) is the new-issue stop-line:
 # every non-healthy closure holds new work. "controller-activation" is the
 # startup check for installing the repair controller itself: a grace/red
@@ -140,6 +148,29 @@ query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $f
     pageInfo {
       hasNextPage
       endCursor
+    }
+  }
+}
+"""
+# Official burrito pin: JovieInc/symphony#10 team-scoped Linear intake.
+# v0.0.2-jovie.2 still required $projectSlug: String! on ID refresh (JOV-5822).
+OFFICIAL_SYMPHONY_GIT_SHA = "dae31f823850c9ef2dea121433e5b60f09af26fa"
+OFFICIAL_SYMPHONY_RELEASE_TAG = f"symphony-build-{OFFICIAL_SYMPHONY_GIT_SHA}"
+LINEAR_ISSUE_ID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+# Mirrors JovieInc/symphony SymphonyLinearTeamIssuesById. Never send projectSlug
+# or first:0 — both are Linear HTTP 400 INPUT_ERROR on the official team WORKFLOW.
+LINEAR_ISSUE_STATE_REFRESH_QUERY = """
+query SymphonyLinearTeamIssuesById($ids: [ID!]!, $teamKey: String!, $first: Int!) {
+  issues(filter: {id: {in: $ids}, team: {key: {eq: $teamKey}}}, first: $first) {
+    nodes {
+      id
+      identifier
+      state {
+        name
+      }
     }
   }
 }
@@ -480,6 +511,175 @@ def fetch_linear_eligible_issue_count(
         pages += 1
         if pages >= LINEAR_COUNT_MAX_PAGES:
             raise RuntimeError("linear_eligible_count_page_limit_exceeded")
+
+
+def official_symphony_release_tag(version: str | None = None) -> str:
+    """Map a burrito version override to the GitHub release tag."""
+    value = (version or OFFICIAL_SYMPHONY_GIT_SHA).strip()
+    if value.startswith("symphony-build-"):
+        return value
+    if value.startswith("v"):
+        return value
+    if re.fullmatch(r"[0-9a-f]{40}", value):
+        return f"symphony-build-{value}"
+    return value
+
+
+def official_symphony_bin_infix(version: str | None = None) -> str:
+    """Binary infix is the git SHA for symphony-build tags."""
+    value = (version or OFFICIAL_SYMPHONY_GIT_SHA).strip()
+    prefix = "symphony-build-"
+    if value.startswith(prefix):
+        return value[len(prefix) :]
+    return value
+
+
+def normalize_linear_issue_ids(issue_ids: list[str] | tuple[str, ...]) -> list[str]:
+    """Accept Linear UUIDs only. Identifiers as [ID!] are HTTP 400."""
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in issue_ids:
+        if not isinstance(raw, str):
+            raise ValueError("linear_issue_state_refresh_invalid_id")
+        value = raw.strip()
+        if not value:
+            continue
+        if ISSUE_IDENTIFIER_PATTERN.fullmatch(value):
+            raise ValueError(f"linear_issue_state_refresh_identifier_not_id:{value}")
+        if not LINEAR_ISSUE_ID_PATTERN.fullmatch(value):
+            raise ValueError(f"linear_issue_state_refresh_invalid_id:{value}")
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(value)
+    return normalized
+
+
+def build_linear_issue_state_refresh_request(
+    *,
+    team_key: str = OFFICIAL_TEAM_KEY,
+    issue_ids: list[str] | tuple[str, ...] = (),
+    page_size: int = LINEAR_PAGE_SIZE,
+) -> dict[str, Any] | None:
+    """Build a team-scoped ID-refresh payload, or None when running=0.
+
+    Empty IDs must not POST: Linear rejects ``first: 0`` and ``ids: []``
+    on ``[ID!]!`` as HTTP 400. Project slug is never a variable — official
+    WORKFLOW is team-keyed and ``projectSlug: null`` is INPUT_ERROR.
+    """
+    if not TEAM_KEY_PATTERN.fullmatch(team_key):
+        raise ValueError(f"team_key must match {TEAM_KEY_PATTERN.pattern}")
+    if page_size <= 0:
+        raise ValueError("page_size must be positive")
+    ids = normalize_linear_issue_ids(issue_ids)
+    if not ids:
+        return None
+    first = min(page_size, len(ids))
+    return {
+        "query": LINEAR_ISSUE_STATE_REFRESH_QUERY,
+        "operationName": "SymphonyLinearTeamIssuesById",
+        "variables": {
+            "ids": ids[:first],
+            "teamKey": team_key,
+            "first": first,
+        },
+    }
+
+
+def refresh_linear_issue_states(
+    *,
+    api_key: str,
+    issue_ids: list[str] | tuple[str, ...] = (),
+    team_key: str = OFFICIAL_TEAM_KEY,
+    api_url: str = LINEAR_API_URL,
+    page_size: int = LINEAR_PAGE_SIZE,
+) -> dict[str, Any]:
+    """Refresh Linear issue states without the v0.0.2-jovie.2 400 path."""
+    payload = build_linear_issue_state_refresh_request(
+        team_key=team_key,
+        issue_ids=issue_ids,
+        page_size=page_size,
+    )
+    if payload is None:
+        return {
+            "kind": "skipped",
+            "reason": "empty_running",
+            "issues": [],
+        }
+
+    request = urllib.request.Request(
+        api_url,
+        data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+        headers={
+            "Authorization": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": "jovie-symphony-elixir-issue-state-refresh/1",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = int(getattr(response, "status", 200))
+            headers = {key.lower(): value for key, value in response.headers.items()}
+            body = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        headers = {key.lower(): value for key, value in exc.headers.items()}
+        classification = classify_linear_response(
+            status=exc.code,
+            headers=headers,
+            body=body,
+        )
+        if classification["kind"] == "rate_limited":
+            raise RuntimeError(
+                "linear_issue_state_refresh_rate_limited:"
+                f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+                f"resetAt={classification['resetAt']}"
+            ) from exc
+        raise RuntimeError(f"linear_issue_state_refresh_http_status:{exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"linear_issue_state_refresh_request_failed:{exc.reason}") from exc
+
+    classification = classify_linear_response(status=status, headers=headers, body=body)
+    if classification["kind"] == "rate_limited":
+        raise RuntimeError(
+            "linear_issue_state_refresh_rate_limited:"
+            f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+            f"resetAt={classification['resetAt']}"
+        )
+    if status < 200 or status >= 300:
+        raise RuntimeError(f"linear_issue_state_refresh_http_status:{status}")
+    try:
+        decoded = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("linear_issue_state_refresh_invalid_json") from exc
+    if _graphql_ratelimited(body):
+        raise RuntimeError("linear_issue_state_refresh_rate_limited")
+    errors = decoded.get("errors") if isinstance(decoded, dict) else None
+    if errors:
+        raise RuntimeError("linear_issue_state_refresh_graphql_errors")
+    issues = decoded.get("data", {}).get("issues") if isinstance(decoded, dict) else None
+    nodes = issues.get("nodes") if isinstance(issues, dict) else None
+    if not isinstance(nodes, list):
+        raise RuntimeError("linear_issue_state_refresh_missing_team_issues")
+    refreshed: list[dict[str, str]] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        issue_id = node.get("id")
+        identifier = node.get("identifier")
+        state = node.get("state")
+        state_name = state.get("name") if isinstance(state, dict) else None
+        if (
+            isinstance(issue_id, str)
+            and isinstance(identifier, str)
+            and isinstance(state_name, str)
+        ):
+            refreshed.append(
+                {"id": issue_id, "identifier": identifier, "state": state_name}
+            )
+    return {"kind": "refreshed", "reason": None, "issues": refreshed}
 
 
 def resolve_linear_eligible_issue_count(
@@ -1081,12 +1281,18 @@ def read_dispatch_admission(
 
     The controller must separately verify tracker/repository identity, exact
     repair assignment and writer lease, and recheck before its one-use claim.
+
+    Returns a typed symphony-dispatch-admission/v1 object. The flat keys
+    (allowed/reason/mode/productId/maxConcurrent, optional observedAt) are the
+    legacy machine contract and stay first-class; the per-mode sub-objects
+    (newWork/existingRepair) carry the mode-specific evidence so consumers can
+    bind typed fields instead of re-deriving them from the fleet receipt.
+    A held admission never leaks the other mode's fields.
     """
-    result = {"allowed": False, "reason": "dispatch-gate-invalid", "maxConcurrent": 0,
-              "mode": mode, "productId": product_id}
+    result = _new_dispatch_admission(mode, product_id)
     if (not isinstance(mode, str) or not isinstance(product_id, str)
-            or mode not in {"new-work", "existing-pr-repair"}
-            or product_id not in {"jovie", "ovie", "logyourbody"}):
+            or mode not in DISPATCH_ADMISSION_MODES
+            or product_id not in DISPATCH_ADMISSION_PRODUCTS):
         return result
     try:
         # One read: closure and capacity must never come from different versions.
@@ -1097,6 +1303,7 @@ def read_dispatch_admission(
     result["reason"] = verdict["reason"]
     valid_reasons = {"closure-health-green", "closure-health-product-independent", "closure-health-not-green"}
     if verdict["reason"] not in valid_reasons:
+        result["closureHealth"] = _admission_closure_projection(verdict)
         return result
     result["observedAt"] = verdict["receiptObservedAt"]
     concurrency = payload.get("concurrency")
@@ -1107,6 +1314,7 @@ def read_dispatch_admission(
             or gem.get("evidenceAccepted") is not True or gem.get("newMutationAllowed") is not True
             or type(maximum) is not int or maximum <= 0):
         result["reason"] = "dispatch-capacity-unproven"
+        result["capacity"] = _admission_capacity_projection(gem)
         return result
     if mode == "new-work":
         work = payload.get("workAdmission")
@@ -1119,7 +1327,11 @@ def read_dispatch_admission(
                 or work.get("newIssueLeaseAllowed") is not True
                 or work.get("newImplementationAllowed") is not True or not product_ok):
             result["reason"] = "new-work-admission-closed"
+            result["newWork"] = _admission_new_work_projection(
+                work, products, product_id
+            )
             return result
+        result["newWork"] = _admission_new_work_projection(work, products, product_id)
     else:
         repair = payload.get("remediationAdmission")
         activities = repair.get("activities") if isinstance(repair, dict) else None
@@ -1132,9 +1344,98 @@ def read_dispatch_admission(
                 or type(repair.get("pushAllowed")) is not bool
                 or type(repair_max) is not int or repair_max != maximum):
             result["reason"] = "existing-pr-remediation-closed"
+            result["existingRepair"] = _admission_repair_projection(repair)
             return result
+        result["existingRepair"] = _admission_repair_projection(repair)
     result.update(allowed=True, reason="dispatch-gate-prerequisite-passed", maxConcurrent=maximum)
     return result
+
+
+def _new_dispatch_admission(mode: object, product_id: object) -> dict[str, Any]:
+    """Fail-closed typed skeleton for an unevaluable admission."""
+    return {
+        "schema": DISPATCH_ADMISSION_SCHEMA,
+        "allowed": False,
+        "reason": "dispatch-gate-invalid",
+        "maxConcurrent": 0,
+        "mode": mode,
+        "productId": product_id,
+    }
+
+
+def _admission_closure_projection(verdict: dict[str, Any]) -> dict[str, Any]:
+    """Typed closure evidence snapshot for a held admission."""
+    return {
+        "closureStatus": verdict.get("closureStatus"),
+        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
+        "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
+        "holdReason": verdict.get("reason"),
+    }
+
+
+def _admission_capacity_projection(gem: object) -> dict[str, Any]:
+    """Typed capacity evidence snapshot for an unproven admission."""
+    if not isinstance(gem, dict):
+        return {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": None}
+    return {
+        "evidenceAccepted": gem.get("evidenceAccepted") is True,
+        "newMutationAllowed": gem.get("newMutationAllowed") is True,
+        "maxConcurrent": gem.get("maxConcurrent") if type(gem.get("maxConcurrent")) is int else None,
+    }
+
+
+def _admission_new_work_projection(
+    work: object, products: object, product_id: str
+) -> dict[str, Any]:
+    """Typed new-work evidence; absent workAdmission degrades to all-closed.
+
+    The product flag mirrors the decision's missing-map semantics exactly: a
+    fleet receipt with no productNewIssueLeaseAllowed map projects the
+    product's own intake as allowed-by-omission (the decision's product_ok
+    treats the missing map as OK), never a contradicting False.
+    """
+    if not isinstance(work, dict):
+        return {
+            "allowed": False,
+            "newIssueLeaseAllowed": False,
+            "newImplementationAllowed": False,
+            "productNewIssueLeaseAllowed": False,
+        }
+    if isinstance(products, dict):
+        product_flag = products.get(product_id) is True
+    elif "productNewIssueLeaseAllowed" not in work:
+        # Omitted map: the decision admits by omission; project the same.
+        product_flag = work.get("newIssueLeaseAllowed") is True
+    else:
+        product_flag = False
+    return {
+        "allowed": work.get("allowed") is True,
+        "newIssueLeaseAllowed": work.get("newIssueLeaseAllowed") is True,
+        "newImplementationAllowed": work.get("newImplementationAllowed") is True,
+        "productNewIssueLeaseAllowed": product_flag,
+    }
+
+
+def _admission_repair_projection(repair: object) -> dict[str, Any]:
+    """Typed existing-repair evidence; absent admission degrades to closed."""
+    if not isinstance(repair, dict):
+        return {
+            "allowed": False,
+            "localAllowed": False,
+            "pushAllowed": False,
+            "authority": None,
+            "activities": [],
+        }
+    activities = repair.get("activities")
+    return {
+        "allowed": repair.get("allowed") is True,
+        "localAllowed": repair.get("localAllowed") is True,
+        "pushAllowed": repair.get("pushAllowed") is True,
+        "authority": repair.get("authority") if isinstance(repair.get("authority"), str) else None,
+        "activities": [
+            activity for activity in (activities or []) if isinstance(activity, str)
+        ] if isinstance(activities, list) else [],
+    }
 
 
 def _read_stop_line(
@@ -1321,7 +1622,12 @@ def classify_linear_issue_error_log_line(
     Only a ``linear_api_status`` 4xx (never 429, never a RATELIMITED body, which
     the rate-limit gate owns) attributed to exactly one issue identifier may
     dead-letter. Ambiguous or unattributable lines fail closed to no action.
+    ``issue_state_refresh_failed`` is a query-class error (empty running set,
+    projectSlug on a team WORKFLOW, identifier-as-ID) — not a per-issue
+    permanent 400. Dead-lettering it blocks Symphony self-heal (JOV-5822).
     """
+    if "issue_state_refresh_failed" in line:
+        return None
     status_match = LINEAR_API_STATUS_PATTERN.search(line)
     if status_match is None:
         return None

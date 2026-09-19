@@ -57,6 +57,11 @@ describe('RATE_LIMIT_OUTAGE_POLICY', () => {
       } as Record<string, RedisLimiterOutagePolicy>)
     ).toEqual(['paymentIntent']);
     expect(
+      unpinnedLimiterPolicies(['zeta', 'alpha', 'paymentIntent'], {
+        paymentIntent: RATE_LIMIT_OUTAGE_POLICY.paymentIntent,
+      } as Record<string, RedisLimiterOutagePolicy>)
+    ).toEqual(['alpha', 'zeta']);
+    expect(
       mandatoryLimitersMissingRequireRedis(
         {
           ...RATE_LIMITERS,

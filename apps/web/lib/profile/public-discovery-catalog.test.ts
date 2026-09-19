@@ -95,6 +95,53 @@ describe('artists directory catalog (JOV-6260)', () => {
     ]);
   });
 
+  it('drops claimed public placeholders whose display name equals the handle', () => {
+    const profiles = toArtistsDirectoryProfiles([
+      {
+        id: 'hello',
+        username: 'hello',
+        handle: 'hello',
+        displayName: 'hello',
+        avatarUrl: null,
+        bio: 'Placeholder identity.',
+        isPublic: true,
+        ownerEmail: 'hello@example.net',
+      },
+      {
+        id: 'ti89m',
+        username: 'ti89m',
+        handle: 'ti89m',
+        displayName: 'ti89m',
+        avatarUrl: null,
+        bio: 'Placeholder identity.',
+        isPublic: true,
+        ownerEmail: 'ti89m@example.net',
+      },
+      {
+        id: 'tim1',
+        username: 'tim1',
+        handle: 'tim1',
+        displayName: 'tim1',
+        avatarUrl: null,
+        bio: 'Placeholder identity.',
+        isPublic: true,
+        ownerEmail: 'tim1@example.net',
+      },
+      {
+        id: 'artist',
+        username: 'tim',
+        handle: 'tim',
+        displayName: 'Tim White',
+        avatarUrl: '/images/avatars/tim-white.jpg',
+        bio: 'Artist',
+        isPublic: true,
+        ownerEmail: 'tim@timwhite.audio',
+      },
+    ]);
+
+    expect(profiles.map(profile => profile.username)).toEqual(['tim']);
+  });
+
   it('fails closed when the eligibility source is missing', () => {
     expect(toArtistsDirectoryProfiles(undefined)).toEqual([]);
     expect(toArtistsDirectoryProfiles(null)).toEqual([]);

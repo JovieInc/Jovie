@@ -196,6 +196,32 @@ describe('public profile discovery eligibility (JOV-6260)', () => {
     ).toBe(true);
   });
 
+  it('excludes claimed public placeholder identities from publication catalogs', () => {
+    expect(
+      getPublicProfileDiscoveryExclusionReason(
+        { handle: 'ti89m', displayName: 'ti89m', isPublic: true },
+        { requirePublication: true }
+      )
+    ).toBe('placeholder_identity');
+    expect(
+      getPublicProfileDiscoveryExclusionReason(
+        { handle: 'hello', displayName: '', isPublic: true },
+        { requirePublication: true }
+      )
+    ).toBe('placeholder_identity');
+    expect(
+      isPublicProfileDiscoveryEligible(
+        {
+          handle: 'tim',
+          displayName: 'Tim White',
+          isPublic: true,
+          ownerEmail: 'tim@timwhite.audio',
+        },
+        { requirePublication: true }
+      )
+    ).toBe(true);
+  });
+
   it('fails closed when listing requires publication and the source omitted it', () => {
     expect(
       isPublicProfileDiscoveryEligible(

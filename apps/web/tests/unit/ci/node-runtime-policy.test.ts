@@ -169,6 +169,13 @@ describe('Node runtime lifecycle policy', () => {
       'matrix: ${{ fromJSON(needs.policy.outputs.matrix) }}'
     );
     expect(workflow).toContain('continue-on-error: ${{ !matrix.blocking }}');
+    const compatibilityJob = workflow.slice(
+      workflow.indexOf('  compatibility:'),
+      workflow.indexOf('  promotion-readiness:')
+    );
+    expect(compatibilityJob).toMatch(
+      /uses: actions\/checkout@[^\n]+\n\s+with:\n(?:\s+#[^\n]*\n)*\s+fetch-depth: 0/
+    );
     expect(workflow).toContain('pnpm install --frozen-lockfile');
     expect(workflow).toContain(
       'node scripts/node-runtime-policy.mjs runtime-smoke'

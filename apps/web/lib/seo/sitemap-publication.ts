@@ -1,5 +1,6 @@
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { isOpaqueInternalProfileHandle } from '@/lib/profile/opaque-internal-profile-handle';
+import { getSitemapExcludedPublicPaths } from '@/lib/seo/public-url-policy';
 
 export interface SitemapManifestRoute {
   readonly url: string;
@@ -142,6 +143,9 @@ export function collectSitemapInventoryViolations(
     if (!seen.add(path)) violations.push(`duplicate sitemap url: ${path}`);
     if (manifest.some(route => route.url === path && route.aliasOf)) {
       violations.push(`alias included: ${path}`);
+    }
+    if (getSitemapExcludedPublicPaths().includes(path)) {
+      violations.push(`non-indexable public url: ${path}`);
     }
     if (
       AUTH_PRIVATE_PATHS.has(path) ||

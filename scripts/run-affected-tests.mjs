@@ -242,6 +242,8 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
 ];
 const ROLLING_CI_FX_CACHE_GC_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
+  'scripts/hooks/pre-push-gate.sh',
+  'scripts/security/scan-secrets.sh',
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
   'scripts/ci-fast-lanes.mjs',
@@ -1385,7 +1387,9 @@ export function buildAffectedTestPlan(
   const hasCiUiDriftGuardrailAnchor = files.some(
     file =>
       file === 'apps/desktop/scripts/desktop-shell-contract.test.mjs' ||
-      file === 'scripts/hooks/configure-git-hooks.sh'
+      file === 'scripts/hooks/configure-git-hooks.sh' ||
+      file === 'scripts/hooks/pre-push-gate.sh' ||
+      file === 'scripts/security/scan-secrets.sh'
   );
   const isBoundedCiUiDriftGuardrailChange =
     ciUiDriftGuardrailInputCount > 0 &&

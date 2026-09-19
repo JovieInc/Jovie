@@ -27,9 +27,13 @@ import {
   isExplicitDevelopmentEnvironment,
   shouldBypassProductionBlockedDebugPath,
 } from '@/lib/security/development-only';
-import { createFastNotFoundResponse } from '@/lib/security/probe-detection';
+import {
+  createFastGoneResponse,
+  createFastNotFoundResponse,
+} from '@/lib/security/probe-detection';
 import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 import { ensureSentry } from '@/lib/sentry/ensure';
+import { resolvePublicUrlGone } from '@/lib/seo/public-url-policy';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 import { isReservedUsername } from '@/lib/validation/username-core';
 
@@ -208,7 +212,13 @@ export async function handleProxyRequest(
 
     // Legacy single-segment paths (e.g. /login, /request-access) must never
     // hit the public profile catch-all — redirect before any DB work (JOV-3054).
+    // Gone roots (e.g. /music, /shows) return 410 so GSC can drop them instead
+    // of treating a missing handle as a soft miss. /product is DESIGN_READY
+    // and must not 410.
     if (isNavigationMethod) {
+      if (resolvePublicUrlGone(pathname)) {
+        return createFastGoneResponse();
+      }
       const legacyRedirect = resolveLegacyRootPathRedirect(pathname);
       if (legacyRedirect) {
         const targetUrl = req.nextUrl.clone();

@@ -30,11 +30,26 @@ PROTECTED_DIR_NAMES = frozenset(
     {".git", ".codex", ".ssh", ".config", ".local", ".gnupg", "credentials", "secrets"}
 )
 WORKSPACE_METADATA_FILES = frozenset({".symphony-routing.json"})
+SKIP_WALK_DIR_NAMES = frozenset({"pnpm-store", "package-cache", ".pnpm"})
+GIT_STATUS_EXCLUDES = (
+    ":!**/node_modules",
+    ":!**/.next",
+    ":!**/.turbo",
+    ":!**/coverage",
+    ":!**/pnpm-store",
+    ":!**/.pnpm",
+    ":!**/.symphony/package-cache",
+)
 ISSUE_IDENTIFIER = re.compile(r"^(?:JOV|LYB)-[0-9]+$")
 GEM_WORKSPACE_ENV = "GEM_DISK_RECLAIM_GEM_WORKSPACE"
 RECEIPT_ENV = "GEM_DISK_RECLAIM_RECEIPT"
 DISK_RECEIPT_ENV = "GEM_DISK_RECLAIM_DISK_RECEIPT"
 CAPACITY_RECEIPT_ENV = "GEM_DISK_RECLAIM_CAPACITY_RECEIPT"
+RECEIPT_MAX_BYTES_ENV = "GEM_DISK_RECLAIM_RECEIPT_MAX_BYTES"
+RECEIPT_MAX_BYTES = 46 * 1024
+RECEIPT_PATH_SAMPLE = 16
+GIT_STATUS_MAX_BYTES = 256 * 1024
+RECEIPT_MIN_MAX_BYTES = 1024
 
 
 class ReclaimTimeout(TimeoutError):
@@ -55,6 +70,189 @@ def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o6
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(temporary, mode)
     os.replace(temporary, path)
+
+
+def encode_receipt(value: dict[str, Any]) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def compact_git_report(git: dict[str, Any]) -> dict[str, Any]:
+    paths = git.get("dirtySourcePaths")
+    if not isinstance(paths, list) or len(paths) <= RECEIPT_PATH_SAMPLE:
+        return git
+    compacted = dict(git)
+    compacted["dirtySourcePaths"] = paths[:RECEIPT_PATH_SAMPLE]
+    compacted["dirtySourcePathCount"] = len(paths)
+    compacted["dirtySourcePathsOmitted"] = len(paths) - RECEIPT_PATH_SAMPLE
+    return compacted
+
+
+def compact_candidate_list(candidates: list[Any]) -> tuple[list[Any], int]:
+    if len(candidates) <= RECEIPT_PATH_SAMPLE:
+        return candidates, len(candidates)
+    keyed = [item for item in candidates if isinstance(item, dict)]
+    keyed.sort(key=lambda item: int(item.get("bytes") or 0), reverse=True)
+    return keyed[:RECEIPT_PATH_SAMPLE], len(candidates)
+
+
+def compact_report_tree(value: Any) -> Any:
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for key, child in value.items():
+            if key == "git" and isinstance(child, dict):
+                out[key] = compact_git_report(compact_report_tree(child) if isinstance(child, dict) else child)
+            elif key == "candidates" and isinstance(child, list) and len(child) > RECEIPT_PATH_SAMPLE:
+                kept, total = compact_candidate_list(child)
+                out[key] = kept
+                out["candidateCount"] = total
+                out["candidatesOmitted"] = total - len(kept)
+            elif key == "dirtySourcePaths" and isinstance(child, list) and len(child) > RECEIPT_PATH_SAMPLE:
+                out[key] = child[:RECEIPT_PATH_SAMPLE]
+                out["dirtySourcePathCount"] = len(child)
+                out["dirtySourcePathsOmitted"] = len(child) - RECEIPT_PATH_SAMPLE
+            elif key == "violations" and isinstance(child, list) and len(child) > RECEIPT_PATH_SAMPLE:
+                out[key] = child[:RECEIPT_PATH_SAMPLE]
+                out["violationCount"] = len(child)
+            else:
+                out[key] = compact_report_tree(child)
+        return out
+    if isinstance(value, list):
+        return [compact_report_tree(item) for item in value]
+    return value
+
+
+def summarize_root_reports(report: dict[str, Any]) -> dict[str, Any]:
+    roots = report.get("roots")
+    if not isinstance(roots, list):
+        return report
+    summarized = []
+    for root in roots:
+        if not isinstance(root, dict):
+            continue
+        workspaces = root.get("workspaces")
+        candidates = root.get("candidates")
+        summarized.append(
+            {
+                "root": root.get("root"),
+                "status": root.get("status"),
+                "reason": root.get("reason"),
+                "workspaceCount": len(workspaces) if isinstance(workspaces, list) else 0,
+                "candidateCount": root.get("candidateCount")
+                if isinstance(root.get("candidateCount"), int)
+                else (len(candidates) if isinstance(candidates, list) else 0),
+            }
+        )
+    compacted = dict(report)
+    compacted["roots"] = summarized
+    compacted["rootsSummarized"] = True
+    return compacted
+
+
+def bound_receipt(receipt: dict[str, Any], max_bytes: int) -> dict[str, Any]:
+    bounded = receipt.get("bounded")
+    receipt = dict(receipt)
+    receipt["bounded"] = {**(bounded if isinstance(bounded, dict) else {}), "receiptMaxBytes": max_bytes}
+    compacted = compact_report_tree(receipt)
+    encoded = encode_receipt(compacted)
+    if len(encoded) <= max_bytes:
+        compacted_bounded = compacted.get("bounded")
+        if isinstance(compacted_bounded, dict):
+            compacted_bounded["receiptBytes"] = len(encoded)
+        return compacted
+    compacted = dict(compacted)
+    for key in ("runners", "workspaces"):
+        section = compacted.get(key)
+        if isinstance(section, dict):
+            compacted[key] = summarize_root_reports(section)
+    encoded = encode_receipt(compacted)
+    compacted_bounded = compacted.get("bounded")
+    if not isinstance(compacted_bounded, dict):
+        compacted_bounded = {}
+        compacted["bounded"] = compacted_bounded
+    compacted_bounded["receiptCompacted"] = True
+    if len(encoded) <= max_bytes:
+        compacted_bounded["receiptBytes"] = len(encoded)
+        return compacted
+    stub = {
+        "schema": compacted.get("schema", SCHEMA),
+        "observedAt": compacted.get("observedAt", utc_now()),
+        "mode": compacted.get("mode"),
+        "status": compacted.get("status") or "error",
+        "error": compacted.get("error") or "receipt_compacted_to_budget",
+        "bounded": {
+            "receiptMaxBytes": max_bytes,
+            "receiptBytesBefore": len(encoded),
+            "receiptCompacted": True,
+        },
+        "summary": compacted.get("summary"),
+        "diskAfter": compacted.get("diskAfter"),
+        "priorReceipt": compacted.get("priorReceipt"),
+    }
+    encoded = encode_receipt(stub)
+    stub["bounded"]["receiptBytes"] = len(encoded)
+    if len(encoded) <= max_bytes:
+        return stub
+    compact_json = (json.dumps(stub, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+    stub["bounded"]["receiptBytes"] = len(compact_json)
+    return stub
+
+
+def write_receipt_atomic(
+    path: pathlib.Path,
+    value: dict[str, Any],
+    max_bytes: int,
+    mode: int = 0o600,
+) -> dict[str, Any]:
+    payload = bound_receipt(value, max_bytes)
+    encoded = encode_receipt(payload)
+    if len(encoded) > max_bytes:
+        payload = bound_receipt(
+            {
+                "schema": SCHEMA,
+                "observedAt": utc_now(),
+                "status": "error",
+                "error": f"receipt_exceeds_budget:{len(encoded)}",
+                "bounded": {"receiptMaxBytes": max_bytes},
+            },
+            max_bytes,
+        )
+        encoded = encode_receipt(payload)
+        if len(encoded) > max_bytes:
+            encoded = (json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    temporary.write_bytes(encoded)
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+    return payload
+
+
+def compact_existing_receipt(path: pathlib.Path, max_bytes: int) -> dict[str, Any] | None:
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    if size <= max_bytes:
+        return None
+    prior = {
+        "path": str(path),
+        "bytes": size,
+        "compacted": True,
+        "reason": "receipt_oversized_unparsed",
+    }
+    write_receipt_atomic(
+        path,
+        {
+            "schema": SCHEMA,
+            "observedAt": utc_now(),
+            "status": "error",
+            "error": f"receipt_oversized:{size}",
+            "bounded": {"receiptMaxBytes": max_bytes, "receiptCompacted": True},
+            "priorReceipt": prior,
+        },
+        max_bytes,
+    )
+    return prior
 
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
@@ -310,23 +508,62 @@ def path_is_allowed_artifact(relative: str) -> bool:
     if relative in WORKSPACE_METADATA_FILES:
         return True
     parts = pathlib.PurePosixPath(relative).parts
-    return any(part in WORKSPACE_ARTIFACT_NAMES for part in parts)
+    return any(part in WORKSPACE_ARTIFACT_NAMES or part in SKIP_WALK_DIR_NAMES for part in parts)
 
 
 def workspace_git_state(workspace: pathlib.Path, deadline: float) -> dict[str, Any]:
     status = run_process(
-        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        ["git", "status", "--porcelain=v1", "--untracked-files=all", "--", ".", *GIT_STATUS_EXCLUDES],
         workspace,
         deadline,
         timeout=15,
     )
     if status.returncode != 0:
         return {"valid": False, "reason": "workspace_status_unavailable"}
+    stdout = status.stdout
+    overflow = len(stdout) > GIT_STATUS_MAX_BYTES
+    if overflow:
+        stdout = stdout[:GIT_STATUS_MAX_BYTES]
+        lines = stdout.splitlines()
+        if lines:
+            lines = lines[:-1]
+    else:
+        lines = stdout.splitlines()
     dirty_source_paths = [
         status_path(line)
-        for line in status.stdout.splitlines()
+        for line in lines
         if status_path(line) and not path_is_allowed_artifact(status_path(line))
     ]
+    if overflow:
+        counts = run_process(
+            ["git", "rev-list", "--left-right", "--count", "origin/main...HEAD"],
+            workspace,
+            deadline,
+            timeout=15,
+        )
+        ahead = 0
+        behind = 0
+        if counts.returncode == 0:
+            try:
+                behind_raw, ahead_raw = counts.stdout.strip().split()
+                behind = int(behind_raw)
+                ahead = int(ahead_raw)
+            except ValueError:
+                return {
+                    "valid": False,
+                    "reason": "workspace_ahead_behind_malformed",
+                    "dirtySourcePaths": dirty_source_paths[:RECEIPT_PATH_SAMPLE],
+                    "dirtySourcePathCount": "truncated",
+                }
+        return {
+            "valid": True,
+            "dirty": True,
+            "dirtySourcePaths": dirty_source_paths[:RECEIPT_PATH_SAMPLE],
+            "dirtySourcePathCount": "truncated",
+            "reason": "git_status_stdout_overflow",
+            "ahead": ahead,
+            "behind": behind,
+        }
     counts = run_process(
         ["git", "rev-list", "--left-right", "--count", "origin/main...HEAD"],
         workspace,
@@ -421,7 +658,7 @@ def discover_workspace_candidates(
         kept: list[str] = []
         for name in dirs:
             child = root / name
-            if name in PROTECTED_DIR_NAMES:
+            if name in PROTECTED_DIR_NAMES or name in SKIP_WALK_DIR_NAMES:
                 continue
             if name in WORKSPACE_ARTIFACT_NAMES:
                 try:
@@ -775,6 +1012,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "protectedDirNames": sorted(PROTECTED_DIR_NAMES),
             "logMaxBytes": args.log_max_bytes,
             "logRetention": args.log_retention,
+            "receiptMaxBytes": args.receipt_max_bytes,
         },
         "diskBefore": disk_before,
         "diskAfter": disk_after,
@@ -789,8 +1027,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "violations": violations,
         },
     }
-    write_json_atomic(args.receipt, receipt)
-    return receipt
+    return write_receipt_atomic(args.receipt, receipt, args.receipt_max_bytes)
 
 
 def positive_int(value: str) -> int:
@@ -802,6 +1039,17 @@ def positive_int(value: str) -> int:
 
 def default_path_from_env(name: str, fallback: pathlib.Path) -> pathlib.Path:
     return pathlib.Path(os.environ.get(name, str(fallback))).expanduser()
+
+
+def default_receipt_max_bytes() -> int:
+    raw = os.environ.get(RECEIPT_MAX_BYTES_ENV, "")
+    if not raw:
+        return RECEIPT_MAX_BYTES
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return RECEIPT_MAX_BYTES
+    return parsed if parsed >= RECEIPT_MIN_MAX_BYTES else RECEIPT_MAX_BYTES
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -833,6 +1081,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--receipt", type=pathlib.Path, default=default_path_from_env(RECEIPT_ENV, receipt_root / "latest.json"))
     parser.add_argument("--disk-receipt", type=pathlib.Path, default=default_path_from_env(DISK_RECEIPT_ENV, receipt_root / "capacity.json"))
     parser.add_argument("--capacity-receipt", type=pathlib.Path, default=default_path_from_env(CAPACITY_RECEIPT_ENV, gem_workspace / "state/concurrency.json"))
+    parser.add_argument(
+        "--receipt-max-bytes",
+        type=positive_int,
+        default=default_receipt_max_bytes(),
+    )
     parser.add_argument("--log-path", type=pathlib.Path, default=home / "symphony-ui-pilot-logs/stdout.log")
     parser.add_argument("--log-max-bytes", type=positive_int, default=64 * 1024 * 1024)
     parser.add_argument("--log-retention", type=positive_int, default=5)
@@ -851,33 +1104,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--timeout-seconds must be non-negative")
     if args.warning_free_bytes < args.min_free_bytes:
         parser.error("--warning-free-bytes must be >= --min-free-bytes")
+    if args.receipt_max_bytes < RECEIPT_MIN_MAX_BYTES:
+        parser.error(f"--receipt-max-bytes must be at least {RECEIPT_MIN_MAX_BYTES}")
     return args
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    prior = compact_existing_receipt(args.receipt, args.receipt_max_bytes)
     try:
         receipt = run(args)
     except ReclaimTimeout as error:
-        receipt = {
-            "schema": SCHEMA,
-            "observedAt": utc_now(),
-            "mode": args.mode,
-            "status": "timeout",
-            "error": str(error),
-            "bounded": {"timeoutSeconds": args.timeout_seconds},
-        }
-        write_json_atomic(args.receipt, receipt)
+        receipt = write_receipt_atomic(
+            args.receipt,
+            {
+                "schema": SCHEMA,
+                "observedAt": utc_now(),
+                "mode": args.mode,
+                "status": "timeout",
+                "error": str(error),
+                "bounded": {"timeoutSeconds": args.timeout_seconds},
+            },
+            args.receipt_max_bytes,
+        )
     except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError, FailClosed) as error:
-        receipt = {
-            "schema": SCHEMA,
-            "observedAt": utc_now(),
-            "mode": args.mode,
-            "status": "error",
-            "error": f"{type(error).__name__}:{error}",
-            "bounded": {"timeoutSeconds": args.timeout_seconds},
-        }
-        write_json_atomic(args.receipt, receipt)
+        receipt = write_receipt_atomic(
+            args.receipt,
+            {
+                "schema": SCHEMA,
+                "observedAt": utc_now(),
+                "mode": args.mode,
+                "status": "error",
+                "error": f"{type(error).__name__}:{error}",
+                "bounded": {"timeoutSeconds": args.timeout_seconds},
+            },
+            args.receipt_max_bytes,
+        )
+    if prior:
+        receipt = write_receipt_atomic(
+            args.receipt,
+            {
+                **receipt,
+                "priorReceipt": prior,
+                "status": "error" if receipt.get("status") in {"ok", "warning"} else receipt.get("status"),
+                "error": receipt.get("error") or "receipt_oversized_compacted",
+            },
+            args.receipt_max_bytes,
+        )
     print(json.dumps(receipt, indent=2, sort_keys=True))
     if receipt.get("status") in {"ok", "warning"}:
         if receipt.get("status") == "warning":

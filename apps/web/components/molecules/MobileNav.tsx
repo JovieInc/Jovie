@@ -77,7 +77,7 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
-  publicCtaHref = APP_ROUTES.WAITLIST,
+  publicCtaHref = APP_ROUTES.SIGNUP,
   publicCtaLabel = 'Sign up',
 }: Readonly<{
   showAuthenticatedAction: boolean;
