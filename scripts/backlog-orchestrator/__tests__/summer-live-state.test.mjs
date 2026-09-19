@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { escalate, openLoopRecord, classifyStall, planFounderContact } from '../no-unattended-red.mjs';
+import {
+  classifyStall,
+  escalate,
+  openLoopRecord,
+  planFounderContact,
+} from '../no-unattended-red.mjs';
 import {
   ALREADY_IN_FLIGHT_SCHEMA,
   evaluateHumanFire,
@@ -60,11 +65,15 @@ describe('summer-live-state-no-false-human-fire-v1', () => {
       'ask-human-create-pr'
     );
     assert.equal(
-      inferHumanFireIntent({ reason: 'authority-budget-exhausted:dropped-controller-event' }),
+      inferHumanFireIntent({
+        reason: 'authority-budget-exhausted:dropped-controller-event',
+      }),
       null
     );
     assert.equal(
-      inferHumanFireIntent({ reason: 'missing-failing-checks:create-bounded-ci-repair-pr' }),
+      inferHumanFireIntent({
+        reason: 'missing-failing-checks:create-bounded-ci-repair-pr',
+      }),
       null
     );
   });
@@ -90,7 +99,11 @@ describe('summer-live-state-no-false-human-fire-v1', () => {
       openRecord(),
       'envelope PR is nonexistent; ask a human to land it',
       NOW,
-      { livePr: livePr(), hostJson: { missing: true }, gbrain: { missing: true } }
+      {
+        livePr: livePr(),
+        hostJson: { missing: true },
+        gbrain: { missing: true },
+      }
     );
     assert.equal(blocked.outcome, 'healthy');
     assert.equal(blocked.dispatchState, 'already-in-flight');
@@ -112,7 +125,12 @@ describe('summer-live-state-no-false-human-fire-v1', () => {
 
     const liveMissing = evaluateHumanFire({
       intent: 'claim-pr-missing',
-      livePr: livePr({ exists: false, prNumber: null, isInMergeQueue: false, prReadyEnrolled: false }),
+      livePr: livePr({
+        exists: false,
+        prNumber: null,
+        isInMergeQueue: false,
+        prReadyEnrolled: false,
+      }),
       now: NOW,
     });
     assert.equal(liveMissing.decision, 'allow');
