@@ -210,9 +210,14 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 ### Sidebar (App Shell)
 
+Founder lock 2026-09-12, Pen `OqZTF`: 280px customer rail; combined search/inbox/
+new-chat bar; Library, Contacts, Presence (`canonicalSidebarNavigation`); 36px
+nav/history rows; Today/Earlier history; bottom-anchored account footer. Mobile
+keeps its composition. Homepage `t1x8T` remains locked.
+
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 244px | 244px |
+| Width | 280px | 280px |
 | Background RGB | `247 248 248` | `6 8 13` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
@@ -303,5 +308,3 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 ## Decisions Log
 
 Read [the decisions log reference](docs/design-system/DETAILS.md#decisions-log) when changing this area.
-
-Editorial titles (founder, 2026-09-14): `BlogCard` uses `data-wrap="editorial-title"` and per-row subgrid tracks. Show full titles; no truncation or global fixed height. Other heading bounds still apply. Storybook covers short, two-line and long titles across responsive widths.
