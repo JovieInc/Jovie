@@ -20,8 +20,8 @@ export interface SearchEnrichmentResult {
 
 /**
  * Apply VIP boost to search results, prioritizing featured creators
- * for exact name matches. Filters out other results with the same
- * normalized name to prevent duplicates.
+ * for exact name matches. Distinct Spotify IDs remain selectable even
+ * when names collide; only repeated IDs are duplicates.
  */
 export async function applyVipBoost(
   results: SpotifyArtistResult[],
@@ -68,22 +68,20 @@ interface VipArtist {
 }
 
 /**
- * Boost a VIP artist to the top of results and filter out
- * other results with the same normalized name.
+ * Boost a VIP artist while retaining other artists with the same name.
+ * Provider IDs, not display names, identify duplicate results.
  */
 function boostVipArtist(
   results: SpotifyArtistResult[],
   vipArtist: VipArtist,
   limit: number
 ): SpotifyArtistResult[] {
-  const normalizedVipName = vipArtist.name.toLowerCase().trim();
-
-  // Filter out non-VIP results with the same name
-  const filtered = results.filter(
-    r =>
-      r.id === vipArtist.spotifyId ||
-      r.name.toLowerCase().trim() !== normalizedVipName
-  );
+  const seenIds = new Set<string>();
+  const filtered = results.filter(result => {
+    if (seenIds.has(result.id)) return false;
+    seenIds.add(result.id);
+    return true;
+  });
 
   const existingIndex = filtered.findIndex(r => r.id === vipArtist.spotifyId);
 
