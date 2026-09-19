@@ -1,8 +1,9 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -43,7 +44,8 @@ function WaitlistRouteWithContract({
  * seven-field waitlist questionnaire.
  *
  * WAITLIST_PENDING stays here. A real pending row is the only success
- * condition; missing receipts fail closed without false confirmation.
+ * condition; missing receipts recover to /signup instead of 404ing
+ * acquisition traffic (JOV-6436).
  *
  * /start is rewrite-exempt for waitlist users, so recovering to /start does
  * not re-enter the JOV-2161 proxy rewrite loop.
@@ -111,5 +113,5 @@ export default async function WaitlistPage() {
     );
   }
 
-  notFound();
+  redirect(APP_ROUTES.SIGNUP);
 }

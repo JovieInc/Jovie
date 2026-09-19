@@ -98,7 +98,7 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to waitlist', async ({ page }) => {
+  test('navigates hero CTA to signup', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(

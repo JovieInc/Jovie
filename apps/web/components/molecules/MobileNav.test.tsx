@@ -78,6 +78,16 @@ describe('MobileNav', () => {
     expect(source).not.toContain("label: 'Log In'");
   });
 
+  it('lands the public CTA on same-origin /signup by default (JOV-6436)', () => {
+    render(<MobileNav navLinks={[{ href: '/pricing', label: 'Pricing' }]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    const signupLink = screen.getByRole('link', { name: 'Sign up' });
+    expect(signupLink).toHaveAttribute('href', '/signup');
+    expect(signupLink.getAttribute('href')).not.toContain('/waitlist');
+  });
+
   it('documents the sentence-case login label as an intentional casing exception', () => {
     const source = readFileSync(resolve(__dirname, './MobileNav.tsx'), 'utf8');
     expect(source).toContain('ui-casing-allow:');

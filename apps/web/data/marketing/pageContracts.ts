@@ -18,7 +18,7 @@ const START_CTA = {
 } as const;
 
 const CLAIM_PROFILE_CTA = {
-  href: 'https://jov.ie/waitlist',
+  href: APP_ROUTES.SIGNUP,
   label: 'Claim your profile',
 } as const;
 
