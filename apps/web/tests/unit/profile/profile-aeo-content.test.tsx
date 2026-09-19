@@ -12,6 +12,7 @@ import {
   type ProfileAeoContent as ProfileAeoContentModel,
   validateProfileAeoContent,
 } from '@/lib/profile/aeo-content';
+import { PROFILE_AEO_OPTIMIZATION_CONTRACT } from '@/lib/profile/aeo-content-optimization';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -1112,5 +1113,80 @@ describe('Profile AEO content', () => {
 
     rerender(<ProfileAeoContent content={content} />);
     expect(screen.queryByTestId('profile-aeo-claim-card')).toBeNull();
+  });
+
+  it('keeps a complete product optimization contract on existing surfaces', () => {
+    expect(PROFILE_AEO_OPTIMIZATION_CONTRACT).toMatchObject({
+      kind: 'product',
+      variantIdentity: 'public-profile.retrieval-ready-aeo:v1',
+      exposure: expect.stringContaining('analytics profile_view'),
+      outcome: expect.stringContaining('release-to-revenue GMV'),
+      attribution: expect.stringContaining('audience-event'),
+      contextDimensions: expect.arrayContaining([
+        'platform',
+        'content-variant',
+        'artist-plus-career-era-or-lifecycle',
+      ]),
+      hypothesis: expect.stringContaining('independently extractable'),
+      primaryMetric: expect.stringContaining('artist-business-outcome'),
+      guardrails: expect.arrayContaining([
+        'complaint',
+        'trust',
+        'brand',
+        'no token-count, FAQ-quota, keyword-repetition, or doorway-page ranking heuristics',
+      ]),
+      privacy: expect.stringContaining('first-party consented'),
+      optimizerOwner: expect.stringContaining('JOV-6244'),
+      cadence: expect.stringContaining('SEO/AEO ratchet'),
+      decisionWriteback: expect.stringContaining('model-experiment'),
+      rollback: expect.stringContaining('aeo-content.ts'),
+    });
+    expect(
+      PROFILE_AEO_OPTIMIZATION_CONTRACT.attribution.toLowerCase()
+    ).toContain('youtube-experiment');
+    expect(PROFILE_AEO_OPTIMIZATION_CONTRACT.primaryMetric).not.toMatch(
+      /^(engagement|ctr|clicks?|impressions?|views?)$/i
+    );
+  });
+
+  it('rejects token-count folklore and does not stuff repeated FAQ copy', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'lib/profile/aeo-content.ts'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/5\s*[–-]\s*7\s*tokens?/i);
+    expect(source).not.toMatch(/keyword\s+density/i);
+    expect(source).not.toMatch(/faq\s+quota/i);
+    expect(source).not.toMatch(/doorway\s+page/i);
+    expect(source).not.toMatch(/fill(?:ing)?\s+(?:the\s+)?context\s+window/i);
+    expect(source).not.toMatch(/min(?:imum)?\s+token/i);
+
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        tagline: 'DJ Test builds late-night club records.',
+        career_highlights: null,
+        target_playlists: null,
+      },
+      latestRelease: {
+        title: 'Neon Circuit',
+        slug: 'neon-circuit',
+        releaseType: 'single',
+        releaseDate: '2026-05-01T00:00:00.000Z',
+      },
+      now,
+    });
+
+    const joined = content.description.join(' ');
+    const nameMatches = joined.match(/DJ Test/g) ?? [];
+    expect(nameMatches.length).toBeLessThanOrEqual(6);
+    expect(content.faqs.every(faq => faq.answer.includes('DJ Test'))).toBe(
+      true
+    );
+    expect(new Set(content.faqs.map(faq => faq.question)).size).toBe(
+      content.faqs.length
+    );
+    expect(validateProfileAeoContent(content)).toEqual([]);
   });
 });

@@ -1,11 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BASE_URL } from '@/constants/app';
+import {
+  buildProfileAeoContent,
+  buildProfileAeoFaqStructuredData,
+  validateProfileAeoContent,
+} from '@/lib/profile/aeo-content';
 import { buildPublicProfileMetadata } from '@/lib/profile/metadata';
 import {
   loadSeoRatchetBaseline,
   resolveSeoSourcePath,
 } from '@/lib/seo/ratchet';
+import type { Artist } from '@/types/db';
 
 const baseline = loadSeoRatchetBaseline();
 
@@ -65,5 +71,63 @@ describe('SEO ratchet — public profile metadata builder (JOV-11044)', () => {
       follow: false,
       googleBot: { index: false, follow: false },
     });
+  });
+
+  it('consumes retrieval-ready AEO validation for independently extracted facts', () => {
+    const profileSurface = baseline.profileSurfaces.find(
+      surface => surface.id === 'public-profile'
+    );
+    expect(profileSurface).toBeDefined();
+
+    const pageSource = readFileSync(
+      resolveSeoSourcePath(profileSurface!.sourceFile),
+      'utf8'
+    );
+    expect(pageSource).toContain('buildProfileAeoContent');
+    expect(pageSource).toContain(
+      'buildProfileAeoFaqStructuredData(aeoContent)'
+    );
+    expect(pageSource).toContain('<ProfileAeoContent');
+
+    const artist = {
+      id: 'artist-ratchet',
+      owner_user_id: 'owner-ratchet',
+      handle: 'tim',
+      name: 'Tim White',
+      tagline: 'Independent artist and founder of Jovie.',
+      location: 'Los Angeles',
+      hometown: null,
+      active_since_year: 2018,
+      genres: ['Electronic'],
+      published: true,
+      is_verified: true,
+      is_featured: false,
+      marketing_opt_out: false,
+      created_at: '2024-01-01T00:00:00.000Z',
+    } as Artist;
+
+    const content = buildProfileAeoContent({
+      artist,
+      genres: ['Electronic'],
+      latestRelease: {
+        title: 'Never Say A Word',
+        slug: 'never-say-a-word',
+        releaseType: 'single',
+        releaseDate: '2024-06-01T00:00:00.000Z',
+      },
+      now: new Date('2026-06-18T00:00:00.000Z'),
+    });
+
+    expect(validateProfileAeoContent(content)).toEqual([]);
+    expect(
+      content.descriptionBlocks.every(block => block.text.includes('Tim White'))
+    ).toBe(true);
+    expect(buildProfileAeoFaqStructuredData(content).mainEntity).toEqual(
+      content.faqs.map(faq => ({
+        '@type': 'Question',
+        name: faq.question,
+        acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+      }))
+    );
   });
 });
