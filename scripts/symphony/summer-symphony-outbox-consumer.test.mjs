@@ -19,6 +19,7 @@ import {
   canonical,
   configFromEnvironment,
   countOpenSummerChildren,
+  createExecutionDelivery,
   createFileJournal,
   createHttpTransport,
   createLinearProjector,
@@ -2314,6 +2315,234 @@ describe('authenticated retained task records', () => {
           async () => new Response('', { status })
         ).readTaskRecords(taskValue, 'JOV-6418'),
         new RegExp(`http-${status}`)
+      );
+    }
+  });
+
+  function deliveryFixture(status = 'failed') {
+    const f = fixture('native-queue', status);
+    const root = mkdtempSync(join(tmpdir(), 'summer-delivery-'));
+    roots.push(root);
+    const reopen = () => createFileJournal(root, keys, host.publicKey);
+    const journal = reopen();
+    const expected = {
+      taskKey: f.taskValue.taskKey,
+      action: f.taskValue.action,
+      issueIdentifier: 'JOV-6418',
+      ...f.taskValue.source,
+    };
+    const active = {
+      phase: 'execution-ready',
+      taskKey: f.taskValue.taskKey,
+      record: f.value.outbox,
+      outcome: f.value.projection,
+    };
+    journal.write({
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active,
+    });
+    const cycle = (j, transport) =>
+      runCycle({
+        journal: j,
+        transport,
+        keys,
+        outcomePublicKey: host.publicKey,
+        outcomeKeyId: 'host-outcome',
+      });
+    const ack = {
+      schema: 'summer.symphony-execution-ack/v1',
+      taskKey: expected.taskKey,
+      status: 'recorded',
+      decision: status,
+    };
+    return { ...f, journal, reopen, expected, active, cycle, ack };
+  }
+
+  it('retains the projection before dispatch and resumes a missed launch without another child', async () => {
+    const f = deliveryFixture();
+    f.journal.write({
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: {
+        phase: 'discovered',
+        taskKey: f.taskValue.taskKey,
+        record: f.value.outbox,
+      },
+    });
+    let projected = 0;
+    let posted = 0;
+    const first = await runCycle({
+      journal: f.journal,
+      keys,
+      outcomePublicKey: host.publicKey,
+      outcomePrivateKey: host.privateKey,
+      outcomeKeyId: 'host-outcome',
+      projector: {
+        project: async () => {
+          projected++;
+          return {
+            identifier: 'JOV-6418',
+            createdAt: f.value.projection.completedAt,
+          };
+        },
+      },
+      transport: {
+        writeOutcome: async () => {
+          posted++;
+          return { status: 'recorded' };
+        },
+      },
+    });
+    assert.equal(first.status, 'projection-recorded');
+    assert.equal(f.reopen().read().active.phase, 'execution-ready');
+    const second = await f.cycle(f.reopen(), {});
+    assert.equal(second.status, 'projection-recorded');
+    assert.equal(second.taskKey, first.taskKey);
+    assert.equal(projected, 1);
+    assert.equal(posted, 1);
+  });
+
+  it('replays identical signed delivery after restart without authorizing execution twice', async () => {
+    const f = deliveryFixture('succeeded');
+    let delivery = createExecutionDelivery(f.journal, f.expected, config);
+    assert.equal(delivery.begin(), null);
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    const held = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => ({
+        ...f.value,
+        state: 'execution-missing',
+        execution: null,
+      }),
+    });
+    assert.equal(held.reason, 'execution-started-outcome-unknown');
+    delivery.persist(f.value.execution);
+    assert.throws(() => delivery.persist(f.value.execution), /not-started/);
+    assert.throws(
+      () => delivery.accepted(f.value.execution, f.ack),
+      /delivery-not-authorized/
+    );
+    delivery.attempt(f.value.execution);
+    delivery = createExecutionDelivery(f.reopen(), f.expected, config);
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    const resumed = await f.cycle(f.reopen(), {});
+    assert.equal(resumed.status, 'projection-recorded');
+    assert.throws(
+      () => delivery.attempt({ ...f.value.execution, detail: 'changed' }),
+      /delivery-not-authorized/
+    );
+    for (const ack of [
+      null,
+      {},
+      { ...f.ack, taskKey: 'f'.repeat(64) },
+      { ...f.ack, status: 'accepted' },
+      { ...f.ack, decision: 'failed' },
+    ]) {
+      assert.throws(
+        () => delivery.accepted(f.value.execution, ack),
+        /ack-invalid-or-cross-bound/
+      );
+    }
+    delivery.attempt(f.value.execution);
+    delivery.accepted(f.value.execution, { ...f.ack, status: 'replay' });
+    assert.equal(f.reopen().read().active.phase, 'execution-recorded');
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    assert.throws(
+      () => delivery.accepted(f.value.execution, f.ack),
+      /delivery-not-authorized/
+    );
+    let read = 0;
+    const result = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => {
+        read++;
+        return f.value;
+      },
+    });
+    assert.equal(result.status, 'execution-recorded');
+    assert.equal(result.decision, 'succeeded');
+    assert.equal(read, 1);
+    assert.equal(f.reopen().read().active, null);
+  });
+
+  it('bounds missing acknowledgment retries and reconciles only the retained identical receipt', async () => {
+    const f = deliveryFixture();
+    const delivery = createExecutionDelivery(f.journal, f.expected, config);
+    delivery.begin();
+    delivery.persist(f.value.execution);
+    for (let i = 0; i < 3; i++) delivery.attempt(f.value.execution);
+    assert.throws(
+      () => delivery.attempt(f.value.execution),
+      /delivery-not-authorized/
+    );
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    const held = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => ({
+        ...f.value,
+        state: 'execution-missing',
+        execution: null,
+      }),
+    });
+    assert.equal(held.reason, 'execution-acknowledgment-retry-exhausted');
+    await assert.rejects(
+      f.cycle(f.reopen(), {
+        readTaskRecords: async () => ({
+          ...f.value,
+          execution: resign({
+            ...f.value.execution,
+            detail: 'different signed result',
+          }),
+        }),
+      }),
+      /retained-execution-conflict/
+    );
+    const recovered = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => f.value,
+    });
+    assert.equal(recovered.status, 'projection-recorded');
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    delivery.attempt(f.value.execution);
+    delivery.accepted(f.value.execution, f.ack);
+    assert.equal(
+      (await f.cycle(f.journal, { readTaskRecords: async () => f.value }))
+        .decision,
+      'failed'
+    );
+  });
+
+  it('recovers an ambiguous start only when the authenticated server already retained the result', async () => {
+    const f = deliveryFixture();
+    const delivery = createExecutionDelivery(f.journal, f.expected, config);
+    delivery.begin();
+    await f.cycle(f.reopen(), { readTaskRecords: async () => f.value });
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    const altered = { ...f.expected, sourceVersion: 'f'.repeat(40) };
+    assert.throws(
+      () => createExecutionDelivery(f.journal, altered, config).begin(),
+      /cross-bound/
+    );
+    assert.throws(
+      () =>
+        createExecutionDelivery(f.journal, f.expected, {
+          ...config,
+          outcomeKeyId: 'another-host',
+        }).begin(),
+      /cross-bound/
+    );
+    for (const extra of [
+      { phase: 'execution-unknown' },
+      { phase: 'execution-pending', execution: f.value.execution, attempts: 4 },
+      { phase: 'execution-ready', extra: true },
+      {
+        phase: 'execution-pending',
+        execution: f.value.execution,
+        attempts: -1,
+      },
+    ]) {
+      assert.throws(
+        () =>
+          f.journal.write({
+            schema: 'jovie.summer-symphony-consumer-state/v1',
+            active: { ...f.active, ...extra },
+          }),
+        /execution-state-invalid/
       );
     }
   });
