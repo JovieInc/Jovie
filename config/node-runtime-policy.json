@@ -26,15 +26,9 @@
   "compatibility": {
     "candidates": [
       {
-        "major": 24,
+        "major": 26,
         "ring": "candidate",
         "blocking": true,
-        "minimumPromotionStatus": "active_lts"
-      },
-      {
-        "major": 26,
-        "ring": "shadow",
-        "blocking": false,
         "minimumPromotionStatus": "active_lts"
       }
     ],

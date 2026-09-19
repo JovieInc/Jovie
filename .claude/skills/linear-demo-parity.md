@@ -17,13 +17,13 @@ pnpm --version
 
 Required:
 
-- Node `>=22.23.1 <23`
+- Node `>=24.21.0 <25`
 - pnpm `9.15.4`
 
 If needed:
 
 ```bash
-nvm use 22 || (nvm install 22 && nvm use 22)
+nvm use 24 || (nvm install 24 && nvm use 24)
 corepack enable
 corepack prepare pnpm@9.15.4 --activate
 ```

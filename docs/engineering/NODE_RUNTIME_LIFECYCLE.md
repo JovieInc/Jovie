@@ -4,9 +4,8 @@ Jovie keeps the production runtime boring while continuously testing the next su
 
 ## Current state
 
-- Production/default: the exact Maintenance LTS patch in `.nvmrc`, with pnpm `9.15.4`.
-- Required compatibility candidate: latest Node 24 (Active LTS).
-- Advisory shadow: latest Node 26 (Current until its planned October 2026 LTS transition). Shadow failures are evidence, not permission to weaken engines.
+- Production/default: the exact Active LTS patch in `.nvmrc` (Node 24), with pnpm `9.15.4`.
+- Required compatibility candidate: latest Node 26 (Current until its planned October 2026 LTS transition). Promotion stays blocked until that line is Active LTS.
 - A candidate never changes `.nvmrc`, Vercel, or the baked runner image merely because a new release exists.
 
 Official lifecycle and release metadata come directly from the Node.js Release working group schedule and `nodejs.org/dist/index.json`. Production must remain Active or Maintenance LTS. A regular patch has a seven-day adoption SLA; a security patch has a 24-hour SLA.
@@ -15,7 +14,7 @@ Official lifecycle and release metadata come directly from the Node.js Release w
 
 `.github/workflows/node-runtime-compatibility.yml` checks official lifecycle and patch freshness daily, with the heavier compatibility matrix weekly and on demand. Each candidate gets an isolated exact-lockfile install, declared-engine probe, native `sharp` smoke, web unit suite, runtime contract tests, typecheck, and production build.
 
-The Node 24 candidate lane is required for the workflow to be green. The Node 26 shadow lane is allowed to fail while Current; the failure remains visible. The fast pull-request gate only runs deterministic policy tests, so the weekly build matrix cannot slow ordinary shipping.
+The Node 26 candidate lane is required for the weekly workflow to be green, but Node 26 cannot enter the production promotion ring while it is Current. The fast pull-request gate only runs deterministic policy tests, so the weekly build matrix cannot slow ordinary shipping.
 This schedule is explicitly approved as part of the runtime lifecycle system. It makes one lightweight policy job daily and two hosted compatibility jobs weekly, uses only public Node metadata, and introduces no paid API, secret, database, or production request.
 
 ## Promotion rings

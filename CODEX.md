@@ -39,7 +39,7 @@ On Windows PowerShell, use the Git Bash wrapper:
 ./scripts/setup.sh
 ```
 
-That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and checks the configured Doppler environment. Authentication uses self-hosted Better Auth; local test users are provisioned through the app database.
+That script verifies Node.js 24.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and checks the configured Doppler environment. Authentication uses self-hosted Better Auth; local test users are provisioned through the app database.
 
 ## Cleanup
 
@@ -67,7 +67,7 @@ CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
 
 | Tool | Required Version |
 |------|------------------|
-| Node.js | 22.x (22.23.2+) |
+| Node.js | 24.x (24.21.0+) |
 | pnpm | 9.15.4 |
 | Doppler CLI | Required for secret-bound commands |
 | GitHub CLI | Required for PR and GitHub automation |

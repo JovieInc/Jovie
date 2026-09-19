@@ -76,7 +76,7 @@ and structured `JovieInputError` or `JovieRequestError` failures as the binary.
 
 ## Adopt-first receipt
 
-The repo already supplies Node 22's `node:util.parseArgs`, built-in `fetch`,
+The repo already supplies Node 24's `node:util.parseArgs`, built-in `fetch`,
 `AbortSignal.timeout`, TypeScript, Vitest, and Biome. The existing
 `packages/action-contracts/bindings/cli.md` is only a future contract for
 authenticated owner actions, outside this package's anonymous read-only scope.
@@ -86,7 +86,7 @@ larger), oclif (extensible but disproportionate), and Python Click/Typer or
 Homebrew (a second runtime/distribution lane). None fits this fixed-command,
 TypeScript-only surface as well as the native substrate.
 
-Decision: build a dependency-free Node 22 client for Jovie's public GET
+Decision: build a dependency-free Node 24 client for Jovie's public GET
 resources without credentials, writes, hidden state, or a new runtime.
 Revisit only for a stable public capability index or extensible authenticated
 owner commands; that requires new approval and security review.

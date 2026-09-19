@@ -30,10 +30,10 @@ function getJobBlock(workflow: string, jobKey: string): string {
 
 describe('Node runtime contract', () => {
   it('keeps canonical version files and workspace engines aligned', () => {
-    expect(canonicalNodeVersion).toBe('22.23.2');
+    expect(canonicalNodeVersion).toBe('24.21.0');
     expect(read('.node-version').trim()).toBe(canonicalNodeVersion);
 
-    const node22OnlyPackagePaths = [
+    const majorPinnedPackagePaths = [
       'package.json',
       'apps/console/package.json',
       'apps/web/package.json',
@@ -44,19 +44,24 @@ describe('Node runtime contract', () => {
       'packages/ui/package.json',
     ];
 
-    for (const packagePath of node22OnlyPackagePaths) {
+    for (const packagePath of majorPinnedPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2 <23');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.21.0 <25');
     }
 
     for (const packagePath of minimumOnlyPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.21.0');
     }
+
+    const evePilot = JSON.parse(read('apps/eve-pilot/package.json')) as {
+      engines?: { node?: string };
+    };
+    expect(evePilot.engines?.node).toBe('>=24');
   });
 
   it('uses .nvmrc for reusable and standalone workflow setup', () => {

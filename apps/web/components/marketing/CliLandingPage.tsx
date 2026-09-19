@@ -45,7 +45,7 @@ export const CLI_FAQ_ITEMS = [
   {
     question: 'Which Node.js version does it need?',
     answer:
-      'Node.js 22.23.2 or later, and below Node 23. That matches the published package engines field.',
+      'Node.js 24.21.0 or later, and below Node 25. That matches the published package engines field.',
   },
   {
     question: 'Can I point it at another Jovie deployment?',
