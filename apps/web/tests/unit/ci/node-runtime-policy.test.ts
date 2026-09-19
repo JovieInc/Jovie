@@ -134,7 +134,7 @@ describe('Node runtime lifecycle policy', () => {
     );
   });
   it('requires both consecutive green runs and the soak window before promotion', () => {
-    const lts = { major: 24, status: 'active_lts' };
+    const lts = { major: 26, status: 'active_lts' };
     expect(isPromotionReady(policy, lts, 2, 18)).toBe(false);
     expect(isPromotionReady(policy, lts, 3, 18)).toBe(true);
     const currentMinimum = structuredClone(policy);
