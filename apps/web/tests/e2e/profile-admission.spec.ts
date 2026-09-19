@@ -428,6 +428,51 @@ test.describe('public profile browser admission', () => {
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
   });
 
+  for (const width of [1179, 1180, 1512]) {
+    test(`${width}px server paint exposes no premature readiness`, async ({
+      browser,
+    }, testInfo) => {
+      const context = await browser.newContext({
+        baseURL: testInfo.project.use.baseURL,
+        javaScriptEnabled: false,
+        viewport: { width, height: 932 },
+      });
+      try {
+        const page = await context.newPage();
+        const response = await page.goto(
+          '/renders/profile-admission?layout=public&state=claimed'
+        );
+        expect(response?.status()).toBe(200);
+        await expect(
+          page.getByTestId('public-profile-layout-shell')
+        ).toHaveCount(1);
+        await expect(
+          page.locator('[data-interactive-ready="true"]')
+        ).toHaveCount(0);
+        if (width >= 1180) {
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toBeVisible();
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toHaveAttribute('aria-busy', 'true');
+          await expect(page.getByTestId('profile-compact-shell')).toBeHidden();
+        } else {
+          await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toBeHidden();
+        }
+        await testInfo.attach(`server-paint-${width}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   test('desktop keeps the long-name Verify & Claim CTA coherent', async ({
     page,
   }) => {
