@@ -1241,7 +1241,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: steps\.profile-browser\.outputs\.run == 'true'/
     );
     for (const requiredPath of [
-      'apps/web/app/(marketing)/renders/profile-admission/**',
+      'apps/web/app/(profile-admission)/renders/profile-admission/**',
       'apps/web/components/features/release/SmartLinkProviderButton.tsx',
       'apps/web/components/organisms/CookieBannerMount.tsx',
       'apps/web/components/organisms/CookieBannerSection.tsx',

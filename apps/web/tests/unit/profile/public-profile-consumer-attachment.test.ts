@@ -90,4 +90,18 @@ describe('public-profile consumer attachment', () => {
       ALLOWED_DIRECT_SURFACE_CONSUMERS
     );
   });
+
+  it('keeps marketing renders on the dark public-profile token scope without locking the host document', () => {
+    const source = readFileSync(
+      join(
+        WEB_ROOT,
+        'app/(marketing)/renders/[state]/MarketingStateRenderClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "className='profile-viewport profile-viewport--embedded'"
+    );
+  });
 });

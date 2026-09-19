@@ -62,7 +62,7 @@ function renderPanel(
 }
 
 describe('ProfilePrimaryTabPanel', () => {
-  it('labels the tour panel Shows per the shared nav contract', () => {
+  it('labels the tour panel Shows for event-specific content', () => {
     renderPanel({ mode: 'tour' });
 
     expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
