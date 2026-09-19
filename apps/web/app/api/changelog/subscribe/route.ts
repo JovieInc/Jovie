@@ -99,7 +99,7 @@ async function handleExistingSubscriber(
 ): Promise<NextResponse> {
   if (existing.verified && !existing.unsubscribedAt) {
     return NextResponse.json(
-      { message: 'Already subscribed!' },
+      { state: 'subscribed', message: 'Already subscribed!' },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   }
@@ -134,7 +134,10 @@ async function handleExistingSubscriber(
   }
 
   return NextResponse.json(
-    { message: 'Check your email to confirm your subscription!' },
+    {
+      state: 'confirmation_required',
+      message: 'Check your email to confirm your subscription!',
+    },
     { status: 201, headers: NO_STORE_HEADERS }
   );
 }
@@ -238,7 +241,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { message: 'Check your email to confirm your subscription!' },
+    {
+      state: 'confirmation_required',
+      message: 'Check your email to confirm your subscription!',
+    },
     { status: 201, headers: NO_STORE_HEADERS }
   );
 }
