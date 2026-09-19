@@ -215,6 +215,81 @@ test('unchanged prior outcome never causes a second evaluation for green', async
   assert.equal(calls, 1);
 });
 
+test('approval that expires during preflight never dispatches paid transport', async () => {
+  let time = 1000;
+  let calls = 0;
+  const receipt = await runJevEvaluation(
+    input,
+    options({
+      now: () => time,
+      readCurrentFingerprint: async () => {
+        time = 3000;
+        return request.fingerprint;
+      },
+      transport: async () => {
+        calls++;
+        return result();
+      },
+    })
+  );
+  assert.equal(calls, 0);
+  assert.equal(receipt.status, 'not-admitted');
+});
+
+test('postflight remains inside cancellation, expiry and timeout boundaries', async () => {
+  for (const boundary of ['cancelled', 'stale', 'timeout']) {
+    const controller = new AbortController();
+    let reads = 0;
+    let time = 1000;
+    const receipt = await runJevEvaluation(
+      input,
+      options({
+        signal: controller.signal,
+        now: () => time,
+        timeoutMs: 5,
+        readCurrentFingerprint: async () => {
+          if (++reads === 2) {
+            if (boundary === 'cancelled') controller.abort();
+            if (boundary === 'stale') time = 3000;
+            if (boundary === 'timeout')
+              await new Promise(resolve => setTimeout(resolve, 20));
+          }
+          return request.fingerprint;
+        },
+      })
+    );
+    assert.equal(receipt.status, boundary);
+    assert.equal(receipt.certified, false);
+    assert.equal(receipt.alignment, undefined);
+  }
+});
+
+test('cancelled or timed out preflight never dispatches after its late completion', async () => {
+  for (const boundary of ['cancelled', 'timeout']) {
+    const controller = new AbortController();
+    let calls = 0;
+    const receipt = await runJevEvaluation(
+      input,
+      options({
+        signal: controller.signal,
+        timeoutMs: 5,
+        readCurrentFingerprint: async () => {
+          if (boundary === 'cancelled') controller.abort();
+          await new Promise(resolve => setTimeout(resolve, 20));
+          return request.fingerprint;
+        },
+        transport: async () => {
+          calls++;
+          return result();
+        },
+      })
+    );
+    assert.equal(receipt.status, boundary);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    assert.equal(calls, 0);
+  }
+});
+
 test('abort before and during I/O, timeout and provider failure fail closed without raw errors', async () => {
   const pre = new AbortController();
   pre.abort();
