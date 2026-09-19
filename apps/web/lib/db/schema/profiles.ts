@@ -170,6 +170,10 @@ export const creatorProfiles = pgTable(
     lastIngestionError: text('last_ingestion_error'),
     profileViews: integer('profile_views').default(0),
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
+    // Server-owned evaluation receipt, excluded from all profile update inputs.
+    completenessJudgment: jsonb('completeness_judgment').$type<
+      import('@/lib/profile/completeness-certification').ProfileCompletenessJudgment
+    >(),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
     theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
     // Notification preferences for granular control
@@ -647,7 +651,9 @@ export const creatorDistributionEvents = pgTable(
 );
 
 // Schema validations
-export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
+export const insertCreatorProfileSchema = createInsertSchema(
+  creatorProfiles
+).omit({ completenessJudgment: true });
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
 
 export const insertCreatorContactSchema = createInsertSchema(creatorContacts);
