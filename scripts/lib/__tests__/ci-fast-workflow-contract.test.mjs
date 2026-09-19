@@ -733,6 +733,12 @@ describe('ci-fast bounded parallel workflow', () => {
       'tests/unit/lib/stripe/customer-sync.queries.test.ts'
     );
     expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'lib/stripe/test-price-contract.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      '--coverage.include=lib/stripe/test-price-contract.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
       '--coverage.thresholds.perFile=true'
     );
     expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(

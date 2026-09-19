@@ -35,7 +35,10 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
     await interceptTrackingRoutes(page);
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('button', { name: /upgrade to pro/i })
+      page
+        .getByRole('heading', { name: 'Free Plan' })
+        .locator('xpath=ancestor::div[.//button][1]')
+        .getByRole('button', { name: /upgrade to pro/i })
     ).toBeVisible({ timeout: 15_000 });
 
     const { sessionId, url } = await createCheckoutSession(page, priceId);

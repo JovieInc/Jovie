@@ -12,7 +12,7 @@ import {
   assertArtistVisibilityStripeTestPrice,
   assertStripeTestAccount,
   getRequiredStripeTestConfig,
-} from './stripe-test-price-contract';
+} from '@/lib/stripe/test-price-contract';
 
 export interface BillingStatus {
   isPro: boolean;

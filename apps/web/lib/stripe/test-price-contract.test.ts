@@ -4,7 +4,14 @@ import {
   assertArtistVisibilityStripeTestPrice,
   assertStripeTestAccount,
   getRequiredStripeTestConfig,
-} from '@/tests/e2e/helpers/stripe-test-price-contract';
+  type StripeTestEnvironment,
+} from './test-price-contract';
+
+const validRecurring = {
+  interval: 'month',
+  interval_count: 1,
+  usage_type: 'licensed',
+} as NonNullable<ArtistVisibilityStripePrice['recurring']>;
 
 const validPrice: ArtistVisibilityStripePrice = {
   active: true,
@@ -12,11 +19,7 @@ const validPrice: ArtistVisibilityStripePrice = {
   currency: 'usd',
   livemode: false,
   metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
-  recurring: {
-    interval: 'month',
-    interval_count: 1,
-    usage_type: 'licensed',
-  } as NonNullable<ArtistVisibilityStripePrice['recurring']>,
+  recurring: validRecurring,
   transform_quantity: null,
   type: 'recurring',
   unit_amount: 19_900,
@@ -48,7 +51,7 @@ describe('Artist Visibility Stripe test price contract', () => {
         STRIPE_PRICE_PRO_YEARLY: 'price_legacy_375',
         STRIPE_PRICE_STANDARD_MONTHLY: 'price_standard',
         STRIPE_TEST_ACCOUNT_ID: validConfig.STRIPE_TEST_ACCOUNT_ID,
-      })
+      } as StripeTestEnvironment)
     ).toThrow('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY');
 
     expect(
@@ -64,6 +67,15 @@ describe('Artist Visibility Stripe test price contract', () => {
   });
 
   it('requires a test secret and webhook signature secret', () => {
+    expect(() =>
+      getRequiredStripeTestConfig({
+        STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY:
+          validConfig.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,
+        STRIPE_SECRET_KEY: validConfig.STRIPE_SECRET_KEY,
+        STRIPE_WEBHOOK_SECRET: validConfig.STRIPE_WEBHOOK_SECRET,
+      })
+    ).toThrow('STRIPE_TEST_ACCOUNT_ID is not configured');
+
     expect(() =>
       getRequiredStripeTestConfig({
         ...validConfig,
@@ -100,10 +112,21 @@ describe('Artist Visibility Stripe test price contract', () => {
     ['inactive price', { active: false }],
     ['wrong currency', { currency: 'eur' }],
     ['wrong amount', { unit_amount: 3_900 }],
+    ['wrong type', { type: 'one_time' }],
     ['wrong billing scheme', { billing_scheme: 'tiered' }],
-    ['wrong interval', { recurring: { interval: 'year' } }],
-    ['wrong recurrence count', { recurring: { interval_count: 2 } }],
-    ['wrong usage type', { recurring: { usage_type: 'metered' } }],
+    ['wrong interval', { recurring: { ...validRecurring, interval: 'year' } }],
+    [
+      'wrong recurrence count',
+      { recurring: { ...validRecurring, interval_count: 2 } },
+    ],
+    [
+      'wrong usage type',
+      { recurring: { ...validRecurring, usage_type: 'metered' } },
+    ],
+    [
+      'wrong transform quantity',
+      { transform_quantity: { divide_by: 10, round: 'up' } },
+    ],
     ['wrong offer metadata', { metadata: { issue: 'JOV-17747' } }],
     ['one-time price', { recurring: null }],
   ])(
