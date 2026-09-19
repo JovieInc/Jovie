@@ -289,12 +289,14 @@ function changedFiles(patterns) {
     .filter(Boolean);
 }
 
-const BILLING_PROVENANCE_COVERAGE_PATHS = [
+export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
   'apps/web/lib/entitlements/**',
   'apps/web/lib/stripe/customer-sync/**',
+  'apps/web/lib/stripe/test-price-contract.ts',
+  'apps/web/lib/stripe/test-price-contract.test.ts',
   'apps/web/tests/unit/lib/entitlements/**',
   'apps/web/tests/unit/lib/stripe/customer-sync.billing-info.test.ts',
-];
+]);
 
 const FAN_SEND_SAFETY_COVERAGE_PATHS = [
   'apps/web/app/api/cron/send-release-notifications/**',
@@ -305,16 +307,11 @@ const FAN_SEND_SAFETY_COVERAGE_PATHS = [
   'apps/web/tests/unit/lib/entitlements-state-transitions.test.ts',
 ];
 
-export function runBillingCoverage() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  const provenanceFiles =
-    event === 'workflow_dispatch'
-      ? null
-      : changedFiles(BILLING_PROVENANCE_COVERAGE_PATHS);
-  const fanSendFiles =
-    event === 'workflow_dispatch'
-      ? null
-      : changedFiles(FAN_SEND_SAFETY_COVERAGE_PATHS);
+export function selectBillingCoverageCommands({
+  event,
+  provenanceFiles,
+  fanSendFiles,
+}) {
   const commands = [];
 
   // An unreadable diff fails closed and runs both focused suites. On a normal
@@ -333,6 +330,25 @@ export function runBillingCoverage() {
   ) {
     commands.push(FAN_SEND_SAFETY_COVERAGE_COMMAND);
   }
+
+  return commands;
+}
+
+export function runBillingCoverage() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const provenanceFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(BILLING_PROVENANCE_COVERAGE_PATHS);
+  const fanSendFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(FAN_SEND_SAFETY_COVERAGE_PATHS);
+  const commands = selectBillingCoverageCommands({
+    event,
+    provenanceFiles,
+    fanSendFiles,
+  });
 
   if (commands.length === 0) {
     return {
