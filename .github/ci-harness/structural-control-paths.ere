@@ -8,6 +8,8 @@
 ^scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)
 ^apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)
 ^packages/agent-transport-contracts/
+^packages/jev-evaluation/
+^apps/web/lib/jev/
 ^scripts/lib/__tests__/symphony-health-contract\.test\.mjs$
 ^\.github/
 ^\.claude/rules/(ci-branching|release|testing|gstack)\.md

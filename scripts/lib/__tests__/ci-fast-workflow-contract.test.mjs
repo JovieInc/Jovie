@@ -2654,3 +2654,21 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
   expect(selected).toContain('.github/workflows/ci.yml');
   expect(selected).not.toContain('README.md');
 });
+
+it('keeps Jev package-only and web-boundary changes on its package coverage gate', () => {
+  const pattern = structuralControlPattern();
+  for (const path of [
+    'packages/jev-evaluation/gateway.mjs',
+    'apps/web/lib/jev/profile-completeness.server.ts',
+  ]) {
+    expect(
+      spawnSync('grep', ['-Eq', pattern], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      }).status
+    ).toBe(0);
+  }
+  expect(CI_FAST_SOURCE).toContain(
+    "'pnpm --filter @jovie/jev-evaluation test'"
+  );
+});
