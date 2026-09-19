@@ -1100,6 +1100,18 @@ ${selectedGateScript}`,
     }
   });
 
+  it('skips the product-lane receipt when merge-group admission is not admitted', () => {
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).toContain('ci-merge-group-admission');
+    expect(receipt).toContain('always()');
+    expect(receipt).toContain(
+      "github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true'"
+    );
+    expect(receipt).toContain(
+      "github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"
+    );
+  });
+
   it('builds the exact product-lane receipt with a valid immutable run URL', () => {
     const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
     expect(receipt).toContain(
