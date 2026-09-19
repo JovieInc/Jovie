@@ -188,8 +188,8 @@ export function checkoutCorrelationIdempotencyPart(
   correlation: CheckoutCorrelation | null | undefined
 ): string | undefined {
   if (!hasCheckoutCorrelation(correlation)) return undefined;
-  const stable = CHECKOUT_CORRELATION_FIELDS.map(
-    field => `${field}=${correlation[field] ?? ''}`
-  ).join('|');
+  const stable = JSON.stringify(
+    CHECKOUT_CORRELATION_FIELDS.map(field => [field, correlation[field] ?? ''])
+  );
   return createHash('sha256').update(stable).digest('hex').slice(0, 16);
 }
