@@ -190,37 +190,36 @@ export function AiCrawlerDetailPanel({
                   {CRAWLER_READ_DISCLOSURE.description}
                 </p>
               </div>
-              <DrawerSurfaceCard
-                variant='flat'
-                className='grid grid-cols-2 gap-2 p-2'
-              >
-                <StatTile
-                  label='30-Day Reads'
-                  value={
-                    isLoading
-                      ? ''
-                      : data
-                        ? data.totalRequests.toLocaleString()
-                        : 'Unknown'
-                  }
-                />
-                <StatTile
-                  label='This Week'
-                  value={
-                    isLoading
-                      ? ''
-                      : data
-                        ? data.weeklyRequests.toLocaleString()
-                        : 'Unknown'
-                  }
-                />
-              </DrawerSurfaceCard>
+              <div className='grid grid-cols-2 gap-2 p-2'>
+                <DrawerSurfaceCard variant='flat'>
+                  <StatTile
+                    label='30-Day Reads'
+                    value={
+                      isLoading
+                        ? ''
+                        : data
+                          ? data.totalRequests.toLocaleString()
+                          : 'Unknown'
+                    }
+                  />
+                  <StatTile
+                    label='This Week'
+                    value={
+                      isLoading
+                        ? ''
+                        : data
+                          ? data.weeklyRequests.toLocaleString()
+                          : 'Unknown'
+                    }
+                  />
+                </DrawerSurfaceCard>
+              </div>
             </div>
           </div>
         </DrawerSurfaceCard>
       }
     >
-      <DrawerSurfaceCard variant='card' className='p-3'>
+      <DrawerSurfaceCard variant='card'>
         {showTeaser ? (
           <div className='mb-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3 text-center'>
             <p className='text-app text-secondary-token'>
