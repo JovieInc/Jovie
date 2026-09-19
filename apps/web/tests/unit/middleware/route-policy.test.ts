@@ -81,13 +81,22 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/joviewhite')).toBe('joviewhite');
       expect(getPublicProfileCandidate('/user_123')).toBe('user_123');
       expect(getPublicProfileCandidate('/a.b-c')).toBe('a.b-c');
+      // /you stays a public-profile handle: locked claim-card target, not reserved.
       expect(getPublicProfileCandidate('/you')).toBe('you');
-      expect(getPublicProfileCandidate('/product')).toBe('product');
     });
 
     it('returns null for GSC-dead marketing roots that are reserved handles', () => {
       expect(getPublicProfileCandidate('/music')).toBeNull();
       expect(getPublicProfileCandidate('/shows')).toBeNull();
+    });
+
+    it('treats /product as a live marketing APP_ROUTE, not a public-profile handle', () => {
+      // APP_ROUTES.PRODUCT pins the dedicated marketing page. Do not treat
+      // `product` as a username, and do not 410 it like /music or /shows.
+      expect(APP_ROUTES.PRODUCT).toBe('/product');
+      expect(getPublicProfileCandidate('/product')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/product')).toBe(false);
+      expect(categorizePath('/product').publicProfileCandidate).toBeNull();
     });
 
     it('rejects too-short or invalid usernames', () => {
