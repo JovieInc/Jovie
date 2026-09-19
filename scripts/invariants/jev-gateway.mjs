@@ -152,38 +152,8 @@ export async function runJevEvaluation(
   };
   const finish = (status, detail = {}) =>
     Object.freeze({ ...base, status, ...detail });
-  if (
-    typeof readCurrentFingerprint !== 'function' ||
-    (await readCurrentFingerprint()) !== request.fingerprint
-  )
-    return finish('stale');
+  if (typeof readCurrentFingerprint !== 'function') return finish('stale');
   if (signal?.aborted) return finish('cancelled');
-  // One explicit funding/data approval for this immutable request, with freshness.
-  if (
-    !approval ||
-    approval.fingerprint !== request.fingerprint ||
-    approval.dataApproved !== true ||
-    approval.fundingApproved !== true ||
-    !Number.isFinite(approval.expiresAt) ||
-    approval.expiresAt <= startedAt ||
-    approval.expiresAt > startedAt + TTL ||
-    !approval.authorityRef?.trim() ||
-    !Number.isFinite(approval.availableUsd) ||
-    !Number.isFinite(approval.maxUsd) ||
-    approval.maxUsd <= 0 ||
-    approval.availableUsd < approval.maxUsd ||
-    !Number.isFinite(approval.estimatedUpperBoundUsd) ||
-    approval.estimatedUpperBoundUsd <= 0 ||
-    approval.estimatedUpperBoundUsd > approval.maxUsd
-  ) {
-    return finish('not-admitted');
-  }
-  if (previous?.requestFingerprint === request.fingerprint) {
-    // The durable owner may retain the prior receipt; never retry unchanged evidence for green.
-    return finish('unchanged', {
-      previousStatus: previous.status ?? 'unknown',
-    });
-  }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 15000)
     return finish('not-admitted');
   const controller = new AbortController();
@@ -191,28 +161,42 @@ export async function runJevEvaluation(
   signal?.addEventListener('abort', abort, { once: true });
   let timer;
   let timedOut = false;
-  try {
-    const deadline = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        timedOut = true;
-        abort();
-        reject(new Error('timeout'));
-      }, timeoutMs);
-      controller.signal.addEventListener(
-        'abort',
-        () => reject(new Error('aborted')),
-        { once: true }
-      );
+  const admitted = () =>
+    approval &&
+    approval.fingerprint === request.fingerprint &&
+    approval.dataApproved === true &&
+    approval.fundingApproved === true &&
+    Number.isFinite(approval.expiresAt) &&
+    approval.expiresAt > now() &&
+    approval.expiresAt <= startedAt + TTL &&
+    approval.authorityRef?.trim() &&
+    Number.isFinite(approval.availableUsd) &&
+    Number.isFinite(approval.maxUsd) &&
+    approval.maxUsd > 0 &&
+    approval.availableUsd >= approval.maxUsd &&
+    Number.isFinite(approval.estimatedUpperBoundUsd) &&
+    approval.estimatedUpperBoundUsd > 0 &&
+    approval.estimatedUpperBoundUsd <= approval.maxUsd;
+  const work = async () => {
+    const initialFingerprint = await readCurrentFingerprint();
+    // Late preflight completion must not start I/O after the caller has returned.
+    controller.signal.throwIfAborted();
+    if (initialFingerprint !== request.fingerprint) return finish('stale');
+    if (!admitted()) return finish('not-admitted');
+    if (previous?.requestFingerprint === request.fingerprint) {
+      return finish('unchanged', {
+        previousStatus: previous.status ?? 'unknown',
+      });
+    }
+    const result = await transport(request, {
+      apiKey,
+      signal: controller.signal,
     });
-    const result = await Promise.race([
-      transport(request, { apiKey, signal: controller.signal }),
-      deadline,
-    ]);
-    if (signal?.aborted) return finish('cancelled');
-    if (
-      now() >= approval.expiresAt ||
-      (await readCurrentFingerprint()) !== request.fingerprint
-    )
+    controller.signal.throwIfAborted();
+    const currentFingerprint = await readCurrentFingerprint();
+    controller.signal.throwIfAborted();
+    // Recheck after every awaited boundary, including the final evidence reread.
+    if (!admitted() || currentFingerprint !== request.fingerprint)
       return finish('stale');
     const answer = result?.answers?.alignment;
     if (
@@ -245,6 +229,21 @@ export async function runJevEvaluation(
       billedCostUsd: null,
       authorityRef: approval.authorityRef,
     });
+  };
+  try {
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        abort();
+      }, timeoutMs);
+      controller.signal.addEventListener(
+        'abort',
+        () => reject(new Error('aborted')),
+        { once: true }
+      );
+    });
+    // The deadline covers preflight, transport and postflight, not just network I/O.
+    return await Promise.race([work(), deadline]);
   } catch {
     // Never persist raw provider errors: they can contain state or credentials.
     return finish(
