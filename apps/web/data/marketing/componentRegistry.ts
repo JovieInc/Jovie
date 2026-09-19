@@ -85,7 +85,8 @@ const shell = (
   penRootIds: readonly MarketingPenContractId[],
   rootBinding: string,
   delegatedProofs: readonly MarketingPenRootProof[] = [],
-  penVariantRoots?: Readonly<Record<string, MarketingPenContractId>>
+  penVariantRoots?: Readonly<Record<string, MarketingPenContractId>>,
+  rootProofKind?: MarketingPenRootProof['kind']
 ): MarketingShellRegistryEntry => ({
   id,
   kind: 'shell',
@@ -97,7 +98,12 @@ const shell = (
   penRootIds,
   penVariantRoots,
   rootProofs: [
-    { source: `${source}.tsx`, binding: rootBinding, occurrences: 1 },
+    {
+      source: `${source}.tsx`,
+      binding: rootBinding,
+      occurrences: 1,
+      ...(rootProofKind ? { kind: rootProofKind } : {}),
+    },
     ...delegatedProofs,
   ],
 });
@@ -125,7 +131,12 @@ export const MARKETING_SHELL_REGISTRY = [
         binding: 'data-pen-contract={penContractId}',
         occurrences: 1,
       },
-    ]
+    ],
+    undefined,
+    // The header composes its shell body into a growth-space wrapper before
+    // returning, so the identity binding is proven at source level while the
+    // rendered root stays proven by the HeaderNav delegation above.
+    'source'
   ),
   shell(
     'shell.footer',
