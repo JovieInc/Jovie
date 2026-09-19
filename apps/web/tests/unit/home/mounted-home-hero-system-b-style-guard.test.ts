@@ -120,7 +120,7 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--homepage-grid-gutter)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain('font-weight: 600;');
+    expect(css).toContain('font-weight: 400;');
     expect(css).toContain('letter-spacing: -0.03em;');
     expect(css).toContain('border-radius: var(--radius-pill);');
     expect(css).toContain('min-height: 660px;');

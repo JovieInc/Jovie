@@ -2087,8 +2087,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   font-size: clamp(2.5rem, 5.5556vw, 5rem);
-  /* Canonical homepage exception: Satoshi-Latin variable face at 600. */
-  font-weight: 600;
+  /* Locked pDnxi/F8fmF specimen: Satoshi-Latin variable face at 400. */
+  font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1.04;
   text-wrap: balance;
@@ -2180,7 +2180,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-editorial-hero__headline {
     max-width: min(16ch, 100%);
     font-size: 40px;
-    font-weight: 600;
+    font-weight: 400;
     line-height: 1.06;
     letter-spacing: -0.03em;
     white-space: normal;
