@@ -8,8 +8,11 @@ import { projectStructuredReleaseCollaborators } from '@/lib/discography/artist-
 import type { PublicMerchCard } from '@/lib/merch/types';
 import {
   buildProfileAeoContent,
+  buildProfileAeoFaqStructuredData,
   type ProfileAeoContent as ProfileAeoContentModel,
+  validateProfileAeoContent,
 } from '@/lib/profile/aeo-content';
+import { PROFILE_AEO_OPTIMIZATION_CONTRACT } from '@/lib/profile/aeo-content-optimization';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -195,6 +198,230 @@ describe('Profile AEO content', () => {
     expect(content.description.join(' ')).not.toContain('Their public Jovie');
     expect(content.description.join(' ')).toContain('known for');
     expect(content.description.join(' ')).toContain('Find DJ Test on Jovie');
+  });
+
+  it('keeps independently extracted description blocks and FAQ JSON-LD source-parallel', () => {
+    const content = buildContent();
+
+    expect(validateProfileAeoContent(content)).toEqual([]);
+    expect(content.descriptionBlocks.map(block => block.text)).toEqual(
+      content.description
+    );
+    expect(
+      content.descriptionSegments.map(segments =>
+        segments.map(segment => segment.text).join('')
+      )
+    ).toEqual(content.description);
+
+    expect(buildProfileAeoFaqStructuredData(content)).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: content.faqs.map(faq => ({
+        '@type': 'Question',
+        name: faq.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.answer,
+        },
+      })),
+    });
+  });
+
+  it('drops stale, future, invalid, and cancelled facts before building AEO copy', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      latestRelease: {
+        title: 'Stale Latest',
+        slug: 'stale-latest',
+        releaseType: 'single',
+        releaseDate: '2025-01-01T00:00:00.000Z',
+      },
+      releases: [
+        {
+          id: 'release-current-old',
+          title: 'Current Old',
+          slug: 'current-old',
+          releaseType: 'single',
+          releaseDate: '2026-01-01T00:00:00.000Z',
+          artworkUrl: null,
+          artistNames: ['DJ Test'],
+        },
+        {
+          id: 'release-current-new',
+          title: 'Current New',
+          slug: 'current-new',
+          releaseType: 'ep',
+          releaseDate: '2026-06-01T00:00:00.000Z',
+          artworkUrl: null,
+          artistNames: ['DJ Test'],
+        },
+        {
+          id: 'release-stale',
+          title: 'Stale Release',
+          slug: 'stale-release',
+          releaseType: 'single',
+          releaseDate: 'not-a-date',
+          artworkUrl: null,
+          artistNames: ['DJ Test'],
+        },
+        {
+          id: 'release-future',
+          title: 'Future Catalog Entry',
+          slug: 'future-catalog-entry',
+          releaseType: 'album',
+          releaseDate: '2026-07-01T00:00:00.000Z',
+          artworkUrl: null,
+          artistNames: ['DJ Test'],
+        },
+      ],
+      tourDates: [
+        ...tourDates,
+        {
+          ...tourDates[0]!,
+          id: 'tour-cancelled',
+          ticketStatus: 'cancelled',
+        },
+      ],
+      now,
+    });
+
+    expect(content.faqs[1]?.answer).toContain('Current New');
+    expect(content.faqs[1]?.answer).not.toContain('Stale Latest');
+    expect(content.faqs[1]?.answer).not.toContain('Future Catalog Entry');
+    expect(content.description.join(' ')).toContain('Current New');
+    expect(content.description.join(' ')).toContain('2 listed releases');
+    expect(content.description.join(' ')).not.toContain('Future Catalog Entry');
+    expect(content.description.join(' ')).not.toContain('Stale Release');
+    expect(content.faqs[2]?.answer).toContain('1 upcoming show');
+    expect(validateProfileAeoContent(content)).toEqual([]);
+  });
+
+  it('filters unsupported free-form claims and reports malformed extracted fixtures', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        tagline: "The world's greatest artist",
+        career_highlights: '12',
+      },
+      now,
+    });
+
+    expect(content.description.join(' ')).not.toContain('greatest');
+    expect(content.description.join(' ')).not.toMatch(/\b12\b/);
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const malformed: ProfileAeoContentModel = {
+      ...content,
+      description: ['DJ Test is the greatest.', 'DJ Test: 12.'],
+      descriptionBlocks: [
+        { kind: 'bio', text: 'DJ Test is the greatest.' },
+        { kind: 'highlight', text: 'DJ Test: 12.' },
+      ],
+      descriptionSegments: [
+        [{ type: 'text', text: 'DJ Test is the greatest.' }],
+        [{ type: 'text', text: 'DJ Test: 12.' }],
+      ],
+    };
+    const issueCodes = validateProfileAeoContent(malformed).map(
+      issue => issue.code
+    );
+
+    expect(issueCodes).toContain('unsupported-superlative');
+    expect(issueCodes).toContain('orphaned-quantitative-claim');
+  });
+
+  it('keeps contextual superlatives and requires token-aware short-name identity', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'Al',
+        handle: 'al',
+        tagline: 'International producer',
+        career_highlights:
+          'Formed with my best friend in Austin. Track "The Greatest Artist" is in the catalog.',
+      },
+      now,
+    });
+
+    expect(content.descriptionBlocks).toContainEqual({
+      kind: 'bio',
+      text: 'Al: International producer.',
+    });
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toContain('best friend');
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toContain('Track "The Greatest Artist"');
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const sameNameFragment: ProfileAeoContentModel = {
+      ...content,
+      description: content.description.map((paragraph, index) =>
+        index === 1 ? 'Alpine producer.' : paragraph
+      ),
+      descriptionBlocks: content.descriptionBlocks.map((block, index) =>
+        index === 1 ? { ...block, text: 'Alpine producer.' } : block
+      ),
+      descriptionSegments: content.descriptionSegments.map((segments, index) =>
+        index === 1
+          ? [{ type: 'text' as const, text: 'Alpine producer.' }]
+          : segments
+      ),
+    };
+
+    expect(
+      validateProfileAeoContent(sameNameFragment).map(issue => issue.code)
+    ).toContain('description-identity-missing');
+  });
+
+  it('preserves accepted source spans around unsupported claims', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'Al',
+        handle: 'al',
+        tagline: 'International producer',
+        career_highlights: [
+          'Raised $1.5 million in 2024.',
+          "The world's greatest artist.",
+          'Visit example.com.',
+          'U.S. producer with A/B testing.',
+          'Track "The Greatest Artist, Vol. 1" is in the catalog.',
+        ].join(' '),
+      },
+      now,
+    });
+
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toBe(
+      'Al\'s profile highlights: Raised $1.5 million in 2024. Visit example.com. U.S. producer with A/B testing. Track "The Greatest Artist, Vol. 1" is in the catalog.'
+    );
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const compatibilityName: ProfileAeoContentModel = {
+      ...content,
+      artistName: 'Ａｌ',
+      description: content.description.map((paragraph, index) =>
+        index === 1 ? paragraph.replaceAll('Al', 'Ａｌ') : paragraph
+      ),
+      descriptionBlocks: content.descriptionBlocks.map((block, index) =>
+        index === 1
+          ? { ...block, text: block.text.replaceAll('Al', 'Ａｌ') }
+          : block
+      ),
+      descriptionSegments: content.descriptionSegments.map((segments, index) =>
+        index === 1
+          ? segments.map(segment => ({
+              ...segment,
+              text: segment.text.replaceAll('Al', 'Ａｌ'),
+            }))
+          : segments
+      ),
+    };
+
+    expect(validateProfileAeoContent(compatibilityName)).toEqual([]);
   });
 
   it('builds the facts strip from genres, active year, hometown, and based-in', () => {
@@ -744,7 +971,7 @@ describe('Profile AEO content', () => {
     const paragraph = content.description.at(-1);
 
     expect(paragraph).toBe(
-      'Collaborators credited include Austin Leeds on "Take Me Over (Austin Leeds Remix)", Vigel on "Seaside Heights", Lynx on "Wheels Up", and Bowles on "The Sound".'
+      'DJ Test\'s credited collaborators include Austin Leeds on "Take Me Over (Austin Leeds Remix)", Vigel on "Seaside Heights", Lynx on "Wheels Up", and Bowles on "The Sound".'
     );
     expect(paragraph).not.toContain(
       'Lynx on "Take Me Over (Austin Leeds Remix)"'
@@ -886,5 +1113,80 @@ describe('Profile AEO content', () => {
 
     rerender(<ProfileAeoContent content={content} />);
     expect(screen.queryByTestId('profile-aeo-claim-card')).toBeNull();
+  });
+
+  it('keeps a complete product optimization contract on existing surfaces', () => {
+    expect(PROFILE_AEO_OPTIMIZATION_CONTRACT).toMatchObject({
+      kind: 'product',
+      variantIdentity: 'public-profile.retrieval-ready-aeo:v1',
+      exposure: expect.stringContaining('analytics profile_view'),
+      outcome: expect.stringContaining('release-to-revenue GMV'),
+      attribution: expect.stringContaining('audience-event'),
+      contextDimensions: expect.arrayContaining([
+        'platform',
+        'content-variant',
+        'artist-plus-career-era-or-lifecycle',
+      ]),
+      hypothesis: expect.stringContaining('independently extractable'),
+      primaryMetric: expect.stringContaining('artist-business-outcome'),
+      guardrails: expect.arrayContaining([
+        'complaint',
+        'trust',
+        'brand',
+        'no token-count, FAQ-quota, keyword-repetition, or doorway-page ranking heuristics',
+      ]),
+      privacy: expect.stringContaining('first-party consented'),
+      optimizerOwner: expect.stringContaining('JOV-6244'),
+      cadence: expect.stringContaining('SEO/AEO ratchet'),
+      decisionWriteback: expect.stringContaining('model-experiment'),
+      rollback: expect.stringContaining('aeo-content.ts'),
+    });
+    expect(
+      PROFILE_AEO_OPTIMIZATION_CONTRACT.attribution.toLowerCase()
+    ).toContain('youtube-experiment');
+    expect(PROFILE_AEO_OPTIMIZATION_CONTRACT.primaryMetric).not.toMatch(
+      /^(engagement|ctr|clicks?|impressions?|views?)$/i
+    );
+  });
+
+  it('rejects token-count folklore and does not stuff repeated FAQ copy', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'lib/profile/aeo-content.ts'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/5\s*[–-]\s*7\s*tokens?/i);
+    expect(source).not.toMatch(/keyword\s+density/i);
+    expect(source).not.toMatch(/faq\s+quota/i);
+    expect(source).not.toMatch(/doorway\s+page/i);
+    expect(source).not.toMatch(/fill(?:ing)?\s+(?:the\s+)?context\s+window/i);
+    expect(source).not.toMatch(/min(?:imum)?\s+token/i);
+
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        tagline: 'DJ Test builds late-night club records.',
+        career_highlights: null,
+        target_playlists: null,
+      },
+      latestRelease: {
+        title: 'Neon Circuit',
+        slug: 'neon-circuit',
+        releaseType: 'single',
+        releaseDate: '2026-05-01T00:00:00.000Z',
+      },
+      now,
+    });
+
+    const joined = content.description.join(' ');
+    const nameMatches = joined.match(/DJ Test/g) ?? [];
+    expect(nameMatches.length).toBeLessThanOrEqual(6);
+    expect(content.faqs.every(faq => faq.answer.includes('DJ Test'))).toBe(
+      true
+    );
+    expect(new Set(content.faqs.map(faq => faq.question)).size).toBe(
+      content.faqs.length
+    );
+    expect(validateProfileAeoContent(content)).toEqual([]);
   });
 });
