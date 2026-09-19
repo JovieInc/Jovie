@@ -2716,13 +2716,12 @@ def persist_live_receipt(
         persisted = _read_persisted_receipt(state_dir)
         remint = should_remint_lagging_zero_concurrency(receipt, persisted)
         if should_preserve_approved_concurrency(receipt, persisted):
-            warn_live_receipt_not_persisted(
-                LivePersistFenceError(
-                    f"{LIVE_PERSIST_WRITER}: kept last-good approved concurrency "
-                    "after flap-class dispatch close"
-                )
-            )
-            return overlay_preserved_dispatch_seats(receipt, persisted)
+            # Keep the prior capacity target, not its old observation. The
+            # publisher consumes latest.json, so the current closed admissions
+            # must reach the same atomic write/readback path as every refresh.
+            receipt = overlay_preserved_dispatch_seats(receipt, persisted)
+            print("INFO: fleet gate publishing current flap-closed admissions "
+                  "with preserved capacity target", file=sys.stderr)
         persisted_at = (
             parse_time(persisted.get("observedAt")) if persisted is not None else None
         )

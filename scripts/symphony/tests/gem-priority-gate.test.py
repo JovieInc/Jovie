@@ -1057,8 +1057,14 @@ class FallbackSeatPathTests(unittest.TestCase):
             model = {"provider": "grok", "model": "grok-4.6"}
             with mock.patch.dict(os.environ, {"GEM_GROK_BIN": str(alias)}):
                 self.assertEqual(MODULE._resolve_seat_executable(model), str(alias))
-            with mock.patch.dict(os.environ, {"GEM_GROK_BIN": ""}):
+            with mock.patch.dict(os.environ, {"GEM_GROK_BIN": ""}), \
+                    mock.patch.object(MODULE.Path, "home", return_value=pathlib.Path(tmp)):
                 self.assertIsNone(MODULE._resolve_seat_executable(model))
+                installed = pathlib.Path(tmp) / ".local/bin/grok"
+                installed.parent.mkdir(parents=True)
+                installed.write_text("#!/bin/sh\n", encoding="utf-8")
+                installed.chmod(0o755)
+                self.assertEqual(MODULE._resolve_seat_executable(model), str(installed))
 
     def test_resolve_seat_executable_rejects_non_executable(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1721,11 +1727,11 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
         self.assertEqual(MODULE.approved_dispatch_concurrency(receipt), 4)
         return receipt
 
-    def test_flap_close_keeps_last_good_approved_concurrency(self):
+    def test_flap_close_persists_current_observation_without_granting_dispatch(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
             now = MODULE.utc_now()
-            last_good = self.approved_receipt(now - MODULE.timedelta(minutes=1))
+            last_good = self.approved_receipt(now - MODULE.timedelta(hours=2))
             MODULE.write_receipt(last_good, state_dir)
             seeded = self.read_latest(state_dir)
             live = self.persistable_max0(
@@ -1737,7 +1743,13 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
                 returned = MODULE.persist_live_receipt(live, state_dir, now)
 
             persisted = self.read_latest(state_dir)
-            self.assertEqual(persisted, seeded)
+            self.assertEqual(persisted, returned)
+            self.assertEqual(persisted["observedAt"], live["observedAt"])
+            self.assertNotEqual(persisted["observedAt"], seeded["observedAt"])
+            self.assertEqual(persisted["signals"], live["signals"])
+            self.assertEqual(persisted["workAdmission"], live["workAdmission"])
+            self.assertEqual(persisted["remediationAdmission"], live["remediationAdmission"])
+            self.assertEqual(persisted["concurrency"]["gem"]["approvedCapacityTarget"], 4)
             self.assertEqual(returned["promotionMode"], live["promotionMode"])
             self.assertEqual(returned["state"], live["state"])
             self.assertEqual(
@@ -1747,8 +1759,25 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
             self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
             self.assertFalse(returned["concurrency"]["gem"]["evidenceAccepted"])
             self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
-            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
-            self.assertIn("kept last-good approved concurrency", stderr.getvalue())
+            self.assertFalse(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("publishing current flap-closed admissions", stderr.getvalue())
+            # A second timer cycle stays fresh and cannot treat the remembered
+            # target as approved capacity. Actual new proof can restore seats.
+            next_time = now + MODULE.timedelta(minutes=1)
+            next_live = self.persistable_max0(MODULE.isoformat(next_time),
+                reason="capacity-evidence-trust-context-unavailable")
+            second = MODULE.persist_live_receipt(next_live, state_dir, next_time)
+            self.assertEqual(self.read_latest(state_dir), second)
+            self.assertEqual(second["observedAt"], next_live["observedAt"])
+            self.assertFalse(second["concurrency"]["gem"]["newMutationAllowed"])
+            self.assertFalse(second["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertEqual(second["concurrency"]["gem"]["approvedCapacityTarget"], 4)
+            healthy_time = next_time + MODULE.timedelta(minutes=1)
+            healthy = self.approved_receipt(healthy_time)
+            restored = MODULE.persist_live_receipt(healthy, state_dir, healthy_time)
+            self.assertEqual(self.read_latest(state_dir), restored)
+            self.assertEqual(restored["observedAt"], healthy["observedAt"])
+            self.assertTrue(restored["concurrency"]["gem"]["evidenceAccepted"])
 
     def test_flap_close_does_not_print_stale_hold_intake_as_promotion_authority(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1786,13 +1815,14 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
                 returned = MODULE.persist_live_receipt(live, state_dir, now)
 
             persisted = self.read_latest(state_dir)
-            self.assertEqual(persisted["promotionMode"], "hold-intake")
+            self.assertEqual(persisted, returned)
+            self.assertEqual(persisted["observedAt"], live["observedAt"])
             self.assertEqual(returned["state"], "GREEN")
             self.assertEqual(returned["promotionMode"], "normal")
             self.assertTrue(returned["promotionAdmission"]["allowed"])
             self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
             self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
-            self.assertIn("kept last-good approved concurrency", stderr.getvalue())
+            self.assertIn("publishing current flap-closed admissions", stderr.getvalue())
 
     def test_genuine_stale_evidence_still_persists_max0(self):
         with tempfile.TemporaryDirectory() as tmp:
