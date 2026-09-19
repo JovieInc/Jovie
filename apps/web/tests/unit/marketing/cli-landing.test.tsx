@@ -80,8 +80,8 @@ describe('CLI landing page', () => {
     const route = readWebSource('app/(marketing)/cli/page.tsx');
 
     expect(source).toContain('MarketingHero');
-    expect(source).toContain("align='center'");
-    expect(source).toContain('logos={false}');
+    expect(source).toContain("variant='developer'");
+    expect(source).toContain('copyLabel');
     expect(source).toContain("width='prose'");
     expect(source).toContain('FaqSection');
     expect(source).toContain('MarketingFooterCta');
