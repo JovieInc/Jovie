@@ -188,7 +188,8 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
-          subscription.id
+          subscription.id,
+          result.correlation
         );
       } catch (error) {
         await captureCriticalError(
@@ -278,7 +279,8 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
-          subscription.id
+          subscription.id,
+          result.correlation
         );
       } catch (error) {
         await captureCriticalError(

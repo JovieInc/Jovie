@@ -9,6 +9,11 @@ import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  type CheckoutCorrelation,
+  hasCheckoutCorrelation,
+  toStripeCheckoutCorrelationMetadata,
+} from './checkout-correlation';
 import { assertCheckoutPriceContract } from './price-contract';
 
 let stripeSingleton: Stripe | undefined;
@@ -152,6 +157,7 @@ export async function createCheckoutSession({
   cancelUrl,
   idempotencyKey,
   referralCode,
+  correlation,
 }: {
   customerId: string;
   priceId: string;
@@ -161,6 +167,7 @@ export async function createCheckoutSession({
   cancelUrl: string;
   idempotencyKey?: string;
   referralCode?: string;
+  correlation?: CheckoutCorrelation;
 }): Promise<Stripe.Checkout.Session> {
   try {
     const stripeClient = getStripe();
@@ -170,6 +177,9 @@ export async function createCheckoutSession({
     const requestOptions: Stripe.RequestOptions | undefined = idempotencyKey
       ? { idempotencyKey }
       : undefined;
+    const correlationMetadata = hasCheckoutCorrelation(correlation)
+      ? toStripeCheckoutCorrelationMetadata(correlation)
+      : {};
     const session = await stripeClient.checkout.sessions.create(
       {
         customer: customerId,
@@ -188,6 +198,7 @@ export async function createCheckoutSession({
           clerk_user_id: userId,
           ...(plan ? { plan } : {}),
           ...(referralCode ? { referral_code: referralCode } : {}),
+          ...correlationMetadata,
         },
 
         // Subscription settings
@@ -196,6 +207,7 @@ export async function createCheckoutSession({
             clerk_user_id: userId,
             ...(plan ? { plan } : {}),
             ...(referralCode ? { referral_code: referralCode } : {}),
+            ...correlationMetadata,
           },
         },
 
