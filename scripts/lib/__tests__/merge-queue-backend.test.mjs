@@ -2627,6 +2627,25 @@ describe('canonical admission membership binding', () => {
       rmSync(config, { recursive: true, force: true });
     }
   });
+  it('does not prove or stamp new membership when receipt evidence is unavailable', () => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('record_queue_reentry_receipt() {');
+    const end = source.indexOf('\n}\n', start) + 2;
+    const result = spawnSync('bash', ['-c', `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
+fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
+queue_reentry_receipt_is_recoverable() { return 2; }
+node() { echo UNEXPECTED_PROOF >&2; }
+gh_mutate_retry() { echo UNEXPECTED_STATUS >&2; }
+record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
+`], {
+      encoding: 'utf8',
+      env: { ...process.env, DRY_RUN: '0', DRAIN_PROMOTION_MODE: 'normal',
+        FLEET_POLICY_MAIN_SHA: HEAD, EXPECTED_HEAD: HEAD, EXPECTED_ENTRY: ENTRY_ID },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).not.toContain('UNEXPECTED_');
+  });
   it.each([
     '2026-07-14T23:59:59Z',
     '2026-07-15T00:00:00Z',

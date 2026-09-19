@@ -6650,12 +6650,35 @@ class TestNativeAdmissionReceiptReconciliation:
         assert dequeue_log.read_text() == ""
         assert "enroll" not in (tmp_path / "node-calls").read_text().splitlines()
 
-    @pytest.mark.parametrize("failure_marker", ["identity-api-failure", "identity-malformed", "producer-api-failure", "producer-malformed"])
+    @pytest.mark.parametrize("failure_marker", ["identity-api-failure", "identity-malformed", "producer-api-failure", "producer-malformed", "producer-missing-workflow-id"])
     def test_null_creator_identity_api_failure_preserves_membership(self, tmp_path: Path, failure_marker: str) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z", receipt_creator=None,
         )
-        (tmp_path / failure_marker).touch()
+        if failure_marker == "producer-missing-workflow-id":
+            (tmp_path / "producer-overrides.json").write_text(json.dumps({"workflow_id": None}))
+        else:
+            (tmp_path / failure_marker).touch()
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode != 0
+        assert "preserving membership" in result.stderr
+        assert dequeue_log.read_text() == ""
+
+    @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", None])
+    @pytest.mark.parametrize("overrides", [
+        {"name": None}, {"path": None}, {"head_sha": None},
+        {"repository": {}}, {"run_attempt": None}, {"conclusion": {}},
+        {"created_at": None}, {"updated_at": None},
+        {"created_at": "not-a-date"}, {"updated_at": "not-a-date"},
+    ])
+    def test_partial_producer_object_preserves_membership(self, tmp_path: Path, overrides: dict, receipt_creator: str | None) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
+        )
+        (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
             extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",

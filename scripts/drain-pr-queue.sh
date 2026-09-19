@@ -731,13 +731,27 @@ canonical_admission_producer_is_active() {
   fi
 }
 
+canonical_admission_run_is_complete() {  # <run-json>
+  jq -e '
+    try (
+      type == "object" and (.id | type == "number") and
+      (.run_attempt | type == "number") and has("conclusion") and
+      (.conclusion == null or (.conclusion | type == "string")) and
+      ([.name, .path, .html_url, .repository.full_name, .head_repository.full_name,
+        .head_sha, .head_branch, .event, .status] | all(.[]; type == "string")) and
+      (.created_at | fromdateiso8601 | type == "number") and
+      (.updated_at | fromdateiso8601 | type == "number")
+    ) catch false
+  ' <<<"$1" >/dev/null 2>&1
+}
+
 # Return 2 for unavailable evidence: an API outage must not evict valid members.
 canonical_admission_receipt_has_provenance() {  # <status-json> [enqueued-at]
   local receipt="$1" run_id run
   run_id="$(jq -r '.target_url | split("/") | last' <<<"$receipt")"
   [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || return 1
   if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")" \
-    || ! jq -e 'type == "object" and (.id | type == "number")' <<<"$run" >/dev/null 2>&1; then
+    || ! canonical_admission_run_is_complete "$run"; then
     echo "::error::Canonical admission receipt producer evidence is unavailable" >&2
     return 2
   fi
@@ -809,6 +823,11 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
     return 2
   fi
   if ! jq -e 'type == "object" and (.id | type == "number") and (.name | type == "string") and (.path | type == "string")' <<<"$run" >/dev/null 2>&1; then
+    return 2
+  fi
+  if jq -e '.context == "jovie-queue-admission/v2"' <<<"$status" >/dev/null \
+    && { ! canonical_admission_run_is_complete "$run" \
+      || ! jq -e '.workflow_id | type == "number"' <<<"$run" >/dev/null; }; then
     return 2
   fi
   jq -e \
