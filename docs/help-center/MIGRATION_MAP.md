@@ -245,7 +245,8 @@ contain 29 unique URLs. A 2026-09-19 anonymous HTTP check followed redirects:
 
 - 22 resolved with HTTP 200. Spotify and TikTok moved to equivalent, specific
   canonical help pages.
-- Seven returned HTTP 403: Symphonic, Discogs, TuneCore, UnitedMasters, ASCAP,
+- Seven returned HTTP 403: Symphonic, Discogs, the self-serve distributor whose
+  name the public-repo brand-scrub policy withholds, UnitedMasters, ASCAP,
   and two BMI URLs. Treat these as anonymously unverifiable, not proven dead.
 - `https://support.google.com/domains/answer/3290350` now lands on the generic
   Google Support home. It is stale for DNS verification instructions and must
