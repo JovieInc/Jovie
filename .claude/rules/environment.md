@@ -20,7 +20,7 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 .\scripts\setup.ps1
 ```
 
-`setup.sh` is idempotent. It checks Node.js (22.x), pnpm (9.15.4), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.4), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything else. Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
@@ -28,20 +28,20 @@ Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **22.x** (22.23.2+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **24.x** (24.21.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
 | **Turbo** | 2.8+ | Root devDependencies |
 
-AI agents frequently default to Node 18/20 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 22 LTS.
+AI agents frequently default to Node 18/20/22 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 24 LTS.
 
 ### Pre-Flight Checklist
 
 ```bash
-node --version  # Expected: v22.23.2 or higher
+node --version  # Expected: v24.21.0 or higher
 pnpm --version  # Expected: 9.15.4
 
 # If wrong:
-nvm use 22       # or: nvm install 22
+nvm use 24       # or: nvm install 24
 corepack enable && corepack prepare pnpm@9.15.4 --activate
 ```
 
@@ -54,7 +54,7 @@ corepack enable && corepack prepare pnpm@9.15.4 --activate
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
 | `cd apps/web && pnpm dev` | `pnpm run dev:web:fast` |
-| `node script.js` with Node < 22 | Verify `node --version` first |
+| `node script.js` with Node < 24 | Verify `node --version` first |
 
 ## Doppler (Secrets)
 
@@ -106,11 +106,11 @@ For headless/container environments (Codex, cloud sandboxes, CI runners). Requir
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1. Node 22 LTS + pnpm
+# 1. Node 24 LTS + pnpm
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 22.23.2 && fnm use 22.23.2
+fnm install 24.21.0 && fnm use 24.21.0
 corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 # 2. Doppler CLI
@@ -293,7 +293,7 @@ corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 ### "Node version mismatch"
 ```bash
-nvm install 22 && nvm use 22
+nvm install 24 && nvm use 24
 # Or check .nvmrc: cat .nvmrc
 ```
 

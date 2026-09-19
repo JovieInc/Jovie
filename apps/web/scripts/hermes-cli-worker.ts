@@ -196,7 +196,7 @@ ${verification}
 
 Hard requirements:
 - Read AGENTS.md/CLAUDE.md and scoped rules before editing.
-- Use Node 22.x, pnpm 9.15.4, and run commands from repo root.
+- Use Node 24.x, pnpm 9.15.4, and run commands from repo root.
 - Do not edit drizzle/migrations.
 - Do not add biome-ignore comments.
 - Keep the change focused and reviewable.

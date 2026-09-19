@@ -9,7 +9,7 @@
 #
 # Skip (return 0) only when ALL of:
 #   1. JOVIE_SETUP_FORCE is not 1
-#   2. Node pin is 22.23.2+
+#   2. Node pin is 24.21.0+
 #   3. pnpm pin is exactly 9.15.4
 #   4. $repo/node_modules/.modules.yaml exists
 #   5. deps fingerprint matches node_modules/.cache/jovie-setup/deps.sha256
