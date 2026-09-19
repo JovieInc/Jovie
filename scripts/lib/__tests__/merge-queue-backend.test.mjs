@@ -1045,7 +1045,7 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
-    expect(drain).toContain('exit 3');
+    expect(drain).toContain('defer_admission_failure 3');
   });
 
   it.each([
@@ -3834,6 +3834,33 @@ describe('canonical current-entry ownership and event ordering', () => {
       expectedEntryId: ENTRY_ID,
       now,
     });
+
+  it('reports a stale removal identity without certifying current membership', async () => {
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0] = {
+      __typename: 'RemovedFromMergeQueueEvent',
+      id: 'removed-old-entry',
+      createdAt: '2026-07-14T00:00:00Z',
+      actor: { __typename: 'User', login: 'itstimwhite' },
+    };
+    const runner = vi.fn(async args => {
+      expect(queryText(args)).toContain(
+        '... on RemovedFromMergeQueueEvent{id createdAt actor{__typename login}}'
+      );
+      return ok(value);
+    });
+    await expect(proveCanonicalMembership({
+      ...nativeOptions(runner), expectedHeadOid: HEAD,
+      expectedEntryId: ENTRY_ID, now: () => observedAt,
+    })).rejects.toMatchObject({
+      code: 'noncanonical_queue_membership',
+      details: { membershipEvidence: {
+        eventId: 'removed-old-entry', eventType: 'RemovedFromMergeQueueEvent',
+        createdAt: '2026-07-14T00:00:00Z', eventActorLogin: 'itstimwhite',
+        failedPredicates: expect.arrayContaining(['addedEvent', 'eventNotBeforeEntry']),
+      } },
+    });
+  });
 
   it.each([
     '2026-07-15T00:00:00Z',
