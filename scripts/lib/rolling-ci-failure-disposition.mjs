@@ -242,3 +242,72 @@ export function planOfflineFailureDispositions(input = {}) {
   });
   return { dispositions, state };
 }
+
+/** Independent, exact-artifact fixture proof; never a production certificate. */
+export function settleOfflineFailure({
+  disposition,
+  liveHead,
+  now,
+  patchSha256,
+  changedPaths,
+  tests,
+  review,
+}) {
+  const base = {
+    ...disposition,
+    mode: 'offline',
+    productionAuthorized: false,
+    modelCalls: 0,
+    action: 'stop',
+    nextAction: 'inspect-terminal-evidence',
+  };
+  if (
+    disposition?.schema !== SCHEMA ||
+    disposition.action !== 'prepare-offline-patch'
+  ) {
+    return { ...base, reason: 'not-a-patch-candidate' };
+  }
+  if (liveHead !== disposition.head)
+    return { ...base, action: 'supersede', reason: 'stale-head' };
+  if (
+    !Number.isFinite(Date.parse(now)) ||
+    !Number.isFinite(Date.parse(disposition.deadline)) ||
+    Date.parse(now) >= Date.parse(disposition.deadline)
+  )
+    return { ...base, reason: 'lease-expired-or-invalid' };
+  if (
+    !Array.isArray(changedPaths) ||
+    changedPaths.length === 0 ||
+    changedPaths.some(
+      path =>
+        !disposition.paths?.includes(path) ||
+        !validateHostedRepairPath(path).allowed
+    )
+  ) {
+    return { ...base, reason: 'patch-scope-mismatch' };
+  }
+  if (!/^[0-9a-f]{64}$/.test(String(patchSha256)))
+    return { ...base, reason: 'invalid-patch-digest' };
+  if (
+    tests?.head !== liveHead ||
+    tests.patchSha256 !== patchSha256 ||
+    tests.passed !== true
+  ) {
+    return { ...base, reason: 'fresh-tests-missing' };
+  }
+  if (
+    review?.head !== liveHead ||
+    review.patchSha256 !== patchSha256 ||
+    review.accepted !== true ||
+    !namedOwner(review.reviewer) ||
+    review.reviewer === disposition.owner
+  ) {
+    return { ...base, reason: 'independent-review-missing' };
+  }
+  return {
+    ...base,
+    action: 'offline-verified',
+    reason: 'fixture-only',
+    patchSha256,
+  };
+}
