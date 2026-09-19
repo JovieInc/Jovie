@@ -3,10 +3,18 @@
  *
  * This file intentionally lives under apps/web so the Next.js build never
  * reaches outside the app root when parsing the public changelog.
+ *
+ * Mirror of scripts/lib/changelog-filter-rules.mjs — the two copies must
+ * stay rule-for-rule identical. The parity test in
+ * apps/web/lib/__tests__/changelog-parser.test.ts compares both rule lists
+ * and their classification behavior.
  */
 
-/** Vendor names that should never appear in public changelog entries. */
-const VENDOR_NAMES = [
+/**
+ * Vendor names that should never appear in public changelog entries.
+ * Exported for the cross-language parity test.
+ */
+export const VENDOR_NAMES = [
   'Clerk',
   'Statsig',
   'Sentry',
@@ -33,8 +41,11 @@ const VENDOR_PATTERNS = VENDOR_NAMES.map(
   name => new RegExp(String.raw`\b${escapeRegex(name)}\b`)
 );
 
-/** Infrastructure, dev tooling, admin, and business-sensitive patterns. */
-const INTERNAL_PATTERNS = [
+/**
+ * Infrastructure, dev tooling, admin, and business-sensitive patterns.
+ * Exported for the cross-language parity test.
+ */
+export const INTERNAL_PATTERNS = [
   // Local development and operator implementation are not product updates.
   /\b(?:localhost|127\.0\.0\.1|loopback|Chromium|SwiftUI|invalidAuthURL)\b/i,
   /\bhot[- ]reload\b/i,
