@@ -214,9 +214,14 @@ async function storeMatch(
         matchSource: 'isrc_discovery',
         updatedAt: now,
       },
-      where: or(
-        isNull(dspArtistMatches.matchSource),
-        ne(dspArtistMatches.matchSource, 'manual')
+      // Recheck the persisted decision atomically: confirm/reject preserves
+      // matchSource, and may happen while provider requests are in flight.
+      where: and(
+        eq(dspArtistMatches.status, 'suggested'),
+        or(
+          isNull(dspArtistMatches.matchSource),
+          ne(dspArtistMatches.matchSource, 'manual')
+        )
       ),
     })
     .returning({ id: dspArtistMatches.id });
@@ -378,9 +383,11 @@ async function discoverAppleMusicMatch(
     status
   );
 
-  // If auto-confirmed and upsert succeeded (not blocked by manual match),
+  if (!matchId) return { match: null, status: null };
+
+  // If auto-confirmed and upsert succeeded (not blocked by an existing decision),
   // update the creator profile and enqueue release enrichment
-  if (status === 'auto_confirmed' && matchId) {
+  if (status === 'auto_confirmed') {
     await tx
       .update(creatorProfiles)
       .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
@@ -502,7 +509,8 @@ async function discoverDeezerMatch(
     matchingResult.bestMatch,
     status
   );
-  if (status === 'auto_confirmed' && matchId) {
+  if (!matchId) return { match: null, status: null };
+  if (status === 'auto_confirmed') {
     await tx
       .update(creatorProfiles)
       .set({ deezerId: matchingResult.bestMatch.externalArtistId })
@@ -625,7 +633,8 @@ async function discoverMusicBrainzMatch(
     creatorProfileId,
     status,
   });
-  if (status === 'auto_confirmed' && matchId) {
+  if (!matchId) return { match: null, status: null };
+  if (status === 'auto_confirmed') {
     const mbid = matchingResult.bestMatch.externalArtistId;
     await tx
       .update(creatorProfiles)
