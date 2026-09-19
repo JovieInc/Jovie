@@ -13,7 +13,9 @@ declaration files to drift. The package separately runs checkJs type validation.
 
 Adoption decision: compose the existing Gateway evaluator and pnpm workspace
 boundary. No new provider, queue, runtime service or broad SDK migration is needed.
-The existing code is extracted with its regression tests; script compatibility
+Only alignment/completeness transport is extracted with its regression tests.
+The separate UI Choice and certification-shadow APIs remain in their original
+scripts workstream; they are not requirements of this product boundary. Script compatibility
 updates remain with the older scripts PR owner after this package lands.
 
 ## Contract and ownership
