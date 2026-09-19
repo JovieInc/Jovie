@@ -205,22 +205,25 @@ function MarketingHeroCtaLink({
   cta,
   intent,
   linkComponent,
+  presentation = 'content',
 }: {
   readonly cta: MarketingHeroCta;
   readonly intent: 'primary' | 'secondary';
   readonly linkComponent: ElementType;
+  readonly presentation?: 'content' | 'landing-secondary';
 }) {
   const LinkComponent = linkComponent;
   const analyticsProps = cta.eventName
     ? { eventName: cta.eventName, eventProperties: cta.eventProperties }
     : {};
+  const isLandingSecondary = presentation === 'landing-secondary';
 
   return (
     <Button
       asChild
-      size='md'
+      size={isLandingSecondary ? 'marketing' : 'md'}
       variant={intent === 'primary' ? 'primary' : 'ghost'}
-      className='marketing-hero-cta'
+      className={isLandingSecondary ? undefined : 'marketing-hero-cta'}
     >
       <LinkComponent
         href={cta.href}
@@ -362,7 +365,7 @@ function MarketingHeroLanding({
                 {body}
               </div>
 
-              <div className='mt-8 flex flex-wrap items-center gap-3'>
+              <div className='mt-8 flex flex-wrap items-center gap-x-3 gap-y-4'>
                 <LandingCtaLink
                   href={primaryCtaHref}
                   label={primaryCtaLabel}
@@ -372,12 +375,12 @@ function MarketingHeroLanding({
                 />
 
                 {secondaryCtaLabel && secondaryCtaHref ? (
-                  <Link
-                    href={secondaryCtaHref}
-                    className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-                  >
-                    {secondaryCtaLabel}
-                  </Link>
+                  <MarketingHeroCtaLink
+                    cta={{ label: secondaryCtaLabel, href: secondaryCtaHref }}
+                    intent='secondary'
+                    linkComponent={Link}
+                    presentation='landing-secondary'
+                  />
                 ) : null}
 
                 {subcopy ? (

@@ -27,6 +27,49 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
 }));
 
 describe('MarketingHero — landing mode', () => {
+  it('keeps the secondary destination on the shared growing action contract', () => {
+    render(
+      <MarketingHero
+        eyebrow='Voice Cloning'
+        headingId='voice-heading'
+        title='Clone your voice.'
+        body='Hero body'
+        media={<div>Media</div>}
+        secondaryCtaLabel='See pricing'
+        secondaryCtaHref='/pricing'
+      />
+    );
+
+    const link = screen.getByRole('link', { name: 'See pricing' });
+    expect(link).toHaveAttribute('href', '/pricing');
+    expect(link).toHaveAttribute('data-variant', 'ghost');
+    expect(link).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11'
+    );
+    expect(link).not.toHaveClass('h-10');
+  });
+
+  it.each([
+    { secondaryCtaLabel: 'See pricing' },
+    { secondaryCtaHref: '/pricing' },
+  ])('does not expose an incomplete secondary action: %j', secondary => {
+    render(
+      <MarketingHero
+        eyebrow='Voice Cloning'
+        headingId='voice-heading'
+        title='Clone your voice.'
+        body='Hero body'
+        media={<div>Media</div>}
+        {...secondary}
+      />
+    );
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('uses a generic default section test id', () => {
     render(
       <MarketingHero
