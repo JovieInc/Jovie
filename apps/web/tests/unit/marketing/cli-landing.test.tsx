@@ -146,4 +146,21 @@ describe('CLI landing page', () => {
     expect(cliSource).toContain('No login, API key');
     expect(isReservedUsername('cli')).toBe(true);
   });
+
+  it('documents the published CLI Node engines range', () => {
+    const packageJson = JSON.parse(
+      readFileSync(
+        resolve(process.cwd(), '../../packages/jovie-cli/package.json'),
+        'utf8'
+      )
+    ) as { engines?: { node?: string } };
+    const nodeFaq = CLI_FAQ_ITEMS.find(
+      item => item.question === 'Which Node.js version does it need?'
+    );
+
+    expect(packageJson.engines?.node).toBe('>=24.21.0 <25');
+    expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
+    expect(nodeFaq?.answer).toContain('below Node 25');
+    expect(nodeFaq?.answer).toContain('published package engines field');
+  });
 });
