@@ -93,6 +93,31 @@ describe('MarketingHero source-backed default story', () => {
     ).toHaveClass('marketing-h1-max-two-lines');
   });
 
+  it('uses the canonical growing action contract for a landing secondary CTA', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='landing-actions-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        secondaryCtaLabel='See pricing'
+        secondaryCtaHref='/pricing'
+      />
+    );
+
+    const secondary = screen.getByRole('link', { name: 'See pricing' });
+    expect(secondary).toHaveAttribute('href', '/pricing');
+    expect(secondary).toHaveAttribute('data-variant', 'ghost');
+    expect(secondary).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11'
+    );
+    expect(secondary).not.toHaveClass('h-10');
+  });
+
   it('routes route-owned presentation through the unstyled shell without hero chrome', () => {
     render(
       <MarketingHero
