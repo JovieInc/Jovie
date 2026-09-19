@@ -372,9 +372,10 @@ function MarketingHeroLanding({
                 />
 
                 {secondaryCtaLabel && secondaryCtaHref ? (
-                  <Button asChild size='marketing' variant='ghost'>
-                    <Link href={secondaryCtaHref}>{secondaryCtaLabel}</Link>
-                  </Button>
+                  <MarketingHeroCtaLink
+                    cta={{ href: secondaryCtaHref, label: secondaryCtaLabel }}
+                    intent='secondary'
+                  />
                 ) : null}
 
                 {subcopy ? (
