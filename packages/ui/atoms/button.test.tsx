@@ -428,7 +428,8 @@ describe('Button', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');
 
-    expect(btn.className).toContain(
+    expect(btn.className).toContain('transition-[box-shadow,transform]');
+    expect(btn.className).not.toContain(
       'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
     );
     expect(btn.className).toContain('duration-subtle');
@@ -441,7 +442,8 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
 
     expect(btn.className).toContain('active:opacity-90');
-    expect(btn.className).toContain(
+    expect(btn.className).toContain('transition-[box-shadow,transform]');
+    expect(btn.className).not.toContain(
       'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
     );
   });
