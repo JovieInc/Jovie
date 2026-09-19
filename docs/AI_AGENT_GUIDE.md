@@ -21,15 +21,15 @@ Before editing UI, read the auto-generated design contract:
 
 ## 1. API Route Inventory
 
-All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless noted.
+All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (`getCachedAuth()` from `@/lib/auth/cached`) unless noted. Jovie owns the configuration in `apps/web/lib/auth/better-auth.ts` and stores identity in Neon Postgres through Drizzle; this is not managed Neon Auth. `getCachedAuth().userId` is the app user UUID. See `.claude/rules/auth.md` for current client/server and test flows.
 
 ### Account
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/account/delete` | POST | Clerk | Delete user account |
-| `/api/account/email` | POST | Clerk | Update account email |
-| `/api/account/export` | GET | Clerk | Export user data (GDPR) |
+| `/api/account/delete` | POST | Better Auth | Delete user account |
+| `/api/account/email` | POST | Better Auth | Update account email |
+| `/api/account/export` | GET | Better Auth | Export user data (GDPR) |
 
 ### Admin (requires admin role)
 
@@ -74,33 +74,33 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/billing/health` | GET | Clerk | Billing system health |
-| `/api/billing/history` | GET | Clerk | Invoice history |
-| `/api/billing/status` | GET | Clerk | Current billing status |
-| `/api/stripe/cancel` | POST/GET | Clerk | Cancel subscription |
-| `/api/stripe/checkout` | POST/GET | Clerk | Create checkout session |
-| `/api/stripe/plan-change` | POST/GET/DELETE | Clerk | Change/preview/cancel plan |
-| `/api/stripe/plan-change/preview` | POST/GET | Clerk | Preview plan change cost |
-| `/api/stripe/portal` | POST/GET | Clerk | Stripe customer portal |
+| `/api/billing/health` | GET | Better Auth | Billing system health |
+| `/api/billing/history` | GET | Better Auth | Invoice history |
+| `/api/billing/status` | GET | Better Auth | Current billing status |
+| `/api/stripe/cancel` | POST/GET | Better Auth | Cancel subscription |
+| `/api/stripe/checkout` | POST/GET | Better Auth | Create checkout session |
+| `/api/stripe/plan-change` | POST/GET/DELETE | Better Auth | Change/preview/cancel plan |
+| `/api/stripe/plan-change/preview` | POST/GET | Better Auth | Preview plan change cost |
+| `/api/stripe/portal` | POST/GET | Better Auth | Stripe customer portal |
 | `/api/stripe/pricing-options` | GET | Public | Available pricing tiers |
 | `/api/stripe/webhooks` | POST/GET | Stripe sig | Stripe webhook handler |
-| `/api/stripe-connect/disconnect` | POST | Clerk | Disconnect Stripe Connect |
-| `/api/stripe-connect/onboard` | POST | Clerk | Start Connect onboarding |
-| `/api/stripe-connect/return` | GET | Clerk | Connect onboarding return |
-| `/api/stripe-connect/status` | GET | Clerk | Connect account status |
+| `/api/stripe-connect/disconnect` | POST | Better Auth | Disconnect Stripe Connect |
+| `/api/stripe-connect/onboard` | POST | Better Auth | Start Connect onboarding |
+| `/api/stripe-connect/return` | GET | Better Auth | Connect onboarding return |
+| `/api/stripe-connect/status` | GET | Better Auth | Connect account status |
 
 ### Chat (Jovie AI)
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/chat` | POST | Clerk | Send chat message (streaming) |
-| `/api/chat/confirm-edit` | POST | Clerk | Confirm AI-suggested edit |
-| `/api/chat/confirm-link` | POST | Clerk | Confirm AI-suggested link |
-| `/api/chat/confirm-remove-link` | POST | Clerk | Confirm link removal |
-| `/api/chat/conversations` | GET | Clerk | List conversations |
-| `/api/chat/conversations/[id]` | GET | Clerk | Get conversation |
-| `/api/chat/conversations/[id]/messages` | GET | Clerk | Get conversation messages |
-| `/api/chat/usage` | GET | Clerk | Chat usage stats |
+| `/api/chat` | POST | Better Auth | Send chat message (streaming) |
+| `/api/chat/confirm-edit` | POST | Better Auth | Confirm AI-suggested edit |
+| `/api/chat/confirm-link` | POST | Better Auth | Confirm AI-suggested link |
+| `/api/chat/confirm-remove-link` | POST | Better Auth | Confirm link removal |
+| `/api/chat/conversations` | GET | Better Auth | List conversations |
+| `/api/chat/conversations/[id]` | GET | Better Auth | Get conversation |
+| `/api/chat/conversations/[id]/messages` | GET | Better Auth | Get conversation messages |
+| `/api/chat/usage` | GET | Better Auth | Chat usage stats |
 
 ### Cron Jobs (CRON_SECRET bearer token)
 
@@ -123,37 +123,37 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/inbox/founder-reviews` | GET/POST | Clerk | List or persist owner-bound review receipts before Inbox decisions |
-| `/api/inbox/founder-reviews/upload-token` | POST | Clerk / signed Blob callback | Issue private-audio upload tokens and persist expiring cleanup leases |
-| `/api/inbox/founder-reviews/[id]/media` | GET/DELETE | Clerk | Stream or delete retained private audio for an owned receipt |
-| `/api/inbox/founder-reviews/[id]/outcome` | PATCH | Clerk | Persist failed action state or verify applied state from canonical suggested actions |
+| `/api/inbox/founder-reviews` | GET/POST | Better Auth | List or persist owner-bound review receipts before Inbox decisions |
+| `/api/inbox/founder-reviews/upload-token` | POST | Better Auth / signed Blob callback | Issue private-audio upload tokens and persist expiring cleanup leases |
+| `/api/inbox/founder-reviews/[id]/media` | GET/DELETE | Better Auth | Stream or delete retained private audio for an owned receipt |
+| `/api/inbox/founder-reviews/[id]/outcome` | PATCH | Better Auth | Persist failed action state or verify applied state from canonical suggested actions |
 
 ### Dashboard (authenticated creator)
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/dashboard/activity/recent` | GET | Clerk | Recent activity feed |
-| `/api/dashboard/analytics` | GET | Clerk | Analytics data |
-| `/api/dashboard/audience/members` | GET | Clerk | Audience members list |
-| `/api/dashboard/audience/subscribers` | GET | Clerk | Email subscribers list |
-| `/api/dashboard/earnings` | GET | Clerk | Earnings/tips data |
-| `/api/dashboard/pixels` | GET/POST | Clerk | Ad pixel settings |
-| `/api/dashboard/profile` | GET | Clerk | Dashboard profile data |
-| `/api/dashboard/releases/[releaseId]/analytics` | GET | Clerk | Release analytics |
-| `/api/dashboard/releases/[releaseId]/tracks` | GET | Clerk | Release tracks |
-| `/api/dashboard/social-links` | GET | Clerk | Social links |
+| `/api/dashboard/activity/recent` | GET | Better Auth | Recent activity feed |
+| `/api/dashboard/analytics` | GET | Better Auth | Analytics data |
+| `/api/dashboard/audience/members` | GET | Better Auth | Audience members list |
+| `/api/dashboard/audience/subscribers` | GET | Better Auth | Email subscribers list |
+| `/api/dashboard/earnings` | GET | Better Auth | Earnings/tips data |
+| `/api/dashboard/pixels` | GET/POST | Better Auth | Ad pixel settings |
+| `/api/dashboard/profile` | GET | Better Auth | Dashboard profile data |
+| `/api/dashboard/releases/[releaseId]/analytics` | GET | Better Auth | Release analytics |
+| `/api/dashboard/releases/[releaseId]/tracks` | GET | Better Auth | Release tracks |
+| `/api/dashboard/social-links` | GET | Better Auth | Social links |
 
 ### DSP Enrichment
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/dsp/bio-sync` | POST | Clerk | Sync bio to DSPs |
-| `/api/dsp/bio-sync/status` | GET | Clerk | Bio sync status |
-| `/api/dsp/discover` | POST | Clerk | Discover DSP profiles |
-| `/api/dsp/enrichment/status` | GET | Clerk | Enrichment job status |
-| `/api/dsp/matches` | GET | Clerk | List DSP matches |
-| `/api/dsp/matches/[id]/confirm` | POST | Clerk | Confirm DSP match |
-| `/api/dsp/matches/[id]/reject` | POST | Clerk | Reject DSP match |
+| `/api/dsp/bio-sync` | POST | Better Auth | Sync bio to DSPs |
+| `/api/dsp/bio-sync/status` | GET | Better Auth | Bio sync status |
+| `/api/dsp/discover` | POST | Better Auth | Discover DSP profiles |
+| `/api/dsp/enrichment/status` | GET | Better Auth | Enrichment job status |
+| `/api/dsp/matches` | GET | Better Auth | List DSP matches |
+| `/api/dsp/matches/[id]/confirm` | POST | Better Auth | Confirm DSP match |
+| `/api/dsp/matches/[id]/reject` | POST | Better Auth | Reject DSP match |
 
 ### Email Tracking (pixel/redirect)
 
@@ -167,7 +167,7 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/api/health` | GET | Public | Basic health check |
-| `/api/health/auth` | GET | Clerk | Auth system health |
+| `/api/health/auth` | GET | Better Auth | Auth system health |
 | `/api/health/build-info` | GET | Public | Build metadata |
 | `/api/health/comprehensive` | GET | Admin | Full system health |
 | `/api/health/db` | GET | Admin | Database health |
@@ -182,42 +182,42 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/library/documents` | GET/POST | Clerk | Cursor-page private documents or capture an idempotent idea |
-| `/api/library/documents/[id]` | PATCH | Clerk | Save an immutable rich-text revision with optimistic concurrency |
-| `/api/library/documents/[id]/claims` | POST | Clerk | Add evidence to the exact current revision |
-| `/api/library/documents/[id]/review` | POST | Clerk | Complete factual evidence review for a script |
+| `/api/library/documents` | GET/POST | Better Auth | Cursor-page private documents or capture an idempotent idea |
+| `/api/library/documents/[id]` | PATCH | Better Auth | Save an immutable rich-text revision with optimistic concurrency |
+| `/api/library/documents/[id]/claims` | POST | Better Auth | Add evidence to the exact current revision |
+| `/api/library/documents/[id]/review` | POST | Better Auth | Complete factual evidence review for a script |
 | `/api/library/documents/[id]/approve` | POST | Owner | Approve and hand off the exact revision for capture |
 
 ### Images
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/images/artwork/upload` | POST | Clerk | Upload release artwork |
-| `/api/images/status/[id]` | GET | Clerk | Image processing status |
-| `/api/images/upload` | POST | Clerk | Upload profile image |
+| `/api/images/artwork/upload` | POST | Better Auth | Upload release artwork |
+| `/api/images/status/[id]` | GET | Better Auth | Image processing status |
+| `/api/images/upload` | POST | Better Auth | Upload profile image |
 
 ### Insights (AI)
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/insights` | GET | Clerk | List AI insights |
-| `/api/insights/[id]` | PATCH | Clerk | Update insight |
-| `/api/insights/generate` | POST | Clerk | Generate new insights |
-| `/api/insights/summary` | GET | Clerk | Insights summary |
+| `/api/insights` | GET | Better Auth | List AI insights |
+| `/api/insights/[id]` | PATCH | Better Auth | Update insight |
+| `/api/insights/generate` | POST | Better Auth | Generate new insights |
+| `/api/insights/summary` | GET | Better Auth | Insights summary |
 
 ### Links
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/link/[id]` | POST | Clerk | Create/update link |
-| `/api/wrap-link` | POST/PUT/DELETE/GET | Clerk | Manage wrapped links |
+| `/api/link/[id]` | POST | Better Auth | Create/update link |
+| `/api/wrap-link` | POST/PUT/DELETE/GET | Better Auth | Manage wrapped links |
 
 ### Music Search
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/apple-music/search` | GET | Clerk | Search Apple Music |
-| `/api/spotify/search` | GET | Clerk | Search Spotify |
+| `/api/apple-music/search` | GET | Better Auth | Search Apple Music |
+| `/api/spotify/search` | GET | Better Auth | Search Spotify |
 
 ### Notifications (fan-facing)
 
@@ -242,28 +242,28 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/artist/theme` | POST | Clerk | Update artist theme |
+| `/api/artist/theme` | POST | Better Auth | Update artist theme |
 | `/api/calendar/[eventId]` | GET | Public | Get calendar event (.ics) |
-| `/api/canvas/generate` | POST | Clerk | Generate share canvas |
+| `/api/canvas/generate` | POST | Better Auth | Generate share canvas |
 | `/api/create-tip-intent` | POST | Public | Create Stripe tip intent |
-| `/api/creator` | GET | Clerk | Get current creator profile |
+| `/api/creator` | GET | Better Auth | Get current creator profile |
 | `/api/featured-creators` | GET | Public | Featured creators list |
-| `/api/feedback` | POST | Clerk | Submit feedback |
-| `/api/max-access-request` | POST | Clerk | Request Max plan features |
-| `/api/handle/check` | GET | Clerk | Check handle availability |
-| `/api/ingestion/jobs` | POST | Clerk | Trigger ingestion job |
+| `/api/feedback` | POST | Better Auth | Submit feedback |
+| `/api/max-access-request` | POST | Better Auth | Request Max plan features |
+| `/api/handle/check` | GET | Better Auth | Check handle availability |
+| `/api/ingestion/jobs` | POST | Better Auth | Trigger ingestion job |
 | `/api/monitoring/performance` | GET | Admin | Performance metrics |
 | `/api/profile/view` | POST | Public | Track profile view |
 | `/api/px` | POST | Public | Tracking pixel |
-| `/api/referrals/apply` | POST | Clerk | Apply referral code |
-| `/api/referrals/code` | GET/POST | Clerk | Get/create referral code |
-| `/api/referrals/stats` | GET | Clerk | Referral stats |
+| `/api/referrals/apply` | POST | Better Auth | Apply referral code |
+| `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
+| `/api/referrals/stats` | GET | Better Auth | Referral stats |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
-| `/api/suggestions` | GET | Clerk | Profile suggestions |
-| `/api/suggestions/avatars/[id]/dismiss` | POST | Clerk | Dismiss avatar suggestion |
-| `/api/suggestions/avatars/[id]/select` | POST | Clerk | Select avatar suggestion |
-| `/api/suggestions/social-links/[id]/approve` | POST | Clerk | Approve social link |
-| `/api/suggestions/social-links/[id]/reject` | POST | Clerk | Reject social link |
+| `/api/suggestions` | GET | Better Auth | Profile suggestions |
+| `/api/suggestions/avatars/[id]/dismiss` | POST | Better Auth | Dismiss avatar suggestion |
+| `/api/suggestions/avatars/[id]/select` | POST | Better Auth | Select avatar suggestion |
+| `/api/suggestions/social-links/[id]/approve` | POST | Better Auth | Approve social link |
+| `/api/suggestions/social-links/[id]/reject` | POST | Better Auth | Reject social link |
 | `/api/tips/create-checkout` | POST | Public | Create tip checkout |
 | `/api/track` | POST | Public | Generic event tracking |
 | `/api/unsubscribe/claim-invites` | GET/POST | Token | Unsubscribe from invites |
@@ -273,7 +273,6 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/clerk/webhook` | POST | Svix sig | Clerk user events |
 | `/api/webhooks/linear` | POST | Linear sig | Linear issue sync |
 | `/api/webhooks/resend` | POST/GET | Resend sig | Email delivery events |
 | `/api/webhooks/sentry` | POST/GET | Sentry sig | Error alert events |
@@ -484,7 +483,7 @@ This is the ONLY valid import for database access. Uses `@neondatabase/serverles
 
 ```typescript
 // Select with conditions
-const users = await db.select().from(profiles).where(eq(profiles.clerkUserId, clerkId));
+const profiles = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, userId));
 
 // Insert (batch)
 await db.insert(links).values([{ url, title, profileId }, ...]);
