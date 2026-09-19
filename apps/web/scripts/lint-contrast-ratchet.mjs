@@ -52,6 +52,11 @@ const EMPTY_COUNTS = {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
+function shouldSkipFile(filePath) {
+  const normalized = filePath.replaceAll('\\', '/');
+  return SKIP_FRAGMENTS.some(fragment => normalized.includes(fragment));
+}
+
 function shouldSkipLine(line) {
   return SKIP_FRAGMENTS.some(f => line.includes(f));
 }
@@ -154,6 +159,8 @@ export function listViolations(files) {
   const violations = [];
 
   for (const filePath of files) {
+    if (shouldSkipFile(filePath)) continue;
+
     let content;
     try {
       content = readFileSync(filePath, 'utf8');

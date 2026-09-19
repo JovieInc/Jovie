@@ -176,9 +176,9 @@ describe('ProfileCompactSurface', () => {
     const menu = screen.getByRole('button', { name: 'Menu' });
 
     expect(back).not.toHaveClass('profile-top-chrome-icon');
-    expect(back).not.toHaveClass('text-white');
     expect(menu).not.toHaveClass('profile-top-chrome-icon');
-    expect(menu).not.toHaveClass('text-white');
+    expect(back).toHaveClass('bg-transparent', 'text-primary-token/78');
+    expect(menu).toHaveClass('bg-transparent', 'text-primary-token/78');
   });
 
   it('shows the back control on the public profile root for a signed-in session', () => {
