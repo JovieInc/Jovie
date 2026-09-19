@@ -6,29 +6,20 @@
  * certification. Only the executable harness may set `certified:true`.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  attachJevShadow,
-  classifyJevShadow,
-  evidenceFingerprint,
-} from './jev-shadow.mjs';
 import {
   runScreenCertification,
   SCREEN_CERT_GATE,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
+  SCREEN_REGISTRATION_GATE,
 } from './screen-certification.mjs';
 
 export const RUN_OUTCOME_SCHEMA = 'run-outcome/v1';
 export const RUN_OUTCOMES = Object.freeze(['pass', 'fail', 'unresolved']);
 export const CERTIFIER_HARNESS = 'harness';
-export {
-  ALIGNMENT_CLASSES,
-  GATEWAY_MODEL_ALLOWLIST,
-  JEV_MODEL,
-  JEV_SHADOW_SCHEMA,
-} from './jev-shadow.mjs';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -36,6 +27,21 @@ function isObject(value) {
 
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (isObject(value)) {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function evidenceFingerprint(value) {
+  return `sha256:${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
 
 function exactSha(value) {
@@ -89,6 +95,152 @@ function evidenceFromReceipt(receipt) {
 function claimedScreens(claim) {
   if (!isObject(claim) || !Array.isArray(claim.screenIds)) return [];
   return claim.screenIds.filter(id => hasText(id));
+}
+
+const UNRESOLVED_RECEIPT_STATUSES = new Set([
+  'not-applicable',
+  'source-registered',
+  'evidence-required',
+]);
+const SCREEN_VERDICTS = new Set(['pass', 'block', 'evidence-required']);
+
+function normalizeClaim(claim) {
+  const source = isObject(claim) ? claim : {};
+  return {
+    statement: source.statement ?? null,
+    kind: source.kind ?? 'screen-certification',
+    expectedOutcome: RUN_OUTCOMES.includes(source.expectedOutcome)
+      ? source.expectedOutcome
+      : null,
+    expectedCertified:
+      typeof source.expectedCertified === 'boolean'
+        ? source.expectedCertified
+        : null,
+    screenIds: claimedScreens(source),
+  };
+}
+
+function validateScreenCertificationReceipt(receipt) {
+  if (!isObject(receipt)) return ['screen-certification receipt is required'];
+
+  const issues = [];
+  const required = [
+    [
+      receipt.schema === SCREEN_CERT_SCHEMA,
+      `receipt schema must be ${SCREEN_CERT_SCHEMA}`,
+    ],
+    [exactSha(receipt.headSha), 'receipt must bind an exact-head headSha'],
+    [
+      receipt.baseSha === null || exactSha(receipt.baseSha),
+      'receipt baseSha must be null or an exact commit SHA',
+    ],
+    [
+      receipt.gate === SCREEN_CERT_GATE ||
+        receipt.gate === SCREEN_REGISTRATION_GATE,
+      `receipt gate must be ${SCREEN_CERT_GATE} or ${SCREEN_REGISTRATION_GATE}`,
+    ],
+    [
+      receipt.invariant === SCREEN_CERT_INVARIANT_ID,
+      `receipt invariant must be ${SCREEN_CERT_INVARIANT_ID}`,
+    ],
+    [hasText(receipt.status), 'receipt status is required'],
+  ];
+  issues.push(
+    ...required.filter(([valid]) => !valid).map(([, issue]) => issue)
+  );
+  for (const field of ['ok', 'certified', 'registrationOnly']) {
+    if (typeof receipt[field] !== 'boolean')
+      issues.push(`receipt ${field} must be boolean`);
+  }
+  for (const field of [
+    'issues',
+    'changedScreens',
+    'excludedChanges',
+    'fixtures',
+    'sweeps',
+  ]) {
+    if (!Array.isArray(receipt[field])) {
+      issues.push(`receipt ${field} must be an array`);
+    }
+  }
+
+  if (
+    receipt.gate === SCREEN_REGISTRATION_GATE &&
+    receipt.registrationOnly !== true
+  ) {
+    issues.push('registration gate requires registrationOnly:true');
+  }
+
+  const changedScreens = Array.isArray(receipt.changedScreens)
+    ? receipt.changedScreens
+    : [];
+  for (const row of changedScreens) {
+    if (!isObject(row)) {
+      issues.push('changed screen evidence must be an object');
+      continue;
+    }
+    if (!hasText(row.id)) issues.push('changed screen evidence needs an id');
+    if (!SCREEN_VERDICTS.has(row.verdict)) {
+      issues.push(
+        `changed screen ${row.id ?? '<unknown>'} has an invalid verdict`
+      );
+    }
+    if (!Array.isArray(row.findings)) {
+      issues.push(
+        `changed screen ${row.id ?? '<unknown>'} findings must be an array`
+      );
+    }
+    if (
+      receipt.ok === true &&
+      receipt.certified === true &&
+      row.verdict === 'pass'
+    ) {
+      if (Array.isArray(row.findings) && row.findings.length > 0) {
+        issues.push(
+          `changed screen ${row.id ?? '<unknown>'} pass has findings`
+        );
+      }
+      if (
+        typeof row.artifactDigest !== 'string' ||
+        !/^sha256:[0-9a-f]{64}$/i.test(row.artifactDigest)
+      ) {
+        issues.push(
+          `changed screen ${row.id ?? '<unknown>'} pass needs an artifact digest`
+        );
+      }
+      if (
+        typeof row.rendererRunUrl !== 'string' ||
+        !/^https:\/\/[^\s]+$/i.test(row.rendererRunUrl)
+      ) {
+        issues.push(
+          `changed screen ${row.id ?? '<unknown>'} pass needs renderer provenance`
+        );
+      }
+    }
+  }
+
+  if (
+    receipt.ok === true &&
+    receipt.certified === true &&
+    !receipt.registrationOnly
+  ) {
+    if (receipt.gate !== SCREEN_CERT_GATE)
+      issues.push('certified receipt must use the certification gate');
+    if (receipt.status !== 'certified')
+      issues.push('certified receipt must have status:certified');
+    if (changedScreens.length === 0)
+      issues.push('certified receipt needs changed screen evidence');
+    if (changedScreens.some(row => row?.verdict !== 'pass')) {
+      issues.push(
+        'certified receipt needs pass verdicts for every changed screen'
+      );
+    }
+    if (Array.isArray(receipt.issues) && receipt.issues.length > 0) {
+      issues.push('certified receipt cannot contain issues');
+    }
+  }
+
+  return issues;
 }
 
 function decideOutcome({ claim, receipt, issues }) {
@@ -168,8 +320,20 @@ function decideOutcome({ claim, receipt, issues }) {
   }
 
   if (expectedOutcome === 'fail') {
-    const failed = receipt.ok === false || receipt.certified !== true;
-    return failed
+    const confirmedFailure =
+      receipt.ok === false ||
+      receipt.status === 'blocked' ||
+      receipt.changedScreens.some(row => row?.verdict === 'block');
+    if (!confirmedFailure && receipt.certified !== true) {
+      return {
+        outcome: 'unresolved',
+        certified: false,
+        reason: UNRESOLVED_RECEIPT_STATUSES.has(receipt.status)
+          ? `harness status ${receipt.status} is not a confirmed failure`
+          : 'harness evidence does not confirm the expected failure',
+      };
+    }
+    return confirmedFailure
       ? {
           outcome: 'pass',
           certified: false,
@@ -211,12 +375,9 @@ function decideOutcome({ claim, receipt, issues }) {
     return {
       outcome: 'unresolved',
       certified: false,
-      reason:
-        receipt.status === 'not-applicable' ||
-        receipt.status === 'source-registered' ||
-        receipt.status === 'evidence-required'
-          ? `harness status ${receipt.status} is not a certified acceptance`
-          : 'harness ok without certified is not a verified acceptance',
+      reason: UNRESOLVED_RECEIPT_STATUSES.has(receipt.status)
+        ? `harness status ${receipt.status} is not a certified acceptance`
+        : 'harness ok without certified is not a verified acceptance',
     };
   }
 
@@ -240,11 +401,6 @@ function decideOutcome({ claim, receipt, issues }) {
  *   receipt?: object,
  *   receipts?: object[],
  *   persistTo?: string,
- *   includeShadow?: boolean,
- *   evaluate?: (input: { claim: object, evidence: unknown, model: string }) =>
- *     | { alignment?: string, certified?: unknown, reason?: string }
- *     | null,
- *   model?: string,
  *   previous?: object | null,
  * }} [input]
  */
@@ -254,9 +410,6 @@ export function verifyRunOutcome({
   receipt,
   receipts,
   persistTo,
-  includeShadow = true,
-  evaluate,
-  model,
   previous = null,
 } = {}) {
   const issues = [];
@@ -268,20 +421,18 @@ export function verifyRunOutcome({
     issues.push('one run only; averaging multiple receipts is forbidden');
   }
   const resolvedReceipt = Array.isArray(receipts) ? receipts[0] : receipt;
-  if (!isObject(resolvedReceipt)) {
-    issues.push('screen-certification receipt is required');
-  } else if (resolvedReceipt.schema !== SCREEN_CERT_SCHEMA) {
-    issues.push(`receipt schema must be ${SCREEN_CERT_SCHEMA}`);
-  }
+  issues.push(...validateScreenCertificationReceipt(resolvedReceipt));
 
   const evidence = evidenceFromReceipt(resolvedReceipt);
+  const normalizedClaim = isObject(claim) ? normalizeClaim(claim) : null;
   const fingerprint = evidenceFingerprint({
     runId: hasText(runId) ? runId : null,
-    claim: isObject(claim) ? { statement: claim.statement } : null,
+    claim: normalizedClaim,
     evidence,
   });
 
   if (
+    issues.length === 0 &&
     isObject(previous) &&
     previous.schema === RUN_OUTCOME_SCHEMA &&
     previous.evidenceFingerprint === fingerprint &&
@@ -314,18 +465,7 @@ export function verifyRunOutcome({
     invariant: SCREEN_CERT_INVARIANT_ID,
     gate: SCREEN_CERT_GATE,
     headSha: exactSha(evidence?.headSha) ?? evidence?.headSha ?? null,
-    claim: isObject(claim)
-      ? Object.freeze({
-          statement: claim.statement ?? null,
-          kind: claim.kind ?? 'screen-certification',
-          expectedOutcome: claim.expectedOutcome ?? null,
-          expectedCertified:
-            typeof claim.expectedCertified === 'boolean'
-              ? claim.expectedCertified
-              : null,
-          screenIds: claimedScreens(claim),
-        })
-      : null,
+    claim: normalizedClaim ? Object.freeze(normalizedClaim) : null,
     evidence,
     outcome: decision.outcome,
     reason: decision.reason,
@@ -337,21 +477,9 @@ export function verifyRunOutcome({
     shadow: null,
   };
 
-  const withShadow = includeShadow
-    ? attachJevShadow(
-        record,
-        classifyJevShadow({
-          claim: record.claim,
-          evidence: record.evidence,
-          evaluate,
-          model,
-          previousShadow: previous?.shadow ?? null,
-        })
-      )
-    : Object.freeze(record);
-
-  if (persistTo) persistRunOutcome(withShadow, persistTo);
-  return withShadow;
+  const frozen = Object.freeze(record);
+  if (persistTo) persistRunOutcome(frozen, persistTo);
+  return frozen;
 }
 
 export function persistRunOutcome(record, filePath) {
@@ -397,11 +525,6 @@ export function readRunOutcome(filePath) {
  *   claim?: object,
  *   certOptions?: object,
  *   persistTo?: string,
- *   includeShadow?: boolean,
- *   evaluate?: (input: { claim: object, evidence: unknown, model: string }) =>
- *     | { alignment?: string, certified?: unknown, reason?: string }
- *     | null,
- *   model?: string,
  *   previous?: object | null,
  * }} [input]
  */
@@ -410,9 +533,6 @@ export function verifyScreenCertRun({
   claim,
   certOptions = {},
   persistTo,
-  includeShadow = true,
-  evaluate,
-  model,
   previous = null,
 } = {}) {
   const result = runScreenCertification(certOptions);
@@ -421,9 +541,6 @@ export function verifyScreenCertRun({
     claim,
     receipt: result.receipt,
     persistTo,
-    includeShadow,
-    evaluate,
-    model,
     previous,
   });
 }

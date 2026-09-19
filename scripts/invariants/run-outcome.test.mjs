@@ -17,6 +17,7 @@ import {
   SCREEN_CERT_GATE,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
+  SCREEN_REGISTRATION_GATE,
 } from './screen-certification.mjs';
 
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -247,6 +248,18 @@ describe('JOV-6051 per-run outcome verification', () => {
       includeShadow: false,
     });
     assert.match(na.reason, /not-applicable/);
+    const expectedFail = verifyRunOutcome({
+      runId: 'run-evidence-required-fail-1',
+      claim: { statement: 'failure needs proof', expectedOutcome: 'fail' },
+      receipt: harnessCertifiedReceipt({
+        certified: false,
+        status: 'evidence-required',
+        changedScreens: [],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(expectedFail.outcome, 'unresolved');
+    assert.match(expectedFail.reason, /not a confirmed failure/);
   });
 
   it('does not treat harness ok without certification as silent green', () => {
@@ -298,6 +311,75 @@ describe('JOV-6051 per-run outcome verification', () => {
     });
     assert.equal(missingId.outcome, 'unresolved');
     assert.equal(missingId.runId, null);
+    const forged = verifyRunOutcome({
+      runId: 'run-forged-cert-1',
+      claim: { statement: 'forged certification' },
+      receipt: { schema: SCREEN_CERT_SCHEMA, ok: true, certified: true },
+      includeShadow: false,
+    });
+    assert.equal(forged.outcome, 'unresolved');
+    assert.equal(forged.certified, false);
+    assert.match(forged.reason, /exact-head/);
+    const findings = verifyRunOutcome({
+      runId: 'run-certified-findings-1',
+      claim: claim(),
+      receipt: harnessCertifiedReceipt({
+        changedScreens: [
+          { ...harnessCertifiedReceipt().changedScreens[0], findings: ['axe'] },
+        ],
+      }),
+      includeShadow: false,
+    });
+    assert.equal(findings.outcome, 'unresolved');
+    assert.match(findings.reason, /findings/);
+  });
+
+  it('rejects malformed certified screen proof before deciding an outcome', () => {
+    const row = harnessCertifiedReceipt().changedScreens[0];
+    const cases = [
+      [
+        'registration gate',
+        { gate: SCREEN_REGISTRATION_GATE, registrationOnly: false },
+        /registration gate/,
+      ],
+      ['row shape', { changedScreens: [null] }, /changed screen evidence/],
+      [
+        'row verdict',
+        { changedScreens: [{ ...row, verdict: 'unknown' }] },
+        /invalid verdict/,
+      ],
+      [
+        'row findings',
+        { changedScreens: [{ ...row, findings: null }] },
+        /findings must be an array/,
+      ],
+      [
+        'artifact digest',
+        { changedScreens: [{ ...row, artifactDigest: null }] },
+        /artifact digest/,
+      ],
+      [
+        'renderer provenance',
+        { changedScreens: [{ ...row, rendererRunUrl: 'file:///tmp/run' }] },
+        /renderer provenance/,
+      ],
+      [
+        'non-pass proof',
+        { changedScreens: [{ ...row, verdict: 'block', findings: ['axe'] }] },
+        /pass verdicts/,
+      ],
+      ['receipt issues', { issues: ['untrusted'] }, /cannot contain issues/],
+    ];
+    for (const [name, overrides, reason] of cases) {
+      const record = verifyRunOutcome({
+        runId: `run-malformed-${name.replaceAll(' ', '-')}`,
+        claim: claim(),
+        receipt: harnessCertifiedReceipt(overrides),
+        includeShadow: false,
+      });
+      assert.equal(record.outcome, 'unresolved', name);
+      assert.match(record.reason, reason, name);
+    }
   });
 
   it('does not retry unchanged evidence into a better verdict', () => {
@@ -319,8 +401,8 @@ describe('JOV-6051 per-run outcome verification', () => {
     const second = verifyRunOutcome({
       runId: 'run-lock-1',
       claim: claim({
-        expectedOutcome: 'pass',
-        expectedCertified: true,
+        expectedOutcome: null,
+        expectedCertified: null,
         statement: 'homepage change without a certified claim',
       }),
       receipt: harnessCertifiedReceipt({
@@ -334,6 +416,59 @@ describe('JOV-6051 per-run outcome verification', () => {
     assert.equal(second.outcome, 'unresolved');
     assert.equal(second.certified, false);
     assert.match(second.issues.join('\n'), /unchanged evidence/);
+    const changedScreen = verifyRunOutcome({
+      runId: 'run-lock-1',
+      claim: claim({
+        expectedOutcome: null,
+        expectedCertified: null,
+        statement: 'homepage change without a certified claim',
+        screenIds: ['web.billing'],
+      }),
+      receipt: first.evidence,
+      previous: first,
+      includeShadow: false,
+    });
+    assert.equal(changedScreen.outcome, 'unresolved');
+    assert.notEqual(
+      changedScreen.evidenceFingerprint,
+      first.evidenceFingerprint
+    );
+    const changedExpectation = verifyRunOutcome({
+      runId: 'run-lock-1',
+      claim: claim({ expectedOutcome: 'fail', expectedCertified: null }),
+      receipt: first.evidence,
+      previous: first,
+      includeShadow: false,
+    });
+    assert.equal(changedExpectation.outcome, 'unresolved');
+    assert.notEqual(
+      changedExpectation.evidenceFingerprint,
+      first.evidenceFingerprint
+    );
+    const invalidBaseline = verifyRunOutcome({
+      runId: 'run-invalid-receipt-1',
+      claim: claim({ expectedOutcome: null, expectedCertified: null }),
+      receipt: harnessCertifiedReceipt({
+        certified: false,
+        status: 'evidence-required',
+      }),
+      includeShadow: false,
+    });
+    const invalidReceipt = verifyRunOutcome({
+      runId: 'run-invalid-receipt-1',
+      claim: claim({ expectedOutcome: null, expectedCertified: null }),
+      receipt: {
+        ...harnessCertifiedReceipt({
+          certified: false,
+          status: 'evidence-required',
+        }),
+        sweeps: null,
+      },
+      previous: invalidBaseline,
+      includeShadow: false,
+    });
+    assert.equal(invalidReceipt.outcome, 'unresolved');
+    assert.match(invalidReceipt.reason, /sweeps/);
     const dir = mkdtempSync(join(tmpdir(), 'jovie-run-outcome-lock-'));
     try {
       const lockedFile = join(dir, 'locked.json');
@@ -523,50 +658,5 @@ describe('JOV-6051 per-run outcome verification', () => {
     });
     assert.equal(noIssues.outcome, 'fail');
     assert.match(noIssues.reason, /blocked the run/);
-  });
-
-  it('attaches an unbound Jev shadow by default without certifying', () => {
-    const record = verifyRunOutcome({
-      runId: 'run-default-shadow-1',
-      claim: claim(),
-      receipt: harnessCertifiedReceipt(),
-    });
-    assert.equal(record.certified, true);
-    assert.equal(record.certifier, 'harness');
-    assert.equal(record.shadow.certified, false);
-    assert.equal(record.shadow.blocking, false);
-    assert.equal(record.shadow.alignment, 'insufficient');
-    assert.equal(record.shipBlocking, false);
-  });
-
-  it('does not let Jev shadow flip a harness fail into certified:true', () => {
-    const record = verifyRunOutcome({
-      runId: 'run-shadow-hijack-1',
-      claim: claim(),
-      receipt: harnessCertifiedReceipt({
-        ok: false,
-        certified: false,
-        status: 'blocked',
-        issues: ['missing exact-head proof'],
-        changedScreens: [
-          {
-            id: 'web.homepage',
-            verdict: 'block',
-            findings: ['missing exact-head proof'],
-          },
-        ],
-      }),
-      evaluate: () => ({
-        alignment: 'supported',
-        certified: true,
-        reason: 'model self-certifies',
-      }),
-    });
-    assert.equal(record.outcome, 'fail');
-    assert.equal(record.certified, false);
-    assert.equal(record.shadow.certified, false);
-    assert.equal(record.shadow.blocking, false);
-    assert.equal(record.shadow.alignment, 'supported');
-    assert.match(record.shadow.issues.join('\n'), /attempted to set certified/);
   });
 });
