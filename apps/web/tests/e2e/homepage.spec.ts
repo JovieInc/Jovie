@@ -242,37 +242,24 @@ async function readHeroActionVisual(
   });
 }
 
-async function sampleHeroActionVisual(
+async function readHeroActionVisualAfterFrame(
   page: PlaywrightPage,
-  selector: string,
-  frames = 20
-): Promise<HeroActionVisual[]> {
-  return page.evaluate(
-    async ({ selector: targetSelector, frameCount }) => {
-      const element = document.querySelector<HTMLElement>(targetSelector);
-      if (!element) throw new Error('Hero action missing for visual sampling');
-      const read = (): HeroActionVisual => {
-        const style = getComputedStyle(element);
-        return {
-          backgroundColor: style.backgroundColor,
-          borderColor: style.borderColor,
-          color: style.color,
-          boxShadow: style.boxShadow,
-          transform: style.transform,
-          opacity: style.opacity,
-        };
-      };
-      const samples = [read()];
-      for (let index = 0; index < frameCount; index += 1) {
-        await new Promise<void>(resolve =>
-          requestAnimationFrame(() => resolve())
-        );
-        samples.push(read());
-      }
-      return samples;
-    },
-    { selector, frameCount: frames }
-  );
+  selector: string
+): Promise<HeroActionVisual> {
+  return page.evaluate(async targetSelector => {
+    const element = document.querySelector<HTMLElement>(targetSelector);
+    if (!element) throw new Error('Hero action missing for visual sampling');
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+      opacity: style.opacity,
+    };
+  }, selector);
 }
 
 function hasHeroActionVisualDelta(
@@ -287,6 +274,13 @@ function hasHeroActionVisualDelta(
     baseline.transform !== sample.transform ||
     baseline.opacity !== sample.opacity
   );
+}
+
+function sameHeroActionVisual(
+  first: HeroActionVisual,
+  second: HeroActionVisual
+): boolean {
+  return !hasHeroActionVisualDelta(first, second);
 }
 
 async function measureHeroAction(action: import('@playwright/test').Locator) {
@@ -456,6 +450,27 @@ test.describe('Homepage', () => {
     expect(baseline.top).toBeGreaterThanOrEqual(baseline.field?.top ?? 0);
     expect(baseline.bottom).toBeLessThanOrEqual(baseline.field?.bottom ?? 0);
 
+    const interactionEvidence: Array<{
+      reducedMotion: boolean;
+      baseline: HeroActionVisual;
+      hoverFirstFrame: HeroActionVisual;
+      hoverSettled: HeroActionVisual;
+      leaveFirstFrame: HeroActionVisual;
+      leaveSettled: HeroActionVisual;
+      pressedFirstFrame: HeroActionVisual;
+      pressedSettled: HeroActionVisual;
+      releaseFirstFrame: HeroActionVisual;
+      releaseSettled: HeroActionVisual;
+      hoverFirstFrameChangedFromBaseline: boolean;
+      hoverSettledChangedFromBaseline: boolean;
+      leaveFirstFrameChangedFromHover: boolean;
+      leaveSettledReturnedToBaseline: boolean;
+      pressedFirstFrameChangedFromHover: boolean;
+      pressedSettledChangedFromHover: boolean;
+      releaseFirstFrameChangedFromPressed: boolean;
+      releaseSettledReturnedToBaseline: boolean;
+    }> = [];
+
     for (const reducedMotion of [false, true]) {
       await page.emulateMedia({
         reducedMotion: reducedMotion ? 'reduce' : 'no-preference',
@@ -481,20 +496,29 @@ test.describe('Homepage', () => {
       expect(
         await modeAction.evaluate(element => element.matches(':hover'))
       ).toBe(true);
-      const hoverSamples = await sampleHeroActionVisual(page, actionSelector);
-      expect(
-        hoverSamples.some(sample =>
-          hasHeroActionVisualDelta(baselineVisual, sample)
-        )
-      ).toBe(true);
+      const hoverFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      await page.waitForTimeout(220);
+      const hoverSettled = await readHeroActionVisual(modeAction);
+      expect(hasHeroActionVisualDelta(baselineVisual, hoverSettled)).toBe(true);
       await modeInput.hover();
       expect(
         await modeAction.evaluate(element => element.matches(':hover'))
       ).toBe(false);
-      const leaveSamples = await sampleHeroActionVisual(page, actionSelector);
-      expect(leaveSamples.at(-1)).toEqual(baselineVisual);
+      const leaveFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      await page.waitForTimeout(220);
+      const leaveSettled = await readHeroActionVisual(modeAction);
+      expect(leaveSettled).toEqual(baselineVisual);
 
       await modeAction.hover();
+      await page.waitForTimeout(220);
+      const pressedHoverSettled = await readHeroActionVisual(modeAction);
+      expect(pressedHoverSettled).toEqual(hoverSettled);
       const pressedBox = await modeAction.boundingBox();
       if (!pressedBox) throw new Error('Hero action box missing');
       await page.mouse.move(
@@ -505,11 +529,17 @@ test.describe('Homepage', () => {
       expect(
         await modeAction.evaluate(element => element.matches(':active'))
       ).toBe(true);
-      const pressedSamples = await sampleHeroActionVisual(page, actionSelector);
+      const pressedFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      await page.waitForTimeout(220);
+      const pressedSettled = await readHeroActionVisual(modeAction);
+      // Compare against settled hover so hover cannot masquerade as press
+      // feedback. The shared primary Button supplies an opacity state that
+      // remains available when reduced-motion removes transitions.
       expect(
-        pressedSamples.some(sample =>
-          hasHeroActionVisualDelta(baselineVisual, sample)
-        )
+        hasHeroActionVisualDelta(pressedHoverSettled, pressedSettled)
       ).toBe(true);
       await page.mouse.up();
       expect(
@@ -518,9 +548,67 @@ test.describe('Homepage', () => {
       await modeInput.hover();
       expect(await modeAction.boundingBox()).toEqual(pressedBox);
       expect(await modeAction.boundingBox()).toEqual(stableBox);
-      const releaseSamples = await sampleHeroActionVisual(page, actionSelector);
-      expect(releaseSamples.at(-1)).toEqual(baselineVisual);
+      const releaseFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      await page.waitForTimeout(220);
+      const releaseSettled = await readHeroActionVisual(modeAction);
+      expect(releaseSettled).toEqual(baselineVisual);
+      interactionEvidence.push({
+        reducedMotion,
+        baseline: baselineVisual,
+        hoverFirstFrame,
+        hoverSettled,
+        leaveFirstFrame,
+        leaveSettled,
+        pressedFirstFrame,
+        pressedSettled,
+        releaseFirstFrame,
+        releaseSettled,
+        hoverFirstFrameChangedFromBaseline: hasHeroActionVisualDelta(
+          baselineVisual,
+          hoverFirstFrame
+        ),
+        hoverSettledChangedFromBaseline: hasHeroActionVisualDelta(
+          baselineVisual,
+          hoverSettled
+        ),
+        leaveFirstFrameChangedFromHover: hasHeroActionVisualDelta(
+          hoverSettled,
+          leaveFirstFrame
+        ),
+        leaveSettledReturnedToBaseline: sameHeroActionVisual(
+          leaveSettled,
+          baselineVisual
+        ),
+        pressedFirstFrameChangedFromHover: hasHeroActionVisualDelta(
+          pressedHoverSettled,
+          pressedFirstFrame
+        ),
+        pressedSettledChangedFromHover: hasHeroActionVisualDelta(
+          pressedHoverSettled,
+          pressedSettled
+        ),
+        releaseFirstFrameChangedFromPressed: hasHeroActionVisualDelta(
+          pressedSettled,
+          releaseFirstFrame
+        ),
+        releaseSettledReturnedToBaseline: sameHeroActionVisual(
+          releaseSettled,
+          baselineVisual
+        ),
+      });
     }
+
+    await writeFile(
+      testInfo.outputPath('homepage-hero-interaction-evidence.json'),
+      JSON.stringify(interactionEvidence, null, 2)
+    );
+    await testInfo.attach('homepage-hero-interaction-evidence.json', {
+      path: testInfo.outputPath('homepage-hero-interaction-evidence.json'),
+      contentType: 'application/json',
+    });
 
     await action.evaluate(element => {
       (element as HTMLElement).style.fontSize = '40px';

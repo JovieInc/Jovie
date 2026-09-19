@@ -436,6 +436,16 @@ describe('Button', () => {
     expect(btn.className).toContain('motion-reduce:transition-none');
   });
 
+  it('gives primary actions immediate pressed feedback without changing geometry', () => {
+    render(<Button>Press</Button>);
+    const btn = screen.getByRole('button');
+
+    expect(btn.className).toContain('active:opacity-90');
+    expect(btn.className).toContain(
+      'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
+    );
+  });
+
   it('keeps secondary buttons borderless at rest with tokenized hover', () => {
     render(<Button variant='secondary'>Press</Button>);
     const btn = screen.getByRole('button');
