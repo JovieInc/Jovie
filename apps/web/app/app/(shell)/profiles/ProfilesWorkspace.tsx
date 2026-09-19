@@ -98,6 +98,7 @@ import {
   PresenceOutcomeStrip as PresenceOutcomeBoard,
   presenceFilterForGroup,
 } from './PresenceOutcomes';
+import styles from './profiles-workspace.module.css';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested' | 'review';
@@ -578,6 +579,7 @@ function ConnectionRail({
     <EntitySidebarShell
       isOpen={row !== null}
       ariaLabel='Presence details'
+      onClose={onClose}
       contextMenuItems={contextMenuItems}
       scrollStrategy='shell'
       workspaceSurface='raised'
@@ -1292,7 +1294,8 @@ export function ProfilesWorkspace({
           ariaLabel='Add Profile Or Site'
           onClick={handleAddConnection}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Profile Or Site'
+          label='Add Page'
+          hideLabelOnMobile
         />
       </DashboardHeaderActionGroup>
     ),
@@ -1380,6 +1383,12 @@ export function ProfilesWorkspace({
                     ) : null}
                   </div>
                 )}
+                <div className={styles.mobileStatus}>
+                  <StatusCell
+                    row={row}
+                    providerAvailable={data?.providerAvailable ?? false}
+                  />
+                </div>
               </div>
             </div>
           );
@@ -1397,8 +1406,8 @@ export function ProfilesWorkspace({
         {
           id: 'status',
           header: 'Status',
-          size: 160,
-          meta: { className: 'px-3' },
+          size: 120,
+          meta: { className: cn('px-2', styles.statusColumn) },
           cell: context => (
             <StatusCell
               row={context.row.original}
@@ -1575,6 +1584,7 @@ export function ProfilesWorkspace({
           start={FILTERS.map(option => (
             <PageToolbarTabButton
               key={option.id}
+              className={styles.filter}
               label={
                 option.id === 'review'
                   ? `Review Pages (${selectPresenceReviewRows(data.rows).length})`
@@ -1628,7 +1638,7 @@ export function ProfilesWorkspace({
           rowHeight={56}
           containerClassName='min-h-0 flex-1'
           minWidth='0'
-          className='table-fixed'
+          className={styles.table}
           isRowSelected={row =>
             !row.id.startsWith('preview:') && selected?.id === row.id
           }

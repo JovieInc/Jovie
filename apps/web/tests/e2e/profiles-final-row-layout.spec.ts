@@ -194,15 +194,34 @@ test('keeps page identity and review status readable at narrow widths', async ({
     const table = workspace.getByRole('table');
     const firstRow = table.locator('tbody tr').first();
     await expect(firstRow.getByTestId('presence-page-identity')).toBeVisible();
+    await page.screenshot({
+      path: test.info().outputPath(`presence-before-${width}.png`),
+      fullPage: true,
+    });
     const bounds = await table.boundingBox();
     expect(bounds).not.toBeNull();
     expect(bounds!.width).toBeLessThanOrEqual(width);
+    if (width < 640) {
+      await expect(
+        table.getByRole('columnheader', { name: 'Status', exact: true })
+      ).toBeHidden();
+      const identityBounds = await firstRow.locator('td').first().boundingBox();
+      expect(identityBounds!.width).toBeGreaterThan(200);
+    }
     await firstRow.focus();
     await firstRow.press('Enter');
-    await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+    if (width < 640) {
+      await expect(
+        page.getByRole('dialog', { name: 'Presence details' })
+      ).toBeVisible();
+    } else {
+      await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+    }
     await page.screenshot({
       path: test.info().outputPath(`presence-${width}.png`),
       fullPage: true,
     });
+    await page.keyboard.press('Escape');
+    await expect(table).toBeVisible();
   }
 });
