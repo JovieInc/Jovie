@@ -154,6 +154,11 @@ const POLICY_REJECTIONS = [
   },
   { name: 'absent toolchain', patch: { toolchain: {} }, pattern: /toolchain/ },
   {
+    name: 'incompatible node major',
+    patch: { toolchain: { node: 'v22.23.2', pnpm: '9.15.4' } },
+    pattern: /toolchain/,
+  },
+  {
     name: 'incompatible runtime',
     patch: {
       compatibility: { workflow: 'wrong/v999', runtime: 'unrelated/runtime' },
