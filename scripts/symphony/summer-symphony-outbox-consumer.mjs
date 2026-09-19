@@ -1056,6 +1056,50 @@ export function validateState(state, keys, outcomePublicKey = null) {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record'])) {
       throw new Error('consumer-state-invalid');
     }
+  } else if (state.active.phase?.startsWith('execution-')) {
+    const { phase, execution, attempts } = state.active;
+    const hasExecution = ['execution-pending', 'execution-recorded'].includes(
+      phase
+    );
+    if (
+      ![
+        'execution-ready',
+        'execution-started',
+        'execution-pending',
+        'execution-recorded',
+      ].includes(phase) ||
+      !exactKeys(state.active, [
+        'phase',
+        'taskKey',
+        'record',
+        'outcome',
+        ...(hasExecution ? ['execution', 'attempts'] : []),
+      ]) ||
+      (hasExecution &&
+        (!Number.isInteger(attempts) || attempts < 0 || attempts > 3))
+    ) {
+      throw new Error('consumer-execution-state-invalid');
+    }
+    validateTaskRecords(
+      {
+        schema: 'summer.symphony-task-records/v1',
+        taskKey: task.taskKey,
+        issueIdentifier: state.active.outcome?.result?.issueIdentifier,
+        state: hasExecution
+          ? `execution-${execution?.status}`
+          : 'execution-missing',
+        outbox: state.active.record,
+        projection: state.active.outcome,
+        execution: hasExecution ? execution : null,
+      },
+      task,
+      state.active.outcome?.result?.issueIdentifier,
+      {
+        keys,
+        outcomePublicKey,
+        outcomeKeyId: state.active.outcome?.signatureKeyId,
+      }
+    );
   } else if (state.active.phase === 'outcome-pending') {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record', 'outcome'])) {
       throw new Error('consumer-state-invalid');
@@ -1419,6 +1463,62 @@ export async function runCycle({
       acknowledgement: acknowledgement.status,
     };
   }
+  if (state.active.phase?.startsWith('execution-')) {
+    const active = state.active;
+    if (
+      active.phase === 'execution-ready' ||
+      (active.phase === 'execution-pending' && active.attempts < 3)
+    ) {
+      return projectedExecution(task, active.outcome, 'journal-retained');
+    }
+    const retained = await transport.readTaskRecords(
+      task,
+      active.outcome.result.issueIdentifier
+    );
+    validateTaskRecords(retained, task, active.outcome.result.issueIdentifier, {
+      keys,
+      outcomePublicKey,
+      outcomeKeyId,
+    });
+    if (retained.execution === null) {
+      return {
+        status: 'execution-held',
+        taskKey: task.taskKey,
+        reason:
+          active.phase === 'execution-started'
+            ? 'execution-started-outcome-unknown'
+            : 'execution-acknowledgment-retry-exhausted',
+      };
+    }
+    if (
+      active.execution &&
+      canonical(active.execution) !== canonical(retained.execution)
+    ) {
+      throw new Error('consumer-retained-execution-conflict');
+    }
+    // A retained server receipt reconciles a lost response; it never authorizes
+    // another mutation. Leave terminal handling to the same execution wrapper.
+    if (active.phase !== 'execution-recorded') {
+      journal.write({
+        ...state,
+        active: {
+          ...active,
+          phase: 'execution-pending',
+          execution: retained.execution,
+          attempts: 0,
+        },
+      });
+      return projectedExecution(task, active.outcome, 'retained-execution');
+    }
+    if (journal.clear) journal.clear(task.taskKey);
+    else journal.write(emptyState());
+    return {
+      status: 'execution-recorded',
+      taskKey: task.taskKey,
+      issueIdentifier: retained.issueIdentifier,
+      decision: retained.execution.status,
+    };
+  }
   if (
     !projector ||
     !outcomePrivateKey ||
@@ -1456,16 +1556,119 @@ export async function runCycle({
   }
   validateOutcomeV2(state.active.outcome, task, outcomePublicKey);
   const acknowledgement = await transport.writeOutcome(state.active.outcome);
-  if (journal.clear) journal.clear(task.taskKey);
+  if (
+    [
+      'reconcile-native-queue-starvation',
+      'reconcile-release-certification-starvation',
+    ].includes(task.action)
+  ) {
+    journal.write({
+      ...state,
+      active: { ...state.active, phase: 'execution-ready' },
+    });
+  } else if (journal.clear) journal.clear(task.taskKey);
   else journal.write(emptyState());
+  return projectedExecution(task, state.active.outcome, acknowledgement.status);
+}
+
+function projectedExecution(task, outcome, acknowledgement) {
   return {
     status: 'projection-recorded',
     taskKey: task.taskKey,
-    issueIdentifier: state.active.outcome.result.issueIdentifier,
-    acknowledgement: acknowledgement.status,
+    issueIdentifier: outcome.result.issueIdentifier,
+    acknowledgement,
     action: task.action,
     sourceVersion: task.source.sourceVersion,
     snapshotDigest: task.source.snapshotDigest,
+  };
+}
+
+// Used only under the existing drain lock. Reopening this journal after a
+// restart may resend a signed result, but must never repeat started work.
+export function createExecutionDelivery(journal, expected, config) {
+  const read = () => {
+    const state = validateState(
+      journal.read(),
+      config.keys,
+      config.outcomePublicKey
+    );
+    const active = state.active;
+    const task = active?.record?.task;
+    if (
+      !task ||
+      task.taskKey !== expected.taskKey ||
+      task.action !== expected.action ||
+      task.source.sourceVersion !== expected.sourceVersion ||
+      task.source.snapshotDigest !== expected.snapshotDigest ||
+      active.outcome?.result?.issueIdentifier !== expected.issueIdentifier ||
+      active.outcome.signatureKeyId !== config.outcomeKeyId
+    )
+      throw new Error('execution-journal-cross-bound');
+    return state;
+  };
+  return {
+    begin() {
+      const state = read();
+      if (
+        state.active.phase === 'execution-pending' &&
+        state.active.attempts < 3
+      )
+        return state.active.execution;
+      if (state.active.phase !== 'execution-ready')
+        throw new Error('execution-journal-replay-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, phase: 'execution-started' },
+      });
+      return null;
+    },
+    persist(execution) {
+      const state = read();
+      if (state.active.phase !== 'execution-started')
+        throw new Error('execution-journal-not-started');
+      journal.write({
+        ...state,
+        active: {
+          ...state.active,
+          phase: 'execution-pending',
+          execution,
+          attempts: 0,
+        },
+      });
+    },
+    attempt(execution) {
+      const state = read();
+      if (
+        state.active.phase !== 'execution-pending' ||
+        state.active.attempts >= 3 ||
+        canonical(state.active.execution) !== canonical(execution)
+      )
+        throw new Error('execution-journal-delivery-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, attempts: state.active.attempts + 1 },
+      });
+    },
+    accepted(execution, acknowledgement) {
+      if (
+        acknowledgement?.schema !== 'summer.symphony-execution-ack/v1' ||
+        acknowledgement.taskKey !== expected.taskKey ||
+        !['recorded', 'replay'].includes(acknowledgement.status) ||
+        acknowledgement.decision !== execution.status
+      )
+        throw new Error('execution-ack-invalid-or-cross-bound');
+      const state = read();
+      if (
+        state.active.phase !== 'execution-pending' ||
+        state.active.attempts < 1 ||
+        canonical(state.active.execution) !== canonical(execution)
+      )
+        throw new Error('execution-journal-delivery-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, phase: 'execution-recorded' },
+      });
+    },
   };
 }
 
