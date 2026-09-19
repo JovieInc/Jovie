@@ -27,8 +27,8 @@ authorize it through a stale route. Existing isolated execution additionally
 requires an operator-bound task grant, an authenticated qualified route, cost
 eligibility, and the matching class admission. Summer cannot create or renew
 those grants. No provider, spend, enrollment, push or merge permission follows
-from a healthy configuration observation. Preserve #17453, HOLD #17156, and
-leave #17511/#17521 untouched.
+from a healthy configuration observation. HOLD #17156 remains protected.
+Leave #17511/#17521 untouched.
 
 The service runs continuously with its normal restart delay and source-owned
 start-rate limit. Runtime lifetime is independent of finite task authorization.

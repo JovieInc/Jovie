@@ -16,8 +16,9 @@ name: Auto-Ready Agent Drafts
 #    Auto-Enroll / jovie-bot can pick it up. This job never enables auto-merge
 #    and never enrolls the merge queue.
 #
-# Green-source never mutates #17156 HOLD, #17453, or #17929, and it honors
-# Tim-hold / machine hold labels.
+# Green-source never mutates HOLD #17156. Tim-hold / machine hold labels
+# (GREEN_SOURCE_HOLD_LABELS) cover other open holds; merged PR numbers are
+# not numeric exemptions.
 #
 # Manual dispatch without pr_number remains writer-proof recovery. Dispatch
 # with pr_number + head_sha is a targeted green-source undraft. Opt out
