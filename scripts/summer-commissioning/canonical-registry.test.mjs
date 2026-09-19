@@ -137,10 +137,7 @@ test('completed empty heartbeat turns fail the canonical recurrence probe', () =
   );
   assert.equal(heartbeat.probe.version, '1.2.0');
   assert.equal(heartbeat.implementationState, 'in_flight');
-  assert.equal(
-    heartbeat.probe.fixture,
-    'eve-owned-15m-nonempty-receipt/v3'
-  );
+  assert.equal(heartbeat.probe.fixture, 'eve-owned-15m-nonempty-receipt/v3');
   assert.match(
     heartbeat.canonicalPath.join('\n'),
     /summer-liveness-heartbeat/u

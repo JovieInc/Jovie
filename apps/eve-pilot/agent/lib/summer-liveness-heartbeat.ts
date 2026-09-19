@@ -220,10 +220,9 @@ function statusFor(
 async function observeEventDelivery(
   dependencies: SummerLivenessHeartbeatDependencies
 ): Promise<SummerLivenessEventDelivery> {
-  const expected =
-    (await dependencies.observeExpectedDelivery?.()) ?? {
-      expectedDeliveryBy: null,
-    };
+  const expected = (await dependencies.observeExpectedDelivery?.()) ?? {
+    expectedDeliveryBy: null,
+  };
   try {
     const page = await dependencies.store.list(SUMMER_LIVENESS_EVENT_PREFIX, {
       limit: 25,

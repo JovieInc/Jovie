@@ -14,9 +14,9 @@ import {
   SUMMER_LIVENESS_HEARTBEAT_SCHEMA,
   SUMMER_LIVENESS_SILENCE_MS,
   SUPERSEDED_CODEX_EMPTY_TURN,
-  verifySummerLivenessReceipt,
   type SummerLivenessHeartbeatDependencies,
   type SummerLivenessHeartbeatRecord,
+  verifySummerLivenessReceipt,
 } from '../agent/lib/summer-liveness-heartbeat';
 
 vi.mock('eve/schedules', () => ({
@@ -27,7 +27,9 @@ const NOW = new Date('2026-09-19T02:11:00.000Z');
 const KEY = 'synthetic-summer-liveness-receipt-signing-key';
 const KEY_ID = 'eve-liveness-receipts-2026-09';
 
-function memoryStore(records = new Map<string, SummerLivenessHeartbeatRecord>()) {
+function memoryStore(
+  records = new Map<string, SummerLivenessHeartbeatRecord>()
+) {
   const store: SummerBottleneckStore = {
     async create(pathname, record) {
       if (records.has(pathname)) return 'exists';
@@ -94,7 +96,7 @@ describe('Summer liveness heartbeat — Tim LOCK summer-liveness-heartbeat-v1', 
     });
     expect(SUMMER_LIVENESS_HEARTBEAT_CADENCE).toBe('*/15 * * * *');
     expect(SUMMER_LIVENESS_SILENCE_MS).toBe(30 * 60 * 1000);
-    expect(source).toContain("cron: SUMMER_LIVENESS_HEARTBEAT_CADENCE");
+    expect(source).toContain('cron: SUMMER_LIVENESS_HEARTBEAT_CADENCE');
     expect(source).not.toContain('rankSummerBottlenecks');
     expect(source).not.toContain('backlog-orchestrator');
     expect(lib).not.toContain('rankSummerBottlenecks');
@@ -214,9 +216,14 @@ describe('Summer liveness heartbeat — Tim LOCK summer-liveness-heartbeat-v1', 
     expect(() => assertNonEmptyLivenessReceipt({})).toThrow(
       /empty completed liveness turn fails closed/u
     );
-    expect(
-      SUMMER_LIVENESS_EVENT_DRIVEN_RERANK_TRIGGERS
-    ).toEqual(['land', 'ci', 'signal', 'founder', 'gsc', 'intake']);
+    expect(SUMMER_LIVENESS_EVENT_DRIVEN_RERANK_TRIGGERS).toEqual([
+      'land',
+      'ci',
+      'signal',
+      'founder',
+      'gsc',
+      'intake',
+    ]);
   });
 
   it('does not invoke backlog rerank while emitting a scheduled receipt', async () => {

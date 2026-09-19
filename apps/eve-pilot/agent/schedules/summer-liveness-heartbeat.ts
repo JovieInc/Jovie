@@ -2,8 +2,8 @@ import { defineSchedule } from 'eve/schedules';
 import {
   runSummerLivenessHeartbeat,
   SUMMER_LIVENESS_HEARTBEAT_CADENCE,
-  summerLivenessHeartbeatFromEnvironment,
   type SummerLivenessHeartbeatDependencies,
+  summerLivenessHeartbeatFromEnvironment,
 } from '../lib/summer-liveness-heartbeat';
 
 /**
