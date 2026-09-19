@@ -14,6 +14,12 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 
 spec-version: 1.3.0 · registry: `apps/web/data/marketing/index.ts`.
 
+## Founder direction
+
+Before marketing design or copy work, read [Design invariants](./DESIGN_INVARIANTS.md).
+It owns the scoped 2026-09-13 founder decisions, approval distinctions, and
+review requirements; it does not create a second executable invariant registry.
+
 ## The 4-step procedure
 
 ### 1. Receive a Brief
@@ -249,6 +255,11 @@ asset consent. The asset generator cannot review its own output. Automated
 review admits work for human taste; it never substitutes for that decision.
 
 ### Product callout assembly
+
+Select the medium from the communication goal first. The homepage editorial
+section rejects dense screenshot callouts; apply MKT-D05 in the
+[founder register](./DESIGN_INVARIANTS.md#mkt-d05--choose-the-medium-before-the-component).
+The library below applies when product proof is the selected medium.
 
 Use the shared callout library instead of creating one-off marketing chrome:
 
