@@ -30,14 +30,12 @@ describe('lib/ai/sdk gateway routing', () => {
     delete process.env.HELICONE_API_KEY;
 
     const { gateway } = await import('@/lib/ai/sdk');
-    const model = gateway('anthropic/claude-haiku-4-5-20251001');
+    const model = gateway('zai/glm-5.3-flash');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({ apiKey: 'gateway-key' });
-    expect(mockGatewayModel).toHaveBeenCalledWith(
-      'anthropic/claude-haiku-4-5-20251001'
-    );
+    expect(mockGatewayModel).toHaveBeenCalledWith('zai/glm-5.3-flash');
     expect(model).toEqual({
-      __model: 'anthropic/claude-haiku-4-5-20251001',
+      __model: 'zai/glm-5.3-flash',
     });
   });
 
@@ -48,7 +46,7 @@ describe('lib/ai/sdk gateway routing', () => {
     process.env.HELICONE_API_KEY = 'helicone-key';
 
     const { gateway } = await import('@/lib/ai/sdk');
-    gateway('openai/gpt-4o-mini');
+    gateway('zai/glm-5.3');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({
       apiKey: 'gateway-key',
@@ -57,7 +55,7 @@ describe('lib/ai/sdk gateway routing', () => {
         'Helicone-Auth': 'Bearer helicone-key',
       },
     });
-    expect(mockGatewayModel).toHaveBeenCalledWith('openai/gpt-4o-mini');
+    expect(mockGatewayModel).toHaveBeenCalledWith('zai/glm-5.3');
   });
 
   it('omits Helicone auth header when API key is unset', async () => {
@@ -68,12 +66,24 @@ describe('lib/ai/sdk gateway routing', () => {
     delete process.env.AI_GATEWAY_API_KEY;
 
     const { gateway } = await import('@/lib/ai/sdk');
-    gateway('openai/gpt-4o-mini');
+    gateway('zai/glm-5.3');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({
       apiKey: undefined,
       baseURL: 'https://helicone-proxy.example.workers.dev/v1/ai',
       headers: undefined,
     });
+  });
+
+  it('fails closed for non-allowlisted Gateway models before network', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    delete process.env.HELICONE_GATEWAY_BASE_URL;
+
+    const { gateway } = await import('@/lib/ai/sdk');
+    expect(() => gateway('openai/gpt-5.5-pro')).toThrow(
+      'gateway-allowlist:denied-model'
+    );
+    expect(() => gateway('openai/gpt-6-astra')).toThrow('openai/gpt-6-astra');
+    expect(mockGatewayModel).not.toHaveBeenCalled();
   });
 });

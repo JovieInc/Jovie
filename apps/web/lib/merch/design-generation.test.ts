@@ -23,10 +23,10 @@ describe('selectionCountsToWeights', () => {
   it('Laplace-smooths: weight = 1 + picks', () => {
     expect(
       selectionCountsToWeights([
-        { modelKey: 'gpt-image-1.5', count: 4 },
-        { modelKey: 'recraft-v3', count: 1 },
+        { modelKey: 'recraft-v3', count: 4 },
+        { modelKey: 'flux-2-pro', count: 1 },
       ])
-    ).toEqual({ 'gpt-image-1.5': 5, 'recraft-v3': 2 });
+    ).toEqual({ 'recraft-v3': 5, 'flux-2-pro': 2 });
   });
 
   it('skips rows with no recorded model (legacy designs)', () => {
@@ -40,7 +40,7 @@ describe('selectionCountsToWeights', () => {
 
   it('never produces a zero/negative weight that could lock a model out', () => {
     const w = selectionCountsToWeights([
-      { modelKey: 'gpt-image-1.5', count: 0 },
+      { modelKey: 'recraft-v3', count: 0 },
       { modelKey: 'recraft-v3', count: -3 },
     ]);
     for (const v of Object.values(w)) expect(v).toBeGreaterThanOrEqual(1);

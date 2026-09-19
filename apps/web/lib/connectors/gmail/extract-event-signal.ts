@@ -66,7 +66,7 @@ export async function assertDailyBudget(userId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /** claude-sonnet-4-6 via AI Gateway (Gateway format: provider/model) */
-const EXTRACTOR_MODEL = 'anthropic/claude-sonnet-4-20250514';
+const EXTRACTOR_MODEL = 'zai/glm-5.3-flash';
 
 // ---------------------------------------------------------------------------
 // Input / Output schemas

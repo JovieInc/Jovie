@@ -34,12 +34,21 @@ describe('AI Gateway model identifiers', () => {
     expect(identifier).not.toContain(':');
   });
 
-  it('CHAT_MODEL specifies the anthropic provider', () => {
-    expect(CHAT_MODEL.split('/')[0]).toBe('anthropic');
+  it('CHAT_MODEL specifies the zai provider', () => {
+    expect(CHAT_MODEL.split('/')[0]).toBe('zai');
   });
 
-  it('TITLE_MODEL specifies the google provider', () => {
-    expect(TITLE_MODEL.split('/')[0]).toBe('google');
+  it('TITLE_MODEL stays on the Gateway allowlist (zai)', () => {
+    expect(TITLE_MODEL.split('/')[0]).toBe('zai');
+  });
+
+  it('CHAT_MODEL_ROTATION_CHAIN entries are Gateway-allowlisted', async () => {
+    const { isGatewayAllowlistedModel } = await import(
+      '@/lib/ai/gateway-allowlist'
+    );
+    for (const identifier of CHAT_MODEL_ROTATION_CHAIN) {
+      expect(isGatewayAllowlistedModel(identifier)).toBe(true);
+    }
   });
 
   it('every CHAT_MODEL_ROTATION_CHAIN entry uses provider/model format', () => {
