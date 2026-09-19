@@ -314,10 +314,26 @@ describe('Summer bottleneck loop', () => {
       handle: 'symphony',
     });
     expect(
+      ranking.find(item => item.id === 'closure-health-red')
+    ).toMatchObject({
+      inEnvelope: true,
+      owner: 'Summer',
+      handle: 'symphony',
+    });
+    expect(
+      ranking.find(item => item.id === 'runner-capacity-starvation')
+    ).toMatchObject({
+      inEnvelope: true,
+      owner: 'Summer',
+      handle: 'symphony',
+    });
+    expect(
       ranking
         .filter(item => !summerCiImprovementClassIds.some(id => id === item.id))
         .filter(item => item.id !== 'native-queue-starvation')
         .filter(item => item.id !== 'release-certification-starvation')
+        .filter(item => item.id !== 'closure-health-red')
+        .filter(item => item.id !== 'runner-capacity-starvation')
         .every(item => !item.inEnvelope)
     ).toBe(true);
   });
@@ -590,7 +606,7 @@ describe('Summer bottleneck loop', () => {
     expect(second.observeSymphonyOutcome).not.toHaveBeenCalled();
   });
 
-  it('dispatches the first in-envelope bottleneck when an older out-of-envelope row ranks first', async () => {
+  it('dispatches the oldest in-envelope bottleneck when closure-health-red ranks first', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
@@ -610,13 +626,13 @@ describe('Summer bottleneck loop', () => {
 
     expect(receipt).toMatchObject({
       decision: 'symphony-succeeded',
-      selected: { id: 'native-queue-starvation', inEnvelope: true },
+      selected: { id: 'closure-health-red', inEnvelope: true },
       terminal: true,
     });
     expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
     expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
-      action: 'reconcile-native-queue-starvation',
-      selected: { id: 'native-queue-starvation' },
+      action: 'reconcile-closure-health-red',
+      selected: { id: 'closure-health-red' },
     });
   });
 
@@ -644,7 +660,7 @@ describe('Summer bottleneck loop', () => {
     });
   });
 
-  it('holds and escalates when every ranked bottleneck is out of envelope', async () => {
+  it('dispatches closure-health-red instead of holding when it is the only ranked bottleneck', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
@@ -669,15 +685,16 @@ describe('Summer bottleneck loop', () => {
     );
 
     expect(receipt).toMatchObject({
-      decision: 'held-out-of-envelope',
-      selected: { id: 'closure-health-red', inEnvelope: false },
-      escalation: {
-        owner: 'Summer',
-        handle: 'ovie-founder-review',
-      },
+      decision: 'symphony-succeeded',
+      selected: { id: 'closure-health-red', inEnvelope: true },
+      handle: 'symphony',
       terminal: true,
     });
-    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
+    expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
+    expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
+      action: 'reconcile-closure-health-red',
+      selected: { id: 'closure-health-red' },
+    });
   });
 
   it('rejects a duplicate event before a second dispatch or observation', async () => {
@@ -1233,6 +1250,7 @@ describe('Summer bottleneck loop', () => {
         },
       },
       'closure-health-red',
+      'reconcile-closure-health-red',
     ],
     [
       'runner',
@@ -1244,10 +1262,11 @@ describe('Summer bottleneck loop', () => {
         },
       },
       'runner-capacity-starvation',
+      'reconcile-runner-capacity-starvation',
     ],
   ])(
-    'source-binds and holds the selected %s bottleneck',
-    async (_name, change, expectedId) => {
+    'source-binds and dispatches the selected %s bottleneck inside the repair envelope',
+    async (_name, change, expectedId, expectedAction) => {
       const proof = harness();
       const receipt = await ingestSummerBottleneckSnapshot(
         snapshot({
@@ -1262,10 +1281,16 @@ describe('Summer bottleneck loop', () => {
         proof.dependencies
       );
       expect(receipt).toMatchObject({
-        decision: 'held-out-of-envelope',
-        selected: { id: expectedId },
+        decision: 'symphony-succeeded',
+        selected: { id: expectedId, inEnvelope: true, handle: 'symphony' },
       });
-      expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
+      expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: expectedAction,
+          selected: expect.objectContaining({ id: expectedId }),
+        }),
+        { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
+      );
     }
   );
 
