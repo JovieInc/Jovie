@@ -21,6 +21,22 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
+    const receipt = classifyProductLanes([
+      'packages/jev-evaluation/gateway.mjs',
+      'packages/jev-evaluation/package.json',
+      'packages/jev-evaluation/gateway.test.mjs',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(
+        item => item.rule === 'shared-jev-evaluation'
+      )
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/jev-evaluation-other/gateway.mjs'])
+    ).toThrow(ProductLaneClassificationError);
+  });
   it('selects the consuming product and contract lane for agent transport changes', () => {
     const receipt = classifyProductLanes([
       'packages/agent-transport-contracts/index.ts',
