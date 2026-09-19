@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { generateKeyPairSync, sign, verify } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
-
 import {
   AUTONOMOUS_LINEAR_WORKER,
   appendSummerIssueBind,
@@ -22,6 +25,11 @@ import {
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
 } from './native-queue-starvation-execute.mjs';
+import {
+  canonical,
+  createFileJournal,
+  signOutcomeV2,
+} from './summer-symphony-outbox-consumer.mjs';
 
 function pair() {
   const keys = generateKeyPairSync('ed25519');
@@ -380,7 +388,12 @@ describe('executeNativeQueueStarvation', () => {
       },
       writeExecution: async record => {
         writes.push(record);
-        return { status: 'recorded' };
+        return {
+          schema: 'summer.symphony-execution-ack/v1',
+          taskKey: record.taskKey,
+          status: 'recorded',
+          decision: record.status,
+        };
       },
     });
     assert.equal(result.status, 'execution-recorded');
@@ -438,7 +451,12 @@ describe('executeNativeQueueStarvation', () => {
           head: 'd'.repeat(40),
         };
       },
-      writeExecution: async () => ({ status: 'recorded' }),
+      writeExecution: async record => ({
+        schema: 'summer.symphony-execution-ack/v1',
+        taskKey: record.taskKey,
+        status: 'recorded',
+        decision: record.status,
+      }),
     });
     assert.deepEqual(enrolls, [
       {
@@ -452,7 +470,7 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(result.decision.pr, 17917);
     assert.equal(result.decision.mergeQueueEntryId, CAPTURED_17917);
     assert.equal(result.record.status, 'succeeded');
-    assert.equal(result.record.action, NATIVE_QUEUE_ACTION);
+    assert.equal(result.record.action, RELEASE_CERT_ACTION);
     assert.equal(result.record.source.action, RELEASE_CERT_ACTION);
   });
 
@@ -482,7 +500,12 @@ describe('executeNativeQueueStarvation', () => {
         reason: PR_CHURN_EJECT,
         pr: 17917,
       }),
-      writeExecution: async () => ({ status: 'recorded' }),
+      writeExecution: async record => ({
+        schema: 'summer.symphony-execution-ack/v1',
+        taskKey: record.taskKey,
+        status: 'recorded',
+        decision: record.status,
+      }),
     });
     assert.deepEqual(completes, []);
     assert.equal(occupancy.decision.detail, PR_CHURN_EJECT);
@@ -490,42 +513,72 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(occupancy.record.status, 'failed');
   });
 
-  it('still terminals Linear Done when execution write throws after durable enroll', async () => {
-    const completes = [];
-    const result = await executeNativeQueueStarvation({
-      taskKey: TASK_KEY,
-      issueIdentifier: 'JOV-6383',
-      source: SOURCE,
-      admission: {
-        action: RELEASE_CERT_ACTION,
-        greenReadyPrs: [{ number: 17918, head: 'e'.repeat(40) }],
+  it('keeps Linear open when execution delivery is missing, malformed, or cross-bound', async () => {
+    for (const response of [
+      null,
+      {},
+      { status: 'recorded' },
+      {
+        schema: 'summer.symphony-execution-ack/v1',
+        taskKey: 'f'.repeat(64),
+        status: 'recorded',
+        decision: 'succeeded',
       },
-      signatureKeyId: 'symphony-outcome-2026-09',
-      privateKeyPem: host.privateKey,
-      now: () => '2026-09-17T04:43:32.000Z',
-      claimIssue: async () => ({
-        state: 'In Progress',
-        assignee: null,
-      }),
-      completeIssue: async input => {
-        completes.push(input);
-        return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
+      {
+        schema: 'summer.symphony-execution-ack/v1',
+        taskKey: TASK_KEY,
+        status: 'pending',
+        decision: 'succeeded',
       },
-      enrollPr: async () => ({
-        ok: true,
-        durable: true,
-        mergeQueueEntryId: 'MQE_durable',
-        head: 'e'.repeat(40),
-      }),
-      writeExecution: async () => {
-        throw new Error('execution-write-rejected:schema');
+      {
+        schema: 'summer.symphony-execution-ack/v1',
+        taskKey: TASK_KEY,
+        status: 'replay',
+        decision: 'failed',
       },
-    });
-    assert.deepEqual(completes, [{ identifier: 'JOV-6383', state: 'Done' }]);
-    assert.equal(result.terminal.state, 'Done');
-    assert.equal(result.acknowledgement.status, 'execution-write-failed');
-    assert.match(result.acknowledgement.detail, /execution-write-rejected/);
-    assert.equal(result.decision.pr, 17918);
+    ]) {
+      const completes = [];
+      const result = await executeNativeQueueStarvation({
+        taskKey: TASK_KEY,
+        issueIdentifier: 'JOV-6383',
+        source: SOURCE,
+        admission: {
+          action: RELEASE_CERT_ACTION,
+          greenReadyPrs: [{ number: 17918, head: 'e'.repeat(40) }],
+        },
+        signatureKeyId: 'symphony-outcome-2026-09',
+        privateKeyPem: host.privateKey,
+        now: () => '2026-09-17T04:43:32.000Z',
+        claimIssue: async () => ({
+          state: 'In Progress',
+          assignee: null,
+        }),
+        completeIssue: async input => {
+          completes.push(input);
+          return { state: 'Done', assignee: AUTONOMOUS_LINEAR_WORKER };
+        },
+        enrollPr: async () => ({
+          ok: true,
+          durable: true,
+          mergeQueueEntryId: 'MQE_durable',
+          head: 'e'.repeat(40),
+        }),
+        writeExecution: async () => {
+          if (response === null)
+            throw new Error('execution-write-rejected:schema');
+          return response;
+        },
+      });
+      assert.deepEqual(completes, []);
+      assert.equal(result.status, 'execution-unacknowledged');
+      assert.equal(result.terminal.state, 'In Progress');
+      assert.equal(result.acknowledgement.status, 'execution-write-failed');
+      assert.match(
+        result.acknowledgement.detail,
+        /execution-write-rejected|execution-ack-invalid-or-cross-bound/
+      );
+      assert.equal(result.decision.pr, 17918);
+    }
   });
 
   it('signs a fail-closed execution that cannot claim a PR number', () => {
@@ -537,6 +590,7 @@ describe('executeNativeQueueStarvation', () => {
       greenReadyPrs: [],
     });
     const unsigned = unsignedNativeQueueExecution({
+      action: NATIVE_QUEUE_ACTION,
       taskKey: TASK_KEY,
       issueIdentifier: 'JOV-6304',
       source: SOURCE,
@@ -548,6 +602,7 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(unsigned.execution.pr, null);
     const signed = signNativeQueueExecution(
       {
+        action: NATIVE_QUEUE_ACTION,
         taskKey: TASK_KEY,
         issueIdentifier: 'JOV-6304',
         source: SOURCE,
@@ -559,5 +614,421 @@ describe('executeNativeQueueStarvation', () => {
       host.privateKey
     );
     assert.notEqual(signed.signature, unsigned.signature);
+  });
+});
+
+describe('native queue execution command delivery status', () => {
+  const host = pair();
+  function makeJournal(directory) {
+    const company = pair();
+    const task = {
+      schema: 'jovie-symphony-repair-task/v2',
+      taskKey: TASK_KEY,
+      decisionFingerprint: TASK_KEY,
+      createdAt: '2026-09-19T00:00:00Z',
+      owner: 'symphony',
+      route: 'symphony',
+      authority: 'linear-child-projection-only',
+      action: NATIVE_QUEUE_ACTION,
+      safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+      selected: {
+        id: 'native-queue-starvation',
+        sourceRevision: SOURCE.sourceVersion,
+        sourceDigest: 'd'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+      source: SOURCE,
+      linearProjection: {
+        mutation: 'create-child-issue',
+        team: 'JOV',
+        parentIssue: 'JOV-5853',
+        title: `[summer-task:${TASK_KEY}] native-queue-starvation`,
+        description: `[summer-task:${TASK_KEY}]\n\nSelected: native-queue-starvation\nAction: ${NATIVE_QUEUE_ACTION}\nSource: ${SOURCE.sourceVersion}`,
+        initialState: 'Todo',
+        labels: ['symphony'],
+      },
+    };
+    const unsigned = {
+      schema: 'jovie.eve.symphony-repair-outbox/v2',
+      destination: 'symphony',
+      idempotencyKey: TASK_KEY,
+      status: 'ready',
+      task,
+      signatureKeyId: 'company-fixture',
+    };
+    const record = {
+      ...unsigned,
+      signature: `ed25519=${sign(null, Buffer.from(`${unsigned.schema}\0${canonical(unsigned)}`), company.privateKey).toString('base64url')}`,
+    };
+    const outcome = signOutcomeV2(
+      task,
+      { identifier: 'JOV-6383', createdAt: '2026-09-19T00:01:00Z' },
+      host.privateKey,
+      'host-fixture'
+    );
+    const journal = createFileJournal(
+      directory,
+      new Map([['company-fixture', company.publicKey]]),
+      host.publicKey
+    );
+    return { company, journal, record, outcome };
+  }
+  it('returns nonzero on missing acknowledgment and zero for a correlated failed-result acknowledgment', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'summer-execution-ack-'));
+    try {
+      const preload = join(directory, 'transport.mjs');
+      const fleet = join(directory, 'fleet.json');
+      writeFileSync(fleet, JSON.stringify({}));
+      writeFileSync(
+        preload,
+        `
+        import cp from 'node:child_process';
+        import {syncBuiltinESMExports} from 'node:module';
+        cp.spawnSync = (command, args) => {
+          if (process.env.FIXTURE_ACK === 'recorded') throw new Error('replay-must-not-run-command');
+          if (command !== 'gh' || args[0] !== 'pr' || args[1] !== 'list')
+            throw new Error('unexpected-command');
+          return {status:0,stdout:'[]',stderr:''};
+        };
+        syncBuiltinESMExports();
+        globalThis.fetch = async (url, options) => {
+          const body = JSON.parse(options.body);
+          if (url === 'https://api.linear.app/graphql') {
+            if (process.env.FIXTURE_ACK === 'recorded') throw new Error('replay-must-not-claim');
+            if (body.query.includes('issueUpdate')) return Response.json({data:{issueUpdate:{success:true,issue:{identifier:'JOV-6383',state:{name:'In Progress'},assignee:null}}}});
+            return Response.json({data:{issue:{id:'fixture-issue',identifier:'JOV-6383',state:{name:'Todo'}}}});
+          }
+          if (url !== 'https://summer.example/summer/v1/symphony/executions') throw new Error('unexpected-url');
+          if (process.env.FIXTURE_ACK === 'missing') throw new Error('ack-lost');
+          return Response.json({schema:'summer.symphony-execution-ack/v1',taskKey:body.taskKey,status:process.env.FIXTURE_ACK,decision:body.status});
+        };
+      `
+      );
+      const { company, journal, record, outcome } = makeJournal(directory);
+      for (const mode of ['missing', 'recorded', 'replay']) {
+        if (mode !== 'recorded')
+          journal.write({
+            schema: 'jovie.summer-symphony-consumer-state/v1',
+            active: {
+              phase: 'execution-ready',
+              taskKey: TASK_KEY,
+              record,
+              outcome,
+            },
+          });
+        const result = spawnSync(
+          process.execPath,
+          [
+            '--import',
+            preload,
+            new URL('./run-native-queue-execution.mjs', import.meta.url)
+              .pathname,
+            TASK_KEY,
+            'JOV-6383',
+            SOURCE.sourceVersion,
+            SOURCE.snapshotDigest,
+            fleet,
+            NATIVE_QUEUE_ACTION,
+          ],
+          {
+            encoding: 'utf8',
+            timeout: 10000,
+            env: {
+              FIXTURE_ACK: mode,
+              GEM_WORKSPACE: directory,
+              SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON:
+                JSON.stringify({ 'company-fixture': company.publicKey }),
+              SUMMER_LINEAR_GOVERNOR_API_KEY: 'fixture',
+              SUMMER_BOTTLENECK_ORIGIN: 'https://summer.example',
+              SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID: 'host-fixture',
+              SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY:
+                host.privateKey,
+            },
+          }
+        );
+        assert.equal(result.status, mode === 'missing' ? 1 : 0, result.stderr);
+        const output = JSON.parse(result.stdout);
+        assert.equal(
+          output.status,
+          mode === 'missing' ? 'execution-unacknowledged' : 'execution-recorded'
+        );
+        assert.equal(output.decision.status, 'failed');
+        assert.equal(output.terminal.state, 'In Progress');
+        assert.equal(
+          journal.read().active.phase,
+          mode === 'missing' ? 'execution-pending' : 'execution-recorded'
+        );
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+  it('replays a succeeded record across lost acknowledgment and failed Done write without executing twice', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'summer-success-replay-'));
+    try {
+      const { company, journal, record, outcome } = makeJournal(directory);
+      journal.write({
+        schema: 'jovie.summer-symphony-consumer-state/v1',
+        active: {
+          phase: 'execution-ready',
+          taskKey: TASK_KEY,
+          record,
+          outcome,
+        },
+      });
+      const fleet = join(directory, 'fleet.json');
+      writeFileSync(
+        fleet,
+        JSON.stringify({
+          signals: {
+            queue: { greenReady: [{ number: 17918, head: 'e'.repeat(40) }] },
+          },
+        })
+      );
+      const preload = join(directory, 'success-transport.mjs');
+      const trace = join(directory, 'trace.jsonl');
+      writeFileSync(
+        preload,
+        `
+        import cp from 'node:child_process';
+        import {appendFileSync} from 'node:fs';
+        import {syncBuiltinESMExports} from 'node:module';
+        const mode=process.env.FIXTURE_MODE;
+        const trace=(event)=>appendFileSync(process.env.FIXTURE_TRACE, JSON.stringify({mode,event})+'\\n');
+        cp.spawnSync=(command,args)=>{
+          if(mode!=='lost' || command!=='gh') throw new Error('duplicate-execution');
+          trace('gh:'+args.slice(0,2).join(':'));
+          let value;
+          if(args[0]==='pr' && args[1]==='list') value=[];
+          else if(args[0]==='pr' && args[1]==='view') value={number:17918,state:'OPEN',isDraft:false,baseRefName:'main',headRefOid:'e'.repeat(40),mergeStateStatus:'CLEAN',body:'JOV-6383\\nmergeQueueEntryId:MQE_fixture'};
+          else if(args[0]==='api') value={data:{repository:{pullRequest:{mergedAt:null,mergeQueueEntry:{id:'MQE_fixture'},timelineItems:{nodes:[{__typename:'AddedToMergeQueueEvent'}]}}}}};
+          else if(args[0]==='pr' && args[1]==='comment') value={};
+          else throw new Error('unexpected-command');
+          return {status:0,stdout:JSON.stringify(value),stderr:''};
+        };
+        syncBuiltinESMExports();
+        globalThis.fetch=async(url,options)=>{
+          const body=JSON.parse(options.body);
+          if(url==='https://api.linear.app/graphql') {
+            if(body.query.includes('issueUpdate')) {
+              const done=body.variables.stateId==='a95b08f1-61f8-438f-ba39-ebd8f8ae6471';
+              if(!done && mode!=='lost') throw new Error('duplicate-claim');
+              trace(done?'Done':'claim');
+              if(done && mode==='completion-failed') return Response.json({errors:[{message:'write-failed'}]});
+              return Response.json({data:{issueUpdate:{success:true,issue:{identifier:'JOV-6383',state:{name:done?'Done':'In Progress'},assignee:null}}}});
+            }
+            return Response.json({data:{issue:{id:'fixture-issue',identifier:'JOV-6383',state:{name:'In Progress'}}}});
+          }
+          if(url!=='https://summer.example/summer/v1/symphony/executions') throw new Error('unexpected-url');
+          trace('execution-post');
+          if(mode==='lost') throw new Error('lost-ack');
+          trace('acknowledged');
+          return Response.json({schema:'summer.symphony-execution-ack/v1',taskKey:body.taskKey,status:'replay',decision:body.status});
+        };
+      `
+      );
+      let original;
+      for (const mode of ['lost', 'completion-failed', 'accepted']) {
+        const result = spawnSync(
+          process.execPath,
+          [
+            '--import',
+            preload,
+            new URL('./run-native-queue-execution.mjs', import.meta.url)
+              .pathname,
+            TASK_KEY,
+            'JOV-6383',
+            SOURCE.sourceVersion,
+            SOURCE.snapshotDigest,
+            fleet,
+            NATIVE_QUEUE_ACTION,
+          ],
+          {
+            encoding: 'utf8',
+            timeout: 10000,
+            env: {
+              GEM_WORKSPACE: directory,
+              FIXTURE_MODE: mode,
+              FIXTURE_TRACE: trace,
+              SUMMER_LINEAR_GOVERNOR_API_KEY: 'fixture',
+              SUMMER_BOTTLENECK_ORIGIN: 'https://summer.example',
+              SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID: 'host-fixture',
+              SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY:
+                host.privateKey,
+              SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON:
+                JSON.stringify({ 'company-fixture': company.publicKey }),
+            },
+          }
+        );
+        assert.equal(result.status, mode === 'accepted' ? 0 : 1, result.stderr);
+        const active = journal.read().active;
+        if (mode === 'lost') {
+          original = JSON.stringify(active.execution);
+          assert.equal(active.execution.status, 'succeeded');
+          assert.equal(JSON.parse(result.stdout).terminal.state, 'In Progress');
+        }
+        assert.equal(JSON.stringify(active.execution), original);
+        assert.equal(
+          active.phase,
+          mode === 'accepted' ? 'execution-recorded' : 'execution-pending'
+        );
+        if (mode === 'completion-failed')
+          assert.match(result.stderr, /write-failed/);
+        if (mode === 'accepted')
+          assert.equal(JSON.parse(result.stdout).terminal.state, 'Done');
+      }
+      const events = readFileSync(trace, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      assert.equal(events.filter(row => row.event === 'claim').length, 1);
+      assert.equal(events.filter(row => row.event === 'gh:pr:view').length, 1);
+      assert.equal(
+        events.filter(row => row.event === 'execution-post').length,
+        3
+      );
+      for (const mode of ['lost', 'completion-failed', 'accepted']) {
+        const row = events
+          .filter(event => event.mode === mode)
+          .map(event => event.event);
+        if (mode === 'lost') assert.equal(row.includes('Done'), false);
+        else {
+          assert.ok(row.indexOf('acknowledged') < row.indexOf('Done'));
+          assert.ok(!row.some(event => event.startsWith('gh:')));
+        }
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('execution action protocol', () => {
+  it('signs exactly matching native and release actions under the existing domain', () => {
+    const host = pair();
+    for (const action of [NATIVE_QUEUE_ACTION, RELEASE_CERT_ACTION]) {
+      const record = signNativeQueueExecution(
+        {
+          action,
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          source: SOURCE,
+          decision: decideNativeQueueExecution({ action, greenReadyPrs: [] }),
+          completedAt: '2026-09-19T14:00:00Z',
+          claim: { state: 'In Progress', assignee: 'unassigned-machine' },
+          signatureKeyId: 'host',
+        },
+        host.privateKey
+      );
+      assert.equal(record.action, action);
+      assert.equal(record.source.action, action);
+      assert.equal(record.schema, 'jovie.symphony-native-queue-execution/v1');
+      const { signature, ...unsigned } = record;
+      assert.ok(
+        verify(
+          null,
+          Buffer.from(`${record.schema}\0${canonical(unsigned)}`),
+          host.publicKey,
+          Buffer.from(signature.slice(8), 'base64url')
+        )
+      );
+    }
+  });
+  it('rejects missing and unsupported action before claiming or executing any work', async () => {
+    for (const action of [undefined, null, '', 'arbitrary']) {
+      assert.throws(
+        () => unsignedNativeQueueExecution({ action }),
+        /native-queue-action-required/
+      );
+      let claims = 0;
+      await assert.rejects(
+        executeNativeQueueStarvation({
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          source: SOURCE,
+          signatureKeyId: 'host',
+          privateKeyPem: pair().privateKey,
+          completeIssue: async () => {
+            throw new Error('unexpected-completion');
+          },
+          enrollPr: async () => {
+            throw new Error('unexpected-execution');
+          },
+          writeExecution: async () => {
+            throw new Error('unexpected-write');
+          },
+          admission: { action, greenReadyPrs: [] },
+          claimIssue: async () => {
+            claims++;
+          },
+        }),
+        /native-queue-action-required/
+      );
+      assert.equal(claims, 0);
+    }
+  });
+});
+
+describe('retained execution delivery binding', () => {
+  it('rejects cross-bound replay before posting or repeating any mutation', async () => {
+    const host = pair();
+    const record = signNativeQueueExecution(
+      {
+        action: NATIVE_QUEUE_ACTION,
+        taskKey: TASK_KEY,
+        issueIdentifier: 'JOV-6418',
+        source: SOURCE,
+        decision: decideNativeQueueExecution({
+          action: NATIVE_QUEUE_ACTION,
+          greenReadyPrs: [],
+        }),
+        completedAt: '2026-09-19T14:00:00Z',
+        claim: { state: 'In Progress', assignee: null },
+        signatureKeyId: 'host',
+      },
+      host.privateKey
+    );
+    for (const change of [
+      { delivery: null },
+      { taskKey: 'f'.repeat(64) },
+      { issueIdentifier: 'JOV-6417' },
+      { admission: { action: RELEASE_CERT_ACTION } },
+      { source: { ...SOURCE, snapshotDigest: 'f'.repeat(64) } },
+      { source: { ...SOURCE, sourceVersion: 'f'.repeat(40) } },
+      {
+        retainedRecord: {
+          ...record,
+          source: { ...record.source, action: RELEASE_CERT_ACTION },
+        },
+      },
+    ]) {
+      await assert.rejects(
+        executeNativeQueueStarvation({
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          admission: { action: NATIVE_QUEUE_ACTION },
+          source: SOURCE,
+          signatureKeyId: 'host',
+          privateKeyPem: host.privateKey,
+          delivery: {},
+          retainedRecord: record,
+          claimIssue: async () => {
+            throw new Error('unexpected claim');
+          },
+          completeIssue: async () => {
+            throw new Error('unexpected completion');
+          },
+          enrollPr: async () => {
+            throw new Error('unexpected mutation');
+          },
+          writeExecution: async () => {
+            throw new Error('unexpected write');
+          },
+          ...change,
+        }),
+        /execution-replay-cross-bound/
+      );
+    }
   });
 });

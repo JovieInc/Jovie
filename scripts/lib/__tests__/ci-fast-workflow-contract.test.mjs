@@ -920,6 +920,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
   });
 
+  it('runs native queue delivery regressions with coverage for executor changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain(
+      '(run-native-queue-execution|native-queue-starvation-execute(?:\\.test)?)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs'
+    );
+  });
+
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

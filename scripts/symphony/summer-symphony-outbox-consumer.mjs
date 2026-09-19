@@ -41,6 +41,7 @@ export const DISCOVERY_CURSOR_SCHEMA =
   'jovie.summer-symphony-discovery-cursor/v1';
 export const OUTBOX_PATH = '/summer/v1/symphony/outbox';
 export const OUTCOME_PATH = '/summer/v1/symphony/outcomes';
+export const TASK_RECORDS_PATH = '/summer/v1/symphony/task-records';
 export const EXECUTION_HOLD =
   'v1-missing-explicit-execution-target-and-decision-fingerprint';
 const TASK_ACCEPTANCE_SCHEMA = 'symphony-existing-repair-task-acceptance/v1';
@@ -90,6 +91,8 @@ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u;
 const SIGNATURE = /^ed25519=[A-Za-z0-9_-]{86}$/u;
 const MAX_PAGES = 4;
 const PAGE_LIMIT = 25;
+export const MAX_OPEN_SUMMER_CHILDREN = 3;
+export const OPEN_CHILD_BUDGET = 'linear-projection-open-child-budget-exceeded';
 const RESPONSE_BYTE_LIMIT = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -1053,6 +1056,50 @@ export function validateState(state, keys, outcomePublicKey = null) {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record'])) {
       throw new Error('consumer-state-invalid');
     }
+  } else if (state.active.phase?.startsWith('execution-')) {
+    const { phase, execution, attempts } = state.active;
+    const hasExecution = ['execution-pending', 'execution-recorded'].includes(
+      phase
+    );
+    if (
+      ![
+        'execution-ready',
+        'execution-started',
+        'execution-pending',
+        'execution-recorded',
+      ].includes(phase) ||
+      !exactKeys(state.active, [
+        'phase',
+        'taskKey',
+        'record',
+        'outcome',
+        ...(hasExecution ? ['execution', 'attempts'] : []),
+      ]) ||
+      (hasExecution &&
+        (!Number.isInteger(attempts) || attempts < 0 || attempts > 3))
+    ) {
+      throw new Error('consumer-execution-state-invalid');
+    }
+    validateTaskRecords(
+      {
+        schema: 'summer.symphony-task-records/v1',
+        taskKey: task.taskKey,
+        issueIdentifier: state.active.outcome?.result?.issueIdentifier,
+        state: hasExecution
+          ? `execution-${execution?.status}`
+          : 'execution-missing',
+        outbox: state.active.record,
+        projection: state.active.outcome,
+        execution: hasExecution ? execution : null,
+      },
+      task,
+      state.active.outcome?.result?.issueIdentifier,
+      {
+        keys,
+        outcomePublicKey,
+        outcomeKeyId: state.active.outcome?.signatureKeyId,
+      }
+    );
   } else if (state.active.phase === 'outcome-pending') {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record', 'outcome'])) {
       throw new Error('consumer-state-invalid');
@@ -1416,6 +1463,62 @@ export async function runCycle({
       acknowledgement: acknowledgement.status,
     };
   }
+  if (state.active.phase?.startsWith('execution-')) {
+    const active = state.active;
+    if (
+      active.phase === 'execution-ready' ||
+      (active.phase === 'execution-pending' && active.attempts < 3)
+    ) {
+      return projectedExecution(task, active.outcome, 'journal-retained');
+    }
+    const retained = await transport.readTaskRecords(
+      task,
+      active.outcome.result.issueIdentifier
+    );
+    validateTaskRecords(retained, task, active.outcome.result.issueIdentifier, {
+      keys,
+      outcomePublicKey,
+      outcomeKeyId,
+    });
+    if (retained.execution === null) {
+      return {
+        status: 'execution-held',
+        taskKey: task.taskKey,
+        reason:
+          active.phase === 'execution-started'
+            ? 'execution-started-outcome-unknown'
+            : 'execution-acknowledgment-retry-exhausted',
+      };
+    }
+    if (
+      active.execution &&
+      canonical(active.execution) !== canonical(retained.execution)
+    ) {
+      throw new Error('consumer-retained-execution-conflict');
+    }
+    // A retained server receipt reconciles a lost response; it never authorizes
+    // another mutation. Leave terminal handling to the same execution wrapper.
+    if (active.phase !== 'execution-recorded') {
+      journal.write({
+        ...state,
+        active: {
+          ...active,
+          phase: 'execution-pending',
+          execution: retained.execution,
+          attempts: 0,
+        },
+      });
+      return projectedExecution(task, active.outcome, 'retained-execution');
+    }
+    if (journal.clear) journal.clear(task.taskKey);
+    else journal.write(emptyState());
+    return {
+      status: 'execution-recorded',
+      taskKey: task.taskKey,
+      issueIdentifier: retained.issueIdentifier,
+      decision: retained.execution.status,
+    };
+  }
   if (
     !projector ||
     !outcomePrivateKey ||
@@ -1425,7 +1528,19 @@ export async function runCycle({
     throw new Error('v2-execution-configuration-missing');
   }
   if (state.active.phase === 'discovered') {
-    const issue = await projector.project(task);
+    let issue;
+    try {
+      issue = await projector.project(task);
+    } catch (error) {
+      if (error?.message === OPEN_CHILD_BUDGET) {
+        return {
+          status: 'projection-held',
+          taskKey: task.taskKey,
+          reason: OPEN_CHILD_BUDGET,
+        };
+      }
+      throw error;
+    }
     const outcome = signOutcomeV2(task, issue, outcomePrivateKey, outcomeKeyId);
     validateOutcomeV2(outcome, task, outcomePublicKey);
     state = {
@@ -1441,16 +1556,119 @@ export async function runCycle({
   }
   validateOutcomeV2(state.active.outcome, task, outcomePublicKey);
   const acknowledgement = await transport.writeOutcome(state.active.outcome);
-  if (journal.clear) journal.clear(task.taskKey);
+  if (
+    [
+      'reconcile-native-queue-starvation',
+      'reconcile-release-certification-starvation',
+    ].includes(task.action)
+  ) {
+    journal.write({
+      ...state,
+      active: { ...state.active, phase: 'execution-ready' },
+    });
+  } else if (journal.clear) journal.clear(task.taskKey);
   else journal.write(emptyState());
+  return projectedExecution(task, state.active.outcome, acknowledgement.status);
+}
+
+function projectedExecution(task, outcome, acknowledgement) {
   return {
     status: 'projection-recorded',
     taskKey: task.taskKey,
-    issueIdentifier: state.active.outcome.result.issueIdentifier,
-    acknowledgement: acknowledgement.status,
+    issueIdentifier: outcome.result.issueIdentifier,
+    acknowledgement,
     action: task.action,
     sourceVersion: task.source.sourceVersion,
     snapshotDigest: task.source.snapshotDigest,
+  };
+}
+
+// Used only under the existing drain lock. Reopening this journal after a
+// restart may resend a signed result, but must never repeat started work.
+export function createExecutionDelivery(journal, expected, config) {
+  const read = () => {
+    const state = validateState(
+      journal.read(),
+      config.keys,
+      config.outcomePublicKey
+    );
+    const active = state.active;
+    const task = active?.record?.task;
+    if (
+      !task ||
+      task.taskKey !== expected.taskKey ||
+      task.action !== expected.action ||
+      task.source.sourceVersion !== expected.sourceVersion ||
+      task.source.snapshotDigest !== expected.snapshotDigest ||
+      active.outcome?.result?.issueIdentifier !== expected.issueIdentifier ||
+      active.outcome.signatureKeyId !== config.outcomeKeyId
+    )
+      throw new Error('execution-journal-cross-bound');
+    return state;
+  };
+  return {
+    begin() {
+      const state = read();
+      if (
+        state.active.phase === 'execution-pending' &&
+        state.active.attempts < 3
+      )
+        return state.active.execution;
+      if (state.active.phase !== 'execution-ready')
+        throw new Error('execution-journal-replay-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, phase: 'execution-started' },
+      });
+      return null;
+    },
+    persist(execution) {
+      const state = read();
+      if (state.active.phase !== 'execution-started')
+        throw new Error('execution-journal-not-started');
+      journal.write({
+        ...state,
+        active: {
+          ...state.active,
+          phase: 'execution-pending',
+          execution,
+          attempts: 0,
+        },
+      });
+    },
+    attempt(execution) {
+      const state = read();
+      if (
+        state.active.phase !== 'execution-pending' ||
+        state.active.attempts >= 3 ||
+        canonical(state.active.execution) !== canonical(execution)
+      )
+        throw new Error('execution-journal-delivery-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, attempts: state.active.attempts + 1 },
+      });
+    },
+    accepted(execution, acknowledgement) {
+      if (
+        acknowledgement?.schema !== 'summer.symphony-execution-ack/v1' ||
+        acknowledgement.taskKey !== expected.taskKey ||
+        !['recorded', 'replay'].includes(acknowledgement.status) ||
+        acknowledgement.decision !== execution.status
+      )
+        throw new Error('execution-ack-invalid-or-cross-bound');
+      const state = read();
+      if (
+        state.active.phase !== 'execution-pending' ||
+        state.active.attempts < 1 ||
+        canonical(state.active.execution) !== canonical(execution)
+      )
+        throw new Error('execution-journal-delivery-not-authorized');
+      journal.write({
+        ...state,
+        active: { ...state.active, phase: 'execution-recorded' },
+      });
+    },
   };
 }
 
@@ -1543,6 +1761,76 @@ function validateProjectedIssue(issue, projection) {
   return issue;
 }
 
+export function countOpenSummerChildren(nodes) {
+  if (
+    !Array.isArray(nodes) ||
+    nodes.some(
+      node =>
+        typeof node?.identifier !== 'string' ||
+        typeof node?.title !== 'string' ||
+        typeof node?.state?.name !== 'string'
+    )
+  )
+    throw new Error('linear-projection-child-evidence-invalid');
+  return nodes.filter(
+    node =>
+      node.title.startsWith('[summer-task:') &&
+      !['Done', 'Canceled'].includes(node.state.name)
+  ).length;
+}
+
+async function requireChildCapacity(config, parent, fetchImpl) {
+  let connection = parent.children;
+  let openCount = 0;
+  const cursors = new Set();
+  const identifiers = new Set();
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    openCount += countOpenSummerChildren(connection?.nodes);
+    for (const node of connection.nodes) {
+      if (identifiers.has(node.identifier))
+        throw new Error('linear-projection-child-evidence-invalid');
+      identifiers.add(node.identifier);
+    }
+    if (openCount >= MAX_OPEN_SUMMER_CHILDREN)
+      throw new Error(OPEN_CHILD_BUDGET);
+    if (typeof connection.pageInfo?.hasNextPage !== 'boolean') {
+      throw new Error('linear-projection-child-evidence-invalid');
+    }
+    if (!connection.pageInfo.hasNextPage) return;
+    const cursor = connection.pageInfo.endCursor;
+    if (
+      typeof cursor !== 'string' ||
+      !cursor ||
+      cursors.has(cursor) ||
+      page + 1 === MAX_PAGES
+    ) {
+      throw new Error('linear-projection-child-evidence-incomplete');
+    }
+    cursors.add(cursor);
+    const next = await linearGraphql(
+      config,
+      `query SummerChildren($parentIssue: String!, $after: String!) {
+        parent: issue(id: $parentIssue) {
+          id identifier
+          children(first: 50, after: $after, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+            nodes { identifier title state { name } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { parentIssue: parent.identifier, after: cursor },
+      fetchImpl
+    );
+    if (
+      next.parent?.id !== parent.id ||
+      next.parent?.identifier !== parent.identifier
+    ) {
+      throw new Error('linear-projection-child-evidence-invalid');
+    }
+    connection = next.parent.children;
+  }
+}
+
 export function createLinearProjector(config, fetchImpl = fetch) {
   return {
     async project(task) {
@@ -1562,7 +1850,13 @@ export function createLinearProjector(config, fetchImpl = fetch) {
               labels(filter: { name: { eq: "symphony" } }, first: 2) { nodes { id name } }
             }
           }
-          parent: issue(id: $parentIssue) { id identifier }
+          parent: issue(id: $parentIssue) {
+            id identifier
+            children(first: 50, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+              nodes { identifier title state { name } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
           issues(filter: { team: { key: { eq: $teamKey } }, title: { eq: $title } }, first: 10) {
             nodes {
               id identifier title description createdAt
@@ -1603,6 +1897,7 @@ export function createLinearProjector(config, fetchImpl = fetch) {
       if (existing.length === 1) {
         return validateProjectedIssue(existing[0], projection);
       }
+      await requireChildCapacity(config, prepared.parent, fetchImpl);
       const created = await linearGraphql(
         config,
         `mutation SummerProjectionCreate($input: IssueCreateInput!) {
@@ -1637,6 +1932,141 @@ export function createLinearProjector(config, fetchImpl = fetch) {
   };
 }
 
+function assertTaskRecordScope(task, issueIdentifier) {
+  validateTask(task);
+  if (
+    task.schema !== 'jovie-symphony-repair-task/v2' ||
+    ![
+      'reconcile-native-queue-starvation',
+      'reconcile-release-certification-starvation',
+    ].includes(task.action) ||
+    task.linearProjection.parentIssue !== 'JOV-5853' ||
+    !/^JOV-[1-9][0-9]*$/u.test(issueIdentifier ?? '') ||
+    issueIdentifier === 'JOV-5853'
+  ) {
+    throw new Error('task-record-read-scope-invalid');
+  }
+}
+
+export function validateTaskRecords(value, task, issueIdentifier, config) {
+  assertTaskRecordScope(task, issueIdentifier);
+  if (
+    !exactKeys(value, [
+      'schema',
+      'taskKey',
+      'issueIdentifier',
+      'state',
+      'outbox',
+      'projection',
+      'execution',
+    ]) ||
+    value.schema !== 'summer.symphony-task-records/v1' ||
+    value.taskKey !== task.taskKey ||
+    value.issueIdentifier !== issueIdentifier ||
+    canonical(verifyOutboxRecord(value.outbox, config.keys)) !== canonical(task)
+  ) {
+    throw new Error('task-record-read-cross-bound');
+  }
+  validateOutcomeV2(value.projection, task, config.outcomePublicKey);
+  if (
+    value.projection.signatureKeyId !== config.outcomeKeyId ||
+    value.projection.result.issueIdentifier !== issueIdentifier ||
+    Date.parse(value.projection.completedAt) < Date.parse(task.createdAt)
+  ) {
+    throw new Error('task-record-read-other-host-or-issue');
+  }
+  if (value.execution === null) {
+    if (value.state !== 'execution-missing')
+      throw new Error('task-record-read-state-invalid');
+    return value;
+  }
+  const execution = value.execution;
+  if (
+    !exactKeys(execution, [
+      'schema',
+      'taskKey',
+      'issueIdentifier',
+      'action',
+      'status',
+      'detail',
+      'completedAt',
+      'claim',
+      'execution',
+      'source',
+      'signatureKeyId',
+      'signature',
+    ]) ||
+    execution.schema !== 'jovie.symphony-native-queue-execution/v1' ||
+    execution.action !== task.action ||
+    execution.taskKey !== task.taskKey ||
+    execution.issueIdentifier !== issueIdentifier ||
+    !['succeeded', 'failed'].includes(execution.status) ||
+    value.state !== `execution-${execution.status}` ||
+    typeof execution.detail !== 'string' ||
+    !execution.detail ||
+    execution.detail.length > 240 ||
+    !validTimestamp(execution.completedAt) ||
+    Date.parse(execution.completedAt) < Date.parse(task.createdAt) ||
+    Date.parse(execution.completedAt) <
+      Date.parse(value.projection.completedAt) ||
+    !exactKeys(execution.source, [
+      'action',
+      'sourceVersion',
+      'snapshotDigest',
+    ]) ||
+    execution.source.action !== task.action ||
+    execution.source.sourceVersion !== task.source.sourceVersion ||
+    execution.source.snapshotDigest !== task.source.snapshotDigest ||
+    !exactKeys(execution.claim, ['state', 'assignee']) ||
+    !['Todo', 'In Progress', 'Done'].includes(execution.claim.state) ||
+    !(
+      execution.claim.assignee === null ||
+      (typeof execution.claim.assignee === 'string' &&
+        execution.claim.assignee.length > 0 &&
+        execution.claim.assignee.length <= 120)
+    ) ||
+    !exactKeys(execution.execution, [
+      'mutationAttempted',
+      'authority',
+      'pr',
+      'head',
+    ]) ||
+    typeof execution.execution.mutationAttempted !== 'boolean' ||
+    ![
+      'native-queue-mutation-authority-unavailable',
+      'exact-source-ci-native-queue-production-gates-remain-required',
+    ].includes(execution.execution.authority) ||
+    !(
+      execution.execution.pr === null ||
+      (Number.isInteger(execution.execution.pr) && execution.execution.pr > 0)
+    ) ||
+    !(
+      execution.execution.head === null || SHA.test(execution.execution.head)
+    ) ||
+    (execution.status === 'succeeded' && execution.execution.pr === null) ||
+    (execution.status === 'failed' &&
+      execution.execution.authority ===
+        'native-queue-mutation-authority-unavailable' &&
+      execution.execution.pr !== null) ||
+    execution.signatureKeyId !== config.outcomeKeyId ||
+    !SIGNATURE.test(execution.signature ?? '')
+  ) {
+    throw new Error('task-record-execution-invalid-or-cross-bound');
+  }
+  const { signature, ...unsigned } = execution;
+  if (
+    !nodeVerify(
+      null,
+      Buffer.from(`${execution.schema}\0${canonical(unsigned)}`),
+      config.outcomePublicKey,
+      Buffer.from(signature.slice('ed25519='.length), 'base64url')
+    )
+  ) {
+    throw new Error('task-record-execution-signature-invalid');
+  }
+  return value;
+}
+
 export function createHttpTransport(config, fetchImpl = fetch) {
   const protectionHeaders = config.vercelAutomationBypassSecret
     ? {
@@ -1662,6 +2092,31 @@ export function createHttpTransport(config, fetchImpl = fetch) {
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
       );
+    },
+    async readTaskRecords(task, issueIdentifier) {
+      assertTaskRecordScope(task, issueIdentifier);
+      const query = new URLSearchParams({
+        taskKey: task.taskKey,
+        issueIdentifier,
+        sourceVersion: task.source.sourceVersion,
+        snapshotDigest: task.source.snapshotDigest,
+      });
+      const target = `${TASK_RECORDS_PATH}?${query}`;
+      const headers = signedReadHeaders(
+        target,
+        Date.now(),
+        config.outcomePrivateKey,
+        config.outcomeKeyId,
+        randomBytes(18).toString('base64url')
+      );
+      const value = await responseJson(
+        await fetchImpl(`${config.summerOrigin}${target}`, {
+          headers: { ...headers, ...protectionHeaders },
+          redirect: 'error',
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      );
+      return validateTaskRecords(value, task, issueIdentifier, config);
     },
     async writeOutcome(outcome) {
       const acknowledgement = await responseJson(

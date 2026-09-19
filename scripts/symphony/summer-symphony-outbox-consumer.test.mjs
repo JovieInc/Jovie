@@ -18,6 +18,8 @@ import { afterEach, describe, it } from 'node:test';
 import {
   canonical,
   configFromEnvironment,
+  countOpenSummerChildren,
+  createExecutionDelivery,
   createFileJournal,
   createHttpTransport,
   createLinearProjector,
@@ -25,6 +27,8 @@ import {
   DISCOVERY_CURSOR_SCHEMA,
   discoverOne,
   EXECUTION_HOLD,
+  MAX_OPEN_SUMMER_CHILDREN,
+  OPEN_CHILD_BUDGET,
   OUTBOX_DOMAIN,
   OUTBOX_DOMAIN_V2,
   OUTBOX_DOMAIN_V3,
@@ -42,6 +46,7 @@ import {
   validateOutcomeV3,
   validateState,
   validateTask,
+  validateTaskRecords,
   verifyOutboxRecord,
 } from './summer-symphony-outbox-consumer.mjs';
 
@@ -629,6 +634,53 @@ describe('bounded discovery and durable WIP=1 hold', () => {
     assert.equal(state.active, null);
   });
 
+  it('holds projection without acknowledging when the open-child budget is exceeded', async () => {
+    const v2Task = taskV2();
+    const record = signedOutbox(v2Task);
+    let state = {
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: null,
+    };
+    const journal = {
+      read: () => state,
+      write: next => {
+        state = structuredClone(next);
+      },
+    };
+    let posted = 0;
+    const result = await runCycle({
+      journal,
+      keys,
+      transport: {
+        readPage: async () => page([record]),
+        writeOutcome: async () => {
+          posted += 1;
+          return {
+            schema: 'summer.symphony-outcome-ack/v1',
+            taskKey,
+            status: 'recorded',
+          };
+        },
+      },
+      projector: {
+        project: async () => {
+          throw new Error(OPEN_CHILD_BUDGET);
+        },
+      },
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+    });
+    assert.deepEqual(result, {
+      status: 'projection-held',
+      taskKey: v2Task.taskKey,
+      reason: OPEN_CHILD_BUDGET,
+    });
+    assert.equal(posted, 0);
+    assert.equal(state.active.phase, 'discovered');
+    assert.equal(state.active.taskKey, v2Task.taskKey);
+  });
+
   it('replays byte-identical pending outcomes without a second Linear projection', async () => {
     const v2Task = taskV2();
     const record = signedOutbox(v2Task);
@@ -1095,7 +1147,14 @@ describe('configuration boundaries', () => {
             },
           ],
         },
-        parent: { id: 'parent-id', identifier: 'JOV-5853' },
+        parent: {
+          id: 'parent-id',
+          identifier: 'JOV-5853',
+          children: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
         issues: { nodes: existing },
       },
     });
@@ -1107,18 +1166,44 @@ describe('configuration boundaries', () => {
       },
       async (url, options) => {
         calls.push({ url, options });
-        if (calls.length === 1) return Response.json(prepared([]));
+        if (calls.length === 1) {
+          const first = prepared([]);
+          first.data.parent.children = {
+            nodes: [
+              {
+                identifier: 'JOV-1',
+                title: '[summer-task:a] repair',
+                state: { name: 'Todo' },
+              },
+            ],
+            pageInfo: { hasNextPage: true, endCursor: 'next' },
+          };
+          return Response.json(first);
+        }
+        if (calls.length === 2) {
+          const request = JSON.parse(String(options.body));
+          assert.equal(request.variables.after, 'next');
+          assert.equal(request.variables.parentIssue, 'JOV-5853');
+          assert.doesNotMatch(request.query, /mutation/);
+          return Response.json({ data: { parent: prepared([]).data.parent } });
+        }
         return Response.json({
           data: { issueCreate: { success: true, issue } },
         });
       }
     );
     assert.deepEqual(await projector.project(v2Task), issue);
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
+    for (const call of calls.slice(0, 2)) {
+      assert.match(
+        JSON.parse(String(call.options.body)).query,
+        /children\(first: 50.*filter: \{ state: \{ type: \{ nin: \["completed", "canceled"\]/
+      );
+    }
     assert.equal(calls[0].url, 'https://api.linear.app/graphql');
     assert.equal(calls[0].options.redirect, 'error');
     assert.equal(calls[0].options.headers.authorization, 'scoped-test-key');
-    const mutation = JSON.parse(calls[1].options.body);
+    const mutation = JSON.parse(calls[2].options.body);
     assert.deepEqual(mutation.variables.input, {
       teamId: 'team-id',
       parentId: 'parent-id',
@@ -1136,11 +1221,205 @@ describe('configuration boundaries', () => {
       },
       async () => {
         replayCalls += 1;
-        return Response.json(prepared([issue]));
+        const replay = prepared([issue]);
+        replay.data.parent.children.nodes = ['a', 'b', 'c'].map(id => ({
+          identifier: `JOV-${id}`,
+          title: `[summer-task:${id}] repair`,
+          state: { name: 'Todo' },
+        }));
+        return Response.json(replay);
       }
     );
     assert.deepEqual(await replayProjector.project(v2Task), issue);
     assert.equal(replayCalls, 1);
+  });
+
+  it('counts open summer-task children and refuses new creates past the budget', async () => {
+    assert.equal(MAX_OPEN_SUMMER_CHILDREN, 3);
+    assert.equal(
+      countOpenSummerChildren([
+        {
+          identifier: 'JOV-1',
+          title: '[summer-task:aa] native-queue-starvation',
+          state: { name: 'In Progress' },
+        },
+        {
+          identifier: 'JOV-2',
+          title: '[summer-task:bb] native-queue-starvation',
+          state: { name: 'Todo' },
+        },
+        {
+          identifier: 'JOV-3',
+          title: '[summer-task:cc] native-queue-starvation',
+          state: { name: 'Done' },
+        },
+        { identifier: 'JOV-4', title: 'unrelated', state: { name: 'Todo' } },
+      ]),
+      2
+    );
+    const v2Task = taskV2();
+    const prepared = {
+      data: {
+        teams: {
+          nodes: [
+            {
+              id: 'team-id',
+              key: 'JOV',
+              states: { nodes: [{ id: 'todo-id', name: 'Todo' }] },
+              labels: { nodes: [{ id: 'label-id', name: 'symphony' }] },
+            },
+          ],
+        },
+        parent: {
+          id: 'parent-id',
+          identifier: 'JOV-5853',
+          children: {
+            nodes: [
+              {
+                identifier: 'JOV-1',
+                title: '[summer-task:a] native-queue-starvation',
+                state: { name: 'In Progress' },
+              },
+              {
+                identifier: 'JOV-2',
+                title: '[summer-task:b] native-queue-starvation',
+                state: { name: 'Todo' },
+              },
+              {
+                identifier: 'JOV-3',
+                title: '[summer-task:c] release-certification-starvation',
+                state: { name: 'In Progress' },
+              },
+            ],
+          },
+        },
+        issues: { nodes: [] },
+      },
+    };
+    const calls = [];
+    const projector = createLinearProjector(
+      {
+        linearOrigin: 'https://api.linear.app/graphql',
+        linearApiKey: 'scoped-test-key',
+      },
+      async (url, options) => {
+        calls.push({ url, options });
+        return Response.json(prepared);
+      }
+    );
+    await assert.rejects(
+      () => projector.project(v2Task),
+      error => error instanceof Error && error.message === OPEN_CHILD_BUDGET
+    );
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(JSON.stringify(calls[0].options.body), /issueCreate/);
+  });
+
+  it('checks later child pages and never creates from incomplete budget evidence', async () => {
+    const task = taskV2();
+    const child = (id, name = 'Todo') => ({
+      identifier: `JOV-${id}`,
+      title: `[summer-task:${id}] repair`,
+      state: { name },
+    });
+    const connection = (nodes, hasNextPage = false, endCursor = null) => ({
+      nodes,
+      pageInfo: { hasNextPage, endCursor },
+    });
+    const parent = children => ({
+      id: 'parent-id',
+      identifier: 'JOV-5853',
+      children,
+    });
+    const scenarios = [
+      {
+        pages: [
+          connection([child(1)], true, 'a'),
+          connection([child(2), child(3)]),
+        ],
+        error: OPEN_CHILD_BUDGET,
+      },
+      { pages: [undefined], error: 'child-evidence-invalid' },
+      {
+        pages: [
+          connection([{ identifier: 'JOV-1', title: '[summer-task:1]' }]),
+        ],
+        error: 'child-evidence-invalid',
+      },
+      { pages: [{ nodes: [] }], error: 'child-evidence-invalid' },
+      { pages: [connection([], true, '')], error: 'child-evidence-incomplete' },
+      {
+        pages: [connection([], true, 'a'), connection([], true, 'a')],
+        error: 'child-evidence-incomplete',
+      },
+      {
+        pages: [connection([child(1)], true, 'a'), connection([child(1)])],
+        error: 'child-evidence-invalid',
+      },
+      {
+        pages: [
+          connection([], true, 'a'),
+          connection([], true, 'b'),
+          connection([], true, 'c'),
+          connection([], true, 'd'),
+        ],
+        error: 'child-evidence-incomplete',
+      },
+      {
+        pages: [connection([], true, 'a'), connection([])],
+        otherParent: true,
+        error: 'child-evidence-invalid',
+      },
+    ];
+    for (const scenario of scenarios) {
+      const calls = [];
+      const projector = createLinearProjector(
+        {
+          linearOrigin: 'https://api.linear.app/graphql',
+          linearApiKey: 'fixture',
+        },
+        async (_url, options) => {
+          const request = JSON.parse(String(options.body));
+          calls.push(request);
+          assert.doesNotMatch(request.query, /mutation|issueCreate/);
+          if (calls.length === 1)
+            return Response.json({
+              data: {
+                teams: {
+                  nodes: [
+                    {
+                      id: 'team',
+                      key: 'JOV',
+                      states: { nodes: [{ id: 'todo', name: 'Todo' }] },
+                      labels: { nodes: [{ id: 'label', name: 'symphony' }] },
+                    },
+                  ],
+                },
+                parent: parent(scenario.pages[0]),
+                issues: { nodes: [] },
+              },
+            });
+          assert.equal(request.variables.parentIssue, 'JOV-5853');
+          assert.equal(
+            request.variables.after,
+            scenario.pages[calls.length - 2].pageInfo.endCursor
+          );
+          return Response.json({
+            data: {
+              parent: {
+                ...parent(scenario.pages[calls.length - 1]),
+                ...(scenario.otherParent ? { identifier: 'JOV-999' } : {}),
+              },
+            },
+          });
+        }
+      );
+      await assert.rejects(
+        () => projector.project(task),
+        new RegExp(scenario.error)
+      );
+      assert.equal(calls.length, scenario.pages.length);
+    }
   });
 
   it('entrypoint exits with a typed configuration rejection', () => {
@@ -1629,6 +1908,570 @@ describe('existing owned repair transport', () => {
       else process.env.HOME = previousHome;
       if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
       else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+});
+
+describe('authenticated retained task records', () => {
+  const config = {
+    keys,
+    outcomePublicKey: host.publicKey,
+    outcomePrivateKey: host.privateKey,
+    outcomeKeyId: 'host-outcome',
+    summerOrigin: 'https://summer.example',
+    vercelAutomationBypassSecret: 'test-scoped-protection',
+  };
+  function fixture(kind = 'native-queue', status = null) {
+    const id = `${kind}-starvation`;
+    const selected = {
+      ...task().selected,
+      id,
+      owner: 'Summer',
+      handle: 'symphony',
+    };
+    const taskValue = taskV2({ action: `reconcile-${id}`, selected });
+    const projection = signOutcomeV2(
+      taskValue,
+      {
+        identifier: 'JOV-6418',
+        createdAt: '2026-09-07T01:01:00Z',
+      },
+      host.privateKey,
+      'host-outcome'
+    );
+    const value = {
+      schema: 'summer.symphony-task-records/v1',
+      taskKey: taskValue.taskKey,
+      issueIdentifier: 'JOV-6418',
+      state: status ? `execution-${status}` : 'execution-missing',
+      outbox: signedOutbox(taskValue),
+      projection,
+      execution: null,
+    };
+    if (status)
+      value.execution = resign({
+        schema: 'jovie.symphony-native-queue-execution/v1',
+        taskKey: taskValue.taskKey,
+        issueIdentifier: 'JOV-6418',
+        action: taskValue.action,
+        status,
+        detail: status === 'failed' ? 'native-queue-pr-churn-eject' : 'merged',
+        completedAt: '2026-09-07T01:02:00Z',
+        claim: { state: 'In Progress', assignee: 'unassigned-machine' },
+        execution: {
+          mutationAttempted: false,
+          authority:
+            'exact-source-ci-native-queue-production-gates-remain-required',
+          pr: 17917,
+          head: 'e'.repeat(40),
+        },
+        source: { action: taskValue.action, ...taskValue.source },
+        signatureKeyId: 'host-outcome',
+      });
+    return { taskValue, value };
+  }
+  function resign(record, signer = host) {
+    const { signature: _old, ...unsigned } = record;
+    return {
+      ...unsigned,
+      signature: `ed25519=${sign(
+        null,
+        Buffer.from(`${unsigned.schema}\0${canonical(unsigned)}`),
+        signer.privateKey
+      ).toString('base64url')}`,
+    };
+  }
+  const check = (value, taskValue) =>
+    validateTaskRecords(value, taskValue, 'JOV-6418', config);
+
+  it('returns original signed native success/failure and missing records unchanged', () => {
+    for (const status of [null, 'failed', 'succeeded']) {
+      const { value, taskValue } = fixture('native-queue', status);
+      assert.equal(check(value, taskValue), value);
+      assert.equal(check(value, taskValue), value);
+    }
+    const { value, taskValue } = fixture('release-certification');
+    assert.equal(check(value, taskValue), value);
+  });
+
+  it('rejects scope, envelope, projection, host and state substitutions', () => {
+    const { value, taskValue } = fixture();
+    for (const bad of [task(), taskV2()])
+      assert.throws(() => check(value, bad));
+    for (const issue of ['JOV-5853', 'JOV-0', null]) {
+      assert.throws(() => validateTaskRecords(value, taskValue, issue, config));
+    }
+    for (const mutate of [
+      v => {
+        v.extra = true;
+      },
+      v => {
+        v.schema = 'other';
+      },
+      v => {
+        v.taskKey = 'f'.repeat(64);
+      },
+      v => {
+        v.issueIdentifier = 'JOV-6417';
+      },
+      v => {
+        v.outbox.task.createdAt = '2026-09-07T00:00:00Z';
+      },
+      v => {
+        v.outbox = signedOutbox({
+          ...taskValue,
+          createdAt: '2026-09-07T00:00:00Z',
+        });
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          signatureKeyId: 'another-host',
+        });
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          result: { issueIdentifier: 'JOV-6417' },
+        });
+      },
+      v => {
+        v.projection = resign(v.projection, foreign);
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          completedAt: '2026-09-07T00:00:00Z',
+        });
+      },
+      v => {
+        v.state = 'execution-succeeded';
+      },
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed);
+      assert.throws(() => check(changed, taskValue));
+    }
+  });
+
+  it('rejects signed execution records with cross-bound or malformed evidence', () => {
+    const { value, taskValue } = fixture('native-queue', 'failed');
+    for (const mutate of [
+      r => {
+        r.extra = true;
+      },
+      r => {
+        r.schema = 'other';
+      },
+      r => {
+        r.action = 'reconcile-release-certification-starvation';
+      },
+      r => {
+        r.taskKey = 'f'.repeat(64);
+      },
+      r => {
+        r.issueIdentifier = 'JOV-6417';
+      },
+      r => {
+        r.status = 'unknown';
+      },
+      r => {
+        r.detail = '';
+      },
+      r => {
+        r.detail = 'x'.repeat(241);
+      },
+      r => {
+        r.completedAt = 'bad';
+      },
+      r => {
+        r.completedAt = '2026-09-07T00:00:00Z';
+      },
+      r => {
+        r.completedAt = '2026-09-07T01:00:30Z';
+      },
+      r => {
+        r.source.extra = true;
+      },
+      r => {
+        r.source.action = 'other';
+      },
+      r => {
+        r.source.sourceVersion = 'f'.repeat(40);
+      },
+      r => {
+        r.source.snapshotDigest = 'f'.repeat(64);
+      },
+      r => {
+        r.claim.extra = true;
+      },
+      r => {
+        r.claim.state = 'Canceled';
+      },
+      r => {
+        r.claim.assignee = '';
+      },
+      r => {
+        r.claim.assignee = 5;
+      },
+      r => {
+        r.claim.assignee = 'x'.repeat(121);
+      },
+      r => {
+        r.execution.extra = true;
+      },
+      r => {
+        r.execution.mutationAttempted = 'yes';
+      },
+      r => {
+        r.execution.authority = 'anything';
+      },
+      r => {
+        r.execution.pr = 0;
+      },
+      r => {
+        r.execution.pr = '17917';
+      },
+      r => {
+        r.execution.head = 'not-a-sha';
+      },
+      r => {
+        r.execution.authority = 'native-queue-mutation-authority-unavailable';
+      },
+      r => {
+        r.signatureKeyId = 'other-host';
+      },
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed.execution);
+      changed.execution = resign(changed.execution);
+      assert.throws(() => check(changed, taskValue));
+    }
+    assert.throws(() =>
+      check({ ...value, state: 'execution-succeeded' }, taskValue)
+    );
+    assert.throws(
+      () =>
+        check(
+          { ...value, execution: resign(value.execution, foreign) },
+          taskValue
+        ),
+      /signature-invalid/
+    );
+    assert.throws(() =>
+      check(
+        { ...value, execution: { ...value.execution, signature: 'invalid' } },
+        taskValue
+      )
+    );
+    const success = fixture('native-queue', 'succeeded');
+    success.value.execution.execution.pr = null;
+    success.value.execution = resign(success.value.execution);
+    assert.throws(() => check(success.value, success.taskValue));
+    const release = fixture('release-certification', 'failed');
+    assert.equal(check(release.value, release.taskValue), release.value);
+    release.value.execution.action = 'reconcile-native-queue-starvation';
+    release.value.execution = resign(release.value.execution);
+    assert.throws(() => check(release.value, release.taskValue));
+    const unavailable = structuredClone(value);
+    unavailable.execution.claim.assignee = null;
+    unavailable.execution.execution = {
+      mutationAttempted: false,
+      authority: 'native-queue-mutation-authority-unavailable',
+      pr: null,
+      head: null,
+    };
+    unavailable.execution = resign(unavailable.execution);
+    assert.equal(check(unavailable, taskValue), unavailable);
+  });
+
+  it('signs only exact selectors, makes bounded GETs and never writes during repeat reads', async () => {
+    const { value, taskValue } = fixture();
+    const requests = [];
+    const transport = createHttpTransport(config, async (url, options) => {
+      requests.push({ url, options });
+      return Response.json(value);
+    });
+    for (let i = 0; i < 2; i++)
+      assert.deepEqual(
+        await transport.readTaskRecords(taskValue, 'JOV-6418'),
+        value
+      );
+    assert.equal(requests.length, 2);
+    for (const { url, options } of requests) {
+      const parsed = new URL(url);
+      assert.equal(parsed.pathname, '/summer/v1/symphony/task-records');
+      assert.deepEqual(Object.fromEntries(parsed.searchParams), {
+        taskKey: taskValue.taskKey,
+        issueIdentifier: 'JOV-6418',
+        sourceVersion: taskValue.source.sourceVersion,
+        snapshotDigest: taskValue.source.snapshotDigest,
+      });
+      assert.equal(options.method ?? 'GET', 'GET');
+      assert.equal(options.body, undefined);
+      assert.equal(options.redirect, 'error');
+      assert.ok(options.signal instanceof AbortSignal);
+      assert.equal(
+        options.headers['x-vercel-protection-bypass'],
+        'test-scoped-protection'
+      );
+      const unsigned = {
+        method: 'GET',
+        target: parsed.pathname + parsed.search,
+        timestamp: options.headers['x-summer-timestamp'],
+        nonce: options.headers['x-summer-nonce'],
+        signatureKeyId: options.headers['x-summer-key-id'],
+      };
+      assert.ok(
+        verify(
+          null,
+          Buffer.from(`${READ_DOMAIN}\0${canonical(unsigned)}`),
+          host.publicKey,
+          Buffer.from(
+            options.headers['x-summer-signature'].slice(8),
+            'base64url'
+          )
+        )
+      );
+    }
+    await assert.rejects(transport.readTaskRecords(taskV2(), 'JOV-6418'));
+    assert.equal(requests.length, 2);
+    for (const status of [401, 404, 409, 422, 503]) {
+      await assert.rejects(
+        createHttpTransport(
+          config,
+          async () => new Response('', { status })
+        ).readTaskRecords(taskValue, 'JOV-6418'),
+        new RegExp(`http-${status}`)
+      );
+    }
+  });
+
+  function deliveryFixture(status = 'failed') {
+    const f = fixture('native-queue', status);
+    const root = mkdtempSync(join(tmpdir(), 'summer-delivery-'));
+    roots.push(root);
+    const reopen = () => createFileJournal(root, keys, host.publicKey);
+    const journal = reopen();
+    const expected = {
+      taskKey: f.taskValue.taskKey,
+      action: f.taskValue.action,
+      issueIdentifier: 'JOV-6418',
+      ...f.taskValue.source,
+    };
+    const active = {
+      phase: 'execution-ready',
+      taskKey: f.taskValue.taskKey,
+      record: f.value.outbox,
+      outcome: f.value.projection,
+    };
+    journal.write({
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active,
+    });
+    const cycle = (j, transport) =>
+      runCycle({
+        journal: j,
+        transport,
+        keys,
+        outcomePublicKey: host.publicKey,
+        outcomeKeyId: 'host-outcome',
+      });
+    const ack = {
+      schema: 'summer.symphony-execution-ack/v1',
+      taskKey: expected.taskKey,
+      status: 'recorded',
+      decision: status,
+    };
+    return { ...f, journal, reopen, expected, active, cycle, ack };
+  }
+
+  it('retains the projection before dispatch and resumes a missed launch without another child', async () => {
+    const f = deliveryFixture();
+    f.journal.write({
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: {
+        phase: 'discovered',
+        taskKey: f.taskValue.taskKey,
+        record: f.value.outbox,
+      },
+    });
+    let projected = 0;
+    let posted = 0;
+    const first = await runCycle({
+      journal: f.journal,
+      keys,
+      outcomePublicKey: host.publicKey,
+      outcomePrivateKey: host.privateKey,
+      outcomeKeyId: 'host-outcome',
+      projector: {
+        project: async () => {
+          projected++;
+          return {
+            identifier: 'JOV-6418',
+            createdAt: f.value.projection.completedAt,
+          };
+        },
+      },
+      transport: {
+        writeOutcome: async () => {
+          posted++;
+          return { status: 'recorded' };
+        },
+      },
+    });
+    assert.equal(first.status, 'projection-recorded');
+    assert.equal(f.reopen().read().active.phase, 'execution-ready');
+    const second = await f.cycle(f.reopen(), {});
+    assert.equal(second.status, 'projection-recorded');
+    assert.equal(second.taskKey, first.taskKey);
+    assert.equal(projected, 1);
+    assert.equal(posted, 1);
+  });
+
+  it('replays identical signed delivery after restart without authorizing execution twice', async () => {
+    const f = deliveryFixture('succeeded');
+    let delivery = createExecutionDelivery(f.journal, f.expected, config);
+    assert.equal(delivery.begin(), null);
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    const held = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => ({
+        ...f.value,
+        state: 'execution-missing',
+        execution: null,
+      }),
+    });
+    assert.equal(held.reason, 'execution-started-outcome-unknown');
+    delivery.persist(f.value.execution);
+    assert.throws(() => delivery.persist(f.value.execution), /not-started/);
+    assert.throws(
+      () => delivery.accepted(f.value.execution, f.ack),
+      /delivery-not-authorized/
+    );
+    delivery.attempt(f.value.execution);
+    delivery = createExecutionDelivery(f.reopen(), f.expected, config);
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    const resumed = await f.cycle(f.reopen(), {});
+    assert.equal(resumed.status, 'projection-recorded');
+    assert.throws(
+      () => delivery.attempt({ ...f.value.execution, detail: 'changed' }),
+      /delivery-not-authorized/
+    );
+    for (const ack of [
+      null,
+      {},
+      { ...f.ack, taskKey: 'f'.repeat(64) },
+      { ...f.ack, status: 'accepted' },
+      { ...f.ack, decision: 'failed' },
+    ]) {
+      assert.throws(
+        () => delivery.accepted(f.value.execution, ack),
+        /ack-invalid-or-cross-bound/
+      );
+    }
+    delivery.attempt(f.value.execution);
+    delivery.accepted(f.value.execution, { ...f.ack, status: 'replay' });
+    assert.equal(f.reopen().read().active.phase, 'execution-recorded');
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    assert.throws(
+      () => delivery.accepted(f.value.execution, f.ack),
+      /delivery-not-authorized/
+    );
+    let read = 0;
+    const result = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => {
+        read++;
+        return f.value;
+      },
+    });
+    assert.equal(result.status, 'execution-recorded');
+    assert.equal(result.decision, 'succeeded');
+    assert.equal(read, 1);
+    assert.equal(f.reopen().read().active, null);
+  });
+
+  it('bounds missing acknowledgment retries and reconciles only the retained identical receipt', async () => {
+    const f = deliveryFixture();
+    const delivery = createExecutionDelivery(f.journal, f.expected, config);
+    delivery.begin();
+    delivery.persist(f.value.execution);
+    for (let i = 0; i < 3; i++) delivery.attempt(f.value.execution);
+    assert.throws(
+      () => delivery.attempt(f.value.execution),
+      /delivery-not-authorized/
+    );
+    assert.throws(() => delivery.begin(), /replay-not-authorized/);
+    const held = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => ({
+        ...f.value,
+        state: 'execution-missing',
+        execution: null,
+      }),
+    });
+    assert.equal(held.reason, 'execution-acknowledgment-retry-exhausted');
+    await assert.rejects(
+      f.cycle(f.reopen(), {
+        readTaskRecords: async () => ({
+          ...f.value,
+          execution: resign({
+            ...f.value.execution,
+            detail: 'different signed result',
+          }),
+        }),
+      }),
+      /retained-execution-conflict/
+    );
+    const recovered = await f.cycle(f.reopen(), {
+      readTaskRecords: async () => f.value,
+    });
+    assert.equal(recovered.status, 'projection-recorded');
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    delivery.attempt(f.value.execution);
+    delivery.accepted(f.value.execution, f.ack);
+    assert.equal(
+      (await f.cycle(f.journal, { readTaskRecords: async () => f.value }))
+        .decision,
+      'failed'
+    );
+  });
+
+  it('recovers an ambiguous start only when the authenticated server already retained the result', async () => {
+    const f = deliveryFixture();
+    const delivery = createExecutionDelivery(f.journal, f.expected, config);
+    delivery.begin();
+    await f.cycle(f.reopen(), { readTaskRecords: async () => f.value });
+    assert.deepEqual(delivery.begin(), f.value.execution);
+    const altered = { ...f.expected, sourceVersion: 'f'.repeat(40) };
+    assert.throws(
+      () => createExecutionDelivery(f.journal, altered, config).begin(),
+      /cross-bound/
+    );
+    assert.throws(
+      () =>
+        createExecutionDelivery(f.journal, f.expected, {
+          ...config,
+          outcomeKeyId: 'another-host',
+        }).begin(),
+      /cross-bound/
+    );
+    for (const extra of [
+      { phase: 'execution-unknown' },
+      { phase: 'execution-pending', execution: f.value.execution, attempts: 4 },
+      { phase: 'execution-ready', extra: true },
+      {
+        phase: 'execution-pending',
+        execution: f.value.execution,
+        attempts: -1,
+      },
+    ]) {
+      assert.throws(
+        () =>
+          f.journal.write({
+            schema: 'jovie.summer-symphony-consumer-state/v1',
+            active: { ...f.active, ...extra },
+          }),
+        /execution-state-invalid/
+      );
     }
   });
 });
