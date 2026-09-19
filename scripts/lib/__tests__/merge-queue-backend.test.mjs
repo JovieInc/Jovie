@@ -2653,6 +2653,7 @@ describe('canonical admission membership binding', () => {
       [
         '-c',
         `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
 fleet_hold_target_url() { echo "$TARGET"; }
 gh_retry() { printf '%s' "$STATUSES"; }
 node() { return 0; }
@@ -2697,6 +2698,7 @@ record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-1
       [
         '-c',
         `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
 fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
 queue_reentry_receipt_is_recoverable() { lookup_finished=1; return ${reuse ? 0 : 1}; }
 node() { [[ "$lookup_finished" == 1 ]] || return 0; printf '%s\\n' "$*" >&2; return 1; }

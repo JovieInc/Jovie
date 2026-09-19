@@ -51,10 +51,46 @@ def _drain_command(
 ) -> str:
     fake_gh = tmp_path / "gh"
     assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
-    expected = expected_gh or fake_gh
+    gh_path = tmp_path
+    if backend == "native":
+        # Model the real Actions producer separately from each test's fleet API.
+        # All native tests execute the production guard; no bypass flag exists.
+        gh_path = tmp_path / "producer-api"
+        gh_path.mkdir(exist_ok=True)
+        producer_gh = gh_path / "gh"
+        producer_gh.write_text(textwrap.dedent(f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "${{1:-}}" == api && "${{2:-}}" == "repos/JovieInc/Jovie/actions/runs/${{GITHUB_RUN_ID:-}}" ]]; then
+              count=0
+              [[ ! -f "{tmp_path}/producer-reads" ]] || count=$(<"{tmp_path}/producer-reads")
+              echo "$((count + 1))" >"{tmp_path}/producer-reads"
+              [[ ! -f "{tmp_path}/producer-api-failure" ]] || exit 1
+              if [[ -f "{tmp_path}/producer-malformed" ]]; then echo 'not-json'; exit 0; fi
+              overrides='{{}}'
+              [[ ! -f "{tmp_path}/producer-overrides.json" ]] || overrides=$(<"{tmp_path}/producer-overrides.json")
+              if [[ "$count" -gt 0 && -f "{tmp_path}/producer-after-enroll.json" ]]; then
+                overrides=$(<"{tmp_path}/producer-after-enroll.json")
+              fi
+              # Preserve historical receipt fixtures that share the current
+              # run ID, instead of replacing their source-head provenance.
+              fixture_run=$('{fake_gh}' "$@" 2>/dev/null) || fixture_run='{{}}'
+              jq -e 'type == "object"' <<<"$fixture_run" >/dev/null 2>&1 || fixture_run='{{}}'
+              jq -n --argjson id "$GITHUB_RUN_ID" --argjson attempt "${{GITHUB_RUN_ATTEMPT:-1}}" --argjson fixture_run "$fixture_run" --argjson overrides "$overrides" '
+                {{id:$id,run_attempt:$attempt,name:"Merge Queue Auto-Enroll",path:".github/workflows/merge-queue-autoenroll.yml",
+                html_url:("https://github.com/JovieInc/Jovie/actions/runs/" + ($id|tostring)),
+                repository:{{full_name:"JovieInc/Jovie"}},head_repository:{{full_name:"JovieInc/Jovie"}},
+                head_sha:"{'a' * 40}",head_branch:"main",event:"workflow_run",status:"in_progress",conclusion:null}} + $fixture_run + $overrides'
+              exit 0
+            fi
+            exec "{fake_gh}" "$@"
+            """), encoding="utf-8")
+        producer_gh.chmod(producer_gh.stat().st_mode | stat.S_IXUSR)
+    expected = expected_gh or (gh_path / "gh")
     authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
     env_prefix = (
-        f'PATH="{tmp_path}:$PATH" '
+        f'PATH="{gh_path}:{tmp_path}:$PATH" '
+        'GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 '
         f'DRAIN_EXPECT_GH="{expected}" '
         f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
         'GH_MUTATION_TOKEN=test-fixture-writer-token '
@@ -68,7 +104,7 @@ def _drain_command(
 
 
 def _run_same_token_rest_fixture(
-    tmp_path: Path, *, rest_mode: str, post_hold: bool = False
+    tmp_path: Path, *, rest_mode: str, post_hold: bool = False, producer_env: str = ""
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, Path], str, str]:
     """Run an exact native admission against controlled REST/GraphQL reads."""
     head = "b" * 40
@@ -172,6 +208,7 @@ def _run_same_token_rest_fixture(
               exit 0
             fi
             if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+              echo "$*" >>"{tmp_path}/receipt-writes"
               exit 0
             fi
             if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
@@ -203,7 +240,8 @@ def _run_same_token_rest_fixture(
                 f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
                 "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
                 "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
-                "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com "
+                f"{producer_env}"
             ),
         )
     )
@@ -6554,3 +6592,79 @@ class TestNativeAdmissionReceiptReconciliation:
         assert result.returncode == 1
         assert "no authoritative enqueue timestamp" in result.stderr
         assert dequeue_log.read_text(encoding="utf-8") == ""
+
+
+class TestCanonicalAdmissionProducer:
+    @pytest.mark.parametrize("producer_env", [
+        "GITHUB_RUN_ID=", "GITHUB_RUN_ID=invalid", "GITHUB_RUN_ATTEMPT=",
+        "GITHUB_RUN_ATTEMPT=0", "GITHUB_SERVER_URL=https://untrusted.example",
+    ])
+    def test_missing_identity_stops_before_api_and_queue(self, tmp_path: Path, producer_env: str) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true", producer_env=producer_env)
+        assert "exact workflow run and attempt" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "producer-reads").exists()
+        assert not (tmp_path / "receipt-writes").exists()
+
+    @pytest.mark.parametrize("overrides", [
+        {"name": "Queue-Deferred Release", "path": ".github/workflows/queue-deferred-release.yml"},
+        {"name": "Claude Code", "path": ".github/workflows/claude.yml"},
+        {"name": "Delivery Control Receipts", "path": ".github/workflows/delivery-control-receipts.yml"},
+        {"status": "completed", "conclusion": "cancelled"},
+        {"status": "completed", "conclusion": "success"},
+        {"status": "queued"},
+        {"name": "Wrong workflow"},
+        {"path": ".github/workflows/other.yml"},
+        {"head_branch": ""},
+        {"conclusion": "success"},
+        {"id": 123},
+        {"run_attempt": 2},
+        {"repository": {"full_name": "other/repository"}},
+        {"head_repository": {"full_name": "other/repository"}},
+        {"html_url": "https://github.com/JovieInc/Jovie/actions/runs/123"},
+        {"head_sha": "missing"},
+        {"head_branch": "untrusted"},
+        {"event": "schedule"},
+    ])
+    def test_untrusted_producer_never_enrolls_or_stamps(self, tmp_path: Path, overrides: dict) -> None:
+        (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert paths["dequeue"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_api_failure_never_enrolls_or_stamps(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-api-failure").touch()
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "producer identity is unavailable" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_malformed_response_never_enrolls_or_stamps(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-malformed").touch()
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_producer_ending_after_enroll_is_compensated_without_receipt(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-after-enroll.json").write_text(json.dumps({"status": "completed", "conclusion": "cancelled"}))
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert paths["enroll"].read_text().strip() == "1"
+        assert paths["dequeue"].read_text().strip() == "1"
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert not (tmp_path / "receipt-writes").exists()
+
+    @pytest.mark.parametrize("event,branch", [("workflow_run", "main"), ("pull_request", "codex/source")])
+    def test_active_canonical_producer_enrolls_and_stamps(self, tmp_path: Path, event: str, branch: str) -> None:
+        (tmp_path / "producer-overrides.json").write_text(json.dumps({"event": event, "head_branch": branch}))
+        result, paths, head, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert result.returncode == 0, result.stderr
+        assert paths["enroll"].read_text().strip() == "1"
+        assert paths["dequeue"].read_text().strip() == "0"
+        receipt = (tmp_path / "receipt-writes").read_text()
+        assert "context=jovie-queue-admission/v2" in receipt
+        assert f"statuses/{head}" in receipt
+        assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/42" in receipt
+        assert (tmp_path / "producer-reads").read_text().strip() == "2"

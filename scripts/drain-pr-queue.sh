@@ -693,6 +693,38 @@ fleet_hold_target_url() {
   printf '%s/%s/actions/runs/%s' "$server_url" "$REPO" "$run_id"
 }
 
+# A numeric run ID is a link, not authority. Only the running canonical
+# workflow may create membership or stamp its admission receipt. Re-read at
+# both mutation boundaries; a completed run must never acquire new receipts.
+canonical_admission_producer_is_active() {
+  local run_id="${GITHUB_RUN_ID:-}" attempt="${GITHUB_RUN_ATTEMPT:-}" run
+  if [[ ! "$run_id" =~ ^[1-9][0-9]*$ || ! "$attempt" =~ ^[1-9][0-9]*$ \
+    || "${GITHUB_SERVER_URL:-https://github.com}" != "https://github.com" ]]; then
+    echo "::error::Canonical admission requires an exact workflow run and attempt" >&2
+    return 1
+  fi
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")"; then
+    echo "::error::Canonical admission producer identity is unavailable" >&2
+    return 1
+  fi
+  if ! jq -e --arg repo "$REPO" --argjson run_id "$run_id" \
+    --argjson attempt "$attempt" '
+      .id == $run_id and .run_attempt == $attempt and
+      .name == "Merge Queue Auto-Enroll" and
+      .path == ".github/workflows/merge-queue-autoenroll.yml" and
+      .html_url == ("https://github.com/" + $repo + "/actions/runs/" + ($run_id | tostring)) and
+      .repository.full_name == $repo and .head_repository.full_name == $repo and
+      .status == "in_progress" and .conclusion == null and
+      (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+      (.event | IN("pull_request", "push", "repository_dispatch", "workflow_dispatch", "workflow_run")) and
+      (.head_branch | type == "string" and length > 0) and
+      (.event == "pull_request" or .head_branch == "main")
+    ' <<<"$run" >/dev/null 2>&1; then
+    echo "::error::Refusing admission from an inactive or noncanonical workflow producer" >&2
+    return 1
+  fi
+}
+
 waiting_lane_allows_clean_enroll() {
   case "$DRAIN_PROMOTION_MODE" in
     normal | hold-intake | draft-only) return 0 ;;
@@ -997,6 +1029,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <en
     echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
     return 0
   fi
+  canonical_admission_producer_is_active || return 1
   if ! target_url="$(fleet_hold_target_url)"; then
     echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
     return 1
@@ -1724,6 +1757,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    canonical_admission_producer_is_active || return 1
     if ! enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       if ! dequeue_strict "$n"; then
