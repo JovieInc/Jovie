@@ -25,20 +25,19 @@ describe('app shell mode', () => {
     vi.clearAllMocks();
   });
 
-  it.each([
-    APP_ROUTES.OV,
-    `${APP_ROUTES.OV}/ops`,
-  ])('resolves %s to OV mode', pathname => {
-    expect(resolveAppShellMode(pathname)).toBe('ov');
-  });
+  it.each([APP_ROUTES.OV, `${APP_ROUTES.OV}/ops`, APP_ROUTES.HUD])(
+    'resolves %s to OV mode',
+    pathname => {
+      expect(resolveAppShellMode(pathname)).toBe('ov');
+    }
+  );
 
-  it.each([
-    APP_ROUTES.DASHBOARD,
-    APP_ROUTES.CHAT,
-    '/app/overview',
-  ])('keeps %s in customer mode', pathname => {
-    expect(resolveAppShellMode(pathname)).toBe('customer');
-  });
+  it.each([APP_ROUTES.DASHBOARD, APP_ROUTES.CHAT, '/app/overview'])(
+    'keeps %s in customer mode',
+    pathname => {
+      expect(resolveAppShellMode(pathname)).toBe('customer');
+    }
+  );
 
   it('does not consult admin access for customer routes', async () => {
     await expect(
@@ -69,12 +68,15 @@ describe('app shell mode', () => {
       hasAdminRole: false,
     },
     { userId: null, isAuthenticated: false, hasAdminRole: false },
-  ])('redirects unauthorized OV requests before shell data renders', async access => {
-    getCurrentAdminPageAccessMock.mockResolvedValue(access);
+  ])(
+    'redirects unauthorized OV requests before shell data renders',
+    async access => {
+      getCurrentAdminPageAccessMock.mockResolvedValue(access);
 
-    await expect(requireAppShellModeAccess('ov')).rejects.toThrow(
-      `NEXT_REDIRECT:${APP_ROUTES.DASHBOARD}`
-    );
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
-  });
+      await expect(requireAppShellModeAccess('ov')).rejects.toThrow(
+        `NEXT_REDIRECT:${APP_ROUTES.DASHBOARD}`
+      );
+      expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    }
+  );
 });

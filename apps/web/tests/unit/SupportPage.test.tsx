@@ -46,7 +46,17 @@ describe('SupportPage', () => {
     });
     expect(contactButton).toHaveAttribute('data-variant', 'secondary');
     expect(contactButton).toHaveAttribute('data-size', 'marketing');
-    expect(contactButton).toHaveClass('h-7', 'rounded-full');
+    expect(contactButton).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11',
+      'rounded-full'
+    );
+    for (const residue of ['h-7', 'h-11', 'h-11!', 'h-12', 'before:h-11']) {
+      expect(contactButton).not.toHaveClass(residue);
+    }
     expect(contactButton).not.toHaveClass('public-action-secondary');
     expect(contactButton).not.toHaveClass('public-action-primary');
   });
@@ -158,7 +168,17 @@ describe('SupportPage', () => {
         /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
       )) {
       expect(action).toHaveAttribute('data-size', 'marketing');
-      expect(action).toHaveClass('h-7', 'rounded-full');
+      expect(action).toHaveClass(
+        'h-auto',
+        'min-h-7',
+        'before:h-full',
+        'before:min-h-11',
+        'before:min-w-11',
+        'rounded-full'
+      );
+      for (const residue of ['h-7', 'h-11', 'h-11!', 'h-12', 'before:h-11']) {
+        expect(action).not.toHaveClass(residue);
+      }
       expect(action).not.toHaveClass('public-action-inline');
     }
   });

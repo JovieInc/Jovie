@@ -3783,6 +3783,7 @@
 }
 
 :where(.system-b-chat-user-text) {
+  font-weight: var(--font-weight-book);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);
 }
@@ -3956,6 +3957,7 @@
 }
 
 :where(.system-b-chat-message-reply) {
+  font-weight: var(--font-weight-book);
   color: var(--color-text-primary-token);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);
@@ -4543,7 +4545,6 @@
 :where(.system-b-chat-tool-surface-cancelled) {
   border-color: var(--system-b-app-frame-seam);
   background: var(--system-b-app-content-surface);
-  opacity: 0.6;
 }
 
 :where(.system-b-chat-tool-surface-flat) {
@@ -6368,4 +6369,11 @@
 
 .system-b-dsp-avatar-stack-popover {
   z-index: 150;
+}
+
+/* An open composer palette/status owns the space above the dock. Keep the
+   suggestion geometry reserved while removing overlapping content and focus. */
+[data-empty-chat-region="true"]:has([data-chat-composer-overlay="true"])
+[data-empty-chat-suggestions="true"] {
+  visibility: hidden;
 }

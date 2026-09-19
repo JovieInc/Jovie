@@ -2,14 +2,28 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import {
+  CANONICAL_PUBLIC_SHELL_CONTEXT,
+  CANONICAL_PUBLIC_SHELL_EVENTS,
+} from '@/data/canonicalPublicShellOptimization';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
-const mockUsePathname = vi.fn<string | null, []>(() => '/about');
+const mockUsePathname = vi.fn<() => string | null>(() => '/about');
+const mockTrack = vi.fn();
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
     usePathname: () => mockUsePathname(),
+  };
+});
+
+vi.mock('@/lib/analytics', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/analytics')>();
+  return {
+    ...actual,
+    track: (...args: unknown[]) => mockTrack(...args),
   };
 });
 
@@ -30,6 +44,7 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
 
 describe('MarketingHeader', () => {
   beforeEach(() => {
+    mockTrack.mockClear();
     mockUsePathname.mockReturnValue('/about');
     Object.defineProperty(window, 'scrollY', {
       configurable: true,
@@ -37,40 +52,60 @@ describe('MarketingHeader', () => {
     });
   });
 
-  it('renders marketing center navigation when the center-nav flag is enabled', () => {
+  it('fires one canonical public-shell exposure receipt', () => {
     render(<MarketingHeader />);
 
+    expect(mockTrack).toHaveBeenCalledTimes(1);
+    expect(mockTrack).toHaveBeenCalledWith(
+      CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,
+      CANONICAL_PUBLIC_SHELL_CONTEXT
+    );
+  });
+
+  it('renders the canonical public navigation when the center-nav flag is enabled', () => {
+    render(<MarketingHeader />);
+
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.header
+    );
+    expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
     );
-    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
+    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    // Header utility CTA stays on the /start front door; the waitlist-first
-    // contract applies to owned hero/final CTAs, not the shared nav utilities.
-    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+    // The shared public CTA follows the waitlist-on front-door contract on /signup.
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      '/start'
+      '/signup'
     );
   });
 
-  it('shows flyout menu triggers when center navigation is enabled', () => {
+  it('shows canonical desktop links instead of flyout menu triggers', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Product', 'For', 'Tools', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Artists', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -81,8 +116,10 @@ describe('MarketingHeader', () => {
         .getByTestId('site-logo-link')
         .querySelector('[data-brand-variant="jovie"]')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -99,7 +136,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -116,9 +153,7 @@ describe('MarketingHeader', () => {
   it('does not leak artist-profile header overrides onto the homepage', () => {
     mockUsePathname.mockReturnValue('/');
 
-    render(
-      <MarketingHeader variant='homepage' showHomepageCenterNav={false} />
-    );
+    render(<MarketingHeader variant='homepage' />);
 
     expect(screen.getByTestId('header-nav')).not.toHaveClass(
       'artist-profiles-home-header'
@@ -127,7 +162,14 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.queryByRole('link', { name: 'Find yourself' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/signup'
+    );
   });
 
   it('applies and cleans up homepage-style scroll treatment', () => {

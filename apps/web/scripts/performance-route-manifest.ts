@@ -915,7 +915,8 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-subscribe"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Alerts"]',
+        '[data-testid="profile-home-alerts-row"] button',
+        'button:has-text("Get updates")',
       ],
     },
     viewport: { width: 390, height: 844 },
@@ -991,7 +992,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-tour"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
+        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
       ],
     },
     viewport: { width: 390, height: 844 },
@@ -1622,21 +1623,22 @@ const CREATOR_SHELL_ROUTES = [
     surface: 'creator-app',
     path: APP_ROUTES.CALENDAR,
     navigationItemId: 'calendar',
-    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
-    warmupStrategy: 'authenticated-shell',
-    measureMode: 'warm-navigation',
+    // Calendar is mobile More only (OqZTF desktop rail is Library/Contacts/
+    // Presence). The warm-nav guard cannot open More, so this is a documented
+    // route-load contract rather than a desktop `a[href="/app/calendar"]`.
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="calendar-workspace"]'],
       loading: ['[aria-label="Loading Calendar"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.CALENDAR}"]`,
-        `a[href^="${APP_ROUTES.CALENDAR}?"]`,
-      ],
     },
     timings: [
-      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
       { metric: 'skeleton-to-content', budget: 1000 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,

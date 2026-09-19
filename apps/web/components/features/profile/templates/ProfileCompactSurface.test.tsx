@@ -61,12 +61,29 @@ vi.mock(
 );
 
 vi.mock('@/features/profile/ProfileHomeRail', () => ({
-  ProfileHomeRail: () => <div data-testid='mock-profile-home-rail' />,
+  ProfileHomeRail: ({
+    showAlertsCard,
+  }: {
+    readonly showAlertsCard?: boolean;
+  }) => (
+    <div data-testid='mock-profile-home-rail'>
+      {showAlertsCard ? <div data-testid='profile-home-alerts-row' /> : null}
+    </div>
+  ),
 }));
 
 vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
-  ProfilePrimaryTabPanel: ({ mode }: { readonly mode: string }) => (
-    <div data-testid={`mock-primary-tab-panel-${mode}`} />
+  ProfilePrimaryTabPanel: ({
+    mode,
+    catalogLoadFailed,
+  }: {
+    readonly mode: string;
+    readonly catalogLoadFailed?: boolean;
+  }) => (
+    <div
+      data-testid={`mock-primary-tab-panel-${mode}`}
+      data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -151,6 +168,19 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
+  it('uses pearlQuiet top chrome without IconButton restyle classes', () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    renderSurface({ allowSignedInEscape: true });
+
+    const back = screen.getByRole('button', { name: 'Back' });
+    const menu = screen.getByRole('button', { name: 'Menu' });
+
+    expect(back).not.toHaveClass('profile-top-chrome-icon');
+    expect(menu).not.toHaveClass('profile-top-chrome-icon');
+    expect(back).toHaveClass('bg-transparent', 'text-primary-token/78');
+    expect(menu).toHaveClass('bg-transparent', 'text-primary-token/78');
+  });
+
   it('shows the back control on the public profile root for a signed-in session', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
     const onBack = vi.fn();
@@ -190,6 +220,19 @@ describe('ProfileCompactSurface', () => {
   });
   // Regression: hero social labels must use registry brand casing
   // (tiktok -> 'TikTok'), not naive title case ('Tiktok').
+  it('forwards catalog load failure into the Music panel instead of an empty catalog', () => {
+    renderSurface({
+      activeMode: 'listen',
+      catalogLoadFailed: true,
+      releases: [],
+    });
+
+    expect(screen.getByTestId('mock-primary-tab-panel-listen')).toHaveAttribute(
+      'data-catalog-load-failed',
+      'true'
+    );
+  });
+
   it('renders registry-cased hero social aria labels for TikTok', () => {
     renderSurface({ socialLinks: [tiktokLink] });
 
@@ -201,5 +244,61 @@ describe('ProfileCompactSurface', () => {
     expect(
       screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
+  });
+
+  // JOV-6198: fan-capture gates the Get updates action, not the destination
+  // set. The home alerts row must disappear when fan capture is off while
+  // the primary tab panel keeps rendering.
+  it('hides the home alerts card when fan capture is disabled', () => {
+    renderSurface({ allowFanCapture: false });
+
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the home alerts card when fan capture is enabled', () => {
+    renderSurface({ allowFanCapture: true });
+
+    expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
+  });
+
+  it('marks only the active public home surface for mobile overflow scoping', () => {
+    const { unmount } = renderSurface();
+    const homeSurface = screen.getByTestId('profile-compact-surface');
+
+    expect(homeSurface.parentElement).toHaveAttribute(
+      'data-profile-home-mode',
+      'true'
+    );
+    expect(homeSurface).not.toHaveAttribute('data-profile-overflow-mode');
+
+    unmount();
+    renderSurface({ activeMode: 'listen' });
+    const listenSurface = screen.getByTestId('profile-compact-surface');
+
+    expect(listenSurface.parentElement).not.toHaveAttribute(
+      'data-profile-home-mode'
+    );
+    expect(listenSurface).not.toHaveAttribute('data-profile-overflow-mode');
+  });
+
+  it('keeps the home hero and content regions in the responsive layout contract', () => {
+    renderSurface();
+
+    expect(screen.getByTestId('profile-cover')).toHaveClass(
+      'profile-home-fluid-hero',
+      'profile-home-fluid-hero--no-media',
+      'shrink-0'
+    );
+    expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
+      'profile-home-content-scroll',
+      'min-h-0',
+      'flex-1',
+      'flex',
+      'flex-col',
+      'overflow-y-auto',
+      'overscroll-contain'
+    );
   });
 });

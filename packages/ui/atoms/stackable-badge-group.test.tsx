@@ -67,7 +67,12 @@ describe('StackableBadgeGroup', () => {
 
     const trigger = screen.getByRole('button', { name: 'Show 2 more badges' });
     expect(trigger).toHaveTextContent('+2 more');
-    expect(trigger.className).toContain('before:h-11');
+    expect(trigger).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(trigger).not.toHaveClass('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
   });
 

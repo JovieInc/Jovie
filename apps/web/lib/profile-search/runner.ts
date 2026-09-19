@@ -13,13 +13,17 @@ import { getAppFlagValue } from '@/lib/flags/server';
 import { reserveProfileSearchAttempt } from './budget';
 import { GoogleSerpApiProvider } from './google-serpapi';
 import {
+  buildClaimDueQuerySql,
+  type ProfileSearchQueryScope,
+  profileSearchQueryScopeSchema,
+} from './query-scope';
+import {
   type ClaimedProfileSearchQuery,
   type ProfileSearchRunnerDependencies,
   runProfileSearchBatch,
 } from './runner-core';
 
 const PROVIDER_ID = 'google_serpapi';
-const LEASE_SECONDS = 120;
 
 async function isProviderHealthy() {
   try {
@@ -34,33 +38,16 @@ async function isProviderHealthy() {
   }
 }
 
-async function claimDueQuery(): Promise<ClaimedProfileSearchQuery | null> {
+async function claimDueQuery(
+  scope?: ProfileSearchQueryScope
+): Promise<ClaimedProfileSearchQuery | null> {
   const result = await db.execute<{
     id: string;
     query_text: string;
     market: string;
     locale: 'en';
     device: 'desktop';
-  }>(drizzleSql`
-    WITH candidate AS (
-      SELECT id
-      FROM profile_search_queries
-      WHERE enabled = true
-        AND provider = ${PROVIDER_ID}
-        AND next_run_at <= now()
-        AND (lease_expires_at IS NULL OR lease_expires_at < now())
-      ORDER BY next_run_at ASC, creator_profile_id ASC
-      FOR UPDATE SKIP LOCKED
-      LIMIT 1
-    )
-    UPDATE profile_search_queries AS query
-    SET lease_token = gen_random_uuid(),
-        lease_expires_at = now() + (${LEASE_SECONDS} * interval '1 second'),
-        updated_at = now()
-    FROM candidate
-    WHERE query.id = candidate.id
-    RETURNING query.id, query.query_text, query.market, query.locale, query.device
-  `);
+  }>(buildClaimDueQuerySql(scope));
   const row = result.rows[0];
   if (!row) return null;
   return {
@@ -228,4 +215,16 @@ const dependencies: ProfileSearchRunnerDependencies = {
 
 export function runProfileSearchMonitoring(deadlineAt: number) {
   return runProfileSearchBatch(dependencies, { deadlineAt });
+}
+
+/** Operator preparation only: the existing rollout and health gates still apply. */
+export function runScopedProfileSearchMonitoring(
+  deadlineAt: number,
+  input: ProfileSearchQueryScope
+) {
+  const scope = profileSearchQueryScopeSchema.parse(input);
+  return runProfileSearchBatch(
+    { ...dependencies, claimDueQuery: () => claimDueQuery(scope) },
+    { deadlineAt, singleAttempt: true }
+  );
 }

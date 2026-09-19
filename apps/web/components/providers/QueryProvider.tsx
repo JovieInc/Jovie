@@ -10,7 +10,14 @@ import {
 import dynamic from 'next/dynamic';
 import { type ReactNode, useEffect, useState } from 'react';
 import { getFeedbackErrorMessage, toast } from '@/components/feedback';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { isDevChromeDisabledClient } from '@/lib/demo-recording';
+import {
+  applyCacheScope,
+  type CacheFenceReason,
+  copyShareableQueryData,
+  subscribeCacheFence,
+} from '@/lib/queries/cache-isolation';
 
 declare global {
   interface Window {
@@ -62,7 +69,8 @@ const createQueryClientConfig = (): QueryClientConfig => ({
       gcTime: 30 * 60 * 1000,
 
       // Retry failed requests up to 3 times with exponential backoff
-      // Handles transient network issues gracefully
+      // Handles transient network issues gracefully.
+      // JOV-6185 owns classified-retry rewrite — do not change this default here.
       retry: 3,
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
 
@@ -131,6 +139,24 @@ function getQueryClient(): QueryClient {
   return browserQueryClient;
 }
 
+export function fenceBrowserQueryClient(reason: CacheFenceReason): QueryClient {
+  const previous = browserQueryClient ?? createClient();
+  const next = createClient();
+  copyShareableQueryData(previous, next, reason);
+  void previous.cancelQueries();
+  previous.clear();
+  browserQueryClient = next;
+  return next;
+}
+
+export function resetBrowserQueryClientForTests(): void {
+  browserQueryClient = undefined;
+}
+
+export function getBrowserQueryClientForTests(): QueryClient | undefined {
+  return browserQueryClient;
+}
+
 interface QueryProviderProps {
   readonly children: ReactNode;
 }
@@ -149,8 +175,30 @@ interface QueryProviderProps {
  * - Dashboard/app: Use TanStack Query (client caching, background refresh)
  */
 export function QueryProvider({ children }: QueryProviderProps) {
+  const { userId, sessionId, isLoaded, isSignedIn } = useAuthSafe();
   // Use useState to ensure client gets the singleton on hydration
-  const [queryClient] = useState(getQueryClient);
+  const [queryClient, setQueryClient] = useState(getQueryClient);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+    applyCacheScope({
+      userId: isSignedIn ? userId : null,
+      sessionId: isSignedIn ? sessionId : null,
+      ready: true,
+      ...(isSignedIn ? {} : { profileId: null, impersonationSubject: null }),
+    });
+  }, [isLoaded, isSignedIn, userId, sessionId]);
+
+  useEffect(() => {
+    return subscribeCacheFence(event => {
+      if (event.reason === 'hydrate' || event.reason === 'manual') {
+        return;
+      }
+      setQueryClient(fenceBrowserQueryClient(event.reason));
+    });
+  }, []);
 
   // Gated E2E-only hook: exposes window.__JOVIE_E2E_INVALIDATE_QUERIES__ so
   // Playwright specs can trigger a TanStack Query invalidation and assert the

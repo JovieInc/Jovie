@@ -45,6 +45,10 @@
 @source not "../**/*.test.*";
 @source not "../**/*.spec.*";
 @source not "../**/*.stories.*";
+/* DashboardThemeToggle is rendered by the app shell and has a small
+   route-owned utility set. Re-include only this file so its state paints are
+   present without scanning the dashboard tree into public CSS. */
+@source "../components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -63,6 +67,7 @@ body {
 
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
+  --electron-controls-width: 200px;
   --electron-traffic-light-safe-width: 72px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
@@ -84,7 +89,7 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
   box-sizing: border-box;
 }
 
-/* Electron titlebar owns top inset; do not stack a second top gap. */
+/* The page header and window controls share one top row. */
 html[data-desktop-runtime="electron"]
 [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
   padding-top: 0;
@@ -92,17 +97,43 @@ html[data-desktop-runtime="electron"]
 }
 
 html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
+  position: absolute;
+  top: 0;
+  left: 0;
   -webkit-app-region: drag;
   z-index: 60;
-  display: grid;
-  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
-  column-gap: var(--app-shell-gap);
+  display: flex;
   align-items: center;
-  padding-right: var(--app-shell-gap);
-  flex-shrink: 0;
+  width: var(--electron-sidebar-width);
+  min-width: var(--electron-controls-width);
   height: var(--electron-titlebar-height);
   user-select: none;
   background: rgb(var(--sidebar-background));
+}
+
+html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
+  padding-top: var(--electron-titlebar-height);
+}
+
+html[data-desktop-runtime="electron"]
+  [data-top-spacing-owner="shell-header"]
+  > div {
+  height: var(--electron-titlebar-height);
+  padding-block: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:has([data-main-header-inset="true"])
+  [data-electron-titlebar="true"] {
+  width: var(--electron-controls-width);
+  /* With no sidebar beneath the controls, reveal the header/ambient plane. */
+  background: transparent;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:has([data-main-header-inset="true"])
+  [data-top-spacing-owner="shell-header"] {
+  padding-left: var(--electron-controls-width);
 }
 
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
@@ -125,14 +156,24 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
-/* Titlebar rail alignment for the canonical app shell — the app-shell-body has
-   p-[--app-shell-gap] on all sides, so the sidebar column starts at
-   gap offset from the left edge. Mirror that offset in the titlebar so the
-   sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+/* JOV-6340: route canvas/composer are never a window-drag region. */
+html[data-desktop-runtime="electron"] [data-app-shell-scroll],
+html[data-desktop-runtime="electron"] [data-testid="chat-composer-surface"] {
+  -webkit-app-region: no-drag;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-top-spacing-owner="shell-header"]
+  h1 {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height, 1.5);
+}
+
+/* Match the existing sidebar rail's horizontal inset. */
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
-  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
@@ -2017,7 +2058,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   * {
-    animation-duration: 0.01ms !important;
+    /* Exact 0s — Chromium serializes 0.01ms as 1e-05s and fails JOV-4911. */
+    animation-duration: 0s !important;
   }
 }
 
@@ -2375,8 +2417,8 @@ body {
   .transition-all,
   .transform,
   [data-state] {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
   }
 }
 

@@ -8,7 +8,7 @@
  */
 
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
@@ -21,6 +21,12 @@ import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import {
+  canonicalizeReleaseArtistCredits,
+  canonicalizeReleaseCreditGroups,
+  opaqueInternalProfileRedirectPath,
+} from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { toISOStringOrNull } from '@/lib/utils/date';
@@ -71,6 +77,16 @@ export default async function TrackDeepLinkPage({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    notFound();
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(
+      opaqueInternalProfileRedirectPath(opaqueDecision, `${slug}/${trackSlug}`)
+    );
+  }
 
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
@@ -123,11 +139,14 @@ export default async function TrackDeepLinkPage({
   const primaryArtistIds = new Set(
     (track.primaryArtists ?? []).map(entry => entry.artistId)
   );
-  const featuredArtists =
+  const owner = { name: ownerName, handle: creator.usernameNormalized };
+  const featuredArtists = canonicalizeReleaseArtistCredits(
     track.credits
       ?.find(group => group.role === 'featured_artist')
       ?.entries.filter(entry => !primaryArtistIds.has(entry.artistId))
-      .map(entry => ({ name: entry.name, handle: entry.handle })) ?? [];
+      .map(entry => ({ name: entry.name, handle: entry.handle })) ?? [],
+    owner
+  );
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
   const isUnreleased =
@@ -208,7 +227,7 @@ export default async function TrackDeepLinkPage({
         }}
         primaryArtists={artistByline.entries}
         featuredArtists={featuredArtists}
-        credits={track.credits}
+        credits={canonicalizeReleaseCreditGroups(track.credits, owner)}
         providers={allProviders}
         tracking={{
           contentType: 'track',
@@ -242,6 +261,17 @@ export async function generateMetadata({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    return { title: 'Not Found', robots: { index: false, follow: false } };
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(
+      opaqueInternalProfileRedirectPath(opaqueDecision, `${slug}/${trackSlug}`)
+    );
+  }
+
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     return { title: 'Not Found' };

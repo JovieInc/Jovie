@@ -17,7 +17,7 @@ describe('public profile QA regressions', () => {
       'components/features/profile/templates/ProfileCompactSurface.tsx'
     );
     expect(source).toMatch(
-      /className='shrink-0 whitespace-nowrap'\s*>\s*\{locationLabel\}/
+      /className='min-w-0 max-w-full whitespace-normal \[overflow-wrap:anywhere\] md:truncate md:whitespace-nowrap md:wrap-normal'\s*>\s*\{locationLabel\}/
     );
   });
 

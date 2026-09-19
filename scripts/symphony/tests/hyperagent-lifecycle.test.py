@@ -27,9 +27,10 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "expected_account_alias": "workspace-a",
             "workspace_id": "workspace-id-a",
             "agent_id": "agent-a",
-            "agent_name": "Developer",
+            "agent_name": "GLM 5.3",
             "agent_mode": "auto",
-            "model_id": "live-cheapest-capable",
+            "task_class": "code",
+            "model_id": "GLM 5.3",
             "model_price_usd": 0.5,
             "runtime": "hyperagent-sandbox",
             "runtime_compatible": True,
@@ -97,11 +98,25 @@ class HyperagentLifecycleTests(unittest.TestCase):
     def expected_job(self):
         return {**self.envelope, "thread_id": "thread-1"}
 
+    def land_proof(self, **updates):
+        value = {
+            "schema": lifecycle.LAND_SCHEMA,
+            "thread_id": "thread-1",
+            "idempotency_key": "job-1",
+            "landed": True,
+            "destination": "production",
+            "merged_pr": 17453,
+            "production_sha": "f" * 64,
+            "merged_at": self.now.isoformat(),
+        }
+        value.update(updates)
+        return value
+
     def test_preflight_accepts_only_a_complete_live_selected_route(self):
         self.assertEqual(lifecycle.validate_dispatch(self.envelope, self.now), {"decision": "PROCEED", "reasons": []})
         for field in (
             "account_alias", "expected_account_alias", "workspace_id", "agent_id",
-            "agent_name", "model_id", "runtime", "paying_org", "expected_paying_org",
+            "agent_name", "model_id", "task_class", "runtime", "paying_org", "expected_paying_org",
             "credits_expire_at",
             "idempotency_key", "useful_outcome",
             "destination", "expected_destination", "balance_checked_at",
@@ -136,6 +151,61 @@ class HyperagentLifecycleTests(unittest.TestCase):
             )
             for model in hyperagent:
                 self.assertGreater(chain.index(model["id"]), last_subscription)
+
+    def test_named_agent_is_selected_by_task_class(self):
+        for task, agent in (
+            ("architecture", "Fable 5.1"), ("root-cause", "Fable 5.1"),
+            ("review", "Fable 5.1"), ("design", "Fable 5.1"),
+            ("code", "GLM 5.3"), ("tests", "GLM 5.3"), ("mechanical", "Flash"),
+        ):
+            self.assertEqual(lifecycle.select_named_agent(task), {"agent_name": agent, "model_id": agent})
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.select_named_agent("newest")
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.select_named_agent(None)
+        self.assertEqual(lifecycle.DISPATCH_AGENT_NAMES, {"Fable 5.1", "GLM 5.3", "Flash"})
+
+    def test_preflight_fails_closed_on_named_model_mismatch_and_silent_alternatives(self):
+        mismatched = {**self.envelope, "agent_name": "Fable 5.1", "model_id": "Fable 5.1"}
+        decision = lifecycle.validate_dispatch(mismatched, self.now)
+        self.assertEqual(decision["decision"], "HOLD")
+        self.assertIn("named_agent_mismatch", [item["code"] for item in decision["reasons"]])
+        self.assertIn("named_model_mismatch", [item["code"] for item in decision["reasons"]])
+        for field, value, code in (
+            ("model_id", "opus", "silent_model_alternative"),
+            ("model_id", "newest", "silent_model_alternative"),
+            ("model_id", "codex", "silent_model_alternative"),
+            ("model_id", "live-cheapest-capable", "silent_model_alternative"),
+            ("task_class", "newest", "unknown_task_class"),
+            ("agent_name", "Jovie instruction eval — temporary", "temp_roster_agent"),
+            ("agent_name", "Jovie Skills Audit Tranche 4 — GLM Flash", "temp_roster_agent"),
+            ("agent_name", "GLM 5.3 Flash Developer (copy)", "temp_roster_agent"),
+        ):
+            changed = {**self.envelope, field: value}
+            result = lifecycle.validate_dispatch(changed, self.now)
+            self.assertIn(code, [item["code"] for item in result["reasons"]])
+        pileup = lifecycle.validate_dispatch(
+            {
+                **self.envelope,
+                "open_threads": [
+                    {
+                        "id": "thread-eval-1",
+                        "name": "Agent Policy Decision Evaluation",
+                        "agent_name": "Jovie instruction eval — temporary",
+                    },
+                    {
+                        "id": "thread-eval-2",
+                        "name": "Agent Policy Decision Evaluation",
+                        "agent_name": "Jovie instruction eval — temporary",
+                    },
+                ],
+            },
+            self.now,
+        )
+        self.assertIn("usage_burn_pileup", [item["code"] for item in pileup["reasons"]])
+        invalid = lifecycle.validate_dispatch({**self.envelope, "roster": {}, "open_threads": {}}, self.now)
+        self.assertIn("invalid_roster", [item["code"] for item in invalid["reasons"]])
+        self.assertIn("invalid_pileup", [item["code"] for item in invalid["reasons"]])
 
     def test_preflight_fails_closed_on_identity_auth_scope_mode_and_hash(self):
         mutations = (
@@ -441,15 +511,42 @@ class HyperagentLifecycleTests(unittest.TestCase):
             terminal_state="completed",
             account_alias="workspace-a",
             destination="local-artifact",
-            model_id="live-cheapest-capable",
+            model_id="GLM 5.3",
             useful_outcome_verified=True,
             final_output_sha256="d" * 64,
             usage_receipt_sha256="e" * 64,
             cost_usd=0.5,
+            land=self.land_proof(),
         )
         expected_job = self.expected_job()
         classified = lifecycle.classify_observation(success, self.now, expected_job)
         self.assertEqual(classified["state"], "useful_success")
+        unfinished = {k: v for k, v in success.items() if k != "land"}
+        unfinished_state = lifecycle.classify_observation(unfinished, self.now, expected_job)
+        self.assertEqual(unfinished_state["state"], "land_not_complete")
+        self.assertEqual(unfinished_state["pairedThroughput"], lifecycle.THROUGHPUT_SCHEMA)
+        self.assertEqual(
+            lifecycle.plan_resolution(
+                lifecycle.classify_observation(unfinished, self.now, expected_job)
+            )["action"],
+            "close_or_land_original_thread",
+        )
+        for field, value in (
+            ("landed", False),
+            ("destination", "preview"),
+            ("thread_id", "other"),
+            ("merged_pr", 0),
+            ("production_sha", "short"),
+            ("schema", "wrong"),
+        ):
+            self.assertEqual(
+                lifecycle.classify_observation(
+                    {**unfinished, "land": self.land_proof(**{field: value})},
+                    self.now,
+                    expected_job,
+                )["state"],
+                "land_not_complete",
+            )
         self.assertEqual(lifecycle.plan_resolution(classified)["action"], "record_terminal_receipt")
         for field, value in (
             ("useful_outcome_verified", False), ("final_output_sha256", "short"),
@@ -544,6 +641,79 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 lifecycle.plan_resolution({"state": state})["action"], "hold_unknown"
             )
 
+    def test_roster_and_pileup_exclude_temp_agents_and_usage_burns(self):
+        roster = lifecycle.classify_roster([
+            {"id": "named-glm", "name": "GLM 5.3"},
+            {"id": "named-fable", "name": "Fable 5.1"},
+            {"id": "named-flash", "name": "Flash"},
+            {"id": "eval", "name": "Jovie instruction eval — temporary", "description": "Temporary isolated synthetic decision trials"},
+            {"id": "audit", "name": "Jovie Skills Audit Tranche 4 — GLM Flash", "description": "Temporary read-only auditor"},
+            {"id": "copy", "name": "GLM 5.3 Flash Developer (copy)"},
+            {"id": "eve", "name": "Eve - Prodcut"},
+            "bad",
+        ])
+        self.assertEqual(roster["schema"], lifecycle.LAND_SCHEMA)
+        self.assertEqual(
+            {item["name"] for item in roster["eligible"]},
+            {"GLM 5.3", "Fable 5.1", "Flash"},
+        )
+        excluded_reasons = {item.get("name"): item["reason"] for item in roster["excluded"] if item.get("name")}
+        self.assertEqual(excluded_reasons.get("Jovie instruction eval — temporary"), "temp_roster_agent")
+        self.assertEqual({excluded_reasons.get("Jovie Skills Audit Tranche 4 — GLM Flash"), excluded_reasons.get("GLM 5.3 Flash Developer (copy)")}, {"temp_roster_agent"})
+        self.assertEqual(excluded_reasons["Eve - Prodcut"], "not_named_dispatch_agent")
+        self.assertTrue(any(item["reason"] == "invalid_agent" for item in roster["excluded"]))
+        self.assertEqual(lifecycle.classify_roster({})["reason"], "invalid_roster")
+
+        now = self.now
+        stale = (now - timedelta(hours=2)).isoformat()
+        pileup = lifecycle.classify_pileup(
+            [
+                {"id": "eval-1", "name": "Agent Policy Decision Evaluation", "agent_name": "Jovie instruction eval — temporary", "updatedAt": now.isoformat(), "terminal_state": "completed"},
+                {"id": "eval-2", "name": "Agent Policy Decision Evaluation", "agent_name": "Jovie instruction eval — temporary", "updatedAt": now.isoformat(), "terminal_state": "completed"},
+                {"id": "stale-1", "name": "JOV-1 land", "agent_name": "GLM 5.3", "is_running": True, "updated_at": stale},
+                {"id": "fail-1", "name": "JOV-2 land", "agent_name": "Flash", "terminal_state": "failed"},
+                {"id": "miss-1", "name": "JOV-4", "agent_name": "GLM 5.3", "terminal_state": "cancelled"},
+                {"id": ""},
+                "bad",
+            ],
+            now=now,
+        )
+        self.assertEqual(pileup["status"], "pileup")
+        self.assertEqual(pileup["pairedThroughput"], lifecycle.THROUGHPUT_SCHEMA)
+        kinds = {item["kind"] for item in pileup["burns"]}
+        self.assertTrue({"duplicate", "temp_roster_burn", "stale", "failed_burn", "miss", "land_not_complete", "invalid_thread"} <= kinds)
+        self.assertEqual(lifecycle.classify_pileup({}, now=now)["status"], "unknown")
+        clear = lifecycle.classify_pileup(
+            [{
+                "id": "landed-1",
+                "name": "JOV-3",
+                "agent_name": "GLM 5.3",
+                "terminal_state": "completed",
+                "landed": True,
+                "destination": "production",
+                "updated_at": now.isoformat(),
+                "is_running": False,
+            }],
+            now=now,
+        )
+        self.assertEqual(clear["status"], "clear")
+        burned = lifecycle.plan_resolution({"state": "failed_burn", "job": {"thread_id": "fail-1", "idempotency_key": "job-1"}})
+        self.assertEqual((burned["action"], burned["execute"]), ("quarantine_failed_burn", False))
+        self.assertEqual(lifecycle.plan_resolution({"state": "land_not_complete"})["action"], "hold_unknown")
+        self.assertEqual(lifecycle.plan_resolution({"state": "failed_burn"})["action"], "hold_unknown")
+        self.assertEqual(lifecycle.plan_resolution(None)["action"], "hold_unknown")
+        self.assertEqual(lifecycle.validate_dispatch({**self.envelope, "agent_id": "Jovie instruction eval — temporary"}, self.now)["decision"], "HOLD")
+        described = lifecycle.validate_dispatch({**self.envelope, "roster": [{"name": "GLM 5.3", "description": "temporary isolated eval copy"}]}, self.now)
+        self.assertIn("temp_roster_agent", [item["code"] for item in described["reasons"]])
+        self.assertEqual(lifecycle.validate_dispatch({**self.envelope, "open_threads": []}, self.now)["decision"], "PROCEED")
+        self.assertFalse(lifecycle.is_temp_roster_agent("") or lifecycle.is_temp_roster_agent(None))
+        mismatch_land = lifecycle.classify_observation(
+            {**self.observation(is_running=False, terminal_state="completed", account_alias="workspace-a", destination="local-artifact", model_id="GLM 5.3", useful_outcome_verified=True, final_output_sha256="d" * 64, usage_receipt_sha256="e" * 64, cost_usd=0.5), "land": self.land_proof(idempotency_key="other", merged_pr=True)},
+            self.now,
+            self.expected_job(),
+        )
+        self.assertEqual(mismatch_land["state"], "land_not_complete")
+
     def test_cli_preflight_and_classification_are_machine_readable(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -580,7 +750,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 "terminal_state": "completed",
                 "account_alias": "workspace-a",
                 "destination": "local-artifact",
-                "model_id": "live-cheapest-capable",
+                "model_id": "GLM 5.3",
                 "useful_outcome_verified": True,
                 "final_output_sha256": "d" * 64,
                 "usage_receipt_sha256": "e" * 64,

@@ -36,8 +36,15 @@ describe('HeaderBulkActions', () => {
 
     const actions = screen.getByRole('button', { name: 'Actions' });
     expect(actions).toHaveAttribute('data-size', 'sm');
-    expect(actions.className).toContain('h-7');
-    expect(actions.className).toContain('before:h-11');
+    expect(actions).toHaveClass('h-auto', 'min-h-7');
+    expect(actions).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(actions).not.toHaveClass(fixedHeight);
+    }
     expect(actions.className).toContain('rounded-full');
     expect(actions.className).not.toContain('normal-case');
     expect(actions.className).not.toMatch(

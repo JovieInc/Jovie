@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { act } from 'react';
 import { hydrateRoot } from 'react-dom/client';
@@ -13,6 +15,17 @@ describe('AnimatedIconSwap', () => {
       </AnimatedIconSwap>
     );
     expect(getByTestId('copy-icon')).not.toBeNull();
+  });
+
+  it('renders the initial icon without hidden motion state on the server', () => {
+    const html = renderToString(
+      <AnimatedIconSwap activeKey='copy'>
+        <svg data-testid='copy-icon' />
+      </AnimatedIconSwap>
+    );
+
+    expect(html).not.toContain('opacity:0');
+    expect(html).not.toContain('scale(0.25)');
   });
 
   it('mounts the incoming child when activeKey changes', () => {
@@ -96,5 +109,16 @@ describe('AnimatedIconSwap', () => {
     root.unmount();
     consoleError.mockRestore();
     window.matchMedia = originalMatchMedia;
+  });
+
+  it('keeps the server and first client render visible before hydrated swaps animate', () => {
+    const source = readFileSync(
+      resolve(__dirname, './AnimatedIconSwap.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('setHasMounted(true)');
+    expect(source).toContain("initial={hasMounted ? 'hidden' : false}");
+    expect(source).not.toContain("initial='hidden'");
   });
 });

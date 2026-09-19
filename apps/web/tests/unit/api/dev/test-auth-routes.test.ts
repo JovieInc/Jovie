@@ -663,6 +663,46 @@ describe('dev test-auth routes', () => {
     );
   });
 
+  it('passes the explicit profiles final-row fixture to the auth bootstrap', async () => {
+    mockEnsureDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=/app/profiles'
+      )
+    );
+
+    expect(response.status).toBe(303);
+    expect(mockEnsureDevTestAuthActor).toHaveBeenCalledWith('creator-ready', {
+      fixture: 'profiles-final-row',
+    });
+  });
+
+  it('rejects unknown auth bootstrap fixtures', async () => {
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?fixture=unknown&redirect=/app/profiles'
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Invalid fixture',
+    });
+    expect(mockEnsureDevTestAuthActor).not.toHaveBeenCalled();
+  });
+
   it('rejects external redirect targets on the enter route', async () => {
     mockSanitizeDevTestAuthRedirectPath.mockReturnValue(null);
 

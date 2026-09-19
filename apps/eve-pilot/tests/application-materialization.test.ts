@@ -6,61 +6,98 @@ import { describe, expect, it } from 'vitest';
 import { materializeApp } from '../scripts/materialize-app.mjs';
 
 describe('independent application source export', () => {
-  it.each([
-    'jovie',
-    'summer',
-  ])('exports only allowlisted %s source with checksums and no shared workspace install', identity => {
-    const directory = mkdtempSync(join(tmpdir(), 'eve-app-export-'));
-    const destination = join(directory, identity);
-    try {
-      const receipt = materializeApp(identity, destination);
-      expect(receipt.status).toBe('prepared-not-commissioned');
-      expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
-      expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
-      expect(existsSync(join(destination, '.env'))).toBe(false);
-      expect(
-        JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
-          .scripts.release
-      ).toBe(
-        identity === 'jovie' ? 'node scripts/jovie-release.mjs' : undefined
-      );
-      const other = identity === 'summer' ? 'jovie' : 'summer';
-      expect(existsSync(join(destination, `identities/${other}`))).toBe(false);
-      for (const [path, hash] of Object.entries(receipt.files)) {
+  it.each(['jovie', 'summer'])(
+    'exports only allowlisted %s source with checksums and no shared workspace install',
+    identity => {
+      const directory = mkdtempSync(join(tmpdir(), 'eve-app-export-'));
+      const destination = join(directory, identity);
+      try {
+        const receipt = materializeApp(identity, destination);
+        expect(receipt.status).toBe('prepared-not-commissioned');
+        expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
+        expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
+        expect(existsSync(join(destination, '.env'))).toBe(false);
         expect(
-          createHash('sha256')
-            .update(readFileSync(join(destination, path)))
-            .digest('hex')
-        ).toBe(hash.sha256);
-        if (path.startsWith('agent/'))
-          expect(readFileSync(join(destination, path), 'utf8')).not.toMatch(
-            /(?:apps\/web|@\/lib\/db)/u
-          );
-      }
-      if (identity === 'summer') {
-        expect(
-          readFileSync(join(destination, 'agent/channels/eve.ts'), 'utf8')
-        ).toContain('disableRoute()');
+          JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
+            .scripts.release
+        ).toBe(
+          identity === 'jovie' ? 'node scripts/jovie-release.mjs' : undefined
+        );
+        const other = identity === 'summer' ? 'jovie' : 'summer';
+        expect(existsSync(join(destination, `identities/${other}`))).toBe(
+          false
+        );
+        for (const [path, hash] of Object.entries(receipt.files)) {
+          expect(
+            createHash('sha256')
+              .update(readFileSync(join(destination, path)))
+              .digest('hex')
+          ).toBe(hash.sha256);
+          if (path.startsWith('agent/'))
+            expect(readFileSync(join(destination, path), 'utf8')).not.toMatch(
+              /(?:apps\/web|@\/lib\/db)/u
+            );
+        }
+        const health = readFileSync(
+          join(destination, 'agent/channels/runtime-health.ts'),
+          'utf8'
+        );
+        expect(health).toContain('resolveRuntimeHealthStatus');
+        expect(health).not.toMatch(/status:\s*['"]commissioned['"]/u);
         expect(
           existsSync(
-            join(destination, 'agent/tools/jovie_capability_manifest.ts')
+            join(destination, 'agent/lib/runtime-commissioning-health.ts')
           )
-        ).toBe(false);
+        ).toBe(true);
         expect(
-          readFileSync(
-            join(destination, 'agent/lib/vercel-blob-shadow-store.ts'),
+          readFileSync(join(destination, 'scripts/check-built-app.mjs'), 'utf8')
+        ).toContain("status: 'uncommissioned'");
+        if (identity === 'summer') {
+          const contractDirectory = join(
+            destination,
+            'vendor/agent-transport-contracts'
+          );
+          const entrypoint = readFileSync(
+            join(contractDirectory, 'index.ts'),
             'utf8'
-          ).match(/token: summerStoreToken\(\)/gu)
-        ).toHaveLength(5);
-      } else
-        expect(existsSync(join(destination, 'agent/schedules'))).toBe(false);
-      expect(() => materializeApp(identity, destination)).toThrow(
-        'destination must not exist'
-      );
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+          );
+          expect(entrypoint).toContain("export * from './symphony-outage.js'");
+          for (const [, target] of entrypoint.matchAll(
+            /from ['"](\.\/[^'"]+)['"]/gu
+          ))
+            expect(
+              existsSync(
+                join(contractDirectory, `${target.replace(/\.js$/u, '')}.ts`)
+              )
+            ).toBe(true);
+          expect(
+            receipt.files['vendor/agent-transport-contracts/symphony-outage.ts']
+          ).toBeDefined();
+
+          expect(
+            readFileSync(join(destination, 'agent/channels/eve.ts'), 'utf8')
+          ).toContain('disableRoute()');
+          expect(
+            existsSync(
+              join(destination, 'agent/tools/jovie_capability_manifest.ts')
+            )
+          ).toBe(false);
+          expect(
+            readFileSync(
+              join(destination, 'agent/lib/vercel-blob-shadow-store.ts'),
+              'utf8'
+            ).match(/token: summerStoreToken\(\)/gu)
+          ).toHaveLength(5);
+        } else
+          expect(existsSync(join(destination, 'agent/schedules'))).toBe(false);
+        expect(() => materializeApp(identity, destination)).toThrow(
+          'destination must not exist'
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
   it('rejects unknown identities before writing', () => {
     expect(() => materializeApp('ovie', '/unused')).toThrow(
       'unknown application'

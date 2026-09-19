@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { hasClerkCredentials, signInUser } from '../helpers/clerk-auth';
+import { hasClerkCredentials, signInUser } from '../helpers/auth';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';

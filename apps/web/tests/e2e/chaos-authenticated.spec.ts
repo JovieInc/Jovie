@@ -3,7 +3,7 @@ import {
   ensureSignedInUser,
   getAdminCredentials,
   hasClerkCredentials,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   DASHBOARD_ROUTE_MATRIX,
   getRoutePaths,

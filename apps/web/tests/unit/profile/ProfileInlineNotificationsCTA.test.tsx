@@ -184,10 +184,15 @@ describe('ProfileInlineNotificationsCTA', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     const trigger = screen.getByRole('button', { name: 'Get alerts' });
-    expect(trigger).toHaveClass('h-7');
-    expect(trigger.className).toContain('before:h-11');
-    expect(trigger.className).toContain('before:min-w-11');
-    expect(trigger).not.toHaveClass('h-11', 'h-12');
+    expect(trigger).toHaveClass('h-auto', 'min-h-7');
+    expect(trigger).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(trigger).not.toHaveClass(fixedHeight);
+    }
   });
 
   it('opens the shared full-screen flow from the trigger', async () => {

@@ -36,7 +36,10 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // The inbox flag changes canonical customer navigation. Keep its
       // rollout role-invariant so entering customer mode never gives admins
       // a different sidebar from creators.
-      flagName !== 'INBOX_HOME'
+      flagName !== 'INBOX_HOME' &&
+      // External-recipient paid welcome stays founder-gated. Admins must
+      // not receive a different default than customers (JOV-6445).
+      flagName !== 'PAID_WELCOME_EMAIL'
   )
 );
 

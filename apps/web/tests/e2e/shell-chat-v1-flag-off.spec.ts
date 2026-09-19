@@ -12,7 +12,7 @@ import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });

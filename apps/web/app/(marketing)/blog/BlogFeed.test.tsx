@@ -61,7 +61,10 @@ describe('BlogFeed', () => {
       screen.getByRole('heading', { level: 2, name: 'Second Post' })
     ).toBeVisible();
     expect(container.querySelectorAll('article')).toHaveLength(2);
-    expect(container.querySelector('article')?.className).toContain('p-8');
+    expect(container.querySelector('article')).toHaveAttribute(
+      'data-variant',
+      'featured'
+    );
   });
 
   it('renders the production empty state without inventing posts', () => {

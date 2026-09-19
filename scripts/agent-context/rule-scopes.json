@@ -2,7 +2,7 @@
   {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
-    "bodySha256": "f51100637f153d064b0c292b508a0b4ea5079fc238d86c6de4244f02e5ea3f5c"
+    "bodySha256": "977d28661a368d7ff8617026b4cbbed677705f31c007041fe455e9c3af373ee8"
   },
   {
     "file": ".claude/rules/ci-branching.md",
@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "c08876df6d30729eddd8d7c8ec3e36b2338298c97cc54a463ef6b864e3591e26"
+    "bodySha256": "a3e201248490d4f7607afb1dde495bdd8b672948cba3ee9b8143df8400df81d5"
   },
   {
     "file": ".claude/rules/db.md",
@@ -39,7 +39,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "7e266ad340bec06bb14412854b8bd8ca081f140022469d39506517ee0a8b5126"
+    "bodySha256": "2524497e7f69a6fc2fe20bee4b1735bc3797d5c375d38ced0bb34c2090ac1142"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -54,7 +54,7 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "c4e9985133e811da0ea02b174b00b7f9dcef41a1ed834bbc6de1cca3b9c9c24f"
+    "bodySha256": "fe43d1631f0d7110578dddcd570f4504623ec5b23c883b036f008d6d647a7801"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "19b13c669a3ef0f007076bab948a3776f5289d6a922115b682c267afaaa3728e"
+    "bodySha256": "c419fc94f02f632c39b7d2cc127b56b6737709b38c201734698e99fdc317253b"
   },
   {
     "file": ".claude/rules/security.md",

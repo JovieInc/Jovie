@@ -11,7 +11,7 @@ import {
   NAVIGATION_TELEMETRY_ENDPOINT,
   type NavigationTelemetryPayload,
 } from '@/lib/tracking/navigation-telemetry-contract';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(

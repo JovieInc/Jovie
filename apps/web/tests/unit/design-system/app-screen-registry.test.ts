@@ -31,7 +31,7 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(95);
+    expect(APP_SCREEN_REGISTRY).toHaveLength(96);
   });
 
   it('has a valid registered recipe and component composition', () => {

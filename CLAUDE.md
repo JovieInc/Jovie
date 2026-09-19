@@ -43,7 +43,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | Environment/tooling | [.claude/rules/environment.md](.claude/rules/environment.md) |
 | TypeScript, React, boundaries, prior art | [.claude/rules/code-style.md](.claude/rules/code-style.md) |
 | DB/migrations | [.claude/rules/db.md](.claude/rules/db.md) |
-| Auth/Clerk | [.claude/rules/auth.md](.claude/rules/auth.md) |
+| Auth/Better Auth | [.claude/rules/auth.md](.claude/rules/auth.md) |
 | Security, billing, entitlements | [.claude/rules/security.md](.claude/rules/security.md) |
 | UI/design | [DESIGN.md](DESIGN.md), [.claude/rules/ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |

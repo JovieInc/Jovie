@@ -8,7 +8,12 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
+import {
+  createRateLimitHeaders,
+  paymentIntentLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+} from '@/lib/rate-limit';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -68,9 +73,15 @@ export async function POST(req: NextRequest) {
     const rateLimitResult = await paymentIntentLimiter.limit(userId);
     if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Too many payment intent requests. Please try again later.' },
         {
-          status: 429,
+          error: rateLimitDenialMessage(
+            rateLimitResult,
+            'Too many payment intent requests. Please try again later.',
+            'Payments are temporarily unavailable. Please try again later.'
+          ),
+        },
+        {
+          status: rateLimitDenialStatus(rateLimitResult),
           headers: {
             ...NO_STORE_HEADERS,
             ...createRateLimitHeaders(rateLimitResult),

@@ -1,0 +1,187 @@
+name: Gem Publisher Commission (JOV-6163 E1)
+# Publisher-only install on jovie-fixed when activation coalesces past Install.
+# workflow_dispatch needs actions:write. Push of
+# scripts/symphony/signals/gem-publisher-commission.request lets MQ land the
+# same confirm gate when the dispatcher lacks actions:write.
+# Path lives under scripts/ so main's trusted product-lane classifier admits it
+# without a prior ops/ mapping on main.
+on:
+  workflow_dispatch:
+    inputs:
+      tip_sha:
+        description: Full lowercase 40-hex main tip as configurationSourceRevision
+        required: true
+        type: string
+      confirm:
+        description: Type install-jov-6163-publisher to confirm
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/symphony/signals/gem-publisher-commission.request'
+permissions:
+  contents: read
+concurrency:
+  group: gem-publisher-commission
+  cancel-in-progress: false
+jobs:
+  commission:
+    name: Install JOV-6163 publisher on Gem
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.confirm == 'install-jov-6163-publisher') ||
+      github.event_name == 'push'
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact tip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tip_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve tip + confirm
+        id: req
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TIP: ${{ github.event.inputs.tip_sha }}
+          DISPATCH_CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            tip_sha="$DISPATCH_TIP"
+            confirm="$DISPATCH_CONFIRM"
+          else
+            signal=scripts/symphony/signals/gem-publisher-commission.request
+            test -f "$signal"
+            confirm="$(jq -r '.confirm // empty' "$signal")"
+            tip_sha="$(git rev-parse HEAD)"
+          fi
+          if [[ "$confirm" != install-jov-6163-publisher ]]; then
+            echo "::error::confirm must be install-jov-6163-publisher (got ${confirm:-empty})"
+            exit 2
+          fi
+          [[ "$tip_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "tip_sha=$tip_sha" >> "$GITHUB_OUTPUT"
+          echo "confirm=$confirm" >> "$GITHUB_OUTPUT"
+      - name: Refuse tip drift / wrong host
+        env:
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
+        run: |
+          set -euo pipefail
+          test "$(id -un)" = timwhite
+          [[ "$TIP_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$TIP_SHA"
+          git fetch --quiet origin main
+          tip_now="$(git rev-parse origin/main)"
+          if [[ "$tip_now" != "$TIP_SHA" ]]; then
+            echo "::error::main tip moved to $tip_now; re-dispatch with current tip"
+            exit 2
+          fi
+      - name: Lingering user-systemd session
+        run: |
+          set -euo pipefail
+          uid="$(id -u)"
+          export XDG_RUNTIME_DIR="/run/user/${uid}"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+          test -S "${XDG_RUNTIME_DIR}/bus" || { echo "user bus missing; enable linger" >&2; exit 4; }
+          systemctl --user show-environment >/dev/null
+          {
+            printf 'XDG_RUNTIME_DIR=%s\n' "${XDG_RUNTIME_DIR}"
+            printf 'DBUS_SESSION_BUS_ADDRESS=%s\n' "${DBUS_SESSION_BUS_ADDRESS}"
+            printf 'GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1\n'
+          } >> "${GITHUB_ENV}"
+      - name: Align runner-source revision
+        env:
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
+          ALIGN_ALLOW_CHECKOUT: '1'
+        run: bash scripts/symphony/align-runner-source-revision.sh "$TIP_SHA"
+      - name: Install publisher onto attestation timer
+        run: |
+          set -euo pipefail
+          GEM_WORKSPACE=/home/timwhite/gem-workspace \
+            bash scripts/symphony/install-gem-service-attestation.sh "$GITHUB_WORKSPACE"
+      - name: Verify + two ≤600s observations
+        env:
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        run: |
+          set -euo pipefail
+          # Export sourced operator inputs — emit reads profile from environ when
+          # --profile is omitted; unexported shell vars silently fall back to
+          # canonical and can diverge from install's explicit --profile.
+          set -a
+          # shellcheck disable=SC1090
+          source "${HOME}/.config/symphony/runner-source.env"
+          set +a
+          test "$JOVIE_CONFIGURATION_SOURCE_REVISION" = "$TIP_SHA"
+          profile="${JOVIE_CONFIGURATION_PROFILE:-canonical}"
+          receipt="${GEM_WORKSPACE}/state/gem-service-attestation.json"
+          emit() {
+            python3 "${GEM_WORKSPACE}/scripts/emit-gem-service-attestation.py" \
+              --provenance "${SYMPHONY_RELEASE_PROVENANCE}" \
+              --source-root "${JOVIE_CONFIGURATION_SOURCE_ROOT}" \
+              --source-revision "${JOVIE_CONFIGURATION_SOURCE_REVISION}" \
+              --profile "${profile}" \
+              --gem-root "${GEM_WORKSPACE}"
+          }
+          ok='.schema=="gem-service-attestation/v1" and .configurationSourceRevision==$sha and .healthy==true and .active==true and (.sourceRevision|type=="string" and test("^[0-9a-f]{40}$"))'
+          emit_ok() {
+            local label="$1" out status attempt
+            for attempt in 1 2 3; do
+              set +e
+              out="$(emit 2>&1)"
+              status=$?
+              set -e
+              if [[ "${status}" -eq 0 ]] && jq -e --arg sha "$TIP_SHA" "$ok" "${receipt}" >/dev/null; then
+                return 0
+              fi
+              echo "::warning::${label} attempt ${attempt}/3 failed (emit_exit=${status})"
+              if [[ -n "${out}" ]]; then
+                echo "${out}" | tail -n 40
+              fi
+              if [[ -f "${receipt}" ]]; then
+                jq '{schema,healthy,active,configurationSourceRevision,configurationProfile,daemonReloaded,observedAt,mismatches:[.unit,.policy,.gate,.closureHealth,.workflow|select(.matches==false)],overrideMismatches:[.unitOverrides[]?|select(.matches==false)]}' \
+                  "${receipt}" || true
+              fi
+              if [[ "${attempt}" -lt 3 ]]; then
+                systemctl --user daemon-reload || true
+                sleep 2
+              fi
+            done
+            # emit exit 0 with a receipt that fails jq is still a hard failure —
+            # never return 0 here or Verify would upload unhealthy observations.
+            # Use exit (not set +e + return): curly-brace functions share shell
+            # options with the caller, so a sticky set +e would let cp/verify
+            # continue after a failed observation (Sentry 16703781).
+            echo "::error::${label} failed after retries (last emit_exit=${status})"
+            if [[ "${status:-1}" -ne 0 ]]; then
+              exit "${status}"
+            fi
+            exit 2
+          }
+          emit_ok "observation-a"
+          cp "${receipt}" "${RUNNER_TEMP}/e1-observation-a.json"
+          sleep 2
+          emit_ok "observation-b"
+          cp "${receipt}" "${RUNNER_TEMP}/e1-observation-b.json"
+          a_at="$(jq -r .observedAt "${RUNNER_TEMP}/e1-observation-a.json")"
+          b_at="$(jq -r .observedAt "${RUNNER_TEMP}/e1-observation-b.json")"
+          if [[ "$a_at" == "$b_at" ]]; then
+            echo "::error::observations not independent (identical observedAt)"; exit 2
+          fi
+          node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \
+            --observation-a "${RUNNER_TEMP}/e1-observation-a.json" \
+            --observation-b "${RUNNER_TEMP}/e1-observation-b.json"
+      - name: Upload E1 observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e1-publisher-commission-observations
+          path: |
+            ${{ runner.temp }}/e1-observation-a.json
+            ${{ runner.temp }}/e1-observation-b.json
+            ${{ runner.temp }}/e1-attestation-observations-receipt.json
+            /opt/cursor/artifacts/e1-attestation-observations-receipt.json
+          if-no-files-found: warn

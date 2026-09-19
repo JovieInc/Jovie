@@ -2,16 +2,12 @@
  * Unit tests for BottomTabBar (JOV-2022)
  *
  * Covers:
- *  - All four tabs render whether or not events exist
- *  - Active tab is marked with aria-current="page"
- *  - Active tab uses correct icon colour class
- *  - Inactive tabs do not have aria-current
+ *  - All four destinations render whether or not shows exist
+ *  - Active destination is marked with aria-current="page"
  *  - Tab click handler calls onTabSelect with correct mode
- *  - Grid column count matches visible tab count
- *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - Compact 32px floating capsule with 44px interaction geometry
- *  - Labels remain screen-reader-only
- *  - Empty Events tabs remain reachable so the surface can show alert signup
+ *  - Grid column count matches the shared destination contract
+ *  - Get updates is not an equal-weight destination
+ *  - Fan-capture flags do not hide Home · Music · Shows · About
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -40,35 +36,37 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — tab rendering', () => {
-  it('renders all four primary tabs when hasTourDates is true', () => {
+  it('renders the shared Home · Music · Shows · About destinations', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Events' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
   });
 
-  it('keeps the Events tab when hasTourDates is false', () => {
+  it('keeps Shows when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
   });
 
-  it('removes fan-capture navigation when alerts are not ownership-safe', () => {
+  it('does not let fan-capture flags invent or hide destinations', () => {
     const { container } = render(
-      <BottomTabBar {...makeProps({ showAlerts: false })} />
+      <BottomTabBar
+        {...makeProps({ showAlerts: false, showAlertsTab: false })}
+      />
     );
 
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
     const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(3,');
-  });
-
-  it('omits Alerts when the legacy availability flag is false', () => {
-    render(<BottomTabBar {...makeProps({ showAlertsTab: false })} />);
-    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
+    expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
   it('does not render a More button', () => {
@@ -107,11 +105,22 @@ describe('BottomTabBar — active state', () => {
   });
 
   it('marks the active tab with font-semibold class on label', () => {
-    render(<BottomTabBar {...makeProps({ activeTab: 'subscribe' })} />);
-    const alertsBtn = screen.getByRole('button', { name: 'Alerts' });
-    // The label span inside the active button should be font-semibold
-    const span = alertsBtn.querySelector('span');
+    render(<BottomTabBar {...makeProps({ activeTab: 'about' })} />);
+    const aboutBtn = screen.getByRole('button', { name: 'About' });
+    const span = aboutBtn.querySelector('span');
     expect(span?.className).toContain('font-semibold');
+  });
+
+  it('does not promote Get updates into a destination when subscribe is requested', () => {
+    render(<BottomTabBar {...makeProps({ activeTab: 'subscribe' })} />);
+    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
+    for (const name of ['Home', 'Music', 'Shows', 'About']) {
+      expect(screen.getByRole('button', { name })).not.toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    }
   });
 
   it('uses font-medium class on inactive tab labels', () => {
@@ -164,20 +173,20 @@ describe('BottomTabBar — interaction handlers', () => {
     expect(onTabSelect).toHaveBeenCalledWith('listen');
   });
 
-  it('calls onTabSelect with "tour" when Events is clicked', () => {
+  it('calls onTabSelect with "tour" when Shows is clicked', () => {
     const onTabSelect = vi.fn();
     render(
       <BottomTabBar {...makeProps({ onTabSelect, hasTourDates: true })} />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Events' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Shows' }));
     expect(onTabSelect).toHaveBeenCalledWith('tour');
   });
 
-  it('calls onTabSelect with "subscribe" when Alerts is clicked', () => {
+  it('calls onTabSelect with "about" when About is clicked', () => {
     const onTabSelect = vi.fn();
     render(<BottomTabBar {...makeProps({ onTabSelect })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }));
-    expect(onTabSelect).toHaveBeenCalledWith('subscribe');
+    fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    expect(onTabSelect).toHaveBeenCalledWith('about');
   });
 
   it('keeps tab selection keyboard-operable inside the safe-area wrapper', async () => {

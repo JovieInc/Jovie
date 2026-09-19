@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import type { Page, TestInfo } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { createFreshUser, interceptTrackingCalls } from './helpers/e2e-helpers';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';

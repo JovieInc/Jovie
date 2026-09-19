@@ -6,7 +6,7 @@ import { PLAN_PRICES, toCents } from './plan-prices';
 export const PRICING = {
   pro: {
     monthly: {
-      priceId: env.STRIPE_PRICE_PRO_MONTHLY,
+      priceId: env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,
       amount: toCents(PLAN_PRICES.pro.monthly),
       label: 'Pro',
       entitlementPlan: 'pro',

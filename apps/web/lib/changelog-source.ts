@@ -8,16 +8,21 @@ function resolveChangelogPath(): string | null {
   return fs.existsSync(changelogPath) ? changelogPath : null;
 }
 
-export const getChangelogReleases = unstable_cache(
-  async (): Promise<ChangelogRelease[]> => {
+const getChangelogMarkdown = unstable_cache(
+  async (): Promise<string> => {
     const changelogPath = resolveChangelogPath();
-    if (!changelogPath) return [];
+    if (!changelogPath) return '';
     try {
-      return parseChangelog(fs.readFileSync(changelogPath, 'utf8'));
+      return fs.readFileSync(changelogPath, 'utf8');
     } catch {
-      return [];
+      return '';
     }
   },
-  ['changelog-releases'],
+  ['changelog-markdown'],
   { revalidate: false, tags: ['changelog'] }
 );
+
+// Cache source bytes, not policy decisions: safety rules must apply on every read.
+export async function getChangelogReleases(): Promise<ChangelogRelease[]> {
+  return parseChangelog(await getChangelogMarkdown());
+}

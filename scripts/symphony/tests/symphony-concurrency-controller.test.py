@@ -236,6 +236,17 @@ class EvidenceTests(unittest.TestCase):
             result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
             self.assertEqual(result["headroom"], 5)
             self.assertTrue(result["healthy"])
+            self.assertEqual(
+                result["closureEvidence"]["repairPrs"]["status"], "missing"
+            )
+            self.assertIsNone(result["closureEvidence"]["observedAt"])
+            self.assertEqual(
+                result["closureEvidence"]["observedAtStatus"], "missing"
+            )
+            self.assertEqual(
+                result["closureEvidence"]["gateObservedAt"], gate["observedAt"]
+            )
+            self.assertEqual(result["closureEvidence"]["ownerEvidence"], "missing")
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/LogYourBody", now))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now + 601))
             gate["state"] = "AMBER"
@@ -278,6 +289,197 @@ class EvidenceTests(unittest.TestCase):
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
             path.write_text('{}')
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
+
+    def test_downstream_closure_evidence_preserves_current_targets_and_owners(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "gate.json"
+            now = 2000
+            observed = datetime.fromtimestamp(now, timezone.utc).isoformat()
+            gate = {
+                "schema": "jovie-fleet-gate/v1",
+                "observedAt": observed,
+                "state": "AMBER",
+                "workAdmission": {
+                    "allowed": False,
+                    "newIssueLeaseAllowed": False,
+                    "newImplementationAllowed": False,
+                },
+                "closureAdmission": {
+                    "newIssueIntakeAllowed": False,
+                    "newImplementationAllowed": False,
+                    "remediationContinues": True,
+                },
+                "remediationAdmission": {
+                    "allowed": True,
+                    "localAllowed": True,
+                    "pushAllowed": False,
+                },
+                "signals": {
+                    "main": {"status": "green"},
+                    "production": {"status": "green"},
+                    "closureHealth": {
+                        "schema": "jovie-closure-health/v1",
+                        "observedAt": observed,
+                        "reasons": [
+                            "expired-held-prs",
+                            "internally-repairable-prs-open",
+                        ],
+                        "repairPrs": [12, 11],
+                        "expiredHolds": [12],
+                        "closePrs": [],
+                        "lifecycleActions": [
+                            {
+                                "repository": "JovieInc/Jovie",
+                                "pr": 11,
+                                "sourceState": "repair",
+                                "headSha": "a" * 40,
+                                "owner": "symphony",
+                                "writer": "symphony",
+                                "action": "exact-head-branch-update",
+                                "reason": "merge-state-dirty",
+                                "observedAt": observed,
+                            },
+                            {
+                                "repository": "JovieInc/Jovie",
+                                "pr": 12,
+                                "sourceState": "held",
+                                "headSha": "b" * 40,
+                                "owner": "symphony",
+                                "writer": "symphony",
+                                "action": "reconcile-expired-machine-hold",
+                                "reason": "draft",
+                                "observedAt": observed,
+                            },
+                        ],
+                    },
+                    "queue": {
+                        "repository": "JovieInc/Jovie",
+                        "status": "known",
+                        "greenReadyPrs": 0,
+                        "target": 15,
+                    },
+                },
+            }
+            path.write_text(json.dumps(gate))
+
+            evidence = MODULE.read_downstream(path, "JovieInc/Jovie", now)[
+                "closureEvidence"
+            ]
+
+            self.assertEqual(
+                evidence["schema"], "jovie-downstream-closure-evidence/v1"
+            )
+            self.assertEqual(evidence["observedAt"], observed)
+            self.assertEqual(evidence["reasons"], [
+                "expired-held-prs",
+                "internally-repairable-prs-open",
+            ])
+            self.assertEqual(evidence["repairPrs"]["ids"], [11, 12])
+            self.assertEqual(evidence["expiredHolds"]["ids"], [12])
+            self.assertEqual(
+                [item["pr"] for item in evidence["targets"]], [11, 12]
+            )
+            self.assertEqual(evidence["targets"][0]["owner"], "symphony")
+            self.assertEqual(evidence["targets"][1]["action"], "reconcile-expired-machine-hold")
+            self.assertEqual(evidence["ownerEvidence"], "present")
+
+    def test_pr_identifier_projection_is_explicit_and_bounded(self):
+        self.assertEqual(MODULE._project_pr_numbers([True])["status"], "malformed")
+        self.assertEqual(
+            MODULE._project_pr_numbers([1, "2"])["status"], "malformed"
+        )
+        self.assertEqual(
+            MODULE._project_pr_numbers([7, 7])["status"], "malformed"
+        )
+        bounded = MODULE._project_pr_numbers(list(range(1, 102)))
+        self.assertEqual(bounded["status"], "present")
+        self.assertEqual(bounded["total"], 101)
+        self.assertTrue(bounded["truncated"])
+        self.assertEqual(len(bounded["ids"]), 100)
+
+        invalid_timestamp = MODULE._project_closure_evidence(
+            {"observedAt": False},
+            "2026-09-14T01:50:35Z",
+            "JovieInc/Jovie",
+        )
+        self.assertIsNone(invalid_timestamp["observedAt"])
+        self.assertEqual(invalid_timestamp["observedAtStatus"], "malformed")
+        self.assertEqual(
+            invalid_timestamp["gateObservedAt"], "2026-09-14T01:50:35Z"
+        )
+
+    def test_malformed_lifecycle_evidence_does_not_change_read_downstream_decisions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "gate.json"
+            observed = datetime.fromtimestamp(2000, timezone.utc).isoformat()
+            gate = {
+                "schema": "jovie-fleet-gate/v1",
+                "observedAt": observed,
+                "state": "AMBER",
+                "workAdmission": {
+                    "allowed": False,
+                    "newIssueLeaseAllowed": False,
+                    "newImplementationAllowed": False,
+                },
+                "closureAdmission": {
+                    "newIssueIntakeAllowed": False,
+                    "newImplementationAllowed": False,
+                    "remediationContinues": True,
+                },
+                "remediationAdmission": {
+                    "allowed": True,
+                    "localAllowed": True,
+                    "pushAllowed": False,
+                },
+                "signals": {
+                    "main": {"status": "green"},
+                    "production": {"status": "green"},
+                    "closureHealth": {
+                        "schema": "jovie-closure-health/v1",
+                        "observedAt": observed,
+                        "reasons": ["internally-repairable-prs-open"],
+                        "repairPrs": [17],
+                        "lifecycleActions": [
+                            {
+                                "repository": "JovieInc/Jovie",
+                                "pr": 999,
+                                "sourceState": {"unexpected": True},
+                            }
+                        ],
+                    },
+                    "queue": {
+                        "repository": "JovieInc/Jovie",
+                        "status": "known",
+                        "greenReadyPrs": 0,
+                        "target": 15,
+                    },
+                },
+            }
+            path.write_text(json.dumps(gate))
+            malformed = MODULE.read_downstream(path, "JovieInc/Jovie", 2000)
+
+            baseline_gate = json.loads(json.dumps(gate))
+            baseline_gate["signals"]["closureHealth"].pop("lifecycleActions")
+            path.write_text(json.dumps(baseline_gate))
+            baseline = MODULE.read_downstream(path, "JovieInc/Jovie", 2000)
+
+            decision_fields = (
+                "healthy",
+                "headroom",
+                "newWorkAllowed",
+                "repairOnly",
+                "remediationPushAllowed",
+            )
+            self.assertEqual(
+                {field: malformed[field] for field in decision_fields},
+                {field: baseline[field] for field in decision_fields},
+            )
+            self.assertEqual(
+                malformed["closureEvidence"]["lifecycleStatus"], "malformed"
+            )
+            self.assertEqual(
+                malformed["closureEvidence"]["observedAt"], observed
+            )
 
     def test_runtime_counts_useful_stage_without_counting_notifications(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -335,7 +537,7 @@ class EvidenceTests(unittest.TestCase):
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
-    def test_run_applies_only_future_concurrency_and_preserves_workflow(self):
+    def test_operator_runtime_workflow_applies_only_future_concurrency_and_preserves_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             workflow = root / "WORKFLOW.md"
@@ -349,7 +551,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 "healthy": True,
                 "listener": {"port": 4041, "boundToService": True},
             }))
-            with mock.patch.object(sys, "argv", ["controller", "--workflow", str(workflow), "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--source-attestation", str(attestation), "--proc-root", str(root / "proc")]):
+            with mock.patch.dict(MODULE.os.environ, {"SYMPHONY_RUNTIME_WORKFLOW": str(workflow)}), mock.patch.object(sys, "argv", ["controller", "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--source-attestation", str(attestation), "--proc-root", str(root / "proc")]):
                 args = MODULE.parse_args()
             for name in ("cpu", "memory", "io"):
                 path = args.proc_root / "pressure" / name
@@ -562,7 +764,7 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
     def test_high_runtime_concurrency_preserves_workflow_identity(self):
         self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("128")), 128)
 
-    def test_fleet_installer_attests_high_overlay_and_rejects_other_drift(self):
+    def test_fleet_installer_verifies_configuration_without_overwriting_runtime_identity(self):
         installer = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
         code = installer.read_text().rsplit("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
         with tempfile.TemporaryDirectory() as tmp:
@@ -570,19 +772,35 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
             source, installed = root / "source", root / "installed"
             source.write_text(self.SOURCE)
             env = {"GEM_ROOT": str(root), "WORKFLOW_SOURCE": str(source), "WORKFLOW_TARGET": str(installed),
-                   "SOURCE_REVISION": "a" * 40, "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
+                   "SOURCE_REVISION": "a" * 40, "CONFIGURATION_PROFILE": "canonical",
+                   "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
             for prefix in ("UNIT", "POLICY", "GATE", "CLOSURE"):
                 env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
             with mock.patch.dict(MODULE.os.environ, env):
                 for value in ("1", "41", "128"):
                     installed.write_text(self.overlay(value))
-                    exec(compile(code, str(installer), "exec"), {})
-                    receipt = json.loads((root / "state/gem-service-attestation.json").read_text())
+                    namespace = {}
+                    with mock.patch("builtins.print"):
+                        exec(compile(code, str(installer), "exec"), namespace)
+                    receipt = namespace["receipt"]
+                    self.assertEqual(receipt["schema"], "gem-fleet-configuration-verification/v1")
+                    self.assertNotIn("sourceRevision", receipt)
+                    self.assertFalse((root / "state/gem-service-attestation.json").exists())
                     self.assertTrue(receipt["workflow"]["matches"])
+                    self.assertEqual(receipt["configurationProfile"], "canonical")
                     self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], int(value))
                 for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):
                     installed.write_text(text)
                     with self.assertRaises(SystemExit): exec(compile(code, str(installer), "exec"), {})
+            with mock.patch.dict(MODULE.os.environ, {**env, "CONFIGURATION_PROFILE": "governor-bounded"}):
+                installed.write_text(self.overlay("1"))
+                namespace = {}
+                with mock.patch("builtins.print"):
+                    exec(compile(code, str(installer), "exec"), namespace)
+                self.assertEqual(namespace["receipt"]["configurationProfile"], "governor-bounded")
+                installed.write_text(self.overlay("128"))
+                with self.assertRaises(SystemExit):
+                    exec(compile(code, str(installer), "exec"), {})
 
     def test_any_other_workflow_drift_fails_closed(self):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
@@ -606,9 +824,11 @@ class SystemdActivationTests(unittest.TestCase):
     def test_service_invokes_controller_with_fail_closed_defaults(self):
         text = SERVICE_UNIT.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "Type"), "oneshot")
-        # Exactly the binary, no flags: every policy input stays at its
-        # fail-closed default (missing telemetry or integrity evidence pins
-        # concurrency to MIN_CONCURRENCY).
+        # Runtime path inputs share the observer configuration. Policy remains
+        # fail-closed: missing telemetry or integrity evidence pins concurrency
+        # to MIN_CONCURRENCY. Explicit CLI overrides remain available.
+        self.assertEqual(ini_value(text, "EnvironmentFile"),
+                         "-%h/.config/symphony/runner-source.env")
         self.assertEqual(
             ini_value(text, "ExecStart"),
             "%h/.local/bin/symphony-concurrency-controller",
@@ -679,6 +899,14 @@ class SystemdActivationTests(unittest.TestCase):
         self.assertIn('.bounds.policy == "empirical-additive-probe"', text)
         self.assertIn('.sourceRevision == $sha', text)
         self.assertIn('symphony concurrency receipt is stale or from the future', text)
+        # JOV-6163 publisher: Jovie tip is configurationSourceRevision; Symphony
+        # release SHA stays in sourceRevision (see emit_gem_service_attestation.py).
+        self.assertIn('install-gem-service-attestation.sh', text)
+        self.assertIn('.configurationSourceRevision == $sha', text)
+        self.assertIn(
+            '(.sourceRevision | type == "string" and test("^[0-9a-f]{40}$"))',
+            text,
+        )
 
 
 

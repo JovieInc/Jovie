@@ -7,7 +7,7 @@ import {
   getAdminCredentials,
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,

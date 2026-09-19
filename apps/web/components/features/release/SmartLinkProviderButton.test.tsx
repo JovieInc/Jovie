@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   SMART_LINK_PRIMARY_PROVIDER_BUTTON_CLASSNAME,
@@ -36,6 +36,27 @@ const CONSUMER_PATHS = [
 ] as const;
 
 describe('SmartLinkProviderButton', () => {
+  it('forwards the click event on href rows so listeners can preventDefault', () => {
+    const onClick = vi.fn(
+      (event: { preventDefault: () => void; defaultPrevented: boolean }) => {
+        event.preventDefault();
+      }
+    );
+
+    render(
+      <SmartLinkProviderButton
+        label='Spotify'
+        href='https://open.spotify.com'
+        providerKey='spotify'
+        onClick={onClick}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: 'Open Spotify' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick.mock.calls[0]?.[0]?.defaultPrevented).toBe(true);
+  });
+
   it('exposes the canonical provider key for a non-Spotify action', () => {
     render(
       <SmartLinkProviderButton

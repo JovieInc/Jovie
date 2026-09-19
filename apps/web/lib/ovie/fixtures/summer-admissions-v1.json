@@ -1,0 +1,45 @@
+{
+  "schema": "jovie.eve.summer-admissions-projection/v1",
+  "repository": "JovieInc/Jovie",
+  "authorityScope": "observed-class-admission-task-acceptance-required",
+  "newImplementation": {
+    "state": "HELD",
+    "sourceSchema": "jovie-fleet-gate/v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reason": "independent-authority-observation"
+  },
+  "ownedRemediation": {
+    "state": "ALLOWED",
+    "sourceSchema": "jovie-fleet-gate/v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reason": "independent-authority-observation"
+  },
+  "push": {
+    "state": "HELD",
+    "sourceSchema": "jovie-fleet-gate/v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reason": "independent-authority-observation"
+  },
+  "providerEligibility": {
+    "state": "HELD",
+    "sourceSchema": "symphony-concurrency/v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reason": "independent-authority-observation"
+  },
+  "downstreamHealth": {
+    "state": "HELD",
+    "sourceSchema": "symphony-concurrency/v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reason": "independent-authority-observation"
+  }
+}

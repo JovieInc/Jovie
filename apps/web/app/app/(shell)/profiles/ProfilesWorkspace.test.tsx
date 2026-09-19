@@ -101,7 +101,7 @@ const data: ProfilesWorkspaceData = {
   artist: {
     name: 'Tim White',
     username: 'tim',
-    avatarUrl: null,
+    avatarUrl: 'https://cdn.jov.ie/tim.jpg',
     isPublic: true,
   },
   rows: [
@@ -120,6 +120,14 @@ const data: ProfilesWorkspaceData = {
       rank: 2,
       previousRank: 4,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
+      identityPhoto: {
+        url: 'https://cdn.jov.ie/tim.jpg',
+        source: 'jovie',
+        kind: 'profile',
+        verified: true,
+        observedAt: '2026-07-16T00:00:00.000Z',
+        freshness: 'current',
+      },
     },
     {
       id: 'spotify',
@@ -136,6 +144,14 @@ const data: ProfilesWorkspaceData = {
       rank: 7,
       previousRank: 9,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
+      identityPhoto: {
+        url: 'https://i.scdn.co/image/tim.jpg',
+        source: 'connector',
+        kind: 'profile',
+        verified: true,
+        observedAt: '2026-07-16T00:00:00.000Z',
+        freshness: 'current',
+      },
     },
     {
       id: 'instagram',
@@ -334,38 +350,31 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
-  it('uses the canonical mark state contract and a compact URL display', async () => {
+  it('uses attributable profile photos instead of platform icons as primary identity', async () => {
     renderWorkspace(data);
 
-    const url = screen.getByTitle('https://open.spotify.com/artist/tim');
-    expect(url).toHaveTextContent('open.spotify.com · artist/tim');
-
-    const mark = screen.getByRole('img', { name: 'Spotify' });
-    expect(mark).toHaveClass('relative');
+    const table = screen.getByRole('table');
+    const spotifyPhoto = within(table).getByRole('img', {
+      name: 'Tim White on Spotify',
+    });
+    expect(spotifyPhoto).toHaveAttribute('data-photo-kind', 'profile');
+    expect(spotifyPhoto).toHaveAttribute('data-photo-verified', 'true');
     expect(
-      mark.querySelector('.group-hover\\/connection-row\\:opacity-100')
-    ).not.toBeNull();
-    expect(
-      mark.querySelector('.group-focus-visible\\/connection-row\\:opacity-100')
-    ).not.toBeNull();
-    expect(
-      mark.querySelector(
-        '.group-aria-\\[selected\\=true\\]\\/connection-row\\:opacity-100'
+      decodeURIComponent(
+        spotifyPhoto.querySelector('img')?.getAttribute('src') ?? ''
       )
-    ).not.toBeNull();
-    expect(mark.querySelector('.opacity-0')).not.toBeNull();
+    ).toContain('i.scdn.co/image/tim.jpg');
+
+    const spotifyRow = screen
+      .getByRole('button', { name: 'Actions for Spotify' })
+      .closest('tr');
+    expect(
+      within(spotifyRow as HTMLElement).queryByText(/open\.spotify\.com/)
+    ).not.toBeInTheDocument();
+
     const user = userEvent.setup();
-    await user.click(screen.getByText('Spotify'));
-
-    const selectedRow = screen.getByText('Spotify').closest('tr');
-    expect(selectedRow).toHaveAttribute('aria-selected', 'true');
-
-    const selectedReveal = screen
-      .getByRole('img', { name: 'Spotify' })
-      .querySelector('span[aria-hidden="true"]');
-    expect(selectedReveal).toHaveClass('opacity-100');
-    expect(selectedReveal).not.toHaveClass('opacity-0');
-    expect(selectedReveal).toHaveStyle({ color: '#1DB954' });
+    await user.click(within(spotifyRow as HTMLElement).getByText('Spotify'));
+    expect(spotifyRow).toHaveAttribute('aria-selected', 'true');
   });
 
   it('shows recurring artist outcomes, all monitored pages, and a focused header action', async () => {
@@ -374,28 +383,34 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
-    expect(screen.getByText('Instagram')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Actions for Instagram' })
+    ).toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'All Pages' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
     const outcomes = screen.getByTestId('presence-outcomes');
-    expect(within(outcomes).getByText('Search Visibility')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Identity')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Profiles')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Catalog')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Search')).toBeInTheDocument();
     expect(within(outcomes).getByText('#2')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Answer Visibility')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Published')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Audience Quality')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Engagement Scored')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Monitored Pages')).toBeInTheDocument();
-    expect(within(outcomes).getByText('1 of 5')).toBeInTheDocument();
-    expect(
-      within(outcomes).getByRole('link', { name: /Published/i })
-    ).toHaveAttribute('href', '/tim');
-    expect(
-      within(outcomes).getByRole('link', { name: /Engagement Scored/i })
-    ).toHaveAttribute('href', '/app/contacts');
+    expect(within(outcomes).getByText('Not Measured')).toBeInTheDocument();
+    expect(screen.getByTestId('presence-photo-strip')).toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
+
+    // JOV-6170: presence outcomes group by artist goal, not raw type.
+    expect(
+      screen.getByRole('button', { name: /^Identity$/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Profiles$/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Catalog$/ })
+    ).toBeInTheDocument();
     const typeGlyph = screen.getByRole('img', {
       name: 'DSP profile type',
     });
@@ -418,13 +433,109 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         .some(element => element.classList.contains('sr-only'))
     ).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Profiles$/ }));
     expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Actions for Instagram' })
+    ).toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Identity$/ }));
+    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+
+    // Catalog outcome: authority/directory sources. Base fixture has none,
+    // so the outcome tab renders the category empty state.
+    fireEvent.click(screen.getByRole('button', { name: /^Catalog$/ }));
+    expect(
+      screen.getByText('No Presence in This Category')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('button', { name: 'Connectors' })
     ).toBeInTheDocument();
+  });
+
+  it('renders one recommendation primitive per suggested-qualification surface', async () => {
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        {
+          id: 'fan-wiki',
+          rowType: 'surface',
+          kind: 'authority',
+          platform: 'wikipedia',
+          label: 'Fan Wiki',
+          handle: null,
+          url: 'https://example.com/wiki/tim',
+          trackedUrl: null,
+          qualificationStatus: 'suggested',
+          isOfficial: false,
+          monitoringState: 'unavailable',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+
+    await userEvent.setup().click(screen.getByText('Fan Wiki'));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    const signalList = screen.getByTestId('presence-signal-list');
+    // Suggested qualification: recommendation primitive at its own weight.
+    expect(
+      within(signalList).getByTestId('presence-signal-recommendation')
+    ).toHaveTextContent('Qualify This Page');
+    expect(
+      within(signalList).getByTestId('presence-signal-finding')
+    ).toHaveTextContent('Needs Qualification');
+  });
+
+  it('groups presence signals into separated blocker, finding, and state primitives', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(dataWithConnector);
+
+    await user.click(screen.getByText('Gmail'));
+    const connectorPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    expect(connectorPanel).not.toBeNull();
+    const connectorRender = render(
+      <TooltipProvider>{connectorPanel as ReactElement}</TooltipProvider>
+    );
+
+    const signalList = screen.getByTestId('presence-signal-list');
+    // Connected connector: quiet state primitive only, no fabricated recs.
+    expect(
+      within(signalList).getByTestId('presence-signal-state')
+    ).toHaveTextContent('Active');
+    expect(
+      within(signalList).queryByTestId('presence-signal-blocker')
+    ).not.toBeInTheDocument();
+    expect(
+      within(signalList).queryByTestId('presence-signal-recommendation')
+    ).not.toBeInTheDocument();
+
+    connectorRender.unmount();
+    await user.click(screen.getByRole('button', { name: 'All Pages' }));
+    await user.click(screen.getByText('Spotify'));
+    const dspPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    render(<TooltipProvider>{dspPanel as ReactElement}</TooltipProvider>);
+
+    const dspSignals = screen.getByTestId('presence-signal-list');
+    expect(
+      within(dspSignals).getByTestId('presence-signal-finding')
+    ).toHaveTextContent('Limit Reached');
+    expect(
+      within(dspSignals).queryByTestId('presence-signal-blocker')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Next Best Action')).not.toBeInTheDocument();
   });
 
   it('renders persisted suggestions without fabricating profile surface suggestions', async () => {
@@ -468,6 +579,18 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       await screen.findAllByTestId('suggested-connection-row')
     ).toHaveLength(2);
     expect(screen.getAllByTestId('suggested-connection-group')).toHaveLength(1);
+    // JOV-6170: one identity = one opportunity with a Review count and
+    // canonical directory drills (Genius / Last.fm / MusicBrainz).
+    expect(
+      screen.getByText('Add canonical @timwhite profile')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Review 2')).toBeInTheDocument();
+    expect(screen.getAllByTestId('canonical-source-drill')).toHaveLength(3);
+    expect(
+      screen
+        .getAllByTestId('canonical-source-drill')
+        .map(drill => drill.textContent)
+    ).toEqual(['Genius', 'Last.fm', 'MusicBrainz']);
     expect(screen.getByTestId('suggested-connections-review')).toHaveClass(
       'min-w-0'
     );
@@ -492,6 +615,33 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByText('2 suggested profiles to review.')
     ).toBeInTheDocument();
+  });
+
+  it('renders one opportunity per identity with drills scoped to that identity', async () => {
+    mockPersistedSuggestions([
+      socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96),
+      dspSuggestion('spotify-alpha', 'Alpha Artist', 0.89),
+    ]);
+    renderWorkspace(data);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Suggested' }));
+
+    expect(
+      await screen.findByText('Add canonical Alpha Artist profile')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Add canonical @timwhite profile')
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId('suggested-connection-group')).toHaveLength(2);
+    expect(screen.getAllByText('Review 1')).toHaveLength(2);
+    const drills = screen.getAllByTestId('canonical-source-drill');
+    expect(drills).toHaveLength(6);
+    expect(drills[0]).toHaveAttribute(
+      'href',
+      'https://genius.com/search?q=Alpha%20Artist'
+    );
   });
 
   it('accepts a persisted suggestion, removes review actions, and shows a normal connection row', async () => {
@@ -529,9 +679,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'Social' }));
-    expect(screen.getByText('TikTok')).toBeInTheDocument();
-    const acceptedRow = screen.getByText('TikTok').closest('tr');
+    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
+    const acceptedRow = screen
+      .getByRole('button', { name: 'Actions for TikTok' })
+      .closest('tr');
     expect(acceptedRow).not.toBeNull();
     expect(
       within(acceptedRow as HTMLElement).getByRole('button', {
@@ -627,7 +778,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     expect(screen.getByText('Gmail')).toBeInTheDocument();
     expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
-    expect(screen.queryByText('Instagram')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Instagram' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Connectors' })).toHaveAttribute(
       'aria-pressed',
@@ -664,10 +817,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'href',
       'https://open.spotify.com/artist/tim'
     );
-    expect(screen.getByText('Next Best Action')).toBeInTheDocument();
-    expect(
-      screen.getByText('Upgrade the monitoring limit to track this page.')
-    ).toBeInTheDocument();
+    // JOV-6170: separated signal primitives replace the merged next-best-action.
+    expect(screen.getByTestId('presence-signal-finding')).toHaveTextContent(
+      'Limit Reached'
+    );
+    expect(screen.getByText('Signals')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
       'href',
       '/app/settings/billing'
@@ -677,11 +831,14 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('uses the canonical Jovie URL only for supported social connections', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
-    await user.click(screen.getByRole('button', { name: 'Social' }));
+    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
 
+    const instagramRow = screen
+      .getByRole('button', { name: 'Actions for Instagram' })
+      .closest('tr');
     expect(
-      screen.getByTitle('https://jov.ie/tim/s/instagram')
-    ).toHaveTextContent('jov.ie · tim/s/instagram');
+      within(instagramRow as HTMLElement).getByText('@tim')
+    ).toBeInTheDocument();
 
     await user.click(
       screen.getByRole('button', { name: 'Actions for Instagram' })
@@ -757,7 +914,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Social' }));
+    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 
@@ -867,5 +1024,75 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       ).getByText('Status / Issue')
     ).toHaveClass('sr-only');
     expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
+  });
+
+  it('keeps the final profile row reachable with its secondary line', () => {
+    renderWorkspace(data);
+
+    const table = screen.getByRole('table');
+    expect(table.parentElement).toHaveClass(
+      'overflow-auto',
+      'min-h-0',
+      'flex-1'
+    );
+
+    const finalRow = screen
+      .getByRole('button', { name: 'Actions for Instagram' })
+      .closest('tr');
+    expect(finalRow).not.toBeNull();
+    expect(
+      within(finalRow as HTMLElement).getByText('@tim')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps generic OG images unverified and lock explanations keyboard-reachable', async () => {
+    const user = userEvent.setup();
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        {
+          id: 'seven-digital',
+          rowType: 'surface',
+          kind: 'dsp',
+          platform: 'seven_digital',
+          label: '7digital',
+          handle: null,
+          url: 'https://www.7digital.com/artist/tim-white',
+          trackedUrl: null,
+          qualificationStatus: 'qualified',
+          isOfficial: true,
+          monitoringState: 'active',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: '2026-07-16T00:00:00.000Z',
+          identityPhoto: {
+            url: 'https://www.7digital.com/og-card.jpg',
+            source: 'public_metadata',
+            kind: 'generic',
+            verified: false,
+            observedAt: '2026-07-16T00:00:00.000Z',
+            freshness: 'current',
+          },
+        },
+      ],
+    });
+
+    const photo = within(screen.getByRole('table')).getByRole('img', {
+      name: /Unverified preview for Tim White on 7digital/i,
+    });
+    expect(photo).toHaveAttribute('data-photo-kind', 'generic');
+    expect(photo).toHaveAttribute('data-photo-verified', 'false');
+
+    const lock = screen.getAllByTestId('presence-lock')[0];
+    lock?.focus();
+    const explanation = await screen.findByTestId('presence-lock-explanation');
+    expect(explanation).toHaveTextContent(
+      'Upgrade required to monitor this page.'
+    );
+    await user.keyboard('{Tab}');
+    expect(
+      within(explanation).getByRole('link', { name: 'Upgrade' })
+    ).toHaveAttribute('href', '/app/settings/billing');
   });
 });

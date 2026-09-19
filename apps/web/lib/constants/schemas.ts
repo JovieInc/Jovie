@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 /** Safely serialize JSON-LD with XSS protection */
@@ -108,14 +109,7 @@ export function buildOrganizationSchema(overrides: {
     contactPoint: SCHEMA_FRAGMENTS.contactPoint,
     foundingDate: '2024',
     additionalType: 'https://schema.org/SoftwareApplication',
-    knowsAbout: [
-      'Music Technology',
-      'Smart Links',
-      'Music Marketing',
-      'Independent Musicians',
-      'Music Distribution',
-      'Fan Engagement',
-    ],
+    knowsAbout: [...COMPANY_IDENTITY.knowsAbout],
   });
 }
 

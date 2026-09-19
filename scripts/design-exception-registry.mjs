@@ -32,6 +32,11 @@ export const ISSUE_CODES = Object.freeze({
 /** @type {readonly RegistrySpec[]} */
 export const DESIGN_EXCEPTION_REGISTRIES = Object.freeze(
   JSON.parse(`[
+{"id":"arbitrary-radius","path":"apps/web/tests/unit/design-system/arbitrary-radius.baseline.json","kind":"count","counts":["count"]},
+{"id":"spacing-scale","path":"apps/web/tests/unit/design-system/spacing-scale.baseline.json","kind":"count","pointer":["conservative"],"counts":["count"]},
+{"id":"spacing-scale-families","path":"apps/web/tests/unit/design-system/spacing-scale.baseline.json","kind":"count-map","pointer":["conservative","perFamily"]},
+{"id":"native-spacing-ios","path":"scripts/invariants/native-spacing-scale.baseline.json","kind":"count","pointer":["surfaces","ios"],"counts":["conservative"]},
+{"id":"native-spacing-desktop","path":"scripts/invariants/native-spacing-scale.baseline.json","kind":"count","pointer":["surfaces","desktop"],"counts":["conservative"]},
 {"id":"arbitrary-values","path":"apps/web/tests/unit/design-system/arbitrary-values.baseline.json","kind":"count","counts":["count"]},
 {"id":"linear-namespace","path":"apps/web/tests/unit/design-system/linear-namespace.baseline.json","kind":"count","counts":["count"]},
 {"id":"raw-button","path":"apps/web/tests/unit/design-system/raw-button.baseline.json","kind":"count","counts":["count"]},
@@ -308,8 +313,8 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
     case 'count':
       return compareCounts(
         spec,
-        candidateRecord,
-        baseRecord,
+        atPointer(candidateRecord, spec.pointer),
+        atPointer(baseRecord, spec.pointer),
         spec.counts ?? []
       );
     case 'count-map': {

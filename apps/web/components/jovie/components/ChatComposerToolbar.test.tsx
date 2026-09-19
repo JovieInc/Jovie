@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ComposerAttachButton,
   ComposerMicButton,
   type ComposerMicButtonProps,
 } from './ChatComposerToolbar';
@@ -81,5 +82,48 @@ describe('ComposerMicButton', () => {
     expect(onUnavailable).toHaveBeenCalledTimes(1);
     // An unsupported mic never starts dictation.
     expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
+describe('ComposerAttachButton', () => {
+  it('opens the shared composer palette instead of a file-only dropdown', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <ComposerAttachButton
+          isFileProcessing={false}
+          plusMenuOpen={false}
+          onOpenChange={onOpenChange}
+          onMouseDown={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Attachment options' });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByRole('option', { name: /Attach Files/i })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it('stays disabled while a file is processing', () => {
+    render(
+      <TooltipProvider>
+        <ComposerAttachButton
+          isFileProcessing
+          plusMenuOpen={false}
+          onOpenChange={vi.fn()}
+          onMouseDown={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Attachment options' })
+    ).toBeDisabled();
   });
 });

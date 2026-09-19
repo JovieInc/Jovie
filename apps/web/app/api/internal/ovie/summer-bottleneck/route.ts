@@ -4,9 +4,12 @@ import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
+import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
+import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
+import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -18,12 +21,16 @@ const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
+const ZERO_SHA = '0'.repeat(40);
 const DIGEST = /^[0-9a-f]{64}$/u;
 const JOVIE_PRODUCTION_OIDC_SUBJECT =
   'owner:jovie:project:jovie:environment:production';
 const JOVIE_VERCEL_OIDC_ISSUER = 'https://oidc.vercel.com/jovie';
 const timestamp = z.string().datetime({ offset: true });
-const exactSha = z.string().regex(SHA);
+const exactSha = z
+  .string()
+  .regex(SHA)
+  .refine(value => value !== ZERO_SHA, 'source SHA must not be all zeros');
 const safeCount = z.number().int().nonnegative().safe();
 
 const summerCiImprovementClassIds = [
@@ -57,7 +64,7 @@ const runnerAuthority = z
   })
   .strict();
 
-const ciAuditSchema = z
+const ciAuditV1Schema = z
   .object({
     schema: z.literal('jovie-ci-bottleneck-audit/v1'),
     ...sourceFields,
@@ -90,6 +97,33 @@ const ciAuditSchema = z
       });
     }
   });
+
+const ciAuditSchema = z.union([
+  ciAuditV1Schema,
+  createSummerCiAuditV2Schema(summerCiImprovementClassIds),
+]);
+
+// References an existing host grant; signing this snapshot does not grant execution.
+const existingRepairSchema = z
+  .object({
+    mode: z.literal('isolated-cli'),
+    identifier: z.string().regex(/^JOV-[1-9][0-9]*$/u),
+    issueId: z.uuid(),
+    ownerId: z.uuid(),
+    issueRevision: timestamp,
+    repository: z.literal('JovieInc/Jovie'),
+    pr: z.number().int().positive().safe(),
+    head: exactSha,
+    workspace: z
+      .string()
+      .min(2)
+      .max(1024)
+      .regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0\r\n]+$/u),
+    writerUnit: z.string().regex(/^[a-zA-Z0-9_.@-]+\.service$/u),
+    assignmentDigest: z.string().regex(DIGEST),
+    expiresAt: timestamp,
+  })
+  .strict();
 
 const unsignedSnapshotSchema = z
   .object({
@@ -135,6 +169,12 @@ const unsignedSnapshotSchema = z
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
             sourceSchema: z.literal('symphony-runner-projection/v1'),
             ...runtimeSourceFields,
+            runtimeGeneration: z.string().regex(DIGEST).nullable().optional(),
+            runtimeInvocationId: z
+              .string()
+              .regex(/^[a-f0-9]{32}$/u)
+              .nullable()
+              .optional(),
             blockedSince: timestamp.nullable(),
             capacitySource: runnerAuthority,
             workSource: runnerAuthority,
@@ -144,6 +184,9 @@ const unsignedSnapshotSchema = z
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
         productPaths: summerProductPathsSchema.optional(),
+        admissions: summerAdmissionsSchema.optional(),
+        existingRepair: existingRepairSchema.optional(),
+        taskAdmissions: summerTaskAdmissionsSchema.optional(),
       })
       .strict(),
   })

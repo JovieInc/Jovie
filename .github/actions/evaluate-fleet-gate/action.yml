@@ -7,7 +7,10 @@ description: >
 
 inputs:
   dry-run:
-    description: Pass --dry-run (do not persist latest.json).
+    description: >
+      Pass --dry-run (do not persist latest.json). Live persist stays
+      refuse-closed for placeholder/malformed receipts. Never set
+      FLEET_GATE_ALLOW_LIVE_PERSIST; any nonzero spelling fails the live path.
     required: false
     default: 'false'
   consumer:
@@ -47,6 +50,21 @@ outputs:
   state:
     description: GREEN, AMBER, or RED.
     value: ${{ steps.evaluate.outputs.state }}
+  receipt_age_seconds:
+    description: Age of receipt.observedAt in seconds.
+    value: ${{ steps.evaluate.outputs.receipt_age_seconds }}
+  capacity_accepted:
+    description: concurrency.gem.evidenceAccepted
+    value: ${{ steps.evaluate.outputs.capacity_accepted }}
+  capacity_max_concurrent:
+    description: concurrency.gem.maxConcurrent
+    value: ${{ steps.evaluate.outputs.capacity_max_concurrent }}
+  capacity_reason:
+    description: concurrency.gem.reason
+    value: ${{ steps.evaluate.outputs.capacity_reason }}
+  new_mutation_allowed:
+    description: concurrency.gem.newMutationAllowed (new dispatch only)
+    value: ${{ steps.evaluate.outputs.new_mutation_allowed }}
   receipt_path:
     description: Path to the written receipt JSON.
     value: ${{ steps.evaluate.outputs.receipt_path }}

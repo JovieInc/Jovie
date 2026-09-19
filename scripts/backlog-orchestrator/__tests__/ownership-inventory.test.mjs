@@ -30,6 +30,20 @@ Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.m
 - Class: non-product
 - Justification: This control-plane ownership adapter ships no user-facing page, link, asset, campaign, recommendation, or content variant.
 
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
+
 ## Acceptance criteria
 * New packets name target fields.`,
     createdAt: '2026-08-01T00:00:00.000Z',
@@ -50,6 +64,20 @@ function summerOnlyIssue() {
     title: 'Update Summer bottleneck policy',
     description: `## Proposed fix
 Change the Summer runtime manifest in JovieInc/summer-config. No Jovie product files change.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * Summer policy updates without a Jovie PR.`,

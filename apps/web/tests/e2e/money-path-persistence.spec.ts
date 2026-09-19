@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
-import { prepareBetterAuthEmailOtp } from '../helpers/clerk-auth';
+import { prepareBetterAuthEmailOtp } from '../helpers/auth';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,

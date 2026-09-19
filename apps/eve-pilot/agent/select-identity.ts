@@ -6,6 +6,8 @@ export type EvePilotIdentityId = 'jovie' | 'summer';
 
 export type EvePilotCapability =
   | 'privileged-gbrain-write'
+  | 'operational-gbrain-write'
+  | 'linear-coordination-write'
   | 'symphony-heal'
   | 'symphony-bounded-dispatch'
   | 'gbrain-read'
@@ -18,6 +20,8 @@ export type EvePilotPack = {
   readonly id: EvePilotIdentityId;
   readonly role: 'artist' | 'founder' | 'company-operator';
   readonly canPrivilegedWriteGbrain: boolean;
+  readonly canOperationalWriteGbrain: boolean;
+  readonly canLinearCoordinationWrite: boolean;
   readonly canHealSymphony: boolean;
   readonly canDispatchBoundedSymphonyRepair: boolean;
   readonly canIngestAck: boolean;
@@ -43,6 +47,8 @@ const JOVIE_PACK: EvePilotPack = {
   id: 'jovie',
   role: 'artist',
   canPrivilegedWriteGbrain: false,
+  canOperationalWriteGbrain: false,
+  canLinearCoordinationWrite: false,
   canHealSymphony: false,
   canDispatchBoundedSymphonyRepair: false,
   canIngestAck: false,
@@ -56,10 +62,12 @@ const SUMMER_SHADOW_PACK: EvePilotPack = {
   id: 'summer',
   role: 'company-operator',
   canPrivilegedWriteGbrain: false,
+  canOperationalWriteGbrain: true,
+  canLinearCoordinationWrite: true,
   canHealSymphony: false,
   canDispatchBoundedSymphonyRepair: true,
   canIngestAck: false,
-  canReadGbrain: false,
+  canReadGbrain: true,
   canGovernorAdmit: true,
   canGovernorRoute: true,
   canGovernorEnforce: false,
@@ -84,6 +92,10 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   switch (capability) {
     case 'privileged-gbrain-write':
       return pack.canPrivilegedWriteGbrain;
+    case 'operational-gbrain-write':
+      return pack.canOperationalWriteGbrain;
+    case 'linear-coordination-write':
+      return pack.canLinearCoordinationWrite;
     case 'symphony-heal':
       return pack.canHealSymphony;
     case 'symphony-bounded-dispatch':

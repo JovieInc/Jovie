@@ -7,6 +7,7 @@ const hoisted = vi.hoisted(() => ({
   cacheQueryMock: vi.fn(),
   dashboardQueryMock: vi.fn(),
   dbExecuteMock: vi.fn(),
+  dbSelectMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -15,7 +16,7 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: { execute: hoisted.dbExecuteMock },
+  db: { execute: hoisted.dbExecuteMock, select: hoisted.dbSelectMock },
   doesTableExist: hoisted.doesTableExistMock,
   TABLE_NAMES: { dailyProfileViews: 'daily_profile_views' },
 }));
@@ -140,5 +141,47 @@ describe('getUserDashboardAnalytics view metrics', () => {
     const result = await getUserDashboardAnalytics('user_123', '7d', 'full');
 
     expect(result.unique_views).toBeLessThanOrEqual(result.profile_views);
+  });
+});
+
+describe('getCanonicalProfileViews', () => {
+  function createThenableSelect<T>(row: T) {
+    const chain: {
+      from: ReturnType<typeof vi.fn>;
+      innerJoin: ReturnType<typeof vi.fn>;
+      where: ReturnType<typeof vi.fn>;
+      then: (resolve: (value: T[]) => unknown) => unknown;
+    } = {
+      from: vi.fn(() => chain),
+      innerJoin: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      then: (resolve: (value: T[]) => unknown) => resolve([row]),
+    };
+    return chain;
+  }
+
+  it('returns the summed daily profile views for a public handle', async () => {
+    hoisted.dbSelectMock.mockReturnValue(createThenableSelect({ views: 12 }));
+
+    const { getCanonicalProfileViews } = await import(
+      '@/lib/db/queries/analytics'
+    );
+    const views = await getCanonicalProfileViews({
+      handle: 'tim',
+      start: new Date('2026-09-01T00:00:00.000Z'),
+      end: new Date('2026-09-19T00:00:00.000Z'),
+    });
+
+    expect(views).toBe(12);
+    expect(hoisted.dbSelectMock).toHaveBeenCalled();
+  });
+
+  it('returns 0 when the aggregate row is empty', async () => {
+    hoisted.dbSelectMock.mockReturnValue(createThenableSelect({ views: null }));
+
+    const { getCanonicalProfileViews } = await import(
+      '@/lib/db/queries/analytics'
+    );
+    await expect(getCanonicalProfileViews({ handle: 'tim' })).resolves.toBe(0);
   });
 });

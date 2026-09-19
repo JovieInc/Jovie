@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ export const SIDEBAR_IDENTITY_GROUP_TEST_ID = 'sidebar-identity-group';
 export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 
 export interface SidebarIdentityGroupProps {
+  readonly calm?: boolean;
   readonly profileHref: string | undefined;
 }
 
@@ -42,6 +44,7 @@ export function publicProfileAccessibleName(
  * two top-level rows.
  */
 export function SidebarIdentityGroup({
+  calm = false,
   profileHref,
 }: SidebarIdentityGroupProps) {
   const pathname = usePathname();
@@ -57,52 +60,58 @@ export function SidebarIdentityGroup({
       data-testid={SIDEBAR_USER_PANEL_TEST_ID}
       data-identity-group=''
       data-active={isPublicProfileActive ? 'true' : undefined}
-      className='m-0 min-w-0 border-0 border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
+      className={cn(
+        'm-0 min-w-0 border-0',
+        calm ? 'px-3 py-0' : 'px-2.5 py-1.5'
+      )}
     >
       <div
         data-sidebar='identity-group'
         data-testid={SIDEBAR_IDENTITY_GROUP_TEST_ID}
         className={cn(
-          'relative flex flex-col rounded-xl px-0.5 py-0.5',
+          'relative flex items-center rounded-lg px-0.5 py-0.5',
+          calm && 'p-0',
           'transition-colors duration-fast ease-interactive',
           'hover:bg-sidebar-accent',
           isPublicProfileActive && 'bg-sidebar-accent-active',
           // Inner actions stay siblings; the group owns hover / focus-visible /
           // selected / spacing / border chrome so they do not read as two rows.
+          '[&_[data-slot=common-dropdown-trigger]]:min-w-0',
+          '[&_[data-slot=common-dropdown-trigger]]:flex-1',
           '[&_[data-slot=common-dropdown-trigger]]:hover:bg-transparent',
           '[&_[data-slot=common-dropdown-trigger]]:focus-visible:bg-transparent',
           '[&_[data-slot=common-dropdown-trigger]]:focus-visible:ring-0'
         )}
       >
         <UserButton
+          calm={calm}
           profileHref={profileHref}
           settingsHref={APP_ROUTES.SETTINGS}
           showUserInfo
         />
-        {profileHref && profileDisplayHref ? (
-          <Link
-            href={profileHref}
-            data-sidebar='identity-public-profile'
-            aria-current={isPublicProfileActive ? 'page' : undefined}
-            aria-label={publicProfileAccessibleName(profileDisplayHref)}
-            className={cn(
-              'relative flex min-h-8 min-w-0 items-center gap-2 rounded-lg py-0.5 pl-10 pr-2 text-left outline-none',
-              'text-2xs font-normal text-sidebar-muted',
-              'focus-visible:bg-sidebar-accent',
-              'after:absolute after:-inset-y-1 after:inset-x-0 after:lg:hidden'
-            )}
-          >
-            <span
-              data-sidebar='identity-profile-url'
-              className='min-w-0 flex-1 truncate'
+        {!calm && profileHref && profileDisplayHref ? (
+          <Tooltip label={profileDisplayHref} side='right'>
+            <Link
+              href={profileHref}
+              data-sidebar='identity-public-profile'
+              aria-current={isPublicProfileActive ? 'page' : undefined}
+              aria-label={publicProfileAccessibleName(profileDisplayHref)}
+              className={cn(
+                'relative flex size-8 shrink-0 items-center justify-center rounded-md outline-none',
+                'text-2xs font-normal text-sidebar-muted',
+                'focus-visible:bg-sidebar-accent',
+                'after:absolute after:-inset-y-1 after:inset-x-0 after:lg:hidden'
+              )}
             >
-              {profileDisplayHref}
-            </span>
-            <ExternalLink
-              aria-hidden='true'
-              className='size-3 shrink-0 text-sidebar-item-icon'
-            />
-          </Link>
+              <span data-sidebar='identity-profile-url' className='sr-only'>
+                {profileDisplayHref}
+              </span>
+              <ExternalLink
+                aria-hidden='true'
+                className='size-3 shrink-0 text-sidebar-item-icon'
+              />
+            </Link>
+          </Tooltip>
         ) : null}
       </div>
     </fieldset>

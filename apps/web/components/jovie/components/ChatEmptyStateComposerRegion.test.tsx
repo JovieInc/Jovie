@@ -47,6 +47,30 @@ describe('ChatEmptyStateComposerRegion', () => {
     );
   });
 
+  it.each(
+    CHAT_EMPTY_ROTATE_SAMPLES.map(
+      (sample, index) => [sample.id, index] as const
+    )
+  )(
+    'preserves the live bubble shape for sample %s with and without activation',
+    (_id, index) => {
+      for (const interactive of [false, true]) {
+        sessionStorage.setItem(CHAT_EMPTY_SAMPLE_STORAGE_KEY, String(index));
+        const { unmount } = render(
+          <ChatEmptyStateComposerRegion
+            onSelectSample={interactive ? vi.fn() : undefined}
+          >
+            <div />
+          </ChatEmptyStateComposerRegion>
+        );
+        expect(
+          screen.getByTestId('chat-empty-state-sample-user')
+        ).toHaveAttribute('data-bubble-shape', 'pill');
+        unmount();
+      }
+    }
+  );
+
   it('rotates the sample conversation across empty-chat mounts', () => {
     const { unmount } = render(
       <ChatEmptyStateComposerRegion onSelectSample={vi.fn()}>
@@ -150,6 +174,26 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(composer.getAttribute('data-dock')).toBe('bottom');
     expect(composer.className).toContain('shrink-0');
     expect(screen.getByTestId('composer-child')).toBeTruthy();
+  });
+
+  it('bottom-aligns short suggestions and keeps the composer docked', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        above={<div data-testid='compact-suggestion'>Review release</div>}
+      >
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region).toHaveAttribute('data-empty-chat-region', 'true');
+    const suggestions = screen
+      .getByTestId('compact-suggestion')
+      .closest('[data-empty-chat-suggestions="true"]');
+    expect(suggestions).toHaveClass('mt-auto');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
   });
 
   it('keeps a stable dock while an empty-state affordance is temporarily hidden', () => {

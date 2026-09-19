@@ -105,6 +105,65 @@ export function getCustomerId(
 }
 
 /**
+ * Extract a Stripe object ID from a string or expanded object.
+ */
+export function extractStripeObjectId(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (hasStringId(value)) {
+    return value.id;
+  }
+  return null;
+}
+
+/**
+ * Extract the subscription ID from a Stripe invoice.
+ *
+ * Stripe SDK v20 moved the subscription reference from the top-level
+ * `invoice.subscription` field to `invoice.parent.subscription_details.subscription`.
+ * Check the new location first and fall back to the legacy field.
+ */
+export function extractSubscriptionIdFromInvoice(
+  invoice: Stripe.Invoice
+): string | null {
+  const parent = invoice.parent;
+  if (parent?.subscription_details?.subscription) {
+    return extractStripeObjectId(parent.subscription_details.subscription);
+  }
+
+  return extractStripeObjectId(Reflect.get(invoice, 'subscription'));
+}
+
+/**
+ * A charge is fully refunded when Stripe marks it refunded or the refunded
+ * amount covers the original charge. Partial refunds stay paid.
+ */
+export function isFullyRefundedCharge(
+  charge: Pick<Stripe.Charge, 'refunded' | 'amount' | 'amount_refunded'>
+): boolean {
+  if (charge.refunded) {
+    return true;
+  }
+
+  const amount = charge.amount ?? 0;
+  const amountRefunded = charge.amount_refunded ?? 0;
+  return amount > 0 && amountRefunded >= amount;
+}
+
+/**
+ * True when this invoice is the subscription's current latest invoice.
+ * Historical goodwill refunds of older invoices must not revoke Pro.
+ */
+export function isLatestSubscriptionInvoice(
+  invoice: Pick<Stripe.Invoice, 'id'>,
+  subscription: Pick<Stripe.Subscription, 'latest_invoice'>
+): boolean {
+  const latestInvoiceId = extractStripeObjectId(subscription.latest_invoice);
+  return latestInvoiceId !== null && latestInvoiceId === invoice.id;
+}
+
+/**
  * Fallback: Look up Clerk user ID by Stripe customer ID.
  *
  * Used when subscription/session metadata is missing the clerk_user_id.

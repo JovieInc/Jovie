@@ -465,8 +465,40 @@ struct MobileChatClientTests {
 
     #expect(request.url?.path == "/api/mobile/v1/chat/conversations/conv_1")
     #expect(request.url?.query?.contains("limit=100") == true)
+    #expect(request.url?.query?.contains("before=") == false)
     #expect(detail.conversation.id == "conv_1")
     #expect(detail.hasMore == false)
+  }
+
+  @Test func fetchConversationIncludesBeforeCursorForOlderWindow() async throws {
+    let requestRecorder = RequestRecorder()
+    MockChatURLProtocol.requestHandler = { request in
+      requestRecorder.record(request)
+      let payload = MobileConversationDetailResponse(
+        conversation: MobileConversationRecord(
+          id: "conv_1",
+          title: "Launch plan",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-02T00:00:00.000Z"
+        ),
+        messages: [],
+        hasMore: true
+      )
+      return (makeResponse(for: request), try JSONEncoder().encode(payload))
+    }
+
+    let client = makeClient()
+    _ = try await client.fetchConversation(
+      id: "conv_1",
+      limit: ChatTranscriptWindow.initialMessageLimit,
+      before: "2026-06-01T00:00:00.000Z"
+    )
+    let request = try #require(requestRecorder.recordedRequest())
+
+    let query = request.url?.query ?? ""
+    #expect(query.contains("limit=40"))
+    #expect(query.contains("before="))
+    #expect(query.contains("2026-06-01"))
   }
 
   @Test func sendTurnRetriesWithFreshTokenAfterUnauthorized() async throws {

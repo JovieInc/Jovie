@@ -176,6 +176,23 @@ struct MobileChatView: View {
     ScrollViewReader { proxy in
       ScrollView {
         LazyVStack(alignment: .leading, spacing: JovieSpacing.large) {
+          if ChatTranscriptWindow.shouldOfferLoadEarlier(
+            hasMoreOlder: repository.hasMoreOlder
+          ) {
+            Button {
+              Task { await repository.loadOlderMessages() }
+            } label: {
+              Text("Load Earlier Messages")
+                .font(JovieFont.body(size: 14))
+                .foregroundStyle(JovieColor.textTertiary)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 32)
+            }
+            .buttonStyle(.plain)
+            .disabled(repository.isLoadingOlder)
+            .accessibilityIdentifier("chat-load-earlier")
+          }
+
           ForEach(repository.timeline) { item in
             MobileChatMessageRow(
               item: item,

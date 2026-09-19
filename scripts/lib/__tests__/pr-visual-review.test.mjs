@@ -386,7 +386,7 @@ describe('bounded PR visual review contract', () => {
     });
   });
 
-  it('keeps the workflow bounded, idempotent, and artifact-retained', () => {
+  it('keeps automatic capture bounded and artifact-retained without paid review', () => {
     const workflow = readFileSync(
       '.github/workflows/pr-visual-review.yml',
       'utf8'
@@ -400,26 +400,51 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).not.toContain('github-ai-orchestrator.yml');
     expect(workflow).toContain('review_status');
     expect(workflow).toContain('Capture changed UI (desktop + mobile)');
-    expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
-    expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
-    expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
-    expect(workflow).not.toContain('Kimi');
+    expect(workflow).not.toMatch(
+      /secrets\.|API_KEY|api\.x\.ai|api\.openai\.com/
+    );
+    expect(workflow).not.toMatch(
+      /pr-visual-review\.mjs review|reviewWithConfiguredBackends|reviewWithBackend/
+    );
+    expect(workflow).not.toContain('pull-requests: write');
+    expect(workflow).not.toContain('Call Grok');
+    expect(workflow).not.toContain('Codex fallback');
     expect(workflow).toContain("'unavailable'");
     expect(workflow).toContain("'skipped'");
     expect(workflow).not.toContain('pr-visual-review-capture.mjs || true');
-    expect(workflow).toContain('PR_HEAD_SHA');
-    expect(workflow).toContain('visualReviewIdentity');
-    expect(workflow).toContain('--paginate --slurp');
-    expect(workflow).toContain('| jq -r --arg marker "$MARKER"');
-    expect(workflow).toContain('contains($marker)');
-    expect(workflow).not.toContain('--jq --arg marker');
-    expect(workflow).not.toContain(
-      '--slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq'
-    );
-    expect(workflow).toContain(
-      'Exact visual review already exists; idempotent no-op.'
-    );
+    expect(workflow.match(/^  [a-z][a-z_-]*:$/gm)).toEqual([
+      '  pull_request_target:',
+      '  capture:',
+    ]);
+    expect(workflow).toContain('pr-visual-review-capture.mjs');
+    expect(workflow).toContain('actions/upload-artifact@');
+    expect(workflow).toContain('if-no-files-found: error');
+    expect(workflow).toContain('Fail on missing evidence upload');
     expect(workflow).not.toContain('requested_reviewers');
+  });
+
+  it('routes automatic capture without invoking a provider even when keys exist', () => {
+    const script = `
+      globalThis.fetch = () => { throw new Error('Unexpected paid provider call'); };
+      const { routeChangedFiles } = await import('./.github/scripts/pr-visual-review.mjs');
+      const route = routeChangedFiles(['apps/web/components/homepage/Hero.tsx']);
+      if (!route.shouldReview || route.routes.length === 0) process.exit(1);
+      console.log(JSON.stringify(route));
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GROK_VISUAL_REVIEW_API_KEY: 'test-grok-key',
+          CODEX_VISUAL_REVIEW_API_KEY: 'test-codex-key',
+        },
+      }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout).shouldReview).toBe(true);
   });
 
   it('fails visual capture closed on runtime console, page, and server errors', () => {
@@ -655,10 +680,7 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
       '.github/workflows/pr-visual-review.yml',
       'utf8'
     );
-    const captureJob = workflow.slice(
-      workflow.indexOf('  capture:'),
-      workflow.indexOf('\n  review:')
-    );
+    const captureJob = workflow.slice(workflow.indexOf('  capture:'));
     expect(captureJob).toContain(
       'run: node .github/scripts/pr-visual-evidence-gate.mjs'
     );

@@ -1,3 +1,4 @@
+import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ComponentProps, useEffect, useState } from 'react';
 import { fn } from 'storybook/test';
@@ -62,7 +63,6 @@ const meta = {
         'isRootPickerOpen',
         'pickerListId',
         'pickerActiveRowId',
-        'attachDisabledForPicker',
         'isHero',
       ],
     },
@@ -114,4 +114,17 @@ export const Streaming: Story = {
     onStop: fn(),
     variant: 'compact',
   },
+};
+
+/** Docked fixture for palette and recoverable microphone-error geometry. */
+export const Docked: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: { dictationEnabled: true },
+  decorators: [
+    Story => (
+      <div className='flex h-screen items-end justify-center p-6'>
+        <Story />
+      </div>
+    ),
+  ],
 };

@@ -42,7 +42,14 @@ describe('InlineOfflineNotice', () => {
 
     expect(retry).toHaveAttribute('data-variant', 'secondary');
     expect(retry).toHaveAttribute('data-size', 'sm');
-    expect(retry.className).toContain('before:h-11');
+    expect(retry).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(retry).not.toHaveClass('before:h-11');
   });
 
   it('supports custom copy and omits the action without a handler', () => {

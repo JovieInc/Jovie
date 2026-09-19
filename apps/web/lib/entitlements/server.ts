@@ -10,6 +10,7 @@ import {
   hasAdvancedFeatures,
   isProPlan,
 } from '@/lib/entitlements/registry';
+import { isLegacyFanSendPrice } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import type {
@@ -224,11 +225,15 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     });
   }
 
-  const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
+  const {
+    email: emailFromDb,
+    isPro,
+    plan: dbPlan,
+    stripePriceId,
+    trialEndsAt: rawTrialEndsAt,
+  } = billing.data;
   const effectiveEmail = emailFromDb || userEmail;
 
-  const rawTrialEndsAt = (billing.data as Record<string, unknown>)
-    .trialEndsAt as Date | null;
   const normalized = normalizeBillingPlan({
     rawPlan: dbPlan,
     isPro,
@@ -247,6 +252,15 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   }
 
   const ent = getEntitlements(normalized.plan);
+  const canSendNotifications =
+    ent.booleans.canSendNotifications &&
+    (normalized.isTrialing || isLegacyFanSendPrice(stripePriceId));
+  if (ent.booleans.canSendNotifications && !canSendNotifications) {
+    logger.warn('Paid fan sending requires verified legacy price provenance', {
+      userId,
+      hasStripePriceId: Boolean(stripePriceId),
+    });
+  }
 
   return {
     userId,
@@ -267,5 +281,6 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     hasStripeSubscription: Boolean(billing.data.stripeSubscriptionId),
     ...ent.booleans,
     ...ent.limits,
+    canSendNotifications,
   };
 }

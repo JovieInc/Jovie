@@ -107,8 +107,8 @@ test.describe('Synthetic Monitoring - production waitlist', () => {
     expect(preflight.emailSha256).toBe(emailSha256);
 
     await page.goto('/signin', { waitUntil: 'domcontentloaded' });
-    await page.getByLabel('Email Address').fill(email);
-    await page.getByRole('button', { name: 'Continue with Email' }).click();
+    await page.getByLabel('Email').fill(email);
+    await page.getByRole('button', { name: 'Send sign-in code' }).click();
     await expect(
       page.locator('[data-auth-email-code-step="code"]')
     ).toBeVisible();

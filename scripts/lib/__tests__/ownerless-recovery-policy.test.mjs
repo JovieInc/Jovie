@@ -229,7 +229,33 @@ describe('ownerless recovery policy', () => {
       attempts: 0,
       resetAt,
       retryAt: new Date(resetAt).toISOString(),
+      stderr: null,
       cause: { code: 'RATE_LIMITED', attempts: 0 },
+    });
+  });
+
+  it('surfaces gh stderr from native queue GraphQL failures', () => {
+    const error = Object.assign(
+      new Error(
+        'reading native queue state for PR #17763 failed with exit code 1'
+      ),
+      {
+        name: 'MergeQueueBackendError',
+        code: 'gh_command_failed',
+        details: {
+          stderr:
+            'GraphQL: Resource not accessible by integration (isInMergeQueue)',
+        },
+      }
+    );
+    expect(
+      ownerlessRecoveryFailureDisposition(error, Date.parse(now))
+    ).toMatchObject({
+      schema: 'jovie-ownerless-recovery-failure/v1',
+      status: 'blocked',
+      code: 'gh_command_failed',
+      stderr:
+        'GraphQL: Resource not accessible by integration (isInMergeQueue)',
     });
   });
 
@@ -387,6 +413,8 @@ describe('tracker scan admission', () => {
     expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
     expect(workflow).not.toContain('ready_for_review');
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('permission-merge-queues');
+    expect(workflow).not.toMatch(/permission-contents:/);
     expect(workflow).toMatch(
       /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
     );
@@ -454,73 +482,82 @@ describe('recovery event admission before tracker reads', () => {
     event('unlabeled', { draft: true }),
     event('opened', { base: { ref: 'feature' } }),
     { name: 'push' },
-  ])('skips ineligible event %# before GitHub inventory or Linear', async eventContext => {
-    await expect(
-      run({
-        eventContext,
-        now: Date.parse(now),
-        readEventTimeline: unexpected,
-        resolvePolicyHead: unexpected,
-        readOpenPulls: unexpected,
-        readIssueSnapshot: unexpected,
-      })
-    ).resolves.toBeUndefined();
-  });
+  ])(
+    'skips ineligible event %# before GitHub inventory or Linear',
+    async eventContext => {
+      await expect(
+        run({
+          eventContext,
+          now: Date.parse(now),
+          readEventTimeline: unexpected,
+          resolvePolicyHead: unexpected,
+          readOpenPulls: unexpected,
+          readIssueSnapshot: unexpected,
+        })
+      ).resolves.toBeUndefined();
+    }
+  );
 
   it.each([
     event('opened'),
     event('reopened'),
     { name: 'workflow_dispatch' },
     { name: 'manual' },
-  ])('preserves full closure audit for legitimate event %#', async eventContext => {
-    await expect(
-      run({
-        eventContext,
-        now: Date.parse(now),
-        resolvePolicyHead: async () => main,
-        readEventQueueState: async () => ({
-          number: 17298,
-          headRefOid: head,
-          state: 'OPEN',
-          isDraft: false,
-          queued: false,
-          autoMergeEnabled: false,
-        }),
-        readOpenPulls: async () => [ready],
-        readIssueSnapshot: async () => {
-          throw new Error('full closure audit reached');
-        },
-      })
-    ).rejects.toThrow('full closure audit reached');
-  });
-
-  it.each([
-    { queued: true, autoMergeEnabled: true },
-    { queued: false, autoMergeEnabled: true },
-  ])('repeated events for admitted exact heads never inventory GitHub or Linear: %j', async admission => {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await run({
-        eventContext: event('opened'),
-        now: Date.parse(now),
-        readEventQueueState: async input => {
-          expect(input).toEqual({
-            repository: 'JovieInc/Jovie',
-            number: 17298,
-          });
-          return {
+  ])(
+    'preserves full closure audit for legitimate event %#',
+    async eventContext => {
+      await expect(
+        run({
+          eventContext,
+          now: Date.parse(now),
+          resolvePolicyHead: async () => main,
+          readEventQueueState: async () => ({
             number: 17298,
             headRefOid: head,
             state: 'OPEN',
             isDraft: false,
-            ...admission,
-          };
-        },
-        resolvePolicyHead: unexpected,
-        readOpenPulls: unexpected,
-        readIssueSnapshot: unexpected,
-      });
+            queued: false,
+            autoMergeEnabled: false,
+          }),
+          readOpenPulls: async () => [ready],
+          readIssueSnapshot: async () => {
+            throw new Error('full closure audit reached');
+          },
+        })
+      ).rejects.toThrow('full closure audit reached');
     }
-  });
+  );
+
+  it.each([
+    { queued: true, autoMergeEnabled: true },
+    { queued: false, autoMergeEnabled: true },
+  ])(
+    'repeated events for admitted exact heads never inventory GitHub or Linear: %j',
+    async admission => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await run({
+          eventContext: event('opened'),
+          now: Date.parse(now),
+          readEventQueueState: async input => {
+            expect(input).toEqual({
+              repository: 'JovieInc/Jovie',
+              number: 17298,
+            });
+            return {
+              number: 17298,
+              headRefOid: head,
+              state: 'OPEN',
+              isDraft: false,
+              ...admission,
+            };
+          },
+          resolvePolicyHead: unexpected,
+          readOpenPulls: unexpected,
+          readIssueSnapshot: unexpected,
+        });
+      }
+    }
+  );
 
   it.each([
     { number: 17298, headRefOid: main },
@@ -528,17 +565,20 @@ describe('recovery event admission before tracker reads', () => {
     { number: 17298, headRefOid: head, state: 'OPEN', isDraft: false },
     { number: 17298, headRefOid: head },
     null,
-  ])('rejects stale or partial live admission evidence before tracker inventory: %j', async state => {
-    await expect(
-      run({
-        eventContext: event('opened'),
-        readEventQueueState: async () => state,
-        resolvePolicyHead: unexpected,
-        readOpenPulls: unexpected,
-        readIssueSnapshot: unexpected,
-      })
-    ).rejects.toThrow(/indeterminate|changed/);
-  });
+  ])(
+    'rejects stale or partial live admission evidence before tracker inventory: %j',
+    async state => {
+      await expect(
+        run({
+          eventContext: event('opened'),
+          readEventQueueState: async () => state,
+          resolvePolicyHead: unexpected,
+          readOpenPulls: unexpected,
+          readIssueSnapshot: unexpected,
+        })
+      ).rejects.toThrow(/indeterminate|changed/);
+    }
+  );
 
   it('skips a current closed or draft PR and propagates failed readback', async () => {
     for (const changed of [

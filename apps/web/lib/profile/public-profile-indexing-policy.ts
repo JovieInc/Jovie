@@ -1,6 +1,12 @@
 import type { Metadata } from 'next';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import {
+  getEmailDomain,
+  isReservedTestEmailDomain,
+  normalizeEmail,
+} from '@/lib/utils/email';
+import { isOpaqueInternalProfileHandle } from './opaque-internal-profile-handle';
+import {
   getPublicProfileIdentityExclusionReason,
   type PublicProfileIdentityExclusionReason,
 } from './public-profile-identity-policy';
@@ -16,6 +22,25 @@ export { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from './public-profile-identi
 export type PublicProfileIndexingExclusionReason =
   | PublicProfileIdentityExclusionReason
   | 'qa_machine_handle';
+
+export type PublicProfileDiscoveryExclusionReason =
+  | PublicProfileIndexingExclusionReason
+  | 'qa_display_name'
+  | 'test_account_email'
+  | 'private_or_unpublished'
+  | 'unknown_identity'
+  | 'placeholder_identity';
+
+export interface PublicProfileDiscoveryIdentity {
+  readonly handle?: string | null;
+  readonly displayName?: string | null;
+  readonly isPublic?: boolean | null;
+  readonly ownerEmail?: string | null;
+}
+
+export interface PublicProfileDiscoveryEligibilityOptions {
+  readonly requirePublication?: boolean;
+}
 
 export const PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS = {
   'Cache-Control': 'no-store',
@@ -42,16 +67,14 @@ export function getPublicProfileIndexingExclusionReason(
  * never looks like `tmoc` + ~15 chars of base36, and real display names do not
  * end in the `+clerk test` suffix. Revisit only if a genuine collision appears.
  */
-const QA_MACHINE_HANDLE_PATTERN = /^tmoc[0-9a-z]{10,}$/;
 const QA_CLERK_TEST_DISPLAY_NAME_PATTERN = /\+clerk test$/;
+const JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
+const CLERK_TEST_EMAIL_LOCAL_PART_PATTERN = /\+clerk_test(?:\+|$)/;
 
 function getQaMachineHandleIndexingExclusionReason(
   handle: string
 ): 'qa_machine_handle' | null {
-  const normalized = handle.trim().toLowerCase();
-  return QA_MACHINE_HANDLE_PATTERN.test(normalized)
-    ? 'qa_machine_handle'
-    : null;
+  return isOpaqueInternalProfileHandle(handle) ? 'qa_machine_handle' : null;
 }
 
 function matchesQaClerkTestDisplayName(displayName: string): boolean {
@@ -60,16 +83,85 @@ function matchesQaClerkTestDisplayName(displayName: string): boolean {
   );
 }
 
+function isPlaceholderIdentity(handle: string, displayName: string): boolean {
+  if (displayName === '') return true;
+  return displayName.toLowerCase() === handle.toLowerCase();
+}
+
+function isDiscoveryTestAccountEmail(
+  email: string | null | undefined
+): boolean {
+  if (typeof email !== 'string' || email.trim() === '') return false;
+  const normalized = normalizeEmail(email);
+  const domain = getEmailDomain(normalized);
+  if (!domain) return false;
+  if (isReservedTestEmailDomain(domain)) return true;
+  const localPart = normalized.slice(0, normalized.lastIndexOf('@'));
+  if (CLERK_TEST_EMAIL_LOCAL_PART_PATTERN.test(localPart)) return true;
+  return (
+    domain === 'jov.ie' && JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart)
+  );
+}
+
+export function getPublicProfileDiscoveryExclusionReason(
+  identity: PublicProfileDiscoveryIdentity | null | undefined,
+  options: PublicProfileDiscoveryEligibilityOptions = {}
+): PublicProfileDiscoveryExclusionReason | null {
+  if (!identity) return 'unknown_identity';
+
+  const handle = identity.handle?.trim() ?? '';
+  if (!handle) return 'unknown_identity';
+
+  if (identity.isPublic === false) return 'private_or_unpublished';
+  if (options.requirePublication && identity.isPublic !== true) {
+    return 'private_or_unpublished';
+  }
+
+  const indexingReason = getPublicProfileIndexingExclusionReason(handle);
+  if (indexingReason) return indexingReason;
+
+  const displayName = identity.displayName?.trim() ?? '';
+  if (displayName !== '' && matchesQaClerkTestDisplayName(displayName)) {
+    return 'qa_display_name';
+  }
+
+  if (isDiscoveryTestAccountEmail(identity.ownerEmail)) {
+    return 'test_account_email';
+  }
+
+  // Directory/sitemap only. Direct profile access stays independent.
+  // DATA unpublish of existing placeholder rows is a separate follow-up.
+  if (
+    options.requirePublication &&
+    isPlaceholderIdentity(handle, displayName)
+  ) {
+    return 'placeholder_identity';
+  }
+
+  return null;
+}
+
+export function isPublicProfileDiscoveryEligible(
+  identity: PublicProfileDiscoveryIdentity | null | undefined,
+  options: PublicProfileDiscoveryEligibilityOptions = {}
+): boolean {
+  return getPublicProfileDiscoveryExclusionReason(identity, options) === null;
+}
+
+export function filterPublicDiscoveryIdentities<
+  T extends PublicProfileDiscoveryIdentity,
+>(identities: readonly T[] | null | undefined): T[] {
+  if (!Array.isArray(identities)) return [];
+  return identities.filter(identity =>
+    isPublicProfileDiscoveryEligible(identity, { requirePublication: true })
+  );
+}
+
 export function isPublicProfileIndexable(
   handle: string,
   displayName?: string | null
 ): boolean {
-  return (
-    getPublicProfileIndexingExclusionReason(handle) === null &&
-    (displayName == null ||
-      displayName.trim() === '' ||
-      !matchesQaClerkTestDisplayName(displayName))
-  );
+  return isPublicProfileDiscoveryEligible({ handle, displayName });
 }
 
 const INDEXABLE_PROFILE_ROBOTS: NonNullable<Metadata['robots']> = {

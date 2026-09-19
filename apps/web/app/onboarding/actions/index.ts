@@ -29,11 +29,12 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   createOnboardingError,
+  createOnboardingReceiptPendingError,
   isHandleUniqueViolation,
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
-import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
+import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
@@ -386,10 +387,6 @@ export async function completeOnboarding({
       throw error;
     });
 
-    if (pendingClaim?.mode === 'token_backed') {
-      await clearPendingClaimContext();
-    }
-
     // Await proxy user state cache invalidation BEFORE the redirect so
     // middleware sees fresh state on the user's next navigation. A stale
     // cache would rewrite a completed user back to /start (onboarding),
@@ -404,6 +401,18 @@ export async function completeOnboarding({
       });
     }
 
+    // Required receipts are awaited before reporting success. Failure keeps
+    // the attribution cookie so the completed transaction can be reconciled.
+    try {
+      await attributeLeadSignupFromAppUserId(userId);
+    } catch (error) {
+      throw createOnboardingReceiptPendingError(error);
+    }
+
+    if (pendingClaim?.mode === 'token_backed') {
+      await clearPendingClaimContext();
+    }
+
     // Remaining side effects are fire-and-forget — they don't affect routing.
     await Promise.allSettled([
       runBoundedPostOnboardingSideEffect(
@@ -411,13 +420,6 @@ export async function completeOnboarding({
         () => cacheHandleAvailability(completion.username, false),
         {
           username: completion.username,
-        }
-      ),
-      runBoundedPostOnboardingSideEffect(
-        'attribute_lead_signup',
-        () => attributeLeadSignupFromClerkUserId(userId).then(() => {}),
-        {
-          userId,
         }
       ),
       runBoundedPostOnboardingSideEffect(

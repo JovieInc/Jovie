@@ -20,6 +20,7 @@ import { PublicProfileErrorState } from '@/app/[username]/_components/PublicProf
 import {
   getLegacyProfileModeRedirectHref,
   getProfileModeRedirectHref,
+  LEGACY_PROFILE_MODE_BY_SLUG,
 } from '@/app/[username]/_lib/mode-route-redirect';
 import {
   getProfileModeSubtitle,
@@ -166,7 +167,7 @@ describe('Public Profile Page Logic', () => {
 
     it('resolves missing profiles before the streamed page boundary', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "import { notFound } from 'next/navigation'"
+        "import { notFound, permanentRedirect } from 'next/navigation'"
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const profileResult = await getProfileAndLinks(username)'
@@ -183,6 +184,15 @@ describe('Public Profile Page Logic', () => {
         )
       );
       expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
+
+    it('redirects or 404s opaque internal-ID profile URLs before rendering junk', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'resolveOpaqueInternalProfileUsername'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
     });
 
     it('keeps the transient profile error state out of the client graph', () => {
@@ -265,6 +275,16 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
+    it('marks a failed catalog load instead of treating it as an empty catalog', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'Error fetching public profile releases'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('failed: true');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'catalogLoadFailed={catalogLoadFailed}'
+      );
+    });
+
     it('reads a confirmed playlist fallback from profile settings without live search', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'getConfirmedFeaturedPlaylistFallback(profileSettings)'
@@ -319,11 +339,17 @@ describe('Public Profile Page Logic', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
     });
 
-    it('offers the editorial AEO claim card only for unclaimed direct-claim profiles', () => {
+    it('offers the editorial AEO claim card for unclaimed direct-claim or proof profiles', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '!isClaimed && directClaimSupported'
+        '!isProofProfile && !isClaimed && directClaimSupported'
       );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('isProofProfile');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('resolveProofClaimCta');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('ProfileAeoProofClaimCard');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'claimFooterLabel={isProofProfile ? proofClaim.label : undefined}'
+      );
     });
   });
 
@@ -894,26 +920,25 @@ describe('profile mode route redirects', () => {
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
 
-    expect(afterFiles.slice(0, 12)).toEqual(
-      ['listen', 'music', 'releases', 'subscribe', 'tip', 'tour'].flatMap(
-        alias => [
-          {
-            source: `/:username/${alias}`,
-            has: [
-              {
-                type: 'query',
-                key: 'source',
-                value: '^(?<profileSource>link|qr)$',
-              },
-            ],
-            destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
-          },
-          {
-            source: `/:username/${alias}`,
-            destination: `/:username/${alias}/__profile-mode-alias/resolve`,
-          },
-        ]
-      )
+    const aliasSlugs = Object.keys(LEGACY_PROFILE_MODE_BY_SLUG);
+    expect(afterFiles.slice(0, aliasSlugs.length * 2)).toEqual(
+      aliasSlugs.flatMap(alias => [
+        {
+          source: `/:username/${alias}`,
+          has: [
+            {
+              type: 'query',
+              key: 'source',
+              value: '^(?<profileSource>link|qr)$',
+            },
+          ],
+          destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
+        },
+        {
+          source: `/:username/${alias}`,
+          destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+        },
+      ])
     );
   });
 
@@ -994,10 +1019,26 @@ describe('profile mode route redirects', () => {
     ['subscribe', 'subscribe'],
     ['tip', 'pay'],
     ['tour', 'tour'],
+    ['shows', 'tour'],
+    ['events', 'tour'],
   ] as const)('maps the missing %s slug to %s mode', (slug, mode) => {
     expect(
       getLegacyProfileModeRedirectHref('dualipa', slug, { source: 'qr' })
     ).toBe(`/dualipa?mode=${mode}&source=qr`);
+  });
+
+  it('keeps the proxy duplicate-source allowlist aligned with alias slugs', () => {
+    const proxySource = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
+    const aliasBlock = proxySource.match(
+      /const LEGACY_PROFILE_MODE_ALIASES = new Set\(\[([\s\S]*?)\]\)/
+    )?.[1];
+    expect(aliasBlock).toBeTruthy();
+    const proxyAliases = [...(aliasBlock?.matchAll(/'([^']+)'/g) ?? [])].map(
+      match => match[1]
+    );
+    expect(proxyAliases.sort()).toEqual(
+      Object.keys(LEGACY_PROFILE_MODE_BY_SLUG).sort()
+    );
   });
 
   it('leaves arbitrary content slugs to the smart-link route', () => {

@@ -62,7 +62,7 @@ describe('CTA label weight lock (JOV-5317)', () => {
     expect(primary).toContain('min-height: 42px');
     expect(primary).toContain('border-radius: 999px');
     expect(primary).toContain('letter-spacing: 0');
-    expect(headerCta).toContain('min-height: 2rem');
+    expect(headerCta).not.toContain('min-height: 2rem');
     expect(headerCta).toContain('font-size: 0.79rem');
     expect(headerCta).toContain('letter-spacing: 0');
   });

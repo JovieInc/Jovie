@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync, sign, verify } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import {
   chmodSync,
   mkdirSync,
@@ -17,22 +18,33 @@ import { afterEach, describe, it } from 'node:test';
 import {
   canonical,
   configFromEnvironment,
+  countOpenSummerChildren,
   createFileJournal,
   createHttpTransport,
   createLinearProjector,
+  createOwnedRepairExecutor,
   DISCOVERY_CURSOR_SCHEMA,
   discoverOne,
   EXECUTION_HOLD,
+  MAX_OPEN_SUMMER_CHILDREN,
+  OPEN_CHILD_BUDGET,
   OUTBOX_DOMAIN,
   OUTBOX_DOMAIN_V2,
+  OUTBOX_DOMAIN_V3,
   OUTBOX_PATH,
+  OUTCOME_DOMAIN_V3,
+  OUTCOME_PATH,
   PAGE_SCHEMA,
   parseVerificationKeys,
   READ_DOMAIN,
   runCycle,
   signedReadHeaders,
   signOutcomeV2,
+  signOutcomeV3,
+  validateExecutionEvidenceV3,
+  validateOutcomeV3,
   validateState,
+  validateTask,
   verifyOutboxRecord,
 } from './summer-symphony-outbox-consumer.mjs';
 
@@ -53,6 +65,12 @@ const host = pair();
 const foreign = pair();
 const taskKey = 'a'.repeat(64);
 const keys = new Map([['summer-outbox', summer.publicKey]]);
+const existingRepairFixture = JSON.parse(
+  readFileSync(
+    new URL('./test-vectors/symphony-existing-repair-v3.json', import.meta.url),
+    'utf8'
+  )
+);
 
 function task(overrides = {}) {
   return {
@@ -87,9 +105,11 @@ function signedOutbox(
   keyId = 'summer-outbox'
 ) {
   const domain =
-    taskValue.schema === 'jovie-symphony-repair-task/v2'
-      ? OUTBOX_DOMAIN_V2
-      : OUTBOX_DOMAIN;
+    taskValue.schema === 'jovie-symphony-repair-task/v3'
+      ? OUTBOX_DOMAIN_V3
+      : taskValue.schema === 'jovie-symphony-repair-task/v2'
+        ? OUTBOX_DOMAIN_V2
+        : OUTBOX_DOMAIN;
   const unsigned = {
     schema: domain,
     destination: 'symphony',
@@ -260,6 +280,114 @@ describe('Summer outbox record authority', () => {
           keys
         ),
       /outbox-signature-invalid/
+    );
+  });
+
+  it('accepts the native-queue-starvation repair task bound to its action', () => {
+    const queueTask = task({
+      action: 'reconcile-native-queue-starvation',
+      selected: {
+        id: 'native-queue-starvation',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(queueTask), keys),
+      queueTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-native-queue-starvation',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
+    );
+  });
+
+  it('accepts the closure-health-red repair task bound to its action', () => {
+    const closureTask = task({
+      action: 'reconcile-closure-health-red',
+      selected: {
+        id: 'closure-health-red',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(closureTask), keys),
+      closureTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-closure-health-red',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
+    );
+  });
+
+  it('accepts the runner-capacity-starvation repair task bound to its action', () => {
+    const runnerTask = task({
+      action: 'reconcile-runner-capacity-starvation',
+      selected: {
+        id: 'runner-capacity-starvation',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(runnerTask), keys),
+      runnerTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-runner-capacity-starvation',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
     );
   });
 
@@ -566,11 +694,61 @@ describe('bounded discovery and durable WIP=1 hold', () => {
       taskKey,
       issueIdentifier: 'JOV-6001',
       acknowledgement: 'recorded',
+      action: v2Task.action,
+      sourceVersion: v2Task.source.sourceVersion,
+      snapshotDigest: v2Task.source.snapshotDigest,
     });
     assert.ok(posted);
     assert.equal(posted.decisionFingerprint, taskKey);
     assert.deepEqual(posted.linearProjection, v2Task.linearProjection);
     assert.equal(state.active, null);
+  });
+
+  it('holds projection without acknowledging when the open-child budget is exceeded', async () => {
+    const v2Task = taskV2();
+    const record = signedOutbox(v2Task);
+    let state = {
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: null,
+    };
+    const journal = {
+      read: () => state,
+      write: next => {
+        state = structuredClone(next);
+      },
+    };
+    let posted = 0;
+    const result = await runCycle({
+      journal,
+      keys,
+      transport: {
+        readPage: async () => page([record]),
+        writeOutcome: async () => {
+          posted += 1;
+          return {
+            schema: 'summer.symphony-outcome-ack/v1',
+            taskKey,
+            status: 'recorded',
+          };
+        },
+      },
+      projector: {
+        project: async () => {
+          throw new Error(OPEN_CHILD_BUDGET);
+        },
+      },
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+    });
+    assert.deepEqual(result, {
+      status: 'projection-held',
+      taskKey: v2Task.taskKey,
+      reason: OPEN_CHILD_BUDGET,
+    });
+    assert.equal(posted, 0);
+    assert.equal(state.active.phase, 'discovered');
+    assert.equal(state.active.taskKey, v2Task.taskKey);
   });
 
   it('replays byte-identical pending outcomes without a second Linear projection', async () => {
@@ -975,6 +1153,44 @@ describe('configuration boundaries', () => {
     );
   });
 
+  it('posts the signed v3 execution outcome to the dedicated HTTP endpoint', async () => {
+    const outcome = signOutcomeV3(
+      taskV3(),
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    /** @type {any} */
+    let request;
+    const acknowledgement = {
+      schema: 'summer.symphony-outcome-ack/v1',
+      taskKey: outcome.taskKey,
+      status: 'recorded',
+    };
+    const transport = createHttpTransport(
+      {
+        summerOrigin: 'https://summer.example',
+        outcomePrivateKey: host.privateKey,
+        outcomeKeyId: 'host-outcome',
+      },
+      async (url, options) => {
+        request = { url, options };
+        return Response.json(acknowledgement, { status: 201 });
+      }
+    );
+    assert.deepEqual(await transport.writeOutcome(outcome), acknowledgement);
+    assert.ok(request);
+    const capturedRequest = /** @type {any} */ (request);
+    assert.equal(capturedRequest.url, `https://summer.example${OUTCOME_PATH}`);
+    assert.equal(capturedRequest.options.method, 'POST');
+    assert.equal(
+      capturedRequest.options.headers['content-type'],
+      'application/json'
+    );
+    assert.deepEqual(JSON.parse(capturedRequest.options.body), outcome);
+    assert.equal(outcome.schema, OUTCOME_DOMAIN_V3);
+  });
+
   it('deduplicates the exact Linear projection and creates only when absent', async () => {
     const v2Task = taskV2();
     const projection = v2Task.linearProjection;
@@ -1001,7 +1217,14 @@ describe('configuration boundaries', () => {
             },
           ],
         },
-        parent: { id: 'parent-id', identifier: 'JOV-5853' },
+        parent: {
+          id: 'parent-id',
+          identifier: 'JOV-5853',
+          children: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
         issues: { nodes: existing },
       },
     });
@@ -1013,18 +1236,44 @@ describe('configuration boundaries', () => {
       },
       async (url, options) => {
         calls.push({ url, options });
-        if (calls.length === 1) return Response.json(prepared([]));
+        if (calls.length === 1) {
+          const first = prepared([]);
+          first.data.parent.children = {
+            nodes: [
+              {
+                identifier: 'JOV-1',
+                title: '[summer-task:a] repair',
+                state: { name: 'Todo' },
+              },
+            ],
+            pageInfo: { hasNextPage: true, endCursor: 'next' },
+          };
+          return Response.json(first);
+        }
+        if (calls.length === 2) {
+          const request = JSON.parse(String(options.body));
+          assert.equal(request.variables.after, 'next');
+          assert.equal(request.variables.parentIssue, 'JOV-5853');
+          assert.doesNotMatch(request.query, /mutation/);
+          return Response.json({ data: { parent: prepared([]).data.parent } });
+        }
         return Response.json({
           data: { issueCreate: { success: true, issue } },
         });
       }
     );
     assert.deepEqual(await projector.project(v2Task), issue);
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
+    for (const call of calls.slice(0, 2)) {
+      assert.match(
+        JSON.parse(String(call.options.body)).query,
+        /children\(first: 50.*filter: \{ state: \{ type: \{ nin: \["completed", "canceled"\]/
+      );
+    }
     assert.equal(calls[0].url, 'https://api.linear.app/graphql');
     assert.equal(calls[0].options.redirect, 'error');
     assert.equal(calls[0].options.headers.authorization, 'scoped-test-key');
-    const mutation = JSON.parse(calls[1].options.body);
+    const mutation = JSON.parse(calls[2].options.body);
     assert.deepEqual(mutation.variables.input, {
       teamId: 'team-id',
       parentId: 'parent-id',
@@ -1042,11 +1291,205 @@ describe('configuration boundaries', () => {
       },
       async () => {
         replayCalls += 1;
-        return Response.json(prepared([issue]));
+        const replay = prepared([issue]);
+        replay.data.parent.children.nodes = ['a', 'b', 'c'].map(id => ({
+          identifier: `JOV-${id}`,
+          title: `[summer-task:${id}] repair`,
+          state: { name: 'Todo' },
+        }));
+        return Response.json(replay);
       }
     );
     assert.deepEqual(await replayProjector.project(v2Task), issue);
     assert.equal(replayCalls, 1);
+  });
+
+  it('counts open summer-task children and refuses new creates past the budget', async () => {
+    assert.equal(MAX_OPEN_SUMMER_CHILDREN, 3);
+    assert.equal(
+      countOpenSummerChildren([
+        {
+          identifier: 'JOV-1',
+          title: '[summer-task:aa] native-queue-starvation',
+          state: { name: 'In Progress' },
+        },
+        {
+          identifier: 'JOV-2',
+          title: '[summer-task:bb] native-queue-starvation',
+          state: { name: 'Todo' },
+        },
+        {
+          identifier: 'JOV-3',
+          title: '[summer-task:cc] native-queue-starvation',
+          state: { name: 'Done' },
+        },
+        { identifier: 'JOV-4', title: 'unrelated', state: { name: 'Todo' } },
+      ]),
+      2
+    );
+    const v2Task = taskV2();
+    const prepared = {
+      data: {
+        teams: {
+          nodes: [
+            {
+              id: 'team-id',
+              key: 'JOV',
+              states: { nodes: [{ id: 'todo-id', name: 'Todo' }] },
+              labels: { nodes: [{ id: 'label-id', name: 'symphony' }] },
+            },
+          ],
+        },
+        parent: {
+          id: 'parent-id',
+          identifier: 'JOV-5853',
+          children: {
+            nodes: [
+              {
+                identifier: 'JOV-1',
+                title: '[summer-task:a] native-queue-starvation',
+                state: { name: 'In Progress' },
+              },
+              {
+                identifier: 'JOV-2',
+                title: '[summer-task:b] native-queue-starvation',
+                state: { name: 'Todo' },
+              },
+              {
+                identifier: 'JOV-3',
+                title: '[summer-task:c] release-certification-starvation',
+                state: { name: 'In Progress' },
+              },
+            ],
+          },
+        },
+        issues: { nodes: [] },
+      },
+    };
+    const calls = [];
+    const projector = createLinearProjector(
+      {
+        linearOrigin: 'https://api.linear.app/graphql',
+        linearApiKey: 'scoped-test-key',
+      },
+      async (url, options) => {
+        calls.push({ url, options });
+        return Response.json(prepared);
+      }
+    );
+    await assert.rejects(
+      () => projector.project(v2Task),
+      error => error instanceof Error && error.message === OPEN_CHILD_BUDGET
+    );
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(JSON.stringify(calls[0].options.body), /issueCreate/);
+  });
+
+  it('checks later child pages and never creates from incomplete budget evidence', async () => {
+    const task = taskV2();
+    const child = (id, name = 'Todo') => ({
+      identifier: `JOV-${id}`,
+      title: `[summer-task:${id}] repair`,
+      state: { name },
+    });
+    const connection = (nodes, hasNextPage = false, endCursor = null) => ({
+      nodes,
+      pageInfo: { hasNextPage, endCursor },
+    });
+    const parent = children => ({
+      id: 'parent-id',
+      identifier: 'JOV-5853',
+      children,
+    });
+    const scenarios = [
+      {
+        pages: [
+          connection([child(1)], true, 'a'),
+          connection([child(2), child(3)]),
+        ],
+        error: OPEN_CHILD_BUDGET,
+      },
+      { pages: [undefined], error: 'child-evidence-invalid' },
+      {
+        pages: [
+          connection([{ identifier: 'JOV-1', title: '[summer-task:1]' }]),
+        ],
+        error: 'child-evidence-invalid',
+      },
+      { pages: [{ nodes: [] }], error: 'child-evidence-invalid' },
+      { pages: [connection([], true, '')], error: 'child-evidence-incomplete' },
+      {
+        pages: [connection([], true, 'a'), connection([], true, 'a')],
+        error: 'child-evidence-incomplete',
+      },
+      {
+        pages: [connection([child(1)], true, 'a'), connection([child(1)])],
+        error: 'child-evidence-invalid',
+      },
+      {
+        pages: [
+          connection([], true, 'a'),
+          connection([], true, 'b'),
+          connection([], true, 'c'),
+          connection([], true, 'd'),
+        ],
+        error: 'child-evidence-incomplete',
+      },
+      {
+        pages: [connection([], true, 'a'), connection([])],
+        otherParent: true,
+        error: 'child-evidence-invalid',
+      },
+    ];
+    for (const scenario of scenarios) {
+      const calls = [];
+      const projector = createLinearProjector(
+        {
+          linearOrigin: 'https://api.linear.app/graphql',
+          linearApiKey: 'fixture',
+        },
+        async (_url, options) => {
+          const request = JSON.parse(String(options.body));
+          calls.push(request);
+          assert.doesNotMatch(request.query, /mutation|issueCreate/);
+          if (calls.length === 1)
+            return Response.json({
+              data: {
+                teams: {
+                  nodes: [
+                    {
+                      id: 'team',
+                      key: 'JOV',
+                      states: { nodes: [{ id: 'todo', name: 'Todo' }] },
+                      labels: { nodes: [{ id: 'label', name: 'symphony' }] },
+                    },
+                  ],
+                },
+                parent: parent(scenario.pages[0]),
+                issues: { nodes: [] },
+              },
+            });
+          assert.equal(request.variables.parentIssue, 'JOV-5853');
+          assert.equal(
+            request.variables.after,
+            scenario.pages[calls.length - 2].pageInfo.endCursor
+          );
+          return Response.json({
+            data: {
+              parent: {
+                ...parent(scenario.pages[calls.length - 1]),
+                ...(scenario.otherParent ? { identifier: 'JOV-999' } : {}),
+              },
+            },
+          });
+        }
+      );
+      await assert.rejects(
+        () => projector.project(task),
+        new RegExp(scenario.error)
+      );
+      assert.equal(calls.length, scenario.pages.length);
+    }
   });
 
   it('entrypoint exits with a typed configuration rejection', () => {
@@ -1061,5 +1504,480 @@ describe('configuration boundaries', () => {
     assert.equal(result.status, 78);
     assert.match(result.stderr, /SUMMER_SYMPHONY_CONSUMER_REJECTED/);
     assert.doesNotMatch(result.stderr, /PRIVATE KEY|LINEAR_API_KEY/u);
+  });
+});
+
+function taskV3() {
+  return structuredClone(existingRepairFixture.task);
+}
+function executionResult() {
+  return structuredClone(existingRepairFixture.result);
+}
+describe('existing owned repair transport', () => {
+  it('strictly binds signed v3 and rejects widened or native-only authority', () => {
+    const value = taskV3();
+    assert.deepEqual(verifyOutboxRecord(signedOutbox(value), keys), value);
+    for (const mutate of [
+      v => (v.existingRepair.mode = 'native'),
+      v => (v.existingRepair.workspace = '/fixture/../other'),
+      v => (v.existingRepair.expiresAt = '2026-09-08T01:00:00Z'),
+      v => (v.linearProjection = {}),
+      v => (v.decisionFingerprint = '9'.repeat(64)),
+      v => (v.action = 'create-child-issue'),
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed);
+      assert.throws(() => validateTask(changed));
+    }
+  });
+  it('keeps unqualified execution held without Linear projection or an outcome', async () => {
+    let state = {
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: null,
+    };
+    const journal = { read: () => state, write: next => (state = next) };
+    const result = await runCycle({
+      journal,
+      transport: {
+        readPage: async () => page([signedOutbox(taskV3())]),
+        writeOutcome: () => assert.fail('no outcome'),
+      },
+      keys,
+      projector: { project: () => assert.fail('no Linear mutation') },
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+    });
+    assert.equal(result.status, 'execution-held');
+    assert.equal(state.active.phase, 'discovered');
+  });
+  it('durably retries the identical signed terminal outcome without a second execution', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'summer-v3-'));
+    roots.push(root);
+    const journal = createFileJournal(root, keys, host.publicKey);
+    let executions = 0;
+    const writes = [];
+    const options = {
+      journal,
+      keys,
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+      executor: {
+        execute: async () => {
+          executions++;
+          return executionResult();
+        },
+      },
+      transport: {
+        readPage: async () => page([signedOutbox(taskV3())]),
+        writeOutcome: async outcome => {
+          writes.push(outcome);
+          if (writes.length === 1) throw new Error('uncertain persistence');
+          return { status: 'replay' };
+        },
+      },
+    };
+    await assert.rejects(runCycle(options), /uncertain persistence/);
+    assert.equal((await runCycle(options)).status, 'execution-recorded');
+    assert.equal(executions, 1);
+    assert.deepEqual(writes[0], writes[1]);
+    assert.equal(journal.read().active, null);
+  });
+  it('rejects cross-bound execution, source, signature, and premature terminal records', () => {
+    const value = taskV3();
+    const outcome = signOutcomeV3(
+      value,
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    assert.deepEqual(
+      validateOutcomeV3(outcome, value, host.publicKey),
+      outcome
+    );
+    for (const mutate of [
+      v => (v.existingRepair.head = '0'.repeat(40)),
+      v => (v.source.snapshotDigest = '0'.repeat(64)),
+      v => (v.execution.provider = 'codex'),
+      v => (v.completedAt = '2026-09-06T01:00:00Z'),
+      v => (v.execution.runId = 'other'),
+      v => (v.execution.taskAcceptanceDigest = '0'.repeat(64)),
+    ]) {
+      const changed = structuredClone(outcome);
+      mutate(changed);
+      assert.throws(() => validateOutcomeV3(changed, value, host.publicKey));
+    }
+  });
+  it('uses the existing controller command and retains unsupported live execution explicitly', async () => {
+    const root = mkdtempSync(
+      join(tmpdir(), 'symphony-owned-repair-controller-')
+    );
+    roots.push(root);
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    mkdirSync(current, { recursive: true });
+    writeFileSync(
+      join(gem, 'config/existing-repair-controller-manifest.json'),
+      readFileSync(
+        new URL(
+          './config/existing-repair-controller-manifest.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    for (const path of [
+      join(home, '.local/bin/symphony-codex-exhausted.py'),
+      join(current, 'symphony-codex-exhausted.py'),
+      join(current, 'existing_pr_repair.py'),
+    ]) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, '#!/usr/bin/env python3\n');
+      chmodSync(path, 0o755);
+    }
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
+    let calls = 0;
+    try {
+      const executor = createOwnedRepairExecutor({
+        run: (binary, args, options) => {
+          calls++;
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(JSON.parse(options.input), taskV3());
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              status: 'held',
+              reason: 'qualified-isolated-repair-executor-unavailable',
+            }),
+          };
+        },
+      });
+      assert.equal((await executor.execute(taskV3())).status, 'held');
+      assert.equal(calls, 1);
+
+      const child = /** @type {import('node:events').EventEmitter & {
+        stdout: import('node:events').EventEmitter,
+        stderr: import('node:events').EventEmitter,
+        stdin: { end(input: string): void },
+        kill(signal?: string): void
+      }} */ (/** @type {unknown} */ (new EventEmitter()));
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = {
+        end(input) {
+          assert.deepEqual(JSON.parse(input), taskV3());
+          queueMicrotask(() => {
+            child.stdout.emit(
+              'data',
+              JSON.stringify({
+                status: 'held',
+                reason: 'qualified-isolated-repair-executor-unavailable',
+              })
+            );
+            child.emit('close', 0, null);
+          });
+        },
+      };
+      child.kill = signal => assert.equal(signal, 'SIGTERM');
+      const asyncExecutor = createOwnedRepairExecutor({
+        spawnProcess: (binary, args, options) => {
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(options.stdio, ['pipe', 'pipe', 'pipe']);
+          return child;
+        },
+      });
+      assert.equal((await asyncExecutor.execute(taskV3())).status, 'held');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+  it('rejects terminal evidence that is cross-bound, head-frozen on success, or wrongly signed', () => {
+    const value = taskV3();
+    const outcome = signOutcomeV3(
+      value,
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    assert.deepEqual(
+      validateOutcomeV3(outcome, value, host.publicKey),
+      outcome
+    );
+    for (const mutate of [
+      v => (v.execution.verification.claimRecorded = false),
+      v => (v.execution.baseHead = '0'.repeat(40)),
+      v => (v.execution.finalHead = v.execution.baseHead),
+    ]) {
+      const changed = structuredClone(outcome);
+      mutate(changed);
+      assert.throws(
+        () => validateExecutionEvidenceV3(changed),
+        /consumer-execution-evidence-(invalid-or-cross-bound|success-without-head-change)/
+      );
+    }
+    const reworded = structuredClone(outcome);
+    reworded.detail = 'tampered detail';
+    assert.throws(
+      () => validateOutcomeV3(reworded, value, host.publicKey),
+      /consumer-execution-outcome-signature-invalid/
+    );
+  });
+  it('holds when the controller package is missing or malformed and rejects process failures', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'symphony-owned-repair-hold-'));
+    roots.push(root);
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
+    const held = {
+      status: 'held',
+      reason: 'qualified-isolated-repair-executor-unavailable',
+    };
+    try {
+      // No manifest at all -> package unavailable, the cycle holds.
+      const missingManifest = createOwnedRepairExecutor();
+      assert.deepEqual(await missingManifest.execute(taskV3()), held);
+      // Malformed manifest -> invalid package, still held (never executed).
+      const manifest = JSON.parse(
+        readFileSync(
+          new URL(
+            './config/existing-repair-controller-manifest.json',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      );
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify({ ...manifest, packageId: 'not-the-published-package' })
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // Path-escape manifest -> path-invalid, still held.
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify({
+          ...manifest,
+          launcherRelativePath: '../escape/symphony-codex-exhausted.py',
+        })
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // Valid manifest but no launcher on disk -> unavailable, still held.
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify(manifest)
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // With the launcher present, process-level failures reject loudly.
+      mkdirSync(current, { recursive: true });
+      for (const path of [
+        join(home, '.local/bin/symphony-codex-exhausted.py'),
+        join(current, 'symphony-codex-exhausted.py'),
+        join(current, 'existing_pr_repair.py'),
+      ]) {
+        writeFileSync(path, '#!/usr/bin/env python3\n');
+        chmodSync(path, 0o755);
+      }
+      const failingExecutor = createOwnedRepairExecutor({
+        run: () => ({ status: 3, stdout: '' }),
+      });
+      await assert.rejects(
+        failingExecutor.execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      const invalidJsonExecutor = createOwnedRepairExecutor({
+        run: () => ({ status: 0, stdout: 'not-json' }),
+      });
+      await assert.rejects(
+        invalidJsonExecutor.execute(taskV3()),
+        /"not-json" is not valid JSON/
+      );
+      const streamErrorExecutor = createOwnedRepairExecutor({
+        run: () => ({
+          status: null,
+          stdout: '',
+          error: new Error('spawn boom'),
+        }),
+      });
+      await assert.rejects(
+        streamErrorExecutor.execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      const oversizedExecutor = createOwnedRepairExecutor({
+        run: () => ({
+          status: 0,
+          stdout: 'x'.repeat(128 * 1024 + 1),
+        }),
+      });
+      await assert.rejects(
+        oversizedExecutor.execute(taskV3()),
+        /is not valid JSON/
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+  it('bounds controller output and rejects failed, invalid, or unreadable controller streams', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'symphony-owned-repair-streams-'));
+    roots.push(root);
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    mkdirSync(current, { recursive: true });
+    writeFileSync(
+      join(gem, 'config/existing-repair-controller-manifest.json'),
+      readFileSync(
+        new URL(
+          './config/existing-repair-controller-manifest.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    for (const path of [
+      join(home, '.local/bin/symphony-codex-exhausted.py'),
+      join(current, 'symphony-codex-exhausted.py'),
+      join(current, 'existing_pr_repair.py'),
+    ]) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, '#!/usr/bin/env python3\n');
+      chmodSync(path, 0o755);
+    }
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
+    try {
+      const fakeChild = () => {
+        const child = /** @type {import('node:events').EventEmitter & {
+          stdout: import('node:events').EventEmitter,
+          stderr: import('node:events').EventEmitter,
+          stdin: { end(input: string): void },
+          kill(signal?: string): void
+        }} */ (/** @type {unknown} */ (new EventEmitter()));
+        child.stdout = new EventEmitter();
+        child.stderr = new EventEmitter();
+        child.kill = signal => assert.equal(signal, 'SIGTERM');
+        return child;
+      };
+      // stderr output is drained (append else-branch) and a nonzero close
+      // rejects as unavailable.
+      const failedChild = fakeChild();
+      failedChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            failedChild.stderr.emit('data', 'controller boomed');
+            failedChild.emit('close', 3, null);
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => failedChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      // A close with a signal is equally unavailable.
+      const signaledChild = fakeChild();
+      signaledChild.stdin = {
+        end() {
+          queueMicrotask(() => signaledChild.emit('close', null, 'SIGKILL'));
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => signaledChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      // Clean close with non-JSON stdout -> invalid JSON.
+      const invalidJsonChild = fakeChild();
+      invalidJsonChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            invalidJsonChild.stdout.emit('data', 'not-json');
+            invalidJsonChild.emit('close', 0, null);
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => invalidJsonChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-invalid-json/
+      );
+      // Output beyond the bounded buffer is killed, never trusted.
+      const oversizedChild = fakeChild();
+      oversizedChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            oversizedChild.stdout.emit(
+              'data',
+              Buffer.alloc(128 * 1024 + 1, 'x')
+            );
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => oversizedChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-output-too-large/
+      );
+      // A stdin write failure finishes with the write error.
+      const brokenStdinChild = fakeChild();
+      brokenStdinChild.stdin = {
+        end() {
+          throw new Error('stdin pipe broken');
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => brokenStdinChild,
+        }).execute(taskV3()),
+        /stdin pipe broken/
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
   });
 });

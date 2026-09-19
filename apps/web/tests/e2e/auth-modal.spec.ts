@@ -23,9 +23,7 @@ function expectedDialogName(mode: 'signin' | 'signup') {
     return 'Authentication unavailable';
   }
 
-  return mode === 'signin'
-    ? 'Sign in to Jovie'
-    : 'Create your account on Jovie';
+  return mode === 'signin' ? 'Log in to Jovie' : 'Continue to Jovie';
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -240,7 +238,7 @@ test.describe('Intercepted auth modal', () => {
   test('back button dismisses the intercepted modal', async ({ page }) => {
     await openInterceptedModal(page, 'signin');
 
-    await page.getByRole('button', { name: 'Go back' }).click();
+    await page.getByRole('button', { name: 'Back to homepage' }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({
       timeout: 5_000,

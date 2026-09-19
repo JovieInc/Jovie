@@ -36,14 +36,17 @@ test.describe('/new landing page', () => {
 
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
+      headerNav.getByRole('link', { name: 'Artists', exact: true })
+    ).toHaveAttribute('href', APP_ROUTES.ARTISTS);
+    await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
     await expect(
       headerNav.getByRole('button', { name: 'For', exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       headerNav.getByRole('button', { name: 'Tools', exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       headerNav.getByRole('link', { name: 'Pricing', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRICING);
@@ -95,7 +98,7 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to waitlist', async ({ page }) => {
+  test('navigates hero CTA to signup', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(

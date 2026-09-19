@@ -12,10 +12,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ACQUISITION_CERTIFICATION_COMMAND,
+  BILLING_COVERAGE_COMMAND,
+  BILLING_PROVENANCE_COVERAGE_COMMAND,
   CERTIFICATION_KERNEL_COMMAND,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
+  FAN_SEND_SAFETY_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
+  MARKETING_CERTIFICATION_COMMAND,
+  RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -56,6 +62,65 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it.each([
+    { ci: 'true', available: false, suiteExit: 0, expected: 1 },
+    { ci: '', available: false, suiteExit: 0, expected: 0 },
+    { ci: 'true', available: true, suiteExit: 0, expected: 0 },
+    { ci: 'true', available: true, suiteExit: 37, expected: 37 },
+  ])('executes structural Python dependency policy %j', scenario => {
+    const command = CI_FAST_SOURCE.match(
+      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
+    )?.[1];
+    expect(command).toBeTruthy();
+    if (!command) throw new Error('missing structural Python command');
+    const root = mkdtempSync(join(tmpdir(), 'structural-python-policy-'));
+    const calls = join(root, 'calls');
+    try {
+      const shim = join(root, 'python3');
+      writeFileSync(
+        shim,
+        [
+          '#!/bin/sh',
+          'printf "%s\\n" "$*" >> "$POLICY_CALLS"',
+          'if [ "$1" = "-c" ]; then exit "$POLICY_IMPORT_EXIT"; fi',
+          'if [ "$1" = "-m" ] && [ "$2" = "pytest" ]; then exit "$POLICY_SUITE_EXIT"; fi',
+          'exit 0',
+          '',
+        ].join('\n')
+      );
+      chmodSync(shim, 0o755);
+      const result = spawnSync('/bin/sh', ['-c', command], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CI: scenario.ci,
+          PATH: `${root}:${process.env.PATH}`,
+          POLICY_CALLS: calls,
+          POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
+          POLICY_SUITE_EXIT: String(scenario.suiteExit),
+        },
+      });
+      expect(result.status, result.stderr).toBe(scenario.expected);
+      const invoked = readFileSync(calls, 'utf8');
+      if (scenario.available) {
+        expect(invoked).toContain('-m coverage run --branch');
+        expect(invoked).toContain('-m pytest scripts/tests/test_gh_retry.py');
+        expect(invoked).toContain(
+          'scripts/tests/test_symphony_reconciler_runtime.py -v'
+        );
+      } else {
+        expect(invoked.trim()).toBe('-c import coverage, pytest');
+        if (scenario.ci === 'true') {
+          expect(result.stderr).toContain('::error::pytest/coverage missing');
+        } else {
+          expect(result.stdout).toContain('skip local structural regressions');
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs desktop release regressions with measured coverage for mac changes', () => {
     expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
       '--test-coverage-include=scripts/desktop-release-assets.mjs'
@@ -127,6 +192,45 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects and runs alignment regressions for source-only changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/align-runner-source-revision.sh',
+      'scripts/symphony/tests/align-runner-source-revision.test.sh',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'bash scripts/symphony/tests/align-runner-source-revision.test.sh'"
+    );
+  });
+
+  it('runs Linux restart boundary tests when the helper or its proof changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/symphony-elixir-safe-restart',
+      'scripts/symphony/tests/run-safe-restart-gate.py',
+      'scripts/symphony/tests/symphony-safe-restart.test.py',
+    ]) {
+      const result = spawnSync('grep', ['-Eq', pattern], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(result.status, path).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/symphony/tests/run-safe-restart-gate.py'"
+    );
+  });
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),
@@ -157,11 +261,44 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toBe(0);
   });
 
+  it('admits acquisition-only and shared CAS edits to measured structural tests', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    for (const path of [
+      'apps/web/lib/acquisition/certification-store.ts',
+      'apps/web/lib/acquisition/certification-store.test.ts',
+      'apps/web/lib/agent-os/certification-cas.ts',
+      'apps/web/lib/agent-os/certification-adapter.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status,
+        path
+      ).toBe(0);
+    }
+    expect(LANE_COMMANDS.structural).toContain(
+      ACQUISITION_CERTIFICATION_COMMAND
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).toContain(
+      'lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts'
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).not.toContain(
+      '--passWithNoTests'
+    );
+    const webParts = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = [')
+    );
+    expect(webParts).toContain('ACQUISITION_CERTIFICATION_COMMAND,');
+  });
+
   it('covers every lane exactly once across the explicit hosted groups', () => {
     const laneIds = Object.values(LANE_GROUPS).flat();
 
     expect(new Set(laneIds).size).toBe(laneIds.length);
     expect([...laneIds].sort()).toEqual([
+      'billing-coverage',
       'biome',
       'design-conformance',
       'design-exception-registry',
@@ -171,6 +308,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'scripts-typecheck',
+      'shadcn-lint-contracts',
       'structural',
       'typecheck',
     ]);
@@ -505,6 +643,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes().map(lane => lane.id)).toEqual([
       'biome',
       'eslint-server-boundaries',
+      'shadcn-lint-contracts',
       'typecheck',
       'scripts-typecheck',
       'guardrails',
@@ -513,6 +652,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance',
       'ios-fast',
       'profile-admission',
+      'billing-coverage',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
@@ -531,6 +671,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance': 'pnpm design:conformance:gate',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
+      'shadcn-lint-contracts':
+        'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
@@ -539,10 +681,15 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+      'billing-coverage': BILLING_COVERAGE_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
+        MARKETING_CERTIFICATION_COMMAND +
+        ' && ' +
         CERTIFICATION_KERNEL_COMMAND +
+        ' && ' +
+        ACQUISITION_CERTIFICATION_COMMAND +
         ' && ' +
         DESKTOP_RELEASE_COVERAGE_COMMAND,
     });
@@ -564,6 +711,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
+    expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
     expect(LANE_COMMANDS['design-conformance']).toBe(
       'pnpm design:conformance:gate'
     );
@@ -575,6 +723,23 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(LANE_COMMANDS['design-exception-registry']).toBe(
       'pnpm design:exception-registry:check'
+    );
+    expect(LANE_GROUPS.remaining).toContain('billing-coverage');
+    expect(LANE_COMMANDS['billing-coverage']).toBe(BILLING_COVERAGE_COMMAND);
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'tests/unit/lib/entitlements/creator-plan.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'tests/unit/lib/stripe/customer-sync.queries.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
+      'tests/lib/notifications/service.test.ts'
+    );
+    expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.lines=70'
     );
     expect(LANE_COMMANDS['design-exception-registry']).not.toMatch(
       /vitest|playwright|e2e/i
@@ -645,6 +810,67 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects structural CI for marketing registry-only edits and enforces per-file coverage', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    for (const path of [
+      'apps/web/data/marketing/componentRegistry.ts',
+      'apps/web/data/marketing/routeManifest.ts',
+      'apps/web/data/marketing/sections.ts',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    const marketingAlt = 'apps/web/data/marketing/';
+    expect(pattern).toContain(`${marketingAlt}|`);
+    const stripped = pattern.replace(`${marketingAlt}|`, '');
+    expect(stripped).not.toBe(pattern);
+    for (const path of [
+      'apps/web/data/marketing/componentRegistry.ts',
+      'apps/web/data/marketing/routeManifest.ts',
+      'apps/web/data/marketing/sections.ts',
+    ]) {
+      const red = spawnSync('grep', ['-qE', stripped], {
+        input: `${path}\n`,
+      });
+      expect(red.status, `deliberate-red ${path}`).not.toBe(0);
+    }
+    const start = CI_FAST_SOURCE.indexOf('const webParts = [');
+    const web = CI_FAST_SOURCE.slice(
+      start,
+      CI_FAST_SOURCE.indexOf('const parts = [', start)
+    );
+    expect(web).toContain('MARKETING_CERTIFICATION_COMMAND');
+    const command = MARKETING_CERTIFICATION_COMMAND;
+    expect(LANE_COMMANDS.structural).toContain(command);
+    for (const selector of [
+      'app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx',
+      'components/homepage/HomepageNoScriptContent.test.tsx',
+      'components/marketing/MarketingHero.test.tsx',
+      'tests/unit/home/HomepageCertifiedSections.test.tsx',
+      'tests/unit/home/HomepageEditorialHero.test.tsx',
+      'tests/unit/marketing/component-registry.test.ts',
+      'tests/unit/marketing/recipe-manifest.test.ts',
+      'tests/unit/marketing/route-health-contract.test.ts',
+      'components/site/PublicPageShell.test.tsx',
+      '--coverage.enabled',
+      '--coverage.provider=v8',
+      '--coverage.include=data/marketing/componentRegistry.ts',
+      '--coverage.include=data/marketing/routeManifest.ts',
+      '--coverage.include=data/marketing/sections.ts',
+      '--coverage.include=components/marketing/MarketingHero.tsx',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.lines=80',
+      '--coverage.thresholds.statements=80',
+      '--coverage.thresholds.branches=75',
+      '--coverage.thresholds.functions=75',
+    ])
+      expect(command).toContain(selector);
+    expect(command).not.toContain('passWithNoTests');
+  });
+
   it('runs the lockfile specifier preflight before expensive fast lanes', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
@@ -672,6 +898,38 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain('--test-coverage-functions=90');
     expect(controlTest).toContain(
       '&& node scripts/run-affected-tests.mjs --control'
+    );
+  });
+
+  it('enforces external shared health contract coverage for package and test changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain('packages/agent-transport-contracts/');
+    expect(remaining).toContain('symphony-health-contract\\.test\\.mjs');
+    expect(CI_FAST_SOURCE).toContain(
+      "selected.has('operations') || selected.has('web')"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      '--coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts"'
+    );
+    expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
+  });
+
+  it('runs native queue delivery regressions with coverage for executor changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain(
+      '(run-native-queue-execution|native-queue-starvation-execute(?:\\.test)?)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs'
     );
   });
 
@@ -720,14 +978,16 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
       'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-      'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
       'python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py',
       'coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
       'python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py',
       'coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
       'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'python3 scripts/symphony/tests/test-model-router.py',
+      'python3 scripts/symphony/tests/run-model-state-gate.py',
+      'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
       'python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py',
       'python3 scripts/symphony/tests/symphony-github-poke.test.py',
     ]) {
@@ -1103,9 +1363,20 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/test-model-router.py',
       'scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'scripts/symphony/tests/test_fleet_admission_receipt.py',
+      'scripts/lib/release-wave-admission.mjs',
+      'scripts/lib/__tests__/release-wave-admission.test.mjs',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }
+    expect(CI_FAST_SOURCE).toContain(
+      'RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      'lib/__tests__/release-wave-admission.test.mjs'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      '--coverage.include=release-wave-admission.mjs'
+    );
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
     expect(CI_FAST_SOURCE).toContain(
@@ -1242,6 +1513,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
     expect(selectsStructural.test('scripts/doc-freshness-lint.mjs')).toBe(true);
+    expect(
+      spawnSync('grep', ['-qE', controlPattern], {
+        input: 'apps/web/scripts/optical-grid-scanners.ts\n',
+        encoding: 'utf8',
+      }).status
+    ).toBe(0);
+    const scannerCoverage = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = ['),
+      CI_FAST_SOURCE.indexOf('const macParts = [')
+    );
+    expect(scannerCoverage).toContain(
+      '--coverage.include=scripts/optical-grid-scanners.ts'
+    );
+    expect(scannerCoverage).toContain(
+      'tests/unit/design-system/spacing-scale-ratchet.test.ts'
+    );
+    expect(scannerCoverage).toContain(
+      'tests/unit/design-system/concentric-radius-contract.test.ts'
+    );
 
     // JOV-5435 centralized web-test boundary stays selected.
     expect(uiRe.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')).toBe(true);
@@ -1323,4 +1613,36 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(WORKFLOW).toContain('name: ci-fast');
   });
+});
+
+it('runs the attestation observation coverage gate for publisher-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
+  const selected = new RegExp(pattern);
+  expect(
+    selected.test('scripts/symphony/emit_gem_service_attestation.py')
+  ).toBe(true);
+  expect(
+    selected.test('scripts/symphony/tests/gem-service-attestation.test.py')
+  ).toBe(true);
+  expect(CI_FAST_SOURCE).toContain(
+    'coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py'
+  );
+  expect(CI_FAST_SOURCE).toContain(
+    'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
+  );
+});
+
+it('runs authenticated Summer bridge coverage for admission-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
+  const selected = new RegExp(pattern);
+  expect(selected.test('apps/web/lib/ovie/summer-admissions.ts')).toBe(true);
+  expect(
+    selected.test('apps/web/app/api/internal/ovie/summer-bottleneck/route.ts')
+  ).toBe(true);
+  expect(CI_FAST_SOURCE).toContain(
+    'app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage'
+  );
+  expect(CI_FAST_SOURCE).toContain(
+    '--coverage.include=lib/ovie/summer-admissions.ts'
+  );
 });

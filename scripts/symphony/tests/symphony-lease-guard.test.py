@@ -27,13 +27,28 @@ if SPEC is None or SPEC.loader is None:
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
-ACTIVE = frozenset(("todo", "in progress"))
+ACTIVE = frozenset(("todo", "in progress", "rework", "merging"))
 JOVIE_TOMBSTONE = "JovieInc/Jovie:JOV-5029"
 LYB_TOMBSTONE = "JovieInc/LogYourBody:LYB-5029"
 
 
-def make_issue(identifier: str, state: str, updated_epoch: float) -> dict:
-    return {"identifier": identifier, "state": state, "updatedAtEpoch": updated_epoch}
+def make_issue(
+    identifier: str,
+    state: str,
+    updated_epoch: float,
+    *,
+    team_key: str = "JOV",
+    labels: list[str] | None = None,
+    blocked_by: list[str] | None = None,
+) -> dict:
+    return {
+        "identifier": identifier,
+        "state": state,
+        "teamKey": team_key,
+        "labels": frozenset(labels or []),
+        "blockedBy": tuple(blocked_by or []),
+        "updatedAtEpoch": updated_epoch,
+    }
 
 
 class LeaseDecisionTests(unittest.TestCase):
@@ -82,6 +97,90 @@ class LeaseDecisionTests(unittest.TestCase):
         )
         self.assertEqual((decision, reason, clear), ("admit", "active", False))
 
+    def test_rework_and_merging_are_active_states(self):
+        for state in ("Rework", "Merging"):
+            issue = make_issue("JOV-5811", state, 1000)
+            decision, reason, _stored, clear = MODULE.lease_decision(
+                "JOV-5811", issue, None, ACTIVE, now=2000, expected_team_key="JOV"
+            )
+            self.assertEqual((decision, reason, clear), ("admit", "active", False))
+
+    def test_wrong_team_scope_suppresses(self):
+        issue = make_issue("LYB-1", "Todo", 1000, team_key="LYB")
+        decision, reason, stored, clear = MODULE.lease_decision(
+            "LYB-1", issue, None, ACTIVE, now=2000, expected_team_key="JOV"
+        )
+        self.assertEqual(decision, "suppress")
+        self.assertIn("wrong_team", reason)
+        self.assertIsNone(stored)
+        self.assertFalse(clear)
+
+    def test_explicit_exclusion_labels_suppress_with_receipts(self):
+        for label in ("no-symphony",):
+            issue = make_issue("JOV-5811", "Todo", 1000, labels=[label])
+            decision, reason, stored, clear = MODULE.lease_decision(
+                "JOV-5811", issue, None, ACTIVE, now=2000, expected_team_key="JOV"
+            )
+            self.assertEqual(decision, "suppress")
+            self.assertEqual(reason, f"excluded_label label='{label}'")
+            self.assertEqual(stored["state"], "Todo")
+            self.assertEqual(stored["reason"], f"excluded_label label='{label}'")
+            self.assertFalse(clear)
+
+    def test_unresolved_dependency_blocker_suppresses_with_receipt(self):
+        issue = make_issue("JOV-5811", "Todo", 1000, blocked_by=["JOV-5800"])
+        decision, reason, stored, clear = MODULE.lease_decision(
+            "JOV-5811", issue, None, ACTIVE, now=2000, expected_team_key="JOV"
+        )
+        self.assertEqual(decision, "suppress")
+        self.assertEqual(reason, "unresolved_dependency_blocker blockers='JOV-5800'")
+        self.assertEqual(stored["state"], "Todo")
+        self.assertEqual(stored["reason"], "unresolved_dependency_blocker blockers='JOV-5800'")
+        self.assertFalse(clear)
+
+    def test_resolved_dependency_blocker_clears_tombstone_without_issue_update(self):
+        tombstone = {
+            "state": "Todo",
+            "reason": "unresolved_dependency_blocker blockers='JOV-5800'",
+            "observedAt": 2000,
+            "issueUpdatedAtEpoch": 1000,
+        }
+        issue = make_issue("JOV-5811", "Todo", 1000)
+        decision, reason, stored, clear = MODULE.lease_decision(
+            "JOV-5811", issue, tombstone, ACTIVE, now=3000, expected_team_key="JOV"
+        )
+        self.assertEqual(decision, "admit")
+        self.assertEqual(reason, "dependency_blocker_resolved")
+        self.assertIsNone(stored)
+        self.assertTrue(clear)
+
+    def test_removed_exclusion_label_clears_tombstone_without_issue_update(self):
+        tombstone = {
+            "state": "Todo",
+            "reason": "excluded_label label='no-symphony'",
+            "observedAt": 2000,
+            "issueUpdatedAtEpoch": 1000,
+        }
+        issue = make_issue("JOV-5811", "Todo", 1000)
+        decision, reason, stored, clear = MODULE.lease_decision(
+            "JOV-5811", issue, tombstone, ACTIVE, now=3000, expected_team_key="JOV"
+        )
+        self.assertEqual(decision, "admit")
+        self.assertEqual(reason, "excluded_label_removed")
+        self.assertIsNone(stored)
+        self.assertTrue(clear)
+
+    def test_backlog_and_triage_have_named_exclusion_receipts(self):
+        for state in ("Backlog", "Triage"):
+            issue = make_issue("JOV-5811", state, 1000)
+            decision, reason, stored, clear = MODULE.lease_decision(
+                "JOV-5811", issue, None, ACTIVE, now=2000, expected_team_key="JOV"
+            )
+            self.assertEqual(decision, "suppress")
+            self.assertEqual(reason, f"excluded_state state='{state}'")
+            self.assertEqual(stored["state"], state)
+            self.assertFalse(clear)
+
     def test_indeterminate_read_suppresses_without_tombstoning(self):
         decision, reason, _stored, clear = MODULE.lease_decision(
             "JOV-5031", None, None, ACTIVE, now=2000
@@ -119,7 +218,7 @@ class ConcurrentCheckTests(unittest.TestCase):
                 def fetch(_identifier):
                     barrier.wait(timeout=5)
                     return make_issue(identifier, "Done", 2000)
-                with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": directory}), mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch):
+                with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": directory}), mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch), mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"):
                     MODULE.check(identifier)
             workers = [context.Process(target=worker, args=(identifier,)) for identifier in ("JOV-1", "JOV-2")]
             for worker_process in workers:
@@ -159,14 +258,17 @@ class CheckCommandTests(unittest.TestCase):
 
     def run_check(self, identifier: str, issue: dict | None) -> int:
         stderr = io.StringIO()
+        stdout = io.StringIO()
         with (
             mock.patch.object(MODULE, "_fetch_issue", return_value=issue),
             mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"),
             contextlib.redirect_stderr(stderr),
-            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stdout(stdout),
         ):
             rc = MODULE.check(identifier)
         self.last_stderr = stderr.getvalue()
+        self.last_stdout = stdout.getvalue()
         return rc
 
     def load_state(self) -> dict:
@@ -197,12 +299,27 @@ class CheckCommandTests(unittest.TestCase):
         self.assertNotIn(JOVIE_TOMBSTONE, state["tombstones"])
         self.assertEqual(state["counters"]["reopened"], 1)
 
+    def test_check_clears_resolved_dependency_blocker_without_issue_update(self):
+        blocked = self.run_check(
+            "JOV-5811", make_issue("JOV-5811", "Todo", 1000, blocked_by=["JOV-5800"])
+        )
+        self.assertEqual(blocked, 1)
+        resolved = self.run_check("JOV-5811", make_issue("JOV-5811", "Todo", 1000))
+        self.assertEqual(resolved, 0)
+        self.assertIn(
+            "dependency_blocker_resolved",
+            self.last_stderr + self.last_stdout,
+        )
+        state = self.load_state()
+        self.assertNotIn("JovieInc/Jovie:JOV-5811", state["tombstones"])
+        self.assertEqual(state["counters"]["reopened"], 1)
+
     def test_inflight_active_read_rechecks_newer_committed_tombstone(self):
         def fetch(_identifier):
             # Another check finishes while this tracker request is in flight.
             self.run_check("JOV-5029", make_issue("JOV-5029", "Done", 3000))
             return make_issue("JOV-5029", "In Progress", 2000)
-        with mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch):
+        with mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch), mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"):
             self.assertEqual(MODULE.check("JOV-5029"), 1)
         state = self.load_state()
         self.assertEqual(state["tombstones"][JOVIE_TOMBSTONE]["issueUpdatedAtEpoch"], 3000)
@@ -255,6 +372,7 @@ class CheckCommandTests(unittest.TestCase):
         with (
             mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
             mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"),
             contextlib.redirect_stderr(stderr),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -270,6 +388,7 @@ class CheckCommandTests(unittest.TestCase):
         with (
             mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
             mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"),
             contextlib.redirect_stderr(stderr),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -287,6 +406,7 @@ class CheckCommandTests(unittest.TestCase):
         with (
             mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
             mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"),
             contextlib.redirect_stderr(stderr),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -310,6 +430,7 @@ class CheckCommandTests(unittest.TestCase):
         with (
             mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
             mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            mock.patch.object(MODULE, "_tracker_team_key", return_value="JOV"),
             contextlib.redirect_stderr(stderr),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -322,6 +443,21 @@ class CheckCommandTests(unittest.TestCase):
             rc = MODULE.check("bad identifier!")
         self.assertEqual(rc, 2)
 
+    def test_check_malformed_team_scope_suppresses_without_fetching_linear(self):
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(MODULE, "_tracker_team_key", return_value=None),
+            mock.patch.object(MODULE, "_fetch_issue") as fetch_issue,
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = MODULE.check("JOV-5811")
+        self.assertEqual(rc, 1)
+        self.assertIn("malformed_team_scope", stderr.getvalue())
+        fetch_issue.assert_not_called()
+        state = self.load_state()
+        self.assertEqual(state["counters"]["suppressedNonActive"], 1)
+
 
 class ActiveStatesTests(unittest.TestCase):
     def test_reads_active_states_from_workflow_front_matter(self):
@@ -330,9 +466,13 @@ class ActiveStatesTests(unittest.TestCase):
             workflow.write_text(
                 "---\n"
                 "tracker:\n"
+                "  provider:\n"
+                "    team_key: \"JOV\"\n"
                 "  active_states:\n"
                 "    - Todo\n"
                 "    - In Progress\n"
+                "    - Rework\n"
+                "    - Merging\n"
                 "  terminal_states:\n"
                 "    - Done\n"
                 "server:\n"
@@ -342,7 +482,9 @@ class ActiveStatesTests(unittest.TestCase):
             )
             with mock.patch.dict(os.environ, {"SYMPHONY_WORKFLOW_PATH": str(workflow)}):
                 states = MODULE._active_states()
-        self.assertEqual(states, frozenset(("todo", "in progress")))
+                team_key = MODULE._tracker_team_key()
+        self.assertEqual(states, ACTIVE)
+        self.assertEqual(team_key, "JOV")
 
     def test_missing_workflow_falls_back_to_symphony_default(self):
         with mock.patch.dict(os.environ, {"SYMPHONY_WORKFLOW_PATH": "/nonexistent/WORKFLOW.md"}):

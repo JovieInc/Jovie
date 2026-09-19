@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { emitProofViewedIfProofProfile } from '@/lib/acquisition/proof-claim-client';
 import { track } from '@/lib/analytics';
 import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -44,6 +45,7 @@ export function ProfileViewTracker({
         profile_slug: handle,
         source: source ?? (document.referrer || 'direct'),
       });
+      emitProofViewedIfProofProfile(handle);
 
       const sent = postJsonBeacon('/api/profile/view', { handle });
       if (sent) return;

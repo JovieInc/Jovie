@@ -94,12 +94,19 @@ RUNTIME_NAMES = (
     "model-registry.json",
     "provider_capacity.py",
     "existing_pr_repair.py",
+    "symphony-existing-repair-resolv.conf",
     "writer-owned-pr-promote.sh",
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
     "upsert-pr-comment.sh",
+    "symphony-fallback-finalize.py",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
+LAUNCHER_NAMES = (
+    *LEGACY_RUNTIME_NAMES,
+    "grok-ship-one",
+    "cursor-agent-std",
+    "symphony-fallback-finalize.py",
+)
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -146,7 +153,7 @@ query($first: Int!, $after: String) {
     first: $first
     after: $after
     filter: {
-      state: { name: { in: ["Todo", "In Progress", "In Review"] } }
+      state: { name: { in: ["Todo", "In Progress", "Rework", "Merging", "In Review"] } }
     }
   ) {
     nodes {
@@ -169,6 +176,7 @@ query($id: String!) {
   issue(id: $id) {
     id identifier title description url updatedAt
     state { id name }
+    assignee { id }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
     comments { nodes { body } }
@@ -178,11 +186,13 @@ query($id: String!) {
 
 # Admission must mirror the list query. In Review stays eligible so a CI-red
 # autonomous PR can be remounted; launch still skips inflight green/pending PRs.
-ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
+ADMITTED_STATES = frozenset(("todo", "in progress", "rework", "merging", "in review"))
 # Already-claimed work (Symphony retrying In Review with no Codex slots) must
 # keep flowing on the grok fallback after #16212 emptied the receipt list.
 # Todo still requires a current admission-gate/v1 receipt.
-CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
+CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(
+    ("in progress", "rework", "merging", "in review")
+)
 # symphony/grok/fallback heads are the autonomous lane's own; codex/fable/fugu
 # heads are GPT-worker-authored. Failed or DIRTY GPT work is adopted by the
 # grok/kimi fallback lane (Tim 2026-09-03: "allow the failed gpt ones to move
@@ -282,6 +292,18 @@ def _grok_executable() -> str | None:
 
 def _kimi_executable() -> str | None:
     return _provider_executable(("GEM_KIMI_BIN", "GEM_KIMI_EXECUTABLE"), "kimi")
+
+
+def _cursor_executable() -> str | None:
+    home_std = str(pathlib.Path.home() / ".local/bin/cursor-agent-std")
+    found = _provider_executable(("GEM_CURSOR_EXECUTABLE", "GEM_CURSOR_BIN"), home_std)
+    if found:
+        return found
+    # An invalid GEM_CURSOR_* path is fail-closed for that value, but the
+    # known-good wrapper and PATH binary remain valid recoveries.
+    if os.access(home_std, os.X_OK):
+        return home_std
+    return _provider_executable((), "cursor-agent")
 
 
 def _grok_canary_ready() -> tuple[bool, str]:
@@ -413,6 +435,10 @@ def _model_router_selection(
     if kimi_exe:
         env.setdefault("GEM_KIMI_EXECUTABLE", kimi_exe)
         env.setdefault("GEM_KIMI_BIN", kimi_exe)
+    cursor_exe = _cursor_executable()
+    if cursor_exe:
+        env.setdefault("GEM_CURSOR_EXECUTABLE", cursor_exe)
+        env.setdefault("GEM_CURSOR_BIN", cursor_exe)
     command = [
         sys.executable,
         str(router),
@@ -1035,7 +1061,7 @@ def _provider_measured_capacity(provider: str) -> int:
     if provider == "cursor":
         # The registry proves the CLI executor, while one installed Cursor
         # session is the only portable seat observation available here.
-        return 1 if _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") else 0
+        return 1 if _cursor_executable() else 0
     return 0
 
 
@@ -1497,6 +1523,10 @@ def _issue_meta(
         "original_state_name": state.get("name") or "",
         "in_progress_state_id": states["in progress"],
         "in_review_state_id": states["in review"],
+        "todo_state_id": states.get("todo", ""),
+        "owner_id": (issue.get("assignee") or {}).get("id")
+        if isinstance(issue.get("assignee"), dict)
+        else None,
         "issue_revision": issue_revision,
     }
     return True, "admitted", meta
@@ -1712,11 +1742,14 @@ _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 PRODUCT_FAILURE_TOMBSTONE_CONTEXT = "jovie-queue-product-failure/v1"
 
 
-def _pr_status_check_rollup(repo: str, number: int) -> list | None:
+def _pr_status_check_rollup(repo: str, number: int, *, expected_head: str | None = None) -> list | None:
     payload = _gh_json(
-        ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
+        ["gh", "pr", "view", str(number), "--repo", repo, "--json",
+         "headRefOid,statusCheckRollup" if expected_head is not None else "statusCheckRollup"]
     )
     if not isinstance(payload, dict):
+        return None
+    if expected_head is not None and payload.get("headRefOid") != expected_head:
         return None
     checks = payload.get("statusCheckRollup")
     return checks if isinstance(checks, list) else None
@@ -2178,6 +2211,42 @@ def repair_preflight_command(identifier, issue_revision):
     return 0
 
 
+def _owned_repair_pr_inventory(task, repo):
+    """Add the exact target's fresh status rows to the existing PR inventory."""
+    prs = _complete_open_prs(repo)
+    if not isinstance(prs, list):
+        return prs
+    target = task.get("existingRepair") if isinstance(task, dict) else None
+    target_pr = target.get("pr") if isinstance(target, dict) else None
+    if type(target_pr) is not int:
+        return prs
+    matching = [pr for pr in prs if isinstance(pr, dict) and pr.get("number") == target_pr]
+    if len(matching) != 1 or not re.fullmatch(r"[a-f0-9]{40}", str(matching[0].get("headRefOid"))):
+        return prs
+    checks = _pr_status_check_rollup(repo, target_pr, expected_head=matching[0]["headRefOid"])
+    if not isinstance(checks, list):
+        return prs
+    return [{**pr, "statusCheckRollup": checks}
+            if isinstance(pr, dict) and pr.get("number") == target_pr else pr
+            for pr in prs]
+
+
+def owned_repair_command():
+    """Signed consumer entry. No qualified live repair adapter is installed yet."""
+    try:
+        raw = sys.stdin.read(32769)
+        if len(raw) > 32768:
+            raise ValueError("existing-repair-request-too-large")
+        task = json.loads(raw)
+        result = _repair_module().execute_isolated(task, __file__,
+            lambda identifier: _fetch_single_issue(identifier),
+            lambda repo: _owned_repair_pr_inventory(task, repo))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        result = {"status": "held", "reason": str(exc)}
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
 def repair_assign_command(spec_path):
     try:
         spec = json.loads(pathlib.Path(spec_path).read_text())
@@ -2605,11 +2674,13 @@ def _grok_command(
     unit = _fallback_unit(identifier, issue_revision)
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
-    cursor_exe = _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") or "cursor-agent"
+    cursor_exe = _cursor_executable() or str(pathlib.Path.home() / ".local/bin/cursor-agent-std")
     provider = _selection_provider(selection) or "grok"
+    finalizer = str(pathlib.Path(executable).with_name("symphony-fallback-finalize.py"))
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        "-p", f"ExecStopPost={finalizer} {identifier}",
         "-p", "Environment=AUTOMATION_VERIFY_MAX_WORKERS=4",
         "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
@@ -3021,7 +3092,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-existing-repair-resolv.conf", "symphony-fallback-finalize.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
@@ -3095,6 +3166,20 @@ def _valid_runtime_file(path: pathlib.Path) -> bool:
 
 
 def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
+    if name == "symphony-existing-repair-resolv.conf":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and path.read_bytes() == (
+                    b"# Controller-owned provider resolver; no host-local fallback.\n"
+                    b"nameserver 1.1.1.1\n"
+                    b"nameserver 1.0.0.1\n"
+                    b"options timeout:2 attempts:1\n"
+                )
+            )
+        except OSError:
+            return False
     if name == "model-registry.json":
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -3210,6 +3295,7 @@ def install(destination_root: str | None) -> int:
                 "existing_pr_repair.py",
                 "model-registry.json",
                 "writer-owned-pr-promotion.mjs",
+                "symphony-existing-repair-resolv.conf",
             ):
                 (release / name).write_bytes(data)
                 os.chmod(release / name, 0o644)
@@ -3243,6 +3329,7 @@ def main() -> int:
             "native-preflight",
             "repair-preflight",
             "repair-assign",
+            "owned-repair",
         ),
         default=default,
     )
@@ -3257,6 +3344,8 @@ def main() -> int:
         help="Skip admission-gate/v1 receipt (DIRTY/CI-red remount only)",
     )
     args = parser.parse_args()
+    if args.command == "owned-repair":
+        return owned_repair_command()
     if args.command == "repair-preflight":
         return repair_preflight_command(args.identifier, args.issue_revision)
     if args.command == "repair-assign":

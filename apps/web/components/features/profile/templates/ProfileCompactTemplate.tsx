@@ -62,7 +62,10 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  ProfileDesktopLoadingPlaceholder,
+  PublicProfileLayoutShell,
+} from './PublicProfileLayoutShell';
 
 const ProfileDesktopSurface = dynamic(
   () =>
@@ -71,16 +74,7 @@ const ProfileDesktopSurface = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div
-        className='public-profile-layout-desktop-placeholder'
-        data-testid='profile-desktop-loading'
-        role='status'
-        aria-busy='true'
-      >
-        <span className='text-secondary-token'>Loading profile…</span>
-      </div>
-    ),
+    loading: () => <ProfileDesktopLoadingPlaceholder />,
   }
 );
 
@@ -117,6 +111,7 @@ interface ProfileCompactTemplateProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
@@ -124,6 +119,8 @@ interface ProfileCompactTemplateProps {
   /** Desktop spare-space claim footer (JOV-3544). */
   readonly showClaimFooter?: boolean;
   readonly claimFooterHref?: string | null;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
   /** True when this template is embedded in another page (marketing/demo
    *  preview) rather than serving as the outer profile document. Forwarded
    *  to the layout shell so the global viewport scroll lock skips embedded
@@ -266,21 +263,22 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
   releases,
+  catalogLoadFailed = false,
   merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
   visualVariant = 'default',
   showClaimFooter = false,
   claimFooterHref = null,
+  claimFooterLabel,
+  proofClaim = false,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const hasReleases = (releases?.length ?? 0) >= 2;
-  const publicProfileNavIds = getPermittedPublicProfileNavigation({
-    fanCaptureEnabled: allowFanCapture,
-  })
+  const publicProfileNavIds = getPermittedPublicProfileNavigation()
     .map(destination => destination.id)
     .join(',');
   const initialDrawerView = resolveDrawerView(
@@ -306,6 +304,7 @@ export function ProfileCompactTemplate({
     getInitialIsDesktopLayout
   );
   const [isHydrated, setIsHydrated] = useState(false);
+  const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
@@ -364,6 +363,9 @@ export function ProfileCompactTemplate({
     const syncPresentation = () => {
       const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
       setIsDesktopLayout(ownsDesktopLayout);
+      if (!ownsDesktopLayout) {
+        setDesktopSurfaceReady(false);
+      }
       setDrawerPresentation(
         ownsDesktopLayout
           ? 'modal'
@@ -822,6 +824,10 @@ export function ProfileCompactTemplate({
     }
   }, [isSignedIn, requestedMode]);
 
+  const handleDesktopSurfaceReady = useCallback(() => {
+    setDesktopSurfaceReady(true);
+  }, []);
+
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
     try {
@@ -863,10 +869,13 @@ export function ProfileCompactTemplate({
         heroImageError={heroImageError}
         onHeroImageLoadError={() => setHeroImageError(true)}
         isDesktopLayout={isDesktopLayout}
+        desktopSurfaceReady={desktopSurfaceReady}
         shouldRenderHeading={shouldRenderTemplateHeading}
         profileAccentStyle={profileAccentStyle}
         showClaimFooter={showClaimFooter}
         claimFooterHref={claimFooterHref}
+        claimFooterLabel={claimFooterLabel}
+        proofClaim={proofClaim}
         embedded={embeddedPreview}
         previewExitHref={profileHref}
         compactSurface={
@@ -884,7 +893,7 @@ export function ProfileCompactTemplate({
                 {profileBanner}
               </div>
             ) : null}
-            <div className='relative min-h-0 flex-1'>
+            <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
               <ProfileCompactSurface
                 renderMode='interactive'
                 presentation={drawerPresentation}
@@ -946,6 +955,7 @@ export function ProfileCompactTemplate({
                   revealNotificationsRef.current?.();
                 }}
                 releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
               />
             </div>
           </div>
@@ -954,6 +964,7 @@ export function ProfileCompactTemplate({
         desktopSurface={
           <ProfileDesktopSurface
             presentation='modal'
+            onReady={handleDesktopSurfaceReady}
             artist={artist}
             socialLinks={socialLinks}
             contacts={contacts}
@@ -969,6 +980,7 @@ export function ProfileCompactTemplate({
             tourDates={tourDates}
             viewerCountryCode={viewerCountryCode}
             releases={releases}
+            catalogLoadFailed={catalogLoadFailed}
             drawerOpen={drawerOpen}
             drawerView={drawerView}
             activeMode={requestedMode}

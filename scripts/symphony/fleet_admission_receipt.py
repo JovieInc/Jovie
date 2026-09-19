@@ -5,7 +5,16 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import Any
+
+_SYMPHONY_DIR = Path(__file__).resolve().parent
+if str(_SYMPHONY_DIR) not in sys.path:
+    sys.path.insert(0, str(_SYMPHONY_DIR))
+
+from closure_health import (  # noqa: E402 - sibling executable module
+    issue_intake_allowed,
+)
 
 SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
@@ -108,7 +117,7 @@ def _project_closure_health(value: object) -> dict[str, Any]:
         "remediationContinues": True,
         "reasons": list(reasons),
     }
-    if projected["newIssueIntakeAllowed"] is not (status == "healthy"):
+    if projected["newIssueIntakeAllowed"] is not issue_intake_allowed(status, reasons):
         raise AdmissionProjectionError("closure health status contradicts intake signal")
     if signal.get("schema") != CLOSURE_HEALTH_SCHEMA:
         raise AdmissionProjectionError("closure health signal schema is invalid")
@@ -282,7 +291,7 @@ def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, 
             raise AdmissionProjectionError("controller repair authority contradicts promotionMode")
         if projected["condition"] != "controller-failure":
             raise AdmissionProjectionError("allowed controller repair condition is invalid")
-        if projected["scope"] != "trusted-comment-exact-repository-pr-head-main-path-set":
+        if projected["scope"] != "github-approved-exact-repository-pr-head-main-path-set":
             raise AdmissionProjectionError("allowed controller repair scope is invalid")
         if projected["maxConcurrent"] != 1:
             raise AdmissionProjectionError("allowed controller repair must have maxConcurrent 1")
@@ -294,7 +303,7 @@ def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, 
         raise AdmissionProjectionError("controller-repair-only requires allowed repair authority")
     elif projected["scope"] not in {
         None,
-        "trusted-comment-exact-repository-pr-head-main-path-set",
+        "github-approved-exact-repository-pr-head-main-path-set",
     }:
         raise AdmissionProjectionError("denied controller repair scope is invalid")
     elif any(
@@ -440,7 +449,14 @@ def _project_closure_admission(value: object) -> dict[str, Any]:
         "closureAdmission.newIssueIntakeAllowed",
     )
     status = admission.get("status")
-    if status not in CLOSURE_STATUSES or intake is not (status == "healthy"):
+    if status not in CLOSURE_STATUSES:
+        raise AdmissionProjectionError("closureAdmission status contradicts intake")
+    admission_reasons = admission.get("reasons")
+    if not isinstance(admission_reasons, list) or not all(
+        isinstance(reason, str) for reason in admission_reasons
+    ):
+        raise AdmissionProjectionError("closureAdmission reasons are malformed")
+    if intake is not issue_intake_allowed(status, admission_reasons):
         raise AdmissionProjectionError("closureAdmission status contradicts intake")
     if (
         admission.get("authority") != "Summer"
@@ -485,7 +501,9 @@ def _project_closure_admission(value: object) -> dict[str, Any]:
                 raise AdmissionProjectionError(
                     f"closureAdmission.products.{product_id}.status is invalid"
                 )
-            if product_intake is not (product_status == "healthy"):
+            if product_intake is not issue_intake_allowed(
+                product_status, row.get("reasons")
+            ):
                 raise AdmissionProjectionError(
                     f"closureAdmission.products.{product_id} contradicts intake"
                 )

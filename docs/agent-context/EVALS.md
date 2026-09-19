@@ -9,6 +9,9 @@ pnpm ds:llms-manifest:check
 pnpm skill-governance:check
 ```
 
+Vercel agent-skills coverage and Tim-gated exclusions:
+[vercel-agent-skills-coverage.md](vercel-agent-skills-coverage.md).
+
 ## Mechanical gate
 
 The checked-in budgets are byte limits, not token estimates: root manual ≤6,000;

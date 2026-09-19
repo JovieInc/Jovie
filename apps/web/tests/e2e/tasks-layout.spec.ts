@@ -20,7 +20,7 @@ import {
   ensureSignedInUser,
   hasClerkCredentials,
   resolveBypassFallbackUserId,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 
 const LAYOUT_TASK_TITLE = 'Layout QA task fixture';
 const TASKS_LAYOUT_PERSONA = 'creator-ready';

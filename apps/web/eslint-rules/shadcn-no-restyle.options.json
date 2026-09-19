@@ -1,0 +1,11 @@
+{
+  "allow": ["layout"],
+  "deny": ["h-*", "min-h-*", "max-h-*"],
+  "message": {
+    "spacing": "{{component}} owns spacing. Use a size prop (Button: sm, marketing, md, lg, icon, icon-xs, icon-sm, icon-md, icon-lg, icon-xl; Input: sm, md, lg) instead of padding or height. Upstream {{sizes}} suggestions may be empty because Button/Input sizes are spread from contract maps into cva.",
+    "color": "{{component}} owns color. Use an approved variant ({{variants|none defined}}) from @jovie/ui.",
+    "typography": "{{component}} owns typography. Use an approved variant ({{variants|none defined}}) instead of font/text restyles.",
+    "shape": "{{component}} owns radius/shape. Use an approved variant ({{variants|none defined}}) instead of rounded-* overrides.",
+    "default": "Do not restyle {{component}}. Use approved @jovie/ui variants ({{variants|none defined}}) and sizes ({{sizes|none defined}}). Layout/placement classes are allowed. See DESIGN.md."
+  }
+}

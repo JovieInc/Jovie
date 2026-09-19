@@ -1,12 +1,12 @@
 import { test as setup } from '@playwright/test';
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
+import { signInUser, TestAuthError } from '../helpers/auth';
 
 const AUTH_FILE = 'tests/.auth/user.json';
 
 setup.describe('Auth Setup', () => {
   setup.describe.configure({ mode: 'serial' });
 
-  setup.setTimeout(360_000); // 6min to absorb local cold-start compilation plus Clerk bootstrap
+  setup.setTimeout(360_000); // 6min to absorb local cold-start compilation plus bypass bootstrap
 
   setup('authenticate', async ({ page }) => {
     const username = process.env.E2E_CLERK_USER_USERNAME;
@@ -16,7 +16,9 @@ setup.describe('Auth Setup', () => {
     // Guard: write empty auth state if prerequisites missing
     if (
       !useTestAuthBypass &&
-      (!username || process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true')
+      (!username ||
+        (process.env.TEST_AUTH_SETUP_SUCCESS !== 'true' &&
+          process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true'))
     ) {
       console.log('  Auth prerequisites not met, writing empty auth state');
       await page.context().storageState({ path: AUTH_FILE });
@@ -27,8 +29,9 @@ setup.describe('Auth Setup', () => {
       await signInUser(page, { username, password });
     } catch (error) {
       if (
-        error instanceof ClerkTestError &&
+        error instanceof TestAuthError &&
         [
+          'TEST_AUTH_SETUP_FAILED',
           'CLERK_SETUP_FAILED',
           'CLERK_NOT_READY',
           'MISSING_CREDENTIALS',

@@ -4,6 +4,7 @@ import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
 import { type JovieUser, toJovieUser } from '@/lib/auth/jovie-user';
+import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
 // Jovie auth context fan-out (Better Auth port of hooks/useClerkSafe.tsx)
@@ -78,6 +79,13 @@ export interface UseSessionSafeReturn {
  * back, so the failure is visible rather than silent.
  */
 export async function signOut(options?: JovieSignOutOptions): Promise<void> {
+  applyCacheScope({
+    userId: null,
+    sessionId: null,
+    profileId: null,
+    impersonationSubject: null,
+    ready: true,
+  });
   await authClient.signOut().catch(() => undefined);
   clearLegacyClerkSessionMarker();
 

@@ -9,6 +9,7 @@ import {
   resolveUserState,
 } from '@/lib/auth/gate';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 /**
@@ -39,6 +40,14 @@ async function resolveStartPageRedirect(
   authResult: AuthGateResult
 ): Promise<string | null> {
   if (authResult.state !== CanonicalUserState.WAITLIST_PENDING) {
+    return getStartRouteRedirect(authResult.state);
+  }
+
+  // JOV-6449: with the launch gate off, waitlist table reads are irrelevant
+  // and must not 500 /start. Canonical WAITLIST_PENDING still goes to the
+  // receipt so already-waitlisted accounts stay gated.
+  const waitlistGateEnabled = await isWaitlistGateEnabled();
+  if (!waitlistGateEnabled) {
     return getStartRouteRedirect(authResult.state);
   }
 

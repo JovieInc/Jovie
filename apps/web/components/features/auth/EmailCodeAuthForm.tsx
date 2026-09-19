@@ -1,16 +1,22 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useSearchParams } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
+import {
+  AUTH_EMAIL_CHANGE_LABEL,
+  AUTH_EMAIL_EMPTY_ERROR,
+  AUTH_EMAIL_INVALID_ERROR,
+  AUTH_EMAIL_SEND_LABEL,
+  AUTH_EMAIL_SENDING_LABEL,
+  type AuthShellMode,
+  isAuthEmailAddress,
+} from '@/lib/auth/auth-shell-intent';
 import { authClient } from '@/lib/auth/client';
 import { AUTH_CLASSES } from '@/lib/auth/constants';
 import { logger } from '@/lib/utils/logger';
-import type { AuthShellMode } from './AuthShell';
 
 /**
  * Email one-time-code auth flow for the canonical AuthShell (Clerk → Better
@@ -118,12 +124,11 @@ export function EmailCodeAuthForm({
   initialEmailAddress,
   onOtpStepChange,
 }: EmailCodeAuthFormProps) {
-  const searchParams = useSearchParams();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   // Match SSR on the first client pass. Better Auth can expose a cached
-  // session before hydration, but returning null here would replace the form
-  // that the server rendered and trigger a hydration mismatch.
-  const [hasHydrated, setHasHydrated] = useState(false);
+  // session before hydration. Never return null here: the shared
+  // `AuthenticatedAuthEntryGuard` owns signed-in redirects, and blanking the
+  // form independently left /signup with no email/SSO controls (JOV-6450).
   const [step, setStep] = useState<EmailCodeStep>('email');
   const [emailAddress, setEmailAddress] = useState(initialEmailAddress ?? '');
   const [code, setCode] = useState('');
@@ -131,17 +136,6 @@ export function EmailCodeAuthForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const isSignUp = mode === 'sign-up';
-
-  const _redirectSignedInVisitor = useCallback(() => {
-    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
-    globalThis.location?.assign(destination);
-  }, [searchParams]);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
 
   // Notify the parent when the OTP code-entry/lockout step is active so One
   // Tap can be suppressed (plan design row 20). `'email'` = inactive; `'code'`
@@ -180,7 +174,15 @@ export function EmailCodeAuthForm({
 
   const sendCode = useCallback(async () => {
     const trimmedEmail = emailAddress.trim();
-    if (!trimmedEmail || isPending || (isAuthLoaded && isSignedIn)) {
+    if (isPending || (isAuthLoaded && isSignedIn)) {
+      return;
+    }
+    if (!trimmedEmail) {
+      setErrorMessage(AUTH_EMAIL_EMPTY_ERROR);
+      return;
+    }
+    if (!isAuthEmailAddress(trimmedEmail)) {
+      setErrorMessage(AUTH_EMAIL_INVALID_ERROR);
       return;
     }
 
@@ -306,10 +308,6 @@ export function EmailCodeAuthForm({
     }
   }, []);
 
-  if (hasHydrated && isAuthLoaded && isSignedIn) {
-    return null;
-  }
-
   if (step === 'locked') {
     return (
       <div
@@ -372,7 +370,7 @@ export function EmailCodeAuthForm({
             onClick={handleBackToEmail}
             className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2'
           >
-            Use a different email
+            {AUTH_EMAIL_CHANGE_LABEL}
           </button>
           {resendCooldown > 0 ? (
             <span
@@ -401,33 +399,42 @@ export function EmailCodeAuthForm({
     <form
       data-auth-email-code-step='email'
       onSubmit={handleEmailSubmit}
+      noValidate
       className='flex flex-col gap-3'
     >
-      <AuthInput
-        type='email'
-        name='emailAddress'
-        autoComplete='email'
-        inputMode='email'
-        placeholder='Email address'
-        aria-label='Email Address'
-        aria-describedby={errorMessage ? 'auth-email-error' : undefined}
-        value={emailAddress}
-        error={Boolean(errorMessage)}
-        disabled={isPending}
-        onChange={event => setEmailAddress(event.target.value)}
-      />
-      <FormError id='auth-email-error' message={errorMessage} />
+      <div className='flex flex-col gap-1.5'>
+        <label
+          htmlFor='auth-email'
+          className='text-sm font-medium text-primary-token'
+        >
+          Email
+        </label>
+        <AuthInput
+          id='auth-email'
+          type='email'
+          name='emailAddress'
+          autoComplete='email'
+          inputMode='email'
+          placeholder='you@example.com' // ui-casing-allow: example email address, not a UI label
+          aria-describedby={errorMessage ? 'auth-email-error' : undefined}
+          value={emailAddress}
+          error={Boolean(errorMessage)}
+          disabled={isPending}
+          onChange={event => {
+            setEmailAddress(event.target.value);
+            if (errorMessage) setErrorMessage(null);
+          }}
+        />
+        <FormError id='auth-email-error' message={errorMessage} />
+      </div>
       <Button
         type='submit'
         className={AUTH_CLASSES.authEntryCta}
         static
-        disabled={isPending || emailAddress.trim().length === 0}
+        disabled={isPending}
+        aria-busy={isPending || undefined}
       >
-        {isPending
-          ? 'Sending code…'
-          : isSignUp
-            ? 'Continue with Email'
-            : 'Email me a Code'}
+        {isPending ? AUTH_EMAIL_SENDING_LABEL : AUTH_EMAIL_SEND_LABEL}
       </Button>
     </form>
   );

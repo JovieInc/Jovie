@@ -30,6 +30,8 @@ Load and follow `.claude/skills/jovie-performance-hardening/SKILL.md`.
 - Keep only validated wins.
 - Do not replace route UIs or change behavior to make metrics pass.
 - Do not run as a broad daily LLM cron.
+- Do not install `vercel-optimize` or enable Observability Plus. Scanner-only
+  Vercel specialization lives in `jovie-performance-hardening` section [11].
 
 ## Required Output
 

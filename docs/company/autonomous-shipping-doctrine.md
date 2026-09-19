@@ -62,6 +62,16 @@ Physical or external actions such as signing an agreement, rotating a key, or
 flipping a provider setting ship disabled and are tracked as separate
 post-landing authority actions.
 
+### Authority provenance before containment
+
+Before proposing a rollback, containment, or admission denial from an older
+plan, re-read the latest relevant user direction and bind it to the exact scope,
+owner, and any superseded instruction. Unknown provenance is an investigation
+state, not evidence that approval is missing. Preserve a later authorized
+production cutover and a bounded authorized restart; escalate a newly observed
+safety failure, such as a retry storm beyond that bound, to the sole runtime
+owner.
+
 ## Labels (canonical)
 
 | Label | Meaning |

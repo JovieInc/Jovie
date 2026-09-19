@@ -2,14 +2,11 @@
 
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { type BrowserContext, chromium } from 'playwright';
 
 const DEFAULT_BASE_URL = 'http://localhost:3000';
-const DEFAULT_OUTPUT_PATH = '/tmp/browse-clerk-cookies.json';
+const DEFAULT_OUTPUT_PATH = '/tmp/browse-auth-cookies.json';
 const DEFAULT_CREATOR_EMAIL = 'browse+clerk_test@jov.ie';
 const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
-const MAGIC_CODE = '424242';
-const TESTING_TOKEN_PARAM = '__clerk_testing_token';
 const PRIVATE_IPV4_BLOCKS = [
   /^10\./,
   /^127\./,
@@ -37,7 +34,7 @@ interface ExportedCookie {
   readonly sameSite: SameSitePolicy;
 }
 
-function isPrivateOrLoopbackHost(hostname: string): boolean {
+export function isPrivateOrLoopbackHost(hostname: string): boolean {
   const normalizedHostname = hostname.trim().toLowerCase();
 
   return (
@@ -87,18 +84,6 @@ export function parseBrowseAuthArgs(argv: readonly string[]): BrowseAuthArgs {
     output,
     persona,
   };
-}
-
-function parseFrontendApi(pk: string): string {
-  const match = pk.match(/^pk_(test|live)_(.+)$/);
-  if (!match) {
-    throw new Error(
-      `Invalid publishable key format: ${pk.substring(0, 15)}...`
-    );
-  }
-
-  const decoded = Buffer.from(match[2], 'base64').toString('utf-8');
-  return decoded.replace(/\$$/, '');
 }
 
 export function getPersonaEmail(persona: BrowseAuthPersona): string {
@@ -182,6 +167,16 @@ function writeCookieExport(
   console.log(`Cookies exported: ${outputPath}`);
 }
 
+class LocalBypassError extends Error {
+  constructor(
+    readonly status: number,
+    readonly body: string
+  ) {
+    super(`Local browse auth failed: ${status} ${body}`);
+    this.name = 'LocalBypassError';
+  }
+}
+
 async function runLocalBypassFlow(args: BrowseAuthArgs) {
   const baseUrl = new URL(args.baseUrl);
   const response = await fetch(new URL('/api/dev/test-auth/session', baseUrl), {
@@ -223,204 +218,16 @@ async function runLocalBypassFlow(args: BrowseAuthArgs) {
   );
 }
 
-class LocalBypassError extends Error {
-  constructor(
-    readonly status: number,
-    readonly body: string
-  ) {
-    super(`Local browse auth failed: ${status} ${body}`);
-    this.name = 'LocalBypassError';
-  }
-}
+export async function runBrowseAuth(args: BrowseAuthArgs): Promise<void> {
+  const baseUrl = new URL(args.baseUrl);
 
-function shouldFallbackToClerk(error: unknown): boolean {
-  if (error instanceof LocalBypassError) {
-    return error.status === 403 || error.status === 404;
-  }
-
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return (
-    error.message.includes('E2E_USE_TEST_AUTH_BYPASS is not enabled') ||
-    error.message.includes('Only available on loopback and private dev hosts')
-  );
-}
-
-async function getTestingToken(secretKey: string): Promise<string> {
-  const response = await fetch('https://api.clerk.com/v1/testing_tokens', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${secretKey}` },
-  });
-
-  if (!response.ok) {
+  if (!isPrivateOrLoopbackHost(baseUrl.hostname)) {
     throw new Error(
-      `Failed to get testing token: ${response.status} ${response.statusText}`
+      'browse-auth only supports loopback/private hosts via E2E_USE_TEST_AUTH_BYPASS. Clerk fallback is retired.'
     );
   }
 
-  const data = (await response.json()) as { token?: string };
-  if (!data.token) {
-    throw new Error('Testing token response missing token field');
-  }
-
-  return data.token;
-}
-
-async function ensureFallbackTestUser(
-  secretKey: string,
-  email: string
-): Promise<void> {
-  const searchResponse = await fetch(
-    `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}&limit=1`,
-    {
-      headers: { Authorization: `Bearer ${secretKey}` },
-    }
-  );
-
-  if (!searchResponse.ok) {
-    throw new Error(
-      `Clerk user search failed: ${searchResponse.status} ${searchResponse.statusText}`
-    );
-  }
-
-  const users = (await searchResponse.json()) as Array<{ id: string }>;
-  if (users.length > 0) {
-    return;
-  }
-
-  const createResponse = await fetch('https://api.clerk.com/v1/users', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email_address: [email],
-      first_name: 'Browse',
-      last_name: 'Bot',
-      skip_password_requirement: true,
-    }),
-  });
-
-  if (!createResponse.ok) {
-    throw new Error(
-      `Clerk user create failed: ${createResponse.status} ${await createResponse.text()}`
-    );
-  }
-}
-
-async function setupClerkTestingToken(
-  context: BrowserContext,
-  fapiHost: string,
-  testingToken: string
-): Promise<void> {
-  const escapedHost = fapiHost.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const fapiPattern = new RegExp(`^https://${escapedHost}/v1/.*?(\\?.*)?$`);
-
-  await context.route(fapiPattern, async route => {
-    const url = new URL(route.request().url());
-    url.searchParams.set(TESTING_TOKEN_PARAM, testingToken);
-
-    try {
-      const response = await route.fetch({ url: url.toString() });
-      const json = await response.json();
-      if (json?.response?.captcha_bypass === false) {
-        json.response.captcha_bypass = true;
-      }
-      if (json?.client?.captcha_bypass === false) {
-        json.client.captcha_bypass = true;
-      }
-      await route.fulfill({ response, json });
-    } catch {
-      await route.continue({ url: url.toString() });
-    }
-  });
-}
-
-async function runClerkFallbackFlow(args: BrowseAuthArgs) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-  if (!secretKey) {
-    throw new Error(
-      'Missing CLERK_SECRET_KEY. Run with: doppler run -- pnpm tsx scripts/browse-auth.ts'
-    );
-  }
-
-  if (!publishableKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Run with: doppler run -- pnpm tsx scripts/browse-auth.ts'
-    );
-  }
-
-  const email = getPersonaEmail(args.persona);
-  await ensureFallbackTestUser(secretKey, email);
-
-  const fapiHost = parseFrontendApi(publishableKey);
-  const testingToken = await getTestingToken(secretKey);
-
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  await setupClerkTestingToken(context, fapiHost, testingToken);
-
-  const page = await context.newPage();
-  await page.goto(`${args.baseUrl}/signin`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  await page.waitForFunction(
-    () => Boolean((window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded),
-    {
-      timeout: 30_000,
-    }
-  );
-
-  const signInResult = await page.evaluate(
-    async ({ email, code }) => {
-      const clerk = (window as { Clerk?: any }).Clerk;
-      if (!clerk) {
-        return { error: 'Clerk not loaded' };
-      }
-
-      try {
-        const signIn = await clerk.client.signIn.create({
-          identifier: email,
-          strategy: 'email_code',
-        });
-
-        const result = await signIn.attemptFirstFactor({
-          strategy: 'email_code',
-          code,
-        });
-
-        if (result.status === 'complete') {
-          await clerk.setActive({ session: result.createdSessionId });
-          return { success: true };
-        }
-
-        return { error: `Sign-in status: ${result.status}` };
-      } catch (error: unknown) {
-        return {
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    },
-    { email, code: MAGIC_CODE }
-  );
-
-  if ('error' in signInResult && signInResult.error) {
-    throw new Error(`Fallback sign-in failed: ${signInResult.error}`);
-  }
-
-  await page.goto(`${args.baseUrl}/app/dashboard/earnings`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-
-  writeCookieExport(args.output, await context.cookies());
-  await browser.close();
+  await runLocalBypassFlow(args);
 }
 
 async function main() {
@@ -429,24 +236,9 @@ async function main() {
 
   console.log(`Base URL: ${baseUrl.toString()}`);
   console.log(`Persona: ${args.persona}`);
+  console.log('Mode: Better Auth test-auth bypass');
 
-  if (isPrivateOrLoopbackHost(baseUrl.hostname)) {
-    try {
-      await runLocalBypassFlow(args);
-      return;
-    } catch (error) {
-      if (!shouldFallbackToClerk(error)) {
-        throw error;
-      }
-
-      console.log(
-        'Local bypass unavailable, falling back to Clerk testing token auth'
-      );
-    }
-  }
-
-  console.log('Mode: Clerk fallback');
-  await runClerkFallbackFlow(args);
+  await runBrowseAuth(args);
 }
 
 if (

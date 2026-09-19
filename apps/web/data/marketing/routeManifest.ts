@@ -168,12 +168,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'hero',
         'centered-none'
       ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'logo-cloud',
-        'inline-strip'
-      ),
-      // All six source-owned editorial occurrences remain ordered and legal.
+      // The unsupported adoption strip is intentionally omitted until it has
+      // an attributable permission or adoption receipt.
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
@@ -184,31 +180,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
         'editorial',
-        'found'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'know'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
         'relationships'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'smarter'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'built'
       ),
       approvedBinding(
         'apps/web/components/homepage/HomepageClose.tsx',
@@ -220,7 +192,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; Search-close CTA has a source-only canonical root and editorial-search body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Locked connected and relationships beats plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
@@ -645,6 +617,54 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/cli',
     healthCheck: {
       path: '/cli',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/compare/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 compare hub',
+      notes:
+        'Hub index listing comparison slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'compare hub index listing comparison slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/compare',
+    healthCheck: {
+      path: '/compare',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/alternatives/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 alternatives hub',
+      notes:
+        'Hub index listing alternative slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'alternatives hub index listing alternative slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/alternatives',
+    healthCheck: {
+      path: '/alternatives',
       expected: 'page',
     },
   },

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { PUBLIC_EVENTS_NO_UPCOMING_HEADING } from '@/features/profile/profile-surface-state';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -211,7 +212,7 @@ function TourDatesContent({
 
     return (
       <EmptyState
-        heading='No Events'
+        heading={PUBLIC_EVENTS_NO_UPCOMING_HEADING}
         description='Get alerted when shows are announced.'
         actionSlot={<div className='w-full max-w-xs'>{action}</div>}
         testId='profile-primary-tab-events-empty'

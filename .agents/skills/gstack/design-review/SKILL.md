@@ -881,6 +881,10 @@ The test: would a human designer at a respected studio ever ship this?
 - Fonts: `font-display: swap`, preconnect to CDN origins
 - No visible font swap flash (FOUT) — critical fonts preloaded
 
+**11. Forms, overflow, media, l10n, browser, a11y gaps**
+
+Load `.agents/skills/gstack/design-review/references/web-interface-gaps.md` after the 10 categories above. That file is the uncovered fold from the pinned web-interface handbook. Do not fetch `main`. Do not invoke a parallel `web-design-guidelines` skill. `DESIGN.md` and `/design-canonical` remain authoritative.
+
 ---
 
 ## Phase 4: Interaction Flow Review
@@ -1001,6 +1005,12 @@ Tie everything to user goals and product objectives. Always suggest specific imp
 9. **Document incrementally.** Write each finding to the report as you find it. Don't batch.
 10. **Depth over breadth.** 5-10 well-documented findings with screenshots and specific suggestions > 20 vague observations.
 11. **Show screenshots to the user.** After every `$B screenshot`, `$B snapshot -a -o`, or `$B responsive` command, use the Read tool on the output file(s) so the user can see them inline. For `responsive` (3 files), Read all three. This is critical — without it, screenshots are invisible to the user.
+
+After Phase 3 categories 1-10, load
+`.agents/skills/gstack/design-review/references/web-interface-gaps.md` for
+forms, overflow, media, l10n, browser, and a11y gaps. That is the only fold
+from the pinned web-interface handbook. Do not fetch `main`. Do not invoke
+`web-design-guidelines`. `/design-canonical` remains the canonical contract.
 
 ### Design Hard Rules
 

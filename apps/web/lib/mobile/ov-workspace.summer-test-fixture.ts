@@ -1,6 +1,9 @@
 import { vi } from 'vitest';
 
-export const h = vi.hoisted(() => ({
+// The hoisted block must stay a plain local binding: exporting the
+// `vi.hoisted(...)` result directly is rejected by Vite 8's transform
+// ("Cannot export hoisted variable"), so re-export the binding instead.
+const h = vi.hoisted(() => ({
   canUseOvChatMode: vi.fn(),
   resolveChatAccountContext: vi.fn(),
   checkAiChatRateLimitForPlan: vi.fn(),
@@ -18,6 +21,8 @@ export const h = vi.hoisted(() => ({
   founderPrincipalHash: vi.fn(),
   runOvieSummerTurn: vi.fn(),
 }));
+
+export { h };
 
 vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.canUseOvChatMode }));
 vi.mock('@/lib/chat/account-context', () => ({

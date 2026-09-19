@@ -21,6 +21,13 @@ const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
 const chatToolSchemaStrictRule = require('./eslint-rules/chat-tool-schema-strict');
 const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
 const noHardcodedThemeColorsRule = require('./eslint-rules/no-hardcoded-theme-colors');
+const { plugin: shadcn } = require('@shadcn/lint');
+const shadcnNoRestyleBaseline = require('./tests/unit/design-system/shadcn-no-restyle.baseline.json');
+const shadcnNoRestyleOptions = require('./eslint-rules/shadcn-no-restyle.options.json');
+
+const shadcnNoRestyleBaselineFiles = Object.keys(
+  shadcnNoRestyleBaseline.files
+).flatMap(relativePath => [relativePath, `apps/web/${relativePath}`]);
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -28,6 +35,7 @@ const baseConfig = {
   ...nextBase,
   plugins: {
     ...nextBase.plugins,
+    shadcn,
     '@jovie': {
       rules: {
         'icon-usage': iconUsageRule,
@@ -59,6 +67,11 @@ const baseConfig = {
     },
     'import/resolver': {
       typescript: {},
+    },
+    shadcn: {
+      ui: '@jovie/ui',
+      componentImports: ['^@jovie/ui(/|$)'],
+      note: 'Use an approved @jovie/ui variant or size. Do not add unapproved tokens, variants, duplicate components, new ignores, or enlarge the no-restyle baseline. See DESIGN.md and docs/design-system/shadcn-lint-overlap.md.',
     },
   },
   rules: {
@@ -208,6 +221,15 @@ const baseConfig = {
     // Contrast guardrail — bare text-black/bg-white without dark: counterpart (JOV-11038)
     // error at author time; contrast-ratchet counts legacy debt in CI (JOV-3572)
     '@jovie/no-hardcoded-theme-colors': 'error',
+    // JOV-6280: call-site appearance is owned by @jovie/ui. Layout/placement is
+    // allowed. Extra upstream rules stay off until a fixture proves incremental
+    // protection (see docs/design-system/shadcn-lint-overlap.md).
+    'shadcn/no-restyle': ['error', shadcnNoRestyleOptions],
+    'shadcn/no-raw-colors': 'off',
+    'shadcn/no-arbitrary-values': 'off',
+    'shadcn/no-unknown-classes': 'off',
+    'shadcn/require-static-classes': 'off',
+    'shadcn/no-inline-styles': 'off',
   },
 };
 
@@ -243,6 +265,8 @@ module.exports = [
       'scripts/fix-spotify-ids.js',
       'tests/e2e/**',
       '.github/scripts/**',
+      '**/eslint-rules/__tests__/fixtures/shadcn-lint/invalid/**',
+      '**/eslint-rules/__tests__/fixtures/shadcn-lint/enrollment/**',
     ],
   },
   baseConfig,
@@ -335,6 +359,8 @@ module.exports = [
     rules: {
       '@jovie/use-client-directive': 'off',
       '@next/next/no-img-element': 'off',
+      // Call-site no-restyle is a production contract (JOV-6280).
+      'shadcn/no-restyle': 'off',
     },
   },
 
@@ -506,6 +532,27 @@ module.exports = [
       parser: tsParser,
       ecmaVersion: 'latest',
       sourceType: 'module',
+    },
+  },
+  // Canonical @jovie/ui sources own their appearance. Call-site no-restyle
+  // must not flag component internals (JOV-6280).
+  {
+    files: [
+      'packages/ui/**/*.{ts,tsx}',
+      '**/packages/ui/**/*.{ts,tsx}',
+      '../../packages/ui/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'shadcn/no-restyle': 'off',
+    },
+  },
+  // Exact shrink-only grandfather list. New files are not listed here; adding
+  // paths or raising maxFiles is a reviewable baseline enlargement and the
+  // ratchet test fails closed on growth.
+  {
+    files: shadcnNoRestyleBaselineFiles,
+    rules: {
+      'shadcn/no-restyle': 'off',
     },
   },
 ];

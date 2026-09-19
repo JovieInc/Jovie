@@ -51,10 +51,54 @@ def _drain_command(
 ) -> str:
     fake_gh = tmp_path / "gh"
     assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
-    expected = expected_gh or fake_gh
+    gh_path = tmp_path
+    if backend == "native":
+        # Model the real Actions producer separately from each test's fleet API.
+        # All native tests execute the production guard; no bypass flag exists.
+        gh_path = tmp_path / "producer-api"
+        gh_path.mkdir(exist_ok=True)
+        producer_gh = gh_path / "gh"
+        producer_gh.write_text(textwrap.dedent(f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "${{1:-}}" == api && "${{2:-}}" == *"/statuses?per_page=100" ]]; then
+              # Older fixtures describe the combined status representation;
+              # expose its statuses as the real paginated plural API shape.
+              fixture_statuses=$('{fake_gh}' "$@") || exit $?
+              jq 'if type == "object" and has("statuses") then [.statuses] else . end' <<<"$fixture_statuses"
+              exit 0
+            fi
+            if [[ "${{1:-}}" == api && "${{2:-}}" == "repos/JovieInc/Jovie/actions/runs/${{GITHUB_RUN_ID:-}}" ]]; then
+              count=0
+              [[ ! -f "{tmp_path}/producer-reads" ]] || count=$(<"{tmp_path}/producer-reads")
+              echo "$((count + 1))" >"{tmp_path}/producer-reads"
+              [[ ! -f "{tmp_path}/producer-api-failure" ]] || exit 1
+              if [[ -f "{tmp_path}/producer-malformed" ]]; then echo 'not-json'; exit 0; fi
+              overrides='{{}}'
+              [[ ! -f "{tmp_path}/producer-overrides.json" ]] || overrides=$(<"{tmp_path}/producer-overrides.json")
+              if [[ "$count" -gt 0 && -f "{tmp_path}/producer-after-enroll.json" ]]; then
+                overrides=$(<"{tmp_path}/producer-after-enroll.json")
+              fi
+              # Preserve historical receipt fixtures that share the current
+              # run ID, instead of replacing their source-head provenance.
+              fixture_run=$('{fake_gh}' "$@" 2>/dev/null) || fixture_run='{{}}'
+              jq -e 'type == "object"' <<<"$fixture_run" >/dev/null 2>&1 || fixture_run='{{}}'
+              jq -n --argjson id "$GITHUB_RUN_ID" --argjson attempt "${{GITHUB_RUN_ATTEMPT:-1}}" --argjson fixture_run "$fixture_run" --argjson overrides "$overrides" '
+                {{id:$id,run_attempt:$attempt,name:"Merge Queue Auto-Enroll",path:".github/workflows/merge-queue-autoenroll.yml",
+                html_url:("https://github.com/JovieInc/Jovie/actions/runs/" + ($id|tostring)),
+                repository:{{full_name:"JovieInc/Jovie"}},head_repository:{{full_name:"JovieInc/Jovie"}},
+                head_sha:"{'a' * 40}",head_branch:"main",event:"workflow_run",status:"in_progress",conclusion:null,
+                created_at:"2026-01-01T00:00:00Z",updated_at:"2026-09-19T14:00:00Z"}} + $fixture_run + $overrides'
+              exit 0
+            fi
+            exec "{fake_gh}" "$@"
+            """), encoding="utf-8")
+        producer_gh.chmod(producer_gh.stat().st_mode | stat.S_IXUSR)
+    expected = expected_gh or (gh_path / "gh")
     authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
     env_prefix = (
-        f'PATH="{tmp_path}:$PATH" '
+        f'PATH="{gh_path}:{tmp_path}:$PATH" '
+        'GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 '
         f'DRAIN_EXPECT_GH="{expected}" '
         f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
         'GH_MUTATION_TOKEN=test-fixture-writer-token '
@@ -65,6 +109,156 @@ def _drain_command(
     if extra_env:
         env_prefix += f"{extra_env} "
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
+
+
+def _run_same_token_rest_fixture(
+    tmp_path: Path, *, rest_mode: str, post_hold: bool = False, producer_env: str = ""
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Path], str, str]:
+    """Run an exact native admission against controlled REST/GraphQL reads."""
+    head = "b" * 40
+    base = "c" * 40
+    rest_calls = tmp_path / "rest-calls"
+    view_calls = tmp_path / "view-calls"
+    enroll_calls = tmp_path / "enroll-calls"
+    dequeue_calls = tmp_path / "dequeue-calls"
+    for path in (rest_calls, view_calls, enroll_calls, dequeue_calls):
+        path.write_text("0", encoding="utf-8")
+
+    fake_node = tmp_path / "node"
+    fake_node.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            case "${{2:-}}" in
+              preflight) exit 0 ;;
+              prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
+              list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+              enroll)
+                count=$(<"{enroll_calls}")
+                echo "$((count + 1))" >"{enroll_calls}"
+                echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":1}}}}}}'
+                ;;
+              dequeue)
+                count=$(<"{dequeue_calls}")
+                echo "$((count + 1))" >"{dequeue_calls}"
+                echo '{{"state":{{"queued":false}}}}'
+                ;;
+              max-queue-depth) echo 16 ;;
+              unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+              unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+              explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+              prove-receipt) echo '{{"ok":false,"explanation":{{"reason":"not-queued"}},"state":{{"queued":false}}}}' ;;
+              --classify-queue) echo '[]' ;;
+              *) echo "unexpected node args: $*" >&2; exit 2 ;;
+            esac
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              count=$(<"{view_calls}")
+              echo "$((count + 1))" >"{view_calls}"
+              labels='[]'
+              if [[ "{str(post_hold).lower()}" == "true" && "$count" -ge 1 ]]; then
+                labels='[{{"name":"hold"}}]'
+              fi
+              printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"UNKNOWN","labels":'"$labels"',"headRefOid":"{head}","baseRefName":"main","baseRefOid":"{base}","body":""}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == "user" ]]; then
+              echo '{{"login":"github-actions[bot]","type":"Bot","id":418}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == "repos/JovieInc/Jovie/pulls/101" ]]; then
+              count=$(<"{rest_calls}")
+              next=$((count + 1))
+              echo "$next" >"{rest_calls}"
+              rest_state=open
+              rest_draft=false
+              rest_head={head}
+              rest_base={base}
+              rest_labels='[]'
+              rest_mergeable=true
+              rest_merge_state=clean
+              if [[ "{str(post_hold).lower()}" == "true" && "$next" -ge 3 ]]; then
+                rest_labels='[{{"name":"hold"}}]'
+              fi
+              case "{rest_mode}:$next" in
+                head-mismatch:*) rest_head={'d' * 40} ;;
+                base-mismatch:*) rest_base={'e' * 40} ;;
+                labels-mismatch:*) rest_labels='[{{"name":"hold"}}]' ;;
+                draft-mismatch:*) rest_draft=true ;;
+                state-mismatch:*) rest_state=closed ;;
+                false:*) rest_mergeable=false; rest_merge_state=dirty ;;
+                null:*) rest_mergeable=null; rest_merge_state=unknown ;;
+                read-failure:*) exit 1 ;;
+                flip:1) rest_mergeable=true ;;
+                flip:*) rest_mergeable=false; rest_merge_state=dirty ;;
+              esac
+              printf '%s\\n' '{{"number":101,"state":"'"$rest_state"'","draft":'"$rest_draft"',"mergeable":'"$rest_mergeable"',"mergeable_state":"'"$rest_merge_state"'","head":{{"sha":"'"$rest_head"'","ref":"codex/rest-fallback"}},"base":{{"sha":"'"$rest_base"'","ref":"main"}},"labels":'"$rest_labels"'}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+              echo "$*" >>"{tmp_path}/receipt-writes"
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+              echo '{{"statuses":[]}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+              echo '[]'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+              echo '2026-08-29T20:00:00Z'
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then exit 1; fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+    result = _run_bash(
+        _drain_command(
+            tmp_path,
+            backend="native",
+            extra_env=(
+                f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com "
+                f"{producer_env}"
+            ),
+        )
+    )
+    return result, {
+        "rest": rest_calls,
+        "view": view_calls,
+        "enroll": enroll_calls,
+        "dequeue": dequeue_calls,
+    }, head, base
 
 
 def _summer_closure_admission(
@@ -164,7 +358,7 @@ def _controller_repair_receipt() -> dict[str, object]:
             "condition": "controller-failure",
             "mainSha": "a" * 40,
             "deployedSha": "b" * 40,
-            "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+            "scope": "github-approved-exact-repository-pr-head-main-path-set",
             "maxConcurrent": 1,
             "deploymentsAllowed": False,
             "runtimeActivationAllowed": False,
@@ -296,6 +490,8 @@ def _trusted_autoenroll_run(
         "repository": {"full_name": repository},
         "head_repository": {"full_name": repository},
         "workflow_id": 299216194,
+        "event": "workflow_run", "head_branch": "main", "status": "in_progress", "conclusion": None,
+        "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-09-19T14:00:00Z",
         "run_attempt": 1,
     }
 
@@ -368,7 +564,7 @@ def _write_null_creator_receipt_drain(
         list_state = (
             f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
-            f'"mergeQueueEntry":{{"state":"{entry_state}","position":{queue_position}}}}}}}'
+            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"2026-08-28T14:20:00Z","state":"{entry_state}","position":{queue_position}}}}}}}'
         )
     else:
         list_state = (
@@ -414,7 +610,7 @@ def _write_null_creator_receipt_drain(
               explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":{queued_json},"eligible":true,"reason":"eligible"}}' ;;
               prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
               {enroll_case}
-              dequeue) printf 'dequeue\\n' >>'{logs["dequeue"]}'; echo '{{"state":{{"queued":false}}}}' ;;
+              dequeue|dequeue-ineligible) printf 'dequeue\\n' >>'{logs["dequeue"]}'; echo '{{"state":{{"queued":false}}}}' ;;
               max-queue-depth) echo 16 ;;
               {front_churn_case}
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -464,6 +660,11 @@ def _write_null_creator_receipt_drain(
               fi
               if [[ "$2" == *"/commits/{head}/status"* ]]; then cat '{status_file}'; exit 0; fi
               if [[ "$2" == "users/jovie-bot%5Bbot%5D" ]]; then cat '{identity_file}'; exit 0; fi
+              if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/76" ]]; then
+                if [[ -f '{tmp_path}/prior-run.json' ]]; then cat '{tmp_path}/prior-run.json';
+                else jq '.id = 76 | .html_url = "https://github.com/JovieInc/Jovie/actions/runs/76"' '{run_file}'; fi
+                exit 0
+              fi
               if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then cat '{run_file}'; exit 0; fi
               if [[ "$2" == *"/actions/runs/"*"/jobs"* ]]; then printf '%s\\n' "$2" >>'{logs["jobs"]}'; echo '[]'; exit 0; fi
               if [[ "$2" == *"/commits/{head}" && "$2" != *"/status"* ]]; then echo '2026-08-28T13:00:00Z'; exit 0; fi
@@ -481,6 +682,252 @@ def _write_null_creator_receipt_drain(
         encoding="utf-8",
     )
     fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+    return logs
+
+
+def _write_release_wave_drain_fixture(
+    tmp_path: Path, *, native: bool = False
+) -> dict[str, Path]:
+    """Write a small fake-GitHub queue with healthy, held, and clean PRs."""
+    logs = {
+        "enroll": tmp_path / "release-wave-enroll",
+        "dequeue": tmp_path / "release-wave-dequeue",
+    }
+    for path in logs.values():
+        path.write_text("", encoding="utf-8")
+    held_removed = tmp_path / "held-removed"
+    clean_enrolled = tmp_path / "clean-enrolled"
+    heads = {101: "a" * 40, 102: "b" * 40, 103: "c" * 40, 104: "d" * 40}
+    prs = [
+        {
+            "n": 101,
+            "t": "Already admitted healthy PR",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/healthy",
+            "headOid": heads[101],
+            "base": "main",
+            "body": "",
+            "L": ["merge-queue"],
+            "fail": [],
+        },
+        {
+            "n": 102,
+            "t": "Held queued PR",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/held",
+            "headOid": heads[102],
+            "base": "main",
+            "body": "",
+            "L": ["merge-queue", "hold"],
+            "fail": [],
+        },
+        {
+            "n": 103,
+            "t": "Clean admission candidate",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/clean",
+            "headOid": heads[103],
+            "base": "main",
+            "body": "",
+            "L": [],
+            "fail": [],
+        },
+        {
+            "n": 104,
+            "t": "Clean recovery candidate",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/recovery",
+            "headOid": heads[104],
+            "base": "main",
+            "body": "",
+            "L": [],
+            "fail": [],
+        },
+    ]
+    prs_json = json.dumps(prs, separators=(",", ":"))
+    labels_by_pr = {
+        101: '[{"name":"merge-queue"}]',
+        102: '[{"name":"hold"}]',
+        103: '[{"name":"merge-queue"}]',
+        104: "[]",
+    }
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              printf '%s\\n' '{prs_json}'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr edit" ]]; then
+              n="$3"
+              if [[ " $* " == *" --remove-label merge-queue "* ]]; then
+                printf 'dequeue %s\\n' "$n" >>'{logs["dequeue"]}'
+                if [[ "$n" == "102" ]]; then touch '{held_removed}'; fi
+                exit 0
+              fi
+              if [[ " $* " == *" --add-label merge-queue "* ]]; then
+                printf 'enroll %s\\n' "$n" >>'{logs["enroll"]}'
+                if [[ "$n" == "103" ]]; then touch '{clean_enrolled}'; fi
+                exit 0
+              fi
+              echo "unexpected pr edit: $*" >&2
+              exit 2
+            fi
+            if [[ "{str(native).lower()}" == "true" && "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then
+              printf '%s\\n' '[]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              n="$3"
+              case "$n" in
+                101) head='{heads[101]}'; base='main'; labels='{labels_by_pr[101]}' ;;
+                102) head='{heads[102]}'; base='main'; labels='{labels_by_pr[102]}' ;;
+                103) head='{heads[103]}'; base='main'; labels='[]'; [[ -f '{clean_enrolled}' ]] && labels='{labels_by_pr[103]}' ;;
+                104) head='{heads[104]}'; base='main'; labels='{labels_by_pr[104]}' ;;
+                *) echo "unexpected pr view: $*" >&2; exit 2 ;;
+              esac
+              printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":'"$labels"',"headRefOid":"'"$head"'","baseRefName":"'"$base"'","baseRefOid":"'"$base"'","body":""}}'
+              exit 0
+            fi
+            if [[ "{str(native).lower()}" == "true" && "$1" == "api" ]]; then
+              if [[ "$2" == *"/git/ref/heads/main"* ]]; then
+                printf '%s\\n' '{"a" * 40}'
+                exit 0
+              fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                printf '%s\\n' '[]'
+                exit 0
+              fi
+              if [[ "$2" == *"/commits/"*"/status"* ]]; then
+                printf '%s\\n' '{{"statuses":[]}}'
+                exit 0
+              fi
+              if [[ "$2" == *"/commits/"* ]]; then
+                printf '%s\\n' '{{"commit":{{"committer":{{"date":"2026-08-01T00:00:00Z"}}}}}}'
+                exit 0
+              fi
+              echo "unexpected native api args: $*" >&2
+              exit 2
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+    if native:
+        native_state = {
+            str(pr["n"]): {
+                "number": pr["n"],
+                "title": pr["t"],
+                "isDraft": pr["draft"],
+                "mergeable": pr["m"],
+                "mergeStateStatus": pr["ms"],
+                "headRefName": pr["head"],
+                "headRefOid": pr["headOid"],
+                "baseRefName": pr["base"],
+                "baseRefOid": "a" * 40,
+                "body": pr["body"],
+                "labels": {"nodes": [{"name": label} for label in pr["L"]]},
+                "queued": pr["n"] in (101, 102),
+                "isInMergeQueue": pr["n"] in (101, 102),
+                "mergeQueueEntry": (
+                    {
+                        "id": f"MQE_{pr['n']}",
+                        "state": "QUEUED",
+                        "position": 1 if pr["n"] == 101 else 2,
+                        "enqueuedAt": "2026-09-14T19:00:00Z",
+                    }
+                    if pr["n"] in (101, 102)
+                    else None
+                ),
+            }
+            for pr in prs
+        }
+        native_state_json = json.dumps(native_state, separators=(",", ":"))
+        native_receipt = json.dumps(
+            {
+                "state": {
+                    "state": "OPEN",
+                    "isDraft": False,
+                    "headRefOid": heads[103],
+                    "isInMergeQueue": True,
+                    "mergeQueueEntry": {
+                        "id": "MQE_103",
+                        "state": "QUEUED",
+                        "position": 3,
+                        "enqueuedAt": "2026-09-14T19:00:00Z",
+                    },
+                }
+            },
+            separators=(",", ":"),
+        )
+        native_ok = json.dumps({"ok": True}, separators=(",", ":"))
+        native_dequeue = json.dumps(
+            {
+                "backend": "native",
+                "changed": True,
+                "state": {"isInMergeQueue": False, "mergeQueueEntry": None},
+            },
+            separators=(",", ":"),
+        )
+        real_node = shutil.which("node")
+        assert real_node, "native release-wave fixture requires the real node executable"
+        native_node = tmp_path / "node"
+        native_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "${{1:-}}" == "-e" ]]; then
+                  exec '{real_node}' "$@"
+                fi
+                case "${{2:-}}" in
+                  preflight) printf '%s\\n' '{native_ok}' ;;
+                  list-state) printf '%s\\n' '{native_state_json}' ;;
+                  max-queue-depth) printf '%s\\n' '16' ;;
+                  --classify-queue) printf '%s\\n' '[]' ;;
+                  unmergeable-eject) printf '%s\\n' '{{"action":"keep","reason":"not-queued"}}' ;;
+                  changelog-drain) printf '%s\\n' '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  changelog-inventory) printf '%s\\n' '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  front-churn) printf '%s\\n' '{{"action":"allow","reason":"no classified failure"}}' ;;
+                  explain-selector) printf '%s\\n' '{{"observed":true,"queued":false,"eligible":false,"reason":"release-wave-hold"}}' ;;
+                  unmergeable-reenqueue) printf '%s\\n' '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  enroll)
+                    printf 'enroll %s\\n' "${{3:-}}" >>'{logs["enroll"]}'
+                    printf '%s\\n' '{native_receipt}'
+                    ;;
+                  dequeue|dequeue-ineligible)
+                    printf 'dequeue %s\\n' "${{3:-}}" >>'{logs["dequeue"]}'
+                    if [[ "${{3:-}}" == "102" ]]; then touch '{held_removed}'; fi
+                    printf '%s\\n' '{native_dequeue}'
+                    ;;
+                  prove-admission|prove-receipt) printf '%s\\n' '{{"ok":false}}' ;;
+                  *) echo "unexpected native node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        native_node.chmod(native_node.stat().st_mode | stat.S_IXUSR)
+    logs["held_removed"] = held_removed
+    logs["clean_enrolled"] = clean_enrolled
     return logs
 
 
@@ -835,6 +1282,34 @@ class TestNullCreatorQueueReceiptProvenance:
         posted = logs["post"].read_text(encoding="utf-8")
         assert "context=jovie-queue-admission/v2" in posted
         assert f"description=checkpoint=source-qualified;main={'a' * 40};pr=1001" in posted
+        assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
+
+    def test_wrong_workflow_receipt_is_automatically_replaced_by_canonical_admission(self, tmp_path: Path) -> None:
+        head = "a" * 40
+        prior = _null_creator_status(
+            head=head, context="jovie-queue-admission/v2", state="success",
+            description=f"checkpoint=source-qualified;main={head};pr=1001",
+        )
+        prior["creator"] = {"login": "jovie-bot[bot]", "type": "Bot"}
+        prior["target_url"] = "https://github.com/JovieInc/Jovie/actions/runs/76"
+        prior_run = _trusted_autoenroll_run(head=head)
+        prior_run.update(id=76, name="Queue-Deferred Release", path=".github/workflows/queue-deferred-release.yml", html_url=prior["target_url"])
+        (tmp_path / "prior-run.json").write_text(json.dumps(prior_run))
+        logs = _write_null_creator_receipt_drain(
+            tmp_path, pr=1001, head=head, title="Canonical recovery", status=prior,
+            run=_trusted_autoenroll_run(head=head), queued=True, queue_entry_state="QUEUED",
+            front_churn="allow", allow_enroll=True, labels=[],
+        )
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=1",
+        ))
+        assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
+        assert logs["dequeue"].read_text().splitlines() == ["dequeue"]
+        assert logs["enroll"].read_text().splitlines() == ["1001"]
+        assert "stale or missing exact-checkpoint admission" in result.stdout
+        posted = logs["post"].read_text()
+        assert "context=jovie-queue-admission/v2" in posted
         assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
 
     def test_reentry_rejects_a_receipt_written_by_another_bot(
@@ -1846,6 +2321,97 @@ class TestGhRetryHelper:
         assert counter.read_text(encoding="utf-8").strip() == "1"
 
 
+class TestReleaseWaveAdmissionHold:
+    def test_active_release_wave_native_backend_keeps_healthy_entry_and_dequeues_hold(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path, native=True)
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
+                    f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "new native enrollment/re-entry is deferred" in result.stdout
+        assert "queue depth: 2/16 (0 slots)" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
+        assert logs["held_removed"].exists()
+        assert not logs["clean_enrolled"].exists()
+
+    def test_active_release_wave_holds_new_work_but_keeps_safety_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path)
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
+                    f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "new native enrollment/re-entry is deferred" in result.stdout
+        assert "queue depth: 2/16 (0 slots)" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
+        assert logs["held_removed"].exists()
+        assert not logs["clean_enrolled"].exists()
+        assert "#101" in result.stdout
+
+    def test_expired_release_wave_resumes_exact_target_enrollment(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path)
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                    "DRAIN_RELEASE_WAVE_EXPIRES_AT=2000-01-01T00:00:00Z "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_ADMISSION_PR=103 "
+                    f"DRAIN_ADMISSION_HEAD={'c' * 40} "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "Release-wave admission hold expired" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == "enroll 103\n"
+        assert logs["clean_enrolled"].exists()
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
+
+
 class TestDrainPrQueueWiring:
     def test_exact_admission_rereads_transient_unknown_mergeability(
         self, tmp_path: Path
@@ -1943,6 +2509,156 @@ class TestDrainPrQueueWiring:
         assert "mergeable=UNKNOWN for #101" in result.stdout
         assert "+native-queue on #101" in result.stdout
         assert int(view_calls.read_text(encoding="utf-8")) >= 2
+
+    def test_exact_admission_uses_same_token_rest_mergeability_fallback(self, tmp_path: Path) -> None:
+        head = "b" * 40
+        base = "c" * 40
+        rest_calls = tmp_path / "rest-calls"
+        rest_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"UNKNOWN","labels":[],"headRefOid":"{head}","baseRefName":"main","baseRefOid":"{base}","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == "user" ]]; then
+                  echo '{{"login":"github-actions[bot]","type":"Bot","id":418}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == "repos/JovieInc/Jovie/pulls/101" ]]; then
+                  count=$(<"{rest_calls}")
+                  echo "$((count + 1))" >"{rest_calls}"
+                  echo '{{"number":101,"state":"open","draft":false,"mergeable":true,"mergeable_state":"clean","head":{{"sha":"{head}","ref":"codex/rest-fallback"}},"base":{{"sha":"{base}","ref":"main"}},"labels":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+                  echo '2026-08-29T20:00:00Z'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert 'raw_mergeable_type":"string"' in result.stderr
+        assert "api=rest" in result.stderr
+        assert "actor=github-actions[bot]/Bot/418" in result.stderr
+        assert "same-token REST mergeability fallback" in result.stderr
+        assert "+native-queue on #101" in result.stdout
+        assert int(rest_calls.read_text(encoding="utf-8")) == 3
+
+    @pytest.mark.parametrize(
+        ("rest_mode", "expected_rest_calls"),
+        [
+            ("head-mismatch", 1),
+            ("base-mismatch", 1),
+            ("labels-mismatch", 1),
+            ("draft-mismatch", 1),
+            ("state-mismatch", 1),
+            ("false", 1),
+            ("null", 1),
+            ("read-failure", 1),
+            ("flip", 2),
+        ],
+    )
+    def test_same_token_rest_fallback_rejects_unstable_or_mismatched_evidence(
+        self, tmp_path: Path, rest_mode: str, expected_rest_calls: int
+    ) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(
+            tmp_path, rest_mode=rest_mode
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "queue-noop" in result.stderr
+        assert "same-token REST mergeability fallback" not in result.stderr
+        assert "+native-queue on #101" not in result.stdout
+        assert int(paths["rest"].read_text(encoding="utf-8")) == expected_rest_calls
+        assert int(paths["enroll"].read_text(encoding="utf-8")) == 0
+        assert int(paths["dequeue"].read_text(encoding="utf-8")) == 0
+        if rest_mode == "null":
+            assert 'raw_mergeable":null' in result.stderr
+        if rest_mode == "read-failure":
+            assert "transport=failed" in result.stderr
+
+    def test_post_enrollment_hold_is_not_masked_by_rest_fallback(
+        self, tmp_path: Path
+    ) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(
+            tmp_path, rest_mode="valid", post_hold=True
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "same-token REST mergeability fallback" in result.stderr
+        assert "eligibility changed during native enrollment" in result.stdout
+        assert "-native-queue on #101" in result.stdout
+        assert int(paths["rest"].read_text(encoding="utf-8")) == 3
+        assert int(paths["enroll"].read_text(encoding="utf-8")) == 1
+        assert int(paths["dequeue"].read_text(encoding="utf-8")) == 1
 
     @pytest.mark.parametrize(
         (
@@ -2060,6 +2776,10 @@ class TestDrainPrQueueWiring:
                   exit 0
                 fi
                 if [[ "$1" == "api" ]]; then
+                  if [[ "$2" == *"/commits/{head}/statuses?per_page=100" ]]; then
+                    echo '[[]]'
+                    exit 0
+                  fi
                   if [[ " $* " == *"/commits/{head}/status "* ]]; then
                     echo '{{"statuses":[]}}'
                     exit 0
@@ -2224,10 +2944,11 @@ JSON
         assert heads["1003"] not in result.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
 
+    @pytest.mark.parametrize("released_hold", [False, True])
     def test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations(
-        self, tmp_path: Path
+        self, tmp_path: Path, released_hold: bool
     ) -> None:
-        """Each native enqueued event advances one bounded missed-admission cohort."""
+        """Native events and released-hold clock wakes recover bounded exact heads."""
         heads = {
             "1001": "d" * 40,
             "1002": "e" * 40,
@@ -2247,6 +2968,9 @@ JSON
                 f"""\\
                 #!/usr/bin/env bash
                 set -euo pipefail
+                if [[ "${{1:-}}" == "-e" ]]; then
+                  exec "{real_node}" "$@"
+                fi
                 queued_json() {{
                   if grep -qx -- "$1" "{enrolled}"; then
                     printf true
@@ -2363,13 +3087,44 @@ JSON
         )
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
 
+        admission_env = f"DRAIN_ADMISSION_PR=1001 DRAIN_ADMISSION_HEAD={heads['1001']} "
+        if released_hold:
+            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            held = _run_bash(
+                _drain_command(
+                    tmp_path,
+                    backend="native",
+                    extra_env=(
+                        "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                        "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                        "DRAIN_RELEASE_WAVE_HOLD=1 "
+                        "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                        f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                        "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    ),
+                )
+            )
+            assert held.returncode == 0, f"stdout={held.stdout}\nstderr={held.stderr}"
+            assert "new native enrollment/re-entry is deferred" in held.stdout
+            assert enrolled.read_text(encoding="utf-8") == ""
+            # The later clock wake has no PR payload and no auto-merge intent.
+            # It must recover fresh eligible heads after expiry, not bypass it.
+            admission_env = (
+                "DRAIN_RELEASE_WAVE_HOLD=1 "
+                "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                "DRAIN_RELEASE_WAVE_EXPIRES_AT=2000-01-01T00:00:00Z "
+                "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+            )
+
         first = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
                 extra_env=(
-                    f"DRAIN_ADMISSION_PR=1001 DRAIN_ADMISSION_HEAD={heads['1001']} "
-                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    admission_env
+                    + "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
                     "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
                     "GITHUB_RUN_ID=78 GITHUB_SERVER_URL=https://github.com"
                 ),
@@ -2380,7 +3135,11 @@ JSON
         assert "bounded exact-head native admission" in first.stdout
         assert "exact missed admission at " + heads["1002"] in first.stdout
         assert "reached total exact admission cap (2)" in first.stdout
-        assert "exact missed admission at " + heads["1001"] not in first.stdout
+        if released_hold:
+            assert "Release-wave admission hold expired" in first.stdout
+            assert "exact missed admission at " + heads["1001"] in first.stdout
+        else:
+            assert "exact missed admission at " + heads["1001"] not in first.stdout
         assert "exact missed admission at " + heads["1003"] not in first.stdout
         assert "exact missed admission at " + heads["1004"] not in first.stdout
         assert "exact missed admission at " + heads["1005"] not in first.stdout
@@ -2572,11 +3331,10 @@ JSON
             "pr": 904,
             "head": "f" * 40,
             "mainSha": "a" * 40,
-            "reviewAuthority": "independent-llm-review",
-            "reviewId": "review-17219",
+            "reviewAuthority": "github-approved-collaborator",
+            "reviewId": "github-review-17219",
             "reviewedHead": "f" * 40,
             "changedPathsSha256": paths_hash,
-            "operationId": "run-77-attempt-1",
             "issuedAt": now.isoformat(),
             "expiresAt": (now + timedelta(minutes=10)).isoformat(),
             "deploymentsAllowed": False,
@@ -2604,8 +3362,8 @@ JSON
                     "a" * 40,
                     "--changed-paths-sha256",
                     paths_hash,
-                    "--operation-id",
-                    "run-77-attempt-1",
+                    "--review-id",
+                    "github-review-17219",
                     "--minimum-valid-for-ms",
                     "120000",
                 ],
@@ -2622,7 +3380,7 @@ JSON
             {**attestation, "mainSha": "b" * 40},
             {**attestation, "changedPathsSha256": "0" * 64},
             {**attestation, "reviewedHead": "e" * 40},
-            {**attestation, "operationId": "run-77-attempt-2"},
+            {**attestation, "reviewId": "github-review-99999"},
             {**attestation, "unexpectedScope": True},
             {
                 **attestation,
@@ -2638,7 +3396,8 @@ JSON
 
     @pytest.mark.parametrize(
         (
-            "actor",
+            "reviewer",
+            "association",
             "live_hold",
             "live_head_changed",
             "live_main_sha",
@@ -2646,18 +3405,32 @@ JSON
             "expected_returncode",
         ),
         [
-            ("jovie-bot[bot]", False, False, "a" * 40, True, 0),
-            ("untrusted-user", False, False, "a" * 40, False, 0),
-            ("jovie-bot[bot]", True, False, "a" * 40, False, 0),
-            ("jovie-bot[bot]", False, True, "a" * 40, False, 0),
-            ("jovie-bot[bot]", False, False, "b" * 40, False, 0),
-            ("jovie-bot[bot]", False, False, "", False, 1),
+            ("trusted-reviewer", "MEMBER", False, False, "a" * 40, True, 0),
+            ("trusted-reviewer-revoked", "MEMBER", False, False, "a" * 40, False, 0),
+            ("trusted-reviewer-reapproved", "MEMBER", False, False, "a" * 40, True, 0),
+            (
+                "trusted-reviewer-comment-preserved",
+                "MEMBER",
+                False,
+                False,
+                "a" * 40,
+                True,
+                0,
+            ),
+            ("trusted-reviewer-dismissed", "MEMBER", False, False, "a" * 40, False, 0),
+            ("jovie-bot[bot]", "NONE", False, False, "a" * 40, False, 0),
+            ("itstimwhite", "OWNER", False, False, "a" * 40, False, 0),
+            ("trusted-reviewer", "MEMBER", True, False, "a" * 40, False, 0),
+            ("trusted-reviewer", "MEMBER", False, True, "a" * 40, False, 0),
+            ("trusted-reviewer", "MEMBER", False, False, "b" * 40, False, 0),
+            ("trusted-reviewer", "MEMBER", False, False, "", False, 1),
         ],
     )
     def test_controller_repair_mode_admits_only_trusted_exact_candidate(
         self,
         tmp_path: Path,
-        actor: str,
+        reviewer: str,
+        association: str,
         live_hold: bool,
         live_head_changed: bool,
         live_main_sha: str,
@@ -2680,24 +3453,66 @@ JSON
             "pr": 904,
             "head": head,
             "mainSha": "a" * 40,
-            "reviewAuthority": "independent-llm-review",
-            "reviewId": "review-17219",
+            "reviewAuthority": "github-approved-collaborator",
+            "reviewId": "github-review-17219",
             "reviewedHead": head,
             "changedPathsSha256": paths_hash,
-            "operationId": "run-77-attempt-1",
             "issuedAt": now.isoformat(),
             "expiresAt": (now + timedelta(minutes=10)).isoformat(),
             "deploymentsAllowed": False,
             "runtimeActivationAllowed": False,
         }
-        body = (
-            "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
-            + json.dumps(attestation)
-            + "\n```"
-        )
-        encoded_body = base64.b64encode(body.encode()).decode()
+        def attestation_body(review_id: int) -> str:
+            candidate = {
+                **attestation,
+                "reviewId": f"github-review-{review_id}",
+            }
+            return (
+                "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
+                + json.dumps(candidate)
+                + "\n```"
+            )
+
+        body = attestation_body(17219)
         encoded_receipt = base64.b64encode(
             json.dumps(_controller_repair_receipt()).encode()
+        ).decode()
+        review_records = [
+            {
+                "id": 17219,
+                "state": "APPROVED",
+                "commit_id": head,
+                "submitted_at": "2026-09-05T09:00:00Z",
+                "author_association": association,
+                "user": {"login": reviewer},
+                "body": body,
+            }
+        ]
+        review_transitions = {
+            "trusted-reviewer-revoked": ("CHANGES_REQUESTED",),
+            "trusted-reviewer-reapproved": ("CHANGES_REQUESTED", "APPROVED"),
+            "trusted-reviewer-comment-preserved": ("COMMENTED", "PENDING"),
+            "trusted-reviewer-dismissed": ("DISMISSED",),
+        }.get(reviewer, ())
+        for offset, state in enumerate(review_transitions, start=1):
+            review_id = 17219 + offset
+            review_records.append(
+                {
+                    "id": review_id,
+                    "state": state,
+                    "commit_id": head,
+                    "submitted_at": f"2026-09-05T09:{offset:02d}:00Z",
+                    "author_association": association,
+                    "user": {"login": reviewer},
+                    "body": (
+                        attestation_body(review_id)
+                        if state == "APPROVED"
+                        else f"{state} follow-up review."
+                    ),
+                }
+            )
+        encoded_reviews = base64.b64encode(
+            json.dumps([review_records]).encode()
         ).decode()
         main_ref_response = f"echo '{live_main_sha}'; exit 0" if live_main_sha else "exit 1"
         fake_gh = tmp_path / "gh"
@@ -2718,9 +3533,12 @@ JSON
                   echo '["scripts/drain-pr-queue.sh"]'
                   exit 0
                 fi
-                if [[ "$1" == "api" && "$2" == *"/issues/904/comments" ]]; then
-                  body=$(printf '%s' '{encoded_body}' | base64 --decode)
-                  jq -nc --arg actor '{actor}' --arg body "$body" '[[{{user:{{login:$actor}},body:$body}}]]'
+                if [[ "$1" == "api" && "$2" == *"/pulls/904/reviews" ]]; then
+                  printf '%s' '{encoded_reviews}' | base64 --decode
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/pulls/904" ]]; then
+                  echo '{{"user":{{"login":"itstimwhite"}}}}'
                   exit 0
                 fi
                 if [[ "$1" == "api" && " $* " == *" repos/JovieInc/Jovie/git/ref/heads/main "* ]]; then
@@ -2760,11 +3578,16 @@ JSON
         assert result.returncode == expected_returncode, result.stderr
         assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enroll
         assert "would +merge-queue on #905" not in result.stdout
-        assert "would -merge-queue on #905" not in result.stdout
+        assert "would -merge-queue on #905" in result.stdout
         assert "=== RECOVER (bounded exact-head native admission) ===" not in result.stdout
-        if actor != "jovie-bot[bot]":
+        if reviewer in {
+            "jovie-bot[bot]",
+            "itstimwhite",
+            "trusted-reviewer-revoked",
+            "trusted-reviewer-dismissed",
+        }:
             assert (
-                "trusted exact-scope controller repair attestation is absent or stale"
+                "authenticated exact-scope controller repair approval is absent or stale"
                 in result.stdout
             )
         if live_hold:
@@ -2775,6 +3598,185 @@ JSON
             assert "main moved from attested" in result.stdout
         if not live_main_sha:
             assert "current main SHA is unavailable" in result.stderr
+
+    def test_controller_repair_native_cli_enrolls_and_writes_durable_receipts(
+        self, tmp_path: Path
+    ) -> None:
+        head = "f" * 40
+        main = "a" * 40
+        paths = ["scripts/drain-pr-queue.sh"]
+        paths_hash = hashlib.sha256(
+            json.dumps(paths, separators=(",", ":")).encode()
+        ).hexdigest()
+        now = datetime.now(timezone.utc)
+        attestation = {
+            "schema": "jovie-controller-repair-attestation/v1",
+            "kind": "controller-runtime-repair",
+            "condition": "controller-failure",
+            "repository": "JovieInc/Jovie",
+            "pr": 904,
+            "head": head,
+            "mainSha": main,
+            "reviewAuthority": "github-approved-collaborator",
+            "reviewId": "github-review-17219",
+            "reviewedHead": head,
+            "changedPathsSha256": paths_hash,
+            "issuedAt": now.isoformat(),
+            "expiresAt": (now + timedelta(minutes=10)).isoformat(),
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        }
+        body = base64.b64encode(
+            (
+                "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
+                + json.dumps(attestation)
+                + "\n```"
+            ).encode()
+        ).decode()
+        receipt = _controller_repair_receipt()
+        encoded_receipt = base64.b64encode(json.dumps(receipt).encode()).decode()
+        state_file = tmp_path / "queued"
+        state_file.write_text("0", encoding="utf-8")
+        status_log = tmp_path / "statuses"
+        status_log.write_text("", encoding="utf-8")
+        main_calls = tmp_path / "main-calls"
+        main_calls.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                state_file='{state_file}'
+                status_log='{status_log}'
+                main_calls='{main_calls}'
+                head='{head}'
+                main='{main}'
+                pr_node='PR_kwDO_native_904'
+                queued=$(<"$state_file")
+                state_json() {{
+                  if [[ "$queued" == 1 ]]; then
+                    entry='{{"id":"MQE_904","state":"QUEUED","position":1,"enqueuedAt":"2026-09-05T00:00:00Z"}}'
+                    auto='{{"enabledAt":"2026-09-05T00:00:00Z"}}'
+                  else
+                    entry=null; auto=null
+                  fi
+                  jq -nc --arg id "$pr_node" --arg head "$head" --argjson q "$queued" \
+                    --argjson entry "$entry" --argjson auto "$auto" \
+                    '{{id:$id,number:904,state:"OPEN",isDraft:false,headRefOid:$head,headRefName:"codex/controller-repair",baseRefName:"main",mergeable:"MERGEABLE",mergeStateStatus:"CLEAN",labels:{{nodes:[]}},isInMergeQueue:($q == 1),mergeQueueEntry:$entry,autoMergeRequest:$auto}}'
+                }}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":904,"t":"Controller repair","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/controller-repair","headOid":"{head}","base":"main","body":"","L":[],"fail":[],"q":false}}]'; exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'; exit 0
+                fi
+                if [[ "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then echo '["scripts/drain-pr-queue.sh"]'; exit 0; fi
+                if [[ "$1 $2" == "pr view" ]]; then echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/pulls/904/reviews"* ]]; then
+                  review_body=$(printf '%s' '{body}' | base64 --decode)
+                  jq -nc --arg body "$review_body" --arg head "$head" '[[{{id:17219,state:"APPROVED",commit_id:$head,author_association:"MEMBER",user:{{login:"trusted-reviewer"}},body:$body}}]]'; exit 0
+                fi
+                if [[ "$1" == api && "$2" == *"/pulls/904" ]]; then echo '{{"user":{{"login":"itstimwhite"}}}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/git/ref/heads/main"* ]]; then
+                  calls=$(<"$main_calls"); calls=$((calls + 1)); echo "$calls" >"$main_calls"
+                  if [[ "${{TEST_MAIN_DRIFT_AFTER_ENROLL:-0}}" == 1 && "$calls" -gt 2 ]]; then printf '%040d\n' 0; else echo "$main"; fi
+                  exit 0
+                fi
+                if [[ "$1" == api && "$2" == *"/commits/{head}/status"* ]]; then
+                  if grep -q 'context=jovie-controller-repair-queue/v1' "$status_log"; then
+                    echo '{{"statuses":[{{"context":"jovie-controller-repair-queue/v1","state":"success","description":"Authenticated controller repair PR #904 at exact head","target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","creator":{{"login":"jovie-bot[bot]"}}}}]}}'
+                  else echo '{{"statuses":[]}}'; fi
+                  exit 0
+                fi
+                if [[ "$1" == api && " $* " == *" -X POST "* && "$*" == *"/statuses/{head}"* ]]; then echo "$*" >>"$status_log"; echo '{{}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/commits/{head}"* ]]; then echo '2026-09-05T00:00:00Z'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
+                if [[ "$1" == api && "$2" == "repos/JovieInc/Jovie" ]]; then echo '{{"default_branch":"main","allow_auto_merge":true,"allow_squash_merge":true}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}}}]}}'; exit 0; fi
+                if [[ "$1" == api && "$*" == *"/contents/.github/workflows/ci.yml"* ]]; then printf 'name: CI\non:\n  pull_request:\n    branches: [main]\n  merge_group:\n    types: [checks_requested]\n'; exit 0; fi
+                if [[ "$1 $2" == "api graphql" ]]; then
+                  args="$*"
+                  if [[ "$args" == *"MergeQueueNativeMutationActor"* ]]; then echo '{{"data":{{"viewer":{{"login":"jovie-bot[bot]"}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"enablePullRequestAutoMerge"* ]]; then echo 1 >"$state_file"; echo '{{"data":{{"enablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"dequeuePullRequest"* ]]; then echo 0 >"$state_file"; echo '{{"data":{{"dequeuePullRequest":{{"mergeQueueEntry":null}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"disablePullRequestAutoMerge"* ]]; then echo '{{"data":{{"disablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueuePullRequestState"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequest:$state}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueCanonicalMembership"* ]]; then
+                    if [[ "$queued" != 1 ]]; then echo '{{"data":{{"repository":{{"pullRequest":{{"id":"PR_kwDO_native_904","number":904,"state":"OPEN","isDraft":false,"headRefOid":"'"$head"'","headRefName":"codex/controller-repair","baseRefName":"main","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","labels":{{"nodes":[]}},"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null,"timelineItems":{{"nodes":[],"pageInfo":{{"hasNextPage":false}}}}}}}}}}}}'; exit 0; fi
+                    jq -nc --arg id "$pr_node" --arg head "$head" '{{data:{{repository:{{pullRequest:{{id:$id,number:904,state:"OPEN",isDraft:false,headRefOid:$head,headRefName:"codex/controller-repair",baseRefName:"main",mergeable:"MERGEABLE",mergeStateStatus:"CLEAN",labels:{{nodes:[]}},isInMergeQueue:true,mergeQueueEntry:{{id:"MQE_904",state:"QUEUED",position:1,enqueuedAt:"2026-09-05T00:00:00Z",enqueuer:{{__typename:"Bot",login:"jovie-bot"}}}},autoMergeRequest:{{enabledAt:"2026-09-05T00:00:00Z"}},timelineItems:{{nodes:[{{__typename:"AddedToMergeQueueEvent",id:"MQE_EVT_904",createdAt:"2026-09-05T00:00:00Z",actor:{{__typename:"Bot",login:"jovie-bot"}},enqueuer:{{login:"jovie-bot[bot]"}}}}],pageInfo:{{hasNextPage:false}}}}}}}}}}}}'; exit 0
+                  fi
+                  if [[ "$args" == *"MergeQueueOpenPullRequestStates"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequests:{{nodes:[$state],pageInfo:{{hasNextPage:false}}}}}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueBranchProtection"* ]]; then echo '{{"data":{{"repository":{{"ref":{{"name":"main","branchProtectionRule":null}}}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":1200,"maximumEntriesToBuild":1,"maximumEntriesToMerge":5,"mergeMethod":"SQUASH","minimumEntriesToMerge":5,"minimumEntriesToMergeWaitTime":10}}}}}}}}}}'; exit 0; fi
+                fi
+                echo "unexpected gh args: $*" >&2; exit 2
+                """
+            ).lstrip(),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRY_RUN=0 GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "DRAIN_PROMOTION_MODE=controller-repair-only "
+                    "DRAIN_ADMISSION_PR=904 "
+                    f"DRAIN_ADMISSION_HEAD={head} "
+                    f"DRAIN_FLEET_GATE_B64={encoded_receipt}"
+                ),
+            )
+        )
+        assert result.returncode == 0, result.stderr
+        assert state_file.read_text(encoding="utf-8").strip() == "1"
+        statuses = status_log.read_text(encoding="utf-8")
+        assert "context=jovie-controller-repair-queue/v1" in statuses
+        assert "context=jovie-queue-admission/v2" in statuses
+
+        retained = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRY_RUN=0 GITHUB_RUN_ID=79 GITHUB_RUN_ATTEMPT=1 "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "DRAIN_PROMOTION_MODE=controller-repair-only "
+                    "DRAIN_ADMISSION_PR=904 "
+                    f"DRAIN_ADMISSION_HEAD={head} "
+                    f"DRAIN_FLEET_GATE_B64={encoded_receipt}"
+                ),
+            )
+        )
+        assert retained.returncode == 0, retained.stderr
+        assert "preserving exact controller repair PR #904 (WIP 1)" in retained.stdout
+        assert "queue depth: 1/16 (0 slots)" in retained.stdout
+        assert state_file.read_text(encoding="utf-8").strip() == "1"
+
+        state_file.write_text("0", encoding="utf-8")
+        status_log.write_text("", encoding="utf-8")
+        main_calls.write_text("0", encoding="utf-8")
+        raced = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRY_RUN=0 TEST_MAIN_DRIFT_AFTER_ENROLL=1 "
+                    "GITHUB_RUN_ID=78 GITHUB_RUN_ATTEMPT=1 "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "DRAIN_PROMOTION_MODE=controller-repair-only "
+                    "DRAIN_ADMISSION_PR=904 "
+                    f"DRAIN_ADMISSION_HEAD={head} "
+                    f"DRAIN_FLEET_GATE_B64={encoded_receipt}"
+                ),
+            )
+        )
+        assert raced.returncode != 0
+        assert state_file.read_text(encoding="utf-8").strip() == "0"
+        assert "controller repair evidence changed" in raced.stdout
 
     def test_blocked_receipt_dry_run_preserves_clean_queued_pr(
         self, tmp_path: Path
@@ -2854,12 +3856,19 @@ JSON
         assert "(0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
-    @pytest.mark.parametrize("closure_status", ["healthy", "grace"])
+    @pytest.mark.parametrize(
+        ("closure_status", "intake_allowed"),
+        [
+            ("healthy", True),
+            ("grace", False),
+            ("grace", True),
+            ("red", True),
+        ],
+    )
     def test_hold_intake_accepts_canonical_closure_statuses(
-        self, tmp_path: Path, closure_status: str
+        self, tmp_path: Path, closure_status: str, intake_allowed: bool
     ) -> None:
         queued_head = "8" * 40
-        intake_allowed = closure_status == "healthy"
         receipt = _production_unbound_hold_receipt(
             closure_status=closure_status,
             intake_allowed=intake_allowed,
@@ -2913,8 +3922,6 @@ JSON
         [
             ("green", True),
             ("healthy", False),
-            ("grace", True),
-            ("red", True),
         ],
     )
     def test_hold_intake_rejects_retired_or_contradictory_closure_receipts(
@@ -5401,7 +6408,7 @@ class TestNativeAdmissionReceiptReconciliation:
         *,
         receipt_main: str,
         checkpoint: str = "verified",
-        receipt_creator: str = "jovie-bot[bot]",
+        receipt_creator: str | None = "jovie-bot[bot]",
         older_receipt_creator: str | None = None,
         receipt_at: str | None,
         enqueued_at: str | None = "2026-09-07T12:00:00Z",
@@ -5451,6 +6458,10 @@ class TestNativeAdmissionReceiptReconciliation:
             else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"{receipt_creator}"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
         )
         plural_statuses = json.loads(status_json)["statuses"]
+        if receipt_creator is None:
+            plural_statuses[0]["creator"] = None
+            plural_statuses[0]["avatar_url"] = _TRUSTED_BOT_AVATAR
+            plural_statuses[0]["url"] = f"https://api.github.com/repos/JovieInc/Jovie/statuses/{head}"
         if older_receipt_creator is not None:
             plural_statuses[0]["id"] = 2
             older = json.loads(json.dumps(plural_statuses[0]))
@@ -5476,8 +6487,16 @@ class TestNativeAdmissionReceiptReconciliation:
                   echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
                   exit 0
                 fi
+                if [[ "$1" == "api" && "$2" == "users/jovie-bot%5Bbot%5D" ]]; then
+                  [[ ! -f "{tmp_path}/identity-api-failure" ]] || exit 1
+                  if [[ -f "{tmp_path}/identity-malformed" ]]; then echo '{{}}'; exit 0; fi
+                  echo '{{"login":"jovie-bot[bot]","type":"Bot","avatar_url":"{_TRUSTED_BOT_AVATAR}"}}'
+                  exit 0
+                fi
                 if [[ "$1" == "api" && "$2" == *"/commits/{head}/statuses?per_page=100" ]]; then
                   [[ " $* " == *" --paginate --slurp "* ]] || exit 2
+                  [[ ! -f "{tmp_path}/statuses-api-failure" ]] || exit 1
+                  if [[ -f "{tmp_path}/statuses-malformed" ]]; then echo '{{}}'; exit 0; fi
                   echo '{plural_status_json}'
                   exit 0
                 fi
@@ -5577,6 +6596,97 @@ class TestNativeAdmissionReceiptReconciliation:
             [] if receipt_creator == "jovie-bot[bot]" else ["1001"]
         )
 
+    @pytest.mark.parametrize("overrides", [
+        {"name": "Queue-Deferred Release", "path": ".github/workflows/queue-deferred-release.yml"},
+        {"name": "Claude Code", "path": ".github/workflows/claude.yml"},
+        {"name": "Delivery Control Receipts", "path": ".github/workflows/delivery-control-receipts.yml"},
+        {"status": "completed", "conclusion": "cancelled", "updated_at": "2026-09-07T12:00:01Z"},
+        {"status": "queued"},
+        {"created_at": "2026-09-07T12:00:01Z"},
+        {"repository": {"full_name": "other/repository"}},
+        {"event": "schedule"},
+    ])
+    def test_reconciler_removes_bot_receipt_with_untrusted_producer(self, tmp_path: Path, overrides: dict) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z",
+        )
+        (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode == 0, result.stderr
+        assert dequeue_log.read_text().splitlines() == ["1001"]
+        assert "stale or missing exact-checkpoint admission" in result.stdout
+
+    @pytest.mark.parametrize("conclusion", ["success", "cancelled", "failure"])
+    def test_reconciler_preserves_canonical_receipt_before_producer_ended(self, tmp_path: Path, conclusion: str) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="b" * 40, receipt_at="2026-09-07T12:00:02Z",
+        )
+        (tmp_path / "producer-overrides.json").write_text(json.dumps({
+            "status": "completed", "conclusion": conclusion, "updated_at": "2026-09-07T12:00:03Z",
+        }))
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode == 0, result.stderr
+        assert dequeue_log.read_text() == ""
+        assert "=fresh exact-checkpoint native admission" in result.stdout
+
+    @pytest.mark.parametrize("failure_marker", ["producer-api-failure", "producer-malformed", "statuses-api-failure", "statuses-malformed"])
+    def test_reconciler_preserves_membership_when_producer_evidence_is_unavailable(self, tmp_path: Path, failure_marker: str) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z",
+        )
+        (tmp_path / failure_marker).touch()
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode != 0
+        assert "preserving membership" in result.stderr
+        assert dequeue_log.read_text() == ""
+        assert "enroll" not in (tmp_path / "node-calls").read_text().splitlines()
+
+    @pytest.mark.parametrize("failure_marker", ["identity-api-failure", "identity-malformed", "producer-api-failure", "producer-malformed", "producer-missing-workflow-id"])
+    def test_null_creator_identity_api_failure_preserves_membership(self, tmp_path: Path, failure_marker: str) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z", receipt_creator=None,
+        )
+        if failure_marker == "producer-missing-workflow-id":
+            (tmp_path / "producer-overrides.json").write_text(json.dumps({"workflow_id": None}))
+        else:
+            (tmp_path / failure_marker).touch()
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode != 0
+        assert "preserving membership" in result.stderr
+        assert dequeue_log.read_text() == ""
+
+    @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", None])
+    @pytest.mark.parametrize("overrides", [
+        {"name": None}, {"path": None}, {"head_sha": None},
+        {"repository": {}}, {"run_attempt": None}, {"conclusion": {}},
+        {"created_at": None}, {"updated_at": None},
+        {"created_at": "not-a-date"}, {"updated_at": "not-a-date"},
+    ])
+    def test_partial_producer_object_preserves_membership(self, tmp_path: Path, overrides: dict, receipt_creator: str | None) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
+        )
+        (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode != 0
+        assert "preserving membership" in result.stderr
+        assert dequeue_log.read_text() == ""
+
     def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
         self, tmp_path: Path
     ) -> None:
@@ -5632,3 +6742,196 @@ class TestNativeAdmissionReceiptReconciliation:
         assert result.returncode == 1
         assert "no authoritative enqueue timestamp" in result.stderr
         assert dequeue_log.read_text(encoding="utf-8") == ""
+
+
+class TestCanonicalAdmissionProducer:
+    @pytest.mark.parametrize("producer_env", [
+        "GITHUB_RUN_ID=", "GITHUB_RUN_ID=invalid", "GITHUB_RUN_ATTEMPT=",
+        "GITHUB_RUN_ATTEMPT=0", "GITHUB_SERVER_URL=https://untrusted.example",
+    ])
+    def test_missing_identity_stops_before_api_and_queue(self, tmp_path: Path, producer_env: str) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true", producer_env=producer_env)
+        assert "exact workflow run and attempt" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "producer-reads").exists()
+        assert not (tmp_path / "receipt-writes").exists()
+
+    @pytest.mark.parametrize("overrides", [
+        {"name": "Queue-Deferred Release", "path": ".github/workflows/queue-deferred-release.yml"},
+        {"name": "Claude Code", "path": ".github/workflows/claude.yml"},
+        {"name": "Delivery Control Receipts", "path": ".github/workflows/delivery-control-receipts.yml"},
+        {"status": "completed", "conclusion": "cancelled"},
+        {"status": "completed", "conclusion": "success"},
+        {"status": "queued"},
+        {"name": "Wrong workflow"},
+        {"path": ".github/workflows/other.yml"},
+        {"head_branch": ""},
+        {"conclusion": "success"},
+        {"id": 123},
+        {"run_attempt": 2},
+        {"repository": {"full_name": "other/repository"}},
+        {"head_repository": {"full_name": "other/repository"}},
+        {"html_url": "https://github.com/JovieInc/Jovie/actions/runs/123"},
+        {"head_sha": "missing"},
+        {"head_branch": "untrusted"},
+        {"event": "schedule"},
+    ])
+    def test_untrusted_producer_never_enrolls_or_stamps(self, tmp_path: Path, overrides: dict) -> None:
+        (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert paths["dequeue"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_api_failure_never_enrolls_or_stamps(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-api-failure").touch()
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "producer identity is unavailable" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_malformed_response_never_enrolls_or_stamps(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-malformed").touch()
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert paths["enroll"].read_text().strip() == "0"
+        assert not (tmp_path / "receipt-writes").exists()
+
+    def test_producer_ending_after_enroll_is_compensated_without_receipt(self, tmp_path: Path) -> None:
+        (tmp_path / "producer-after-enroll.json").write_text(json.dumps({"status": "completed", "conclusion": "cancelled"}))
+        result, paths, _, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert paths["enroll"].read_text().strip() == "1"
+        assert paths["dequeue"].read_text().strip() == "1"
+        assert "inactive or noncanonical workflow producer" in result.stderr
+        assert not (tmp_path / "receipt-writes").exists()
+
+    @pytest.mark.parametrize("event,branch", [("workflow_run", "main"), ("pull_request", "codex/source")])
+    def test_active_canonical_producer_enrolls_and_stamps(self, tmp_path: Path, event: str, branch: str) -> None:
+        (tmp_path / "producer-overrides.json").write_text(json.dumps({"event": event, "head_branch": branch}))
+        result, paths, head, _ = _run_same_token_rest_fixture(tmp_path, rest_mode="true")
+        assert result.returncode == 0, result.stderr
+        assert paths["enroll"].read_text().strip() == "1"
+        assert paths["dequeue"].read_text().strip() == "0"
+        receipt = (tmp_path / "receipt-writes").read_text()
+        assert "context=jovie-queue-admission/v2" in receipt
+        assert f"statuses/{head}" in receipt
+        assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/42" in receipt
+        assert (tmp_path / "producer-reads").read_text().strip() == "2"
+
+
+@pytest.mark.parametrize(
+    ("primary_result", "compensation_ok", "queued_count", "expected_code", "expected_enrolls"),
+    [
+        ("success", True, 0, 0, ["101", "102"]),
+        ("failure", True, 0, 1, ["101", "102"]),
+        ("failure", False, 0, 1, ["101"]),
+        ("source-red", True, 0, 3, ["102"]),
+        ("success", True, 15, 0, ["101"]),
+        ("source-red", True, 16, 3, []),
+    ],
+)
+def test_exact_target_failure_isolation_recovers_independent_heads(
+    tmp_path: Path, primary_result: str, compensation_ok: bool, queued_count: int,
+    expected_code: int, expected_enrolls: list[str],
+) -> None:
+    """Use truthful target-only reads; retain failure after safe fleet recovery."""
+    heads = {"101": "b" * 40, "102": "c" * 40, "103": "d" * 40}
+    calls = tmp_path / "calls.jsonl"
+    real_node = shutil.which("node")
+    assert real_node
+    states = {
+        number: {
+            "number": int(number), "headRefOid": head,
+            "headRefName": "release/2026-09-19" if number == "102" else "codex/fixture",
+            "state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE",
+            "mergeStateStatus": "CLEAN", "baseRefName": "main",
+            "labels": {"nodes": [{"name": "hold"}] if number == "103" else []},
+            "queued": False, "isInMergeQueue": False, "mergeQueueEntry": None,
+        }
+        for number, head in heads.items()
+    }
+    for index in range(queued_count):
+        number = str(200 + index)
+        states[number] = dict(states["101"], number=int(number), queued=True, isInMergeQueue=True,
+                              mergeQueueEntry={"id": "MQE_" + number, "state": "QUEUED", "position": index + 1})
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(json.dumps({
+        "heads": heads, "states": states, "result": primary_result,
+        "compensation_ok": compensation_ok,
+    }), encoding="utf-8")
+    prefix = f'''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+fixture = json.loads(Path({str(fixture)!r}).read_text())
+args = sys.argv[1:]
+with open({str(calls)!r}, "a") as out:
+    out.write(json.dumps([Path(sys.argv[0]).name, *args]) + "\\n")
+def emit(value):
+    print(json.dumps(value))
+    sys.exit(0)
+'''
+    node = tmp_path / "node"
+    node.write_text(prefix + f'''
+command = args[1]
+if command == "preflight": sys.exit(0)
+if command == "list-state":
+    emit({{args[2]: fixture["states"][args[2]]}} if len(args) > 2 else fixture["states"])
+if command == "max-queue-depth": emit(16)
+if command == "enroll":
+    number = args[2]
+    if number == "101" and fixture["result"] == "failure": sys.exit(1)
+    state = dict(fixture["states"][number])
+    state["mergeQueueEntry"] = {{"id": "MQE_" + number, "enqueuedAt": "2026-08-15T12:00:00Z", "state": "QUEUED", "position": 1}}
+    state["isInMergeQueue"] = state["queued"] = True
+    emit({{"state": state}})
+if command == "dequeue":
+    if not fixture["compensation_ok"]: sys.exit(1)
+    emit({{"state": {{"queued": False}}}})
+if command == "prove-admission": sys.exit(0)
+if command == "prove-receipt": emit({{"ok": False, "state": {{"queued": False}}, "explanation": {{"reason": "not-queued"}}}})
+if command in ("explain-selector", "--classify-queue", "admission", "changelog-collision"):
+    os.execv({real_node!r}, [{real_node!r}, *args])
+if command == "changelog-inventory": emit({{"prs": [], "count": 0, "reason": "explicit"}})
+if command == "changelog-drain": emit({{"action": "keep", "reason": "omits-changelog"}})
+if command in ("changelog-collision", "unmergeable-reenqueue"): emit({{"action": "allow"}})
+if command == "unmergeable-eject": emit({{"action": "keep", "reason": "not-queued"}})
+raise SystemExit("unexpected node args: " + repr(args))
+''', encoding="utf-8")
+    node.chmod(0o755)
+    gh = tmp_path / "gh"
+    gh.write_text(prefix + '''
+if args[:2] == ["pr", "checks"]:
+    emit([{"name": name, "bucket": "fail" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "pass", "state": "FAILURE" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "SUCCESS"} for name in ["PR Ready", "Migration Guard", "Fork PR Gate", "PR Size Guard"]])
+if args[:2] == ["pr", "view"]:
+    if "files" in args: emit(["CHANGELOG.md"] if args[2] == "102" else [])
+    state = dict(fixture["states"][args[2]])
+    state["labels"] = state["labels"]["nodes"]
+    emit(state)
+if args[0] == "api":
+    if "/statuses?per_page=100" in args[1]: emit([[]])
+    if "/status" in args[1] and "/commits/" in args[1]: emit({"statuses": []})
+    if any("/statuses/" in arg for arg in args): emit({})
+    sys.exit(1)
+raise SystemExit("unexpected gh args: " + repr(args))
+''', encoding="utf-8")
+    gh.chmod(0o755)
+    result = _run_bash(_drain_command(
+        tmp_path, backend="native",
+        extra_env=f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={heads['101']} DRAIN_RECONCILE_MISSED_ADMISSION=1 DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2",
+    ))
+    assert result.returncode == expected_code, result.stdout + result.stderr
+    events = [json.loads(line) for line in calls.read_text().splitlines()]
+    enrolls = [event[3] for event in events if event[0] == "node" and event[2] == "enroll"]
+    assert enrolls == expected_enrolls
+    inventories = [event[3:] for event in events if event[0] == "node" and event[2] == "list-state"]
+    assert inventories[0] == ["101"]
+    if compensation_ok:
+        assert [] in inventories, "exact-target reads cannot contain missed fleet candidates"
+        assert ("+native-queue on #102" in result.stdout) == ("102" in expected_enrolls)
+    else:
+        assert "=== RECOVER (bounded exact-head native admission) ===" not in result.stdout, "unknown mutation effects must abort recovery"
+    status_posts = [arg for event in events if event[0] == "gh" and event[1] == "api" for arg in event[2:] if "/statuses/" in arg]
+    assert any(heads["102"] in endpoint for endpoint in status_posts) == ("102" in expected_enrolls)
+    if primary_result != "success":
+        assert not any(heads["101"] in endpoint for endpoint in status_posts)

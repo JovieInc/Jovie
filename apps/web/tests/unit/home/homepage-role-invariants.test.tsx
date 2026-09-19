@@ -58,9 +58,7 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
       'Control how the world sees you.'
     );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
-      '/artist-profiles'
-    );
+    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe('/tim');
   });
 
   it('keeps verified public proof, routes, and System B visual lock on `/`', () => {

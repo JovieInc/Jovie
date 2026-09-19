@@ -1,8 +1,15 @@
+/**
+ * Production Pen contract IDs for marketing shells, sections, and recipes.
+ *
+ * Header `GTcgO` and footer `jhV4a` are founder-locked (Tim 2026-09-11
+ * ~9:21 PT, JOV-6179). Shared `PublicPageShell` chrome must emit these
+ * selectors. Do not remap without a new lock.
+ */
 export const MARKETING_PEN_CONTRACT_IDS = {
   shell: {
     publicPage: 'C9drCF',
-    header: 'KfGTq',
-    footer: 'pctmZ',
+    header: 'GTcgO',
+    footer: 'jhV4a',
     footerCta: 'LCLXI',
     finalCta: 'iY5Lp',
     page: 'sDFX1',

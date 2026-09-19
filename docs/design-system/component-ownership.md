@@ -39,3 +39,10 @@ canonical overlay/toast boundary.
 5. Do not define a rail, content plane, overlay host, responsive frame, or
    shell-like fixed/sticky container in a route file. The ownership test is a
    deliberate-red guard for these bypasses.
+
+## Shared chrome (design-eight-invariants-v1)
+
+Search aura, header, footer, buttons, device frames, and logos have one
+canonical owner. Variants live on that owner; consumers must not restyle
+internals. Existing pierces are a shrink-only allowlist; search-aura is never
+allowlisted (`pnpm component-ownership:test`, `pnpm design-eight-invariants:test`).

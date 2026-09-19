@@ -5,15 +5,21 @@ import {
   getHomepageFrontDoorCtaContract,
   PUBLIC_WAITLIST_URL,
 } from '@/data/homepageFrontDoorCta';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
+import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
+import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
   it('keeps waitlist-on homepage CTAs in request-access mode', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
+    expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: PUBLIC_WAITLIST_URL,
+      href: APP_ROUTES.SIGNUP,
     });
+    expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'
@@ -29,9 +35,22 @@ describe('auth front-door contract', () => {
     });
     expect(contract.secondary).toEqual({
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: TIM_WHITE_PROFILE.publicProfilePath,
     });
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
+  });
+
+  it('unifies public acquisition CTAs onto working /signup paths (JOV-6436)', () => {
+    expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.SIGNUP);
+    expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.SIGNUP);
+    expect(
+      MARKETING_PRICING_PLANS.find(plan => plan.id === 'free')?.ctaHref
+    ).toBe(`${APP_ROUTES.SIGNUP}?plan=free`);
+    expect(
+      MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.ctaHref
+    ).toBe(`${APP_ROUTES.SIGNUP}?plan=pro`);
+    expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).not.toContain('/waitlist');
+    expect(MARKETING_CTA_INTENTS.claimProfile.href).not.toContain('/waitlist');
   });
 
   it('keeps auth route constants canonical', () => {
@@ -65,12 +84,12 @@ describe('auth front-door contract', () => {
   });
 
   it('keeps first-party auth copy aligned with the canonical cross-links', () => {
-    expect(authCopy.signUp.start.title).toBe('Create your account');
+    expect(authCopy.signUp.start.title).toBe('Continue to Jovie');
     expect(authCopy.signUp.start.actionText).toBe('Have an account?');
     expect(authCopy.signUp.start.actionLink).toBe('Sign in');
 
-    expect(authCopy.signIn.start.title).toBe('Welcome back');
-    expect(authCopy.signIn.start.actionText).toBe('No account?');
-    expect(authCopy.signIn.start.actionLink).toBe('Create your account');
+    expect(authCopy.signIn.start.title).toBe('Log in to Jovie');
+    expect(authCopy.signIn.start.actionText).toBe('Trouble signing in?');
+    expect(authCopy.signIn.start.actionLink).toBe('Get help');
   });
 });

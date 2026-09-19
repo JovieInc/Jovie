@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
  * Single shared CTA intent registry for public marketing surfaces.
@@ -44,7 +45,7 @@ export const MARKETING_CTA_INTENTS = {
   seeLiveProfile: {
     id: 'see-live-profile',
     label: 'See a live profile',
-    href: APP_ROUTES.ARTIST_PROFILES,
+    href: TIM_WHITE_PROFILE.publicProfilePath,
     eventName: 'landing_cta_see_live_profile',
     support: '',
   },
@@ -77,12 +78,15 @@ export function buildClaimProfileStartHref(
     return CLAIM_PROFILE_WAITLIST_INTENT.href;
   }
 
-  const destination = new URL(PUBLIC_WAITLIST_URL);
+  const destination = new URL(
+    CLAIM_PROFILE_WAITLIST_INTENT.href,
+    'https://jov.ie'
+  );
   destination.search = new URLSearchParams({
     starter_prompt: `I want to claim jov.ie/${trimmed}.`,
     handle: trimmed,
   }).toString();
-  return destination.toString();
+  return `${destination.pathname}${destination.search}`;
 }
 
 export function getClaimProfileIntent(

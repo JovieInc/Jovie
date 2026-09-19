@@ -636,7 +636,185 @@ struct ChatRepositoryTests {
 
     #expect(repository.activeConversationID == nil)
     #expect(repository.timeline.isEmpty)
+    #expect(repository.hasMoreOlder == false)
     #expect(repository.lastErrorMessage == nil)
+  }
+
+  @Test func openConversationPaintsCachedTailThenFetchesWindow() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-cache-first")!)
+    let cachedMessages = (1...45).map { index in
+      MobileConversationMessage(
+        id: "msg_cached_\(index)",
+        role: index.isMultiple(of: 2) ? "assistant" : "user",
+        content: "Cached \(index)",
+        clientMessageId: "client_cached_\(index)",
+        turnId: "turn_cached_\(index)",
+        turnStatus: "completed",
+        createdAt: "2026-05-01T00:00:\(String(format: "%02d", index)).000Z",
+        requiresWebHandoff: false
+      )
+    }
+    await cache.store(
+      CachedChatSnapshot(
+        conversations: [],
+        messagesByConversationID: ["conv_cached": cachedMessages],
+        cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+      ),
+      for: "user_repo_cache_first"
+    )
+
+    let client = GateableFetchChatClient(
+      detail: MobileConversationDetailResponse(
+        conversation: MobileConversationRecord(
+          id: "conv_cached",
+          title: "Cached chat",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z"
+        ),
+        messages: [
+          MobileConversationMessage(
+            id: "msg_network",
+            role: "assistant",
+            content: "Network reply",
+            clientMessageId: "client_network",
+            turnId: "turn_network",
+            turnStatus: "completed",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            requiresWebHandoff: false
+          ),
+        ],
+        hasMore: true
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_cache_first",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let openTask = Task { await repository.openConversation("conv_cached") }
+    // Time-bounded wait for the cache-first paint instead of a fixed yield
+    // budget: under merge-queue runner load a fixed 50-iteration loop can
+    // expire before the parallel executor paints the cached tail.
+    let cachePaintDeadline = Date().addingTimeInterval(10)
+    while repository.timeline.map(\.content) != Array(6...45).map({ "Cached \($0)" }),
+          Date() < cachePaintDeadline {
+      await Task.yield()
+    }
+    #expect(repository.timeline.map(\.content) == Array(6...45).map { "Cached \($0)" })
+    #expect(repository.hasMoreOlder)
+
+    client.releaseFetch()
+    await openTask.value
+
+    #expect(client.lastFetchLimit == ChatTranscriptWindow.initialMessageLimit)
+    #expect(client.lastFetchBefore == nil)
+    #expect(repository.timeline.map(\.content) == ["Network reply"])
+    #expect(repository.hasMoreOlder)
+  }
+
+  @Test func loadOlderMessagesPrependsPreviousWindow() async {
+    let older = MobileConversationMessage(
+      id: "msg_older",
+      role: "user",
+      content: "Older",
+      clientMessageId: "client_older",
+      turnId: "turn_older",
+      turnStatus: "completed",
+      createdAt: "2026-05-01T00:00:00.000Z",
+      requiresWebHandoff: false
+    )
+    let newer = MobileConversationMessage(
+      id: "msg_newer",
+      role: "assistant",
+      content: "Newer",
+      clientMessageId: "client_newer",
+      turnId: "turn_newer",
+      turnStatus: "completed",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      requiresWebHandoff: false
+    )
+    let client = ScriptedPagedChatClient(
+      pages: [
+        nil: MobileConversationDetailResponse(
+          conversation: MobileConversationRecord(
+            id: "conv_paged",
+            title: "Paged",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-01T00:00:00.000Z"
+          ),
+          messages: [newer],
+          hasMore: true
+        ),
+        "2026-06-01T00:00:00.000Z": MobileConversationDetailResponse(
+          conversation: MobileConversationRecord(
+            id: "conv_paged",
+            title: "Paged",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-01T00:00:00.000Z"
+          ),
+          messages: [older],
+          hasMore: false
+        ),
+      ]
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-paged")!),
+      userID: "user_repo_paged",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.openConversation("conv_paged")
+    #expect(repository.timeline.map(\.content) == ["Newer"])
+    #expect(repository.hasMoreOlder)
+
+    await repository.loadOlderMessages()
+    #expect(client.lastFetchBefore == "2026-06-01T00:00:00.000Z")
+    #expect(repository.timeline.map(\.content) == ["Older", "Newer"])
+    #expect(repository.hasMoreOlder == false)
+  }
+
+  @Test func sendInterruptsInFlightTurnWhenComposerSendsAgain() async {
+    let client = GateableSendChatClient()
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-interrupt")!),
+      userID: "user_repo_interrupt",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let firstSend = Task { await repository.send(text: "First") }
+    // Time-bounded wait for the first send to start instead of a fixed yield
+    // budget: under merge-queue runner load a fixed 50-iteration loop can
+    // expire before the detached task reaches the client.
+    let sendStartDeadline = Date().addingTimeInterval(10)
+    while client.sendCount < 1, Date() < sendStartDeadline {
+      await Task.yield()
+    }
+    #expect(repository.isSending)
+    #expect(client.sendCount == 1)
+    #expect(repository.timeline.map(\.content) == ["First", ""])
+
+    await repository.send(text: "Steer")
+    client.releaseSend()
+    await firstSend.value
+
+    #expect(client.sendCount == 2)
+    #expect(repository.timeline.map(\.role) == [.user, .user, .assistant])
+    // The replacement turn is the current generation, so its post-stream
+    // guard applies: GateableSendChatClient returns no terminal event, and a
+    // stream that finishes without one marks the assistant row failed
+    // ("Summer did not confirm a terminal state for this turn.").
+    #expect(
+      repository.timeline.map(\.content) == [
+        "First",
+        "Steer",
+        "Summer did not confirm a terminal state for this turn.",
+      ]
+    )
+    #expect(repository.isSending == false)
   }
 
   @Test func refreshConversationsOn401SetsSessionExpiredNotOffline() async {
@@ -960,7 +1138,7 @@ private final class RecordingTurnChatClient: MobileChatClientProtocol, @unchecke
     []
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     throw MobileChatClientError.requestFailed(statusCode: 404)
   }
 
@@ -987,7 +1165,7 @@ private struct SuccessfulChatClient: MobileChatClientProtocol {
     []
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     MobileConversationDetailResponse(
       conversation: MobileConversationRecord(
         id: id,
@@ -1014,7 +1192,7 @@ private struct UnauthorizedChatClient: MobileChatClientProtocol {
     throw MobileChatClientError.requestFailed(statusCode: 401)
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     throw MobileChatClientError.requestFailed(statusCode: 401)
   }
 
@@ -1031,7 +1209,7 @@ private struct FailingChatClient: MobileChatClientProtocol {
     []
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     throw MobileChatClientError.requestFailed(statusCode: 500)
   }
 
@@ -1059,6 +1237,8 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
   private let fetchConversationResult: Result<MobileConversationDetailResponse, Error>
   private(set) var listConversationsCallCount = 0
   private(set) var fetchConversationCallCount = 0
+  private(set) var lastFetchLimit: Int?
+  private(set) var lastFetchBefore: String?
 
   init(
     sendTurnResult: Result<[MobileChatStreamEvent], Error>,
@@ -1075,8 +1255,10 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
     return try listConversationsResult.get()
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     fetchConversationCallCount += 1
+    lastFetchLimit = limit
+    lastFetchBefore = before
     return try fetchConversationResult.get()
   }
 
@@ -1132,7 +1314,7 @@ private final class StreamingThenFailingChatClient: MobileChatClientProtocol, @u
     throw MobileChatClientError.requestFailed(statusCode: 500)
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     throw MobileChatClientError.requestFailed(statusCode: 404)
   }
 
@@ -1165,6 +1347,107 @@ private final class StreamingThenFailingChatClient: MobileChatClientProtocol, @u
       }
     }
     throw MobileChatClientError.decodingFailed
+  }
+}
+
+private final class GateableFetchChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private let detail: MobileConversationDetailResponse
+  private var continuation: CheckedContinuation<Void, Never>?
+  private var released = false
+  private(set) var lastFetchLimit: Int?
+  private(set) var lastFetchBefore: String?
+
+  init(detail: MobileConversationDetailResponse) {
+    self.detail = detail
+  }
+
+  func releaseFetch() {
+    released = true
+    continuation?.resume()
+    continuation = nil
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
+    lastFetchLimit = limit
+    lastFetchBefore = before
+    if !released {
+      await withCheckedContinuation { continuation in
+        self.continuation = continuation
+      }
+    }
+    return detail
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    []
+  }
+}
+
+private final class ScriptedPagedChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private let pages: [String?: MobileConversationDetailResponse]
+  private(set) var lastFetchBefore: String?
+
+  init(pages: [String?: MobileConversationDetailResponse]) {
+    self.pages = pages
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
+    lastFetchBefore = before
+    guard let page = pages[before] else {
+      throw MobileChatClientError.requestFailed(statusCode: 404)
+    }
+    return page
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    []
+  }
+}
+
+private final class GateableSendChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private var continuation: CheckedContinuation<Void, Never>?
+  private var released = false
+  private(set) var sendCount = 0
+
+  func releaseSend() {
+    released = true
+    continuation?.resume()
+    continuation = nil
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 404)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    sendCount += 1
+    if sendCount == 1, !released {
+      await withCheckedContinuation { continuation in
+        self.continuation = continuation
+      }
+    }
+    return []
   }
 }
 
@@ -1221,7 +1504,7 @@ private final class GatedFetchChatClient: MobileChatClientProtocol, @unchecked S
     []
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     fetchRequested = true
     if !released {
       await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in

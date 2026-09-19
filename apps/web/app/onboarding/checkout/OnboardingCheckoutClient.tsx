@@ -8,9 +8,16 @@ import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import {
+  emitProofClaimEvent,
+  hasStoredProofClaimAttribution,
+  rememberProofClaimAttribution,
+} from '@/lib/acquisition/proof-claim-client';
+import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel';
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/billing/offer-truth';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
@@ -42,8 +49,8 @@ function getAnnualSavingsPercent(
 const PRO_HIGHLIGHTS = [
   {
     icon: Bell,
-    label: 'Release Notifications',
-    detail: 'Notify fans the moment you drop',
+    label: 'Visibility Monitoring',
+    detail: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
   },
   {
     icon: BarChart3,
@@ -217,6 +224,13 @@ export function OnboardingCheckoutClient({
       has_annual: !!hasAnnualOption,
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
+    rememberProofClaimAttribution();
+    if (hasStoredProofClaimAttribution()) {
+      emitProofClaimEvent(PROOF_CLAIM_FUNNEL_EVENTS.CHECKOUT, {
+        plan,
+        source: 'onboarding_checkout',
+      });
+    }
   }, [plan, spotifyFollowers, hasAnnualOption, isDefaultUpsell]);
 
   const handleCheckout = useCallback(async () => {

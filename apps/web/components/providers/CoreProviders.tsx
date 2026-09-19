@@ -8,6 +8,7 @@ import React, { useEffect, useMemo } from 'react';
 import { env } from '@/lib/env-client';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
+import { isThemeRoute } from '@/lib/theme/route-policy';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
@@ -245,14 +246,6 @@ const FULL_PROVIDER_PREFIXES = [
   '/onboarding',
 ] as const;
 
-const THEME_ENABLED_PREFIXES = [
-  '/app',
-  '/onboarding',
-  '/signin',
-  '/signup',
-  '/waitlist',
-] as const;
-
 type CoreProviderVariant = 'full' | 'homepage' | 'public';
 
 function isElectronRuntime(): boolean {
@@ -288,7 +281,7 @@ export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
 }
 
 export function isThemeEnabledRoute(pathname: string): boolean {
-  return THEME_ENABLED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  return isThemeRoute(pathname);
 }
 
 export function CoreProviders({
@@ -311,7 +304,11 @@ export function CoreProviders({
     [isElectronRuntimeApp, isTestRuntime, pathname]
   );
 
-  if (isHomepageVariant) {
+  // The homepage historically bypassed client providers for its dark-only
+  // shell. It now opts into the shared theme policy so the footer preference
+  // control can resolve system/light/dark on the declared marketing surface.
+  // Other public routes keep their existing provider boundaries.
+  if (isHomepageVariant && !themeEnabled) {
     return <>{children}</>;
   }
 
@@ -320,10 +317,12 @@ export function CoreProviders({
       <QueryProvider>
         <CoreProvidersInner
           enableAnalytics={enableAnalytics}
-          enableMonitoring={!isPublicVariant && !isTestRuntime}
+          enableMonitoring={
+            !isPublicVariant && !isTestRuntime && !isHomepageVariant
+          }
           initialThemeMode={initialThemeMode}
           themeEnabled={themeEnabled}
-          usePacer={!isPublicVariant}
+          usePacer={!isPublicVariant && !isHomepageVariant}
         >
           {children}
         </CoreProvidersInner>

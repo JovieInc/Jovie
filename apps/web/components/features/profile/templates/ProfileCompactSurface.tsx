@@ -52,7 +52,10 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
-import { resolvePublicProfileActiveDestination } from '@/lib/profile/route-config';
+import {
+  getPermittedPublicProfileActions,
+  resolvePublicProfileActiveDestination,
+} from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -69,6 +72,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
+import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 
 const ProfileUnifiedDrawer = dynamic(() =>
   import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
@@ -187,6 +191,7 @@ interface ProfileCompactSurfaceProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
@@ -286,6 +291,7 @@ export function ProfileCompactSurface({
   viewerLocation,
   resolveNearbyTour = true,
   releases = [],
+  catalogLoadFailed = false,
   merchCards = [],
   drawerOpen,
   drawerView,
@@ -379,12 +385,14 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  const activeNavTab = resolvePublicProfileActiveDestination({
+  const visibleNavTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
     overlayView: isDrawerOverlayActive ? drawerView : null,
   });
-  const visibleNavTab =
-    !allowFanCapture && activeNavTab === 'subscribe' ? 'profile' : activeNavTab;
+  const canGetUpdates =
+    getPermittedPublicProfileActions({
+      fanCaptureEnabled: allowFanCapture,
+    }).length > 0;
   const showBottomNav = shouldShowColdVisitorTabBar({
     tabBarArm: profilePacAssignment.tabBar,
     isSubscribed,
@@ -394,6 +402,11 @@ export function ProfileCompactSurface({
   });
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
+  const shouldUseOverflowScroll = useProfileMobileOverflow({
+    surface: notificationsPortalContainer,
+    isHomeMode,
+    isPreviewEmbedded,
+  });
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -411,10 +424,12 @@ export function ProfileCompactSurface({
         activeSubtitle: getProfileModeDefinition(activeVisiblePrimaryTab)
           .subtitle,
         viewerCountryCode,
+        catalogLoadFailed,
       }),
     [
       activeVisiblePrimaryTab,
       artist,
+      catalogLoadFailed,
       featuredPlaylistFallback,
       isSubscribed,
       latestRelease,
@@ -453,17 +468,14 @@ export function ProfileCompactSurface({
     renderMode === 'preview' || !renderSemanticHeading ? 'p' : 'h1';
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
-  const topChromeButtonClassName =
-    'profile-top-chrome-icon text-white dark:text-white';
   // The 20px glyph sits inside an explicit 44×44 target. Targets participate
   // in the identity grid normally so adjacent social actions never overlap.
   const socialIconClassName =
     'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  // Composition rule: the home hero has one definite token-driven height
-  // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
-  // never shrink-wraps — the old short-viewport min-h-0/flex-none band
-  // collapse is gone. Media crops via object-cover, never squashes; the
-  // carousel below owns the remaining viewport height.
+  // Composition rule: the home media slot has one definite token-driven
+  // height (clamp(220px, 34svh, 400px)) on every viewport. The in-flow identity
+  // band follows that slot, media crops via object-cover, and the carousel owns
+  // the remaining viewport height.
   const heroHeightClassName = isHomeMode
     ? resolvedHeroImageUrl
       ? 'h-(--cover-height) shrink-0'
@@ -511,7 +523,7 @@ export function ProfileCompactSurface({
   }, [onModeSelect]);
   const openNotifications = useCallback(
     (sourceContext?: NotificationSourceContext) => {
-      if (!allowFanCapture) return;
+      if (!canGetUpdates) return;
       setNotificationSourceContext(
         sourceContext ?? defaultNotificationSourceContext
       );
@@ -533,7 +545,7 @@ export function ProfileCompactSurface({
       onRevealNotifications?.();
     },
     [
-      allowFanCapture,
+      canGetUpdates,
       defaultNotificationSourceContext,
       onModeSelect,
       onRevealNotifications,
@@ -578,9 +590,7 @@ export function ProfileCompactSurface({
   );
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
-    renderMode === 'interactive' &&
-    renderInteractiveOverlays &&
-    allowFanCapture;
+    renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
   const homeProfileSettings = homeLatestRelease
@@ -593,6 +603,10 @@ export function ProfileCompactSurface({
       data-testid={dataTestId}
       data-render-mode={renderMode}
       data-profile-mode={activeMode}
+      data-profile-home-mode={isHomeMode ? 'true' : undefined}
+      data-profile-overflow-mode={
+        shouldUseOverflowScroll ? 'scroll' : undefined
+      }
       data-tab-bar-arm={profilePacAssignment.tabBar}
       data-tab-bar-visible={showBottomNav ? 'true' : 'false'}
     >
@@ -602,6 +616,9 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-mode={activeVisiblePrimaryTab}
         data-presentation={presentation}
+        data-profile-overflow-mode={
+          shouldUseOverflowScroll ? 'scroll' : undefined
+        }
       >
         {!isHomeMode && renderMode !== 'preview' ? (
           <IdentityHeading className='sr-only' data-testid='profile-header'>
@@ -667,7 +684,6 @@ export function ProfileCompactSurface({
                   onClick={onBack}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
                   <ChevronLeft className='h-5 w-5' />
@@ -697,7 +713,6 @@ export function ProfileCompactSurface({
                   onClick={onOpenMenu}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Menu'
                 >
                   {/* The drawer is an overflow menu (Share / Pay / Contact), so
@@ -767,7 +782,7 @@ export function ProfileCompactSurface({
                           className='h-3.5 w-3.5 shrink-0 text-white/58'
                           aria-hidden='true'
                         />
-                        <span className='shrink-0 whitespace-nowrap'>
+                        <span className='min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere] md:truncate md:whitespace-nowrap md:wrap-normal'>
                           {locationLabel}
                         </span>
                       </>
@@ -822,7 +837,7 @@ export function ProfileCompactSurface({
             isHomeMode ? 'profile-home-content-column pt-0' : 'pt-2'
           )}
         >
-          {allowFanCapture &&
+          {canGetUpdates &&
           shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
@@ -886,7 +901,7 @@ export function ProfileCompactSurface({
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
-                showAlertsCard={allowFanCapture}
+                showAlertsCard={canGetUpdates}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}
@@ -918,6 +933,7 @@ export function ProfileCompactSurface({
                 allowPhotoDownloads={allowPhotoDownloads}
                 tourDates={tourDates}
                 releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
                 alertSourceContext={defaultNotificationSourceContext}
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}

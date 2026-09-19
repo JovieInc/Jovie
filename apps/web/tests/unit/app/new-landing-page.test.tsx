@@ -4,8 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
-// Product default: center nav is off. Enable it here so this test can assert
-// the staged YC-tightened nav structure in isolation.
+// Enable center nav here so this test can assert the canonical public nav.
 vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/flags/marketing-static')>();
@@ -23,10 +22,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
   HomepageV2Route: () => (
     <main data-testid='homepage-v2-route'>
       <h1>Make every release feel bigger.</h1>
-      <Link
-        data-testid='homepage-v2-hero-primary-cta'
-        href='https://jov.ie/waitlist'
-      >
+      <Link data-testid='homepage-v2-hero-primary-cta' href='/signup'>
         Get started
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
@@ -61,25 +57,27 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('NewLandingPage', () => {
-  it('renders the staged homepage v2 content with YC-tightened nav', () => {
+  it('renders the staged homepage v2 content with canonical public nav', () => {
     render(<MarketingHeader />);
 
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
     );
-    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
-    // Header utility CTA stays on the /start front door; the waitlist-first
-    // contract applies to owned hero/final CTAs, not the shared nav utilities.
-    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      '/start'
+      '/signup'
     );
 
     render(<NewLandingPage />);
@@ -92,7 +90,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })

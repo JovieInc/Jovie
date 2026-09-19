@@ -139,14 +139,16 @@ export function ChatMerchActionCard({
         <div className='flex items-center justify-between gap-2 text-secondary-token'>
           <div className='flex items-center gap-2'>
             <X className='h-4 w-4' />
-            <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+            <span className='text-sm text-secondary-token'>
+              {CHAT_TOOL_CANCELLED_LABEL}
+            </span>
           </div>
           <Button
             type='button'
             variant='link'
             size='sm'
             onClick={handleUndoDismiss}
-            className='h-auto px-0 text-xs font-medium text-primary-token underline-offset-2'
+            className='px-0 text-xs font-medium text-primary-token underline-offset-2'
             data-testid='chat-merch-dismiss-undo'
           >
             Undo

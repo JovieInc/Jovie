@@ -195,7 +195,6 @@
 .marketing-glass-header__cta {
   display: inline-flex;
   flex-shrink: 0;
-  min-height: 2rem;
   align-items: center;
   justify-content: center;
   padding-inline: 0.94rem;
@@ -207,10 +206,12 @@
   font-size: 0.79rem;
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
-  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    var(--tw-ring-offset-shadow, 0 0 transparent),
+    var(--tw-ring-shadow, 0 0 transparent),
+    0 8px 24px rgba(255, 255, 255, 0.1);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;

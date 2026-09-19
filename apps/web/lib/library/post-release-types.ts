@@ -1,3 +1,10 @@
+import {
+  deriveInspectorScope,
+  type InspectorPrimitive,
+  type InspectorScopeCategory,
+  type InspectorScopeType,
+} from './inspector-scope';
+
 export interface LibraryDownloadView {
   readonly id: string;
   readonly releaseId: string;
@@ -9,6 +16,11 @@ export interface LibraryPresenceFindingView {
   readonly id: string;
   readonly subjectType: 'artist' | 'release' | 'recording' | 'track';
   readonly subjectId: string;
+  readonly scopeType: InspectorScopeType;
+  readonly scopeId: string;
+  readonly category: InspectorScopeCategory;
+  readonly primitive: InspectorPrimitive;
+  readonly blocksSelectedObject: boolean;
   readonly kind: 'repair' | 'collision' | 'placement_opportunity';
   readonly issueType:
     | 'dead_link'
@@ -68,3 +80,25 @@ export const EMPTY_LIBRARY_POST_RELEASE_BUNDLE: LibraryPostReleaseBundle = {
   rightsholders: [],
   stats: [],
 };
+
+export function withInspectorScope(
+  finding: Omit<
+    LibraryPresenceFindingView,
+    'scopeType' | 'scopeId' | 'category' | 'primitive' | 'blocksSelectedObject'
+  > &
+    Partial<
+      Pick<
+        LibraryPresenceFindingView,
+        | 'scopeType'
+        | 'scopeId'
+        | 'category'
+        | 'primitive'
+        | 'blocksSelectedObject'
+      >
+    >
+): LibraryPresenceFindingView {
+  return {
+    ...finding,
+    ...deriveInspectorScope(finding),
+  };
+}

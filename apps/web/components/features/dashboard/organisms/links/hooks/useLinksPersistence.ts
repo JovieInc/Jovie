@@ -493,6 +493,7 @@ export function useLinksPersistence({
       lastInputRef.current = null;
       enqueueSave(input);
     },
+    resourceKey: profileId ?? 'missing-profile',
     wait: debounceMs,
     maxRetries: 1,
   });

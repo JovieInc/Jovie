@@ -82,17 +82,28 @@ export function resolveNormalizedLogoLayout(
 }
 
 export function normalizedLogoStyle(
-  asset: LogoAssetNormalization
+  asset: LogoAssetNormalization,
+  fit: 'natural' | 'contain' = 'natural'
 ): Readonly<Record<string, string>> {
   const layout = resolveNormalizedLogoLayout(asset);
+  const contained = fit === 'contain';
   return {
+    '--logo-frame-aspect': `${layout.frameWidth} / ${layout.frameHeight}`,
     '--logo-ink-height': `${layout.inkHeight}px`,
     '--logo-frame-width': `${layout.frameWidth}px`,
     '--logo-frame-height': `${layout.frameHeight}px`,
-    '--logo-render-width': `${layout.renderedCanvasWidth}px`,
-    '--logo-render-height': `${layout.renderedCanvasHeight}px`,
-    '--logo-offset-x': `${layout.translateX}px`,
-    '--logo-offset-y': `${layout.translateY}px`,
+    '--logo-render-width': contained
+      ? `${(layout.renderedCanvasWidth / layout.frameWidth) * 100}%`
+      : `${layout.renderedCanvasWidth}px`,
+    '--logo-render-height': contained
+      ? `${(layout.renderedCanvasHeight / layout.frameHeight) * 100}%`
+      : `${layout.renderedCanvasHeight}px`,
+    '--logo-offset-x': contained
+      ? `${(layout.translateX / layout.renderedCanvasWidth) * 100}%`
+      : `${layout.translateX}px`,
+    '--logo-offset-y': contained
+      ? `${(layout.translateY / layout.renderedCanvasHeight) * 100}%`
+      : `${layout.translateY}px`,
     '--logo-allowed-overflow': `${asset.allowedOverflow}px`,
   };
 }

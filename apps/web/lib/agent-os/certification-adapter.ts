@@ -23,23 +23,14 @@ export const MARKETING_CERTIFICATION_LEDGER_SCHEMA_VERSION = 1 as const;
 export const MARKETING_CERTIFICATION_STORE_KEY =
   'jovie:certification:v1:marketing-components' as const;
 
-const PERSISTENCE_TTL_SECONDS = 315_576_000;
-const MAX_COMPARE_AND_SET_ATTEMPTS = 5;
+import {
+  type CertificationRecordBackend,
+  CERTIFICATION_CAS_ATTEMPTS as MAX_COMPARE_AND_SET_ATTEMPTS,
+  mutateCertificationRecord,
+  CERTIFICATION_PERSISTENCE_TTL_SECONDS as PERSISTENCE_TTL_SECONDS,
+} from './certification-cas';
 
-export interface CertificationRecordBackend {
-  get(key: string): Promise<unknown>;
-  setIfAbsent(
-    key: string,
-    value: unknown,
-    ttlSeconds: number
-  ): Promise<boolean>;
-  compareAndSet(
-    key: string,
-    expectedValue: string,
-    nextValue: string,
-    ttlSeconds: number
-  ): Promise<boolean>;
-}
+export type { CertificationRecordBackend } from './certification-cas';
 
 export interface MarketingCertificationRecord {
   readonly identityId: string;
@@ -1360,40 +1351,15 @@ export class MarketingCertificationStore {
       readonly result: Result;
     }
   ): Promise<Result> {
-    for (
-      let attempt = 0;
-      attempt < MAX_COMPARE_AND_SET_ATTEMPTS;
-      attempt += 1
-    ) {
-      const currentRaw = await this.backend.get(
-        MARKETING_CERTIFICATION_STORE_KEY
-      );
-      if (currentRaw === null || currentRaw === undefined) {
-        await this.ensureLedger(initializedAt);
-        continue;
-      }
-      if (typeof currentRaw !== 'string') {
-        throw new MarketingCertificationPersistenceError(
-          'Certification ledger must be stored as one compare-and-set JSON string.'
-        );
-      }
-      const current = parseLedger(currentRaw);
-      assertLedgerMatchesRegistry(current, this.entries, initializedAt);
-      const next = update(current);
-      if (next.ledger === current) return next.result;
-      const nextRaw = serializeLedger(next.ledger);
-      const validated = parseLedger(nextRaw);
-      assertLedgerMatchesRegistry(validated, this.entries, initializedAt);
-      const saved = await this.backend.compareAndSet(
-        MARKETING_CERTIFICATION_STORE_KEY,
-        currentRaw,
-        nextRaw,
-        PERSISTENCE_TTL_SECONDS
-      );
-      if (saved) return next.result;
-    }
-    throw new MarketingCertificationPersistenceError(
-      'Certification ledger update lost compare-and-set repeatedly.'
-    );
+    return mutateCertificationRecord({
+      backend: this.backend,
+      key: MARKETING_CERTIFICATION_STORE_KEY,
+      initialize: () => this.ensureLedger(initializedAt),
+      parse: parseLedger,
+      validate: ledger =>
+        assertLedgerMatchesRegistry(ledger, this.entries, initializedAt),
+      update,
+      error: message => new MarketingCertificationPersistenceError(message),
+    });
   }
 }

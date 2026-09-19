@@ -23,7 +23,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     title: 'Request Access to Jovie.',
-    body: 'Join the private launch list for the release platform built for independent artists.',
+    body: 'Join the private launch list for presence, relationships, and growth.',
     ctaLabel: 'Request Access',
     ctaHref: '/signup',
   },

@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import {
   HOMEPAGE_PROMPT_HINT_TRUNCATE,
@@ -69,17 +70,19 @@ export function SignupModalClient() {
   ) : null;
 
   return (
-    <AuthModalShell
-      ariaLabel='Create your account on Jovie'
-      statusRow={statusRow}
-      backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
-    >
-      <AuthShell
-        mode='sign-up'
-        compact
-        oppositeModeUrl={signInUrl}
-        fallbackRedirectUrl={redirectUrl}
-      />
-    </AuthModalShell>
+    <AuthenticatedAuthEntryGuard>
+      <AuthModalShell
+        ariaLabel='Continue to Jovie'
+        statusRow={statusRow}
+        backButtonLabel={promptHint ? 'Back to chat' : 'Back to homepage'}
+      >
+        <AuthShell
+          mode='sign-up'
+          compact
+          oppositeModeUrl={signInUrl}
+          fallbackRedirectUrl={redirectUrl}
+        />
+      </AuthModalShell>
+    </AuthenticatedAuthEntryGuard>
   );
 }

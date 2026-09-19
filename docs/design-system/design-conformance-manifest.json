@@ -40,7 +40,7 @@
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
-      "sourceDigest": "ff58af01c7d40c5ea4f75d05b392a3b30ab44a2d9532ec8f603d422846d866de"
+      "sourceDigest": "6560a9f588bc381555854e4599e82ca9c25bc1adeaac30b28b901056868f8688"
     },
     {
       "id": "atom.input",
@@ -53,6 +53,33 @@
       "testSources": ["packages/ui/atoms/input.test.tsx"],
       "penRootId": null,
       "sourceDigest": "baa12303f361963cfc88c69049bf7f08ec3fd47fb27cfa4eae3888f46c35d3aa"
+    },
+    {
+      "id": "atom.separator",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/separator.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/separator.stories.tsx"],
+      "testSources": [
+        "apps/web/tests/e2e/storybook-separator.spec.ts",
+        "packages/ui/atoms/separator.test.tsx"
+      ],
+      "penRootId": null,
+      "sourceDigest": "1af9a61ba19869d04ee3206c2224fb4776f5fc69b7565eaa733396c191348142"
+    },
+    {
+      "id": "atom.switch",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/switch.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/switch.stories.tsx"],
+      "testSources": ["packages/ui/atoms/switch.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "7644089c59dad334db0e46bdf1c21fcf082ec7f9299477d1cb31b5d5f5c10b11"
     }
   ],
   "legacy": {

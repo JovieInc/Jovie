@@ -5,7 +5,7 @@ import {
   ensureSignedInUser,
   isProductionTarget,
   signInUser,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   SMOKE_TIMEOUTS,
   smokeNavigateWithRetry,

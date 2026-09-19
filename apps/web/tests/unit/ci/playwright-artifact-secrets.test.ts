@@ -28,7 +28,10 @@ import {
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
-import { validPlaywrightPng } from '../../../../../scripts/lib/playwright-png.mjs';
+import {
+  MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
+  validPlaywrightPng,
+} from '../../../../../scripts/lib/playwright-png.mjs';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -500,18 +503,25 @@ function chunk(type: string, data = Buffer.alloc(0)) {
 
 const pngSignature = Buffer.from('89504e470d0a1a0a', 'hex');
 const pngRows = Buffer.from([0, 0, 0, 0]);
-function png(extra: Buffer[] = [], idat?: Buffer, colorType = 2) {
+function png(
+  extra: Buffer[] = [],
+  idat?: Buffer,
+  colorType = 2,
+  width = 1,
+  height = 1
+) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(1);
-  header.writeUInt32BE(1, 4);
+  header.writeUInt32BE(width);
+  header.writeUInt32BE(height, 4);
   Buffer.from([8, colorType, 0, 0, 0]).copy(header, 8);
+  const channels = colorType === 6 ? 4 : 3;
   return Buffer.concat([
     pngSignature,
     chunk('IHDR', header),
     ...extra,
     chunk(
       'IDAT',
-      idat ?? deflateSync(Buffer.alloc(1 + (colorType === 6 ? 4 : 3)))
+      idat ?? deflateSync(Buffer.alloc(height * (1 + width * channels)))
     ),
     chunk('IEND'),
   ]);
@@ -1833,6 +1843,51 @@ ${fixtureCheckout}
     const valid = png();
     expect(validPlaywrightPng(valid)).toBe(true);
     expect(validPlaywrightPng(png([], undefined, 6))).toBe(true);
+    // Exact marketing-route failure mode: 2x desktop (1440 CSS @ 2) full-page
+    // at 7_000 CSS px → 2880×14000 RGB = 120_974_000 decoded bytes. The old
+    // 100MB ceiling rejected these as image-policy even with allow-images.
+    const marketingRouteDesktop = png([], undefined, 2, 2880, 14_000);
+    expect((1 + 2880 * 3) * 14_000).toBeGreaterThan(100_000_000);
+    expect((1 + 2880 * 3) * 14_000).toBeLessThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
+    expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
+    const marketingWorkspace = fixture();
+    write(
+      join(marketingWorkspace, 'marketing-route.png'),
+      marketingRouteDesktop
+    );
+    write(join(marketingWorkspace, 'receipt.json'), '{"ok":true}\n');
+    expect(
+      guardPlaywrightArtifacts(
+        ['marketing-route.png', 'receipt.json'],
+        {},
+        { workspace: marketingWorkspace, allowImages: true }
+      )
+    ).toEqual([]);
+    const marketingUpload = spawnSync(
+      process.execPath,
+      [guardScript, 'marketing-route.png', 'receipt.json'],
+      {
+        cwd: marketingWorkspace,
+        encoding: 'utf8',
+        env: baseEnv(marketingWorkspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        }),
+      }
+    );
+    expect(
+      marketingUpload.status,
+      `${marketingUpload.stdout}\n${marketingUpload.stderr}`
+    ).toBe(0);
+    expect(`${marketingUpload.stdout}\n${marketingUpload.stderr}`).toContain(
+      'secret guard passed'
+    );
+    const overCap = png([], deflateSync(pngRows), 2, 20_000, 20_000);
+    expect((1 + 20_000 * 3) * 20_000).toBeGreaterThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
+    expect(validPlaywrightPng(overCap)).toBe(false);
     const badCrc = Buffer.from(valid);
     badCrc[badCrc.length - 1] ^= 1;
     const invalid = [
@@ -1916,7 +1971,41 @@ ${fixtureCheckout}
         { workspace: comparison, allowImages: true }
       )
     ).toEqual([]);
-  }, 90_000);
+    const chromiumDir = fixture('.artifact-chromium-route-', webRoot);
+    const chromiumConfig = join(chromiumDir, 'playwright.config.ts');
+    write(
+      chromiumConfig,
+      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
+    );
+    write(
+      join(chromiumDir, 'route.spec.ts'),
+      "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'})})"
+    );
+    const chromiumRun = spawnSync(
+      'pnpm',
+      ['exec', 'playwright', 'test', '--config', chromiumConfig],
+      { cwd: webRoot, encoding: 'utf8', timeout: 90_000 }
+    );
+    expect(
+      chromiumRun.status,
+      `${chromiumRun.stdout}\n${chromiumRun.stderr}`
+    ).toBe(0);
+    const captured = globSync('test-results/**/marketing-route.png', {
+      cwd: chromiumDir,
+    });
+    expect(captured).toHaveLength(1);
+    const capturedBytes = readFileSync(join(chromiumDir, captured[0]));
+    expect(capturedBytes.readUInt32BE(16)).toBe(2880);
+    expect(capturedBytes.readUInt32BE(20)).toBe(14_000);
+    expect(validPlaywrightPng(capturedBytes)).toBe(true);
+    expect(
+      guardPlaywrightArtifacts(
+        [captured[0]],
+        {},
+        { workspace: chromiumDir, allowImages: true }
+      )
+    ).toEqual([]);
+  }, 120_000);
 
   it('retains filtered profile diagnostics and only explicitly public profile images', () => {
     const workflow = readFileSync(

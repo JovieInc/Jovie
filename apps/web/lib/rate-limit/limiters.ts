@@ -10,7 +10,10 @@ import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
 import type { PlanAwareRateLimiter, RateLimitResult } from './types';
-import { allowIfRateLimitBackendDegraded } from './utils';
+import {
+  allowIfRateLimitBackendDegraded,
+  withDeniedRateLimitReason,
+} from './utils';
 
 // ============================================================================
 // Authentication & User Operations
@@ -443,20 +446,20 @@ export async function checkOnboardingRateLimit(
   // Check user limit
   const userResult = await onboardingLimiter.limit(`user:${userId}`);
   if (!userResult.success) {
-    return {
-      ...userResult,
-      reason: 'Too many onboarding attempts. Please try again later.',
-    };
+    return withDeniedRateLimitReason(
+      userResult,
+      'Too many onboarding attempts. Please try again later.'
+    );
   }
 
   // Check IP limit if enabled
   if (checkIP) {
     const ipResult = await onboardingLimiter.limit(`ip:${ipAddress}`);
     if (!ipResult.success) {
-      return {
-        ...ipResult,
-        reason: 'Too many onboarding attempts from this network.',
-      };
+      return withDeniedRateLimitReason(
+        ipResult,
+        'Too many onboarding attempts from this network.'
+      );
     }
   }
 
@@ -523,10 +526,7 @@ async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const result = await limiter.limit(key);
   if (!result.success) {
-    return {
-      ...result,
-      reason: errorMessage,
-    };
+    return withDeniedRateLimitReason(result, errorMessage);
   }
   return result;
 }
@@ -701,10 +701,9 @@ export async function checkAiChatRateLimit(
  * Applies both the hourly burst limiter (all plans) and the weekly plan quota.
  * Returns the first failure or success if all pass.
  *
- * Fail-open when the durable rate-limit backend is degraded/unavailable
- * (archived Upstash, circuit open → per-instance memory). A healthy Redis
- * denial still blocks. Never throws — chat must not die with CHAT_STREAM_FAILED
- * because the limiter path blew up (JOV-3956 / JOV-3929).
+ * Hourly burst is advisory during a Redis outage (JOV-3956 / JOV-3929): a
+ * per-instance memory bucket must not hard-block chat. Weekly plan quota is
+ * a paid spend limit and fail-closes instead of degrading to memory.
  */
 export async function checkAiChatRateLimitForPlan(
   userId: string,
@@ -726,29 +725,25 @@ export async function checkAiChatRateLimitForPlan(
       return burstAllowed;
     }
 
-    // 2. Check weekly plan-specific quota using the plan-aware limiter
+    // 2. Weekly plan quota is mandatory distributed coordination. A Redis
+    // outage must not fail-open into unbounded model spend.
     const weeklyResult = await aiChatWeeklyPlanAwareLimiter.limit(userId, plan);
-    const weeklyAllowed = allowIfRateLimitBackendDegraded(weeklyResult, {
-      limiter: 'ai-chat-weekly',
-      userId,
-      plan,
-    });
     return {
-      ...weeklyAllowed,
+      ...weeklyResult,
       unavailable:
-        burstAllowed.unavailable === true || weeklyAllowed.unavailable === true,
+        burstAllowed.unavailable === true || weeklyResult.unavailable === true,
       degraded:
-        burstAllowed.degraded === true || weeklyAllowed.degraded === true,
+        burstAllowed.degraded === true || weeklyResult.degraded === true,
     };
   } catch {
-    // Unexpected limiter failure (should be rare — RateLimiter already
-    // catches Redis errors). Fail open so chat stays available.
     return {
-      success: true,
+      success: false,
       limit: 0,
       remaining: 0,
       reset: new Date(),
-      degraded: true,
+      unavailable: true,
+      backend: 'unavailable',
+      reason: 'AI chat rate limiter is temporarily unavailable',
     };
   }
 }

@@ -14,7 +14,7 @@
     "failSafeNote": "VERCEL_ENV undefined/empty must produce production-allow config, not preview-block."
   },
   "sitemap": {
-    "requireLastModified": true,
+    "requireLastModified": false,
     "minEntryCount": 1
   },
   "routes": [

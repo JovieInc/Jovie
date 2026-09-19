@@ -67,6 +67,51 @@ function dependencies(
 }
 
 describe('runProfileSearchBatch', () => {
+  it('single-attempt mode stops after one query even when more artists are due', async () => {
+    const deps = dependencies({
+      claimDueQuery: vi.fn().mockResolvedValue(query),
+    });
+    const stats = await runProfileSearchBatch(deps, {
+      deadlineAt: 100_000,
+      now: () => 0,
+      singleAttempt: true,
+    });
+    expect(stats).toMatchObject({
+      claimed: 1,
+      attempted: 1,
+      succeeded: 1,
+      retried: 0,
+    });
+    expect(deps.claimDueQuery).toHaveBeenCalledTimes(1);
+    expect(deps.provider.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('single-attempt mode never retries a transient provider failure', async () => {
+    const search = vi
+      .fn()
+      .mockRejectedValue(
+        new ProfileSearchProviderError('timeout', 'timeout', true)
+      );
+    const deps = dependencies({ provider: { id: 'test', search } });
+    const stats = await runProfileSearchBatch(deps, {
+      deadlineAt: 100_000,
+      now: () => 0,
+      singleAttempt: true,
+    });
+    expect(stats).toMatchObject({
+      claimed: 1,
+      attempted: 1,
+      failed: 1,
+      retried: 0,
+    });
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(deps.createAttemptIntent).toHaveBeenCalledTimes(1);
+    expect(deps.completeFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'timeout' })
+    );
+    expect(deps.markProviderFailure).toHaveBeenCalledWith('timeout');
+  });
+
   it('fails closed unless rollout and provider health are enabled', async () => {
     const disabled = dependencies({
       isRolloutEnabled: vi.fn().mockResolvedValue(false),

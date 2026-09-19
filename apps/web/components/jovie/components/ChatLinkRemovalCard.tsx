@@ -110,7 +110,9 @@ export function ChatLinkRemovalCard({
       <ChatToolSurface tone='cancelled'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
-          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+          <span className='text-sm text-secondary-token'>
+            {CHAT_TOOL_CANCELLED_LABEL}
+          </span>
         </div>
       </ChatToolSurface>
     );

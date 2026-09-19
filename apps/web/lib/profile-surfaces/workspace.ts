@@ -2,6 +2,7 @@ import type {
   ProfilesWorkspaceFilter,
   ProfileWorkspaceRow,
 } from '@/app/app/(shell)/profiles/data';
+import { isPresenceObservationStale } from './presence-identity';
 
 export type ConnectionStatusTone = 'success' | 'warning' | 'error' | 'neutral';
 
@@ -41,13 +42,29 @@ const PLATFORM_PRIORITY: Readonly<Record<string, number>> = {
   google_calendar: 21,
 };
 
+/** Presence IA outcome tabs (JOV-6170): group by outcome, not raw type. */
+const OUTCOME_TAB_KINDS: Readonly<
+  Record<
+    Exclude<ProfilesWorkspaceFilter, 'all' | 'connector'>,
+    readonly string[]
+  >
+> = {
+  identity: ['jovie', 'website'],
+  profiles: ['dsp', 'social'],
+  catalog: ['authority'],
+};
+
 export function filterProfileWorkspaceRows(
   rows: readonly ProfileWorkspaceRow[],
   filter: ProfilesWorkspaceFilter
 ): ProfileWorkspaceRow[] {
   if (filter === 'all') return [...rows];
-  if (filter === 'source') return rows.filter(row => row.kind === 'authority');
-  return rows.filter(row => row.kind === filter);
+  if (filter === 'connector') {
+    return rows.filter(row => row.kind === 'connector');
+  }
+  // Narrowed to the outcome-tab keys by the guards above.
+  const outcomeKinds: readonly string[] = OUTCOME_TAB_KINDS[filter];
+  return rows.filter(row => outcomeKinds.includes(row.kind));
 }
 
 export function getConnectionStatus(
@@ -139,14 +156,23 @@ export function getConnectionStatus(
       nextAction: 'Review monitoring settings before resuming this page.',
     };
   }
+  if (isPresenceObservationStale(row.lastObservedAt)) {
+    return {
+      label: 'Stale',
+      tone: 'warning',
+      needsAttention: true,
+      sortPriority: 1,
+      nextAction: 'Review this page; the last check is older than two weeks.',
+    };
+  }
   if (row.rank === null) {
     return {
-      label: row.lastObservedAt ? 'Not Found' : 'Not Measured',
+      label: row.lastObservedAt ? 'Not Ranked' : 'Not Measured',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 3,
       nextAction: row.lastObservedAt
-        ? 'Review the page if it should appear in search.'
+        ? 'Missing data is not a failed check. Review the page if it should appear in search.'
         : 'No action needed until the first monitoring run completes.',
     };
   }
@@ -250,4 +276,96 @@ export function formatProfileRankChange(
   const change = previousRank - rank;
   if (change === 0) return '—';
   return change > 0 ? `+${change}` : String(change);
+}
+
+/**
+ * Presence IA signal primitives (JOV-6170).
+ *
+ * Four separate primitives with distinct rendering contracts — never merged
+ * into one unlabeled severity:
+ * - `state` — quiet, render as plain status (no attention weight)
+ * - `blocker` — something is wrong and blocking this object (loudest)
+ * - `finding` — Jovie detected something worth the artist's attention
+ * - `recommendation` — Jovie suggests an action (not wrong, just improvable)
+ */
+export type PresenceSignalKind =
+  | 'state'
+  | 'blocker'
+  | 'finding'
+  | 'recommendation';
+
+export type PresenceSignalTone = 'success' | 'warning' | 'error' | 'neutral';
+
+export interface PresenceSignal {
+  readonly kind: PresenceSignalKind;
+  readonly tone: PresenceSignalTone;
+  readonly label: string;
+  readonly detail: string;
+  readonly sortOrder: number;
+}
+
+/**
+ * Classify a workspace row into its four separated signal primitives,
+ * derived from the canonical connection status so the two stay in lockstep.
+ * Ordered for scan reading: blockers first, quiet state last.
+ */
+export function getPresenceSignals(
+  row: ProfileWorkspaceRow
+): readonly PresenceSignal[] {
+  const status = getConnectionStatus(row);
+  const signals: PresenceSignal[] = [];
+
+  if (status.needsAttention && status.tone === 'error') {
+    signals.push({
+      kind: 'blocker',
+      tone: 'error',
+      label: status.label,
+      detail: status.nextAction,
+      sortOrder: 0,
+    });
+  } else if (status.needsAttention && status.tone === 'warning') {
+    signals.push({
+      kind: 'finding',
+      tone: 'warning',
+      label: status.label,
+      detail: status.nextAction,
+      sortOrder: 1,
+    });
+  } else if (status.needsAttention) {
+    signals.push({
+      kind: 'finding',
+      tone: 'neutral',
+      label: status.label,
+      detail: status.nextAction,
+      sortOrder: 1,
+    });
+  } else if (status.tone === 'success') {
+    signals.push({
+      kind: 'state',
+      tone: 'success',
+      label: status.label,
+      detail: status.nextAction,
+      sortOrder: 3,
+    });
+  } else {
+    signals.push({
+      kind: 'state',
+      tone: 'neutral',
+      label: status.label,
+      detail: status.nextAction,
+      sortOrder: 3,
+    });
+  }
+
+  if (row.rowType === 'surface' && row.qualificationStatus === 'suggested') {
+    signals.push({
+      kind: 'recommendation',
+      tone: 'neutral',
+      label: 'Qualify This Page',
+      detail: 'Confirm whether this page belongs to the artist.',
+      sortOrder: 2,
+    });
+  }
+
+  return [...signals].sort((left, right) => left.sortOrder - right.sortOrder);
 }

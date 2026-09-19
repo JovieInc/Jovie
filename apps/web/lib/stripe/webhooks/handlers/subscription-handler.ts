@@ -19,6 +19,7 @@ import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
@@ -178,20 +179,29 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+      enqueuePaidWelcomeAfterEntitlement({
+        appUserId: result.appUserId,
+        clerkUserId: userId,
+        subscription,
+        plan: result.plan,
+      });
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
           subscription.id
         );
       } catch (error) {
-        logger.warn(
-          'Failed to attribute lead paid conversion on subscription created',
+        await captureCriticalError(
+          'Lead paid conversion outcome receipt failed',
+          error,
           {
-            userId,
+            route: '/api/stripe/webhooks',
+            event: 'customer.subscription.created',
             subscriptionId: subscription.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            userId,
           }
         );
+        throw error;
       }
     }
 
@@ -259,20 +269,29 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+      enqueuePaidWelcomeAfterEntitlement({
+        appUserId: result.appUserId,
+        clerkUserId: userId,
+        subscription,
+        plan: result.plan,
+      });
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
           subscription.id
         );
       } catch (error) {
-        logger.warn(
-          'Failed to attribute lead paid conversion on subscription updated',
+        await captureCriticalError(
+          'Lead paid conversion outcome receipt failed',
+          error,
           {
-            userId,
+            route: '/api/stripe/webhooks',
+            event: 'customer.subscription.updated',
             subscriptionId: subscription.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            userId,
           }
         );
+        throw error;
       }
     }
 

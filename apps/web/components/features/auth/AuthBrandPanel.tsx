@@ -3,6 +3,7 @@
 // @coverage-via apps/web/tests/unit/auth/AuthBrandPanel.test.tsx
 import Image from 'next/image';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
@@ -13,12 +14,13 @@ interface AuthBrandPanelProps {
 }
 
 const AUTH_BRAND_FRAME = 'dashboard-releases-sidebar-desktop';
-const DEFAULT_AUTH_BRAND_HEADLINE = 'Built For Artists.';
+export const DEFAULT_AUTH_BRAND_HEADLINE = COMPANY_IDENTITY.homepageHeadline;
+export const DEFAULT_AUTH_BRAND_DESCRIPTION = COMPANY_IDENTITY.seoDescription;
 
 export function AuthBrandPanel({
   className,
   headline = DEFAULT_AUTH_BRAND_HEADLINE,
-  description,
+  description = DEFAULT_AUTH_BRAND_DESCRIPTION,
   showText = true,
 }: Readonly<AuthBrandPanelProps>) {
   return (

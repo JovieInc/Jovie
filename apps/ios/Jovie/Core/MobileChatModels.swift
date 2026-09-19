@@ -83,6 +83,26 @@ struct CachedChatSnapshot: Codable, Equatable, Sendable {
   var activeConversationID: String? = nil
 }
 
+/// Newest-first transcript window. Numbers match `CHAT_TRANSCRIPT_WINDOW`
+/// in `apps/web/lib/chat/transcript-window.ts` (JOV-5874 / JOV-5044).
+enum ChatTranscriptWindow {
+  static let virtualizeAfterMessageCount = 8
+  static let overscanRowCount = 5
+  static let initialMessageLimit = 40
+
+  static func visibleTail<T>(_ items: [T]) -> [T] {
+    Array(items.suffix(initialMessageLimit))
+  }
+
+  static func hasOlderHistory(cachedCount: Int, fetchedHasMore: Bool) -> Bool {
+    fetchedHasMore || cachedCount > initialMessageLimit
+  }
+
+  static func shouldOfferLoadEarlier(hasMoreOlder: Bool) -> Bool {
+    hasMoreOlder
+  }
+}
+
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
 /// (JOV-3608). Exercises entity mentions (all four kinds), a skill
 /// invocation, and a user-authored turn containing a mention, so UI tests can

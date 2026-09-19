@@ -51,6 +51,7 @@ function HomepageStoryStack() {
   return (
     <div data-testid='homepage-story-stack'>
       <HomepageUnlockedSections />
+      <HomepageEditorialChangelog />
       <HomepageClose />
     </div>
   );

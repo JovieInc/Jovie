@@ -7,6 +7,7 @@
  */
 
 import type { ArtistRole } from '@/lib/db/schema/content';
+import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import {
   isPrimaryArtistRole,
   PRIMARY_ARTIST_ROLES,
@@ -293,7 +294,12 @@ export function resolveSmartLinkArtistByline(input: {
     input.primaryArtists && input.primaryArtists.length > 0
       ? input.primaryArtists.map(artist => ({
           name: artist.name,
-          handle: artist.handle,
+          handle: canonicalizeReleaseArtistHandle({
+            handle: artist.handle,
+            name: artist.name,
+            ownerHandle: input.ownerHandle,
+            ownerName: input.ownerName,
+          }),
         }))
       : [{ name: input.ownerName, handle: input.ownerHandle }];
 

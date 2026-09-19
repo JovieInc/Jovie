@@ -13,8 +13,13 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
+import {
+  EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
+  EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
+} from '../changed-test-coverage.mjs';
 import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
 import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
+import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -285,7 +290,7 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('does not launch any workflow from an unchanged ready transition', () => {
+  it('reacts to a ready transition only through the canonical admission controller', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
@@ -294,7 +299,13 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    expect(offenders).toEqual([]);
+    // A ready transition must never earn an unchanged head a second CI
+    // flight (trigger-hygiene rule 3, JOV-INV-029 intact). The sole
+    // exception is the canonical admission controller, which subscribes to
+    // re-evaluate exact-head admission without restarting CI; its Runner
+    // Heartbeat clock is the ownerless recovery wake. Every other workflow
+    // must keep ignoring the ready transition.
+    expect(offenders).toEqual(['merge-queue-autoenroll.yml']);
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -498,6 +509,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).not.toContain('!cancelled()');
     expect(aggregate).toContain('ci-fast');
     expect(aggregate).toContain('ci-unit-tests');
+    expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
@@ -687,6 +699,39 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('finishes exact-head coverage inside the native merge-queue check budget', () => {
+    const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
+    const timeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+    expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+    expect(timeout).toBeLessThan(
+      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+    );
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
+    expect(coverage).toContain("github.event_name == 'merge_group'");
+    expect(coverage).toContain('github.event.merge_group.head_sha');
+    expect(coverage).toContain('.applicable');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
+    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain('--bail 1');
+    expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
+    expect(coverage).toContain(
+      `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
+    );
+    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
+    expect(coverage).not.toContain('timeout-minutes: 60');
+  });
+
   it('requires one diff-scoped secret scan on source and combined heads', () => {
     const secret = getJobBlock(CI_WORKFLOW, 'ci-secret-scan');
     const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
@@ -818,6 +863,50 @@ describe('merge_group workflow contract', () => {
     );
     expect(mergeGroupBranch).not.toMatch(
       /(?:DIFF_BASE|CHANGED_FILES|git fetch).*\${{ github\.base_ref }}/
+    );
+  });
+
+  it('materializes an empty path artifact for typed no-op merge groups', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const noopStart = detectStep.indexOf(
+      'if [[ "${IS_NOOP:-}" == "true" ]]; then'
+    );
+    const noopEnd = detectStep.indexOf('exit 0', noopStart);
+    const noopBranch = detectStep.slice(noopStart, noopEnd);
+    expect(noopStart).toBeGreaterThanOrEqual(0);
+    expect(noopEnd).toBeGreaterThan(noopStart);
+    expect(noopBranch).toContain(
+      'PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"'
+    );
+    expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
+    expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+
+    const homepageVisualScript = getStepRunScript(
+      pathChanges,
+      'Select rendered homepage visual gate'
+    );
+    const testRoot = mkdtempSync(join(tmpdir(), 'noop-path-artifact-'));
+    const productLaneDir = join(testRoot, 'product-lane-classification');
+    const visualOutput = join(testRoot, 'visual-output');
+    mkdirSync(productLaneDir, { recursive: true });
+    writeFileSync(join(productLaneDir, 'changed-paths.txt'), '');
+    writeFileSync(visualOutput, '');
+
+    const visual = spawnSync('bash', ['-c', homepageVisualScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: visualOutput,
+        RUNNER_TEMP: testRoot,
+      },
+    });
+    expect(visual.status, visual.stderr || visual.stdout).toBe(0);
+    expect(readFileSync(visualOutput, 'utf8')).toContain(
+      'run_homepage_visual=false'
     );
   });
 
@@ -1009,6 +1098,18 @@ ${selectedGateScript}`,
         `${name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
       ).toBe(Number(status));
     }
+  });
+
+  it('skips the product-lane receipt when merge-group admission is not admitted', () => {
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).toContain('ci-merge-group-admission');
+    expect(receipt).toContain('always()');
+    expect(receipt).toContain(
+      "github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true'"
+    );
+    expect(receipt).toContain(
+      "github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"
+    );
   });
 
   it('builds the exact product-lane receipt with a valid immutable run URL', () => {
@@ -1611,43 +1712,46 @@ ${selectedGateScript}`,
   it.each([
     ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
     ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],
-  ])('loads the complete %s policy import closure from its sparse checkout', (_policy, workflow, job) => {
-    const block = getJobBlock(workflow, job);
-    const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
-    expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
-    const paths = sparse[1]
-      .trim()
-      .split('\n')
-      .map(line => line.trim());
-    const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
-    const load = () =>
-      spawnSync(
-        process.execPath,
-        [
-          '--input-type=module',
-          '-e',
-          "await import('./scripts/lib/merge-group-member-policy.mjs')",
-        ],
-        { cwd: root, encoding: 'utf8' }
-      );
-    try {
-      for (const path of paths) {
-        const target = resolve(root, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+  ])(
+    'loads the complete %s policy import closure from its sparse checkout',
+    (_policy, workflow, job) => {
+      const block = getJobBlock(workflow, job);
+      const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+      expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
+      const paths = sparse[1]
+        .trim()
+        .split('\n')
+        .map(line => line.trim());
+      const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
+      const load = () =>
+        spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            "await import('./scripts/lib/merge-group-member-policy.mjs')",
+          ],
+          { cwd: root, encoding: 'utf8' }
+        );
+      try {
+        for (const path of paths) {
+          const target = resolve(root, path);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+        }
+        // Node discovers all transitive static imports in the actual policy.
+        const complete = load();
+        expect(complete.status, complete.stderr).toBe(0);
+        rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
+        const incomplete = load();
+        expect(incomplete.status).not.toBe(0);
+        expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
+        expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
       }
-      // Node discovers all transitive static imports in the actual policy.
-      const complete = load();
-      expect(complete.status, complete.stderr).toBe(0);
-      rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
-      const incomplete = load();
-      expect(incomplete.status).not.toBe(0);
-      expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
-      expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
     }
-  });
+  );
 
   it('revalidates mutable member policy on the exact combined head', () => {
     expect(FORK_GATE_WORKFLOW).toMatch(

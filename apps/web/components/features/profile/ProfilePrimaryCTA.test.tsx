@@ -72,7 +72,11 @@ describe('ProfilePrimaryCTA', () => {
       name: 'Open Listen page with music links',
     });
     expect(listenCta).toHaveAttribute('href', '/timwhite/listen');
-    expect(listenCta.className).toContain('before:h-11');
-    expect(listenCta.className).toContain('before:min-w-11');
+    expect(listenCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(listenCta).not.toHaveClass('before:h-11');
   });
 });

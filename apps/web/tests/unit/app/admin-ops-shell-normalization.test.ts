@@ -17,6 +17,10 @@ const TEST_DIR = dirname(
 const OPS_ROUTE_DIR = join(TEST_DIR, '../../../app/app/(shell)/admin/ops');
 const OPS_PAGE = join(OPS_ROUTE_DIR, 'page.tsx');
 const HUD_PAGE = join(TEST_DIR, '../../../app/hud/page.tsx');
+const HUD_SHELL_PAGE = join(
+  TEST_DIR,
+  '../../../app/app/(shell)/admin/hud/page.tsx'
+);
 const HUD_DASHBOARD_CLIENT = join(OPS_ROUTE_DIR, 'HudDashboardClient.tsx');
 const HUD_STATUS_PILL = join(OPS_ROUTE_DIR, 'HudStatusPill.tsx');
 const TIM_ACTION_REQUIRED_SECTION = join(
@@ -53,12 +57,23 @@ describe('admin ops shell normalization', () => {
 
     expect(hud).toContain('import { AdminPage }');
     expect(hud).toContain('<AdminPage');
+    expect(hud).not.toContain('StandaloneProductPage');
     expect(hud).toContain("tokenOk ? 'token' : 'shell'");
     expect(hud).toContain(
       "density={tokenOk || fullscreen ? 'kiosk' : 'shell'}"
     );
     expect(ops).toContain('redirect(APP_ROUTES.HUD)');
     expect(ops).not.toContain('<AdminPage');
+    const hudShell = readSource(HUD_SHELL_PAGE);
+    expect(hudShell).toContain("from '@/app/hud/page'");
+    expect(hudShell).toContain("export const dynamic = 'force-dynamic'");
+    expect(hudShell).toContain("export const runtime = 'nodejs'");
+    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bdynamic\b/);
+    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bruntime\b/);
+    expect(hudShell).toContain(
+      "import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';"
+    );
+    expect(hudShell).toContain('await requireCurrentAdminPageAccess();');
   });
 
   it('mounts the consolidated operational control panel below the HUD dashboard', () => {

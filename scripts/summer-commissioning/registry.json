@@ -1,6 +1,6 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
-  "registryVersion": "2026-09-02.1",
+  "registryVersion": "2026-09-18.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
@@ -242,24 +242,35 @@
       "capability": "Linear read and explicit durable work update",
       "canonicalPath": [
         "explicit founder intent -> Summer policy -> Linear durable issue mutation -> readback receipt",
-        "apps/web/app/api/webhooks/linear/route.ts"
+        "apps/web/lib/ovie/linear-coordination.ts",
+        "apps/web/lib/ovie/mcp/tools.ts"
       ],
-      "implementationState": "in_flight",
-      "status": "blocked",
+      "implementationState": "already_works",
+      "status": "passing",
       "critical": true,
       "evidence": [
         {
-          "kind": "in_flight",
-          "ref": "https://github.com/JovieInc/Jovie/pull/16396",
-          "summary": "Durable provider delivery and bounded Linear-to-Symphony dispatch remain open."
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/linear-coordination.ts",
+          "summary": "Bounded Linear create/update with founder intent, provenance, and mandatory readback; executionCompleted and deliveryAccepted stay false."
+        },
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/mcp/tools.ts",
+          "summary": "coordinate_linear_work MCP tool gated by linear-coordination-write."
+        },
+        {
+          "kind": "test",
+          "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+          "summary": "Unit coverage for create/update readback, denial paths, and Summer-only capability grant."
         },
         {
           "kind": "policy",
           "ref": "apps/eve-pilot/identities/summer/instructions.md",
-          "summary": "Eve Summer currently refuses Linear writes."
+          "summary": "Summer instructions allow bounded Linear create/update with readback; not execution/delivery."
         }
       ],
-      "lastVerified": "2026-09-01T22:57:22Z",
+      "lastVerified": "2026-09-12T16:34:53Z",
       "invalidationCondition": "Linear mutation policy, delivery identity, explicit-intent gate, or durable readback contract changes.",
       "ownerRemediation": {
         "owner": "Summer durable intake",
@@ -267,7 +278,7 @@
       },
       "probe": {
         "id": "summer.work.linear-read-update",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "fixture": "linear-explicit-update-reversible-fixture/v1",
         "expectedState": "durable_linear_readback_observed",
         "requiresRuntimeReceipt": true,
@@ -275,12 +286,17 @@
           {
             "kind": "file_contains",
             "path": "apps/web/lib/ovie/isolation.ts",
-            "value": "'create_or_update_linear_issue'"
+            "value": "'coordinate_linear_work'"
           },
           {
             "kind": "file_contains",
-            "path": "apps/web/app/api/webhooks/linear/route.ts",
-            "value": "providerDeliveryId"
+            "path": "apps/web/lib/ovie/linear-coordination.ts",
+            "value": "executionCompleted: false"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+            "value": "code: 'readback-missing'"
           }
         ]
       }
@@ -357,7 +373,7 @@
         {
           "kind": "exact_packaged_runtime",
           "ref": "source:b31537204a4a8dfeaeb8c55061bd1c1cfeecc470:/app/ov/chat",
-          "summary": "Summer claimed and completed one real worker job and the persisted UI rendered: SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem — idle factory means Linear work does not land."
+          "summary": "Summer claimed and completed one real worker job and the persisted UI rendered: SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem \u2014 idle factory means Linear work does not land."
         },
         {
           "kind": "in_flight",
@@ -496,50 +512,76 @@
       "id": "SUMMER-COMM-011",
       "capability": "Cheap heartbeat, liveness, and no-op reconciliation",
       "canonicalPath": [
-        "low-cadence heartbeat -> state fingerprint -> no-op or targeted reconciliation -> observable receipt",
-        "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
+        "eve-owned 15m liveness heartbeat -> signed non-empty no-op or identification/remediation receipt",
+        "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+        "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts"
       ],
-      "implementationState": "conflicting",
+      "implementationState": "in_flight",
       "status": "blocked",
       "critical": true,
       "evidence": [
         {
           "kind": "source",
-          "ref": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
-          "summary": "A watchdog exists, but no canonical Summer heartbeat/no-op receipt contract is present."
+          "ref": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+          "summary": "Eve owns the 15-minute summer-liveness-heartbeat trigger. It emits jovie.eve.summer-liveness-heartbeat/v1 and does not invoke backlog rerank."
         },
         {
           "kind": "runtime",
           "ref": "codex-turn:01a05f69-5b89-7db0-81fe-96fe21aae443",
-          "summary": "After the five-minute heartbeat was updated to require a non-empty terminal receipt, this scheduled turn completed in 9.873 seconds with no assistant message, tool marker, or receipt. Scheduling recurrence exists, but the completed empty turn fails closed as Summer identification/remediation evidence."
+          "summary": "The superseded five-minute Codex heartbeat completed in 9.873 seconds with no assistant message, tool marker, or receipt. Empty completed turns fail closed and do not count as Summer liveness evidence."
         },
         {
           "kind": "blocker",
           "ref": "JOV-5853:eve-native-continuous-loop",
-          "summary": "The continuous bottleneck-remediation loop remains blocked until a later scheduled turn emits a non-empty signed terminal no-op/remediation receipt and Eve owns that schedule across restart; the existing Codex heartbeat and its completed empty turn cannot satisfy either boundary."
+          "summary": "Source owns the Eve 15-minute receipt contract. Founder deploy of that schedule in the intended runtime remains required before commissioning; the Codex empty turn cannot satisfy the gate."
         }
       ],
-      "lastVerified": "2026-09-01T23:56:56Z",
-      "invalidationCondition": "Re-evaluate only after a later scheduled turn emits a non-empty signed no-op/remediation receipt and Eve natively owns that five-minute schedule across restart; invalidate on an empty completed turn, cadence, state fingerprint, cost budget, scheduler ownership, or escalation-route changes.",
+      "lastVerified": "2026-09-19T02:11:00Z",
+      "invalidationCondition": "Re-evaluate only after the Eve-owned 15-minute summer-liveness-heartbeat emits a non-empty signed no-op or identification/remediation receipt in the intended runtime; invalidate on an empty completed turn, cadence change, backlog-rerank from this heartbeat, scheduler ownership change, or receipt-schema change.",
       "ownerRemediation": {
         "owner": "Eve / Summer liveness",
         "refs": ["JOV-5852", "JOV-5853"]
       },
       "probe": {
         "id": "summer.liveness.heartbeat-noop",
-        "version": "1.1.0",
-        "fixture": "scheduled-heartbeat-nonempty-receipt-across-restart/v2",
+        "version": "1.2.0",
+        "fixture": "eve-owned-15m-nonempty-receipt/v3",
         "expectedState": "eve_owned_non_empty_terminal_noop_or_remediation_receipt",
         "requiresRuntimeReceipt": true,
         "sourceAssertions": [
           {
             "kind": "file_exists",
-            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts"
           },
           {
             "kind": "file_contains",
-            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
-            "value": "jovie.summer-heartbeat/v1"
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+            "value": "SUMMER_LIVENESS_HEARTBEAT_CADENCE"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "jovie.eve.summer-liveness-heartbeat/v1"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "event-driven-only"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "*/15 * * * *"
+          },
+          {
+            "kind": "file_not_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "rankSummerBottlenecks"
+          },
+          {
+            "kind": "file_not_contains",
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+            "value": "rankSummerBottlenecks"
           }
         ]
       }
@@ -805,7 +847,7 @@
           {
             "kind": "file_contains",
             "path": "apps/web/tests/journey-auditor/README.md",
-            "value": "production bug → scout reproduction → product promise → deterministic test → fix"
+            "value": "production bug \u2192 scout reproduction \u2192 product promise \u2192 deterministic test \u2192 fix"
           }
         ]
       }

@@ -16,8 +16,10 @@ enum ChatComposerMetrics {
     !isSending
   }
 
-  static func isSendEnabled(trimmedDraft: String, isSending: Bool) -> Bool {
-    !trimmedDraft.isEmpty && !isSending
+  static func isSendEnabled(trimmedDraft: String, isSending _: Bool) -> Bool {
+    // Live composer (JOV-5044): typed send stays available while the
+    // assistant streams. ChatRepository interrupts the in-flight turn.
+    !trimmedDraft.isEmpty
   }
 }
 
@@ -193,7 +195,7 @@ struct ChatComposerBar: View {
 
   private func sendButton(trimmedDraft: String) -> some View {
     Button(action: onSend) {
-      Image(systemName: isSending ? "ellipsis" : "arrow.up")
+      Image(systemName: "arrow.up")
         .font(.system(size: 14, weight: .bold))
         .foregroundStyle(
           ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)

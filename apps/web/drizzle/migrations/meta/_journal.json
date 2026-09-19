@@ -715,6 +715,13 @@
       "when": 1788415600002,
       "tag": "0101_canonical_release_communications",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1789199800000,
+      "tag": "0102_creator_profiles_user_id_created_at_index",
+      "breakpoints": true
     }
   ]
 }

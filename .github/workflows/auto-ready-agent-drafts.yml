@@ -1,18 +1,45 @@
 name: Auto-Ready Agent Drafts
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Hosted GitHub App token undrafts same-repo green-source drafts after PR Ready and required checks succeed CLEAN; this hop never enables auto-merge or enrolls the merge queue.
+# removal-trigger: Remove the workflow_run and check_suite wakes when GitHub natively undrafts same-repo drafts that already satisfy required SUCCESS and CLEAN without a hosted App-token hop.
 
-# Manual recovery for interrupted writer-owned promotion drift. Branch prefixes,
-# bot authors, and FX provenance never authorize promotion; an exact-head
-# jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path is
-# scripts/writer-owned-pr-promote.sh, not this workflow.
+# Two controllers share this workflow:
 #
-# Manual dispatch is recovery-only for rare crash-window drift and must not
-# manufacture missing author proof.
-# Enable this workflow only after the provenance selector and App-token
-# mutation path land. Opt out per-PR with taste/security/hold labels or
-# explicit controlled-proof/canary markers.
+# 1. Writer-owned proof recovery (manual dispatch only). Branch prefixes, bot
+#    authors, and FX provenance never authorize promotion; an exact-head
+#    jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path
+#    is scripts/writer-owned-pr-promote.sh. This job never waits for green.
+#
+# 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie has
+#    PR Ready + required checks SUCCESS and mergeable CLEAN, undraft it so
+#    Auto-Enroll / jovie-bot can pick it up. This job never enables auto-merge
+#    and never enrolls the merge queue.
+#
+# Green-source never mutates HOLD #17156. Tim-hold / machine hold labels
+# (GREEN_SOURCE_HOLD_LABELS) cover other open holds; merged PR numbers are
+# not numeric exemptions.
+#
+# Manual dispatch without pr_number remains writer-proof recovery. Dispatch
+# with pr_number + head_sha is a targeted green-source undraft. Opt out
+# per-PR with machine/security/hold labels or controlled-proof/canary markers.
 
 on:
+  workflow_run:
+    workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']
+    types: [completed]
+  check_suite:
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Optional exact draft PR to undraft when already green+CLEAN'
+        required: false
+        type: string
+      head_sha:
+        description: 'Required exact 40-character head SHA when pr_number is set'
+        required: false
+        type: string
 
 concurrency:
   group: auto-ready-agent-drafts
@@ -23,6 +50,9 @@ permissions:
 
 jobs:
   auto-ready:
+    # Writer-proof recovery stays manual. CI/check_suite must not scan 200 PRs
+    # looking for proof receipts — that path is author-owned.
+    if: github.event_name == 'workflow_dispatch' && inputs.pr_number == ''
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
     runs-on: ubuntu-latest
@@ -60,3 +90,65 @@ jobs:
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
         run: bash scripts/auto-ready-agent-drafts.sh
+
+  green-source:
+    # Event-driven undraft when required source checks succeed. Job-level
+    # filters keep failed/cancelled/unrelated suites from provisioning a runner.
+    # No ready_for_review listener — Auto-Enroll owns that event.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.pr_number != '') ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        (
+          github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'pull_request_target'
+        ) &&
+        (
+          startsWith(github.event.workflow_run.path, '.github/workflows/ci.yml') ||
+          startsWith(github.event.workflow_run.path, '.github/workflows/fork-pr-gate.yml') ||
+          startsWith(github.event.workflow_run.path, '.github/workflows/pr-size-guard.yml')
+        )
+      ) ||
+      (
+        github.event_name == 'check_suite' &&
+        github.event.check_suite.conclusion == 'success' &&
+        github.event.check_suite.app.slug == 'github-actions' &&
+        github.event.check_suite.head_branch != github.event.repository.default_branch &&
+        github.event.check_suite.pull_requests[0].number > 0
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Generate short-lived Jovie App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Verify GitHub CLI
+        run: gh --version
+
+      - name: Undraft green-source CLEAN drafts
+        id: green-source
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+          TARGET_PR: ${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || '' }}
+          TARGET_HEAD: ${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.event.check_suite.head_sha || '' }}
+          MISSED_COHORT: ${{ github.event_name == 'workflow_run' && '5' || '0' }}
+        run: bash scripts/auto-ready-green-drafts.sh

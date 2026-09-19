@@ -62,10 +62,54 @@ describe('auth shell contract guard', () => {
       'utf8'
     );
 
-    expect(signin).toContain("layoutVariant='split'");
+    expect(signin).toContain("layoutVariant='stack'");
     expect(signin).not.toContain("chrome='splash-b'");
-    expect(loading).toContain("layoutVariant='split'");
+    expect(loading).toContain("layoutVariant='stack'");
     expect(modal).toContain('<AuthModalShell');
     expect(modal).not.toContain('<AuthLayout');
+  });
+
+  it('keeps signup on the shared signed-in guard instead of independently blanking', () => {
+    const signupPage = readFileSync(
+      join(process.cwd(), 'app', '(auth)', 'signup', 'page.tsx'),
+      'utf8'
+    );
+    const signupClient = readFileSync(
+      join(process.cwd(), 'app', '(auth)', 'signup', 'SignUpPageClient.tsx'),
+      'utf8'
+    );
+    const signupModal = readFileSync(
+      join(process.cwd(), 'app', '@auth', '(.)signup', 'SignupModalClient.tsx'),
+      'utf8'
+    );
+    const signupModalPage = readFileSync(
+      join(process.cwd(), 'app', '@auth', '(.)signup', 'page.tsx'),
+      'utf8'
+    );
+    const authShell = readFileSync(
+      join(process.cwd(), 'components', 'features', 'auth', 'AuthShell.tsx'),
+      'utf8'
+    );
+    const emailForm = readFileSync(
+      join(
+        process.cwd(),
+        'components',
+        'features',
+        'auth',
+        'EmailCodeAuthForm.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(signupPage).toContain('resolveUserState');
+    expect(signupClient).toContain('<AuthenticatedAuthEntryGuard>');
+    expect(signupModal).toContain('<AuthenticatedAuthEntryGuard>');
+    expect(signupModalPage).toContain('resolveUserState');
+    expect(authShell).not.toContain(
+      'if (hasHydrated && isAuthLoaded && isSignedIn)'
+    );
+    expect(emailForm).not.toContain(
+      'if (hasHydrated && isAuthLoaded && isSignedIn)'
+    );
   });
 });

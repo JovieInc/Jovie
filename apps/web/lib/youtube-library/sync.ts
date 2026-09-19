@@ -198,6 +198,11 @@ export interface SyncChannelVideosInput {
   readonly now?: Date;
   /** Test seam — defaults to the Drizzle-backed repository. */
   readonly repo?: YouTubeLibraryRepository;
+  /**
+   * When provided, skip `provider.listChannelVideos` and persist this page.
+   * Used by the resumable import path (JOV-5352).
+   */
+  readonly incoming?: readonly YouTubeChannelVideo[];
 }
 
 export interface SyncChannelVideosResult {
@@ -220,7 +225,9 @@ export async function syncChannelVideos(
   const { creatorProfileId, channelId, provider } = input;
 
   const [incoming, existing] = await Promise.all([
-    provider.listChannelVideos(channelId),
+    input.incoming
+      ? Promise.resolve([...input.incoming])
+      : provider.listChannelVideos(channelId),
     repo.listExistingVideos(creatorProfileId, channelId),
   ]);
 

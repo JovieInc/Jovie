@@ -5,6 +5,11 @@ interface RouteRule {
   readonly source: string;
   readonly destination: string;
   readonly permanent?: boolean;
+  readonly missing?: readonly {
+    readonly type: string;
+    readonly key: string;
+    readonly value?: string;
+  }[];
 }
 
 function flattenRewrites(
@@ -68,5 +73,29 @@ describe('OV mode routing', () => {
       source: `${APP_ROUTES.OV}/:path*`,
       destination: `${APP_ROUTES.LEGACY_ADMIN}/:path*`,
     });
+  });
+
+  it('rewrites default /hud into the OV app shell and keeps isolated query modes on /hud', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const grouped = (await nextConfig.rewrites()) as {
+      readonly beforeFiles?: readonly RouteRule[];
+      readonly afterFiles?: readonly RouteRule[];
+    };
+    const hudInShell = {
+      source: APP_ROUTES.HUD,
+      missing: [
+        { type: 'query', key: 'fs', value: '1' },
+        { type: 'query', key: 'kiosk' },
+        { type: 'query', key: 'ovie', value: 'mac' },
+        { type: 'query', key: 'mode', value: 'kiosk' },
+      ],
+      destination: `${APP_ROUTES.OV}/hud`,
+    };
+
+    // Must be beforeFiles. afterFiles loses to the filesystem /hud page and
+    // keeps the chrome-less isolated screen.
+    expect(grouped.beforeFiles).toContainEqual(hudInShell);
+    expect(grouped.afterFiles ?? []).not.toContainEqual(hudInShell);
   });
 });

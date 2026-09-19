@@ -1,6 +1,8 @@
 import '../(home)/home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';
+import { MarketingEmailSignup } from '@/components/marketing/MarketingEmailSignup';
+import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 
@@ -12,13 +14,16 @@ export default async function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <PublicPageShell
-      className='system-b-marketing dark overflow-x-clip bg-base text-primary-token'
-      logoSize='xs'
-    >
-      {children}
-      <MarketingEnhancements />
-      <div aria-hidden='true' className='marketing-noise' />
-    </PublicPageShell>
+    <ClientProviders forceSignedOutDefaults>
+      <PublicPageShell
+        className='system-b-marketing overflow-x-clip bg-base text-primary-token'
+        logoSize='xs'
+      >
+        {children}
+        <MarketingEmailSignup />
+        <MarketingEnhancements />
+        <div aria-hidden='true' className='marketing-noise' />
+      </PublicPageShell>
+    </ClientProviders>
   );
 }

@@ -21,7 +21,46 @@ readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-pr-drain.py"
 readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_SOURCE="${SOURCE_ROOT}/scripts/symphony/config/gem-repo-registry.json"
 readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py"
-readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/WORKFLOW.md"
+# Honor the operator's persisted profile on every upgrade. Never source this
+# environment file as shell code or let a process override widen its policy.
+CONFIGURATION_PROFILE="$(python3 - "${SYMPHONY_ROOT}/runner-source.env" <<'PY'
+import os
+from pathlib import Path
+import re
+import shlex
+import stat
+import sys
+
+path = Path(sys.argv[1])
+selected = os.environ.get("JOVIE_CONFIGURATION_PROFILE")
+if path.exists() or path.is_symlink():
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+        raise SystemExit("untrusted runner-source profile file")
+    values = re.findall(r'^\s*JOVIE_CONFIGURATION_PROFILE\s*=\s*(.*?)\s*$', path.read_text(), re.MULTILINE)
+    if len(values) > 1:
+        raise SystemExit("duplicate operator profile")
+    if values:
+        words = shlex.split(values[0])
+        if len(words) != 1:
+            raise SystemExit("invalid operator profile value")
+        persisted = words[0]
+        if selected is not None and selected != persisted:
+            raise SystemExit("process profile conflicts with operator profile")
+        selected = persisted
+selected = selected if selected is not None else "canonical"
+if selected not in {"canonical", "governor-bounded"}:
+    raise SystemExit("unknown operator profile")
+print(selected)
+PY
+)"
+readonly CONFIGURATION_PROFILE
+case "${CONFIGURATION_PROFILE}" in
+  canonical) WORKFLOW_RELATIVE="scripts/symphony/WORKFLOW.md" ;;
+  governor-bounded) WORKFLOW_RELATIVE="scripts/symphony/profiles/governor-bounded/WORKFLOW.md" ;;
+esac
+readonly WORKFLOW_RELATIVE
+readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/${WORKFLOW_RELATIVE}"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-elixir.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
@@ -99,7 +138,7 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
-  scripts/symphony/WORKFLOW.md \
+  "${WORKFLOW_RELATIVE}" \
   scripts/symphony/systemd/symphony-elixir.service \
   scripts/symphony/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
@@ -111,7 +150,7 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
   scripts/symphony/lib/user-systemd-context.sh \
-  scripts/symphony/WORKFLOW.md \
+  "${WORKFLOW_RELATIVE}" \
   scripts/symphony/systemd/symphony-elixir.service
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
@@ -272,7 +311,43 @@ install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
 install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
 install_atomic "${REGISTRY_CONFIG_SOURCE}" "${REGISTRY_CONFIG_TARGET}" 0644
 install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
-install_atomic "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" 0644
+if [[ "${CONFIGURATION_PROFILE}" == governor-bounded ]]; then
+  # Preserve a smaller pressure-controller ceiling; an upgrade is not capacity
+  # authorization. The immutable source remains the attestation comparison.
+  python3 - "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" <<'PY'
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+
+source, target = map(Path, sys.argv[1:])
+text = source.read_text()
+pattern = re.compile(r'^(\s*max_concurrent_agents:\s*)([1-9][0-9]*)(\s*)$', re.MULTILINE)
+matches = list(pattern.finditer(text))
+if len(matches) != 1:
+    raise SystemExit("invalid bounded source concurrency")
+ceiling = int(matches[0].group(2))
+if target.exists():
+    current = list(pattern.finditer(target.read_text()))
+    if len(current) != 1:
+        raise SystemExit("invalid installed bounded concurrency")
+    ceiling = min(ceiling, int(current[0].group(2)))
+text = pattern.sub(lambda match: match.group(1) + str(ceiling) + match.group(3), text)
+fd, name = tempfile.mkstemp(prefix='.governor-workflow-', dir=target.parent)
+try:
+    with os.fdopen(fd, 'w') as output:
+        os.fchmod(output.fileno(), 0o644)
+        output.write(text)
+        output.flush()
+        os.fsync(output.fileno())
+    os.replace(name, target)
+finally:
+    if os.path.exists(name): os.unlink(name)
+PY
+else
+  install_atomic "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" 0644
+fi
 mkdir -p "$(dirname "${SERVICE_UNIT_TARGET}")"
 install_atomic "${SERVICE_UNIT_SOURCE}" "${SERVICE_UNIT_TARGET}" 0644
 python3 -m py_compile \
@@ -300,10 +375,10 @@ LISTENER_PID="$(
 [[ "${LISTENER_PID}" =~ ^[1-9][0-9]*$ ]]
 grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${LISTENER_PID}/cgroup"
 
-# File writes are not runtime proof. Attest the exact source revision and both
-# deployed configuration surfaces only after daemon-reload, service activation,
-# and the local state endpoint have all succeeded. This receipt contains hashes
-# and state only; it never serializes credentials or configuration contents.
+# Verify the configuration install, not the running application's source SHA.
+# The source-owned service attestation publisher separately observes the runtime.
+# Installation must not compete with that publisher or substitute a Jovie config
+# revision for a Symphony application revision.
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
 POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
@@ -314,6 +389,7 @@ CLOSURE_SOURCE_SHA="$(sha256sum "${CLOSURE_SOURCE}" | awk '{print $1}')"
 CLOSURE_TARGET_SHA="$(sha256sum "${CLOSURE_TARGET}" | awk '{print $1}')"
 export \
   SOURCE_REVISION \
+  CONFIGURATION_PROFILE \
   WORKFLOW_SOURCE \
   WORKFLOW_TARGET \
   UNIT_SOURCE_SHA \
@@ -337,9 +413,8 @@ import re
 from datetime import datetime, timezone
 
 root = pathlib.Path(os.environ["GEM_ROOT"])
-destination = root / "state" / "gem-service-attestation.json"
-destination.parent.mkdir(parents=True, exist_ok=True)
-temporary = destination.with_suffix(".json.tmp")
+# This verification is emitted to installer output only. No runtime receipt is
+# written: that belongs exclusively to emit_gem_service_attestation.py.
 
 # The pressure controller owns exactly one bounded runtime overlay. It may
 # update this value while the official workflow hot-reloads, so attest that
@@ -370,6 +445,8 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
     workflow_matches = (
         normalized(workflow_source) == normalized(workflow_installed)
     )
+    if os.environ["CONFIGURATION_PROFILE"] == "governor-bounded":
+        workflow_matches = workflow_matches and installed_concurrency <= source_concurrency
     if workflow_matches:
         workflow_match_mode = (
             "exact"
@@ -378,9 +455,10 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
         )
 
 receipt = {
-    "schema": "gem-service-attestation/v1",
+    "schema": "gem-fleet-configuration-verification/v1",
     "observedAt": datetime.now(timezone.utc).isoformat(),
-    "sourceRevision": os.environ["SOURCE_REVISION"],
+    "configurationSourceRevision": os.environ["SOURCE_REVISION"],
+    "configurationProfile": os.environ["CONFIGURATION_PROFILE"],
     "daemonReloaded": True,
     "service": "symphony-elixir.service",
     "active": True,
@@ -425,9 +503,8 @@ if not all(
     receipt[artifact]["matches"]
     for artifact in ("workflow", "unit", "policy", "gate", "closureHealth")
 ):
-    raise SystemExit("refusing stale Gem service attestation")
-temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
-temporary.replace(destination)
+    raise SystemExit("refusing unmatched Gem configuration")
+print(json.dumps(receipt, sort_keys=True))
 PY
 
 if [[ "${timer_was_active}" == true ]]; then

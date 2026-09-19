@@ -17,8 +17,18 @@ describe('ThemeToggleSegmented', () => {
     const toolbar = getByRole('toolbar', { name: 'Theme' });
     expect(toolbar).toBeInTheDocument();
     expect(getByRole('button', { name: 'System Theme' })).toBeInTheDocument();
-    expect(getByRole('button', { name: 'Light Theme' })).toBeInTheDocument();
-    expect(getByRole('button', { name: 'Dark Theme' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'System Theme' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(getByRole('button', { name: 'Light Theme' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(getByRole('button', { name: 'Dark Theme' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
 
     fireEvent.click(getByRole('button', { name: 'System Theme' }));
     fireEvent.click(getByRole('button', { name: 'Light Theme' }));
@@ -28,6 +38,11 @@ describe('ThemeToggleSegmented', () => {
     expect(toolbar.querySelector('[aria-hidden="true"]')).toHaveStyle(
       'transform: translateX(28px)'
     );
+    expect(
+      getByRole('button', { name: 'Dark Theme' }).querySelector(
+        'span[aria-hidden="true"]'
+      )
+    ).toHaveClass('inset-[calc(-3/16*1rem)]');
   });
 
   it('keeps the linear treatment and shortcut description on the same control', () => {
@@ -51,5 +66,39 @@ describe('ThemeToggleSegmented', () => {
       getByText('Press T to toggle between light and dark themes.')
     ).toHaveClass('sr-only');
     expect(wrapButton).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps footer hit targets disjoint while the visible control stays 28px', () => {
+    const { getByRole } = render(
+      <ThemeToggleSegmented
+        currentTheme='dark'
+        indicatorX={88}
+        setTheme={vi.fn()}
+        size='footer'
+        wrapButton={button => button}
+      />
+    );
+
+    const toolbar = getByRole('toolbar', { name: 'Theme' });
+    expect(toolbar).toHaveClass('h-11', 'px-0', 'py-2');
+    expect(getByRole('button', { name: 'Dark Theme' })).toHaveClass(
+      'h-7',
+      'w-11',
+      'px-3'
+    );
+    expect(toolbar.querySelector('[aria-hidden="true"]')).toHaveStyle(
+      'transform: translateX(88px)'
+    );
+    expect(toolbar.querySelector('[aria-hidden="true"]')).toHaveClass(
+      'top-2',
+      'bottom-2',
+      'left-2',
+      'w-7'
+    );
+    expect(
+      getByRole('button', { name: 'Dark Theme' }).querySelector(
+        'span[aria-hidden="true"]'
+      )
+    ).toHaveClass('-inset-y-2', 'left-0', 'right-0');
   });
 });

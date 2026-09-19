@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE } from '@/lib/profile/opaque-internal-profile-handle';
 import { parseMainArtists } from './artist-parser';
 import {
   type CanonicalReleaseCredit,
@@ -71,6 +72,22 @@ describe('release credit integrity', () => {
     expect(byline.entries.map(entry => entry.name)).toEqual([
       'Tim White',
       'LYNX',
+    ]);
+  });
+
+  it('rewrites Never Say a Word opaque credit handle to canonical /tim', () => {
+    const fixture = NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE;
+    const byline = resolveSmartLinkArtistByline({
+      primaryArtists: [
+        { name: fixture.artistName, handle: fixture.opaqueHandle },
+      ],
+      ownerName: fixture.ownerName,
+      ownerHandle: fixture.ownerHandle,
+    });
+
+    expect(byline.text).toBe(fixture.artistName);
+    expect(byline.entries).toEqual([
+      { name: fixture.artistName, handle: fixture.ownerHandle },
     ]);
   });
 

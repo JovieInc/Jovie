@@ -66,4 +66,19 @@ describe('vitest critical-surface coverage floors', () => {
     );
     expect(source).toContain("'.artifact-comparison-*/**'");
   });
+
+  it('keeps exact-head changed coverage parallel and scoped to the patch', () => {
+    const source = readFileSync(
+      resolve(webRoot, 'vitest.config.fast.mts'),
+      'utf8'
+    );
+
+    expect(source).toContain('isChangedRun && !isCoverageRun');
+    expect(source).toContain('isChangedRun && isCoverageRun');
+    expect(source).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(source).toContain('reporter: isExactHeadCoverageRun');
+    expect(source).not.toMatch(
+      /const changedSuiteStabilityConfig = isChangedRun\s*\n\s*\?/
+    );
+  });
 });

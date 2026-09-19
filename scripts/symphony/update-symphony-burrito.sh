@@ -7,10 +7,41 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET_HOME="${SYMPHONY_ELIXIR_HOME:-${SYMPHONY_BURRITO_HOME:-$HOME}}"
-SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"
+# JOV-5822: v0.0.2-jovie.2 still POSTs SymphonyLinearIssuesById($projectSlug: String!)
+# while official WORKFLOW has only team_key. Linear returns HTTP 400
+# (issue_state_refresh_failed / running=0). JovieInc/symphony#10
+# (dae31f823850) adds SymphonyLinearTeamIssuesById + Adapter.scope_for.
+# GitHub release tag is symphony-build-<sha>; binary infix is the sha.
+# Semver overrides (v0.0.2-jovie.2) keep tag == version.
+SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"
 ASSET_NAME_NEEDLE="${SYMPHONY_ASSET_NEEDLE:-linux_x86_64}"
-RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_VERSION}}"
-BIN_NAME="symphony-${SYMPHONY_VERSION}-${ASSET_NAME_NEEDLE}"
+
+symphony_release_tag() {
+  local version="$1"
+  case "$version" in
+    symphony-build-*) printf '%s' "$version" ;;
+    v*) printf '%s' "$version" ;;
+    *)
+      if [[ "$version" =~ ^[0-9a-f]{40}$ ]]; then
+        printf 'symphony-build-%s' "$version"
+      else
+        printf '%s' "$version"
+      fi
+      ;;
+  esac
+}
+
+symphony_bin_infix() {
+  local version="$1"
+  case "$version" in
+    symphony-build-*) printf '%s' "${version#symphony-build-}" ;;
+    *) printf '%s' "$version" ;;
+  esac
+}
+
+SYMPHONY_RELEASE_TAG="${SYMPHONY_RELEASE_TAG:-$(symphony_release_tag "$SYMPHONY_VERSION")}"
+RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_RELEASE_TAG}}"
+BIN_NAME="symphony-$(symphony_bin_infix "$SYMPHONY_VERSION")-${ASSET_NAME_NEEDLE}"
 SUM_NAME="${BIN_NAME}.sha256"
 BIN_DST="${TARGET_HOME}/.local/bin/symphony"
 SERVICE_NAME="${SYMPHONY_SERVICE_NAME:-symphony-elixir.service}"
@@ -28,6 +59,10 @@ AUTO_ROUTE_SRC="${REPO_ROOT}/scripts/symphony/symphony-auto-route.mjs"
 AUTO_ROUTE_DST="${TARGET_HOME}/.local/bin/symphony-auto-route.mjs"
 CURSOR_ADAPTER_SRC="${REPO_ROOT}/scripts/symphony/cursor-appserver-adapter.py"
 CURSOR_ADAPTER_DST="${TARGET_HOME}/.local/bin/cursor-appserver-adapter"
+CURSOR_STD_SRC="${REPO_ROOT}/scripts/symphony/cursor-agent-std"
+CURSOR_STD_DST="${TARGET_HOME}/.local/bin/cursor-agent-std"
+CURSOR_WORKER_SRC="${REPO_ROOT}/scripts/symphony/cursor-cli-worker.py"
+CURSOR_WORKER_DST="${TARGET_HOME}/.local/bin/cursor-cli-worker"
 CODEX_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-codex-router"
 CODEX_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-codex-router-hotfix"
 CODEX_PROBE_SRC="${REPO_ROOT}/scripts/symphony/codex-account-probe.sh"
@@ -55,6 +90,7 @@ MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
 # Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
 # scripts/symphony/install-symphony-grok-sidecar.sh — never mask it here.
+# cursor-cli-worker keep-alive is owned by install-cursor-cli-worker.sh; never stop those units here.
 LEGACY_UNITS=(
   symphony-ui-pilot.service
   symphony-reconciler.service
@@ -438,6 +474,7 @@ SUM_URL="${RELEASE_URL}/${SUM_NAME}"
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "DRY_RUN official OpenAI Symphony"
   echo "RELEASE ${SYMPHONY_VERSION}"
+  echo "RELEASE_TAG ${SYMPHONY_RELEASE_TAG}"
   echo "ASSET ${BIN_NAME}"
   echo "SHA256 ${SUM_NAME}"
   echo "DRY_RUN $BIN_URL"
@@ -451,6 +488,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "AGENT_ROUTER $AGENT_ROUTER_DST"
   echo "AUTO_ROUTE $AUTO_ROUTE_DST"
   echo "CURSOR_ADAPTER $CURSOR_ADAPTER_DST"
+  echo "CURSOR_STD $CURSOR_STD_DST"
+  echo "CURSOR_WORKER $CURSOR_WORKER_DST"
   echo "CODEX_ROUTER $CODEX_ROUTER_DST"
   echo "SAFE_RESTART $SAFE_RESTART_DST"
   echo "FROZEN_TRANSITION $FROZEN_TRANSITION_DST"
@@ -474,6 +513,8 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   else
     check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
     check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
+    check_one "$CURSOR_STD_SRC" "$CURSOR_STD_DST" || rc=1
+    check_one "$CURSOR_WORKER_SRC" "$CURSOR_WORKER_DST" || rc=1
     check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
     check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
   fi
@@ -483,6 +524,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
 fi
 
 echo "RELEASE ${SYMPHONY_VERSION}"
+echo "RELEASE_TAG ${SYMPHONY_RELEASE_TAG}"
 echo "ASSET ${BIN_NAME}"
 echo "SHA256 ${SUM_NAME}"
 
@@ -524,6 +566,8 @@ cleanup() {
       restore_target auto-route "$AUTO_ROUTE_DST" 0755
       if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
         restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
+        restore_target cursor-std "$CURSOR_STD_DST" 0755
+        restore_target cursor-worker "$CURSOR_WORKER_DST" 0755
         restore_target codex-router "$CODEX_ROUTER_DST" 0755
         restore_target codex-probe "$CODEX_PROBE_DST" 0755
       fi
@@ -593,6 +637,8 @@ fi
 backup_target auto-route "$AUTO_ROUTE_DST"
 if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
   backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
+  backup_target cursor-std "$CURSOR_STD_DST"
+  backup_target cursor-worker "$CURSOR_WORKER_DST"
   backup_target codex-router "$CODEX_ROUTER_DST"
   backup_target codex-probe "$CODEX_PROBE_DST"
 fi
@@ -612,6 +658,8 @@ fi
 install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755
 if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
   install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
+  install_one "$CURSOR_STD_SRC" "$CURSOR_STD_DST" 0755
+  install_one "$CURSOR_WORKER_SRC" "$CURSOR_WORKER_DST" 0755
   install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
   install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
 fi

@@ -36,7 +36,7 @@ function issue(identifier, overrides = {}) {
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-08T00:00:00.000Z',
     priority: 3,
-    state: { name: 'Backlog' },
+    state: { name: 'Todo' },
     assignee: null,
     labels: { nodes: [] },
     children: { nodes: [] },
@@ -139,11 +139,7 @@ describe('exhaustive Symphony admission dispositions', () => {
       'deferred',
       'ownership-ambiguous'
     );
-    expect(
-      machineIssue('JOV-23', 'Backlog'),
-      'deferred',
-      'ownership-ambiguous'
-    );
+    expect(machineIssue('JOV-23', 'Backlog'), 'rejected', 'inactive-state');
     expect(
       issue('JOV-24', {
         comments: { nodes: [], pageInfo: { hasNextPage: true } },
@@ -230,7 +226,7 @@ describe('exhaustive Symphony admission dispositions', () => {
   });
 
   it('ignores legacy human holds while preserving machine incident holds', () => {
-    for (const label of ['held', 'manual-incident']) {
+    for (const label of ['held', 'manual-incident', 'no-symphony']) {
       const result = expect(
         issue(`JOV-${label.length}`, { labels: { nodes: [{ name: label }] } }),
         'deferred',

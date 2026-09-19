@@ -355,6 +355,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
+    expect(source).toContain('LibraryInspectorAssetSlots');
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
@@ -931,23 +932,22 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
-    // Approval status stays a single accessible editor in the default-open
-    // Details section while the drawer sections remain single-open.
+    // Approval status stays a single accessible editor on the Details tab.
     expect(
       drawer.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();
-    fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    fireEvent.click(drawer.getByRole('button', { name: 'Audio' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
     expect(
       drawer.getAllByRole('button', {
         name: /Play Preview for Take Me Over/u,
       }).length
     ).toBeGreaterThan(0);
-    fireEvent.click(drawer.getByRole('button', { name: 'Details' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Details' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
     expect(drawer.getByText('68/100')).toBeDefined();
     expect(drawer.getByText('Progressive House')).toBeDefined();
@@ -1205,15 +1205,21 @@ describe('LibrarySurface', () => {
 
     const drawer = screen.getByTestId('library-asset-drawer');
     const entityHeader = screen.getByTestId('library-asset-entity-header');
+    const tabs = within(drawer);
 
     expect(entityHeader).toContainElement(
       screen.getByRole('button', { name: 'More actions' })
     );
     expect(within(entityHeader).getByText('Take Me Over')).toBeInTheDocument();
     const workspace = drawer.querySelector('[data-right-rail-workspace]');
-    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
-    expect(drawer.textContent).toContain('Details');
-    expect(drawer.textContent).toContain('Providers');
+    expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
+    expect(tabs.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Assets' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Links' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Rights' })).toBeInTheDocument();
+    expect(
+      tabs.queryByRole('tab', { name: 'Presence' })
+    ).not.toBeInTheDocument();
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -1238,24 +1244,30 @@ describe('LibrarySurface', () => {
     const overflowButton = drawer.getByRole('button', {
       name: 'More actions',
     });
-    fireEvent.click(drawer.getByRole('button', { name: 'Audio' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
     const [previewButton] = drawer.getAllByRole('button', {
       name: /Play Preview for Take Me Over/u,
     });
     if (!previewButton) {
       throw new Error('Expected a drawer preview button');
     }
-    fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
     expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+    );
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-offset-(--app-shell-content-surface)'
+    );
+    // DSP quiet rows are new surfaces on the canonical ring token (the
+    // source-identity ratchet bars the --linear-border-focus identity there)
+    // and render without a ring offset — focus-visible:bg-surface-1 replaces it.
+    expect(providerLink.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-ring/55'
+    );
     for (const element of [previewButton, providerLink]) {
-      expect(element.className).toContain(
-        'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
-      );
-      expect(element.className).toContain(
-        'focus-visible:ring-offset-(--app-shell-content-surface)'
-      );
       expect(element.className).not.toContain('focus-visible:shadow');
     }
   });
@@ -1458,12 +1470,15 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
 
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
     expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+    expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
   });
 
   it('uploads missing drawer audio and reveals persistent-player controls', async () => {
@@ -1488,6 +1503,7 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [
@@ -1892,8 +1908,12 @@ describe('LibrarySurface', () => {
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
     expectDesktop32Control(trigger, { square: true });
-    expect(trigger.className).toContain('before:h-11');
-    expect(trigger.className).toContain('before:min-w-11');
+    expect(trigger).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(trigger).not.toHaveClass('before:h-11');
     expect(trigger.className).not.toMatch(/(?:^|\s)min-h-11(?:\s|$)/);
     expect(trigger.className).not.toMatch(/(?:^|\s)min-w-11(?:\s|$)/);
 

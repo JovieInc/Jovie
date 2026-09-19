@@ -138,6 +138,17 @@ Jovie canon always wins over third-party guidance. Apply these overlays whenever
 
 The approved Vercel Labs allowlist is enforced by `pnpm run skill-governance:check`: `ai-sdk`, `vercel-react-best-practices`, and `vercel-composition-patterns`. Updating the allowlist requires reviewing the exact source and updating its guard tests in the same change.
 
+Rule-level coverage and explicit rejects live in
+[docs/agent-context/vercel-agent-skills-coverage.md](../../docs/agent-context/vercel-agent-skills-coverage.md).
+Allowlist deny: `vercel-cli-with-tokens`, `deploy-to-vercel`,
+`react-native-skills`, unscoped `react-view-transitions`, `writing-guidelines`
+as a product skill, `web-design-guidelines` as a parallel skill, and
+`vercel-optimize` as an installed skill. Imports must not introduce SWR,
+`printenv`/grep tokens from `.env`, override design rules, expand task scope
+to app-wide animation, bypass deployment URL verification, or enable
+Observability Plus. Handbook docs that fetch mutable `main` must be pinned
+under `docs/vendor/vercel-labs/`.
+
 **Product-surface separation**: external Agent Skills are an engineering-time tool only. They MUST NOT be exposed to artists, fans, or any user-facing Jovie surface. Artist-facing AI workflows are built as Jovie product features and tracked in Linear, not installed from the open ecosystem.
 
 ## Performance Optimization Loop

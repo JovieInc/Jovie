@@ -16,7 +16,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -45,11 +45,17 @@ export const RUNTIME_ROOTS = Object.freeze([
   'apps/web/hooks',
   'apps/web/middleware.ts',
   'apps/web/proxy.ts',
+  'apps/desktop/src',
   'packages/ui',
   'packages/auth-routing',
   'packages/audio-contracts',
   'packages/extension-contracts',
   'packages/agent-transport-contracts',
+]);
+
+export const DESKTOP_ENTRY_POINTS = Object.freeze([
+  'apps/desktop/src/main.ts',
+  'apps/desktop/src/preload.ts',
 ]);
 
 export const WORKER_ALLOWLIST_PREFIXES = Object.freeze(['workers/']);
@@ -173,6 +179,20 @@ function extname(filePath) {
   return index >= 0 ? base.slice(index) : '';
 }
 
+function isTestOrGeneratedPath(posix) {
+  if (/\.(test|spec|stories)\./.test(posix)) return true;
+  const parts = posix.split('/');
+  return parts.some(
+    part =>
+      part === 'node_modules' ||
+      part === 'dist' ||
+      part === '.next' ||
+      part === 'coverage' ||
+      part === 'generated' ||
+      part === 'storybook-static'
+  );
+}
+
 export function isRuntimeSourcePath(relPath) {
   const posix = relPath.split('\\').join('/');
   if (WORKER_ALLOWLIST_PREFIXES.some(prefix => posix.startsWith(prefix))) {
@@ -187,6 +207,125 @@ export function isRuntimeSourcePath(relPath) {
     if (root.endsWith('.ts') || root.endsWith('.js')) return posix === root;
     return posix === root || posix.startsWith(`${root}/`);
   });
+}
+
+/**
+ * Files imported by a runtime entry stay in-scope even when they live under
+ * `workers/` or outside RUNTIME_ROOTS. Isolated workers and build scripts
+ * remain excluded unless a main-thread module imports them.
+ */
+export function isReachableRuntimeSourcePath(relPath) {
+  const posix = relPath.split('\\').join('/');
+  if (isTestOrGeneratedPath(posix)) return false;
+  return SOURCE_EXT.has(extname(posix));
+}
+
+function collectRelativeImportSpecifiers(sourceText, relPath) {
+  const script = ts.createSourceFile(
+    relPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(relPath)
+  );
+  /** @type {string[]} */
+  const specifiers = [];
+
+  function maybeAdd(node, spec) {
+    if (!spec || !spec.startsWith('.')) return;
+    if (ts.isImportDeclaration(node) && node.importClause?.isTypeOnly) {
+      return;
+    }
+    if (ts.isExportDeclaration(node) && node.isTypeOnly) return;
+    specifiers.push(spec);
+  }
+
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier
+    ) {
+      maybeAdd(node, literalString(node.moduleSpecifier));
+    }
+    if (ts.isCallExpression(node) && node.arguments.length > 0) {
+      const callee = node.expression;
+      const isRequire =
+        (ts.isIdentifier(callee) && callee.text === 'require') ||
+        (ts.isPropertyAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === 'require');
+      const isImport = callee.kind === ts.SyntaxKind.ImportKeyword;
+      if (isRequire || isImport) {
+        const spec = literalString(node.arguments[0]);
+        if (spec?.startsWith('.')) specifiers.push(spec);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(script);
+  return specifiers;
+}
+
+function resolveRelativeImport(fromRel, specifier, repoRoot, files) {
+  if (!specifier.startsWith('.')) return null;
+  const inMemory = Object.keys(files).length > 0;
+  const fromAbs = resolve(repoRoot, fromRel);
+  const target = resolve(dirname(fromAbs), specifier);
+  /** @type {string[]} */
+  const candidates = [posixRel(repoRoot, target)];
+  const add = abs => {
+    const rel = posixRel(repoRoot, abs);
+    if (!candidates.includes(rel)) candidates.push(rel);
+  };
+
+  if (!extname(target)) {
+    for (const ext of SOURCE_EXT) add(`${target}${ext}`);
+    for (const ext of SOURCE_EXT) add(join(target, `index${ext}`));
+  } else if (/\.(js|mjs|cjs)$/.test(target)) {
+    add(target.replace(/\.(js|mjs|cjs)$/, '.ts'));
+    add(target.replace(/\.(js|mjs|cjs)$/, '.tsx'));
+  }
+
+  for (const candidate of candidates) {
+    if (inMemory) {
+      if (Object.hasOwn(files, candidate)) return candidate;
+      continue;
+    }
+    if (existsSync(resolve(repoRoot, candidate))) return candidate;
+  }
+  return null;
+}
+
+function readSourceText(relPath, repoRoot, files) {
+  if (Object.hasOwn(files, relPath)) return files[relPath];
+  const abs = resolve(repoRoot, relPath);
+  return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+}
+
+export function collectReachableRuntimeFiles(
+  seedPaths,
+  repoRoot = DEFAULT_ROOT,
+  files = {}
+) {
+  const reachable = new Set(
+    seedPaths.map(path => path.split('\\').join('/')).filter(Boolean)
+  );
+  const queue = [...reachable];
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (!current) continue;
+    const source = readSourceText(current, repoRoot, files);
+    if (source == null) continue;
+    for (const spec of collectRelativeImportSpecifiers(source, current)) {
+      const resolved = resolveRelativeImport(current, spec, repoRoot, files);
+      if (!resolved || !isReachableRuntimeSourcePath(resolved)) continue;
+      if (reachable.has(resolved)) continue;
+      reachable.add(resolved);
+      queue.push(resolved);
+    }
+  }
+  return [...reachable].sort();
 }
 
 function walkFiles(absDir, files) {
@@ -438,17 +577,24 @@ function countByFile(findings) {
 }
 
 export function collectRuntimeFiles(repoRoot = DEFAULT_ROOT, files = {}) {
-  if (Object.keys(files).length > 0) {
-    return Object.keys(files).filter(isRuntimeSourcePath);
-  }
-  const absFiles = [];
-  for (const root of RUNTIME_ROOTS) {
-    walkFiles(resolve(repoRoot, root), absFiles);
-  }
-  return absFiles
-    .map(abs => posixRel(repoRoot, abs))
-    .filter(isRuntimeSourcePath)
-    .sort();
+  const inMemory = Object.keys(files).length > 0;
+  const seeded = inMemory
+    ? Object.keys(files).filter(relPath => {
+        const posix = relPath.split('\\').join('/');
+        return (
+          isRuntimeSourcePath(posix) || DESKTOP_ENTRY_POINTS.includes(posix)
+        );
+      })
+    : (() => {
+        const absFiles = [];
+        for (const root of RUNTIME_ROOTS) {
+          walkFiles(resolve(repoRoot, root), absFiles);
+        }
+        return absFiles
+          .map(abs => posixRel(repoRoot, abs))
+          .filter(isRuntimeSourcePath);
+      })();
+  return collectReachableRuntimeFiles(seeded, repoRoot, files);
 }
 
 export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {

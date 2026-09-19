@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';
 import { buildAdmissionGateReceipt } from '../admission-gate.mjs';
 import {
@@ -87,6 +88,27 @@ export function planEvidenceFor(overrides = {}) {
     acceptance: ['Receipts revalidate semantically before every lease'],
     test: ["node --test 'scripts/backlog-orchestrator/__tests__/*.test.mjs'"],
     rollback: 'Revert the gate commit and remove the receipt comments',
+    value: {
+      authority: 'founder-request',
+      decisionId: 'task-01a082d7-9630-7563-b733-de90db5170f0',
+      rationale: 'Make real shipping ownership and delay visible',
+      expectedBenefit: 'Shorten time from approved work to proven production',
+      validation:
+        'One exact task has a complete source-to-production receipt chain',
+      timebox: 'one bounded implementation slice',
+      sanity: {
+        basis: 'measured',
+        concurrency: 1,
+        demandPerDay: 4,
+        criticalPath: [
+          { stage: 'implementation', durationMs: 3_600_000 },
+          { stage: 'review-and-ci', durationMs: 1_800_000 },
+        ],
+        bottleneck: 'single implementation slot',
+        simplification: 'reuse existing plan and delivery receipts',
+        owner: 'Summer',
+      },
+    },
     optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
     ...overrides,
   };

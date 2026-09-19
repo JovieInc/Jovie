@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { findChromeOverrideViolations } from '../../../../../scripts/component-ownership-check.mjs';
+import { evaluateSharedSearchGeometry } from '../../../../../scripts/component-rendered-invariant-policy.mjs';
+import { HOMEPAGE_AURA_PIERCE_RED_CSS } from './homepage-eight-invariants-fixtures';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -67,6 +70,32 @@ describe('homepage-optical-polish-v1', () => {
     expect(read('components/features/home/InputAuraFrame.css')).not.toContain(
       'rotate-[442deg]'
     );
+
+    const close = read('components/homepage/HomepageClose.tsx');
+    expect(close).toContain('HeroSpotifySearch');
+    expect(close).toContain("appearance='editorial'");
+    expect(
+      findChromeOverrideViolations(
+        'apps/web/app/(home)/home.css',
+        HOMEPAGE_AURA_PIERCE_RED_CSS
+      ).some(item => item.family === 'search-aura')
+    ).toBe(true);
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: {
+          treatment: 'editorial',
+          fieldHeight: 44,
+          fieldBackground: 'shared',
+          consumerAuraPierce: false,
+        },
+        close: {
+          treatment: 'editorial',
+          fieldHeight: 44,
+          fieldBackground: 'shared',
+          consumerAuraPierce: false,
+        },
+      }).ok
+    ).toBe(true);
   });
 
   it('keeps the 28px action concentrically inset and the field interior calm', () => {
@@ -97,8 +126,9 @@ describe('homepage-optical-polish-v1', () => {
     const close = read('components/homepage/HomepageClose.tsx');
     const certifiedCss = readCertifiedCss();
 
-    expect(sections).toContain("data-rhythm='proof'");
-    expect(sections).toContain("data-rhythm={media ? 'product' : 'text'}");
+    expect(sections).not.toContain("data-rhythm='proof'");
+    expect(sections).toContain("rhythm='product'");
+    expect(sections).toContain("rhythm='text'");
     expect(close).toContain("data-rhythm='close'");
     expect(certifiedCss).toContain('--homepage-rhythm-proof:');
     expect(certifiedCss).toContain('--homepage-rhythm-text:');
@@ -110,9 +140,8 @@ describe('homepage-optical-polish-v1', () => {
     expect(certifiedCss).toMatch(
       /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
     );
-    expect(certifiedCss).not.toMatch(
-      /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*clamp/
-    );
+    expect(certifiedCss).toContain('.homepage-connected-artwork');
+    expect(certifiedCss).toContain('.homepage-relationship-outcomes');
   });
 
   it('kills the elliptical wireframe and the 55% horizon line', () => {

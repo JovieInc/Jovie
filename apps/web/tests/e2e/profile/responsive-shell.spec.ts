@@ -118,8 +118,8 @@ async function assertBottomTabBarState(
       const expectedLabelByMode: Record<string, string> = {
         profile: 'Home',
         listen: 'Music',
-        tour: 'Events',
-        subscribe: 'Alerts',
+        tour: 'Shows',
+        about: 'About',
       };
       const expectedLabel = expectedLabelByMode[route.expectedActiveTab];
       if (expectedLabel) {

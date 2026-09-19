@@ -13,6 +13,8 @@ const common = [
   '.gitignore',
   'agent/channels/photon.ts',
   'agent/lib/imessage-allowlist.ts',
+  'agent/lib/runtime-commissioning-health.ts',
+  'tests/runtime-commissioning-health.test.ts',
 ];
 const summer = [
   'agent/lib/summer-web-conversation.ts',
@@ -25,18 +27,27 @@ const summer = [
   'agent/lib/telegram-allowlist.ts',
   'agent/instructions/summer-shadow.ts',
   'agent/schedules/summer-bottleneck-heartbeat.ts',
+  'agent/schedules/summer-liveness-heartbeat.ts',
   ...[
     'summer-bottleneck-loop',
+    'summer-liveness-heartbeat',
     'summer-commercial-projection',
     'summer-commercial-readback',
     'summer-photon-offline-proof',
     'summer-shadow-ingress',
     'vercel-blob-bottleneck-runtime',
     'vercel-blob-shadow-store',
+    // JOV-6163 bounded-operator bridge (heartbeat → governed dispatch → Cursor)
+    'governor-route',
+    'runner-source-attestation',
+    'cursor-recovery',
+    'summer-gem-dark-recovery',
+    'summer-governed-dispatch',
   ].map(name => `agent/lib/${name}.ts`),
   ...[
     'summer-bottleneck-auth',
     'summer-bottleneck-heartbeat',
+    'summer-liveness-heartbeat',
     'summer-bottleneck-loop',
     'summer-commercial-integration',
     'summer-commercial-projection',
@@ -47,6 +58,9 @@ const summer = [
     'telegram-fallback',
     'vercel-blob-bottleneck-runtime',
     'vercel-blob-shadow-store',
+    // Eval-only suites land in stacked recovery-evals PR:
+    // cursor-recovery, summer-gem-dark-recovery, summer-governed-dispatch,
+    // summer-bounded-operator-acceptance, jov-6163-attestation-interop
   ].map(name => `tests/${name}.test.ts`),
   'tests/commercial-fixture.ts',
 ];
@@ -112,14 +126,18 @@ import { assertRuntimeEnvironment } from './lib/application-boundary';
 assertRuntimeEnvironment();
 export default defineAgent({ model: 'zai/glm-5.3-flash' });\n`
   );
+  // Health status comes from a verified signed receipt, never a hardcoded
+  // commissioned literal. Isolated built proof stays uncommissioned.
   put(
     'agent/channels/runtime-health.ts',
     `import { defineChannel, GET } from 'eve/channels';
+import { resolveRuntimeHealthStatus } from '../lib/runtime-commissioning-health';
 import { APPLICATION_IDENTITY } from '../runtime-identity';
 import { bindEvePilotIdentity } from '../select-identity';
 export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
   const identity = bindEvePilotIdentity(APPLICATION_IDENTITY);
-  return Response.json({ identity: identity.pack.id, status: 'uncommissioned',
+  const status = resolveRuntimeHealthStatus({ identity: identity.pack.id });
+  return Response.json({ identity: identity.pack.id, status,
     instructionsAvailable: identity.instructions.length > 0 }, { headers: { 'cache-control': 'no-store' } });
 })] });\n`
   );
@@ -199,7 +217,7 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
         )
         .replace(
           "'agent/instructions/summer-shadow.ts',",
-          "'agent/lib/application-boundary.ts',\n        'agent/select-identity.ts',\n        'agent/instructions/summer-shadow.ts',"
+          "'agent/lib/application-boundary.ts',\n        'agent/lib/runtime-commissioning-health.ts',\n        'agent/select-identity.ts',\n        'agent/instructions/summer-shadow.ts',"
         )
     );
     put(
@@ -211,7 +229,7 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
       'vitest.config.ts',
       `import { defineConfig } from 'vitest/config';
 export default defineConfig({test: {include: ['tests/**/*.test.ts'], environment: 'node',
-coverage: {provider: 'v8', include: ['agent/lib/application-boundary.ts', 'agent/select-identity.ts',
+coverage: {provider: 'v8', include: ['agent/lib/application-boundary.ts', 'agent/lib/runtime-commissioning-health.ts', 'agent/select-identity.ts',
 'agent/channels/eve.ts', 'agent/tools/jovie_capability_manifest.ts', 'scripts/jovie-release.mjs'], reporter: ['text', 'json-summary'],
 thresholds: {statements: 85, branches: 75, functions: 85, lines: 85}}}});\n`
     );
@@ -257,14 +275,21 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'package.json'])
-      put(
-        `vendor/agent-transport-contracts/${path}`,
-        readFileSync(
-          resolve(pilot, '../../packages/agent-transport-contracts', path),
-          'utf8'
-        )
+    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+      let contents = readFileSync(
+        resolve(pilot, '../../packages/agent-transport-contracts', path),
+        'utf8'
       );
+      if (
+        path === 'index.ts' &&
+        !contents.includes("from './symphony-outage.js'")
+      ) {
+        // Workspace index stays bundler-safe for Next typecheck/Turbopack.
+        // Isolated NodeNext copies re-export the health module with .js.
+        contents = `${contents.trimEnd()}\n\nexport * from './symphony-outage.js';\n`;
+      }
+      put(`vendor/agent-transport-contracts/${path}`, contents);
+    }
   }
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: source,
@@ -280,6 +305,7 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];
   const provenance = {

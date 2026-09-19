@@ -140,6 +140,7 @@ vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
   DOCS_URL: 'https://docs.jov.ie',
   HOSTNAME: 'jov.ie',
+  SUPPORT_EMAIL: 'support@jov.ie',
   STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
 
@@ -321,16 +322,15 @@ describe('proxy.ts middleware', () => {
       expect(res.status).not.toBe(404);
     });
 
-    it.each([
-      '/tim/caf%C3%A9',
-      '/tim/100%25-real',
-      '/tim/%25zz',
-    ])('does not reject a valid encoded public path %s', async path => {
-      const req = createUnauthenticatedRequest({ pathname: path });
-      const res = await callMiddleware(req);
+    it.each(['/tim/caf%C3%A9', '/tim/100%25-real', '/tim/%25zz'])(
+      'does not reject a valid encoded public path %s',
+      async path => {
+        const req = createUnauthenticatedRequest({ pathname: path });
+        const res = await callMiddleware(req);
 
-      expect(res.status).not.toBe(404);
-    });
+        expect(res.status).not.toBe(404);
+      }
+    );
 
     it('canonicalizes repeated alias sources to the first non-empty value', async () => {
       const req = createUnauthenticatedRequest({
@@ -406,6 +406,27 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBe(404);
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
+    it('returns 410 for root /music and /shows only', async () => {
+      for (const pathname of ['/music', '/shows']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status, pathname).toBe(410);
+        expect(res.headers.get('x-robots-tag')).toBe('noindex');
+        expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+      }
+    });
+
+    it('leaves /product and /you claimable so Drive can ship the marketing route', async () => {
+      for (const pathname of ['/product', '/you']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status, pathname).not.toBe(410);
+        expect(res.status, pathname).not.toBe(308);
+      }
     });
   });
 
@@ -1060,18 +1081,21 @@ describe('proxy.ts middleware', () => {
       APP_ROUTES.AUTH_START,
       APP_ROUTES.AUTH_CALLBACK,
       APP_ROUTES.LEGACY_APP_AUTH_CALLBACK,
-    ])('lets authenticated central auth route %s reach its handler without user-state redirects', async pathname => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+    ])(
+      'lets authenticated central auth route %s reach its handler without user-state redirects',
+      async pathname => {
+        mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
 
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname,
-        searchParams: { state: 'state_123' },
-      });
-      const res = await callMiddleware(req);
+        const req = createAuthenticatedRequest('clerk_user_1', {
+          pathname,
+          searchParams: { state: 'state_123' },
+        });
+        const res = await callMiddleware(req);
 
-      expect(res.status).toBeLessThan(300);
-      expect(mocks.getUserState).not.toHaveBeenCalled();
-    });
+        expect(res.status).toBeLessThan(300);
+        expect(mocks.getUserState).not.toHaveBeenCalled();
+      }
+    );
 
     it.skip('redirects authenticated user on /signin to /app (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);

@@ -161,12 +161,11 @@ function GlassAuthActions({
       >
         Log in
       </Link>
-      <Link
+      <HeaderPrimaryAuthLink
         href={publicCta.href}
-        className='marketing-glass-header__cta focus-ring-themed'
-      >
-        {publicCta.label}
-      </Link>
+        label={publicCta.label}
+        className='marketing-glass-header__cta'
+      />
     </div>
   );
 }
@@ -305,10 +304,10 @@ function getNavContainerVariantClass({
   }
 
   if (containerSize === 'homepage') {
-    return 'max-w-linear-content lg:px-0';
+    return 'max-w-public-content lg:px-0';
   }
 
-  return 'max-w-[calc(var(--linear-content-max)+3rem)]';
+  return 'max-w-public-content';
 }
 
 export function HeaderNav({

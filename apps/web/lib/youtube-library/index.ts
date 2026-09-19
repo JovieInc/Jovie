@@ -21,6 +21,17 @@ export {
 } from './collaborators';
 export { hasConnectedYouTubeAccount } from './connection';
 export {
+  importYouTubeChannelPage,
+  loadYouTubeImportSnapshot,
+} from './import-channel';
+export {
+  emptyYouTubeImportCounts,
+  parseYouTubeImportCursor,
+  resolveYouTubeImportSurface,
+  type YouTubeImportSnapshot,
+  type YouTubeImportSurfaceState,
+} from './import-status';
+export {
   type CatalogRecording,
   extractIsrcsFromText,
   type ResolvedReleaseLink,

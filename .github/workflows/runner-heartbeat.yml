@@ -42,10 +42,76 @@ jobs:
     permissions:
       actions: write
       contents: read
+      pull-requests: read
     steps:
       - name: Dispatch canonical fleet refresh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh workflow run fleet-gate-refresh.yml --ref main
           gh workflow run ownerless-recovery-sweep.yml --ref main
+      - name: Reconcile pending native admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Reuse this best-effort clock after a missed ready event or expired
+          # release hold. This read-only demand probe cannot authorize admission.
+          # Paginate so a draft-heavy first page cannot hide an eligible PR.
+          # GraphQL variables are expanded by GitHub, not by the shell.
+          # shellcheck disable=SC2016
+          pages="$(gh api graphql --paginate --slurp \
+            -F owner="${GH_REPO%/*}" -F name="${GH_REPO#*/}" \
+            -f query='query($owner: String!, $name: String!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequests(first: 100, after: $endCursor, states: OPEN, baseRefName: "main") {
+                  nodes { isDraft mergeable }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }')"
+          pending="$(jq -er '
+            if type == "array" and length > 0 and all(.[];
+              (.errors == null) and
+              (.data.repository.pullRequests.nodes | type == "array") and
+              (.data.repository.pullRequests.pageInfo.hasNextPage | type == "boolean") and
+              all(.data.repository.pullRequests.nodes[];
+                (.isDraft | type == "boolean") and
+                (.mergeable | IN("MERGEABLE", "CONFLICTING", "UNKNOWN")))) and
+              (.[-1].data.repository.pullRequests.pageInfo.hasNextPage == false) and
+              all(.[:-1][]; .data.repository.pullRequests.pageInfo.hasNextPage == true)
+            then [.[].data.repository.pullRequests.nodes[]
+              | select(.isDraft == false and .mergeable != "CONFLICTING")]
+              | length
+            else error("Invalid pending admission inventory") end
+          ' <<<"$pages")"
+          if [[ "$pending" == '0' ]]; then
+            echo 'No pending main admission demand; no queue wake needed.'
+            exit 0
+          fi
+          # Suppress redundant passes; the canonical mutex still handles a
+          # concurrent event arriving after this probe. API uncertainty fails.
+          for status in queued in_progress waiting pending requested; do
+            runs="$(gh api "repos/$GH_REPO/actions/workflows/merge-queue-autoenroll.yml/runs?status=$status&per_page=1")"
+            active="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<<"$runs")"
+            if (( active > 0 )); then
+              echo "Canonical admission already $status; no duplicate wake."
+              exit 0
+            fi
+          done
+          # Ordinary PR metadata needs only pull-requests:read. Native queue
+          # membership stays with the privileged canonical writer. While a
+          # merge group is running, its completion already supplies a wake.
+          for status in queued in_progress waiting pending requested; do
+            runs="$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=1")"
+            active="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<<"$runs")"
+            if (( active > 0 )); then
+              echo "Combined-head CI already $status; its completion owns the next wake."
+              exit 0
+            fi
+          done
+          # No PR payload or exact-head claim is invented. The existing writer
+          # rereads fleet policy, release-wave state and every candidate gate.
+          gh workflow run merge-queue-autoenroll.yml --ref main

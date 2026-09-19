@@ -68,7 +68,7 @@ export function AnimatedIconSwap({
           key={activeKey}
           className='inline-flex items-center justify-center'
           variants={variants}
-          initial='hidden'
+          initial={hasMounted ? 'hidden' : false}
           animate='visible'
           exit='hidden'
           transition={ICON_SWAP_TRANSITION}

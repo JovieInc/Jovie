@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  artistNavigation,
-  primaryNavigation,
+  canonicalSidebarNavigation,
+  chatNavItem,
+  inboxNavItem,
 } from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
@@ -68,29 +69,35 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('keeps canonical navigation in warm-measurement parity', () => {
+  it('keeps desktop-visible navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
-    const canonicalNavigation = [...primaryNavigation, ...artistNavigation];
+    const desktopVisibleNavigation = [
+      inboxNavItem,
+      chatNavItem,
+      ...canonicalSidebarNavigation,
+    ];
     const warmRoutesByNavigationItem = new Map(
       routes
         .filter(
           route =>
             route.measureMode === 'warm-navigation' &&
             route.navigationItemId &&
-            route.navigationItemId !== 'profile'
+            route.navigationItemId !== 'profile' &&
+            route.navigationItemId !== 'tasks'
         )
         .map(route => [route.navigationItemId, route])
     );
 
     expect([...warmRoutesByNavigationItem.keys()].sort()).toEqual(
-      canonicalNavigation.map(item => item.id).sort()
+      desktopVisibleNavigation.map(item => item.id).sort()
     );
+    expect(warmRoutesByNavigationItem.has('calendar')).toBe(false);
 
-    for (const item of canonicalNavigation) {
+    for (const item of desktopVisibleNavigation) {
       const route = warmRoutesByNavigationItem.get(item.id);
       expect(
         route,
-        `canonical nav item "${item.id}" must have warm-navigation coverage`
+        `desktop-visible nav item "${item.id}" must have warm-navigation coverage`
       ).toBeDefined();
       expect(route?.path).toBe(item.href);
       expect(route?.warmupStrategy).toBe('authenticated-shell');
@@ -226,10 +233,7 @@ describe('performance route manifest', () => {
     for (const route of warmProfileRoutes) {
       expect(route.viewport).toEqual({ width: 390, height: 844 });
       expect(route.warmNavigationStartPath).toContain('[username]');
-      expect(route.readySelectors.navTrigger).toHaveLength(1);
-      expect(route.readySelectors.navTrigger?.[0]).toContain(
-        '[data-testid="profile-bottom-nav"] button[aria-label='
-      );
+      expect(route.readySelectors.navTrigger?.length).toBeGreaterThan(0);
       expect(route.readySelectors.content).not.toContain(
         '[data-testid="profile-header"]'
       );
@@ -243,6 +247,29 @@ describe('performance route manifest', () => {
           timing => timing.metric === 'warm-shell-response'
         )?.budget
       ).toBe(100);
+    }
+
+    // JOV-6198: destinations keep bottom-nav triggers; the Get updates action
+    // triggers through the home alerts row / inline CTA instead of a tab.
+    const navTriggerByRouteId: Record<string, string[]> = {
+      'public-profile-main': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Home"]',
+      ],
+      'public-profile-mode-listen': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Music"]',
+      ],
+      'public-profile-mode-subscribe': [
+        '[data-testid="profile-home-alerts-row"] button',
+        'button:has-text("Get updates")',
+      ],
+      'public-profile-mode-tour': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
+      ],
+    };
+    for (const route of warmProfileRoutes) {
+      expect(route.readySelectors.navTrigger).toEqual(
+        navTriggerByRouteId[route.id]
+      );
     }
 
     const root = warmProfileRoutes.find(

@@ -107,27 +107,38 @@ describe('linkEntityMentions', () => {
     ]);
   });
 
-  it('keeps same-name duplicate profile rows out of mention candidates', () => {
-    // A credited-artist row can resolve the owner's display name to a
-    // DIFFERENT handle (duplicate auto-created profile). The own-handle
-    // guard only catches exact matches, so same-name rows whose handle
-    // differs from ownHandle still link — this pins that they at least
-    // never shadow the release candidate for the same phrase.
-    const segments = linkEntityMentions(
-      'Tim collaborated on Take Me Over.',
-      context
+  it('keeps ambiguous owner names out of prose links and JSON-LD mentions', () => {
+    const duplicateContext: EntityMentionContext = {
+      ...context,
+      ownName: ' Tim White ',
+      artists: [
+        { name: 'Tim White', handle: 'tmoc9mm7xfvx02c' },
+        { name: 'Cosmic Gate', handle: 'cosmicgate' },
+      ],
+    };
+    const text = 'TIM WHITE worked with Cosmic Gate on Take Me Over.';
+    expect(linkEntityMentions(text, duplicateContext)).toEqual([
+      { type: 'text', text: 'TIM WHITE worked with ' },
+      { type: 'artist', text: 'Cosmic Gate', href: '/cosmicgate' },
+      { type: 'text', text: ' on ' },
+      { type: 'release', text: 'Take Me Over', href: '/tim/take-me-over' },
+      { type: 'text', text: '.' },
+    ]);
+    expect(collectEntityMentions(duplicateContext)).not.toContainEqual(
+      expect.objectContaining({ kind: 'artist', name: 'Tim White' })
     );
+  });
 
-    expect(segments).toContainEqual({
-      type: 'release',
-      text: 'Take Me Over',
-      href: '/tim/take-me-over',
-    });
-    expect(segments).not.toContainEqual({
-      type: 'artist',
-      text: 'Tim',
-      href: '/tim',
-    });
+  it('treats canonical handles case-insensitively and preserves same-name releases', () => {
+    const ownContext: EntityMentionContext = {
+      ownHandle: 'Tim',
+      ownName: 'Tim White',
+      releases: [{ title: 'Tim White', slug: 'self-titled' }],
+      artists: [{ name: 'Tim', handle: 'TIM' }],
+    };
+    expect(collectEntityMentions(ownContext)).toEqual([
+      { kind: 'release', name: 'Tim White', href: '/Tim/self-titled' },
+    ]);
   });
 
   it('links multiple entities in one paragraph', () => {

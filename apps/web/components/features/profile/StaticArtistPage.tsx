@@ -50,11 +50,14 @@ export interface StaticArtistPageProps {
   readonly viewerCountryCode?: string | null;
   readonly presentation?: StaticArtistPagePresentation;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly showClaimFooter?: boolean;
   readonly claimFooterHref?: string | null;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
 }
 
 export function StaticArtistPage({
@@ -87,11 +90,14 @@ export function StaticArtistPage({
   viewerCountryCode,
   presentation = 'full-public',
   releases,
+  catalogLoadFailed = false,
   merchCards,
   hideJovieBranding = false,
   hideMoreMenu = false,
   showClaimFooter = false,
   claimFooterHref = null,
+  claimFooterLabel,
+  proofClaim = false,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -152,11 +158,14 @@ export function StaticArtistPage({
       featuredPlaylistFallback={viewModel.featuredPlaylistFallback}
       viewerCountryCode={viewerCountryCode}
       releases={releases}
+      catalogLoadFailed={catalogLoadFailed}
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
+      claimFooterLabel={claimFooterLabel}
+      proofClaim={proofClaim}
       embeddedPreview={presentation === 'compact-preview'}
     />
   );

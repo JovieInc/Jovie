@@ -17,6 +17,19 @@ import {
   resolveChatUsagePlan,
 } from '@/lib/entitlements/registry';
 
+function yearlyAmount(yearly: unknown): number | null {
+  if (typeof yearly === 'number') return yearly;
+  if (
+    yearly &&
+    typeof yearly === 'object' &&
+    'amount' in yearly &&
+    typeof yearly.amount === 'number'
+  ) {
+    return yearly.amount;
+  }
+  return null;
+}
+
 describe('Entitlement Registry Consistency', () => {
   const planIds = getAllPlanIds();
 
@@ -154,8 +167,14 @@ describe('Entitlement Registry Consistency', () => {
     expect(ENTITLEMENT_REGISTRY.free.marketing.features).not.toContain(
       'Release notifications'
     );
+    expect(ENTITLEMENT_REGISTRY.free.marketing.features).not.toContain(
+      'Release notifications to fans'
+    );
     expect(ENTITLEMENT_REGISTRY.pro.booleans.canSendNotifications).toBe(true);
     expect(ENTITLEMENT_REGISTRY.pro.marketing.features).toContain(
+      'Fan sends separately metered; paid sending unavailable'
+    );
+    expect(ENTITLEMENT_REGISTRY.pro.marketing.features).not.toContain(
       'Release notifications to fans'
     );
   });
@@ -209,11 +228,22 @@ describe('Entitlement Registry Consistency', () => {
   });
 
   it('plans with yearly pricing offer a discount', () => {
+    expect(ENTITLEMENT_REGISTRY.pro.marketing.price).toEqual({
+      monthly: 199,
+      yearly: null,
+    });
+
     for (const planId of ['pro', 'max'] as const) {
       const price = ENTITLEMENT_REGISTRY[planId].marketing.price!;
-      expect(price.yearly).toBeGreaterThan(0);
-      // Yearly should be less than 12x monthly (a discount)
-      expect(price.yearly).toBeLessThan(price.monthly * 12);
+      expect(price.monthly).toBeGreaterThan(0);
+      const yearlyUsd = yearlyAmount(price.yearly);
+      if (yearlyUsd === null) {
+        // Artist Visibility is monthly-only; marketing yearly is null.
+        expect(price.yearly).toBeNull();
+        continue;
+      }
+      expect(yearlyUsd).toBeGreaterThan(0);
+      expect(yearlyUsd).toBeLessThan(price.monthly * 12);
     }
   });
 
@@ -300,34 +330,35 @@ describe('Entitlement Registry Consistency', () => {
       'constructor',
     ] as const;
 
-    it.each(
-      matrixInputs
-    )('getEntitlements / isValidPlanId / resolveCanonicalPlanId handle input %s without throwing and consistently', input => {
-      // All paths must return defined entitlements (never throw, degrade to free)
-      const ents = getEntitlements(input as any);
-      expect(ents).toBeDefined();
-      expect(ents.booleans).toBeDefined();
-      expect(ents.limits).toBeDefined();
+    it.each(matrixInputs)(
+      'getEntitlements / isValidPlanId / resolveCanonicalPlanId handle input %s without throwing and consistently',
+      input => {
+        // All paths must return defined entitlements (never throw, degrade to free)
+        const ents = getEntitlements(input as any);
+        expect(ents).toBeDefined();
+        expect(ents.booleans).toBeDefined();
+        expect(ents.limits).toBeDefined();
 
-      const valid = isValidPlanId(input as any);
-      const canon = resolveCanonicalPlanId(input as any);
+        const valid = isValidPlanId(input as any);
+        const canon = resolveCanonicalPlanId(input as any);
 
-      // Property: valid inputs produce non-null canon for canonical/legacy
-      if (valid) {
-        expect(canon).not.toBeNull();
-        if (['founding', 'pro'].includes(input as string)) {
-          expect(canon).toBe('pro');
+        // Property: valid inputs produce non-null canon for canonical/legacy
+        if (valid) {
+          expect(canon).not.toBeNull();
+          if (['founding', 'pro'].includes(input as string)) {
+            expect(canon).toBe('pro');
+          }
+          if (['growth', 'max'].includes(input as string)) {
+            expect(canon).toBe('max');
+          }
+          if (input === 'trial') {
+            expect(canon).toBe('trial');
+          }
+        } else {
+          expect(canon).toBeNull();
         }
-        if (['growth', 'max'].includes(input as string)) {
-          expect(canon).toBe('max');
-        }
-        if (input === 'trial') {
-          expect(canon).toBe('trial');
-        }
-      } else {
-        expect(canon).toBeNull();
       }
-    });
+    );
 
     it('resolveCanonicalPlanId and isValidPlanId reject non-string and empty falsy', () => {
       expect(resolveCanonicalPlanId(null)).toBeNull();

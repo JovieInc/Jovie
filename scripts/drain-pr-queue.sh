@@ -36,6 +36,13 @@
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
 #     0 = uncapped (bounded only by native queue depth), positive N re-caps
+#   DRAIN_RELEASE_WAVE_HOLD  bounded Production Controller release lease
+#     projection (1 pauses only new enrollment/re-entry; default 0)
+#   DRAIN_RELEASE_WAVE_REASON / DRAIN_RELEASE_WAVE_EXPIRES_AT /
+#     DRAIN_RELEASE_WAVE_RUN_ID  classifier receipt fields; an active hold
+#     must carry a bounded expiry and controller run identity
+#   DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS  maximum active-wave age (default
+#     1800, the documented 30-minute recovery window)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
 #                         draft-only, hold-intake, deferred-release-only,
 #                         or blocked
@@ -225,6 +232,63 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
+# Production Controller release-wave backpressure is a projection of the
+# existing workflow run, not a second queue or durable hold ledger. It pauses
+# only new admission/re-entry and expires from the observed controller run.
+DRAIN_RELEASE_WAVE_HOLD="${DRAIN_RELEASE_WAVE_HOLD:-0}"
+DRAIN_RELEASE_WAVE_REASON="${DRAIN_RELEASE_WAVE_REASON:-}"
+DRAIN_RELEASE_WAVE_EXPIRES_AT="${DRAIN_RELEASE_WAVE_EXPIRES_AT:-}"
+DRAIN_RELEASE_WAVE_RUN_ID="${DRAIN_RELEASE_WAVE_RUN_ID:-}"
+DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS="${DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS:-1800}"
+if [[ "$DRAIN_RELEASE_WAVE_HOLD" != "0" && "$DRAIN_RELEASE_WAVE_HOLD" != "1" ]]; then
+  echo "::error::DRAIN_RELEASE_WAVE_HOLD must be 0 or 1" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS < 60 )) \
+  || (( DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS > 3600 )); then
+  echo "::error::DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS must be 60-3600" >&2
+  exit 2
+fi
+RELEASE_WAVE_HOLD_ACTIVE=0
+if [[ "$DRAIN_RELEASE_WAVE_HOLD" == "1" ]]; then
+  if [[ ! "$DRAIN_RELEASE_WAVE_REASON" =~ ^[a-z0-9-]+$ ]]; then
+    echo "::error::Active release-wave hold requires a typed reason" >&2
+    exit 2
+  fi
+  if [[ "$DRAIN_RELEASE_WAVE_REASON" == "controller-state-unavailable" ]]; then
+    echo "::error::Unavailable release-wave evidence must block before drain; no expiring fallback is accepted" >&2
+    exit 2
+  fi
+  if [[ ! "$DRAIN_RELEASE_WAVE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+    echo "::error::Active release-wave hold requires a controller run id" >&2
+    exit 2
+  fi
+  release_wave_expiry_limit="$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS"
+  release_wave_state="$(node -e '
+    const [expiry, maxSeconds] = process.argv.slice(1);
+    const parsed = Date.parse(expiry || "");
+    const max = Number(maxSeconds);
+    const now = Date.now();
+    if (!Number.isFinite(parsed) || !Number.isInteger(max) || max <= 0) process.exit(2);
+    if (parsed <= now) process.stdout.write("expired");
+    else if (parsed > now + max * 1000 + 60_000) process.exit(3);
+    else process.stdout.write("active");
+  ' "$DRAIN_RELEASE_WAVE_EXPIRES_AT" "$release_wave_expiry_limit" 2>/dev/null)" || {
+    echo "::error::Release-wave hold expiry is malformed or exceeds its bound" >&2
+    exit 2
+  }
+  if [[ "$release_wave_state" == "active" ]]; then
+    RELEASE_WAVE_HOLD_ACTIVE=1
+    echo "::notice::Release-wave admission hold active ($DRAIN_RELEASE_WAVE_REASON, controller run $DRAIN_RELEASE_WAVE_RUN_ID, expires $DRAIN_RELEASE_WAVE_EXPIRES_AT); new native enrollment/re-entry is deferred"
+  else
+    echo "::notice::Release-wave admission hold expired at $DRAIN_RELEASE_WAVE_EXPIRES_AT; normal enrollment may resume"
+    DRAIN_RELEASE_WAVE_HOLD=0
+    DRAIN_RELEASE_WAVE_REASON='release-wave-expired'
+    DRAIN_RELEASE_WAVE_RUN_ID=''
+    DRAIN_RELEASE_WAVE_EXPIRES_AT=''
+  fi
+fi
 # Missing-CI class (2026-09-03): a non-draft main PR can sit for days with zero
 # check-runs for the required source contexts on its exact head, so it never
 # becomes green and never enrolls. Close+reopen re-fires the pull_request source
@@ -247,13 +311,19 @@ UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
 PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
 PRODUCT_FAILURE_DESCRIPTION="blocked:merge-group-product-failure"
 LAST_ENROLL_SKIP_REASON=""
+# Mergeability can be reported as the GraphQL enum UNKNOWN while the same
+# hosted read token already has an authoritative REST boolean. Keep this
+# fallback bounded and diagnostic-only: native admission still requires the
+# exact current head, base, labels, source checks, and queue postcondition.
+MERGEABILITY_PROBE_ACTOR=""
+MERGEABILITY_DIAGNOSTIC=""
 # Machine-state labels remain authoritative across every queue mutation.
 MACHINE_HOLD_JQ='. == "hold" or . == "gated" or . == "incident"'
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
 PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
 CONTROLLER_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/controller-repair-attestation.mjs"
 CONTROLLER_REPAIR_ATTESTATION_MARKER='<!-- jovie-controller-repair-attestation/v1 -->'
-CONTROLLER_REPAIR_ATTESTATION_ACTOR='jovie-bot[bot]'
+CONTROLLER_REPAIR_QUEUE_CONTEXT='jovie-controller-repair-queue/v1'
 CONTROLLER_REPAIR_MIN_VALIDITY_MS=120000
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
 QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
@@ -337,7 +407,13 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.authority == "Summer" and
         (.closureAdmission.status | IN("healthy", "grace", "red")) and
         (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
-        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
+        (
+          .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy")
+          or (
+            (.closureAdmission.status | IN("grace", "red"))
+            and .closureAdmission.newIssueIntakeAllowed == true
+          )
+        ) and
         .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
@@ -360,7 +436,7 @@ case "$DRAIN_PROMOTION_MODE" in
         .controllerRepairAdmission.condition == "controller-failure" and
         .controllerRepairAdmission.mainSha == .signals.main.sha and
         .controllerRepairAdmission.deployedSha == .signals.production.deployedSha and
-        .controllerRepairAdmission.scope == "trusted-comment-exact-repository-pr-head-main-path-set" and
+        .controllerRepairAdmission.scope == "github-approved-exact-repository-pr-head-main-path-set" and
         .controllerRepairAdmission.maxConcurrent == 1 and
         .controllerRepairAdmission.deploymentsAllowed == false and
         .controllerRepairAdmission.runtimeActivationAllowed == false and
@@ -502,36 +578,60 @@ production_unbound_repair_attestation_matches() {  # <body> <pr> <head> <main-sh
     --pr "$pr" --head "$head" --main-sha "$main_sha" >/dev/null 2>&1
 }
 
-controller_repair_attestation_for_pr() {  # <pr>
-  local raw body
-  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
-  [[ -n "$raw" ]] || return 0
-  body="$(jq -r --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" --arg actor "$CONTROLLER_REPAIR_ATTESTATION_ACTOR" '
+controller_repair_review_for_pr() {  # <pr> <head>
+  local n="$1" head="$2" author author_payload reviews
+  author_payload="$(gh_retry api "repos/${REPO}/pulls/${n}" 2>/dev/null || true)"
+  author="$(jq -r '.user.login // empty' <<<"$author_payload" 2>/dev/null || true)"
+  [[ -n "$author" ]] || return 0
+  reviews="$(gh_retry api "repos/${REPO}/pulls/${n}/reviews" --paginate --slurp 2>/dev/null || true)"
+  [[ -n "$reviews" ]] || return 0
+  jq -c --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" \
+    --arg author "$author" --arg head "$head" '
     [ .[][]?
-      | select(.user.login == $actor)
+      | select(.state | IN("APPROVED", "CHANGES_REQUESTED", "DISMISSED"))
+    ]
+    | group_by(.user.login)
+    | map(sort_by(.submitted_at // "", .id) | last)
+    | sort_by(.submitted_at // "", .id)
+    | [ .[]
+      | select(.state == "APPROVED")
+      | select(((.commit_id // "") | ascii_downcase) == $head)
+      | select(.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+      | select(.user.login != $author)
       | select((.body | type == "string") and (.body | contains($marker)))
-      | .body
+      | {
+          body,
+          reviewId: ("github-review-" + (.id | tostring)),
+          reviewer: .user.login
+        }
     ] | last // empty
-  ' <<<"$raw" 2>/dev/null || true)"
-  [[ -n "$body" ]] || return 0
-  printf '%s' "$body"
+  ' <<<"$reviews" 2>/dev/null || true
 }
 
-controller_repair_attestation_matches() {  # <body> <pr> <head> <main-sha> <paths-hash>
-  local body="$1" pr="$2" head="$3" main_sha="$4" paths_hash="$5" operation_id verdict
-  operation_id="run-${GITHUB_RUN_ID:-}-attempt-${GITHUB_RUN_ATTEMPT:-}"
-  [[ "$operation_id" =~ ^run-[1-9][0-9]*-attempt-[1-9][0-9]*$ ]] || return 1
-  # Treat the accepted bot statement as a short lease, not revocable shared
-  # state. GitHub's dequeuePullRequest mutation has no expected-head input, so
-  # a post-enrollment comment reread cannot safely compensate without risking
-  # a newer head. Require enough lease runway before mutation instead; the
-  # existing post-enrollment source/head/hold rereads remain authoritative.
+controller_repair_attestation_matches() {  # <review-json> <pr> <head> <main-sha> <paths-hash>
+  local review="$1" pr="$2" head="$3" main_sha="$4" paths_hash="$5" body review_id verdict
+  body="$(jq -r '.body // empty' <<<"$review")"
+  review_id="$(jq -r '.reviewId // empty' <<<"$review")"
+  [[ -n "$body" && "$review_id" =~ ^github-review-[1-9][0-9]*$ ]] || return 1
   verdict="$(printf '%s' "$body" | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" matches \
     --repository "$REPO" --pr "$pr" --head "$head" --main-sha "$main_sha" \
     --changed-paths-sha256 "$paths_hash" \
-    --operation-id "$operation_id" \
+    --review-id "$review_id" \
     --minimum-valid-for-ms "$CONTROLLER_REPAIR_MIN_VALIDITY_MS" 2>/dev/null)" || return 1
   jq -e 'type == "object" and .allowed == true' <<<"$verdict" >/dev/null 2>&1
+}
+
+controller_repair_live_evidence_matches() {  # <pr> <head> <main-sha>
+  local n="$1" head="$2" main_sha="$3" changed_paths paths_hash review
+  changed_paths="$(pr_changed_paths_json "$n")"
+  [[ "$changed_paths" != "null" ]] || return 1
+  paths_hash="$(printf '%s' "$changed_paths" \
+    | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
+  [[ "$paths_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+  review="$(controller_repair_review_for_pr "$n" "$head")"
+  [[ -n "$review" ]] || return 1
+  controller_repair_attestation_matches \
+    "$review" "$n" "$head" "$main_sha" "$paths_hash"
 }
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
@@ -593,6 +693,81 @@ fleet_hold_target_url() {
   printf '%s/%s/actions/runs/%s' "$server_url" "$REPO" "$run_id"
 }
 
+# Shared identity checks apply to both a live writer and historical receipts.
+# Lifecycle checks differ: a valid receipt survives its producer ending later.
+canonical_admission_run_has_identity() {  # <run-json> <run-id>
+  jq -e --arg repo "$REPO" --argjson run_id "$2" '
+    .id == $run_id and
+    (.run_attempt | type == "number" and floor == . and . >= 1) and
+    .name == "Merge Queue Auto-Enroll" and
+    .path == ".github/workflows/merge-queue-autoenroll.yml" and
+    .html_url == ("https://github.com/" + $repo + "/actions/runs/" + ($run_id | tostring)) and
+    .repository.full_name == $repo and .head_repository.full_name == $repo and
+    (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+    (.event | IN("pull_request", "push", "repository_dispatch", "workflow_dispatch", "workflow_run")) and
+    (.head_branch | type == "string" and length > 0) and
+    (.event == "pull_request" or .head_branch == "main")
+  ' <<<"$1" >/dev/null 2>&1
+}
+
+# A numeric run ID is a link, not authority. Re-read at both mutation boundaries.
+canonical_admission_producer_is_active() {
+  local run_id="${GITHUB_RUN_ID:-}" attempt="${GITHUB_RUN_ATTEMPT:-}" run
+  if [[ ! "$run_id" =~ ^[1-9][0-9]*$ || ! "$attempt" =~ ^[1-9][0-9]*$ \
+    || "${GITHUB_SERVER_URL:-https://github.com}" != "https://github.com" ]]; then
+    echo "::error::Canonical admission requires an exact workflow run and attempt" >&2
+    return 1
+  fi
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")"; then
+    echo "::error::Canonical admission producer identity is unavailable" >&2
+    return 1
+  fi
+  if ! canonical_admission_run_has_identity "$run" "$run_id" \
+    || ! jq -e --argjson attempt "$attempt" '
+      .run_attempt == $attempt and .status == "in_progress" and .conclusion == null
+    ' <<<"$run" >/dev/null 2>&1; then
+    echo "::error::Refusing admission from an inactive or noncanonical workflow producer" >&2
+    return 1
+  fi
+}
+
+canonical_admission_run_is_complete() {  # <run-json>
+  jq -e '
+    try (
+      type == "object" and (.id | type == "number") and
+      (.run_attempt | type == "number") and has("conclusion") and
+      (.conclusion == null or (.conclusion | type == "string")) and
+      ([.name, .path, .html_url, .repository.full_name, .head_repository.full_name,
+        .head_sha, .head_branch, .event, .status] | all(.[]; type == "string")) and
+      (.created_at | fromdateiso8601 | type == "number") and
+      (.updated_at | fromdateiso8601 | type == "number")
+    ) catch false
+  ' <<<"$1" >/dev/null 2>&1
+}
+
+# Return 2 for unavailable evidence: an API outage must not evict valid members.
+canonical_admission_receipt_has_provenance() {  # <status-json> [enqueued-at]
+  local receipt="$1" run_id run
+  run_id="$(jq -r '.target_url | split("/") | last' <<<"$receipt")"
+  [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || return 1
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")" \
+    || ! canonical_admission_run_is_complete "$run"; then
+    echo "::error::Canonical admission receipt producer evidence is unavailable" >&2
+    return 2
+  fi
+  canonical_admission_run_has_identity "$run" "$run_id" || return 1
+  jq -e --argjson receipt "$receipt" --arg enqueued_at "${2:-}" '
+    ($receipt.updated_at | fromdateiso8601) as $receipt_at |
+    (if $enqueued_at == "" then $receipt_at else ($enqueued_at | fromdateiso8601) end) as $admitted_at |
+    (.created_at | fromdateiso8601) as $created_at |
+    (.updated_at | fromdateiso8601) as $updated_at |
+    $created_at <= $admitted_at and $updated_at >= $created_at and
+    ((.status == "in_progress" and .conclusion == null) or
+      (.status == "completed" and $updated_at >= $receipt_at and
+        (.conclusion | IN("action_required", "cancelled", "failure", "neutral", "skipped", "stale", "startup_failure", "success", "timed_out"))))
+  ' <<<"$run" >/dev/null 2>&1
+}
+
 waiting_lane_allows_clean_enroll() {
   case "$DRAIN_PROMOTION_MODE" in
     normal | hold-intake | draft-only) return 0 ;;
@@ -626,8 +801,13 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
   fi
   target_url="https://github.com/$REPO/actions/runs/$run_id"
   status_url="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/statuses/$head"
-  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)" \
-    || ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
+  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)"; then
+    return 2
+  fi
+  if ! jq -e 'type == "object" and (.login | type == "string") and (.type | type == "string") and (.avatar_url | type == "string")' <<<"$app_identity" >/dev/null 2>&1; then
+    return 2
+  fi
+  if ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
       select(.login == $login and .type == "Bot") | .avatar_url
     ' <<<"$app_identity" 2>/dev/null)"; then
     return 1
@@ -640,7 +820,15 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
     return 1
   fi
   if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id" 2>/dev/null)"; then
-    return 1
+    return 2
+  fi
+  if ! jq -e 'type == "object" and (.id | type == "number") and (.name | type == "string") and (.path | type == "string")' <<<"$run" >/dev/null 2>&1; then
+    return 2
+  fi
+  if jq -e '.context == "jovie-queue-admission/v2"' <<<"$status" >/dev/null \
+    && { ! canonical_admission_run_is_complete "$run" \
+      || ! jq -e '.workflow_id | type == "number"' <<<"$run" >/dev/null; }; then
+    return 2
   fi
   jq -e \
     --arg run_id "$run_id" \
@@ -788,8 +976,10 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
   # The combined /status response omits creator even for authentic bot writes.
   # Read plural statuses so manual/main-triggered admission retains its actual
   # author instead of requiring the producer's main SHA to equal the PR SHA.
-  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)"; then
-    return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)" \
+    || ! jq -e 'type == "array" and length > 0 and all(.[]; type == "array")' <<<"$statuses" >/dev/null 2>&1; then
+    echo "::error::Canonical admission status evidence is unavailable" >&2
+    return 2
   fi
   latest="$(jq -c \
     --arg context "$QUEUE_REENTRY_CONTEXT" \
@@ -835,9 +1025,58 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
   if jq -e --arg actor "$FLEET_HOLD_APP_USER" '
     .creator.type == "Bot" and .creator.login == $actor
   ' <<<"$latest" >/dev/null; then
+    canonical_admission_receipt_has_provenance "$latest" "$enqueued_at"
+    return $?
+  fi
+  null_creator_receipt_has_provenance "$head" "$latest" || return $?
+  canonical_admission_receipt_has_provenance "$latest" "$enqueued_at"
+}
+
+controller_repair_queue_receipt_is_recoverable() {  # <pr> <head>
+  local n="$1" head="$2" statuses latest description
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$n" =~ ^[1-9][0-9]*$ ]] || return 1
+  description="Authenticated controller repair PR #$n at exact head"
+  statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)" || return 1
+  latest="$(jq -c --arg context "$CONTROLLER_REPAIR_QUEUE_CONTEXT" --arg repo "$REPO" --arg description "$description" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | select(
+        . != null
+        and .state == "success"
+        and .description == $description
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+      )
+  ' <<<"$statuses" 2>/dev/null)" || true
+  [[ -n "$latest" ]] || return 1
+  receipt_actor_is_trusted "$head" "$latest"
+}
+
+record_controller_repair_queue_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url
+  [[ "$expected_head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $CONTROLLER_REPAIR_QUEUE_CONTEXT on #$n at $expected_head"
     return 0
   fi
-  null_creator_receipt_has_provenance "$head" "$latest"
+  if controller_repair_queue_receipt_is_recoverable "$n" "$expected_head"; then
+    echo "    =$CONTROLLER_REPAIR_QUEUE_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  target_url="$(fleet_hold_target_url)" || return 1
+  current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)" || return 1
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    return 2
+  fi
+  gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$CONTROLLER_REPAIR_QUEUE_CONTEXT" \
+    -f description="Authenticated controller repair PR #$n at exact head" \
+    -f target_url="$target_url" >/dev/null
 }
 
 record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <enqueued-at>
@@ -850,6 +1089,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <en
     echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
     return 0
   fi
+  canonical_admission_producer_is_active || return 1
   if ! target_url="$(fleet_hold_target_url)"; then
     echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
     return 1
@@ -868,6 +1108,9 @@ record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <en
   # and never reuse a receipt predating this particular admission.
   if queue_reentry_receipt_is_recoverable "$n" "$expected_head" "$target_url" "" "$enqueued_at"; then
     reuse=1
+  else
+    local receipt_result=$?
+    [[ "$receipt_result" -ne 2 ]] || return 1
   fi
   # Caller token identity does not prove who created observed membership.
   if ! node scripts/merge-queue-backend.mjs prove-admission \
@@ -1058,7 +1301,7 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 changelog_collision_decision_for_pr() {  # <num>
   local n="$1" candidate queued members='[]' files branch admission queue_state queue_snap
   candidate="$(pr_changed_paths_json "$n")"
-  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
+  branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   admission="$(PRE_LAND_CHANGELOG_JSON="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
     '{changedFiles:$changedFiles, branch:$branch}')" \
     node scripts/lib/pre-land-changelog.mjs admission)"
@@ -1119,6 +1362,7 @@ restore_deferred_hold() {  # restore_deferred_hold <num>
 # an unproven revision.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
+  [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]] && return 0
 
   echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
   echo "  ~ no typed pressure-deferral provenance; owner release required"
@@ -1217,21 +1461,188 @@ reconcile_deferred_auto_merge_after_main_push() {
   done < <(jq -c '.[]' <<<"$candidates")
 }
 
+# Record the effective read identity without ever printing a token. The
+# workflow's GITHUB_TOKEN and the Jovie Bot mutation token are deliberately
+# separate; this probe is only used to explain a mergeability observation.
+mergeability_probe_actor() {
+  [[ -n "$MERGEABILITY_PROBE_ACTOR" ]] && return 0
+  local identity login type id
+  if identity="$(gh_retry api user --jq '{login:(.login // ""),type:(.type // ""),id:(.id // null)}' 2>/dev/null)" \
+    && jq -e '
+      type == "object"
+      and (.login | type == "string" and length > 0)
+      and (.type | type == "string" and length > 0)
+      and (.id | type == "number" and floor == . and . > 0)
+    ' <<<"$identity" >/dev/null 2>&1; then
+    login="$(jq -r '.login' <<<"$identity")"
+    type="$(jq -r '.type' <<<"$identity")"
+    id="$(jq -r '.id | tostring' <<<"$identity")"
+    MERGEABILITY_PROBE_ACTOR="$login/$type/$id"
+  else
+    MERGEABILITY_PROBE_ACTOR='unavailable'
+  fi
+}
+
+# Keep a compact, non-secret receipt of the exact field returned by the
+# hosted reader. `mergeable=null` and an omitted field are distinct from the
+# literal GraphQL enum UNKNOWN; all three remain non-admitting states.
+record_mergeability_probe() {  # <pr> <api> <transport> <attempt> <json>
+  local n="$1" api="$2" transport="$3" attempt="$4" raw="$5" observed
+  mergeability_probe_actor
+  if observed="$(jq -c '
+    {
+      field_present: has("mergeable"),
+      raw_mergeable: (if has("mergeable") then .mergeable else null end),
+      raw_mergeable_type: (if has("mergeable") then (.mergeable | type) else "omitted" end),
+      merge_state_status: (.mergeStateStatus // .mergeable_state // null),
+      state: (.state // null),
+      draft: (if has("isDraft") then .isDraft elif has("draft") then .draft else null end),
+      head: (.headRefOid // .head.sha // null),
+      base: (.baseRefName // .base.ref // null),
+      base_oid: (.baseRefOid // .base.sha // null)
+    }
+  ' <<<"$raw" 2>/dev/null)"; then
+    MERGEABILITY_DIAGNOSTIC="api=$api transport=$transport actor=$MERGEABILITY_PROBE_ACTOR attempt=$attempt $observed"
+  else
+    MERGEABILITY_DIAGNOSTIC="api=$api transport=$transport actor=$MERGEABILITY_PROBE_ACTOR attempt=$attempt parse=failed"
+  fi
+  echo "::notice::mergeability-probe pr=#$n $MERGEABILITY_DIAGNOSTIC" >&2
+}
+
+# When the GraphQL enum remains UNKNOWN, ask the same read-token identity for
+# the REST pull-request representation. The fallback is authoritative only
+# when the REST response agrees with the GraphQL PR number, exact head/base,
+# open/non-draft state, and current labels. Source checks are re-read by the
+# caller immediately before mutation as a final exact-head gate.
+read_rest_mergeability() {  # <pr> <expected-head> <expected-base-oid> <graphql-json>
+  local n="$1" expected_head="$2" expected_base_oid="$3" graphql="$4" rest
+  if ! rest="$(gh_retry api "repos/$REPO/pulls/$n" 2>/dev/null)"; then
+    record_mergeability_probe "$n" rest failed 1 '{}'
+    return 1
+  fi
+  record_mergeability_probe "$n" rest success 1 "$rest"
+  if ! jq -e \
+    --arg n "$n" \
+    --arg expected_head "$expected_head" \
+    --arg expected_base_oid "$expected_base_oid" \
+    --argjson graphql "$graphql" '
+      (.number | type == "number" and tostring == $n)
+      and .state == "open"
+      and .draft == false
+      and (.head.sha | type == "string" and (ascii_downcase == $expected_head))
+      and .base.ref == "main"
+      and (.base.sha | type == "string")
+      and ($expected_base_oid == "" or ((.base.sha | ascii_downcase) == $expected_base_oid))
+      and (.mergeable | type == "boolean")
+      and (.mergeable_state | type == "string" and length > 0)
+      and (.labels | type == "array")
+      and ($graphql.state == "OPEN")
+      and ($graphql.isDraft == false)
+      and (($graphql.headRefOid // "") | ascii_downcase) == (.head.sha | ascii_downcase)
+      and (($graphql.baseRefName // "") == .base.ref)
+      and (
+        ($expected_base_oid == "")
+        or (($graphql.baseRefOid // "") | ascii_downcase) == (.base.sha | ascii_downcase)
+      )
+      and (
+        ((if ($graphql.labels | type) == "object" then ($graphql.labels.nodes // []) else ($graphql.labels // []) end) | map(.name) | sort)
+        == ((.labels // []) | map(.name) | sort)
+      )
+    ' <<<"$rest" >/dev/null 2>&1; then
+    echo "::notice::mergeability-probe pr=#$n api=rest transport=success actor=$MERGEABILITY_PROBE_ACTOR validation=failed" >&2
+    return 1
+  fi
+  jq -c '
+    {
+      mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end),
+      mergeStateStatus: (.mergeable_state | ascii_upcase),
+      headRefOid: .head.sha,
+      baseRefName: .base.ref,
+      baseRefOid: .base.sha,
+      labels: (.labels // [] | map({name: .name}))
+    }
+  ' <<<"$rest"
+}
+
 # The queue snapshot can be stale by the time enrollment begins. Re-read the
 # authoritative PR state immediately before mutation so a draft conversion or
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current enrollment_receipt head_oid expected_head json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
+  local current enrollment_receipt head_oid expected_head expected_base_oid json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
+  local rest_fallback_attempted=0 rest_state rest_failures fallback_preconditions post_mergeability_state post_base_oid post_rest_state
   LAST_ENROLL_SKIP_REASON=""
-  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
+  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"
   for ((mergeability_attempt = 1; mergeability_attempt <= DRAIN_MERGEABLE_RECHECK_ATTEMPTS; mergeability_attempt++)); do
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
       --json "$json_fields" 2>/dev/null)"; then
       echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
       return 1
     fi
-    mergeability_state="$(jq -r '.mergeable // "UNKNOWN"' <<<"$current")"
+    if ! mergeability_state="$(jq -r '
+      if has("mergeable") then
+        if .mergeable == null then "NULL"
+        elif (.mergeable | type) == "string" then .mergeable
+        else "INVALID"
+        end
+      else "OMITTED"
+      end
+    ' <<<"$current" 2>/dev/null)"; then
+      echo "    !! could not parse mergeability for #$n; refusing enrollment" >&2
+      return 1
+    fi
+    if [[ "$mergeability_state" == "UNKNOWN" || "$mergeability_state" == "NULL" || "$mergeability_state" == "OMITTED" ]]; then
+      record_mergeability_probe "$n" graphql success "$mergeability_attempt" "$current"
+      if [[ "$rest_fallback_attempted" -eq 0 ]]; then
+        rest_fallback_attempted=1
+        live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+        expected_base_oid="$(jq -r '(.baseRefOid // "") | ascii_downcase' <<<"$current")"
+        fallback_preconditions=1
+        if [[ ! "$live_head" =~ ^[0-9a-f]{40}$ || ! "$expected_base_oid" =~ ^[0-9a-f]{40}$ ]]; then
+          fallback_preconditions=0
+        fi
+        if [[ -n "$authorized_pr" ]] \
+          && [[ "$n" != "$authorized_pr" || "$live_head" != "$authorized_head" ]]; then
+          fallback_preconditions=0
+        fi
+        if ! jq -e '
+          .state == "OPEN"
+          and (.isDraft | not)
+          and .baseRefName == "main"
+          and ([.labels[].name] | any(. == "needs-conflict-resolution" or . == "fast" or '"$MACHINE_HOLD_JQ"') | not)
+        ' <<<"$current" >/dev/null 2>&1; then
+          fallback_preconditions=0
+        fi
+        if [[ "$fallback_preconditions" -eq 1 ]]; then
+          if rest_state="$(read_rest_mergeability "$n" "$live_head" "$expected_base_oid" "$current")"; then
+            if [[ "$(jq -r '.mergeable' <<<"$rest_state")" == "MERGEABLE" ]]; then
+              rest_failures="$(check_failures_for_pr "$n")"
+              if [[ "$(jq 'length' <<<"$rest_failures")" -eq 0 ]] \
+                && rest_state="$(read_rest_mergeability "$n" "$live_head" "$expected_base_oid" "$current")" \
+                && [[ "$(jq -r '.mergeable' <<<"$rest_state")" == "MERGEABLE" ]]; then
+                current="$(jq -c --argjson rest "$rest_state" '
+                  .mergeable = $rest.mergeable
+                  | .mergeStateStatus = $rest.mergeStateStatus
+                  | .headRefOid = $rest.headRefOid
+                  | .baseRefName = $rest.baseRefName
+                  | .baseRefOid = $rest.baseRefOid
+                  | .labels = $rest.labels
+                ' <<<"$current")"
+                mergeability_state='MERGEABLE'
+                echo "    ~ accepted same-token REST mergeability fallback for #$n at $live_head after exact source-check revalidation" >&2
+              else
+                echo "    ~ REST mergeability fallback for #$n was not stable after exact source-check revalidation" >&2
+              fi
+            else
+              current="$(jq -c --argjson rest "$rest_state" '.mergeable = $rest.mergeable | .mergeStateStatus = $rest.mergeStateStatus' <<<"$current")"
+              mergeability_state="$(jq -r '.mergeable' <<<"$current")"
+            fi
+          fi
+        else
+          echo "    ~ REST mergeability fallback preconditions unavailable for #$n (exact head/base/state/draft/labels required)" >&2
+        fi
+      fi
+    fi
     [[ "$mergeability_state" == "MERGEABLE" ]] && break
     [[ "$mergeability_state" == "UNKNOWN" ]] || break
     live_head="$(jq -r '.headRefOid // empty' <<<"$current" | tr '[:upper:]' '[:lower:]')"
@@ -1365,22 +1776,13 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
-    local repair_main_sha changed_paths paths_hash attestation_body
+    local repair_main_sha
     repair_main_sha="$(jq -r '.controllerRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-    changed_paths="$(pr_changed_paths_json "$n")"
-    paths_hash=""
-    if [[ "$changed_paths" != "null" ]]; then
-      paths_hash="$(printf '%s' "$changed_paths" \
-        | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
-    fi
-    attestation_body="$(controller_repair_attestation_for_pr "$n")"
     if [[ "$n" != "$DRAIN_ADMISSION_PR" \
       || "$expected_head" != "$DRAIN_ADMISSION_HEAD" \
-      || ! "$paths_hash" =~ ^[0-9a-f]{64}$ \
-      || -z "$attestation_body" ]] \
-      || ! controller_repair_attestation_matches \
-        "$attestation_body" "$n" "$expected_head" "$repair_main_sha" "$paths_hash"; then
-      echo "    ⏸ trusted exact-scope controller repair attestation is absent or stale for #$n"
+      ]] || ! controller_repair_live_evidence_matches \
+        "$n" "$expected_head" "$repair_main_sha"; then
+      echo "    ⏸ authenticated exact-scope controller repair approval is absent or stale for #$n"
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" || "$DRAIN_PROMOTION_MODE" == "draft-only" ]]; then
@@ -1418,12 +1820,16 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    canonical_admission_producer_is_active || return 1
     if ! enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate unproven native enrollment for #$n" >&2
+        return 1
       fi
-      return 1
+      # Only proven compensation isolates this failure from other candidates.
+      # Unknown mutation effects remain a fatal result (1).
+      return 4
     fi
     if ! jq -e --arg expected_head "$expected_head" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '
       .state.state == "OPEN"
@@ -1441,8 +1847,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    !! native enrollment returned no exact-head positioned queue receipt for #$n" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate malformed native enrollment receipt for #$n" >&2
+        return 1
       fi
-      return 1
+      return 4
     fi
 
     # Labels do not change the head SHA, so expected-head protection alone
@@ -1450,7 +1857,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # compensate immediately if a gated/held label appeared while the queue
     # mutation was in flight.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,labels,headRefOid,baseRefName,body 2>/dev/null)"; then
+      --json state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body 2>/dev/null)"; then
       if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
         echo "    !! could not refresh #$n after controller-repair enrollment; attempting expected-head ineligibility compensation" >&2
         if ! dequeue_strict "$n" "$expected_head"; then
@@ -1465,6 +1872,33 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         return 1
       fi
       return 2
+    fi
+    if post_mergeability_state="$(jq -r '
+      if has("mergeable") then
+        if .mergeable == null then "NULL"
+        elif (.mergeable | type) == "string" then .mergeable
+        else "INVALID"
+        end
+      else "OMITTED"
+      end
+    ' <<<"$current" 2>/dev/null)" \
+      && [[ "$post_mergeability_state" == "UNKNOWN" || "$post_mergeability_state" == "NULL" || "$post_mergeability_state" == "OMITTED" ]]; then
+      record_mergeability_probe "$n" graphql success post "$current"
+      post_base_oid="$(jq -r '(.baseRefOid // "") | ascii_downcase' <<<"$current")"
+      if [[ "$post_base_oid" =~ ^[0-9a-f]{40}$ ]]; then
+        if post_rest_state="$(read_rest_mergeability "$n" "$expected_head" "$post_base_oid" "$current")"; then
+          current="$(jq -c --argjson rest "$post_rest_state" '
+            .mergeable = $rest.mergeable
+            | .mergeStateStatus = $rest.mergeStateStatus
+            | .headRefOid = $rest.headRefOid
+            | .baseRefName = $rest.baseRefName
+            | .baseRefOid = $rest.baseRefOid
+            | .labels = $rest.labels
+          ' <<<"$current")"
+        fi
+      else
+        echo "    ~ post-enrollment REST mergeability fallback preconditions unavailable for #$n (exact base OID missing)" >&2
+      fi
     fi
     if ! jq -e --arg expected_head "$expected_head" '
       .state == "OPEN"
@@ -1530,6 +1964,35 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
           return 1
         fi
         return 2
+      fi
+    fi
+
+    if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+      local post_main_sha post_failures
+      post_main_sha="$(gh_retry api "repos/${REPO}/git/ref/heads/main" \
+        --jq '.object.sha' 2>/dev/null | tr '[:upper:]' '[:lower:]')" || post_main_sha=""
+      post_failures="$(check_failures_for_pr "$n")"
+      if [[ ! "$post_main_sha" =~ ^[0-9a-f]{40}$ \
+        || "$post_main_sha" != "$repair_main_sha" ]] \
+        || ! jq -e '.mutationActor == "jovie-bot[bot]"' \
+          <<<"$enrollment_receipt" >/dev/null \
+        || ! jq -e 'type == "array" and length == 0' \
+          <<<"$post_failures" >/dev/null \
+        || ! controller_repair_live_evidence_matches \
+          "$n" "$expected_head" "$repair_main_sha"; then
+        echo "    ⏸ controller repair evidence changed during native enrollment for #$n; compensating"
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+          return 1
+        fi
+        return 2
+      fi
+      if ! record_controller_repair_queue_receipt "$n" "$expected_head"; then
+        echo "    !! controller repair lacks durable cross-run identity; compensating" >&2
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+        fi
+        return 1
       fi
     fi
 
@@ -1984,23 +2447,18 @@ elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
     n="$(jq -r '.n' <<<"$pr")"
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
     eligible=false
-    if [[ "$n" == "$DRAIN_ADMISSION_PR" \
+    if [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] \
+      && [[ "$(jq -r '.q // false' <<<"$pr")" == "true" ]] \
+      && controller_repair_queue_receipt_is_recoverable "$n" "$head_oid"; then
+      eligible=true
+    elif [[ "$n" == "$DRAIN_ADMISSION_PR" \
       && "$head_oid" == "$DRAIN_ADMISSION_HEAD" \
       && "$head_oid" =~ ^[0-9a-f]{40}$ ]]; then
-      changed_paths="$(pr_changed_paths_json "$n")"
-      paths_hash=""
-      if [[ "$changed_paths" != "null" ]]; then
-        paths_hash="$(printf '%s' "$changed_paths" \
-          | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
-      fi
-      attestation_body="$(controller_repair_attestation_for_pr "$n")"
-      if [[ "$paths_hash" =~ ^[0-9a-f]{64}$ ]] \
-        && [[ -n "$attestation_body" ]] \
-        && controller_repair_attestation_matches \
-          "$attestation_body" "$n" "$head_oid" "$REPAIR_MAIN_SHA" "$paths_hash"; then
+      if controller_repair_live_evidence_matches \
+        "$n" "$head_oid" "$REPAIR_MAIN_SHA"; then
         eligible=true
       else
-        echo "  #$n  ⏸ trusted exact-scope controller repair attestation is absent or stale"
+        echo "  #$n  ⏸ authenticated exact-scope controller repair approval is absent or stale"
       fi
     fi
     CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
@@ -2110,6 +2568,12 @@ if [[ "${DRAIN_RECONCILE_ADMISSION_RECEIPTS:-0}" == "1" ]]; then
       "$n" "$expected_head" "" "$FLEET_POLICY_MAIN_SHA" "$enqueued_at"; then
       echo "  #$n  =fresh exact-checkpoint native admission"
       continue
+    else
+      receipt_result=$?
+      if [[ "$receipt_result" -eq 2 ]]; then
+        echo "::error::Cannot reconcile admission for #$n without producer evidence; preserving membership" >&2
+        exit 1
+      fi
     fi
     echo "  #$n  stale or missing exact-checkpoint admission; canonical dequeue"
     if ! dequeue_strict "$n" "$expected_head"; then
@@ -2141,7 +2605,9 @@ done < <(echo "$SNAP" | jq -c '.[]
 # labels, ready state, or auto-merge intent. Draft-only/blocked modes retain no
 # queued PRs. This is the existing queue controller applying one narrower
 # admission policy, not a parallel queue.
-if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ||
+      "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ||
+      "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   echo "=== DEQUEUE (fleet promotion constraint → queue removal) ==="
   ISOLATED_KEEP_PR=""
   CONTROLLER_REPAIR_KEEP_PR=""
@@ -2436,16 +2902,33 @@ echo "=== ENROLL (mergeable + not failing → queue admission) ==="
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
-if waiting_lane_allows_clean_enroll; then
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+CAPACITY_SNAP="$SNAP"
+if [[ "$MERGE_QUEUE_BACKEND" == "native" && -n "$DRAIN_ADMISSION_PR" && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" \
+  && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]] && ! stop_if_budget_exhausted; then
+  # Exact-target SNAP contains one PR. Use the existing paginated fleet read
+  # for global capacity and recovery selectors, without widening maintenance.
+  if ! RECOVERY_NATIVE_STATE="$(inventory_native_queue_state)"; then
+    echo "::error::Missed-admission fleet inventory unavailable" >&2
+    exit 1
+  fi
+  CAPACITY_SNAP="$(native_state_to_snap <<<"$RECOVERY_NATIVE_STATE")"
+fi
+if [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]]; then
+  # The active release lease only pauses new enrollment/re-entry. Existing
+  # native members have already passed admission and remain under the normal
+  # safety dequeue/reconciliation passes above.
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
+  ENROLL_SLOTS=0
+elif waiting_lane_allows_clean_enroll; then
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   MAX_QUEUE_DEPTH=1
   QUEUED_NOW=$([[ -n "${ISOLATED_KEEP_PR:-}" ]] && echo 1 || echo 0)
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
-  QUEUED_CONTROLLER_REPAIRS=$(echo "$SNAP" | jq \
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_CONTROLLER_REPAIRS=$(echo "$CAPACITY_SNAP" | jq \
     '[.[] | select(.q == true and .controllerRepair == true)] | length')
   if [[ "$QUEUED_CONTROLLER_REPAIRS" -eq 0 && "$QUEUED_NOW" -lt "$MAX_QUEUE_DEPTH" ]]; then
     ENROLL_SLOTS=1
@@ -2457,13 +2940,15 @@ elif [[ "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   QUEUED_NOW=0
   ENROLL_SLOTS=0
 else
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=0
 fi
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
 if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
-  if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+  if [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]]; then
+    echo "  admission scope: release-wave hold ($DRAIN_RELEASE_WAVE_REASON; no new enrollment/re-entry)"
+  elif [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
     echo "  admission scope: no primary target (bounded missed-admission recovery enabled)"
   else
     echo "  admission scope: maintenance-only (no new enrollment)"
@@ -2520,6 +3005,18 @@ while read -r pr; do
   fi
 done < <(echo "$SNAP" | jq -c '.[] | select((.headOid // "") | test("^[0-9a-f]{40}$"))')
 
+# Retain the primary failure for the workflow's durable diagnostic, while a
+# proved no-op/compensated candidate may leave capacity for independent heads.
+ADMISSION_EXIT_STATUS=0
+defer_admission_failure() {
+  local result="$1"
+  if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]]; then
+    [[ "$ADMISSION_EXIT_STATUS" -eq 1 ]] || ADMISSION_EXIT_STATUS="$result"
+  else
+    exit "$result"
+  fi
+}
+
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
@@ -2544,6 +3041,10 @@ while read -r pr; do
       continue
     fi
     echo "::error::Failed to prove enrollment for #$n" >&2
+    if [[ "$enroll_result" -eq 4 ]]; then
+      defer_admission_failure 1
+      continue
+    fi
     exit 1
   fi
 done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '.[]
@@ -2571,7 +3072,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
 # returned success and left the PR invisible until an unrelated event happened.
 # Fail with a classified machine-owned condition so Delivery Control Receipts
 # emits a durable Gem repair task; it still cannot merge or bypass any gate.
-if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
+if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 && "$ADMISSION_EXIT_STATUS" -eq 0 && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" ]]; then
   ADMISSION_DISPOSITION="$(echo "$SNAP" | node scripts/merge-queue-backend.mjs explain-selector \
     "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD" "$DRAIN_PROMOTION_MODE" "$ENROLL_SLOTS")"
   ADMISSION_TARGET_OBSERVED="$(jq -r '.observed' <<<"$ADMISSION_DISPOSITION")"
@@ -2614,13 +3115,13 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
       echo "::error::queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($LAST_ENROLL_SKIP_REASON; native admission refused, hard gate preserved)" >&2
-      exit 3
+      defer_admission_failure 3
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
       echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
-      exit 3
+      defer_admission_failure 3
     else
       echo "::error::queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($ADMISSION_SELECTOR_REASON)" >&2
-      exit 3
+      defer_admission_failure 3
     fi
   fi
 fi
@@ -2636,8 +3137,9 @@ fi
 # heads: exact admission already strips that label, but a main-push recovery
 # used to filter them out and left CI-green Symphony heads (#16187) parked.
 # Legacy human, taste, and no-auto labels never exclude recovery.
-if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]]; then
   echo "=== RECOVER (bounded exact-head native admission) ==="
+  RECOVERY_SNAP="$CAPACITY_SNAP"
   while read -r pr; do
     stop_if_budget_exhausted && break
     if (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 )) \
@@ -2673,12 +3175,15 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
       ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
     else
       recovery_result=$?
-      if [[ "$recovery_result" -ne 2 ]]; then
+      if [[ "$recovery_result" -eq 4 ]]; then
+        echo "::error::Failed exact native admission recovery for #$n; compensation proved" >&2
+        defer_admission_failure 1
+      elif [[ "$recovery_result" -ne 2 ]]; then
         echo "::error::Failed exact native admission recovery for #$n" >&2
         exit 1
       fi
     fi
-  done < <(echo "$SNAP" | jq -c \
+  done < <(echo "$RECOVERY_SNAP" | jq -c \
     --arg admission_pr "$DRAIN_ADMISSION_PR" \
     --arg promotion_mode "$DRAIN_PROMOTION_MODE" \
     --arg missed "$DRAIN_RECONCILE_MISSED_ADMISSION" \
@@ -2852,3 +3357,5 @@ echo "$SNAP" | jq -r '.[]
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
+
+exit "$ADMISSION_EXIT_STATUS"

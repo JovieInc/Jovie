@@ -5,6 +5,7 @@ export interface WindowState {
   y?: number;
   width: number;
   height: number;
+  isFullScreen?: boolean;
 }
 
 export interface DisplayBounds {
@@ -14,7 +15,7 @@ export interface DisplayBounds {
   readonly height: number;
 }
 
-const DEFAULT_WINDOW_STATE: WindowState = {
+export const DEFAULT_WINDOW_STATE: WindowState = {
   width: 1280,
   height: 800,
 };
@@ -136,5 +137,20 @@ export function sanitizeWindowState(
     report?.('window-state-clamped');
   }
 
-  return { x, y, width, height };
+  const isFullScreen = record.isFullScreen === true;
+
+  return { x, y, width, height, ...(isFullScreen ? { isFullScreen } : {}) };
+}
+
+export function persistNativeFullscreen(
+  bounds: Omit<WindowState, 'isFullScreen'>,
+  isFullScreen: boolean
+): WindowState {
+  return isFullScreen ? { ...bounds, isFullScreen: true } : { ...bounds };
+}
+
+export function shouldRestoreNativeFullscreen(
+  state: Pick<WindowState, 'isFullScreen'>
+): boolean {
+  return state.isFullScreen === true;
 }

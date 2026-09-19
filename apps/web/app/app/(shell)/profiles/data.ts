@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import {
   profileSearchProviderHealth,
   profileSearchQueries,
@@ -24,17 +25,19 @@ import {
   redactLockedRank,
   selectAdditionalMonitoredSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
+import {
+  type PresenceIdentityPhoto,
+  resolveIdentityPhoto,
+} from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
 
 export type ProfilesWorkspaceFilter =
   | 'all'
-  | 'dsp'
-  | 'social'
-  | 'source'
-  | 'website'
-  | 'jovie'
+  | 'identity'
+  | 'profiles'
+  | 'catalog'
   | 'connector';
 
 export interface ProfileWorkspaceSurfaceRow {
@@ -52,6 +55,7 @@ export interface ProfileWorkspaceSurfaceRow {
   readonly rank: number | null;
   readonly previousRank: number | null;
   readonly lastObservedAt: string | null;
+  readonly identityPhoto?: PresenceIdentityPhoto;
 }
 
 export interface ProfileWorkspaceConnectorRow {
@@ -307,6 +311,25 @@ export async function loadProfilesWorkspaceData(input: {
             )
           );
   const socialSourceIds = new Set(socialSourceRows.map(row => row.surfaceId));
+  const dspMatches = await db
+    .select({
+      providerId: dspArtistMatches.providerId,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      externalArtistUrl: dspArtistMatches.externalArtistUrl,
+      externalArtistName: dspArtistMatches.externalArtistName,
+      externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+      updatedAt: dspArtistMatches.updatedAt,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, input.profileId),
+        inArray(dspArtistMatches.status, ['confirmed', 'auto_confirmed'])
+      )
+    );
+  const dspMatchByPlatform = new Map(
+    dspMatches.map(match => [match.providerId, match] as const)
+  );
 
   const surfaceRows: ProfileWorkspaceSurfaceRow[] = surfaces.map(surface => {
     const rank = rankFor(surface.id, latestRun?.id);
@@ -322,6 +345,18 @@ export async function loadProfilesWorkspaceData(input: {
             : 'locked';
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
+    const dspMatch =
+      dspMatchByPlatform.get(surface.platform) ??
+      dspMatches.find(
+        match =>
+          match.externalArtistUrl === surface.url ||
+          (match.externalArtistId &&
+            match.externalArtistId === surface.externalId)
+      );
+    const observedAt =
+      surface.lastObservedAt?.toISOString() ??
+      dspMatch?.updatedAt?.toISOString() ??
+      null;
     const trackedUrl =
       surface.kind === 'social' &&
       socialSourceIds.has(surface.id) &&
@@ -339,6 +374,7 @@ export async function loadProfilesWorkspaceData(input: {
       platform: surface.platform,
       label:
         surface.displayName ||
+        dspMatch?.externalArtistName ||
         getDspDisplayName(surface.platform) ||
         surface.platform
           .replaceAll('_', ' ')
@@ -354,7 +390,14 @@ export async function loadProfilesWorkspaceData(input: {
         locked,
         rankFor(surface.id, previousRun?.id)
       ),
-      lastObservedAt: surface.lastObservedAt?.toISOString() ?? null,
+      lastObservedAt: observedAt,
+      identityPhoto: resolveIdentityPhoto({
+        kind: surface.kind,
+        artistAvatarUrl: profileRows[0]?.avatarUrl ?? null,
+        connectorImageUrl: dspMatch?.externalArtistImageUrl ?? null,
+        metadata: surface.metadata,
+        observedAt,
+      }),
     };
   });
   const qualifiedResults = rankRows.filter(

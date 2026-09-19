@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
+  readonly calm?: boolean;
   readonly item: NavItem;
   readonly isActive: boolean;
   readonly shortcut?: KeyboardShortcut;
@@ -114,6 +115,7 @@ function NavMenuInteractiveElement({
 }
 
 export function NavMenuItem({
+  calm,
   item,
   isActive,
   shortcut,
@@ -274,6 +276,7 @@ export function NavMenuItem({
       }
     : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
+    calm,
     active: isActive,
     tone: item.tone,
     className:
@@ -285,6 +288,7 @@ export function NavMenuItem({
         <Icon
           name={item.iconName}
           className={getSidebarNavIconClassName({
+            calm,
             active: isActive,
             tone: item.tone,
           })}
@@ -294,6 +298,7 @@ export function NavMenuItem({
       ) : (
         <item.icon
           className={getSidebarNavIconClassName({
+            calm,
             active: isActive,
             tone: item.tone,
           })}
@@ -304,8 +309,17 @@ export function NavMenuItem({
       <span
         className={cn(
           'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
-          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
+          // A terminal fade reads as intentional truncation only on a
+          // full-width label track (long destinations fade instead of hard
+          // cropping). Compact w-fit create rows (New Chat, primary tone) hug
+          // the text in an auto track — the same fade there sheared the
+          // trailing glyph with rail space free (JOV-6181).
+          item.tone !== 'primary' && item.tone !== 'secondary'
+            ? '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
+            : null,
+          item.tone !== 'primary' && item.tone !== 'secondary'
+            ? '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
+            : null,
           'group-data-[collapsible=icon]:hidden'
         )}
       >

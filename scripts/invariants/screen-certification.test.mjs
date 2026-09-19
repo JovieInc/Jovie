@@ -36,7 +36,12 @@ import {
   verifyProofArtifact,
 } from './screen-certification.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
-import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
+import {
+  MARKETING_EVIDENCE_SCHEMA,
+  marketingArtifactName,
+  REQUIRED_MARKETING_QUALITY_CHECKS,
+  resolveTrustedScreenProof,
+} from './screen-proof-resolver.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -111,6 +116,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf('apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift'),
       'registered'
     );
+    assert.equal(
+      kindOf('apps/ios/Jovie/Features/Chat/MobileChatView.swift'),
+      'registered'
+    );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
@@ -138,6 +147,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens.map(screen => screen.id).sort(), [
       'web.public-profile',
       'web.start',
+    ]);
+  });
+
+  it('registers the public artists directory for changed-surface certification', () => {
+    const source = 'apps/web/app/artists/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artists');
+
+    assert.deepEqual(screen, {
+      id: 'web.artists',
+      platform: 'web',
+      owner: 'marketing-artists',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.artists', verdict: 'evidence-required', findings: [] },
     ]);
   });
 
@@ -566,6 +597,746 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('resolves a genuine trusted producer artifact into an exact-build pass', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-pass-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const proof = {
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        status: 'unverified-candidate',
+        certificationStatus: 'not-certified',
+        screenId: 'web.homepage',
+        headSha: head,
+        tier: 'rendered-evidence',
+        runUrl: `https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3`,
+        producerRunId: 77,
+        producerRunAttempt: 3,
+        producerJobId: 99,
+        environment: 'local-production-build',
+        sourcePaths: [
+          'apps/web/app/(home)/page.tsx',
+          'apps/web/app/(home)/layout.tsx',
+        ],
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${'0'.repeat(64)}`,
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Certify', 'Block'],
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+        })),
+      };
+      writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+      }
+      const digest = createHash('sha256');
+      for (const [name, bytes] of images) {
+        digest.update(name);
+        digest.update('\0');
+        digest.update(bytes);
+        digest.update('\0');
+      }
+      proof.artifactDigest = `sha256:${digest.digest('hex')}`;
+      writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+      assert.equal(
+        spawnSync(
+          'zip',
+          [
+            '-q',
+            'proof.zip',
+            'screen-proof.json',
+            ...images.map(([name]) => name),
+          ],
+          { cwd: root }
+        ).status,
+        0
+      );
+      const zip = readFileSync(join(root, 'proof.zip'));
+      const records = {
+        artifact: {
+          id: 42,
+          name: 'screen-browser-proof',
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 77 },
+        },
+        run: {
+          id: 77,
+          run_attempt: 3,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 99,
+              name: 'Generate Screenshots',
+              run_id: 77,
+              run_attempt: 3,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+      };
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      const result = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        proofRequests: [{ artifactId: 42, screenId: 'web.homepage' }],
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.equal(result.receipt.status, 'certified');
+      assert.deepEqual(result.receipt.changedScreens, [
+        {
+          id: 'web.homepage',
+          verdict: 'pass',
+          findings: [],
+          artifactDigest: proof.artifactDigest,
+          rendererRunUrl: proof.runUrl,
+        },
+      ]);
+      assert.ok(
+        result.receipt.changedScreens.every(
+          screen => screen.verdict !== 'certified:true'
+        )
+      );
+      assert.equal(
+        JSON.stringify(result.receipt).includes('"certified":true'),
+        true
+      );
+      // The certified bit is set exactly once, on the receipt — never as a
+      // per-screen flag a JEV shadow lane could echo as a certified surface.
+      assert.ok(
+        !JSON.stringify(result.receipt.changedScreens).includes('certified')
+      );
+      // A caller-authored copy of the trusted proof object cannot certify:
+      // trust is bound to the resolver-produced object identity.
+      const copied = JSON.parse(JSON.stringify(proof));
+      copied.screenId = 'web.homepage';
+      const forged = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        proofs: [copied],
+      });
+      assert.equal(forged.ok, false);
+      assert.equal(forged.receipt.certified, false);
+      assert.match(
+        forged.receipt.issues.join('\n'),
+        /trusted external browser producer integration is unavailable/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('fails resolver requests with specific reasons: forged, stale, wrong-build, incomplete, unavailable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-fail-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const baseProof = {
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        status: 'unverified-candidate',
+        certificationStatus: 'not-certified',
+        screenId: 'web.homepage',
+        headSha: head,
+        tier: 'rendered-evidence',
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
+        producerRunId: 77,
+        producerRunAttempt: 3,
+        producerJobId: 99,
+        environment: 'local-production-build',
+        sourcePaths: [
+          'apps/web/app/(home)/page.tsx',
+          'apps/web/app/(home)/layout.tsx',
+        ],
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${'0'.repeat(64)}`,
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Certify', 'Block'],
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+        })),
+      };
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+      }
+      // The genuine bundle digest, so each mutated archive fails at its own
+      // specific finding instead of the generic identity check.
+      const bundleDigestOf = list => {
+        const hash = createHash('sha256');
+        for (const [name, bytes] of list) {
+          hash.update(name);
+          hash.update('\0');
+          hash.update(bytes);
+          hash.update('\0');
+        }
+        return `sha256:${hash.digest('hex')}`;
+      };
+      baseProof.artifactDigest = bundleDigestOf(images);
+      const buildArchive = proof => {
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        rmSync(join(root, 'proof.zip'), { force: true });
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'screen-proof.json',
+              ...images.map(([name]) => name),
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        return readFileSync(join(root, 'proof.zip'));
+      };
+      const ghScript = [
+        'gh',
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`,
+      ];
+      const [ghName, ghBody] = ghScript;
+      writeFileSync(join(root, ghName), ghBody);
+      chmodSync(join(root, ghName), 0o755);
+      const makeRecords = patch => {
+        const records = {
+          artifact: {
+            id: 42,
+            name: 'screen-browser-proof',
+            expired: false,
+            digest: `sha256:${'0'.repeat(64)}`,
+            created_at: iso(-30_000),
+            workflow_run: { id: 77 },
+          },
+          run: {
+            id: 77,
+            run_attempt: 3,
+            repository: { full_name: 'JovieInc/Jovie' },
+            head_branch: 'main',
+            head_sha: head,
+            path: '.github/workflows/screenshots.yml',
+            event: 'push',
+            conclusion: 'success',
+          },
+          jobs: {
+            jobs: [
+              {
+                id: 99,
+                name: 'Generate Screenshots',
+                run_id: 77,
+                run_attempt: 3,
+                head_sha: head,
+                conclusion: 'success',
+                started_at: iso(-90_000),
+                completed_at: iso(-10_000),
+              },
+            ],
+          },
+        };
+        for (const [key, value] of Object.entries(patch ?? {})) {
+          records[key] =
+            value && typeof value === 'object' && !Array.isArray(value)
+              ? { ...records[key], ...value }
+              : value;
+        }
+        writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      };
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      const request = () =>
+        runScreenCertification({
+          headSha: head,
+          changedFiles: ['apps/web/app/(home)/page.tsx'],
+          proofRequests: [{ artifactId: 42, screenId: 'web.homepage' }],
+        });
+      const issues = () => {
+        const result = request();
+        assert.equal(result.ok, false);
+        assert.equal(result.receipt.certified, false);
+        return result.receipt.issues.join('\n');
+      };
+
+      // forged: proof JSON edited after archiving — the bundle digest no
+      // longer matches GitHub's artifact digest.
+      const forgedProof = {
+        ...structuredClone(baseProof),
+        screenId: 'web.developers',
+      };
+      const forgedZip = buildArchive(forgedProof);
+      makeRecords({ artifact: { digest: sha256(forgedZip) } });
+      // The zip is intact and matches, but the proof inside claims a
+      // different screen than the admission context, so the resolver's
+      // identity check must reject it before any certification.
+      assert.match(issues(), /candidate identity, capture, or decoded bundle/);
+
+      // stale: the artifact was produced for an older head.
+      makeRecords({
+        run: { head_sha: 'b'.repeat(40) },
+      });
+      assert.match(
+        issues(),
+        /artifact run, workflow, or exact producer attempt/
+      );
+
+      // wrong-build: capture claims a non-production environment.
+      makeRecords({});
+      const wrongBuild = {
+        ...structuredClone(baseProof),
+        environment: 'preview',
+      };
+      buildArchive(wrongBuild);
+      const wrongBuildRecords = JSON.parse(
+        readFileSync(join(root, 'records.json'), 'utf8')
+      );
+      wrongBuildRecords.artifact.digest = sha256(
+        readFileSync(join(root, 'proof.zip'))
+      );
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(wrongBuildRecords)
+      );
+      assert.match(issues(), /candidate identity, capture, or decoded bundle/);
+
+      // incomplete: a required viewport measurement is missing.
+      const incomplete = structuredClone(baseProof);
+      delete incomplete.viewports[1];
+      buildArchive(incomplete);
+      const incompleteRecords = JSON.parse(
+        readFileSync(join(root, 'records.json'), 'utf8')
+      );
+      incompleteRecords.artifact.digest = sha256(
+        readFileSync(join(root, 'proof.zip'))
+      );
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(incompleteRecords)
+      );
+      assert.match(issues(), /required browser measurements are unavailable/);
+
+      // unavailable: the controlled producer transport cannot be reached.
+      const priorPathOnly = process.env.PATH;
+      process.env.PATH = priorPathOnly
+        .split(':')
+        .filter(entry => entry !== root)
+        .join(':');
+      try {
+        assert.match(
+          issues(),
+          /controlled GitHub artifact resolver is unavailable/
+        );
+      } finally {
+        process.env.PATH = priorPathOnly;
+      }
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('resolves genuine marketing-route capture evidence into an exact-build pass', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-marketing-pass-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    const priorArtifact = process.env.SCREEN_CERT_ARTIFACT_ID;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const receiptFor = viewport => ({
+        schemaVersion: MARKETING_EVIDENCE_SCHEMA,
+        buildMode: 'production',
+        capturedAt: iso(-60_000),
+        coverageId: `web-marketing-route-home-${viewport}`,
+        documentStatus: 200,
+        finalPath: '/',
+        route: '/',
+        fixturePath: '/',
+        qualityChecks: [...REQUIRED_MARKETING_QUALITY_CHECKS],
+        routeDisposition: 'active-verified',
+        screenshotSha256: createHash('sha256').update(image).digest('hex'),
+        sourcePath: 'apps/web/app/(home)/page.tsx',
+        sourceGitSha: head,
+        stateMatrix: ['anonymous-default'],
+        viewport,
+      });
+      for (const viewport of ['desktop', 'mobile']) {
+        const dir = join(root, `home-${viewport}`);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, 'receipt.json'),
+          JSON.stringify(receiptFor(viewport))
+        );
+        writeFileSync(join(dir, 'marketing-route.png'), image);
+      }
+      assert.equal(
+        spawnSync(
+          'zip',
+          [
+            '-q',
+            'proof.zip',
+            'home-desktop/receipt.json',
+            'home-desktop/marketing-route.png',
+            'home-mobile/receipt.json',
+            'home-mobile/marketing-route.png',
+          ],
+          { cwd: root }
+        ).status,
+        0
+      );
+      const zip = readFileSync(join(root, 'proof.zip'));
+      const records = {
+        artifact: {
+          id: 42,
+          name: marketingArtifactName(head),
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 77 },
+        },
+        run: {
+          id: 77,
+          run_attempt: 3,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 99,
+              name: 'Generate Screenshots',
+              run_id: 77,
+              run_attempt: 3,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+      };
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      process.env.SCREEN_CERT_ARTIFACT_ID = '42';
+      const result = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        artifactId: 42,
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.equal(result.receipt.status, 'certified');
+      assert.equal(result.receipt.changedScreens[0]?.id, 'web.homepage');
+      assert.equal(result.receipt.changedScreens[0]?.verdict, 'pass');
+      assert.ok(
+        result.receipt.changedScreens.every(
+          screen => screen.verdict !== 'certified:true'
+        )
+      );
+      assert.ok(
+        !JSON.stringify(result.receipt.changedScreens).includes('certified')
+      );
+      const resolved = resolveTrustedScreenProof({
+        artifactId: 42,
+        context: {
+          headSha: head,
+          screenId: 'web.homepage',
+          sourcePaths: [
+            'apps/web/app/(home)/page.tsx',
+            'apps/web/app/(home)/layout.tsx',
+          ],
+          viewports: home().viewports,
+        },
+      });
+      assert.equal(resolved.proof?.certificationStatus, 'not-certified');
+      assert.equal(resolved.proof?.environment, 'local-production-build');
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      if (priorArtifact === undefined)
+        delete process.env.SCREEN_CERT_ARTIFACT_ID;
+      else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('fails marketing capture evidence with specific reasons: forged, stale, wrong-build, incomplete, unavailable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-marketing-fail-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const receiptFor = (viewport, patch = {}) => ({
+        schemaVersion: MARKETING_EVIDENCE_SCHEMA,
+        buildMode: 'production',
+        capturedAt: iso(-60_000),
+        coverageId: `web-marketing-route-home-${viewport}`,
+        documentStatus: 200,
+        finalPath: '/',
+        route: '/',
+        fixturePath: '/',
+        qualityChecks: [...REQUIRED_MARKETING_QUALITY_CHECKS],
+        routeDisposition: 'active-verified',
+        screenshotSha256: createHash('sha256').update(image).digest('hex'),
+        sourcePath: 'apps/web/app/(home)/page.tsx',
+        sourceGitSha: head,
+        stateMatrix: ['anonymous-default'],
+        viewport,
+        ...patch,
+      });
+      const writeBundle = receipts => {
+        for (const viewport of ['desktop', 'mobile']) {
+          const dir = join(root, `home-${viewport}`);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(
+            join(dir, 'receipt.json'),
+            JSON.stringify(receipts[viewport])
+          );
+          writeFileSync(join(dir, 'marketing-route.png'), image);
+        }
+        rmSync(join(root, 'proof.zip'), { force: true });
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'home-desktop/receipt.json',
+              'home-desktop/marketing-route.png',
+              'home-mobile/receipt.json',
+              'home-mobile/marketing-route.png',
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        return readFileSync(join(root, 'proof.zip'));
+      };
+      const baselineReceipts = {
+        desktop: receiptFor('desktop'),
+        mobile: receiptFor('mobile'),
+      };
+      const zip = writeBundle(baselineReceipts);
+      const makeRecords = patch => {
+        const records = {
+          artifact: {
+            id: 42,
+            name: marketingArtifactName(head),
+            expired: false,
+            digest: sha256(zip),
+            created_at: iso(-30_000),
+            workflow_run: { id: 77 },
+          },
+          run: {
+            id: 77,
+            run_attempt: 3,
+            repository: { full_name: 'JovieInc/Jovie' },
+            head_branch: 'main',
+            head_sha: head,
+            path: '.github/workflows/screenshots.yml',
+            event: 'push',
+            conclusion: 'success',
+          },
+          jobs: {
+            jobs: [
+              {
+                id: 99,
+                name: 'Generate Screenshots',
+                run_id: 77,
+                run_attempt: 3,
+                head_sha: head,
+                conclusion: 'success',
+                started_at: iso(-90_000),
+                completed_at: iso(-10_000),
+              },
+            ],
+          },
+        };
+        for (const [key, value] of Object.entries(patch ?? {})) {
+          records[key] =
+            value && typeof value === 'object' && !Array.isArray(value)
+              ? { ...records[key], ...value }
+              : value;
+        }
+        writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      };
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      const issues = () => {
+        const result = runScreenCertification({
+          headSha: head,
+          changedFiles: ['apps/web/app/(home)/page.tsx'],
+          artifactId: 42,
+        });
+        assert.equal(result.ok, false);
+        assert.equal(result.receipt.certified, false);
+        return result.receipt.issues.join('\n');
+      };
+
+      const forgedZip = writeBundle({
+        desktop: receiptFor('desktop', {
+          screenshotSha256: '0'.repeat(64),
+        }),
+        mobile: receiptFor('mobile'),
+      });
+      makeRecords({ artifact: { digest: sha256(forgedZip) } });
+      assert.match(issues(), /forged marketing receipt or screenshot digest/);
+
+      writeBundle(baselineReceipts);
+      makeRecords({
+        artifact: { digest: sha256(readFileSync(join(root, 'proof.zip'))) },
+        run: { head_sha: 'b'.repeat(40) },
+      });
+      assert.match(
+        issues(),
+        /artifact run, workflow, or exact producer attempt/
+      );
+
+      const wrongBuildZip = writeBundle({
+        desktop: receiptFor('desktop', { buildMode: 'preview' }),
+        mobile: receiptFor('mobile', { buildMode: 'preview' }),
+      });
+      makeRecords({ artifact: { digest: sha256(wrongBuildZip) } });
+      assert.match(issues(), /not an exact production build/);
+
+      const incompleteZip = writeBundle({
+        desktop: receiptFor('desktop', {
+          qualityChecks: REQUIRED_MARKETING_QUALITY_CHECKS.filter(
+            check => check !== 'accessibility'
+          ),
+        }),
+        mobile: receiptFor('mobile'),
+      });
+      makeRecords({ artifact: { digest: sha256(incompleteZip) } });
+      assert.match(
+        issues(),
+        /required marketing route receipts or measurements are incomplete/
+      );
+
+      const priorPathOnly = process.env.PATH;
+      process.env.PATH = priorPathOnly
+        .split(':')
+        .filter(entry => entry !== root)
+        .join(':');
+      try {
+        assert.match(
+          issues(),
+          /controlled GitHub artifact resolver is unavailable/
+        );
+      } finally {
+        process.env.PATH = priorPathOnly;
+      }
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   it('emits only a candidate; the emitter cannot self-certify', () => {
     const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-proof-emit-'));
     try {
@@ -979,6 +1750,30 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         verdict: 'evidence-required',
         findings: [],
       },
+    ]);
+  });
+
+  it('registers the marketing shell layout for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/layout.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-shell'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-shell',
+      platform: 'web',
+      owner: 'marketing-shell',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.marketing-shell', verdict: 'evidence-required', findings: [] },
     ]);
   });
 

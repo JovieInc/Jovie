@@ -13,14 +13,8 @@ import {
 
 export const ADMISSION_SCAN_SCHEMA = 'symphony-admission-scan/v1';
 
-const ACTIVE_STATES = new Set([
-  'Triage',
-  'Backlog',
-  'Todo',
-  'In Progress',
-  'In Review',
-]);
-const CLAIMED_STATES = new Set(['In Progress', 'In Review']);
+const ACTIVE_STATES = new Set(['Todo', 'In Progress', 'Rework', 'Merging']);
+const CLAIMED_STATES = new Set(['In Progress', 'Rework', 'Merging']);
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive/i;
 const ACTIVE_PULL_REQUEST =

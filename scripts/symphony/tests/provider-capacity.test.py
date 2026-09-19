@@ -40,6 +40,7 @@ class ProviderCapacityTests(unittest.TestCase):
             "revision", "b" * 64,
         )
         self.assertIn("Environment=SYMPHONY_FALLBACK_PROVIDER=cursor", command)
+        self.assertTrue(any(arg.startswith("Environment=GEM_CURSOR_EXECUTABLE=") for arg in command))
         self.assertNotIn("app-server", command)
         official_router = (ROOT / "scripts/symphony/symphony-codex-router").read_text()
         self.assertIn("entry.provider === 'codex'", official_router)

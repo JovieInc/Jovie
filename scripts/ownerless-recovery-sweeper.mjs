@@ -890,6 +890,8 @@ export async function run({
 export function safeFailureReceipt(error) {
   const err = /** @type {any} */ (error);
   const cause = /** @type {any} */ (err?.cause);
+  const stderr =
+    typeof err?.details?.stderr === 'string' ? err.details.stderr.trim() : '';
   return {
     schema: 'jovie-ownerless-recovery-failure/v1',
     name: err?.name ?? 'Error',
@@ -898,6 +900,7 @@ export function safeFailureReceipt(error) {
     attempts: err?.attempts ?? null,
     resetAt: err?.resetAt ?? null,
     coverage: err?.coverage ?? null,
+    stderr: stderr ? stderr.slice(0, 2000) : null,
     cause: cause
       ? {
           name: cause.name ?? 'Error',

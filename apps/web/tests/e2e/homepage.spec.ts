@@ -1,4 +1,9 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  evaluateAcceptanceEvidence,
+  evaluateRelationalGrid,
+  evaluateSharedSearchGeometry,
+} from '../../../../scripts/component-rendered-invariant-policy.mjs';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -115,28 +120,218 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
+    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
+      0
+    );
+    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
+      0
+    );
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Find yourself' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', '/signup');
   });
 
-  test('canonical header flyouts stay closed until requested', async ({
+  test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
     page,
+    context,
   }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    // Match the consent fixture: middleware refreshes this flag from geo headers.
+    await page.setExtraHTTPHeaders({
+      'x-vercel-ip-country': 'DE',
+      'x-vercel-ip-country-region': 'BE',
+    });
+    await page.addInitScript(() => {
+      try {
+        localStorage.removeItem('jv_cc');
+      } catch {
+        // ignore
+      }
+    });
+    await context.addCookies([
+      {
+        name: 'jv_cc_required',
+        value: '1',
+        url: process.env.BASE_URL ?? 'http://localhost:3100',
+        sameSite: 'Lax',
+      },
+    ]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+      const actions = page.locator(
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
+      );
+      await expect(page.getByTestId('cookie-actions')).toBeVisible();
+      expect(await actions.count()).toBeGreaterThanOrEqual(4);
+      for (const action of await actions.all()) {
+        const geometry = await action.evaluate(element => {
+          const face = element.getBoundingClientRect();
+          const target = getComputedStyle(element, '::before');
+          return {
+            height: face.height,
+            targetHeight: Number.parseFloat(target.height),
+            targetWidth: Number.parseFloat(target.width),
+          };
+        });
+        expect(geometry.height).toBeCloseTo(28, 0);
+        expect(geometry.targetHeight).toBeGreaterThanOrEqual(44);
+        expect(geometry.targetWidth).toBeGreaterThanOrEqual(44);
+      }
+
+      const ink = await page
+        .locator('.homepage-trust-logo-slot:visible')
+        .evaluateAll(slots =>
+          slots.map(slot => {
+            const svg = slot.querySelector('svg');
+            if (!svg) throw new Error('Trust logo SVG missing');
+            const matrix = svg.getScreenCTM();
+            if (!matrix) throw new Error('Trust logo transform missing');
+            const bounds = svg.getBBox();
+            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
+              matrix
+            );
+            const rightBottom = new DOMPoint(
+              bounds.x + bounds.width,
+              bounds.y + bounds.height
+            ).matrixTransform(matrix);
+            const frame = slot.getBoundingClientRect();
+            return {
+              left: leftTop.x,
+              right: rightBottom.x,
+              top: leftTop.y,
+              bottom: rightBottom.y,
+              frameLeft: frame.left,
+              frameRight: frame.right,
+              frameTop: frame.top,
+              frameBottom: frame.bottom,
+            };
+          })
+        );
+      expect(ink.length).toBeGreaterThanOrEqual(4);
+      for (const logo of ink) {
+        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
+        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
+        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
+        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
+        expect(logo.left).toBeGreaterThanOrEqual(0);
+        expect(logo.right).toBeLessThanOrEqual(width);
+      }
+
+      const consentAndHeader = page.locator(
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button'
+      );
+      const assertTargets = async () => {
+        const targets = await consentAndHeader.evaluateAll(elements =>
+          elements.map(element => {
+            const face = element.getBoundingClientRect();
+            const pseudo = getComputedStyle(element, '::before');
+            const width = Math.max(face.width, Number.parseFloat(pseudo.width));
+            const height = Math.max(
+              face.height,
+              Number.parseFloat(pseudo.height)
+            );
+            const left = face.x + (face.width - width) / 2;
+            const top = face.y + (face.height - height) / 2;
+            const points = [
+              [left + width / 2, top + 2],
+              [left + width / 2, top + height - 2],
+              [left + 2, top + height / 2],
+              [left + width - 2, top + height / 2],
+            ];
+            return {
+              left,
+              right: left + width,
+              top,
+              bottom: top + height,
+              owned: points.every(([x, y]) => {
+                const hit = document.elementFromPoint(x, y);
+                return (
+                  hit === element || (hit !== null && element.contains(hit))
+                );
+              }),
+            };
+          })
+        );
+        for (let i = 0; i < targets.length; i += 1) {
+          expect(targets[i].owned, '44px target must hit its own control').toBe(
+            true
+          );
+          for (const other of targets.slice(i + 1)) {
+            const target = targets[i];
+            expect(
+              target.right <= other.left ||
+                other.right <= target.left ||
+                target.bottom <= other.top ||
+                other.bottom <= target.top
+            ).toBe(true);
+          }
+        }
+      };
+      await assertTargets();
+      for (const action of await consentAndHeader.all()) {
+        await page.keyboard.press('Tab');
+        await action.focus();
+        await page.evaluate(
+          () =>
+            new Promise<void>(resolve => {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve())
+              );
+            })
+        );
+        await expect(action).toBeFocused();
+        const shadow = await action.evaluate(
+          element => getComputedStyle(element).boxShadow
+        );
+        expect(shadow).toContain('rgb(17, 175, 255)');
+      }
+
+      // Text-only enlargement must grow the native control, not clip its label.
+      for (const action of await actions.all()) {
+        await action.evaluate(element => {
+          element.style.fontSize = '40px';
+        });
+        const grown = await action.evaluate(element => ({
+          height: element.getBoundingClientRect().height,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+        }));
+        expect(grown.height).toBeGreaterThan(28);
+        expect(grown.scrollHeight).toBeLessThanOrEqual(grown.clientHeight);
+      }
+      await assertTargets();
+    }
+  });
+
+  test('canonical header has no flyout menus', async ({ page }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(toolsFlyout).toHaveCount(0);
   });
 
@@ -486,6 +681,74 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
+  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoHomepage(page);
+    await page.evaluate(() => document.fonts.ready);
+
+    const proof = page.getByTestId('marketing-section-logo-cloud');
+    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
+    );
+    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
+
+    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
+      svgs.map(svg => {
+        const box = svg.getBoundingClientRect();
+        return {
+          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        };
+      })
+    );
+    expect(logoBoxes).toHaveLength(4);
+    for (let index = 0; index < logoBoxes.length; index += 1) {
+      for (let other = index + 1; other < logoBoxes.length; other += 1) {
+        const a = logoBoxes[index];
+        const b = logoBoxes[other];
+        const overlaps =
+          a.left < b.right &&
+          a.right > b.left &&
+          a.top < b.bottom &&
+          a.bottom > b.top;
+        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
+          false
+        );
+      }
+    }
+
+    const headerBottom = await page
+      .getByTestId('header-nav')
+      .evaluate(header => {
+        const shell = header.querySelector('.marketing-glass-header__shell');
+        return (shell ?? header).getBoundingClientRect().bottom;
+      });
+
+    const headings = page.locator('[data-homepage-section-heading]');
+    const headingCount = await headings.count();
+    expect(headingCount).toBeGreaterThanOrEqual(7);
+
+    for (let index = 0; index < headingCount; index += 1) {
+      const heading = headings.nth(index);
+      const name = (await heading.innerText()).trim();
+      await heading.evaluate(element => {
+        element.scrollIntoView({ block: 'start', inline: 'nearest' });
+      });
+      const top = await heading.evaluate(
+        element => element.getBoundingClientRect().top
+      );
+      expect(top, `${name} must clear the sticky nav`).toBeGreaterThanOrEqual(
+        headerBottom - 0.5
+      );
+    }
+  });
+
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
@@ -583,17 +846,14 @@ test.describe('Homepage', () => {
     const mobileNav = page.locator('#mobile-nav-panel');
     await expect(mobileNav).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveCount(0);
-    await expect(
       header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
-    ).toHaveAttribute('href', '/start');
+      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveAttribute('href', '/signup');
   });
 
   test('has no horizontal overflow across common viewports', async ({
@@ -737,6 +997,35 @@ test.describe('Homepage', () => {
     const desktop = await measure(1440);
     expect(spread(desktop.startLefts)).toBeLessThanOrEqual(2);
     expect(spread(desktop.endLefts)).toBeLessThanOrEqual(2);
+    expect(
+      evaluateRelationalGrid({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        elements: desktop.endLefts.map((x, index) => ({
+          id: `end-copy-${index}`,
+          column: '7 / span 6',
+          align: 'end',
+          role: 'copy',
+          box: { x, y: 0, width: 0, height: 0 },
+        })),
+      }).ok
+    ).toBe(true);
+    expect(
+      evaluateAcceptanceEvidence({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        rendered: { aligned: spread(desktop.endLefts) <= 2 },
+        screenshotBaselineUpdated: false,
+      }).ok
+    ).toBe(true);
     expect(desktop.endLefts[0] ?? 0).toBeGreaterThan(
       (desktop.startLefts[0] ?? 0) + 80
     );
@@ -821,6 +1110,22 @@ test.describe('Homepage', () => {
       0
     );
     expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: {
+          treatment: heroSearch?.treatment,
+          fieldHeight: heroSearch?.fieldHeight,
+          fieldBackground: heroSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+        close: {
+          treatment: closeSearch?.treatment,
+          fieldHeight: closeSearch?.fieldHeight,
+          fieldBackground: closeSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+      }).ok
+    ).toBe(true);
 
     const input = page
       .getByTestId('homepage-editorial-hero-search')
@@ -877,11 +1182,10 @@ test.describe('Homepage', () => {
   });
 
   /**
-   * JOV-5334: Public waitlist-first conversion CTAs land on the production
-   * waitlist URL. /start remains the post-auth capture chat, not the public
-   * Get started.
+   * JOV-6436: Public Get started CTAs land on same-origin /signup.
+   * /start remains the post-auth capture chat; /waitlist is the receipt.
    */
-  test('all data-cta-sign-up elements navigate to the public waitlist (JOV-5334)', async ({
+  test('all data-cta-sign-up elements navigate to signup (JOV-6436)', async ({
     page,
   }) => {
     await gotoHomepage(page);
@@ -902,12 +1206,13 @@ test.describe('Homepage', () => {
 
       if (tagName === 'a') {
         const href = await cta.getAttribute('href');
-        const isWaitlistRoute =
+        const isSignupRoute =
           href === PUBLIC_WAITLIST_URL ||
-          (href?.startsWith('/waitlist') ?? false);
+          href === '/signup' ||
+          (href?.startsWith('/signup?') ?? false);
         expect(
-          isWaitlistRoute,
-          `CTA at index ${i} (href="${href}") must route to the public waitlist`
+          isSignupRoute,
+          `CTA at index ${i} (href="${href}") must route to /signup`
         ).toBe(true);
       }
     }

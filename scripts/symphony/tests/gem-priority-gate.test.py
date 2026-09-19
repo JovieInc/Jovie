@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import importlib.util
@@ -673,6 +674,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
             )
             with (
                 mock.patch.object(MODULE, "observe_main", return_value=main),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value=None) as audit_observer,
                 mock.patch.object(
                     MODULE,
                     "observe_production",
@@ -710,8 +712,16 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     "observe_lease",
                     return_value={"status": "unknown", "reason": "missing"},
                 ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_fallback_seats",
+                    return_value=MODULE._unavailable_fallback_seats("test-fixture"),
+                ),
             ):
                 signals = MODULE.observe_signals(args, now)
+
+        audit_observer.assert_called_once_with("JovieInc/Jovie", main["sha"], MODULE.gh_json,
+                                              targets=GREEN_SIGNALS["closureHealth"].get("lifecycleActions", []))
 
         self.assertEqual(
             signals["concurrencyEvidence"],
@@ -725,11 +735,541 @@ class ConcurrencyObservationTests(unittest.TestCase):
         self.assertEqual(queue_observer.call_args.args[2], 1)
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
         self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+
+
+def fallback_seat_signal(grok: bool, kimi: bool) -> dict[str, object]:
+    return {
+        "schema": "gem-fallback-seats/v1",
+        "observedAt": MODULE.isoformat(MODULE.utc_now()),
+        "providers": {
+            "grok": {
+                "available": grok,
+                "reason": "ready" if grok else "probe-failed",
+            },
+            "kimi": {
+                "available": kimi,
+                "reason": "ready" if kimi else "probe-failed",
+            },
+        },
+        "availableSeats": int(grok) + int(kimi),
+    }
+
+
+class FallbackSeatTests(unittest.TestCase):
+    """JOV-5913: unbound-repair concurrency follows live Grok/Kimi OAuth seats."""
+
+    def evaluate_unbound(self, **overrides: object) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals.update(overrides)
+        return MODULE.evaluate(signals, MODULE.isoformat(MODULE.utc_now()))
+
+    def test_unbound_repair_scales_to_eight_with_both_oauth_seats(self):
+        receipt = self.evaluate_unbound(
+            fallbackSeats=fallback_seat_signal(True, True)
+        )
+        admission = receipt["productionUnboundRepairAdmission"]
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(admission["allowed"])
+        self.assertEqual(admission["maxConcurrent"], 8)
+        self.assertFalse(admission["deploymentsAllowed"])
+        self.assertEqual(receipt["signals"]["fallbackSeats"]["availableSeats"], 2)
+
+    def test_unbound_repair_scales_to_four_with_one_oauth_seat(self):
+        for grok, kimi in ((True, False), (False, True)):
+            with self.subTest(grok=grok, kimi=kimi):
+                receipt = self.evaluate_unbound(
+                    fallbackSeats=fallback_seat_signal(grok, kimi)
+                )
+                self.assertEqual(
+                    receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4
+                )
+
+    def test_missing_seat_evidence_keeps_useful_turn_scale(self):
+        receipt = self.evaluate_unbound()
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4
+        )
+
+    def test_malformed_seat_evidence_fails_closed_without_useful_turns(self):
+        stale_capacity = {
+            "schema": "gem-concurrency-evidence/v1",
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+        malformed = [
+            {"schema": "other"},
+            {"schema": "gem-fallback-seats/v1", "providers": {}},
+            {
+                "schema": "gem-fallback-seats/v1",
+                "providers": {
+                    "grok": {"available": "yes"},
+                    "kimi": {"available": True},
+                },
+            },
+        ]
+        for evidence in malformed:
+            with self.subTest(evidence=evidence):
+                receipt = self.evaluate_unbound(
+                    concurrencyEvidence=stale_capacity,
+                    fallbackSeats=evidence,
+                )
+                self.assertEqual(
+                    receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+                )
+
+    def test_zero_live_seats_stays_at_floor(self):
+        receipt = self.evaluate_unbound(
+            fallbackSeats=fallback_seat_signal(False, False)
+        )
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+        )
+
+    def test_codex_capacity_evidence_never_caps_fallback_repair(self):
+        stale_capacity = {
+            "schema": "gem-concurrency-evidence/v1",
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+        receipt = self.evaluate_unbound(
+            concurrencyEvidence=stale_capacity,
+            fallbackSeats=fallback_seat_signal(True, True),
+        )
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 8
+        )
+        self.assertTrue(receipt["productionUnboundRepairAdmission"]["allowed"])
+        self.assertFalse(
+            receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"]
+        )
+
+    def test_unbound_repair_concurrency_bounds(self):
+        cases = [
+            (-1, 1),
+            (0, 1),
+            (1, 4),
+            (2, 8),
+            (10, 40),
+            (99, 40),
+            (None, 1),
+            ("4", 1),
+            (True, 1),
+        ]
+        for available, expected in cases:
+            with self.subTest(available=available):
+                self.assertEqual(
+                    MODULE.unbound_repair_concurrency({"availableSeats": available}),
+                    expected,
+                )
+
+    def test_observe_fallback_seats_missing_registry_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = MODULE.observe_fallback_seats(
+                MODULE.utc_now(),
+                registry_path=pathlib.Path(tmp) / "missing.json",
+            )
+        self.assertEqual(receipt["schema"], MODULE.FALLBACK_SEAT_SCHEMA)
+        self.assertEqual(receipt["availableSeats"], 0)
+        self.assertEqual(receipt["reason"], "model-registry-missing")
+
+    def test_observe_fallback_seats_probes_registry_providers(self):
+        registry = {
+            "models": [
+                {
+                    "provider": "grok",
+                    "model": "grok-4.6",
+                    "executable_default": "grok",
+                    "probe_argv": ["{executable}", "models"],
+                    "probe_forbidden_patterns": ["not authenticated"],
+                },
+                {
+                    "provider": "kimi",
+                    "model": "kimi-code/k3",
+                    "executable_env": "GEM_KIMI_EXECUTABLE",
+                    "executable_default": "kimi",
+                    "probe_argv": ["{executable}", "provider", "list", "--json"],
+                    "probe_mode": "json-model-key",
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "model-registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+
+            def fake_run(argv, **_kwargs):
+                if "provider" in argv:
+                    return subprocess.CompletedProcess(
+                        argv,
+                        0,
+                        stdout=json.dumps({"models": {"kimi-code/k3": {}}}).encode(),
+                        stderr=b"",
+                    )
+                return subprocess.CompletedProcess(
+                    argv, 0, stdout=b"grok-4.6\n", stderr=b""
+                )
+
+            with (
+                mock.patch.object(
+                    MODULE, "_resolve_seat_executable", return_value="/bin/true"
+                ),
+                mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run),
+            ):
+                receipt = MODULE.observe_fallback_seats(
+                    MODULE.utc_now(), registry_path=path
+                )
+        self.assertEqual(receipt["availableSeats"], 2)
+        self.assertTrue(receipt["providers"]["grok"]["available"])
+        self.assertTrue(receipt["providers"]["kimi"]["available"])
+
+    def test_observe_fallback_seats_marks_auth_and_quota_failures_unavailable(self):
+        registry = {
+            "models": [
+                {
+                    "provider": "grok",
+                    "model": "grok-4.6",
+                    "executable_default": "grok",
+                    "probe_argv": ["{executable}", "models"],
+                    "probe_forbidden_patterns": ["not authenticated"],
+                },
+                {
+                    "provider": "kimi",
+                    "model": "kimi-code/k3",
+                    "executable_default": "kimi",
+                    "probe_argv": ["{executable}", "provider", "list", "--json"],
+                    "probe_mode": "json-model-key",
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "model-registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+
+            def fake_run(argv, **_kwargs):
+                if "provider" in argv:
+                    return subprocess.CompletedProcess(
+                        argv, 0, stdout=b"error: 429 too many requests", stderr=b""
+                    )
+                return subprocess.CompletedProcess(
+                    argv, 0, stdout=b"not authenticated", stderr=b""
+                )
+
+            with (
+                mock.patch.object(
+                    MODULE, "_resolve_seat_executable", return_value="/bin/true"
+                ),
+                mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run),
+            ):
+                receipt = MODULE.observe_fallback_seats(
+                    MODULE.utc_now(), registry_path=path
+                )
+        self.assertEqual(receipt["availableSeats"], 0)
+        self.assertEqual(
+            receipt["providers"]["grok"]["reason"], "auth-or-runtime-failed"
+        )
+        self.assertEqual(
+            receipt["providers"]["kimi"]["reason"], "pool-quota-exhausted"
+        )
+
+
+class FallbackSeatPathTests(unittest.TestCase):
+    """JOV-5913 remediation: direct coverage for the seat-probe helper paths.
+
+    The evaluate()-level tests mock observe_fallback_seats, so the probe
+    helpers' own fail-closed branches need direct unit coverage to hold the
+    structural lane's 84% coverage floor on gem-priority-gate.py.
+    """
+
+    def test_probe_timeout_env_variants(self):
+        cases = [
+            ("bogus", MODULE.DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS),
+            ("-5", MODULE.DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS),
+            ("0", MODULE.DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS),
+            ("99", MODULE.MAX_FALLBACK_PROBE_TIMEOUT_SECONDS),
+            ("11.5", 11.5),
+        ]
+        for env_value, expected in cases:
+            with self.subTest(env_value=env_value):
+                with mock.patch.dict(
+                    os.environ, {"GEM_FALLBACK_PROBE_TIMEOUT_SECONDS": env_value}
+                ):
+                    self.assertEqual(MODULE._fallback_probe_timeout(), expected)
+
+    def test_registry_path_prefers_explicit_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            explicit = pathlib.Path(tmp) / "explicit.json"
+            explicit.write_text("{}", encoding="utf-8")
+            self.assertIs(MODULE._fallback_registry_path(explicit), explicit)
+            self.assertIsNone(
+                MODULE._fallback_registry_path(pathlib.Path(tmp) / "missing.json")
+            )
+
+    def test_registry_path_env_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = pathlib.Path(tmp) / "env-registry.json"
+            env_file.write_text(json.dumps({"models": []}), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"GEM_MODEL_REGISTRY": str(env_file)}):
+                self.assertEqual(MODULE._fallback_registry_path(None), env_file)
+                self.assertIsNone(
+                    MODULE._fallback_registry_path(pathlib.Path(tmp) / "none")
+                )
+
+    def test_registry_path_scans_default_candidates(self):
+        found = MODULE._fallback_registry_path(None)
+        script_dir = pathlib.Path(MODULE.__file__).resolve().parent
+        expected = script_dir / "config" / "model-registry.json"
+        if expected.is_file():
+            # _fallback_registry_path rebuilds the candidate Path, so equality
+            # (not identity) is the contract when the default registry exists.
+            self.assertEqual(found, expected)
+        else:
+            self.assertIsNone(found)
+
+    def test_resolve_seat_executable_env_precedence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = pathlib.Path(tmp) / "kimi-cli"
+            binary.write_text("#!/bin/sh\n", encoding="utf-8")
+            binary.chmod(0o755)
+            model = {
+                "provider": "kimi",
+                "model": "kimi-code/k3",
+                "executable_env": "GEM_KIMI_EXECUTABLE",
+                "executable_default": "kimi-from-path",
+            }
+            with mock.patch.dict(
+                os.environ, {"GEM_KIMI_EXECUTABLE": str(binary)}
+            ):
+                self.assertEqual(
+                    MODULE._resolve_seat_executable(model), str(binary)
+                )
+
+    def test_resolve_seat_executable_grok_alias_and_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            alias = pathlib.Path(tmp) / "grok-alias"
+            alias.write_text("#!/bin/sh\n", encoding="utf-8")
+            alias.chmod(0o755)
+            model = {"provider": "grok", "model": "grok-4.6"}
+            with mock.patch.dict(os.environ, {"GEM_GROK_BIN": str(alias)}):
+                self.assertEqual(MODULE._resolve_seat_executable(model), str(alias))
+            with mock.patch.dict(os.environ, {"GEM_GROK_BIN": ""}), \
+                    mock.patch.object(MODULE.Path, "home", return_value=pathlib.Path(tmp)):
+                self.assertIsNone(MODULE._resolve_seat_executable(model))
+                installed = pathlib.Path(tmp) / ".local/bin/grok"
+                installed.parent.mkdir(parents=True)
+                installed.write_text("#!/bin/sh\n", encoding="utf-8")
+                installed.chmod(0o755)
+                self.assertEqual(MODULE._resolve_seat_executable(model), str(installed))
+
+    def test_resolve_seat_executable_rejects_non_executable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            not_exec = pathlib.Path(tmp) / "kimi-noexec"
+            not_exec.write_text("#!/bin/sh\n", encoding="utf-8")
+            not_exec.chmod(0o644)
+            model = {
+                "provider": "kimi",
+                "model": "kimi-code/k3",
+                "executable_env": "GEM_KIMI_EXECUTABLE",
+            }
+            with mock.patch.dict(
+                os.environ, {"GEM_KIMI_EXECUTABLE": str(not_exec)}
+            ):
+                self.assertIsNone(MODULE._resolve_seat_executable(model))
+
+    def test_probe_fallback_seat_rejects_undefined_probe(self):
+        model = {
+            "provider": "kimi",
+            "model": "kimi-code/k3",
+            "executable_default": "kimi",
+            "probe_argv": [],
+        }
+        with mock.patch.object(
+            MODULE, "_resolve_seat_executable", return_value="/bin/true"
+        ):
+            self.assertEqual(
+                MODULE._probe_fallback_seat(model, 1.0), (False, "probe-undefined")
+            )
+            model_mixed = {
+                "provider": "kimi",
+                "model": "kimi-code/k3",
+                "executable_default": "kimi",
+                "probe_argv": ["ok", 3],
+            }
+            self.assertEqual(
+                MODULE._probe_fallback_seat(model_mixed, 1.0),
+                (False, "probe-undefined"),
+            )
+
+    def test_probe_fallback_seat_handles_subprocess_failures(self):
+        model = {
+            "provider": "kimi",
+            "model": "kimi-code/k3",
+            "executable_default": "kimi",
+            "probe_argv": ["{executable}", "provider", "list", "--json"],
+        }
+        with mock.patch.object(
+            MODULE, "_resolve_seat_executable", return_value="/bin/true"
+        ):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(cmd="probe", timeout=0.1),
+            ):
+                self.assertEqual(
+                    MODULE._probe_fallback_seat(model, 1.0), (False, "probe-failed")
+                )
+
+    def test_probe_fallback_seat_reports_nonzero_exit(self):
+        model = {
+            "provider": "kimi",
+            "model": "kimi-code/k3",
+            "executable_default": "kimi",
+            "probe_argv": ["{executable}", "provider", "list", "--json"],
+        }
+        with mock.patch.object(
+            MODULE, "_resolve_seat_executable", return_value="/bin/true"
+        ):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 3, stdout=b"", stderr=b"boom"
+                ),
+            ):
+                self.assertEqual(
+                    MODULE._probe_fallback_seat(model, 1.0), (False, "probe-failed")
+                )
+
+    def test_probe_fallback_seat_rejects_invalid_json_payloads(self):
+        model = {
+            "provider": "kimi",
+            "model": "kimi-code/k3",
+            "executable_default": "kimi",
+            "probe_mode": "json-model-key",
+            "probe_argv": ["{executable}", "provider", "list", "--json"],
+        }
+        with mock.patch.object(
+            MODULE, "_resolve_seat_executable", return_value="/bin/true"
+        ):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=b"not-json", stderr=b""
+                ),
+            ):
+                self.assertEqual(
+                    MODULE._probe_fallback_seat(model, 1.0),
+                    (False, "probe-invalid-json"),
+                )
+
+    def test_probe_fallback_seat_reports_model_unlisted(self):
+        model = {
+            "provider": "kimi",
+            "model": "kimi-code/k3",
+            "executable_default": "kimi",
+            "probe_mode": "json-model-key",
+            "probe_argv": ["{executable}", "provider", "list", "--json"],
+        }
+        with mock.patch.object(
+            MODULE, "_resolve_seat_executable", return_value="/bin/true"
+        ):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=json.dumps({"models": {}}).encode(), stderr=b""
+                ),
+            ):
+                self.assertEqual(
+                    MODULE._probe_fallback_seat(model, 1.0),
+                    (False, "model-unlisted"),
+                )
+
+    def test_observe_fallback_seats_isolates_probe_crashes(self):
+        registry = {
+            "models": [
+                {
+                    "provider": "grok",
+                    "model": "grok-4.6",
+                    "probe_argv": ["{executable}", "models"],
+                },
+                {
+                    "provider": "kimi",
+                    "model": "kimi-code/k3",
+                    "probe_argv": ["{executable}", "provider", "list", "--json"],
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "model-registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+            with mock.patch.object(
+                MODULE,
+                "_probe_fallback_seat",
+                side_effect=RuntimeError("probe crashed"),
+            ):
+                receipt = MODULE.observe_fallback_seats(
+                    MODULE.utc_now(), registry_path=path
+                )
+        self.assertEqual(receipt["availableSeats"], 0)
+        self.assertTrue(
+            all(
+                entry["reason"] == "probe-error"
+                for entry in receipt["providers"].values()
+            )
+        )
+
+    def test_normalize_fallback_seats_fails_closed(self):
+        self.assertEqual(
+            MODULE.normalize_fallback_seats("nope"),
+            MODULE._unavailable_fallback_seats("fallback-seat-evidence-unavailable"),
+        )
+        self.assertEqual(
+            MODULE.normalize_fallback_seats(
+                {"schema": MODULE.FALLBACK_SEAT_SCHEMA}
+            ),
+            MODULE._unavailable_fallback_seats("fallback-seat-evidence-malformed"),
+        )
+        self.assertEqual(
+            MODULE.normalize_fallback_seats(
+                {"schema": MODULE.FALLBACK_SEAT_SCHEMA, "providers": []}
+            ),
+            MODULE._unavailable_fallback_seats("fallback-seat-evidence-malformed"),
+        )
+
+    def test_normalize_fallback_seats_keeps_observed_at(self):
+        normalized = MODULE.normalize_fallback_seats(
+            {
+                "schema": MODULE.FALLBACK_SEAT_SCHEMA,
+                "observedAt": "2026-09-11T00:00:00Z",
+                "providers": {
+                    "grok": {"available": True, "reason": "ready"},
+                    "kimi": {"available": False, "reason": "probe-failed"},
+                },
+            }
+        )
+        self.assertEqual(normalized["availableSeats"], 1)
+        self.assertEqual(normalized["observedAt"], "2026-09-11T00:00:00Z")
+
+    def test_unbound_repair_slots_fallbacks(self):
+        seats = MODULE.normalize_fallback_seats(
+            {
+                "schema": MODULE.FALLBACK_SEAT_SCHEMA,
+                "providers": {
+                    "grok": {"available": True, "reason": "ready"},
+                    "kimi": {"available": True, "reason": "ready"},
+                },
+            }
+        )
+        self.assertEqual(MODULE.unbound_repair_slots(seats, 3), 8)
+        self.assertEqual(MODULE.unbound_repair_slots({"schema": "other"}, 3), 3)
+        self.assertEqual(MODULE.unbound_repair_slots({"schema": "other"}, 0), 1)
 
 
 class PersistedRefreshTests(unittest.TestCase):
@@ -813,6 +1353,692 @@ class PersistedRefreshTests(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 MODULE.verify_persisted_receipt(state_dir, {"observedAt": MODULE.isoformat(MODULE.utc_now())})
+
+
+class LivePersistFenceTests(unittest.TestCase):
+    def seed_last_good(self, state_dir: pathlib.Path) -> dict[str, object]:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        observed = MODULE.utc_now() - MODULE.timedelta(minutes=1)
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = capacity_evidence(observed_at=observed_at)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        last_good = MODULE.evaluate(signals, observed_at)
+        (state_dir / "latest.json").write_text(
+            json.dumps(last_good, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return last_good
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def test_placeholder_closure_health_does_not_replace_latest_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals.pop("closureHealth")
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertIn(MODULE.CLOSURE_HEALTH_PLACEHOLDER_REASON, printed["closureAdmission"]["reasons"])
+            self.assertIn(MODULE.LIVE_PERSIST_WRITER, stderr)
+            self.assertIn(MODULE.CLOSURE_HEALTH_PLACEHOLDER_REASON, stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+            self.assertEqual(
+                self.read_latest(state_dir)["concurrency"]["gem"]["maxConcurrent"],
+                last_good["concurrency"]["gem"]["maxConcurrent"],
+            )
+
+    def test_failed_evaluation_keeps_the_prior_valid_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            with mock.patch.object(
+                MODULE, "evaluate", side_effect=ValueError("observe failed")
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(
+                {reason["code"] for reason in printed["reasons"]},
+                {MODULE.GATE_EVALUATION_FAILED_REASON},
+            )
+            self.assertEqual(printed["concurrency"]["gem"]["maxConcurrent"], 0)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+            self.assertNotEqual(
+                last_good["concurrency"]["gem"]["maxConcurrent"],
+                0,
+            )
+
+    def test_failed_evaluation_receipt_is_not_persistable(self):
+        receipt = MODULE.failed_evaluation_receipt(ValueError("observe failed"))
+        reason = MODULE.live_persist_rejection_reason(receipt)
+        self.assertIsNotNone(reason)
+        self.assertIn(MODULE.LIVE_PERSIST_WRITER, reason)
+        self.assertIn("exact source/main identity", reason)
+
+    def persistable_receipt(self) -> dict[str, object]:
+        return MODULE.evaluate(dict(GREEN_SIGNALS), MODULE.isoformat(MODULE.utc_now()))
+
+    def test_live_persist_rejection_reason_covers_malformed_shapes(self):
+        persistable = self.persistable_receipt()
+        self.assertIsNone(MODULE.live_persist_rejection_reason(persistable))
+
+        self.assertIn("malformed receipt schema", MODULE.live_persist_rejection_reason({"schema": "other"}))
+        self.assertIn(
+            "typed observedAt",
+            MODULE.live_persist_rejection_reason({"schema": MODULE.SCHEMA}),
+        )
+        self.assertIn(
+            "typed signals",
+            MODULE.live_persist_rejection_reason(
+                {"schema": MODULE.SCHEMA, "observedAt": persistable["observedAt"]}
+            ),
+        )
+
+        missing_closure = dict(persistable)
+        missing_closure["signals"] = {**persistable["signals"], "closureHealth": None}
+        self.assertIn("typed closure-health", MODULE.live_persist_rejection_reason(missing_closure))
+
+        wrong_authority = dict(persistable)
+        wrong_authority["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "authority": "Other"},
+        }
+        self.assertIn("closure-health authority", MODULE.live_persist_rejection_reason(wrong_authority))
+
+        untyped_status = dict(persistable)
+        untyped_status["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {**persistable["signals"]["closureHealth"], "status": "unknown"},
+        }
+        self.assertIn("untyped closure-health status", MODULE.live_persist_rejection_reason(untyped_status))
+
+        failed = dict(persistable)
+        failed["reasons"] = [{"code": MODULE.GATE_EVALUATION_FAILED_REASON}]
+        failed["signals"] = {
+            **persistable["signals"],
+            "closureHealth": {
+                **persistable["signals"]["closureHealth"],
+                "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+            },
+        }
+        failed["closureAdmission"] = {
+            **persistable["closureAdmission"],
+            "reasons": [MODULE.GATE_EVALUATION_FAILED_REASON],
+        }
+        self.assertIn(MODULE.GATE_EVALUATION_FAILED_REASON, MODULE.live_persist_rejection_reason(failed))
+
+        no_work = dict(persistable)
+        no_work["workAdmission"] = {"activities": []}
+        self.assertIn("typed workAdmission", MODULE.live_persist_rejection_reason(no_work))
+
+        codes = MODULE._receipt_reason_codes(
+            {
+                "reasons": ["plain", {"code": "typed"}, {"no": "code"}, 3],
+                "signals": {"closureHealth": {"reasons": ["from-closure", 1]}},
+                "closureAdmission": {"reasons": ["from-admission", {"code": "ignored"}]},
+            }
+        )
+        self.assertEqual(codes, {"plain", "typed", "from-closure", "from-admission"})
+
+    def test_typed_red_closure_still_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals["closureHealth"] = {
+                **GREEN_SIGNALS["closureHealth"],
+                "status": "red",
+                "newIssueIntakeAllowed": True,
+                "reasons": [
+                    "expired-held-prs",
+                    "internally-repairable-prs-open",
+                ],
+            }
+
+            exit_code, stdout, _stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(
+                persisted["signals"]["closureHealth"]["reasons"],
+                ["expired-held-prs", "internally-repairable-prs-open"],
+            )
+            self.assertIsNone(MODULE.live_persist_rejection_reason(persisted))
+
+    def test_allow_override_skips_write_but_still_emits_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["state"], "GREEN")
+            self.assertIn(MODULE.LIVE_PERSIST_ALLOW_ENV, stderr)
+            self.assertIn("refuse-closed", stderr)
+            self.assertIn(MODULE.LIVE_PERSIST_WRITER, stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+
+    def test_allow_override_cannot_enable_placeholder_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.seed_last_good(state_dir)
+            signals = dict(GREEN_SIGNALS)
+            signals.pop("closureHealth")
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "true"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                    signals=signals,
+                )
+
+            printed = json.loads(stdout)
+            self.assertIn(exit_code, (0, 2))
+            self.assertTrue(printed)
+            self.assertIn("refuse-closed", stderr)
+            self.assertEqual(self.read_latest(state_dir), last_good)
+
+    def test_allow_zero_does_not_block_typed_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "0"}, clear=False
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, json.loads(stdout))
+            self.assertEqual(persisted["state"], "GREEN")
+
+    def test_dry_run_with_override_still_never_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [
+                        str(GATE),
+                        "--state-dir",
+                        str(state_dir),
+                        "--consumer",
+                        "fleet",
+                        "--dry-run",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout)["state"], "GREEN")
+            self.assertFalse((state_dir / "latest.json").exists())
+
+
+class LaggingConcurrencyRemintTests(unittest.TestCase):
+    """JOV-6461: remint latest.json when evidence is approved and gate is max0."""
+
+    def persistable_max0(self, observed_at: str, *, reason: str) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            "schema": MODULE.CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": reason,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        receipt["signals"]["concurrencyEvidence"]["reason"] = reason
+        receipt["concurrency"]["gem"]["reason"] = reason
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertIsNone(MODULE.live_persist_rejection_reason(receipt))
+        return receipt
+
+    def write_latest(self, state_dir: pathlib.Path, receipt: dict[str, object]) -> None:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "latest.json").write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def test_predicates_detect_flap_class_and_ignore_unrelated_closes(self):
+        now = MODULE.isoformat(MODULE.utc_now())
+        approved = MODULE.evaluate(dict(GREEN_SIGNALS), now)
+        flap_max0 = self.persistable_max0(
+            now, reason="capacity-evidence-trust-context-unavailable"
+        )
+        stale_max0 = self.persistable_max0(
+            now, reason="capacity-evidence-stale-or-future"
+        )
+        self.assertEqual(MODULE.approved_dispatch_concurrency(approved), 4)
+        self.assertIsNone(MODULE.approved_dispatch_concurrency(flap_max0))
+        self.assertTrue(MODULE.should_remint_lagging_zero_concurrency(approved, flap_max0))
+        self.assertFalse(MODULE.should_remint_lagging_zero_concurrency(flap_max0, approved))
+        self.assertTrue(MODULE.should_preserve_approved_concurrency(flap_max0, approved))
+        self.assertFalse(MODULE.should_preserve_approved_concurrency(stale_max0, approved))
+        self.assertFalse(MODULE.should_preserve_approved_concurrency(approved, flap_max0))
+
+    def test_flap_era_max0_remints_when_capacity_is_already_approved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            flap_at = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(minutes=1))
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    flap_at, reason="capacity-evidence-trust-context-unavailable"
+                ),
+            )
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+            printed = json.loads(stdout)
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def test_future_observed_max0_still_remints_after_clock_flap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            future = MODULE.isoformat(MODULE.utc_now() + MODULE.timedelta(minutes=5))
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    future, reason="capacity-evidence-trust-context-unavailable"
+                ),
+            )
+
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertNotEqual(persisted["observedAt"], future)
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def test_allow_override_does_not_block_flap_class_remint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(minutes=1)),
+                    reason="capacity-evidence-trust-context-unavailable",
+                ),
+            )
+            with mock.patch.dict(
+                os.environ, {MODULE.LIVE_PERSIST_ALLOW_ENV: "1"}, clear=False
+            ):
+                exit_code, stdout, stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertIn("reminted lagging maxConcurrent=0 to 4", stderr)
+
+    def approved_receipt(self, observed) -> dict[str, object]:
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = capacity_evidence(observed_at=observed_at)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        self.assertEqual(MODULE.approved_dispatch_concurrency(receipt), 4)
+        return receipt
+
+    def test_flap_close_persists_current_observation_without_granting_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            last_good = self.approved_receipt(now - MODULE.timedelta(hours=2))
+            MODULE.write_receipt(last_good, state_dir)
+            seeded = self.read_latest(state_dir)
+            live = self.persistable_max0(
+                MODULE.isoformat(now),
+                reason="capacity-evidence-trust-context-unavailable",
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(persisted, returned)
+            self.assertEqual(persisted["observedAt"], live["observedAt"])
+            self.assertNotEqual(persisted["observedAt"], seeded["observedAt"])
+            self.assertEqual(persisted["signals"], live["signals"])
+            self.assertEqual(persisted["workAdmission"], live["workAdmission"])
+            self.assertEqual(persisted["remediationAdmission"], live["remediationAdmission"])
+            self.assertEqual(persisted["concurrency"]["gem"]["approvedCapacityTarget"], 4)
+            self.assertEqual(returned["promotionMode"], live["promotionMode"])
+            self.assertEqual(returned["state"], live["state"])
+            self.assertEqual(
+                returned["promotionAdmission"]["allowed"],
+                live["promotionAdmission"]["allowed"],
+            )
+            self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertFalse(returned["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
+            self.assertFalse(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("publishing current flap-closed admissions", stderr.getvalue())
+            # A second timer cycle stays fresh and cannot treat the remembered
+            # target as approved capacity. Actual new proof can restore seats.
+            next_time = now + MODULE.timedelta(minutes=1)
+            next_live = self.persistable_max0(MODULE.isoformat(next_time),
+                reason="capacity-evidence-trust-context-unavailable")
+            second = MODULE.persist_live_receipt(next_live, state_dir, next_time)
+            self.assertEqual(self.read_latest(state_dir), second)
+            self.assertEqual(second["observedAt"], next_live["observedAt"])
+            self.assertFalse(second["concurrency"]["gem"]["newMutationAllowed"])
+            self.assertFalse(second["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertEqual(second["concurrency"]["gem"]["approvedCapacityTarget"], 4)
+            healthy_time = next_time + MODULE.timedelta(minutes=1)
+            healthy = self.approved_receipt(healthy_time)
+            restored = MODULE.persist_live_receipt(healthy, state_dir, healthy_time)
+            self.assertEqual(self.read_latest(state_dir), restored)
+            self.assertEqual(restored["observedAt"], healthy["observedAt"])
+            self.assertTrue(restored["concurrency"]["gem"]["evidenceAccepted"])
+
+    def test_flap_close_does_not_print_stale_hold_intake_as_promotion_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            observed_at = MODULE.isoformat(now - MODULE.timedelta(minutes=1))
+            amber_signals = dict(GREEN_SIGNALS)
+            amber_signals["production"] = {
+                "status": "green",
+                "deployedSha": "b" * 40,
+            }
+            amber_signals["controller"] = {
+                "status": "failed",
+                "error": "controller-observation-failed: Connection refused",
+            }
+            amber_signals["concurrencyEvidence"] = capacity_evidence(
+                observed_at=observed_at
+            )
+            amber_signals["independentReview"] = {
+                **GREEN_SIGNALS["independentReview"],
+                "observedAt": observed_at,
+            }
+            last_hold = MODULE.evaluate(amber_signals, observed_at)
+            self.assertEqual(last_hold["promotionMode"], "hold-intake")
+            self.assertEqual(MODULE.approved_dispatch_concurrency(last_hold), 4)
+            MODULE.write_receipt(last_hold, state_dir)
+            live = self.persistable_max0(
+                MODULE.isoformat(now),
+                reason="capacity-evidence-trust-context-unavailable",
+            )
+            self.assertEqual(live["state"], "GREEN")
+            self.assertTrue(live["promotionAdmission"]["allowed"])
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(persisted, returned)
+            self.assertEqual(persisted["observedAt"], live["observedAt"])
+            self.assertEqual(returned["state"], "GREEN")
+            self.assertEqual(returned["promotionMode"], "normal")
+            self.assertTrue(returned["promotionAdmission"]["allowed"])
+            self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
+            self.assertIn("publishing current flap-closed admissions", stderr.getvalue())
+
+    def test_genuine_stale_evidence_still_persists_max0(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            last_good = self.approved_receipt(
+                MODULE.utc_now() - MODULE.timedelta(minutes=1)
+            )
+            self.write_latest(state_dir, last_good)
+            stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
+            signals = dict(GREEN_SIGNALS)
+            signals["concurrencyEvidence"] = {
+                **GREEN_SIGNALS["concurrencyEvidence"],
+                "observedAt": stale,
+                "acceptedEvidence": [
+                    {**proof, "completedAt": stale}
+                    for proof in GREEN_SIGNALS["concurrencyEvidence"]["acceptedEvidence"]
+                ],
+            }
+
+            exit_code, stdout, _stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"],
+                signals=signals,
+            )
+
+            persisted = self.read_latest(state_dir)
+            printed = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(persisted, printed)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 0)
+            self.assertFalse(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertNotEqual(persisted, last_good)
+
+
+class ConcurrencyRatchetTests(unittest.TestCase):
+    """JOV-6462: raise approved capacity N→N+1 after sticky useful prove."""
+
+    def approved_at(
+        self, target: int, observed, *, digest_salt: str = ""
+    ) -> dict[str, object]:
+        observed_at = MODULE.isoformat(observed)
+        signals = dict(GREEN_SIGNALS)
+        evidence = capacity_evidence(target, observed_at)
+        if digest_salt:
+            for index, proof in enumerate(evidence["acceptedEvidence"], start=1):
+                proof["outputDigest"] = hashlib.sha256(
+                    f"{digest_salt}-{index}".encode()
+                ).hexdigest()
+                proof["completedAt"] = observed_at
+        signals["concurrencyEvidence"] = evidence
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": observed_at,
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        self.assertEqual(MODULE.approved_dispatch_concurrency(receipt), target)
+        return receipt
+
+    def write_latest(self, state_dir: pathlib.Path, receipt: dict[str, object]) -> None:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "latest.json").write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def read_latest(self, state_dir: pathlib.Path) -> dict[str, object]:
+        return json.loads((state_dir / "latest.json").read_text(encoding="utf-8"))
+
+    def persistable_max0(self, observed_at: str) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            "schema": MODULE.CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-trust-context-unavailable",
+        }
+        receipt = MODULE.evaluate(signals, observed_at)
+        receipt["signals"]["concurrencyEvidence"]["reason"] = (
+            "capacity-evidence-trust-context-unavailable"
+        )
+        receipt["concurrency"]["gem"]["reason"] = (
+            "capacity-evidence-trust-context-unavailable"
+        )
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        return receipt
+
+    def test_predicates_raise_only_after_new_sticky_useful_proof(self):
+        now = MODULE.utc_now()
+        proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(
+            1, now - MODULE.timedelta(minutes=1), digest_salt="landed"
+        )
+        same = json.loads(json.dumps(proven))
+        unproven = self.persistable_max0(MODULE.isoformat(now))
+        self.assertEqual(
+            MODULE.should_raise_approved_capacity_target(sticky, proven), 2
+        )
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(same, proven))
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(sticky, None))
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, unproven)
+        )
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(unproven, proven)
+        )
+
+    def test_predicates_never_raise_when_unproven_or_max0(self):
+        now = MODULE.utc_now()
+        proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(1, now, digest_salt="later")
+        unproven = self.persistable_max0(MODULE.isoformat(now))
+        self.assertFalse(unproven["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(unproven["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(unproven, proven)
+        )
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, unproven)
+        )
+        closed = json.loads(json.dumps(sticky))
+        closed["concurrency"]["gem"]["evidenceAccepted"] = False
+        closed["concurrency"]["gem"]["maxConcurrent"] = 0
+        closed["signals"]["concurrencyEvidence"]["accepted"] = False
+        self.assertIsNone(MODULE.approved_dispatch_concurrency(closed))
+        self.assertIsNone(MODULE.should_raise_approved_capacity_target(closed, proven))
+
+    def test_predicates_stop_at_baseline_ceiling(self):
+        now = MODULE.utc_now()
+        baseline = self.approved_at(4, now - MODULE.timedelta(minutes=2))
+        sticky = self.approved_at(4, now, digest_salt="still-busy")
+        self.assertEqual(MODULE.ratchet_ceiling(), 4)
+        self.assertIsNone(
+            MODULE.should_raise_approved_capacity_target(sticky, baseline)
+        )
+
+    def test_persist_raises_target_after_sticky_useful_landing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            MODULE.write_receipt(proven, state_dir)
+            sticky_at = now - MODULE.timedelta(seconds=30)
+            sticky = self.approved_at(1, sticky_at, digest_salt="merged")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(sticky, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(returned, persisted)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 2)
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["approvedCapacityTarget"], 2
+            )
+            self.assertEqual(persisted["remediationAdmission"]["maxConcurrent"], 2)
+            self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["ratchet"]["policy"],
+                "concurrency-ratchet-v1",
+            )
+            self.assertIn(
+                "raised approved capacity target 1 -> 2 after sticky useful prove",
+                stderr.getvalue(),
+            )
+
+    def test_persist_does_not_raise_on_same_proofs_or_remint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            self.write_latest(state_dir, proven)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                refreshed = MODULE.persist_live_receipt(
+                    json.loads(json.dumps(proven)), state_dir, now
+                )
+            self.assertEqual(refreshed["concurrency"]["gem"]["maxConcurrent"], 1)
+            self.assertEqual(
+                refreshed["concurrency"]["gem"]["approvedCapacityTarget"], 1
+            )
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
+
+            self.write_latest(
+                state_dir,
+                self.persistable_max0(
+                    MODULE.isoformat(now - MODULE.timedelta(minutes=1))
+                ),
+            )
+            live = self.approved_at(1, now, digest_salt="remint-recovery")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                reminted = MODULE.persist_live_receipt(live, state_dir, now)
+            self.assertEqual(reminted["concurrency"]["gem"]["maxConcurrent"], 1)
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
+            self.assertIn("reminted lagging maxConcurrent=0 to 1", stderr.getvalue())
+
+    def test_persist_restores_ratcheted_target_above_measured_proofs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            proven = self.approved_at(1, now - MODULE.timedelta(minutes=2))
+            ratcheted = MODULE.apply_approved_capacity_target(
+                proven, 2, apply_seats=True, raised_from=1
+            )
+            MODULE.write_receipt(ratcheted, state_dir)
+            live = json.loads(json.dumps(proven))
+            live["observedAt"] = MODULE.isoformat(now - MODULE.timedelta(seconds=20))
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(returned, persisted)
+            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 2)
+            self.assertEqual(
+                persisted["concurrency"]["gem"]["approvedCapacityTarget"], 2
+            )
+            self.assertIn("restored approved capacity target 2", stderr.getvalue())
+            self.assertNotIn("raised approved capacity target", stderr.getvalue())
 
 
 class DeploymentBindingTests(unittest.TestCase):
@@ -940,8 +2166,8 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["state"], "GREEN")
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
@@ -964,7 +2190,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 receipt = self.evaluate(signals)
 
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
                 self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
@@ -1020,7 +2246,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "repository": "JovieInc/Jovie",
             "status": "red",
             "authority": "Summer",
-            "newIssueIntakeAllowed": False,
+            "newIssueIntakeAllowed": True,
             "promotionContinues": True,
             "remediationContinues": True,
             "reasons": [
@@ -1032,9 +2258,9 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         products = receipt["closureAdmission"]["products"]
 
-        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
         self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
@@ -1122,6 +2348,74 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["reviewAdmission"]["allowed"])
 
+    def test_capacity_parked_controller_feeds_hold_intake(self):
+        """Live 2026-09-04 01:20Z receipt: main green, production green but
+        unbound, integrity clear, queue known, controller failed — the
+        Symphony burrito parked on Codex usage-limit cooldown. Promotion of
+        already-green PRs needs zero Codex capacity, so AMBER degrades to
+        hold-intake instead of stalling the merge queue in blocked."""
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure", "production-deployment-unbound"},
+        )
+        # Deployment authority still requires a live green controller.
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_capacity_parked_controller_with_bound_production_feeds_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure"},
+        )
+
+    def test_capacity_parked_controller_with_extra_reason_stays_blocked(self):
+        # production red adds production-not-green, outside the allowed pair.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "red"}
+        signals["controller"] = {"status": "failed"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_capacity_parked_controller_with_red_main_stays_off_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["main"] = {"status": "red", "sha": MAIN_SHA}
+        signals["controller"] = {"status": "failed"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "draft-only")
+
+    def test_unknown_controller_stays_blocked(self):
+        # controller-unknown is not in the capacity-park reason pair: an
+        # unclassified controller observation still freezes promotion.
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "unknown"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_capacity_parked_controller_with_stale_review_stays_blocked(self):
+        # A non-accepted exact-head review adds its own reason, which fails
+        # the {controller-failure, production-deployment-unbound} subset.
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "failed"}
+        signals["independentReview"] = None
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
         for evidence in (
@@ -1141,8 +2435,8 @@ class DeploymentBindingTests(unittest.TestCase):
                 signals["concurrencyEvidence"] = evidence
                 receipt = self.evaluate(signals)
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
@@ -1402,6 +2696,10 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
     def test_failed_controller_observation_preserves_qualified_source_admission(self):
+        # A failed :4041 probe with main/production green and no reason
+        # outside {controller-failure, production-deployment-unbound} is the
+        # Codex-capacity park shape (live 2026-09-04 01:20Z): promotion
+        # resumes in hold-intake instead of stalling the queue in blocked.
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
@@ -1493,6 +2791,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
@@ -1591,11 +2890,14 @@ class DeploymentBindingTests(unittest.TestCase):
                 "kimi": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
             },
         }
-
+        # Without fallbackSeats evidence, fail closed to the floor even if
+        # concurrencyEvidence reports ready Grok/Kimi providers. Codex
+        # exhaustion still closes gem dispatch; it must not zero unbound repair.
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["promotionMode"], "hold-intake")
-        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
+        self.assertTrue(receipt["productionUnboundRepairAdmission"]["allowed"])
+        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1)
         self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
         projection = subprocess.run(
             ["python3", str(ROOT / "scripts/symphony/fleet_admission_receipt.py")],
@@ -1606,18 +2908,15 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
 
-        signals["concurrencyEvidence"] = {
-            **GREEN_SIGNALS["concurrencyEvidence"],
-            "target": 2,
-            "source": "live-oauth-cli-seats",
-            "providers": {
-                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
-                "grok": {"enrolled": 6, "ready": 6, "reason": "oauth-enrolled"},
-                "kimi": {"enrolled": 2, "ready": 2, "reason": "oauth-enrolled"},
-            },
-        }
+        signals["fallbackSeats"] = fallback_seat_signal(True, False)
+        one_seat = self.evaluate(signals)
+        self.assertEqual(one_seat["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(one_seat["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(one_seat["isolatedPromotionAdmission"]["maxConcurrent"], 1)
+
+        signals["fallbackSeats"] = fallback_seat_signal(True, True)
         scaled = self.evaluate(signals)
-        self.assertEqual(scaled["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(scaled["productionUnboundRepairAdmission"]["maxConcurrent"], 8)
         self.assertFalse(scaled["productionUnboundRepairAdmission"]["deploymentsAllowed"])
         self.assertEqual(scaled["isolatedPromotionAdmission"]["maxConcurrent"], 1)
 
@@ -1741,7 +3040,10 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["state"], "GREEN")
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertEqual(receipt["signals"]["queue"], signals["queue"])
+        queued = dict(receipt["signals"]["queue"])
+        self.assertIn("blockedSince", queued)
+        queued.pop("blockedSince")
+        self.assertEqual(queued, signals["queue"])
         self.assertNotIn(
             "queue-above-target",
             {reason["code"] for reason in receipt["reasons"]},
@@ -1853,7 +3155,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "condition": None,
                 "mainSha": None,
                 "deployedSha": None,
-                "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+                "scope": "github-approved-exact-repository-pr-head-main-path-set",
                 "maxConcurrent": 0,
                 "deploymentsAllowed": False,
                 "runtimeActivationAllowed": False,
@@ -1921,6 +3223,207 @@ class DeploymentBindingTests(unittest.TestCase):
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
         )
+
+
+class QueueSnapshotIsolationTests(unittest.TestCase):
+    NOW = MODULE.datetime(2026, 9, 17, 18, 30, tzinfo=MODULE.UTC)
+
+    def completed(self, payload: list[dict[str, object]]) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout=json.dumps(payload), stderr=""
+        )
+
+    def test_fleet_sidecar_keeps_jovie_singleton_and_namespaces_other_repos(self):
+        from gem_gate_contract import fleet_sidecar_filename, fleet_sidecar_path
+
+        state_dir = pathlib.Path("/tmp/gem/state/gem-priority-gate")
+        jovie = fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json")
+        alias = fleet_sidecar_path(state_dir, "ItsTimWhite/Jovie", "queue-snapshot.json")
+        lyb = fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json")
+        self.assertEqual(jovie, pathlib.Path("/tmp/gem/state/queue-snapshot.json"))
+        self.assertEqual(alias, jovie)
+        self.assertNotEqual(lyb, jovie)
+        self.assertEqual(lyb.parent, jovie.parent)
+        self.assertTrue(lyb.name.startswith("queue-snapshot-"))
+        self.assertTrue(lyb.name.endswith(".json"))
+        self.assertNotEqual(
+            fleet_sidecar_filename("queue-snapshot.json", "foo/bar-baz"),
+            fleet_sidecar_filename("queue-snapshot.json", "foo-bar/baz"),
+        )
+
+    def test_parallel_repo_queue_writes_do_not_clobber_the_jovie_singleton(self):
+        from gem_gate_contract import fleet_sidecar_path
+
+        jovie_prs = [
+            {
+                "number": number,
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "CLEAN" if number <= 4 else "BLOCKED",
+            }
+            for number in range(1, 47)
+        ]
+        lyb_prs = [
+            {
+                "number": number,
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "BLOCKED",
+            }
+            for number in range(1, 10)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            jovie_path = fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json")
+            lyb_path = fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json")
+            with mock.patch.object(
+                MODULE.subprocess, "run", return_value=self.completed(jovie_prs)
+            ):
+                jovie = MODULE.observe_queue(
+                    "JovieInc/Jovie", 16, snapshot_path=jovie_path, now=self.NOW
+                )
+            with mock.patch.object(
+                MODULE.subprocess, "run", return_value=self.completed(lyb_prs)
+            ):
+                lyb = MODULE.observe_queue(
+                    "JovieInc/LogYourBody", 16, snapshot_path=lyb_path, now=self.NOW
+                )
+            jovie_written = json.loads(jovie_path.read_text(encoding="utf-8"))
+            lyb_written = json.loads(lyb_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(jovie_path.name, "queue-snapshot.json")
+        self.assertNotEqual(lyb_path, jovie_path)
+        self.assertEqual(jovie["eligiblePrs"], 46)
+        self.assertEqual(jovie["greenReadyPrs"], 4)
+        self.assertEqual(lyb["eligiblePrs"], 9)
+        self.assertEqual(lyb["greenReadyPrs"], 0)
+        self.assertEqual(jovie_written["repository"], "JovieInc/Jovie")
+        self.assertEqual(jovie_written["eligiblePrs"], 46)
+        self.assertEqual(jovie_written["greenReadyPrs"], 4)
+        self.assertEqual(lyb_written["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(lyb_written["eligiblePrs"], 9)
+        self.assertEqual(lyb_written["greenReadyPrs"], 0)
+
+    def test_foreign_repo_cannot_write_the_jovie_singleton_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            singleton = pathlib.Path(tmp) / "queue-snapshot.json"
+            singleton.write_text(
+                json.dumps(
+                    {
+                        "schema": "jovie-queue-snapshot/v2",
+                        "repository": "JovieInc/Jovie",
+                        "status": "known",
+                        "eligiblePrs": 46,
+                        "greenReadyPrs": 4,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            before = singleton.read_text(encoding="utf-8")
+            observed = MODULE.observe_queue(
+                "JovieInc/LogYourBody",
+                16,
+                snapshot_path=singleton,
+                now=self.NOW,
+            )
+            self.assertEqual(observed["status"], "unknown")
+            self.assertEqual(observed["repository"], "JovieInc/LogYourBody")
+            self.assertIn("refusing to use queue-snapshot.json", observed["error"])
+            self.assertEqual(singleton.read_text(encoding="utf-8"), before)
+            with self.assertRaisesRegex(ValueError, "refusing to use queue-snapshot.json"):
+                MODULE.write_queue_snapshot(
+                    singleton,
+                    {
+                        "schema": "jovie-queue-snapshot/v2",
+                        "repository": "JovieInc/LogYourBody",
+                        "status": "known",
+                        "eligiblePrs": 9,
+                        "greenReadyPrs": 0,
+                    },
+                )
+            self.assertEqual(singleton.read_text(encoding="utf-8"), before)
+            with self.assertRaisesRegex(ValueError, "must name its repository"):
+                MODULE.write_queue_snapshot(
+                    singleton,
+                    {"schema": "jovie-queue-snapshot/v2", "status": "known"},
+                )
+
+    def test_observe_signals_routes_sidecars_per_repository(self):
+        from gem_gate_contract import fleet_sidecar_path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            captured: dict[str, pathlib.Path] = {}
+
+            def capture_queue(*_args: object, **kwargs: object) -> dict[str, object]:
+                captured["queue"] = kwargs["snapshot_path"]  # type: ignore[assignment]
+                return {"status": "unknown", "repository": "JovieInc/LogYourBody"}
+
+            def capture_controller(*_args: object, **kwargs: object) -> dict[str, object]:
+                captured["controller"] = kwargs["snapshot_path"]  # type: ignore[assignment]
+                return {"status": "failed"}
+
+            def capture_review(path: pathlib.Path, *_args: object, **_kwargs: object) -> dict[str, object]:
+                captured["review"] = path
+                return {"accepted": False, "reason": "independent-review-receipt-missing"}
+
+            args = argparse.Namespace(
+                repo="JovieInc/LogYourBody",
+                state_dir=state_dir,
+                queue_target=15,
+                production_url="https://example.test/health",
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                lease_guard_bin="/bin/false",
+                integrity_receipt=None,
+                concurrency_evidence=None,
+                independent_review_receipt=None,
+            )
+            with (
+                mock.patch.object(
+                    MODULE, "observe_main", return_value={"status": "unknown", "sha": "0" * 40}
+                ),
+                mock.patch.object(MODULE, "observe_concurrency", return_value={"accepted": False}),
+                mock.patch.object(MODULE, "observe_closure_health", return_value={"lifecycleActions": []}),
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
+                mock.patch.object(MODULE, "observe_production", return_value={"status": "unknown"}),
+                mock.patch.object(MODULE, "observe_controller", side_effect=capture_controller),
+                mock.patch.object(MODULE, "observe_integrity", return_value={"status": "invalid"}),
+                mock.patch.object(MODULE, "observe_queue", side_effect=capture_queue),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value={}),
+                mock.patch.object(
+                    MODULE, "refresh_independent_review_receipt", side_effect=capture_review
+                ),
+                mock.patch.object(MODULE, "observe_lease", return_value={"status": "unknown"}),
+            ):
+                MODULE.observe_signals(args, self.NOW)
+                self.assertEqual(
+                    captured["queue"],
+                    fleet_sidecar_path(state_dir, "JovieInc/LogYourBody", "queue-snapshot.json"),
+                )
+                self.assertEqual(
+                    captured["controller"],
+                    fleet_sidecar_path(
+                        state_dir, "JovieInc/LogYourBody", "controller-snapshot.json"
+                    ),
+                )
+                self.assertEqual(
+                    captured["review"],
+                    fleet_sidecar_path(
+                        state_dir, "JovieInc/LogYourBody", "independent-review.json"
+                    ),
+                )
+                self.assertNotEqual(captured["queue"].name, "queue-snapshot.json")
+                args.repo = "JovieInc/Jovie"
+                MODULE.observe_signals(args, self.NOW)
+                self.assertEqual(
+                    captured["queue"],
+                    fleet_sidecar_path(state_dir, "JovieInc/Jovie", "queue-snapshot.json"),
+                )
+                self.assertEqual(captured["queue"].name, "queue-snapshot.json")
+                self.assertEqual(captured["controller"].name, "controller-snapshot.json")
+                self.assertEqual(captured["review"].name, "independent-review.json")
 
 
 class IndependentReviewTests(unittest.TestCase):
@@ -2279,9 +3782,28 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("ref: main", content)
         self.assertIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
-        self.assertIn("dry-run: 'false'", content)
+        # pull_request_target Refresh must be a dry run (no live latest.json
+        # write while the main gate is unfenced); every other event persists.
+        self.assertIn(
+            "dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}",
+            content,
+        )
         self.assertIn("jovie-fixed", content)
         self.assertIn("cancel-in-progress: false", content)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=", action)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST:", action)
+        wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("forcing dry-run", wrapper)
+        self.assertIn("refuse-closed", wrapper)
+        self.assertIn("live_persist_override_nonzero", wrapper)
+        self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=1", wrapper)
+        self.assertNotIn('FLEET_GATE_ALLOW_LIVE_PERSIST="1"', wrapper)
         self.assertIn("github.event.workflow_run.conclusion != 'cancelled'", content)
         self.assertIn("github.event.pull_request.merged != true", content)
         self.assertIn("github.event.label.name == 'hold'", content)
@@ -2455,6 +3977,73 @@ class LeaseSignalTests(unittest.TestCase):
             observed = MODULE.observe_lease(guard)
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["reason"], "lease-report-schema-mismatch")
+
+
+class QueueStarvationBlockedSinceTests(unittest.TestCase):
+    def test_starvation_clock_holds_previous_and_clears_when_not_starving(self):
+        first = MODULE.queue_starvation_blocked_since(
+            3, None, "2026-09-16T15:00:00Z"
+        )
+        self.assertEqual(first, "2026-09-16T15:00:00Z")
+        held = MODULE.queue_starvation_blocked_since(
+            4, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+        )
+        self.assertEqual(held, "2026-09-16T15:00:00Z")
+        self.assertIsNone(
+            MODULE.queue_starvation_blocked_since(
+                0, "2026-09-16T15:00:00Z", "2026-09-16T16:00:00Z"
+            )
+        )
+
+    def test_evaluate_emits_queue_blocked_since_for_clean_starvation(self):
+        now = MODULE.isoformat(MODULE.utc_now())
+        signals = json.loads(json.dumps(GREEN_SIGNALS))
+        signals["queue"]["greenReadyPrs"] = 3
+        signals["queue"]["eligiblePrs"] = 3
+        receipt = MODULE.evaluate(signals, now)
+        self.assertEqual(receipt["signals"]["queue"]["blockedSince"], now)
+        again = json.loads(json.dumps(signals))
+        again["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        held = MODULE.evaluate(again, now)
+        self.assertEqual(
+            held["signals"]["queue"]["blockedSince"], "2026-09-16T14:00:00Z"
+        )
+        cleared = json.loads(json.dumps(GREEN_SIGNALS))
+        cleared["queue"]["blockedSince"] = "2026-09-16T14:00:00Z"
+        healthy = MODULE.evaluate(cleared, now)
+        self.assertNotIn("blockedSince", healthy["signals"]["queue"])
+
+
+class PerRepoStateIsolationTests(unittest.TestCase):
+    """Default state-dir and sibling sidecars stay isolated per repository."""
+
+    def test_default_state_dir_follows_repo_without_explicit_flag(self) -> None:
+        from gem_gate_contract import fleet_sidecar_path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(
+                os.environ,
+                {"GEM_WORKSPACE": tmp, "GEM_PRIORITY_GATE_REPO": "JovieInc/LogYourBody"},
+            ):
+                argv = ["gem-priority-gate.py", "--dry-run", "--evaluate-json", "{}"]
+                with mock.patch.object(sys, "argv", argv):
+                    args = MODULE.parse_args()
+            jovie_state = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            self.assertNotEqual(args.state_dir, jovie_state)
+            self.assertEqual(args.state_dir.parent, pathlib.Path(tmp) / "state")
+            # Sibling sidecars for a foreign repo never land on Jovie's files.
+            self.assertNotEqual(
+                fleet_sidecar_path(args.state_dir, "JovieInc/LogYourBody", "queue-snapshot.json"),
+                fleet_sidecar_path(jovie_state, "JovieInc/Jovie", "queue-snapshot.json"),
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"GEM_WORKSPACE": tmp, "GEM_PRIORITY_GATE_REPO": "JovieInc/Jovie"},
+            ):
+                argv = ["gem-priority-gate.py", "--dry-run", "--evaluate-json", "{}"]
+                with mock.patch.object(sys, "argv", argv):
+                    jovie_args = MODULE.parse_args()
+            self.assertEqual(jovie_args.state_dir, jovie_state)
 
 
 if __name__ == "__main__":

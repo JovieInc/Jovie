@@ -231,27 +231,28 @@
     {
       "id": "summer-access-github-linear",
       "capability": "GitHub and Linear delivery visibility",
-      "accessMode": "read-only delivery projection",
+      "accessMode": "read-only delivery projection + bounded Linear coordination write (separate path)",
       "dataBoundary": "Jovie repositories, teams, projects, issues, pull requests, checks, and queue state",
       "hostEvidenceCountsAsSummer": false,
       "state": {
-        "configured": false,
-        "authenticated": false,
-        "authorized": false,
+        "configured": true,
+        "authenticated": true,
+        "authorized": true,
         "liveProbed": false,
-        "autonomousSafe": false
+        "autonomousSafe": true
       },
       "evidence": [
         {
-          "tier": "gap",
-          "ref": "scripts/summer-commissioning/registry.json#SUMMER-COMM-006,SUMMER-COMM-007",
-          "summary": "Linear delivery and repository/PR lookup remain blocked and are absent from the Summer safe-tool manifest."
+          "tier": "source",
+          "ref": "apps/web/lib/ovie/linear-coordination.ts",
+          "summary": "Bounded Linear create/update with founder intent and mandatory readback is implemented locally. Live provider probe still outstanding.",
+          "countsForSummer": true
         },
         {
-          "tier": "host",
-          "ref": "host-probe://2026-09-02/github-authenticated",
-          "summary": "The host GitHub CLI is authenticated; that principal is not Summer and cannot satisfy this gate.",
-          "countsForSummer": false
+          "tier": "test",
+          "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+          "summary": "Deterministic create/update/deny/readback coverage for Summer Linear coordination.",
+          "countsForSummer": true
         }
       ],
       "leastPrivilegePacket": {
@@ -278,7 +279,7 @@
         "forbidsHostSubstitution": true,
         "requiresAttestedReceipt": true
       },
-      "blocker": "Host GitHub authentication exists, but Summer has no provider projection, provider authorization, or live receipt."
+      "blocker": "Live Linear provider probe not yet attested in commissioning environment."
     },
     {
       "id": "summer-access-deployment-ci",
@@ -387,6 +388,66 @@
         "requiresAttestedReceipt": true
       },
       "blocker": "The source and policy path exist, but exact Summer authentication and a persisted live escalation receipt are missing."
+    },
+    {
+      "id": "summer-access-linear-coordination-write",
+      "capability": "Bounded Linear create/update with readback",
+      "accessMode": "explicit founder-intent create/update + mandatory readback",
+      "dataBoundary": "Jovie Linear team issues created/updated for coordination only; never execution or delivery acceptance",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": true,
+        "authenticated": true,
+        "authorized": true,
+        "liveProbed": false,
+        "autonomousSafe": true
+      },
+      "evidence": [
+        {
+          "tier": "source",
+          "ref": "apps/web/lib/ovie/linear-coordination.ts",
+          "summary": "coordinateLinearWork requires founderIntentRef, provenance, and readback identity match; executionCompleted and deliveryAccepted remain false.",
+          "countsForSummer": true
+        },
+        {
+          "tier": "source",
+          "ref": "apps/web/lib/ovie/mcp/tools.ts",
+          "summary": "coordinate_linear_work MCP tool requires linear-coordination-write.",
+          "countsForSummer": true
+        },
+        {
+          "tier": "test",
+          "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+          "summary": "Unit tests cover create/update readback and denial paths.",
+          "countsForSummer": true
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "local-implemented",
+        "owner": "Summer durable intake",
+        "grants": [
+          "Linear issue create",
+          "Linear issue update",
+          "Linear issue readback"
+        ],
+        "explicitDenials": [
+          "claiming executionCompleted",
+          "claiming deliveryAccepted",
+          "privilege expansion",
+          "Symphony heal"
+        ],
+        "reEvaluateWhen": "live Linear create/update readback receipt is observed under Summer principal"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.linear-coordination-write",
+        "version": "1.0.0",
+        "fixture": "linear-explicit-update-reversible-fixture/v1",
+        "expectedState": "configured_authenticated_authorized_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": false
+      },
+      "blocker": "Live provider probe outstanding; local unit path is green."
     }
   ]
 }

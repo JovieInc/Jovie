@@ -232,6 +232,12 @@ export const creatorProfiles = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    // Performance index: dashboard profile lookups by user ordered by creation time.
+    // Restored after the JOV-1036 / #4505 index was dropped from schema (JOV-6195).
+    userIdCreatedAtIndex: index('idx_creator_profiles_user_id_created_at').on(
+      table.userId,
+      table.createdAt
+    ),
     profileEditVersionIndex: index('idx_creator_profiles_user_edit_version').on(
       table.userId,
       table.profileEditVersion

@@ -20,7 +20,7 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | --- | --- | --- |
 | Draft | Symphony | Evidence-complete draft and writer-owned handoff receipt |
 | Review | Writer | Exact-head review, CI, and ticket evidence |
-| Promotion | Gem | Native merge-queue admission at the same head |
+| Promotion | Writer | Native merge-queue admission at the same head |
 | Merge | GitHub native queue | Merge event; this is not activation |
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
@@ -69,10 +69,10 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 
 | Tier | Jobs | Trigger |
 |---|---|---|
-| **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
+| **PR gate** (must stay fast) | typecheck, lint, exact-source-head web coverage (changed-line 60% ratchet), portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
+| **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
-| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
+| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; JOV-INV-033 Done-sprint production HTML rescan (`DONE_INVARIANT_RESCAN=release`) against that same URL; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
 
 Rules:
@@ -98,19 +98,29 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Admission is independent of prior production deployment.** A pending, missing,
-  or failed release checkpoint does not block an otherwise qualified source PR.
-  Exact-head source checks, explicit scoped incident holds, and required native
-  merge-group correctness, provenance, and ancestry checks remain enforced.
-  Admission receipts say `source-qualified`; they never certify production.
+- **Source qualification is separate from production certification.** A pending,
+  missing, or failed release checkpoint by itself does not make an otherwise
+  qualified source PR ineligible. Exact-head source checks, explicit scoped
+  incident holds, and required native merge-group correctness, provenance, and
+  ancestry checks remain enforced. Admission receipts say `source-qualified`;
+  they never certify production.
   The production controller owns deployment serialization and exact runtime
   certification. When main and production are healthy, exact-main review is
   current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: qualified PRs continue through the native queue,
-  while controller containment still holds new implementation and deployment.
+  lag select `hold-intake`: clean exact-head PRs may enter the native queue
+  while new implementation and deployment stay held, subject to the separate
+  release-wave pause below.
+  A separate active release-wave lease pauses only new native queue enrollment
+  and re-entry while a Production Controller run is queued or in progress. The
+  workflow fixes each run's deadline at 30 minutes from `created_at`. Terminal
+  completion releases that run's hold sooner; another queued or in-progress run
+  can keep the pause active against its own deadline. Repeated observations do
+  not restart a run's deadline. Already-admitted native entries remain in the
+  queue, subject to ordinary safety-dequeue checks, throughout the pause.
+  Unavailable or malformed controller state fails closed before enrollment.
   Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An
-  existing incident hold is cleared only by its own evidence.
+  source/review/integrity evidence still blocks admission. An existing incident
+  hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -369,6 +379,17 @@ existed. Contract:
    secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
+   `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
+   web-impacting source heads without repository secrets; the native queue
+   repeats it on the synthetic combined head and must finish inside the
+   20-minute merge-queue check budget. Non-web heads emit an explicit
+   non-applicable receipt. Nightly retains the global risk-surface debt check,
+   so stale unrelated debt cannot deadlock promotion.
+   Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
+   V8 coverage before a static coverage-ownership assertion failed, and hosted
+   run 33892180480 cancelled the full-suite collection at 1h. The cheap
+   structural selector now owns that contract, and the exact-head lane skips
+   V8 when the immutable diff has no coverable product source.
 3. Normalize failures (PR, exact head, check, attempt, fingerprint);
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.

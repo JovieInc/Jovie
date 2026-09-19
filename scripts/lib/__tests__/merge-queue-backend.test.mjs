@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFile, spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -317,6 +318,7 @@ function executeAdmissionScope({
   workflowEvent = 'pull_request',
   pullRequests = [],
   pullRequestEvent = null,
+  eventName = null,
   productionAdmissionAllowed = true,
   fleetPromotionMode = 'normal',
 }) {
@@ -356,7 +358,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: pullRequestEvent ? 'pull_request' : 'workflow_run',
+          EVENT_NAME: eventName ?? (pullRequestEvent ? 'pull_request' : 'workflow_run'),
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
@@ -392,6 +394,122 @@ function executeAdmissionScope({
     rmSync(directory, { recursive: true, force: true });
   }
 }
+
+function executeClockAdmissionProbe({ pages = [], activeStatus = '', activeCiStatus = '', apiFailure = '' } = {}) {
+  const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
+  const script = workflowRunScript(workflow, 'Reconcile pending native admission');
+  const directory = mkdtempSync(join(tmpdir(), 'merge-queue-clock-'));
+  const dispatches = join(directory, 'dispatches');
+  const calls = join(directory, 'calls');
+  const ghPath = join(directory, 'gh');
+  writeFileSync(dispatches, '');
+  writeFileSync(calls, '');
+  writeFileSync(ghPath, `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\\n' "$1" "$2" >>"$MOCK_CALLS"
+if [[ "$1 $2" == 'api graphql' ]]; then
+  [[ "$MOCK_API_FAILURE" != 'inventory' ]] || exit 42
+  printf '%s\\n' "$MOCK_PAGES"
+elif [[ "$1" == 'api' ]]; then
+  [[ "$MOCK_API_FAILURE" != 'runs' ]] || exit 43
+  if [[ -n "$MOCK_ACTIVE_STATUS" && "$2" == *"merge-queue-autoenroll.yml/runs?status=$MOCK_ACTIVE_STATUS&"* ]] ||
+    [[ -n "$MOCK_ACTIVE_CI_STATUS" && "$2" == *"ci.yml/runs?event=merge_group&status=$MOCK_ACTIVE_CI_STATUS&"* ]]; then
+    printf '%s\\n' '{"total_count":1}'
+  else
+    printf '%s\\n' '{"total_count":0}'
+  fi
+elif [[ "$1 $2" == 'workflow run' ]]; then
+  printf '%s\\n' "$*" >>"$MOCK_DISPATCHES"
+else
+  exit 99
+fi
+`);
+  chmodSync(ghPath, 0o755);
+  try {
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${directory}:${process.env.PATH}`,
+        GH_REPO: REPOSITORY,
+        MOCK_PAGES: JSON.stringify(pages),
+        MOCK_ACTIVE_STATUS: activeStatus,
+        MOCK_ACTIVE_CI_STATUS: activeCiStatus,
+        MOCK_API_FAILURE: apiFailure,
+        MOCK_CALLS: calls,
+        MOCK_DISPATCHES: dispatches,
+      },
+    });
+    return { ...result, calls: readFileSync(calls, 'utf8'), dispatches: readFileSync(dispatches, 'utf8') };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+describe('existing remediation clock admission wake', () => {
+  const page = (nodes, hasNextPage = false) => ({ data: { repository: { pullRequests: { nodes, pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null } } } } });
+  const pending = { isDraft: false, mergeable: 'MERGEABLE' };
+
+  it('reuses the scheduled clock and wakes the canonical writer without a PR payload', () => {
+    const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
+    const job = extractWorkflowJobBlock(workflow, 'remediation-clock');
+    expect(job).toContain("if: github.event_name == 'schedule'");
+    expect(job).toContain('pull-requests: read');
+    expect(job).not.toContain('isInMergeQueue');
+    expect(job).not.toContain('mergeQueueEntry');
+    expect(job).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    const result = executeClockAdmissionProbe({ pages: [page([{ ...pending, isDraft: true }], true), page([pending])] });
+    expect(result.status, result.stderr).toBe(0);
+    expect(job).toContain('gh api graphql --paginate --slurp');
+    expect(result.dispatches).toBe('workflow run merge-queue-autoenroll.yml --ref main\n');
+    expect(executeAdmissionScope({ eventName: 'workflow_dispatch' })).toEqual(expect.objectContaining({
+      disposition: 'neutral', reason: 'manual-maintenance', pr_number: '', head_sha: '', reconcile_queue_reentry: '0',
+    }));
+  });
+
+  it.each([
+    { nodes: [] },
+    { nodes: [{ ...pending, isDraft: true }] },
+    { nodes: [{ ...pending, mergeable: 'CONFLICTING' }] },
+  ])('does not wake or read active passes when there is no pending demand: %j', ({ nodes }) => {
+    const result = executeClockAdmissionProbe({ pages: [page(nodes)] });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.dispatches).toBe('');
+    expect(result.calls.trim().split('\n')).toHaveLength(1);
+  });
+
+  it.each(['queued', 'in_progress', 'waiting', 'pending', 'requested'])(
+    'suppresses a duplicate while the canonical pass is %s', activeStatus => {
+      const result = executeClockAdmissionProbe({ pages: [page([pending])], activeStatus });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.dispatches).toBe('');
+      expect(result.stdout).toContain('no duplicate wake');
+    }
+  );
+
+  it.each(['queued', 'in_progress', 'waiting', 'pending', 'requested'])(
+    'leaves the next wake to combined-head CI while it is %s', activeCiStatus => {
+      const result = executeClockAdmissionProbe({ pages: [page([pending])], activeCiStatus });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.dispatches).toBe('');
+      expect(result.stdout).toContain('its completion owns the next wake');
+    }
+  );
+
+  it.each(['inventory', 'runs'])('fails visibly when the %s API fails', apiFailure => {
+    const result = executeClockAdmissionProbe({ pages: [page([pending])], apiFailure });
+    expect(result.status).not.toBe(0);
+    expect(result.dispatches).toBe('');
+  });
+
+  it.each([[], [{}], [{ errors: [{ message: 'unavailable' }] }], [page([{ ...pending, isDraft: null }])], [page([pending], true)]].map(pages => ({ pages })))(
+    'rejects malformed inventory instead of treating it as empty demand: %j', ({ pages }) => {
+      const result = executeClockAdmissionProbe({ pages });
+      expect(result.status).not.toBe(0);
+      expect(result.dispatches).toBe('');
+    }
+  );
+});
 
 /**
  * @param {{
@@ -521,6 +639,8 @@ function exactProductionMarkerEvidence({
 function executeHoldIntakePreflight({
   closureIntakeAllowed,
   cohortIntakeAllowed,
+  closureStatus = undefined,
+  closureReasons = undefined,
 }) {
   const receipt = {
     schema: 'jovie-fleet-gate/v1',
@@ -558,12 +678,13 @@ function executeHoldIntakePreflight({
     closureAdmission: {
       allowed: closureIntakeAllowed,
       authority: 'Summer',
-      status: closureIntakeAllowed ? 'healthy' : 'red',
+      status: closureStatus ?? (closureIntakeAllowed ? 'healthy' : 'red'),
       newIssueIntakeAllowed: closureIntakeAllowed,
       newImplementationAllowed: closureIntakeAllowed,
       fallbackPrGenerationAllowed: closureIntakeAllowed,
       promotionContinues: true,
       remediationContinues: true,
+      ...(closureReasons ? { reasons: closureReasons } : {}),
     },
     alreadyAdmittedCohort: {
       preserve: true,
@@ -725,6 +846,26 @@ describe('queue workflow mutation safety', () => {
     );
   });
 
+  it('accepts issue-blocked red hold-intake while promotion stays held', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: true,
+      cohortIntakeAllowed: true,
+      closureStatus: 'red',
+      closureReasons: [
+        'queue-controller-red-over-10m',
+        'unclassified-open-pr-over-15m',
+      ],
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600'
+    );
+    expect(result.stderr).not.toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
   it.each([
     ['success', '.github/workflows/production-controller.yml', true, '1'],
     [
@@ -797,9 +938,8 @@ describe('queue workflow mutation safety', () => {
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain(
-      'types: [reopened, labeled, unlabeled, enqueued, dequeued]'
+      'types: [ready_for_review, reopened, labeled, unlabeled, enqueued, dequeued]'
     );
-    expect(workflow).not.toContain('ready_for_review, reopened');
 
     expect(fleetPolicy).toContain('github-token: ${{ github.token }}');
     expect(scope).toContain('case "$EVENT_NAME" in');
@@ -905,7 +1045,7 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
-    expect(drain).toContain('exit 3');
+    expect(drain).toContain('defer_admission_failure 3');
   });
 
   it.each([
@@ -965,10 +1105,11 @@ describe('queue workflow mutation safety', () => {
     );
   });
 
-  it('treats a native enqueued event as an exact-head continuation candidate', () => {
+  it.each(['ready_for_review', 'enqueued'])(
+    'treats %s as an exact-head admission candidate without restarting CI', action => {
     const outputs = executeAdmissionScope({
       pullRequestEvent: {
-        action: 'enqueued',
+        action,
         pull_request: {
           number: 16762,
           base: { ref: 'main' },
@@ -1094,6 +1235,10 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).not.toContain('DRAIN_PRODUCTION_CHECKPOINT_STATE');
     expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
     expect(enroll).toContain('needs.fleet-policy.outputs.mode');
+    expect(enroll).toContain('### Auto-Enroll fleet receipt');
+    expect(enroll).toContain('receipt_age_seconds');
+    expect(enroll).toContain('capacity_accepted');
+    expect(enroll).toContain('Capacity bounds new agent dispatch only');
   });
 
   it('observes production verification without making it merge authority', () => {
@@ -1181,7 +1326,7 @@ describe('queue workflow mutation safety', () => {
   it('keeps the controller repair escape exact, independently owned, and expiring', () => {
     const now = Date.parse('2026-09-06T18:00:00.000Z');
     const changedPathsSha256 = 'c'.repeat(64);
-    const operationId = 'run-34050357620-attempt-1';
+    const reviewId = 'github-review-17219';
     const body = renderControllerRepairAttestation(
       {
         schema: 'jovie-controller-repair-attestation/v1',
@@ -1191,11 +1336,10 @@ describe('queue workflow mutation safety', () => {
         pr: 16546,
         head: HEAD,
         mainSha: OTHER_HEAD,
-        reviewAuthority: 'independent-llm-review',
-        reviewId: 'review-release-repair-1',
+        reviewAuthority: 'github-approved-collaborator',
+        reviewId,
         reviewedHead: HEAD,
         changedPathsSha256,
-        operationId,
         issuedAt: new Date(now).toISOString(),
         expiresAt: new Date(now + 15 * 60_000).toISOString(),
         deploymentsAllowed: false,
@@ -1209,7 +1353,7 @@ describe('queue workflow mutation safety', () => {
       head: HEAD,
       mainSha: OTHER_HEAD,
       changedPathsSha256,
-      operationId,
+      reviewId,
     };
 
     expect(
@@ -1237,7 +1381,7 @@ describe('queue workflow mutation safety', () => {
     expect(
       attestationMatchesControllerRepair(body, {
         ...exactScope,
-        operationId: 'run-34050357620-attempt-2',
+        reviewId: 'github-review-99999',
         minimumValidForMs: 1,
         now: now + 10 * 60_000,
       })
@@ -1362,7 +1506,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(drain).toContain('baseRefName,baseRefOid');
     expect(drain).toContain(
-      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"'
+      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"'
     );
     expect(drain).toContain('.baseRefName == "main"');
     expect(drain).toContain('and (.base == "main")');
@@ -1474,6 +1618,13 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain(
       'queue-noop is a controller disposition, not a product-quality failure'
     );
+    expect(enroll).toContain(
+      'hold-intake issue-blocked red aligned fail-closed so CLEAN source can enroll while promotion stays held'
+    );
+    expect(enroll).toContain(
+      'hold-intake waiting-lane is a controller disposition, not a product-quality failure'
+    );
+    expect(enroll).toContain("DRAIN_PROMOTION_MODE\" == \"hold-intake\"");
     expect(enroll).toContain("failure='dropped-controller-event'");
     expect(enroll).toContain("failure='queue-noop'");
     expect(enroll).toContain('[[ "$drain_rc" -eq 3 ]]');
@@ -2480,6 +2631,25 @@ describe('canonical admission membership binding', () => {
       rmSync(config, { recursive: true, force: true });
     }
   });
+  it('does not prove or stamp new membership when receipt evidence is unavailable', () => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('record_queue_reentry_receipt() {');
+    const end = source.indexOf('\n}\n', start) + 2;
+    const result = spawnSync('bash', ['-c', `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
+fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
+queue_reentry_receipt_is_recoverable() { return 2; }
+node() { echo UNEXPECTED_PROOF >&2; }
+gh_mutate_retry() { echo UNEXPECTED_STATUS >&2; }
+record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
+`], {
+      encoding: 'utf8',
+      env: { ...process.env, DRY_RUN: '0', DRAIN_PROMOTION_MODE: 'normal',
+        FLEET_POLICY_MAIN_SHA: HEAD, EXPECTED_HEAD: HEAD, EXPECTED_ENTRY: ENTRY_ID },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).not.toContain('UNEXPECTED_');
+  });
   it.each([
     '2026-07-14T23:59:59Z',
     '2026-07-15T00:00:00Z',
@@ -2506,6 +2676,8 @@ describe('canonical admission membership binding', () => {
       [
         '-c',
         `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
+canonical_admission_receipt_has_provenance() { return 0; }
 fleet_hold_target_url() { echo "$TARGET"; }
 gh_retry() { printf '%s' "$STATUSES"; }
 node() { return 0; }
@@ -2550,6 +2722,7 @@ record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-1
       [
         '-c',
         `${source.slice(start, end)}
+canonical_admission_producer_is_active() { return 0; }
 fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
 queue_reentry_receipt_is_recoverable() { lookup_finished=1; return ${reuse ? 0 : 1}; }
 node() { [[ "$lookup_finished" == 1 ]] || return 0; printf '%s\\n' "$*" >&2; return 1; }
@@ -3661,6 +3834,33 @@ describe('canonical current-entry ownership and event ordering', () => {
       expectedEntryId: ENTRY_ID,
       now,
     });
+
+  it('reports a stale removal identity without certifying current membership', async () => {
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0] = {
+      __typename: 'RemovedFromMergeQueueEvent',
+      id: 'removed-old-entry',
+      createdAt: '2026-07-14T00:00:00Z',
+      actor: { __typename: 'User', login: 'itstimwhite' },
+    };
+    const runner = vi.fn(async args => {
+      expect(queryText(args)).toContain(
+        '... on RemovedFromMergeQueueEvent{id createdAt actor{__typename login}}'
+      );
+      return ok(value);
+    });
+    await expect(proveCanonicalMembership({
+      ...nativeOptions(runner), expectedHeadOid: HEAD,
+      expectedEntryId: ENTRY_ID, now: () => observedAt,
+    })).rejects.toMatchObject({
+      code: 'noncanonical_queue_membership',
+      details: { membershipEvidence: {
+        eventId: 'removed-old-entry', eventType: 'RemovedFromMergeQueueEvent',
+        createdAt: '2026-07-14T00:00:00Z', eventActorLogin: 'itstimwhite',
+        failedPredicates: expect.arrayContaining(['addedEvent', 'eventNotBeforeEntry']),
+      } },
+    });
+  });
 
   it.each([
     '2026-07-15T00:00:00Z',

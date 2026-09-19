@@ -72,7 +72,7 @@ async function validatePriceId(priceId: string): Promise<NextResponse | null> {
     await captureCriticalError(
       'Checkout rejected: no active price IDs configured',
       new Error(
-        'getActivePriceIds() returned empty — STRIPE_PRICE_PRO_MONTHLY/YEARLY likely missing'
+        'getActivePriceIds() returned empty — STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY missing'
       ),
       { route: '/api/stripe/checkout', requestedPriceId: priceId }
     );

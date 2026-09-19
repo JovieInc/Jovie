@@ -34,6 +34,8 @@ const mocks = vi.hoisted(() => ({
     }
   },
   sync: vi.fn(),
+  importPage: vi.fn(),
+  loadSnapshot: vi.fn(),
   capture: vi.fn(),
   env: {
     GOOGLE_OAUTH_CLIENT_ID: 'client-id' as string | undefined,
@@ -69,11 +71,18 @@ vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: mocks.fetch }));
 vi.mock('@/lib/youtube-library/sync', () => ({
   syncChannelVideos: mocks.sync,
 }));
+vi.mock('@/lib/youtube-library/import-channel', () => ({
+  importYouTubeChannelPage: mocks.importPage,
+  loadYouTubeImportSnapshot: mocks.loadSnapshot,
+}));
 
 import { GET as authorize } from '@/app/api/connectors/youtube/authorize/route';
 import { GET as callback } from '@/app/api/connectors/youtube/callback/route';
 import { POST as disconnect } from '@/app/api/connectors/youtube/disconnect/route';
-import { POST as sync } from '@/app/api/youtube-library/sync/route';
+import {
+  POST as sync,
+  GET as syncStatus,
+} from '@/app/api/youtube-library/sync/route';
 
 function tokenResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -183,6 +192,33 @@ beforeEach(() => {
     async (_id: string, fn: () => Promise<unknown>) => fn()
   );
   mocks.sync.mockResolvedValue({ total: 2, inserted: 1 });
+  mocks.importPage.mockResolvedValue({
+    state: 'partial',
+    identity: 'authorized',
+    resumable: true,
+    counts: {
+      discovered: 2,
+      imported: 2,
+      skipped: 0,
+      failed: 0,
+      updated: 0,
+    },
+  });
+  mocks.loadSnapshot.mockResolvedValue({
+    state: 'empty',
+    identity: 'authorized',
+    resumable: false,
+    channelId: 'channel-1',
+    providerTitle: 'Artist',
+    counts: {
+      discovered: 0,
+      imported: 0,
+      skipped: 0,
+      failed: 0,
+      updated: 0,
+    },
+    reasons: [],
+  });
   mocks.capture.mockResolvedValue(undefined);
   configureDb();
 });
@@ -376,6 +412,32 @@ describe('YouTube connector routes', () => {
     expect(mocks.writes.at(-1)).toMatchObject({
       lastErrorCode: 'youtube_sync_failed',
       lastErrorDevMessage: '[REDACTED] provider detail',
+    });
+  });
+
+  it('returns the paginated import snapshot without a full-channel sync', async () => {
+    const status = await syncStatus(
+      getRequest(paths.sync, { creatorProfileId: profileId })
+    );
+    expect(status.status).toBe(200);
+    expect(mocks.loadSnapshot).toHaveBeenCalledWith({
+      userId: 'user-1',
+      creatorProfileId: profileId,
+    });
+    const page = await sync(
+      postRequest(paths.sync, { creatorProfileId: profileId, mode: 'page' })
+    );
+    expect(page.status).toBe(200);
+    expect(mocks.importPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creatorProfileId: profileId,
+        userId: 'user-1',
+      })
+    );
+    expect(mocks.sync).not.toHaveBeenCalled();
+    await expect(page.json()).resolves.toMatchObject({
+      state: 'partial',
+      resumable: true,
     });
   });
 });

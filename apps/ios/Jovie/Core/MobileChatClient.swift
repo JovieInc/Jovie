@@ -2,7 +2,7 @@ import Foundation
 
 protocol MobileChatClientProtocol: Sendable {
   func listConversations(limit: Int) async throws -> [MobileConversationSummary]
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse
   func sendTurn(
     _ request: MobileChatTurnRequest,
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
@@ -13,6 +13,10 @@ protocol MobileChatClientProtocol: Sendable {
 }
 
 extension MobileChatClientProtocol {
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    try await fetchConversation(id: id, limit: limit, before: nil)
+  }
+
   func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
     try await sendTurn(request, onEvent: nil)
   }
@@ -185,8 +189,15 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     return response.conversations
   }
 
-  func fetchConversation(id: String, limit: Int = 100) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(
+    id: String,
+    limit: Int = ChatTranscriptWindow.initialMessageLimit,
+    before: String? = nil
+  ) async throws -> MobileConversationDetailResponse {
     var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+    if let before, !before.isEmpty {
+      queryItems.append(URLQueryItem(name: "before", value: before))
+    }
     appendWorkspaceQuery(to: &queryItems)
     let url = try makeURL(
       path: "/api/mobile/v1/chat/conversations/\(id)",

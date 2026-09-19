@@ -15,7 +15,6 @@ import {
   CircleX,
   ExternalLink,
   Globe2,
-  LockKeyhole,
   MoreHorizontal,
   Orbit,
   Plus,
@@ -66,10 +65,17 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
+  getPresenceEntityName,
+  getPresenceHandle,
+  getPresencePlatformLabel,
+} from '@/lib/profile-surfaces/presence-identity';
+import {
   filterProfileWorkspaceRows,
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  getPresenceSignals,
+  type PresenceSignal,
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
@@ -85,22 +91,25 @@ import type {
   ProfileWorkspaceRow,
   ProfileWorkspaceSurfaceRow,
 } from './data';
+import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
+import { PresenceLockAffordance } from './PresenceLockAffordance';
+import {
+  PresenceOutcomeStrip as PresenceOutcomeBoard,
+  presenceFilterForGroup,
+} from './PresenceOutcomes';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
-const DSP_FILTER_LABEL = 'DSPs';
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested';
 const FILTERS: ReadonlyArray<{
-  id: ProfilesWorkspaceView;
-  label: string;
+  readonly id: ProfilesWorkspaceView;
+  readonly label: string;
 }> = [
   { id: 'all', label: 'All Pages' },
+  { id: 'identity', label: 'Identity' },
+  { id: 'profiles', label: 'Profiles' },
+  { id: 'catalog', label: 'Catalog' },
   { id: 'suggested', label: 'Suggested' },
-  { id: 'dsp', label: DSP_FILTER_LABEL },
-  { id: 'social', label: 'Social' },
   { id: 'connector', label: 'Connectors' },
-  { id: 'source', label: 'Sources' },
-  { id: 'website', label: 'Websites' },
-  { id: 'jovie', label: 'Jovie' },
 ];
 
 type ConnectionSuggestion = ProfileSuggestion & {
@@ -506,27 +515,26 @@ function StatusCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
 const MONITORING_LABELS = {
   active: 'Active',
   paused: 'Paused',
-  locked: 'Requires Upgrade',
+  locked: 'Restricted',
   unavailable: 'Unavailable',
 } as const;
 
 function MonitoringCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const monitoringState = row.monitoringState;
+  if (monitoringState === 'locked') {
+    return <PresenceLockAffordance />;
+  }
   return (
     <span className='inline-flex min-w-20 items-center gap-1.5 text-xs text-secondary-token'>
-      {monitoringState === 'locked' ? (
-        <LockKeyhole className='h-3 w-3' aria-hidden />
-      ) : (
-        <span
-          className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            monitoringState === 'active' && 'bg-success',
-            monitoringState === 'paused' && 'bg-warning',
-            monitoringState === 'unavailable' && 'bg-disabled'
-          )}
-          aria-hidden
-        />
-      )}
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          monitoringState === 'active' && 'bg-success',
+          monitoringState === 'paused' && 'bg-warning',
+          monitoringState === 'unavailable' && 'bg-disabled'
+        )}
+        aria-hidden
+      />
       {MONITORING_LABELS[monitoringState]}
     </span>
   );
@@ -537,18 +545,7 @@ function RankCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
     return <EmptyCell tooltip='Search rank is not available for connectors.' />;
   }
   if (row.monitoringState === 'locked') {
-    return (
-      <SimpleTooltip content='Upgrade required to monitor this page.'>
-        <span
-          role='img'
-          aria-label='Rank Unavailable. Upgrade Required.'
-          className='inline-flex items-center gap-1 text-tertiary-token'
-        >
-          <LockKeyhole className='h-3 w-3' aria-hidden />
-          <span>—</span>
-        </span>
-      </SimpleTooltip>
-    );
+    return <PresenceLockAffordance />;
   }
   if (row.rank === null) {
     return <EmptyCell tooltip='No rank has been measured yet.' />;
@@ -587,20 +584,36 @@ function ConnectionRail({
         row ? (
           <EntityHeaderCard
             image={
-              <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-                <ConnectionBrandIcon row={row} className='h-6 w-6' emphasized />
-              </div>
+              row.rowType === 'connector' ? (
+                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
+                  <ConnectionBrandIcon
+                    row={row}
+                    className='h-6 w-6'
+                    emphasized
+                  />
+                </div>
+              ) : (
+                <PresenceIdentityPhoto
+                  subject={row}
+                  artistName={data.artist.name}
+                  size='xl'
+                  showSource
+                />
+              )
             }
-            title={row.label}
-            subtitle={
-              <span className='flex min-w-0 items-center gap-1.5'>
-                <ConnectionTypeGlyph row={row} className='h-3 w-3' />
-                <span className='truncate'>
-                  {kindLabel(row)} · {data.artist.name}
-                </span>
-              </span>
+            title={getPresenceEntityName(row, data.artist.name)}
+            subtitle={getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+            meta={
+              <ShareableLinkRow
+                url={
+                  row.rowType === 'surface' && row.kind === 'social'
+                    ? (row.trackedUrl ?? row.url)
+                    : row.url
+                }
+                density='rail'
+                testId='profiles-rail-shareable-link'
+              />
             }
-            meta={<ConnectionUrlDisplay row={row} />}
             stableLayout
             titleLineClamp={1}
             subtitleLineClamp={1}
@@ -642,38 +655,21 @@ function ConnectionRail({
                 hint: rankChange === '—' ? 'No change yet' : rankChange,
               },
             ]}
-            footer={
-              <ShareableLinkRow
-                url={
-                  row.rowType === 'surface' && row.kind === 'social'
-                    ? (row.trackedUrl ?? row.url)
-                    : row.url
-                }
-                density='rail'
-                testId='profiles-rail-shareable-link'
-              />
-            }
+            footer={null}
             stableLayout
-            reserveFooterSlot
+            reserveFooterSlot={false}
             testId='profiles-rail-summary'
           />
-          <DrawerSection
-            title='Profile / Page'
-            sectionKind='facts'
-            className='space-y-2'
-          >
-            <RailMetric label='Type' value={kindLabel(row)} />
-            <RailMetric label='Status' value={getConnectionStatus(row).label} />
-            <RailMetric
-              label='Monitoring'
-              value={MONITORING_LABELS[row.monitoringState]}
-            />
+          <DrawerSection title='Profile / Page' sectionKind='facts'>
+            <div className='space-y-2'>
+              <RailMetric label='Type' value={kindLabel(row)} />
+              <RailMetric
+                label='Monitoring'
+                value={MONITORING_LABELS[row.monitoringState]}
+              />
+            </div>
           </DrawerSection>
-          <DrawerSection title='Next Best Action' sectionKind='status'>
-            <p className='text-xs leading-5 text-secondary-token'>
-              {getConnectionStatus(row).nextAction}
-            </p>
-          </DrawerSection>
+          <PresenceSignalSection row={row} />
           <DrawerSection sectionKind='details'>
             <div
               className={cn(
@@ -731,98 +727,98 @@ function RailMetric({
   );
 }
 
-function PresenceOutcomeStrip({
-  data,
-}: Readonly<{ data: ProfilesWorkspaceData }>) {
-  const publicProfileHref =
-    data.artist.isPublic && data.artist.username
-      ? `/${encodeURIComponent(data.artist.username)}`
-      : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
-  const monitoredPages =
-    data.monitoringLimit === null
-      ? String(data.monitoredCount)
-      : `${data.monitoredCount} of ${data.monitoringLimit}`;
-  const outcomes: ReadonlyArray<{
-    readonly label: string;
-    readonly value: string;
-    readonly detail: string;
-    readonly href?: string;
-  }> = [
-    {
-      label: 'Search Visibility',
-      value: !data.providerAvailable
-        ? 'Unavailable'
-        : data.bestJovieRank === null
-          ? 'Not Measured'
-          : `#${data.bestJovieRank}`,
-      detail: 'Ranking across public profile pages',
-    },
-    {
-      label: 'Answer Visibility',
-      value: data.artist.isPublic ? 'Published' : 'Draft',
-      detail: 'Structured artist facts and FAQs',
-      href: publicProfileHref,
-    },
-    {
-      label: 'Audience Quality',
-      value: 'Engagement Scored',
-      detail: 'Filter fans by source, segment, and activity',
-      href: APP_ROUTES.CONTACTS,
-    },
-    {
-      label: 'Monitored Pages',
-      value: monitoredPages,
-      detail: 'Profiles and pages tracked for changes',
-    },
-  ];
+const SIGNAL_LABELS: Readonly<Record<PresenceSignal['kind'], string>> = {
+  blocker: 'Blocker',
+  finding: 'Finding',
+  recommendation: 'Recommendation',
+  state: 'State',
+};
 
+/**
+ * JOV-6170: one opportunity = one identity. Canonical directory sources
+ * (Genius / Last.fm / MusicBrainz) are quiet drill-in links so the artist
+ * can complete the canonical profile from the same review, without Jovie
+ * fabricating matches it has not detected.
+ */
+const CANONICAL_SOURCE_DRILLS: ReadonlyArray<{
+  readonly label: string;
+  readonly searchPath: string;
+}> = [
+  { label: 'Genius', searchPath: 'https://genius.com/search?q=' },
+  // ui-casing-allow: canonical directory brand lockup
+  { label: 'Last.fm', searchPath: 'https://www.last.fm/search?q=' },
+  {
+    // ui-casing-allow: canonical directory brand lockup
+    label: 'MusicBrainz',
+    searchPath: 'https://musicbrainz.org/search?type=artist&query=',
+  },
+];
+
+function CanonicalSourceDrills({ identity }: Readonly<{ identity: string }>) {
+  const query = encodeURIComponent(identity);
   return (
-    <section
-      aria-label='Artist Presence Outcomes'
-      data-testid='presence-outcomes'
-      className='grid shrink-0 grid-cols-2 border-b border-subtle lg:grid-cols-4'
-    >
-      {outcomes.map(outcome => {
-        const content = (
-          <>
-            <span className='block text-2xs font-medium text-tertiary-token'>
-              {outcome.label}
-            </span>
-            <span className='mt-1 flex items-center gap-1.5 text-sm font-semibold text-primary-token'>
-              {outcome.value}
-              {outcome.href ? (
-                <ArrowUpRight
-                  className='h-3.5 w-3.5 text-tertiary-token'
-                  aria-hidden
-                />
-              ) : null}
-            </span>
-            <span className='mt-1 block text-2xs leading-4 text-tertiary-token'>
-              {outcome.detail}
-            </span>
-          </>
-        );
-        const className =
-          'min-h-22 border-b border-subtle px-3 py-3 text-left even:border-l lg:min-h-20 lg:border-b-0 lg:border-l lg:first:border-l-0';
+    <div className='flex items-center gap-3 border-b border-subtle px-3 py-1.5'>
+      <span className='text-2xs text-tertiary-token'>Find on</span>
+      {CANONICAL_SOURCE_DRILLS.map(source => (
+        <a
+          key={source.label}
+          href={`${source.searchPath}${query}`}
+          target='_blank'
+          rel='noreferrer'
+          data-testid='canonical-source-drill'
+          className='inline-flex items-center gap-0.5 text-2xs text-secondary-token underline-offset-2 transition-colors duration-fast hover:text-primary-token hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50'
+        >
+          {source.label}
+          <ExternalLink className='h-2.5 w-2.5' aria-hidden />
+        </a>
+      ))}
+    </div>
+  );
+}
 
-        return outcome.href ? (
-          <Link
-            key={outcome.label}
-            href={outcome.href}
-            className={cn(
-              className,
-              'transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'
-            )}
+/**
+ * JOV-6170: signals render as four SEPARATE primitives with distinct weight —
+ * blockers loudest, state quiet — never merged into one undifferentiated feed.
+ */
+function PresenceSignalSection({
+  row,
+}: Readonly<{ row: ProfileWorkspaceRow }>) {
+  const signals = getPresenceSignals(row);
+  return (
+    <DrawerSection title='Signals' sectionKind='status'>
+      <ul className='space-y-2' data-testid='presence-signal-list'>
+        {signals.map(signal => (
+          <li
+            key={`${signal.kind}:${signal.label}`}
+            className='text-xs leading-5'
+            data-testid={`presence-signal-${signal.kind}`}
           >
-            {content}
-          </Link>
-        ) : (
-          <div key={outcome.label} className={className}>
-            {content}
-          </div>
-        );
-      })}
-    </section>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 font-medium',
+                signal.tone === 'error' && 'text-error',
+                signal.tone === 'warning' && 'text-warning',
+                signal.tone === 'success' && 'text-success',
+                signal.tone === 'neutral' && 'text-secondary-token'
+              )}
+            >
+              {signal.tone === 'neutral' || signal.tone === 'success' ? (
+                <Circle className='h-3 w-3' aria-hidden />
+              ) : signal.tone === 'error' ? (
+                <CircleX className='h-3 w-3' aria-hidden />
+              ) : (
+                <CircleAlert className='h-3 w-3' aria-hidden />
+              )}
+              <span className='sr-only'>{SIGNAL_LABELS[signal.kind]}:</span>
+              {signal.label}
+            </span>
+            <span className='mt-0.5 block text-secondary-token'>
+              {signal.detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </DrawerSection>
   );
 }
 
@@ -1027,6 +1023,18 @@ function SuggestedConnectionsReview({
               data-suggestion-identity={group.id}
               className='min-w-0 border-b border-subtle last:border-b-0'
             >
+              <div className='flex min-h-9 items-center justify-between gap-2 border-b border-subtle bg-surface-2 px-3'>
+                <span className='truncate text-2xs font-medium text-secondary-token'>
+                  Add canonical {group.identity} profile
+                </span>
+                <span
+                  className='shrink-0 text-2xs text-tertiary-token'
+                  data-testid='suggested-connection-group-count'
+                >
+                  Review {group.suggestions.length}
+                </span>
+              </div>
+              <CanonicalSourceDrills identity={group.identity} />
               <ul
                 aria-label={`${group.identity} suggestions`}
                 className='min-w-0 divide-y divide-subtle'
@@ -1307,19 +1315,38 @@ export function ProfilesWorkspace({
           const row = context.row.original;
           return (
             <div className='flex min-w-0 items-center gap-2.5'>
-              <ConnectionBrandIcon
-                row={row}
-                className='h-5 w-5 shrink-0'
-                emphasized={selected?.id === row.id}
-              />
+              {row.rowType === 'connector' ? (
+                <ConnectionBrandIcon
+                  row={row}
+                  className='h-5 w-5 shrink-0'
+                  emphasized={selected?.id === row.id}
+                />
+              ) : (
+                <PresenceIdentityPhoto
+                  subject={row}
+                  artistName={data?.artist.name ?? row.label}
+                  size='lg'
+                />
+              )}
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
-                  {row.label}
+                  {getPresenceEntityName(row, data?.artist.name ?? row.label)}
                 </div>
-                <ConnectionUrlDisplay
-                  row={row}
-                  className='text-xs text-tertiary-token max-sm:hidden'
-                />
+                {row.rowType === 'connector' ? (
+                  <ConnectionUrlDisplay
+                    row={row}
+                    className='text-xs text-tertiary-token max-sm:hidden'
+                  />
+                ) : (
+                  <div
+                    className='truncate text-xs text-tertiary-token max-sm:hidden'
+                    title={
+                      getPresenceHandle(row) ?? getPresencePlatformLabel(row)
+                    }
+                  >
+                    {getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1419,7 +1446,7 @@ export function ProfilesWorkspace({
         },
       }),
     ],
-    [getContextMenuItems, selected?.id]
+    [data?.artist.name, getContextMenuItems, selected?.id]
   );
 
   useRegisterRightPanel(
@@ -1437,13 +1464,13 @@ export function ProfilesWorkspace({
             setPendingCandidate(candidate);
             if (!candidate) return;
             setFilter(
-              candidate.category === 'website' ? 'website' : candidate.category
+              candidate.category === 'website' ? 'identity' : 'profiles'
             );
           }}
           onReviewCandidate={candidate => {
             setPendingCandidate(candidate);
             setFilter(
-              candidate.category === 'website' ? 'website' : candidate.category
+              candidate.category === 'website' ? 'identity' : 'profiles'
             );
             setIsAddConnectionOpen(false);
           }}
@@ -1513,7 +1540,17 @@ export function ProfilesWorkspace({
         />
       }
     >
-      <PresenceOutcomeStrip data={data} />
+      <PresenceOutcomeBoard
+        data={data}
+        rows={rows}
+        onSelectGroup={group => {
+          setFilter(presenceFilterForGroup(group));
+          setSelected(null);
+        }}
+        onSelectRow={row => {
+          if (!row.id.startsWith('preview:')) setSelected(row);
+        }}
+      />
       {filter === 'suggested' ? (
         <SuggestedConnectionsReview
           groups={suggestedGroups}
@@ -1543,6 +1580,7 @@ export function ProfilesWorkspace({
           }}
           getContextMenuItems={getContextMenuItems}
           rowHeight={56}
+          containerClassName='min-h-0 flex-1'
           minWidth='390px'
           isRowSelected={row =>
             !row.id.startsWith('preview:') && selected?.id === row.id

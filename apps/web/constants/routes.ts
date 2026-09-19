@@ -299,7 +299,7 @@ export function buildReleaseDownloadsRoute(releaseId: string): string {
 }
 
 export function buildLibraryViewRoute(
-  view?: 'releases' | 'merch' | 'images' | 'videos' | 'audio'
+  view?: 'releases' | 'merch' | 'images' | 'videos' | 'audio' | 'documents'
 ): string {
   if (!view) {
     return APP_ROUTES.LIBRARY;

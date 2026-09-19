@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
@@ -12,11 +12,16 @@ import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfi
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
+import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import {
+  isProofProfileHandle,
+  resolveProofClaimCta,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,
@@ -48,6 +53,8 @@ import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
+import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
@@ -112,6 +119,16 @@ function assertValidProfileUsername(username: string) {
   }
 }
 
+async function enforceCanonicalPublicProfileUsername(username: string) {
+  const decision = await resolveOpaqueInternalProfileUsername(username);
+  if (decision.action === 'not_found') {
+    notFound();
+  }
+  if (decision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(decision));
+  }
+}
+
 async function getPublicTourDates(
   profileId: string
 ): Promise<TourDateViewModel[]> {
@@ -131,11 +148,15 @@ async function getPublicTourDates(
   }
 }
 
-async function getPublicReleases(
-  profileId: string
-): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+async function getPublicReleases(profileId: string): Promise<{
+  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly failed: boolean;
+}> {
   try {
-    return await getReleasesForProfileLite(profileId);
+    return {
+      releases: await getReleasesForProfileLite(profileId),
+      failed: false,
+    };
   } catch (error) {
     logger.error(
       'Error fetching public profile releases',
@@ -146,7 +167,7 @@ async function getPublicReleases(
       },
       'public-profile'
     );
-    return [];
+    return { releases: [], failed: true };
   }
 }
 
@@ -285,6 +306,8 @@ async function ArtistPageContent({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
   const isClaimed = creatorClerkId !== null;
+  const isProofProfile = isProofProfileHandle(artist.handle);
+  const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
   // Structured-credit profiles still expose a claim path when an exact
@@ -333,11 +356,13 @@ async function ArtistPageContent({
     profile.avatar_url
   );
 
-  // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
+  // Await tour dates + releases (started above, non-blocking). Tour failures
+  // still degrade to an empty list; catalog failures stay marked so Music
+  // can show a recoverable error instead of a false empty catalog.
   // Sort server-side so the client doesn't need a useMemo sort
   const [
     tourDatesRaw,
-    allReleases,
+    catalogResult,
     merchCards,
     alertOptInVariant,
     profilePacAssignment,
@@ -360,6 +385,8 @@ async function ArtistPageContent({
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+  const allReleases = catalogResult.releases;
+  const catalogLoadFailed = catalogResult.failed;
 
   schedulePublicCollaboratorProfileReconciliation({
     creatorProfileId: profile.id,
@@ -383,6 +410,7 @@ async function ArtistPageContent({
   // credited artists with public Jovie profiles (→ /{handle}).
   const entityMentionContext: EntityMentionContext = {
     ownHandle: artist.handle,
+    ownName: artist.name,
     releases: releases.map(release => ({
       title: release.title,
       slug: release.slug,
@@ -489,23 +517,38 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!isClaimed && directClaimSupported}
-        claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
+        showClaimFooter={(!isClaimed && directClaimSupported) || isProofProfile}
+        claimFooterHref={
+          isProofProfile
+            ? proofClaim.href
+            : `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+        }
+        claimFooterLabel={isProofProfile ? proofClaim.label : undefined}
+        proofClaim={isProofProfile}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
+        catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
       />
       <ProfileAeoContent
         content={aeoContent}
         claimHref={
-          !isClaimed && directClaimSupported
+          !isProofProfile && !isClaimed && directClaimSupported
             ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
             : undefined
         }
       />
+      {isProofProfile ? (
+        <ProfileAeoProofClaimCard
+          artistName={aeoContent.artistName}
+          href={proofClaim.href}
+          label={proofClaim.label}
+          note={proofClaim.note}
+        />
+      ) : null}
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
@@ -516,6 +559,7 @@ async function ArtistPageContent({
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return <UnfazedProfileClient />;
@@ -550,6 +594,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return {

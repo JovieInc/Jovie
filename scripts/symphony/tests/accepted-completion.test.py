@@ -45,7 +45,11 @@ class AcceptedCompletionTests(unittest.TestCase):
         self.service = self.root / "service.json"
         self.service.write_text(json.dumps({"schema": "gem-service-attestation/v1",
             "sourceRevision": F.RUNTIME["sourceRevision"], "active": True, "healthy": True,
-            **{name: {"matches": True} for name in ("workflow", "unit", "policy", "gate", "closureHealth")}}))
+            "service": C.V2_OFFICIAL_RUNTIME_SERVICE, "observedAt": self.now.isoformat(),
+            "runtime": {"generation": F.GENERATION, "executableSha256": T.digest(F.RUNTIME_BINARY),
+                        "workflowPath": str(F.SOURCE / "scripts/symphony/WORKFLOW.md")},
+            **{name: {"matches": True} for name in ("unit", "policy", "gate", "closureHealth")},
+            "workflow": {"matches": True, "installedSha256": T.digest(F.SOURCE / "scripts/symphony/WORKFLOW.md")}}))
     def add_completion(self, *, issue, issue_revision, lease_identity, base_head, head,
                        pr_number, observed_at, auth_state=None):
         auth_state = auth_state or self.auth_state
@@ -99,6 +103,36 @@ class AcceptedCompletionTests(unittest.TestCase):
     def github(self, repository, pr_number):
         self.assertEqual((repository, pr_number), ("JovieInc/Jovie", 99))
         return self.pr, self.rules
+
+    def write_rotated_context(self, row, *, contract_sha=None):
+        old_source = self.root / "old-runtime-source"
+        old_source.mkdir()
+        (old_source / "marker").write_text("old runtime source")
+        subprocess.run(["git", "-C", str(old_source), "init", "-q"], check=True)
+        subprocess.run(["git", "-C", str(old_source), "add", "marker"], check=True)
+        subprocess.run([
+            "git", "-C", str(old_source), "-c", "user.email=test@example.com",
+            "-c", "user.name=Test", "commit", "-qm", "old runtime",
+        ], check=True)
+        old_revision = subprocess.check_output(
+            ["git", "-C", str(old_source), "rev-parse", "HEAD"], text=True,
+        ).strip()
+        old_binary = self.root / "old-runtime-binary"
+        old_binary.write_bytes(b"old runtime binary")
+        runtime = {
+            **F.RUNTIME, "sourceRevision": old_revision,
+            "binarySha256": T.digest(old_binary),
+        }
+        if contract_sha is not None:
+            runtime["contractSha256"] = contract_sha
+        A._write_private(self.context, {
+            "runtime": runtime, "sourceRoot": str(old_source),
+            "binaryPath": str(old_binary),
+            "workflowPath": str(F.SOURCE / "scripts/symphony/WORKFLOW.md"),
+            "codexPath": str(self.executor), "codexSha256": T.digest(self.executor),
+            "observedAt": (self.now - timedelta(days=2)).isoformat(),
+            "accounts": [row], "attestationDir": str(self.attestations),
+        })
     def assert_github_rejected(self, pr, rules=None, *, head="d" * 40, number=99):
         with self.assertRaises(ValueError):
             A.validate_github_outcome(pr, rules or self.rules, expected_issue=self.issue,
@@ -118,6 +152,137 @@ class AcceptedCompletionTests(unittest.TestCase):
         self.assertEqual(len(self.ledger.read_text().splitlines()), 1)
         provider = json.loads(self.provider_capacity.read_text())["providers"]["cursor"]
         self.assertEqual((provider["limit"], provider["usefulCompletions"]), (1, 1))
+    def test_refresh_rejects_stale_future_missing_or_malformed_service_observation(self):
+        service = json.loads(self.service.read_text())
+        for observed in (None, "invalid", (self.now - timedelta(seconds=601)).isoformat(),
+                         (self.now + timedelta(seconds=1)).isoformat()):
+            with self.subTest(observed=observed):
+                self.service.write_text(json.dumps({**service, "observedAt": observed}))
+                self.context.write_bytes(b"existing context must survive")
+                with self.assertRaisesRegex(ValueError, "service attestation"):
+                    A.reconcile(self.args(), github=self.github, now=self.now)
+                self.assertEqual(self.context.read_bytes(), b"existing context must survive")
+                self.assertFalse(self.ledger.exists())
+                self.assertFalse(self.capacity.exists())
+
+    def test_refresh_preserves_service_observation_age_at_600_second_boundary(self):
+        service = json.loads(self.service.read_text())
+        observed = self.now - timedelta(seconds=600)
+        service["observedAt"] = observed.isoformat()
+        self.service.write_text(json.dumps(service))
+        A.reconcile(self.args(), github=self.github, now=self.now)
+        self.assertEqual(json.loads(self.context.read_text())["observedAt"], observed.isoformat())
+        before = self.context.read_bytes()
+        with self.assertRaisesRegex(ValueError, "service attestation"):
+            A.reconcile(self.args(), github=self.github, now=self.now + timedelta(seconds=1))
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rebinds_current_enrollment_after_runtime_rotation(self):
+        account = self.root / "enrolled-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        A._write_private(account.parent / "state.json", {"cooldowns": {}, "last_error": {}})
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+
+        result = A.reconcile(self.args(), github=self.github, now=self.now)
+
+        self.assertEqual((result["target"], result["approved"]), (0, False))
+        refreshed = json.loads(self.context.read_text())
+        self.assertEqual(refreshed["runtime"]["sourceRevision"], F.RUNTIME["sourceRevision"])
+        self.assertEqual(refreshed["accounts"][0]["profile"], row["profile"])
+        self.assertEqual(refreshed["codexPath"], str(self.executor))
+
+    def test_refresh_rejects_revoked_enrollment_after_runtime_rotation(self):
+        account = self.root / "revoked-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        state = {"cooldowns": {}, "last_error": {}}
+        A._write_private(account.parent / "state.json", state)
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+        # The existing enrollment binding is revoked/replaced after the old
+        # context was written; its profile no longer matches auth.json.
+        (account / "auth.json").write_text('{"revoked": true}')
+        before = self.context.read_bytes()
+
+        with self.assertRaisesRegex(ValueError, "no trusted completion identities"):
+            A.reconcile(self.args(), github=self.github, now=self.now)
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rejects_non_runtime_context_corruption_during_rotation(self):
+        account = self.root / "corrupt-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        A._write_private(account.parent / "state.json", {"cooldowns": {}, "last_error": {}})
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row, contract_sha="d" * 64)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+        before = self.context.read_bytes()
+
+        with self.assertRaisesRegex(ValueError, "no trusted completion identities"):
+            A.reconcile(self.args(), github=self.github, now=self.now)
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rejects_service_identity_or_runtime_changed_since_observation(self):
+        service = json.loads(self.service.read_text())
+        changes = [
+            {"service": "retired.service"},
+            {"runtime": None},
+            *({"runtime": {**service["runtime"], key: value}} for key, value in (
+                ("generation", "0" * 64), ("executableSha256", "0" * 64),
+                ("workflowPath", str(self.root / "different-workflow.md")))),
+            {"workflow": {"matches": True, "installedSha256": "0" * 64}},
+        ]
+        for change in changes:
+            with self.subTest(change=change):
+                self.service.write_text(json.dumps({**service, **change}))
+                self.context.write_bytes(b"existing context must survive")
+                with self.assertRaisesRegex(ValueError, "service attestation"):
+                    A.reconcile(self.args(), github=self.github, now=self.now)
+                self.assertEqual(self.context.read_bytes(), b"existing context must survive")
+                self.assertFalse(self.ledger.exists())
+
+    def test_operator_runtime_inputs_are_verified_before_accepting_completion(self):
+        arguments = ["--receipt-dir", str(self.receipt_dir), "--result-dir", str(self.result_dir),
+                     "--service-attestation", str(self.service), "--context", str(self.context),
+                     "--attestation-dir", str(self.attestations), "--ledger", str(self.ledger),
+                     "--capacity", str(self.capacity), "--provider-capacity", str(self.provider_capacity)]
+        environment = {
+            "SYMPHONY_RUNTIME_SOURCE_ROOT": str(F.SOURCE),
+            "SYMPHONY_RUNTIME_EXECUTABLE": str(F.RUNTIME_BINARY),
+            "SYMPHONY_RUNTIME_WORKFLOW": str(F.SOURCE / "scripts/symphony/WORKFLOW.md"),
+        }
+        with mock.patch.dict(os.environ, environment):
+            result = A.reconcile(A.parser().parse_args(arguments), github=self.github, now=self.now)
+            self.assertTrue(result["approved"])
+            before = self.context.read_bytes()
+            wrong_binary = self.root / "wrong-binary"
+            wrong_binary.write_bytes(b"different executable")
+            os.environ["SYMPHONY_RUNTIME_EXECUTABLE"] = str(wrong_binary)
+            with self.assertRaisesRegex(ValueError, "runtime binding mismatch"):
+                A.reconcile(A.parser().parse_args(arguments), github=self.github, now=self.now)
+            self.assertEqual(self.context.read_bytes(), before)
+            explicit = A.parser().parse_args([*arguments, "--binary", str(F.RUNTIME_BINARY)])
+            self.assertEqual(explicit.binary, F.RUNTIME_BINARY)
+
     def test_required_ci_failure_never_writes_completion(self):
         self.pr["statusCheckRollup"][1]["state"] = "FAILURE"
         result = A.reconcile(self.args(), github=self.github, now=self.now)

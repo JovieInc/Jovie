@@ -242,6 +242,8 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
 ];
 const ROLLING_CI_FX_CACHE_GC_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
+  'scripts/hooks/pre-push-gate.sh',
+  'scripts/security/scan-secrets.sh',
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
   'scripts/ci-fast-lanes.mjs',
@@ -285,6 +287,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
@@ -364,6 +367,12 @@ const MERGE_GROUP_ADMISSION_LANE = new Set([
 ]);
 const MERGE_GROUP_ADMISSION_WEB_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
+// ownership contract failed. Keep it in the cheap structural selector so
+// coverage-lane drift fails before an expensive changed-surface collection.
+const CI_CONTROL_WEB_TESTS = [
+  'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
 ];
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -614,8 +623,26 @@ const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/symphony/tests/gem-checkin-hud.test.py',
   'scripts/symphony/tests/symphony-burrito-workflow.test.py',
 ]);
+const CURSOR_CLI_WORKER_PRIMARY_INPUTS = new Set([
+  'scripts/symphony/cursor-agent-std',
+  'scripts/symphony/cursor-cli-worker.py',
+  'scripts/symphony/install-cursor-cli-worker.sh',
+  'scripts/symphony/systemd/cursor-cli-worker.service',
+  'scripts/symphony/systemd/cursor-cli-worker.timer',
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
+]);
+const CURSOR_CLI_WORKER_LANE = new Set([
+  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+]);
+const CURSOR_CLI_WORKER_PYTHON_TESTS = [
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
+];
 const GEM_CHECKIN_HUD_LANE = new Set([
   ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
+  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/reusable-ci-lint.yml',
 ]);
@@ -1188,6 +1215,25 @@ export function buildAffectedTestPlan(
       nodeTests: [],
     };
   }
+  const isBoundedCursorCliWorkerChange =
+    files.some(file => CURSOR_CLI_WORKER_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => CURSOR_CLI_WORKER_LANE.has(file));
+  if (isBoundedCursorCliWorkerChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: CURSOR_CLI_WORKER_PYTHON_TESTS,
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
+    };
+  }
   const isBoundedGemCheckinHudChange =
     files.some(file => GEM_CHECKIN_HUD_PRIMARY_INPUTS.has(file)) &&
     files.every(file => GEM_CHECKIN_HUD_LANE.has(file));
@@ -1341,7 +1387,9 @@ export function buildAffectedTestPlan(
   const hasCiUiDriftGuardrailAnchor = files.some(
     file =>
       file === 'apps/desktop/scripts/desktop-shell-contract.test.mjs' ||
-      file === 'scripts/hooks/configure-git-hooks.sh'
+      file === 'scripts/hooks/configure-git-hooks.sh' ||
+      file === 'scripts/hooks/pre-push-gate.sh' ||
+      file === 'scripts/security/scan-secrets.sh'
   );
   const isBoundedCiUiDriftGuardrailChange =
     ciUiDriftGuardrailInputCount > 0 &&
@@ -2379,6 +2427,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',
       '--coverage.thresholds.functions=82',
+    ]);
+    await runCommand('pnpm', [
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
+      '--maxWorkers',
+      '1',
     ]);
   }
   const base = argValue(args, '--base', 'origin/main');

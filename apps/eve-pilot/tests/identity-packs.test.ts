@@ -97,7 +97,8 @@ describe('eve identity instruction packs', () => {
       id: 'summer',
       role: 'company-operator',
       canIngestAck: false,
-      canReadGbrain: false,
+      // Ops-memory path needs GBrain read; privileged write stays locked.
+      canReadGbrain: true,
       canGovernorAdmit: true,
       canGovernorRoute: true,
       canGovernorEnforce: true,
@@ -105,17 +106,18 @@ describe('eve identity instruction packs', () => {
     expect(() => turn.require('governor-admit')).not.toThrow();
     expect(() => turn.require('governor-route')).not.toThrow();
     expect(() => turn.require('governor-enforce')).not.toThrow();
+    expect(() => turn.require('gbrain-read')).not.toThrow();
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
-  it('keeps the Summer shadow route read-only while the Summer pack has the governor path', () => {
+  it('keeps the Summer shadow route non-mutating while the Summer pack has the governor path', () => {
     vi.stubEnv('SUMMER_GOVERNOR_ENFORCE_ENABLED', 'true');
     const turn = eveIdentityForChannel('ovie-summer-shadow');
     expect(turn.pack).toMatchObject({
       id: 'summer',
       role: 'company-operator',
       canIngestAck: false,
-      canReadGbrain: false,
+      canReadGbrain: true,
       canGovernorAdmit: true,
       canGovernorRoute: true,
       canGovernorEnforce: true,
@@ -130,9 +132,7 @@ describe('eve identity instruction packs', () => {
     expect(() => turn.require('ingest-ack')).toThrow(
       EvePilotCapabilityDeniedError
     );
-    expect(() => turn.require('gbrain-read')).toThrow(
-      EvePilotCapabilityDeniedError
-    );
+    expect(() => turn.require('gbrain-read')).not.toThrow();
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 

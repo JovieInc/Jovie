@@ -1,0 +1,12 @@
+{
+  "confirm": "install-jov-6163-publisher",
+  "reason": "JOV-6163 E1 — re-fire after receipt-path fix (Gem runner cannot mkdir /opt/cursor; write receipt under RUNNER_TEMP). Prior tip commission 34757787785: Install succeeded, Verify failed EACCES mkdir /opt/cursor; observations artifact uploaded and locally gates with maxAgeMs=600000. Tip Main Release Ready previously recovered via #17793/#17794.",
+  "requestedAt": "2026-09-13T12:48:00Z",
+  "requestedBy": "cursor-agent",
+  "linear": "JOV-6163",
+  "priorCommissionRun": 34757787785,
+  "priorTip": "0367fb9ef9df552cb7ed429a10c67ffcac00ad7d",
+  "priorConclusion": "failure",
+  "priorFailure": "EACCES mkdir /opt/cursor during verify-e1-attestation-observations",
+  "fix": "receipt path prefers E1_RECEIPT_PATH → RUNNER_TEMP → writable /opt/cursor/artifacts → os.tmpdir()"
+}

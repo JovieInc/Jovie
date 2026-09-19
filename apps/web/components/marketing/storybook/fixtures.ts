@@ -11,17 +11,17 @@ export const STORY_FAQ_ITEMS = [
   {
     question: 'What is Jovie?',
     answer:
-      'Jovie is a release platform for independent musicians. It combines smart links, artist profiles, audience intelligence, release automation, and AI tools.',
+      'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
   },
   {
     question: 'Is Jovie free?',
     answer:
-      'Yes. Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics and release tools.',
+      'Yes. Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics and notifications.',
   },
   {
     question: 'Who is Jovie for?',
     answer:
-      'Independent musicians and their teams who want one adaptive profile that captures fans and reactivates them automatically.',
+      'Artists, founders, authors, creators, and independent experts who want a living profile and a way to turn attention into relationships.',
   },
 ] as const;
 

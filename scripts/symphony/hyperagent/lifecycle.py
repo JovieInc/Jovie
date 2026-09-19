@@ -6,20 +6,48 @@ It never calls Hyperagent, resolves an approval, sends a message, or starts work
 The canonical Symphony router remains the only dispatch-selection owner.
 The classify CLI is diagnostic and cannot certify terminal success; journal-bound
 Python callers must provide the persisted expected job.
+
+ha-land-not-complete/v1: finished work is not useful until it lands to
+production. Pair with symphony-meaningful-throughput/v1. Ban duplicate,
+miss, failed-burn, and stale threads that consume usage without shipping.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import pathlib
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 SCHEMA = "symphony-hyperagent-lifecycle/v1"
+LAND_SCHEMA = "ha-land-not-complete/v1"
+THROUGHPUT_SCHEMA = "symphony-meaningful-throughput/v1"
 MAX_OBSERVATION_AGE_SECONDS = 300
 MAX_LIVE_FACT_AGE_SECONDS = 900
+PILEUP_STALE_AFTER_SECONDS = 3600
+NAMED_AGENTS = {
+    "architecture": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "root-cause": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "review": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "design": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "code": {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+    "tests": {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+    "mechanical": {"agent_name": "Flash", "model_id": "Flash"},
+}
+DISPATCH_AGENT_NAMES = frozenset(agent["agent_name"] for agent in NAMED_AGENTS.values())
+TEMP_ROSTER_MARKERS = ("temporary", "instruction eval", "skills audit", "tranche", "(copy)")
+TEMP_ROSTER_NAMES = frozenset({
+    "Jovie instruction eval — temporary",
+    "Jovie Skills Audit Tranche 4 — GLM Flash",
+    "GLM 5.3 Flash Developer (copy)",
+})
+SILENT_ALTERNATIVE_MARKERS = frozenset({
+    "opus", "newest", "auto", "codex", "composer", "claude",
+    "live-cheapest-capable", "cheapest", "sonnet",
+})
 TERMINAL_STATES = frozenset(
-    {"useful_success", "terminal_failed", "declined", "cancelled"}
+    {"useful_success", "terminal_failed", "declined", "cancelled", "land_not_complete", "failed_burn"}
 )
 PROVIDER_ACTIONS = {
     401: "authorized_reconnect_required",
@@ -127,6 +155,150 @@ def _interaction_matches_dispatch(interaction, observed_job, expected_job):
     )
 
 
+def select_named_agent(task_class):
+    """Return the fail-closed named Hyperagent identity for one task class."""
+    if not isinstance(task_class, str) or task_class not in NAMED_AGENTS:
+        raise LifecycleError("unknown_task_class")
+    return dict(NAMED_AGENTS[task_class])
+
+
+def _silent_alternative(value):
+    text = str(value or "").strip().lower()
+    return any(marker in text for marker in SILENT_ALTERNATIVE_MARKERS)
+
+
+def _norm_text(value):
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def is_temp_roster_agent(name, description=""):
+    """Temp / copy / audit-only roster rows are never Symphony dispatch targets."""
+    if not isinstance(name, str) or not name.strip():
+        return False
+    if name.strip() in TEMP_ROSTER_NAMES:
+        return True
+    text = _norm_text(f"{name} {description}")
+    return any(marker in text for marker in TEMP_ROSTER_MARKERS)
+
+
+def _land_proven(land_proof, observation, expected_job=None):
+    if not isinstance(land_proof, dict) or land_proof.get("schema") != LAND_SCHEMA:
+        return False
+    if land_proof.get("landed") is not True:
+        return False
+    if land_proof.get("destination") != "production":
+        return False
+    thread_id = observation.get("thread_id") if isinstance(observation, dict) else None
+    if not isinstance(thread_id, str) or land_proof.get("thread_id") != thread_id:
+        return False
+    if expected_job is not None and land_proof.get("idempotency_key") != expected_job.get("idempotency_key"):
+        return False
+    merged_pr = land_proof.get("merged_pr")
+    if isinstance(merged_pr, bool) or not isinstance(merged_pr, int) or merged_pr <= 0:
+        return False
+    sha = land_proof.get("production_sha")
+    if not _valid_sha256(sha):
+        return False
+    merged_at = _parse_time(land_proof.get("merged_at"))
+    return merged_at is not None
+
+
+def classify_roster(agents):
+    """Split a live roster snapshot into named dispatch targets vs excluded temps."""
+    if not isinstance(agents, list):
+        return {
+            "schema": LAND_SCHEMA,
+            "kind": "roster",
+            "pairedThroughput": THROUGHPUT_SCHEMA,
+            "eligible": [],
+            "excluded": [],
+            "reason": "invalid_roster",
+        }
+    eligible = []
+    excluded = []
+    for agent in agents:
+        if not isinstance(agent, dict):
+            excluded.append({"reason": "invalid_agent"})
+            continue
+        name = agent.get("name") if isinstance(agent.get("name"), str) else ""
+        description = agent.get("description") if isinstance(agent.get("description"), str) else ""
+        row = {"name": name, "id": agent.get("id") if isinstance(agent.get("id"), str) else ""}
+        if is_temp_roster_agent(name, description):
+            excluded.append({**row, "reason": "temp_roster_agent"})
+        elif name not in DISPATCH_AGENT_NAMES:
+            excluded.append({**row, "reason": "not_named_dispatch_agent"})
+        else:
+            eligible.append(row)
+    return {
+        "schema": LAND_SCHEMA,
+        "kind": "roster",
+        "pairedThroughput": THROUGHPUT_SCHEMA,
+        "eligible": eligible,
+        "excluded": excluded,
+    }
+
+
+def classify_pileup(threads, now=None):
+    """Detect dupe / miss / stale / failed-burn pileups that burn usage without a land."""
+    now = now or datetime.now(timezone.utc)
+    if not isinstance(threads, list):
+        return {
+            "schema": LAND_SCHEMA,
+            "kind": "pileup",
+            "pairedThroughput": THROUGHPUT_SCHEMA,
+            "status": "unknown",
+            "burns": [],
+            "reason": "invalid_threads",
+        }
+    burns = []
+    seen = {}
+    for thread in threads:
+        if not isinstance(thread, dict):
+            burns.append({"kind": "invalid_thread"})
+            continue
+        thread_id = thread.get("thread_id") or thread.get("id")
+        if not isinstance(thread_id, str) or not thread_id:
+            burns.append({"kind": "invalid_thread"})
+            continue
+        name = thread.get("name") if isinstance(thread.get("name"), str) else ""
+        agent_name = thread.get("agent_name") if isinstance(thread.get("agent_name"), str) else ""
+        agent_id = thread.get("agent_id") or thread.get("namedAgentId")
+        agent_id = agent_id if isinstance(agent_id, str) else ""
+        updated = _parse_time(thread.get("updated_at") or thread.get("updatedAt"))
+        running = thread.get("is_running")
+        if running is None:
+            running = thread.get("isRunning")
+        landed = thread.get("landed") is True and thread.get("destination") == "production"
+        terminal = thread.get("terminal_state") or thread.get("terminalState")
+        temp = is_temp_roster_agent(agent_name) or is_temp_roster_agent(name)
+        key = _norm_text(f"{agent_id or agent_name}|{name}")
+        if key and key in seen:
+            burns.append({
+                "kind": "duplicate",
+                "thread_id": thread_id,
+                "duplicate_of": seen[key],
+            })
+        elif key:
+            seen[key] = thread_id
+        if temp:
+            burns.append({"kind": "temp_roster_burn", "thread_id": thread_id})
+        if running is True and updated is not None and (now - updated).total_seconds() > PILEUP_STALE_AFTER_SECONDS:
+            burns.append({"kind": "stale", "thread_id": thread_id})
+        if terminal == "failed" and not landed:
+            burns.append({"kind": "failed_burn", "thread_id": thread_id})
+        if terminal in {"completed", "cancelled"} and not landed:
+            burns.append({"kind": "miss", "thread_id": thread_id})
+        if terminal == "completed" and not landed:
+            burns.append({"kind": "land_not_complete", "thread_id": thread_id})
+    return {
+        "schema": LAND_SCHEMA,
+        "kind": "pileup",
+        "pairedThroughput": THROUGHPUT_SCHEMA,
+        "status": "pileup" if burns else "clear",
+        "burns": burns,
+    }
+
+
 def validate_dispatch(envelope, now=None):
     """Validate live routing/account/cost evidence before an MCP create call."""
     now = now or datetime.now(timezone.utc)
@@ -140,6 +312,7 @@ def validate_dispatch(envelope, now=None):
         "agent_id",
         "agent_name",
         "model_id",
+        "task_class",
         "runtime",
         "paying_org",
         "expected_paying_org",
@@ -155,6 +328,42 @@ def validate_dispatch(envelope, now=None):
     for field in required_text:
         if not isinstance(envelope.get(field), str) or not envelope[field]:
             reasons.append(("unknown_live_fact", field))
+    task_class = envelope.get("task_class")
+    if isinstance(task_class, str) and task_class:
+        if task_class not in NAMED_AGENTS:
+            reasons.append(("unknown_task_class", "task_class"))
+        else:
+            expected = NAMED_AGENTS[task_class]
+            if envelope.get("agent_name") != expected["agent_name"]:
+                reasons.append(("named_agent_mismatch", "agent_name"))
+            if envelope.get("model_id") != expected["model_id"]:
+                reasons.append(("named_model_mismatch", "model_id"))
+    if _silent_alternative(envelope.get("model_id")) or _silent_alternative(envelope.get("agent_name")):
+        reasons.append(("silent_model_alternative", "model_id"))
+    if is_temp_roster_agent(envelope.get("agent_name"), envelope.get("agent_description") or ""):
+        reasons.append(("temp_roster_agent", "agent_name"))
+    if is_temp_roster_agent(envelope.get("agent_id") or ""):
+        reasons.append(("temp_roster_agent", "agent_id"))
+    roster = envelope.get("roster")
+    if roster is not None:
+        classified_roster = classify_roster(roster)
+        if classified_roster.get("reason") == "invalid_roster":
+            reasons.append(("invalid_roster", "roster"))
+        else:
+            excluded_names = {
+                item.get("name")
+                for item in classified_roster.get("excluded") or []
+                if item.get("reason") == "temp_roster_agent"
+            }
+            if envelope.get("agent_name") in excluded_names:
+                reasons.append(("temp_roster_agent", "agent_name"))
+    pileup = envelope.get("open_threads")
+    if pileup is not None:
+        classified_pileup = classify_pileup(pileup, now=now)
+        if classified_pileup.get("status") == "unknown":
+            reasons.append(("invalid_pileup", "open_threads"))
+        elif classified_pileup.get("status") == "pileup":
+            reasons.append(("usage_burn_pileup", "open_threads"))
     if envelope.get("provider") != "hyperagent":
         reasons.append(("route_mismatch", "provider"))
     if envelope.get("route_selected") is not True:
@@ -231,7 +440,7 @@ def validate_dispatch(envelope, now=None):
     return {"decision": "PROCEED" if not reasons else "HOLD", "reasons": _codes(reasons)}
 
 
-def classify_observation(observation, now=None, expected_job=None):
+def classify_observation(observation, now=None, expected_job=None, land_proof=None):
     """Classify structured provider evidence without guessing from prose."""
     now = now or datetime.now(timezone.utc)
     if not isinstance(observation, dict) or observation.get("schema") != SCHEMA:
@@ -355,6 +564,14 @@ def classify_observation(observation, now=None, expected_job=None):
         and _money(observation.get("cost_usd"))
         and _terminal_authority_matches(observation, expected_job)
     ):
+        land = land_proof if land_proof is not None else observation.get("land")
+        if not _land_proven(land, observation, expected_job):
+            return {
+                "state": "land_not_complete",
+                "reason": "thread_complete_without_production_land",
+                "pairedThroughput": THROUGHPUT_SCHEMA,
+                "job": job,
+            }
         return {
             "state": "useful_success", "reason": "terminal_receipts_verified",
             "job": job, "cost_usd": observation["cost_usd"],
@@ -470,6 +687,20 @@ def plan_resolution(classification, authority=None, oauth_scopes=()):
         return result
     if state == "running":
         return {"action": "observe_same_thread", "execute": False, "read_only": True}
+    if state == "land_not_complete":
+        if not _valid_job_identity(classification.get("job")):
+            return {"action": "hold_unknown", "execute": False}
+        return {
+            "action": "close_or_land_original_thread", "execute": False,
+            "requires_journal_reservation": True,
+        }
+    if state == "failed_burn":
+        if not _valid_job_identity(classification.get("job")):
+            return {"action": "hold_unknown", "execute": False}
+        return {
+            "action": "quarantine_failed_burn", "execute": False,
+            "requires_journal_reservation": True,
+        }
     if state in TERMINAL_STATES:
         if not _valid_job_identity(classification.get("job")):
             return {"action": "hold_unknown", "execute": False}

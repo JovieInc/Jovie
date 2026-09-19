@@ -40,6 +40,7 @@ import type {
   ProviderConfidence,
   ProviderKey,
 } from '@/lib/discography/types';
+import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
@@ -228,11 +229,24 @@ function SmartLinkClaimBanner({
 function SmartLinkCreditName({
   name,
   handle,
-}: Readonly<{ name: string; handle: string | null }>) {
-  if (handle) {
+  ownerHandle,
+  ownerName,
+}: Readonly<{
+  name: string;
+  handle: string | null;
+  ownerHandle: string | null;
+  ownerName: string;
+}>) {
+  const hrefHandle = canonicalizeReleaseArtistHandle({
+    handle,
+    name,
+    ownerHandle,
+    ownerName,
+  });
+  if (hrefHandle) {
     return (
       <Link
-        href={`/${handle}`}
+        href={`/${hrefHandle}`}
         className='text-white/70 transition-colors hover:text-white/90'
       >
         {name}
@@ -288,6 +302,8 @@ function SmartLinkArtistLine({
             key={getBylinePartKey(part.type, part.value)}
             name={part.value}
             handle={artistByHandle.get(part.value)?.handle ?? null}
+            ownerHandle={artist.handle}
+            ownerName={artist.name}
           />
         ) : (
           <span
@@ -308,7 +324,12 @@ function SmartLinkArtistLine({
                   {i === featuredArtists.length - 1 ? ' & ' : ', '}
                 </span>
               )}
-              <SmartLinkCreditName name={fa.name} handle={fa.handle} />
+              <SmartLinkCreditName
+                name={fa.name}
+                handle={fa.handle}
+                ownerHandle={artist.handle}
+                ownerName={artist.name}
+              />
             </span>
           ))}
         </>

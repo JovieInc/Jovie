@@ -34,12 +34,18 @@ UNMEASURED = "unmeasured"
 PROD_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 CAP_RE = re.compile(r"^\s*max_concurrent_agents:\s*([0-9]+)\s*$", re.M)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
-LIVE_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
+LIVE_TEAM_KEY = "JOV"
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_TPS_STATE = Path.home() / ".local/state/gem-checkin-hud/symphony-tps.json"
 DEFAULT_PRESSURE_STATE = Path.home() / ".local/state/gem-checkin-hud/system-pressure.json"
 DEFAULT_GITHUB_STATE = Path.home() / ".local/state/gem-checkin-hud/github-projection.json"
+DEFAULT_CURSOR_HEALTH = Path(
+    os.environ.get(
+        "GEM_CURSOR_HEALTH_RECEIPT",
+        str(Path.home() / ".local/state/symphony-cursor-cli/health.json"),
+    )
+)
+CURSOR_HEALTH_SCHEMA = "symphony-cursor-cli-health/v1"
 DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4041/api/v1/state")
 DEFAULT_WORKFLOW = Path(
     os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
@@ -52,13 +58,14 @@ MQ_QUERY = (
     "pullRequest { number title } } } } } }"
 )
 LINEAR_QUERY = (
-    "query($id: String!) { project(id: $id) { issues(filter: { state: { name: { eq: \"In Review\" } } }) "
-    "{ totalCount } } }"
+    "query($teamKey: String!) { issues(filter: { team: { key: { eq: $teamKey } }, "
+    "state: { name: { eq: \"In Review\" } } }) { totalCount } }"
 )
 LINEAR_STAGES_QUERY = (
-    "query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after, filter: { "
-    "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } } }"
+    "query($teamKey: String!, $after: String) { issues(first: 100, after: $after, filter: { "
+    "team: { key: { eq: $teamKey } }, "
+    "state: { name: { in: [\"Todo\", \"In Progress\", \"Rework\", \"Merging\", \"In Review\"] } } }) "
+    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } }"
 )
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
@@ -210,7 +217,9 @@ def terminal_size(
     size = shutil.get_terminal_size((TARGET_WIDTH, TARGET_HEIGHT))
     cols = width if isinstance(width, int) and width > 0 else int(size.columns or TARGET_WIDTH)
     rows = height if isinstance(height, int) and height > 0 else int(size.lines or TARGET_HEIGHT)
-    return max(MIN_WIDTH, cols), max(MIN_HEIGHT, rows)
+    # Hotplug can leave a real console smaller than the preferred layout.
+    # Never invent cells outside that viewport; render() clips to these bounds.
+    return max(1, cols), max(1, rows)
 
 
 def terminal_width(override: int | None = None) -> int:
@@ -1463,7 +1472,7 @@ def _linear_request(query: str, *, timeout: float, variables: dict[str, Any] | N
         return None
     request = urllib.request.Request(
         LINEAR_API,
-        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID, **(variables or {})}}).encode(),
+        data=json.dumps({"query": query, "variables": {"teamKey": LIVE_TEAM_KEY, **(variables or {})}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/3"},
         method="POST",
     )
@@ -1497,7 +1506,7 @@ def fetch_review(*, timeout: float = 8.0) -> int | None:
     payload = _linear_request(LINEAR_QUERY, timeout=timeout)
     if payload is None:
         return None
-    count = (((payload.get("data") or {}).get("project") or {}).get("issues") or {}).get("totalCount")
+    count = ((payload.get("data") or {}).get("issues") or {}).get("totalCount")
     return count if isinstance(count, int) else None
 
 
@@ -1529,8 +1538,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "source_error": f"Linear pagination exceeded {MAX_LINEAR_PAGES} pages",
             }
         payload = _linear_request(LINEAR_STAGES_QUERY, timeout=remaining, variables={"after": cursor})
-        project = (payload.get("data") or {}).get("project") if payload else None
-        issues = project.get("issues") if isinstance(project, dict) else None
+        issues = (payload.get("data") or {}).get("issues") if payload else None
         page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
         if (
             not isinstance(issues, dict)
@@ -2719,6 +2727,18 @@ def read_runtime_context(*, now: datetime) -> dict[str, Any]:
     gate_until = None
     if gate.get("schema") == "symphony-linear-rate-limit-gate/v1" and recorded and recorded <= now and reset and reset > now:
         gate_until = reset.isoformat()
+    cursor_health = load_json_dict(DEFAULT_CURSOR_HEALTH)
+    reasons = cursor_health.get("reasons") if isinstance(cursor_health.get("reasons"), list) else []
+    if cursor_health.get("schema") != CURSOR_HEALTH_SCHEMA:
+        cursor_cli = UNKNOWN
+    elif cursor_health.get("status") == "ready":
+        cursor_cli = "ready"
+    elif cursor_health.get("status") == "admission_held" or cursor_health.get("throughput") == "admission_held":
+        cursor_cli = "admission_held"
+    elif cursor_health.get("throughput") == "dormant_with_capacity" or "dormant_with_capacity" in reasons:
+        cursor_cli = "dormant_with_capacity"
+    else:
+        cursor_cli = ",".join(str(reason) for reason in reasons) or "unhealthy"
     configured = UNKNOWN
     try:
         match = re.search(r"model=[\"']([^\"']+)[\"']", DEFAULT_WORKFLOW.read_text(encoding="utf-8"))
@@ -2726,7 +2746,7 @@ def read_runtime_context(*, now: datetime) -> dict[str, Any]:
             configured = match.group(1)
     except OSError:
         pass
-    return {"service_state": service, "linear_gate_until": gate_until, "configured_model": configured, "runtime_observed_at": now.isoformat()}
+    return {"service_state": service, "linear_gate_until": gate_until, "configured_model": configured, "cursor_cli": cursor_cli, "runtime_observed_at": now.isoformat()}
 
 
 def execution_state(row: dict[str, Any], *, now: datetime) -> str:
@@ -2785,7 +2805,7 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, ma
     cap = symphony.get("cap") if isinstance(symphony.get("cap"), int) and symphony.get("cap") >= 0 else None
     freshness = natural_time(symphony.get("generated_at"), now=now)
     count_text = f"{running}/{cap}" if isinstance(running, int) and cap is not None else f"{running}/{cap if cap is not None else UNKNOWN}"
-    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)}"
+    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)} · cursor-cli {symphony.get('cursor_cli', UNKNOWN)}"
     corner = f"API {source} · {freshness}"
     fill = max(1, width - len(title) - len(corner) - 7)
     border_color = MINT if fresh and running == 0 else BLUE if fresh else ORANGE

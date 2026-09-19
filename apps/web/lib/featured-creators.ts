@@ -4,6 +4,10 @@ import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { transformImageUrl } from '@/lib/images/versioning';
+import {
+  filterPublicDiscoveryIdentities,
+  isPublicProfileDiscoveryEligible,
+} from '@/lib/profile/public-profile-indexing-policy';
 
 export type FeaturedCreator = {
   id: string;
@@ -135,7 +139,14 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
         clearTimeout(featuredQueryTimerId);
     }
 
-    const creatorIds = data.map(creator => creator.id);
+    const discoverableCreators = filterPublicDiscoveryIdentities(
+      data.map(creator => ({
+        ...creator,
+        handle: creator.username,
+        isPublic: true,
+      }))
+    );
+    const creatorIds = discoverableCreators.map(creator => creator.id);
     const releaseByCreatorId = new Map<
       string,
       { title: string; type: string | null }
@@ -187,7 +198,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
 
     const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
     return shuffle(
-      data.map(a => {
+      discoverableCreators.map(a => {
         const latestRelease = releaseByCreatorId.get(a.id);
 
         return {
@@ -285,7 +296,19 @@ async function queryCreatorByHandle(
       if (creatorTimerId !== undefined) clearTimeout(creatorTimerId);
     }
 
-    if (!row) return null;
+    if (
+      !row ||
+      !isPublicProfileDiscoveryEligible(
+        {
+          handle: row.username,
+          displayName: row.displayName,
+          isPublic: true,
+        },
+        { requirePublication: true }
+      )
+    ) {
+      return null;
+    }
     const creatorRow = row;
 
     let latestReleaseTitle: string | null = null;
@@ -369,6 +392,7 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
 
   const data = await db
     .select({
+      username: creatorProfiles.username,
       spotifyId: creatorProfiles.spotifyId,
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
@@ -387,7 +411,13 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
 
   const vipLookup = Object.create(null) as VipArtistLookup;
 
-  for (const creator of data) {
+  for (const creator of filterPublicDiscoveryIdentities(
+    data.map(row => ({
+      ...row,
+      handle: row.username,
+      isPublic: true,
+    }))
+  )) {
     // Skip creators without Spotify IDs
     if (!creator.spotifyId || !creator.displayName) {
       continue;

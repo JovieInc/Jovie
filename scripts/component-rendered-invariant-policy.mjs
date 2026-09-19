@@ -153,3 +153,184 @@ export function evaluateRenderedSnapshots(snapshots) {
     results,
   };
 }
+
+const GRID_TOLERANCE_PX = 2;
+const ACCEPTANCE_CONTEXT_KEYS = [
+  'candidateRevision',
+  'route',
+  'viewport',
+  'state',
+  'theme',
+];
+function contextLabel(snapshot) {
+  const width = snapshot?.viewport?.width ?? snapshot?.viewport;
+  return [
+    snapshot?.route ?? 'unknown-route',
+    width != null ? `${width}w` : 'unknown-viewport',
+    snapshot?.state ?? 'unknown-state',
+    snapshot?.theme ?? 'unknown-theme',
+  ].join('/');
+}
+function hasText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+function hasViewport(value) {
+  return (
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    (value != null && Number.isFinite(value.width))
+  );
+}
+function failClosed(rule, detail) {
+  return { ok: false, issues: [{ rule, detail }] };
+}
+
+export function evaluateAcceptanceEvidence(receipt) {
+  if (!receipt || typeof receipt !== 'object') {
+    return failClosed('acceptance-receipt-missing', 'receipt required');
+  }
+  const issues = [];
+  const fail = (rule, detail) => issues.push({ rule, detail });
+  for (const key of ACCEPTANCE_CONTEXT_KEYS) {
+    const present =
+      key === 'viewport'
+        ? hasViewport(receipt[key])
+        : hasText(String(receipt[key] ?? ''));
+    if (!present) {
+      fail('acceptance-context-missing', `${key} required`);
+    }
+  }
+  const rendered = receipt.rendered;
+  if (!rendered || typeof rendered !== 'object') {
+    fail(
+      'rendered-evidence-missing',
+      'exact-candidate rendered evidence required'
+    );
+  } else if (rendered.aligned !== true) {
+    fail(
+      'rendered-evidence-rejected',
+      `rendered candidate is not aligned at ${contextLabel(receipt)}`
+    );
+  }
+  if (receipt.sourceTokensPass === true && rendered?.aligned !== true) {
+    fail(
+      'source-only-acceptance',
+      'token strings passed while rendered geometry is not accepted'
+    );
+  }
+  if (
+    receipt.screenshotBaselineUpdated === true &&
+    rendered?.aligned !== true
+  ) {
+    fail(
+      'baseline-bump-is-not-acceptance',
+      'screenshot baseline updates are not acceptance; Taste owns optical/art'
+    );
+  }
+  if (hasText(receipt.tasteNote) && rendered?.aligned !== true) {
+    fail(
+      'taste-note-is-not-acceptance',
+      'taste notes cannot mint a rendered pass'
+    );
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+export function evaluateRelationalGrid(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return failClosed('grid-snapshot-missing', 'snapshot required');
+  }
+  const issues = [];
+  const fail = (rule, detail) => issues.push({ rule, detail });
+  if (
+    !hasText(snapshot.route) ||
+    !hasViewport(snapshot.viewport) ||
+    !hasText(snapshot.state) ||
+    !hasText(snapshot.theme)
+  ) {
+    fail(
+      'grid-context-missing',
+      'route, viewport, state, and theme are required'
+    );
+  }
+  const elements = Array.isArray(snapshot.elements) ? snapshot.elements : [];
+  if (elements.length === 0) {
+    fail('grid-elements-missing', 'rendered column boxes are required');
+    return { ok: false, issues };
+  }
+  const groups = new Map();
+  for (const element of elements) {
+    const key = `${element?.column ?? ''}::${element?.align ?? ''}::${element?.role ?? 'copy'}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(element);
+  }
+  for (const [key, group] of groups) {
+    if (group.length < 2) continue;
+    const xs = group.map(element => Number(element?.box?.x));
+    if (xs.some(value => !Number.isFinite(value))) {
+      fail(
+        'grid-box-missing',
+        `${key} missing rendered x at ${contextLabel(snapshot)}`
+      );
+      continue;
+    }
+    const spread = Math.max(...xs) - Math.min(...xs);
+    if (spread > GRID_TOLERANCE_PX) {
+      fail(
+        'column-assignment-drift',
+        `${key} rendered x spread ${spread}px exceeds ${GRID_TOLERANCE_PX}px at ${contextLabel(snapshot)}`
+      );
+    }
+  }
+  if (
+    snapshot.sourceTokensPass === true &&
+    issues.some(issue => issue.rule === 'column-assignment-drift')
+  ) {
+    fail(
+      'source-tokens-without-rendered-alignment',
+      'token strings passed while assigned columns are misaligned'
+    );
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+export function evaluateSharedSearchGeometry(snapshot) {
+  const issues = [];
+  const fail = (rule, detail) => issues.push({ rule, detail });
+  const hero = snapshot?.hero;
+  const close = snapshot?.close;
+  if (!hero || !close) {
+    return failClosed(
+      'shared-search-missing',
+      'hero and close search required'
+    );
+  }
+  if (hero.treatment !== 'editorial' || close.treatment !== 'editorial') {
+    fail(
+      'shared-search-treatment-drift',
+      `hero=${hero.treatment ?? 'none'} close=${close.treatment ?? 'none'}`
+    );
+  }
+  if (hero.consumerAuraPierce === true || close.consumerAuraPierce === true) {
+    fail(
+      'shared-search-aura-pierce',
+      'consumer descendant selectors into aura internals are forbidden'
+    );
+  }
+  if (differs(hero.fieldHeight, close.fieldHeight)) {
+    fail(
+      'shared-search-geometry-drift',
+      `hero field ${hero.fieldHeight}px vs close ${close.fieldHeight}px`
+    );
+  }
+  if (
+    hero.fieldBackground &&
+    close.fieldBackground &&
+    hero.fieldBackground !== close.fieldBackground
+  ) {
+    fail(
+      'shared-search-surface-drift',
+      'hero and close search interiors do not match'
+    );
+  }
+  return { ok: issues.length === 0, issues };
+}

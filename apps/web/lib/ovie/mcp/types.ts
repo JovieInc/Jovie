@@ -16,6 +16,8 @@ export const OVIE_MCP_TOOLS = [
   'get_workflow_capture',
   'search_gbrain',
   'get_gbrain_page',
+  'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];
@@ -25,6 +27,8 @@ export const OVIE_WRITE_TOOLS = [
   'create_initiative',
   'certify_feature',
   'request_workflow_capture',
+  'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 /** Read-only operating detail that is still founder-private. */

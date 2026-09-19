@@ -28,15 +28,21 @@ server actions, browser interactions, and shared helpers. Moving a blocking call
 
 ## Scope
 
-Runtime request path only:
+Runtime request path and Electron main thread:
 
 - `apps/web/app`, `lib`, `components`, `hooks`, `middleware.ts`, `proxy.ts`
 - request-path packages: `ui`, `auth-routing`, `audio-contracts`, `extension-contracts`,
   `agent-transport-contracts`
+- Electron `apps/desktop/src` main/preload plus helpers reachable by relative import
 
-Out of scope: `scripts/`, tests, stories, generated output, and `workers/` (explicit
-allowlist). Existing request-path debt is ratcheted in
+Import reachability is inspected from runtime files and desktop entry points. Renaming a
+helper or placing it in a `workers/` folder is zero escape while a main-thread module
+imports it. Isolated workers and build scripts remain out of scope unless imported.
+
+Out of scope: `scripts/`, tests, stories, generated output, and isolated `workers/`
+that no runtime entry imports. Existing request-path debt is ratcheted in
 `scripts/invariants/latency-sensitive-execution-allowlist.json`. Counts may only decrease.
+There is no blanket desktop or startup exemption.
 
 ## Rejected APIs
 

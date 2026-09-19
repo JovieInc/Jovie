@@ -40,6 +40,12 @@ import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import {
+  canonicalizeReleaseArtistCredits,
+  canonicalizeReleaseCreditGroups,
+  opaqueInternalProfileRedirectPath,
+} from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -114,6 +120,14 @@ export default async function ContentSmartLinkPage({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    notFound();
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
+  }
 
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
@@ -408,11 +422,14 @@ function ContentPageBody({
   );
 
   // Featured credits stay featured — they are never promoted into the byline.
-  const featuredArtists: FeaturedArtist[] =
+  const owner = { name: ownerName, handle: creator.usernameNormalized };
+  const featuredArtists: FeaturedArtist[] = canonicalizeReleaseArtistCredits(
     content.credits
       ?.find(g => g.role === 'featured_artist')
       ?.entries.filter(entry => !primaryArtistIds.has(entry.artistId))
-      .map(e => ({ name: e.name, handle: e.handle })) ?? [];
+      .map(e => ({ name: e.name, handle: e.handle })) ?? [],
+    owner
+  );
 
   // Mystery phase: revealDate is in the future, hide all details
   if (releasePhase === 'mystery' && content.revealDate) {
@@ -484,7 +501,10 @@ function ContentPageBody({
       primaryArtists={artistByline.entries}
       featuredArtists={featuredArtists}
       providers={allProviders}
-      credits={content.credits}
+      credits={canonicalizeReleaseCreditGroups(content.credits, {
+        name: ownerName,
+        handle: creator.usernameNormalized,
+      })}
       artworkSizes={content.artworkSizes}
       allowDownloads={
         (creator.settings as Record<string, unknown> | null)
@@ -628,6 +648,15 @@ export async function generateMetadata({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    return { title: 'Not Found', robots: { index: false, follow: false } };
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
+  }
+
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     return { title: 'Not Found' };
