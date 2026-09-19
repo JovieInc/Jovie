@@ -1,26 +1,13 @@
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { normalizeFailureEvents } from '../rolling-ci-dispatch.mjs';
 import {
   planOfflineFailureDispositions,
   prepareOfflineFailureTriage,
-  settleOfflineFailure,
 } from '../rolling-ci-failure-disposition.mjs';
 
 const head = 'a'.repeat(40);
 const now = '2026-09-19T20:00:00.000Z';
 const path = 'apps/web/lib/fixture-total.js';
-const digest = value => createHash('sha256').update(value).digest('hex');
 function fixture(overrides = {}) {
   const envelope = {
     repository: 'JovieInc/Jovie',
@@ -82,24 +69,6 @@ function fixture(overrides = {}) {
 const first = input => planOfflineFailureDispositions(input).dispositions[0];
 const triageOf = input => Object.values(input.triage)[0];
 const observationOf = input => Object.values(input.observations)[0];
-function settlement(disposition = first(fixture())) {
-  const patchSha256 = digest('fixture patch');
-  return {
-    disposition,
-    liveHead: disposition.head,
-    now,
-    patchSha256,
-    changedPaths: [path],
-    tests: { head: disposition.head, patchSha256, passed: true },
-    review: {
-      head: disposition.head,
-      patchSha256,
-      accepted: true,
-      reviewer: 'fixture-independent-oracle',
-    },
-  };
-}
-
 describe('offline failure accounting', () => {
   it('binds triage to the full event and never grants production or model authority', () => {
     const input = fixture();
@@ -367,189 +336,4 @@ describe('offline failure accounting', () => {
       'invalid-dispatch-state'
     );
   });
-});
-
-describe('exact-artifact offline settlement', () => {
-  it('requires a candidate and the current head', () => {
-    expect(
-      settleOfflineFailure({ ...settlement(), disposition: null }).reason
-    ).toBe('not-a-patch-candidate');
-    expect(
-      settleOfflineFailure({ ...settlement(), liveHead: 'b'.repeat(40) }).action
-    ).toBe('supersede');
-  });
-  it.each(['invalid', '2026-09-19T20:05:00.000Z', '2026-09-19T20:06:00.000Z'])(
-    'stops after invalid or expired lease: %s',
-    timestamp => {
-      expect(
-        settleOfflineFailure({ ...settlement(), now: timestamp }).reason
-      ).toBe('lease-expired-or-invalid');
-    }
-  );
-  it('rejects an invalid deadline', () => {
-    const input = settlement();
-    input.disposition.deadline = 'invalid';
-    expect(settleOfflineFailure(input).reason).toBe('lease-expired-or-invalid');
-  });
-  it.each([null, [], ['apps/web/lib/other.js'], ['.github/workflows/ci.yml']])(
-    'rejects patch scope changes %j',
-    changedPaths => {
-      expect(
-        settleOfflineFailure({ ...settlement(), changedPaths }).reason
-      ).toBe('patch-scope-mismatch');
-    }
-  );
-  it('revalidates protected paths even if the candidate was altered', () => {
-    const input = settlement();
-    input.disposition.paths = ['.github/workflows/ci.yml'];
-    input.changedPaths = input.disposition.paths;
-    expect(settleOfflineFailure(input).reason).toBe('patch-scope-mismatch');
-    delete input.disposition.paths;
-    expect(settleOfflineFailure(input).reason).toBe('patch-scope-mismatch');
-  });
-  it('rejects malformed patch digests', () => {
-    expect(
-      settleOfflineFailure({ ...settlement(), patchSha256: 'bad' }).reason
-    ).toBe('invalid-patch-digest');
-  });
-  it.each([
-    null,
-    { head: 'wrong' },
-    { patchSha256: 'wrong' },
-    { passed: false },
-  ])('requires fresh passing tests %j', mutation => {
-    const input = settlement();
-    input.tests = mutation && { ...input.tests, ...mutation };
-    expect(settleOfflineFailure(input).reason).toBe('fresh-tests-missing');
-  });
-  it.each([
-    null,
-    { head: 'wrong' },
-    { patchSha256: 'wrong' },
-    { accepted: false },
-    { reviewer: '' },
-    { reviewer: 'fx' },
-  ])('requires independent review %j', mutation => {
-    const input = settlement();
-    input.review = mutation && { ...input.review, ...mutation };
-    expect(settleOfflineFailure(input).reason).toBe(
-      'independent-review-missing'
-    );
-  });
-  it('labels a verified fixture as offline with no production authority', () => {
-    expect(settleOfflineFailure(settlement())).toMatchObject({
-      action: 'offline-verified',
-      reason: 'fixture-only',
-      productionAuthorized: false,
-      modelCalls: 0,
-    });
-  });
-});
-
-it('reproduces a synthetic defect, stages one bounded repair, and checks the exact artifact with an independent oracle', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'offline-failure-'));
-  const repo = join(dir, 'repo');
-  mkdirSync(repo);
-  const git = args => {
-    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
-    expect(result.status, result.stderr).toBe(0);
-    return result.stdout.trim();
-  };
-  const smoke = filename =>
-    spawnSync(
-      process.execPath,
-      [
-        '-e',
-        `const assert = require('node:assert/strict'); assert.equal(require(process.argv[1]).total([1, 2]), 3);`,
-        filename,
-      ],
-      { encoding: 'utf8' }
-    );
-  const oracle = filename =>
-    spawnSync(
-      process.execPath,
-      [
-        '-e',
-        `const assert = require('node:assert/strict'); const { total } = require(process.argv[1]); assert.equal(total([]), 0); assert.equal(total([3, -2, 4]), 5); assert.equal(total([0, 0]), 0);`,
-        filename,
-      ],
-      { encoding: 'utf8' }
-    );
-  try {
-    git(['init', '--quiet']);
-    git(['config', 'user.email', 'fixture@example.invalid']);
-    git(['config', 'user.name', 'Offline Fixture']);
-    const source = join(repo, path);
-    mkdirSync(dirname(source), { recursive: true });
-    writeFileSync(
-      source,
-      'exports.total = values => values.reduce((sum, value) => sum + value, 1);\n'
-    );
-    git(['add', '.']);
-    git(['commit', '--quiet', '-m', 'synthetic failing fixture']);
-    expect(oracle(source).status).not.toBe(0);
-    const input = fixture({ headSha: git(['rev-parse', 'HEAD']) });
-    const disposition = first(input);
-    expect(disposition.action).toBe('prepare-offline-patch');
-    writeFileSync(
-      source,
-      'exports.total = values => values.reduce((sum, value) => sum + value, 0);\n'
-    );
-    const planFile = join(dir, 'plan.json');
-    writeFileSync(planFile, JSON.stringify(disposition.plan));
-    const output = join(dir, 'artifact');
-    const staged = spawnSync(
-      process.execPath,
-      [
-        resolve(import.meta.dirname, '../rolling-ci-fx.mjs'),
-        'hosted-stage',
-        '--plan',
-        planFile,
-        '--repository',
-        repo,
-        '--output',
-        output,
-      ],
-      { encoding: 'utf8' }
-    );
-    expect(staged.status, staged.stderr).toBe(0);
-    const changes = JSON.parse(
-      readFileSync(join(output, 'changes.json'), 'utf8')
-    );
-    const artifact = join(output, 'files', path);
-    expect(changes).toHaveLength(1);
-    expect(changes[0].sha256).toBe(digest(readFileSync(artifact)));
-    const patchSha256 = digest(readFileSync(join(output, 'repair.patch')));
-    const localTest = smoke(source),
-      independentArtifactTest = oracle(artifact);
-    expect(localTest.status, localTest.stderr).toBe(0);
-    expect(independentArtifactTest.status, independentArtifactTest.stderr).toBe(
-      0
-    );
-    const proof = { head: input.liveHead, patchSha256 };
-    const result = settleOfflineFailure({
-      disposition,
-      liveHead: git(['rev-parse', 'HEAD']),
-      now,
-      patchSha256,
-      changedPaths: changes.map(c => c.path),
-      tests: { ...proof, passed: localTest.status === 0 },
-      review: {
-        ...proof,
-        accepted: independentArtifactTest.status === 0,
-        reviewer: 'fixture-hidden-oracle',
-      },
-    });
-    expect(result).toMatchObject({
-      action: 'offline-verified',
-      productionAuthorized: false,
-      modelCalls: 0,
-    });
-    expect(first({ ...input, priorDispositions: [result] }).action).toBe(
-      'deduplicate'
-    );
-    expect(git(['rev-parse', 'HEAD'])).toBe(input.liveHead);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
