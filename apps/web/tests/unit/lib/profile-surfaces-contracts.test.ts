@@ -5,6 +5,7 @@ import {
   type MonitoringCandidate,
   redactLockedRank,
   selectAdditionalMonitoredSurfaceIds,
+  selectCanonicalProfileSurfaces,
   selectDefaultMonitoredSurfaceIds,
   selectDurablyMissingSurfaceIds,
   selectRetirableSurfaceIds,
@@ -196,5 +197,40 @@ describe('selectDefaultMonitoredSurfaceIds', () => {
         2
       )
     ).toEqual(['new']);
+  });
+});
+
+describe('canonical Presence identity projection', () => {
+  const production = {
+    id: 'production',
+    kind: 'jovie',
+    url: 'https://jov.ie/tim',
+  };
+  const staging = {
+    id: 'staging-orphan',
+    kind: 'jovie',
+    url: 'https://staging.jov.ie/tim',
+  };
+  const website = {
+    id: 'website',
+    kind: 'website',
+    url: 'https://artist.example/tim',
+  };
+  it('counts the current environment identity once while preserving unrelated pages and source records', () => {
+    const rows = [production, staging, website];
+    expect(selectCanonicalProfileSurfaces(rows, 'https://jov.ie/tim/')).toEqual(
+      [production, website]
+    );
+    expect(rows).toEqual([production, staging, website]);
+  });
+  it('uses the configured environment rather than hardcoding production', () => {
+    expect(
+      selectCanonicalProfileSurfaces([production, staging], staging.url)
+    ).toEqual([staging]);
+  });
+  it('does not collapse a different account into the current identity', () => {
+    expect(
+      selectCanonicalProfileSurfaces([production], 'https://jov.ie/another')
+    ).toEqual([]);
   });
 });

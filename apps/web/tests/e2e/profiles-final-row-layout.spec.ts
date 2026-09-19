@@ -183,10 +183,24 @@ test('keeps page identity and review status readable at narrow widths', async ({
 }) => {
   test.setTimeout(120_000);
   await setTestAuthBypassSession(page, 'creator-ready');
+  const suggestionsResponse = page.waitForResponse(
+    response => new URL(response.url()).pathname === '/api/suggestions'
+  );
   await page.goto(
     `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`
   );
   await page.waitForURL(/\/app\/profiles(?:$|\?)/);
+  const response = await suggestionsResponse;
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    success: true,
+    suggestions: expect.any(Array),
+  });
+  await page.getByRole('button', { name: 'Suggested', exact: true }).click();
+  await expect(page.getByTestId('suggested-connections-review')).toBeVisible();
+  await expect(
+    page.getByTestId('suggested-connections-error-state')
+  ).toHaveCount(0);
   await page.getByRole('button', { name: 'All Pages', exact: true }).click();
   const workspace = page.getByTestId('profiles-workspace');
   for (const width of [320, 390, 1280]) {

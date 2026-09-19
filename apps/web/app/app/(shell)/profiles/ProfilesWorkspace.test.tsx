@@ -335,6 +335,38 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     vi.restoreAllMocks();
   });
 
+  it('stops retrying forbidden suggestions and recovers saved suggestions on explicit retry', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ success: false, error: 'Forbidden' }, { status: 403 })
+    );
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        suggestionsResponse([
+          socialSuggestion('saved-link', 'tiktok', '@artist'),
+        ])
+      )
+    );
+    renderWorkspace(data);
+    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    expect(await screen.findByText("Couldn't Load Suggestions")).toBeVisible();
+    expect(
+      screen.queryByText('Saved suggestions are still available. Try again.')
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(
+      await screen.findByRole('list', {
+        name: 'Suggested Connection Review Queue',
+      })
+    ).toBeVisible();
+    expect(
+      screen.queryByText("Couldn't Load Suggestions")
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('opens the exact counted review set and keeps unmeasured inventory separate during an outage', async () => {
     const user = userEvent.setup();
     const base = data.rows[0];

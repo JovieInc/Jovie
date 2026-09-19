@@ -250,3 +250,16 @@ function monitoringPriority(candidate: MonitoringCandidate): number {
   if (candidate.kind === 'authority') return 300;
   return 400;
 }
+
+/** A profile has one canonical Jovie page per deployment; keep other surfaces intact. */
+export function selectCanonicalProfileSurfaces<
+  T extends { kind: string; url: string },
+>(surfaces: readonly T[], publicProfileUrl: string): T[] {
+  const canonical = canonicalizeSurfaceUrl(publicProfileUrl)?.url;
+  return surfaces.filter(
+    surface =>
+      surface.kind !== 'jovie' ||
+      (canonical !== undefined &&
+        canonicalizeSurfaceUrl(surface.url)?.url === canonical)
+  );
+}

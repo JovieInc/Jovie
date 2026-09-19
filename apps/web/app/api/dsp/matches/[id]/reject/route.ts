@@ -13,7 +13,6 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -61,11 +60,10 @@ export async function POST(
 
     const { profileId, reason } = parsed.data;
 
-    // Verify user owns this profile (join with users to check clerkId)
+    // Verify the current app user owns this profile
     const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
+      .select({ id: creatorProfiles.id, userId: creatorProfiles.userId })
       .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
 
@@ -76,7 +74,7 @@ export async function POST(
       );
     }
 
-    if (profile.clerkId !== userId) {
+    if (profile.userId !== userId) {
       return NextResponse.json(
         {
           success: false,
