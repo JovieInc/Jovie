@@ -15,6 +15,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 POKE = ROOT / ".github/workflows/ha-ci-remediator-poke.yml"
@@ -272,6 +273,119 @@ print(os.environ["CURL_FIXTURE_CODE"])
             ] if curl_log.exists() else []
             return completed, statuses, requests
 
+
+    def _run_gate_shell(
+        self,
+        *,
+        pr_number,
+        head_sha,
+        statuses_by_head,
+        workflow_runs,
+        gate_now=2_000_000_000,
+        force=False,
+    ):
+        'Run the workflow Gate step with local GitHub API and clock fixtures.'
+        workflow = POKE.read_text(encoding="utf-8")
+        start = workflow.index("      - name: Gate duplicate, merged, closed, and cooldown keys\n")
+        end = workflow.index("      - name: Poke Hyperagent CI remediator\n", start)
+        step = workflow[start:end]
+        script = step.split("        run: |\n", 1)[1]
+        script = "\n".join(
+            line[10:] if line.startswith(" " * 10) else line
+            for line in script.splitlines()
+        ) + "\n"
+
+        with tempfile.TemporaryDirectory(prefix="ha-gate-fixture-") as directory:
+            root = pathlib.Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            statuses_path = root / "statuses.json"
+            statuses_path.write_text(json.dumps(statuses_by_head), encoding="utf-8")
+            runs_path = root / "runs.json"
+            runs_path.write_text(json.dumps({"workflow_runs": workflow_runs}), encoding="utf-8")
+            gh_log = root / "gh.jsonl"
+            output_path = root / "github-output"
+
+            gh_fixture = bin_dir / "gh"
+            gh_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+endpoint = args[1] if len(args) > 1 and args[0] == "api" else ""
+with open(os.environ["GH_GATE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"args": args, "endpoint": endpoint}) + "\\n")
+if "/pulls/" in endpoint:
+    print(json.dumps({
+        "merged": os.environ.get("GATE_PR_MERGED") == "true",
+        "state": os.environ.get("GATE_PR_STATE", "open"),
+    }))
+elif "/commits/" in endpoint and "/statuses" in endpoint:
+    head = endpoint.split("/commits/", 1)[1].split("/statuses", 1)[0]
+    with open(os.environ["GATE_STATUS_MAP"], encoding="utf-8") as handle:
+        status_map = json.load(handle)
+    print(json.dumps(status_map.get(head, [])))
+elif "/actions/workflows/ha-ci-remediator-poke.yml/runs" in endpoint:
+    with open(os.environ["GATE_RUNS"], encoding="utf-8") as handle:
+        print(handle.read())
+else:
+    print("{}")
+''',
+                encoding="utf-8",
+            )
+            date_fixture = bin_dir / "date"
+            date_fixture.write_text(
+                '''#!/usr/bin/env python3
+import os
+import sys
+
+if sys.argv[1:] == ["-u", "+%s"]:
+    print(os.environ["GATE_NOW"])
+else:
+    raise SystemExit("unexpected date invocation")
+''',
+                encoding="utf-8",
+            )
+            gh_fixture.chmod(0o755)
+            date_fixture.chmod(0o755)
+
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{bin_dir}:{environment['PATH']}",
+                    "GH_GATE_LOG": str(gh_log),
+                    "GATE_STATUS_MAP": str(statuses_path),
+                    "GATE_RUNS": str(runs_path),
+                    "GATE_NOW": str(gate_now),
+                    "GITHUB_OUTPUT": str(output_path),
+                    "GH_TOKEN": "fixture-token",
+                    "PR_NUMBER": str(pr_number),
+                    "HEAD_SHA": head_sha,
+                    "FORCE": "true" if force else "false",
+                    "REPO": "JovieInc/Jovie",
+                    "RUN_ID": "999999",
+                    "GATE_PR_STATE": "open",
+                    "GATE_PR_MERGED": "false",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", script],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            output = output_path.read_text(encoding="utf-8") if output_path.exists() else ""
+            calls = [
+                json.loads(line)
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if gh_log.exists() else []
+            return completed, output, calls
+
     def test_poke_persists_valid_202_run_id_and_exact_payload_fingerprint(self):
         run_id = "r" * 48
         completed, statuses, requests = self._run_poke_shell(
@@ -322,7 +436,7 @@ print(os.environ["CURL_FIXTURE_CODE"])
         self.assertFalse(statuses[1]["persisted"])
         self.assertIn("failing closed", completed.stdout)
 
-    def test_poke_keeps_non_202_failure_receipt_and_does_not_replay(self):
+    def test_gate_cooldown_protects_failed_attempts_and_non_202_is_not_replayed(self):
         completed, statuses, requests = self._run_poke_shell(
             b'{"error":"temporarily unavailable"}', 503
         )
@@ -332,6 +446,120 @@ print(os.environ["CURL_FIXTURE_CODE"])
         payload = requests[0]["payload"]
         fingerprint = hashlib.sha256(payload.encode()).hexdigest()
         self.assertIn(f"http=503 fp={fingerprint}", statuses[-1]["fields"]["description"])
+
+        old_head = "a" * 40
+        new_head = "b" * 40
+        gate_now = 2_000_000_000
+
+        def created_at(age):
+            return datetime.fromtimestamp(gate_now - age, timezone.utc).isoformat().replace("+00:00", "Z")
+
+        def workflow_run(pr_number=18003, age=100, status="completed", conclusion="failure"):
+            return {
+                "id": 1234,
+                "display_title": f"ha-remediate/PR{pr_number}/{old_head}",
+                "status": status,
+                "conclusion": conclusion,
+                "created_at": created_at(age),
+            }
+
+        accepted_failed, accepted_statuses, accepted_requests = self._run_poke_shell(
+            b'{"runId":"provider-run-123","status":"accepted"}',
+            202,
+            fail_success=True,
+        )
+        self.assertEqual(accepted_failed.returncode, 1)
+        self.assertEqual(len(accepted_requests), 1)
+        old_pending = [
+            {
+                "context": entry["fields"]["context"],
+                "state": entry["fields"]["state"],
+                "description": entry["fields"]["description"],
+                "target_url": entry["fields"]["target_url"],
+            }
+            for entry in accepted_statuses
+            if entry["persisted"] and entry["fields"]["state"] == "pending"
+        ]
+        self.assertEqual(len(old_pending), 1)
+
+        # Cross-step regression: an accepted provider delivery followed by a
+        # failed success-receipt write produces a failed workflow run and an
+        # old-head pending receipt. A new head must still be held by cooldown.
+        cross_step, output, calls = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={old_head: old_pending, new_head: []},
+            workflow_runs=[workflow_run(conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(cross_step.returncode, 0, cross_step.stderr)
+        self.assertNotIn("proceed=true", output)
+        self.assertTrue(any("/actions/workflows/ha-ci-remediator-poke.yml/runs" in call["endpoint"] for call in calls))
+        self.assertTrue(all(call["args"][0] == "api" for call in calls))
+
+        same_head, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=old_head,
+            statuses_by_head={old_head: old_pending},
+            workflow_runs=[],
+            gate_now=gate_now,
+        )
+        self.assertEqual(same_head.returncode, 0, same_head.stderr)
+        self.assertNotIn("proceed=true", output)
+
+        for conclusion in ("success", "failure", "cancelled", "timed_out", None, "unknown"):
+            with self.subTest(conclusion=conclusion):
+                completed_run, output, _ = self._run_gate_shell(
+                    pr_number=18003,
+                    head_sha=new_head,
+                    statuses_by_head={new_head: []},
+                    workflow_runs=[workflow_run(conclusion=conclusion)],
+                    gate_now=gate_now,
+                )
+                self.assertEqual(completed_run.returncode, 0, completed_run.stderr)
+                self.assertNotIn("proceed=true", output)
+
+        for status in ("queued", "in_progress"):
+            with self.subTest(status=status):
+                active_run, output, _ = self._run_gate_shell(
+                    pr_number=18003,
+                    head_sha=new_head,
+                    statuses_by_head={new_head: []},
+                    workflow_runs=[workflow_run(status=status, age=10_000, conclusion=None)],
+                    gate_now=gate_now,
+                )
+                self.assertEqual(active_run.returncode, 0, active_run.stderr)
+                self.assertNotIn("proceed=true", output)
+
+        exact_boundary, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(age=2700, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(exact_boundary.returncode, 0, exact_boundary.stderr)
+        self.assertNotIn("proceed=true", output)
+
+        expired, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(age=2701, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(expired.returncode, 0, expired.stderr)
+        self.assertIn("proceed=true", output)
+
+        isolated, output, _ = self._run_gate_shell(
+            pr_number=18004,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(pr_number=18003, age=100, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(isolated.returncode, 0, isolated.stderr)
+        self.assertIn("proceed=true", output)
 
 
 if __name__ == "__main__":

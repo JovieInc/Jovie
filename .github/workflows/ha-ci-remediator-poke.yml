@@ -105,7 +105,7 @@ jobs:
                     | select(
                         (.status == "in_progress" or .status == "queued")
                         or (
-                          .conclusion == "success"
+                          .status == "completed"
                           and ((.created_at | fromdateiso8601) as $created | ($now - $created) <= 2700)
                         )
                       )
