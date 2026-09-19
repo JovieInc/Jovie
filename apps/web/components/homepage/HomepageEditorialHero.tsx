@@ -49,29 +49,31 @@ export function HomepageEditorialHero({
       >
         <div className='homepage-editorial-hero__light-well' />
       </div>
-      <div className='homepage-editorial-hero__copy' data-hero-layer='active'>
-        <h1 id={headingId} className='homepage-editorial-hero__headline'>
-          {headline}
-        </h1>
-        <p className='homepage-editorial-hero__support'>{support}</p>
-        <div
-          className='homepage-editorial-hero__search'
-          data-testid='homepage-editorial-hero-search'
-        >
-          <HomepagePrimaryAction
-            appearance='editorial'
-            inputId='homepage-name-search'
-            placeholder={search.placeholder}
-            submitLabel={search.action}
-            submitTestId='homepage-primary-cta'
-            submitAnalytics={{
-              eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-              properties: {
-                ...HOMEPAGE_CERTIFIED_CONTEXT,
-                placement: 'hero',
-              },
-            }}
-          />
+      <div className='homepage-editorial-hero__stage'>
+        <div className='homepage-editorial-hero__copy' data-hero-layer='active'>
+          <h1 id={headingId} className='homepage-editorial-hero__headline'>
+            {headline}
+          </h1>
+          <p className='homepage-editorial-hero__support'>{support}</p>
+          <div
+            className='homepage-editorial-hero__search'
+            data-testid='homepage-editorial-hero-search'
+          >
+            <HomepagePrimaryAction
+              appearance='editorial'
+              inputId='homepage-name-search'
+              placeholder={search.placeholder}
+              submitLabel={search.action}
+              submitTestId='homepage-primary-cta'
+              submitAnalytics={{
+                eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+                properties: {
+                  ...HOMEPAGE_CERTIFIED_CONTEXT,
+                  placement: 'hero',
+                },
+              }}
+            />
+          </div>
         </div>
       </div>
     </section>

@@ -106,11 +106,11 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(auraCss).toContain('mask-composite: exclude');
   });
 
-  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+  it('keeps the Find me pill on the 28/510 marketing button contract', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
-      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-inter\)[\s\S]*?font-size: 13px;[\s\S]*?font-weight: 510;[\s\S]*?line-height: 1\.5;[\s\S]*?\}/
     );
   });
 
