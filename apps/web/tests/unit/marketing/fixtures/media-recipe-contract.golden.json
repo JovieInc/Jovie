@@ -1,0 +1,34 @@
+{
+  "schema": "jovie-marketing-media-recipe/v1",
+  "version": "approved-chrome-v1",
+  "visualStandard": "newer-hero / premium bar",
+  "bloomDecisionRef": "gbrain:design/jovie-newer-hero-bloom-b-founder-locked-2026-09-17",
+  "approvedRecipeIds": ["dark-glass", "flowing-accent"],
+  "darkGlass": {
+    "penContractId": "GTcgO",
+    "masterId": "eoUUU",
+    "presentation": "marketing-glass",
+    "opticalGridPx": { "outer": 64, "pill": 44, "cta": 28, "chromeMark": 20 },
+    "heightRem": 2.75,
+    "heightPx": 44,
+    "shellMixPercent": 82,
+    "scrolledShellMixPercent": 90,
+    "blurPx": 20,
+    "saturatePercent": 165,
+    "backdropFilter": "blur(20px) saturate(165%)",
+    "darkShellHex": "#06080D",
+    "darkCanvasHex": "#030407"
+  },
+  "flowingAccent": {
+    "viewBox": "0 0 1200 24",
+    "path": "M0 12 C120 12 164 12 246 12 S382 11 480 12 S620 13 718 12 S856 11 960 12 S1090 12 1200 12",
+    "accentToken": "--system-b-accent-cyan",
+    "accentHex": "#22C1FC",
+    "bloomTreatment": "soft-optical-bloom-b",
+    "bloomBlurPx": 80,
+    "bloomOpacity": 0.42,
+    "bloomBackgroundToken": "--color-accent-blue-subtle",
+    "bloomBackgroundRgba": "rgba(17, 175, 255, 0.12)",
+    "reducedMotion": "static-glow-only"
+  }
+}

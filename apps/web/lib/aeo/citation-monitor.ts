@@ -7,6 +7,8 @@
  *
  * Pure logic — no DB access. Storage is caller's responsibility.
  * Asset-scoped observations live in `./asset-visibility` (JOV-5607).
+ * Measurement layers (readiness / observed visibility / business outcome)
+ * live in `./visibility-measurement` (JOV-6243).
  */
 
 import { computeRatePercent } from '@/lib/analytics/metrics';
