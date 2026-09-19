@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
@@ -87,6 +88,111 @@ async function prepareConsentFixture(
   await waitForHydration(page);
 }
 
+async function readRenderedHeroFontEvidence(page: PlaywrightPage) {
+  const binding = await page.evaluate(() => {
+    const headline = document.querySelector<HTMLElement>(
+      '.homepage-editorial-hero__headline'
+    );
+    if (!headline) throw new Error('Homepage hero headline missing');
+    const firstFamily = (value: string) =>
+      value
+        .split(',')[0]
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
+    const style = getComputedStyle(headline);
+    const rootSatoshi = firstFamily(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        '--font-satoshi'
+      )
+    );
+    return {
+      requestedFamily: firstFamily(style.fontFamily),
+      rootSatoshi,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      letterSpacing: style.letterSpacing,
+      fontStatus: document.fonts.status,
+      matchingFaces: Array.from(document.fonts)
+        .filter(face => firstFamily(face.family) === rootSatoshi)
+        .map(face => ({
+          family: firstFamily(face.family),
+          weight: face.weight,
+          style: face.style,
+          status: face.status,
+          display: face.display,
+        })),
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+        .matches,
+    };
+  });
+
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable');
+    await session.send('CSS.enable');
+    const { root } = await session.send('DOM.getDocument');
+    const { nodeId } = await session.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '.homepage-editorial-hero__headline',
+    });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', {
+      nodeId,
+    });
+    return {
+      binding,
+      platformFonts: fonts
+        .filter(font => font.glyphCount > 0)
+        .map(font => ({
+          familyName: font.familyName,
+          postScriptName: font.postScriptName,
+          isCustomFont: font.isCustomFont,
+          glyphCount: font.glyphCount,
+        })),
+    };
+  } finally {
+    await session.detach();
+  }
+}
+
+async function measureHeroAction(action: import('@playwright/test').Locator) {
+  return action.evaluate(element => {
+    const face = element.getBoundingClientRect();
+    const pseudo = getComputedStyle(element, '::before');
+    const width = Math.max(face.width, Number.parseFloat(pseudo.width) || 0);
+    const height = Math.max(face.height, Number.parseFloat(pseudo.height) || 0);
+    const left = face.x + (face.width - width) / 2;
+    const top = face.y + (face.height - height) / 2;
+    const points = [
+      [left + width / 2, top + 1],
+      [left + width / 2, top + height - 1],
+      [left + 1, top + height / 2],
+      [left + width - 1, top + height / 2],
+    ];
+    return {
+      faceHeight: face.height,
+      clientHeight: element.clientHeight,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      scrollWidth: element.scrollWidth,
+      width,
+      height,
+      left,
+      right: left + width,
+      top,
+      bottom: top + height,
+      viewportWidth: window.innerWidth,
+      owned: points.every(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit === element || (hit !== null && element.contains(hit));
+      }),
+      field: element
+        .closest('.homepage-name-search__field')
+        ?.getBoundingClientRect(),
+    };
+  });
+}
+
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
@@ -145,6 +251,105 @@ test.describe('Homepage', () => {
       expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
       expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
     }
+  });
+
+  test('hero action remains independently operable through native text growth and state reversal', async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== 'chromium',
+      'Platform font evidence is Chromium-only'
+    );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => document.fonts.ready);
+
+    const hero = page.getByTestId('marketing-section-hero');
+    const input = hero.getByPlaceholder('Search your name');
+    const action = hero.getByRole('button', { name: 'Find me', exact: true });
+    await expect(input).toBeVisible();
+    await expect(action).toBeEnabled();
+
+    const fontEvidence = await readRenderedHeroFontEvidence(page);
+    await writeFile(
+      testInfo.outputPath('homepage-hero-font-evidence.json'),
+      JSON.stringify(fontEvidence, null, 2)
+    );
+    await testInfo.attach('homepage-hero-font-evidence.json', {
+      path: testInfo.outputPath('homepage-hero-font-evidence.json'),
+      contentType: 'application/json',
+    });
+    expect(fontEvidence.binding.fontStatus).toBe('loaded');
+    expect(fontEvidence.binding.requestedFamily.toLowerCase()).toBe('satoshi');
+    expect(fontEvidence.binding.rootSatoshi.toLowerCase()).toBe('satoshi');
+    expect(fontEvidence.binding.reducedMotion).toBe(true);
+    expect(
+      fontEvidence.platformFonts.some(
+        font => font.isCustomFont && /satoshi/i.test(font.familyName)
+      )
+    ).toBe(true);
+
+    const baseline = await measureHeroAction(action);
+    expect(baseline.faceHeight).toBeCloseTo(28, 0);
+    expect(baseline.height).toBeGreaterThanOrEqual(44);
+    expect(baseline.width).toBeGreaterThanOrEqual(44);
+    expect(baseline.owned).toBe(true);
+    expect(baseline.field).not.toBeUndefined();
+    expect(baseline.left).toBeGreaterThanOrEqual(baseline.field?.left ?? 0);
+    expect(baseline.right).toBeLessThanOrEqual(baseline.field?.right ?? 0);
+    expect(baseline.top).toBeGreaterThanOrEqual(baseline.field?.top ?? 0);
+    expect(baseline.bottom).toBeLessThanOrEqual(baseline.field?.bottom ?? 0);
+
+    await action.focus();
+    await expect(action).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(input).toBeFocused();
+
+    const stableBox = await action.boundingBox();
+    await action.hover();
+    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
+      true
+    );
+    await input.hover();
+    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
+      false
+    );
+    await action.hover();
+    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
+      true
+    );
+    expect(await action.boundingBox()).toEqual(stableBox);
+
+    const pressedBox = await action.boundingBox();
+    if (!pressedBox) throw new Error('Hero action box missing');
+    await page.mouse.move(
+      pressedBox.x + pressedBox.width / 2,
+      pressedBox.y + pressedBox.height / 2
+    );
+    await page.mouse.down();
+    expect(await action.evaluate(element => element.matches(':active'))).toBe(
+      true
+    );
+    await page.mouse.up();
+    expect(await action.evaluate(element => element.matches(':active'))).toBe(
+      false
+    );
+    expect(await action.boundingBox()).toEqual(pressedBox);
+
+    await action.evaluate(element => {
+      (element as HTMLElement).style.fontSize = '40px';
+    });
+    const enlarged = await measureHeroAction(action);
+    expect(enlarged.faceHeight).toBeGreaterThan(28);
+    expect(enlarged.scrollHeight).toBeLessThanOrEqual(enlarged.clientHeight);
+    expect(enlarged.scrollWidth).toBeLessThanOrEqual(enlarged.clientWidth);
+    expect(enlarged.height).toBeGreaterThanOrEqual(44);
+    expect(enlarged.width).toBeGreaterThanOrEqual(44);
+    expect(enlarged.owned).toBe(true);
+    expect(enlarged.left).toBeGreaterThanOrEqual(enlarged.field?.left ?? 0);
+    expect(enlarged.right).toBeLessThanOrEqual(enlarged.field?.right ?? 0);
+    expect(enlarged.left).toBeGreaterThanOrEqual(0);
+    expect(enlarged.right).toBeLessThanOrEqual(enlarged.viewportWidth);
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -301,61 +506,6 @@ test.describe('Homepage', () => {
         expect(grown.scrollHeight).toBeLessThanOrEqual(grown.clientHeight);
       }
       await assertTargets();
-    }
-  });
-
-  test('trust artwork stays within its visible slots at desktop and phone widths', async ({
-    page,
-    context,
-  }) => {
-    test.fixme(
-      true,
-      'Homepage trust logo strip is intentionally not mounted; the logo-bar owner will re-enable this independent regression when it returns.'
-    );
-    await prepareConsentFixture(page, context);
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      await gotoHomepage(page);
-      await page.evaluate(() => document.fonts.ready);
-
-      const ink = await page
-        .locator('.homepage-trust-logo-slot:visible')
-        .evaluateAll(slots =>
-          slots.map(slot => {
-            const svg = slot.querySelector('svg');
-            if (!svg) throw new Error('Trust logo SVG missing');
-            const matrix = svg.getScreenCTM();
-            if (!matrix) throw new Error('Trust logo transform missing');
-            const bounds = svg.getBBox();
-            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
-              matrix
-            );
-            const rightBottom = new DOMPoint(
-              bounds.x + bounds.width,
-              bounds.y + bounds.height
-            ).matrixTransform(matrix);
-            const frame = slot.getBoundingClientRect();
-            return {
-              left: leftTop.x,
-              right: rightBottom.x,
-              top: leftTop.y,
-              bottom: rightBottom.y,
-              frameLeft: frame.left,
-              frameRight: frame.right,
-              frameTop: frame.top,
-              frameBottom: frame.bottom,
-            };
-          })
-        );
-      expect(ink.length).toBeGreaterThanOrEqual(4);
-      for (const logo of ink) {
-        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
-        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
-        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
-        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
-        expect(logo.left).toBeGreaterThanOrEqual(0);
-        expect(logo.right).toBeLessThanOrEqual(width);
-      }
     }
   });
 
