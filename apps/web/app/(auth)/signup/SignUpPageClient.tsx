@@ -4,6 +4,7 @@ import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
@@ -114,7 +115,7 @@ function SignUpClaimDataPersistence() {
     >
       {availability === 'checking' && (
         <div className='flex items-center justify-center lg:justify-start'>
-          <Skeleton className='h-5 w-64 rounded' />
+          <Skeleton />
           <span className='sr-only'>
             Checking if @{normalizedHandle} is available...
           </span>
@@ -274,21 +275,23 @@ export function SignUpPageClient() {
   }
 
   return (
-    <AuthLayout
-      formTitle='Continue to Jovie'
-      showFormTitle={false}
-      showFooterPrompt={false}
-      layoutVariant='stack'
-    >
-      <AuthRoutePrefetch href={signInUrl} />
-      <SignUpOauthErrorBanner signInUrl={signInUrl} />
-      <SignUpClaimDataPersistence />
-      <AuthShell
-        mode='sign-up'
-        forceOppositeModeHardNavigation
-        oppositeModeUrl={signInUrl}
-        fallbackRedirectUrl={fallbackRedirectUrl}
-      />
-    </AuthLayout>
+    <AuthenticatedAuthEntryGuard>
+      <AuthLayout
+        formTitle='Continue to Jovie'
+        showFormTitle={false}
+        showFooterPrompt={false}
+        layoutVariant='stack'
+      >
+        <AuthRoutePrefetch href={signInUrl} />
+        <SignUpOauthErrorBanner signInUrl={signInUrl} />
+        <SignUpClaimDataPersistence />
+        <AuthShell
+          mode='sign-up'
+          forceOppositeModeHardNavigation
+          oppositeModeUrl={signInUrl}
+          fallbackRedirectUrl={fallbackRedirectUrl}
+        />
+      </AuthLayout>
+    </AuthenticatedAuthEntryGuard>
   );
 }

@@ -11,11 +11,13 @@ interface AuthenticatedAuthEntryGuardProps {
 }
 
 /**
- * Redirects signed-in visitors away from auth entry surfaces before Clerk
- * sign-in/sign-up flows can mount and fail with duplicate error banners.
+ * Redirects signed-in visitors away from auth entry surfaces before sign-in
+ * or sign-up flows can mount and fail with duplicate error banners.
  *
- * Uses the Clerk activity cookie for an immediate pre-hydration redirect, then
- * confirms with `useAuthSafe()` once Clerk loads.
+ * Uses the session-activity cookie for an immediate post-hydration redirect,
+ * then confirms with `useAuthSafe()` once the Better Auth session loads.
+ * BFCache restores re-run the same decision so a session that appears after
+ * browsing or back-forward restore cannot leave a blank auth card.
  */
 export function AuthenticatedAuthEntryGuard({
   children,
@@ -34,27 +36,47 @@ export function AuthenticatedAuthEntryGuard({
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    const cookieSignedIn =
-      typeof document !== 'undefined' && hasClientAuthSession(document.cookie);
-    const clerkSignedIn = isLoaded && isSignedIn;
+    const redirectSignedInVisitor = () => {
+      const cookieSignedIn =
+        typeof document !== 'undefined' &&
+        hasClientAuthSession(document.cookie);
+      const sessionSignedIn = isLoaded && isSignedIn;
 
-    if (!cookieSignedIn && !clerkSignedIn) {
+      if (!cookieSignedIn && !sessionSignedIn) {
+        setIsRedirecting(false);
+        return;
+      }
+
+      // A leftover Clerk/Better Auth cookie is not proof of a session.
+      // Hiding the form here left signed-out /signup blank-black after
+      // browsing (cookie present, useSession still pending) with no
+      // navigation (JOV-6450). Keep the auth UI until the session confirms.
+      if (cookieSignedIn && !isLoaded) {
+        setIsRedirecting(false);
+        return;
+      }
+
+      if (sessionSignedIn) {
+        setIsRedirecting(true);
+        router.replace(getClientAuthenticatedAuthEntryRedirect(searchParams));
+        return;
+      }
+
       setIsRedirecting(false);
-      return;
-    }
+    };
 
-    if (cookieSignedIn && !isLoaded) {
-      setIsRedirecting(true);
-      return;
-    }
+    redirectSignedInVisitor();
 
-    if (clerkSignedIn) {
-      setIsRedirecting(true);
-      router.replace(getClientAuthenticatedAuthEntryRedirect(searchParams));
-      return;
-    }
+    const restoreAfterBfCache = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        redirectSignedInVisitor();
+      }
+    };
 
-    setIsRedirecting(false);
+    globalThis.addEventListener('pageshow', restoreAfterBfCache);
+    return () => {
+      globalThis.removeEventListener('pageshow', restoreAfterBfCache);
+    };
   }, [isLoaded, isSignedIn, router, searchParams]);
 
   if (isRedirecting) {
