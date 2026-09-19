@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -135,10 +135,15 @@ test('completed empty heartbeat turns fail the canonical recurrence probe', () =
   const heartbeat = canonicalRegistry.capabilities.find(
     item => item.id === 'SUMMER-COMM-011'
   );
-  assert.equal(heartbeat.probe.version, '1.1.0');
+  assert.equal(heartbeat.probe.version, '1.2.0');
+  assert.equal(heartbeat.implementationState, 'in_flight');
   assert.equal(
     heartbeat.probe.fixture,
-    'scheduled-heartbeat-nonempty-receipt-across-restart/v2'
+    'eve-owned-15m-nonempty-receipt/v3'
+  );
+  assert.match(
+    heartbeat.canonicalPath.join('\n'),
+    /summer-liveness-heartbeat/u
   );
   assert.equal(
     heartbeat.probe.expectedState,
@@ -186,6 +191,19 @@ test('completed empty heartbeat turns fail the canonical recurrence probe', () =
     errors.join('\n'),
     /actualState does not satisfy expectedState/u
   );
+
+  for (const assertion of heartbeat.probe.sourceAssertions) {
+    const absolutePath = join(canonicalRepositoryRoot, assertion.path);
+    assert.equal(existsSync(absolutePath), true, assertion.path);
+    if (assertion.kind === 'file_exists') continue;
+    const contents = readFileSync(absolutePath, 'utf8');
+    const contains = contents.includes(assertion.value);
+    assert.equal(
+      contains,
+      assertion.kind === 'file_contains',
+      `${assertion.kind} ${assertion.path} ${assertion.value}`
+    );
+  }
 });
 
 test('production provenance ignores hostile Git repository overrides', () => {
