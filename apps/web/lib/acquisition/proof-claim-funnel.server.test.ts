@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDbSelect,
+  mockGetCanonicalProfileViews,
   mockGetRedis,
   mockGetLeadAttributionCookie,
   mockRecordLeadFunnelEvent,
 } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
+  mockGetCanonicalProfileViews: vi.fn(),
   mockGetRedis: vi.fn(),
   mockGetLeadAttributionCookie: vi.fn(),
   mockRecordLeadFunnelEvent: vi.fn(),
@@ -16,6 +18,10 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
   },
+}));
+
+vi.mock('@/lib/db/queries/analytics', () => ({
+  getCanonicalProfileViews: mockGetCanonicalProfileViews,
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -55,6 +61,7 @@ function createThenableSelect<T>(row: T) {
 describe('proof-claim funnel server persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCanonicalProfileViews.mockResolvedValue(0);
     mockGetLeadAttributionCookie.mockResolvedValue(null);
     mockRecordLeadFunnelEvent.mockResolvedValue(undefined);
   });
@@ -99,13 +106,19 @@ describe('proof-claim funnel server persistence', () => {
   });
 
   it('returns conversion from the max of durable views and Redis counters', async () => {
-    mockDbSelect.mockReturnValue(createThenableSelect({ views: 12, count: 3 }));
+    mockGetCanonicalProfileViews.mockResolvedValue(12);
+    mockDbSelect.mockReturnValue(createThenableSelect({ count: 3 }));
     mockGetRedis.mockReturnValue({
       mget: vi.fn().mockResolvedValue([20, 5, 2, 1]),
     });
 
     const report = await getProofClaimFunnelReport();
 
+    expect(mockGetCanonicalProfileViews).toHaveBeenCalledWith({
+      handle: 'tim',
+      start: undefined,
+      end: undefined,
+    });
     expect(report.campaignKey).toBe('proof-to-claim');
     expect(report.stages).toEqual({
       proofViewed: 20,

@@ -2,9 +2,8 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { dailyProfileViews } from '@/lib/db/schema/analytics';
+import { getCanonicalProfileViews } from '@/lib/db/queries/analytics';
 import { leadFunnelEvents } from '@/lib/db/schema/leads';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import {
   getLeadAttributionCookie,
@@ -132,30 +131,11 @@ async function countProofProfileViews(
   start?: Date,
   end?: Date
 ): Promise<number> {
-  const conditions = [eq(creatorProfiles.username, PROOF_PROFILE.handle)];
-  if (start) {
-    conditions.push(
-      gte(dailyProfileViews.viewDate, start.toISOString().slice(0, 10))
-    );
-  }
-  if (end) {
-    conditions.push(
-      lte(dailyProfileViews.viewDate, end.toISOString().slice(0, 10))
-    );
-  }
-
-  const [row] = await db
-    .select({
-      views: drizzleSql<number>`coalesce(sum(${dailyProfileViews.viewCount}), 0)`,
-    })
-    .from(dailyProfileViews)
-    .innerJoin(
-      creatorProfiles,
-      eq(dailyProfileViews.creatorProfileId, creatorProfiles.id)
-    )
-    .where(and(...conditions));
-
-  return Number(row?.views ?? 0);
+  return getCanonicalProfileViews({
+    handle: PROOF_PROFILE.handle,
+    start,
+    end,
+  });
 }
 
 async function countDistinctLeadsForEvents(
