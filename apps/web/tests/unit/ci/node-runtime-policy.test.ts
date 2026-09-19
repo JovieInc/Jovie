@@ -83,9 +83,7 @@ describe('Node runtime lifecycle policy', () => {
         candidate.status,
         candidate.minimumPromotionStatus,
       ])
-    ).toEqual([
-      [26, '26.8.1', 'candidate', true, 'current', 'active_lts'],
-    ]);
+    ).toEqual([[26, '26.8.1', 'candidate', true, 'current', 'active_lts']]);
   });
   it('does not hide an overdue security release behind a newer regular patch', () => {
     const result = evaluateOfficialReleases({
