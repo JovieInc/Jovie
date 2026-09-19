@@ -151,6 +151,20 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('links to the canonical Card route without duplicating its terminal CTA', () => {
+    mockUsePathname.mockReturnValue('/card');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByRole('link', { name: 'Jovie Card' })).toHaveAttribute(
+      'href',
+      '/card'
+    );
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {
     render(<MarketingFooter variant='expanded' />);
 
