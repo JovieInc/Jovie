@@ -115,6 +115,19 @@ describe('receipt + idempotency helpers', () => {
     );
   });
 
+  it('keeps distinct correlation fields distinct when values contain delimiters', () => {
+    const first = checkoutCorrelationIdempotencyPart({
+      claimId: 'a|runId=b',
+      runId: 'c',
+    });
+    const second = checkoutCorrelationIdempotencyPart({
+      claimId: 'a',
+      runId: 'b|runId=c',
+    });
+
+    expect(first).not.toBe(second);
+  });
+
   it('merges later sources only into missing fields', () => {
     expect(
       mergeCheckoutCorrelation(
