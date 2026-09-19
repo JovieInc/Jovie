@@ -15,6 +15,7 @@ interface DmQueueLead {
   priorityScore: number | null;
   dmCopy: string | null;
   outreachStatus: string;
+  completenessEligible?: boolean;
 }
 
 interface DmQueueCardProps {
@@ -28,7 +29,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
   const markDmSentMutation = useMarkLeadDmSentMutation();
 
   async function handleCopy() {
-    if (!lead.dmCopy) return;
+    if (!lead.dmCopy || lead.completenessEligible !== true) return;
     try {
       await navigator.clipboard.writeText(lead.dmCopy);
       setCopied(true);
@@ -40,6 +41,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
   }
 
   async function handleMarkSent() {
+    if (lead.completenessEligible !== true) return;
     try {
       await markDmSentMutation.mutateAsync(lead.id);
       setMarkedDone(true);
@@ -83,7 +85,12 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
         )}
       </div>
 
-      {lead.dmCopy && (
+      {lead.completenessEligible !== true && (
+        <p className='text-xs text-secondary-token'>
+          Profile review is required before outreach.
+        </p>
+      )}
+      {lead.completenessEligible === true && lead.dmCopy && (
         <textarea
           readOnly
           value={lead.dmCopy}
@@ -97,7 +104,9 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           variant='outline'
           size='sm'
           onClick={() => void handleCopy()}
-          disabled={!lead.dmCopy || markedDone}
+          disabled={
+            lead.completenessEligible !== true || !lead.dmCopy || markedDone
+          }
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -110,7 +119,11 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           variant='primary'
           size='sm'
           onClick={() => void handleMarkSent()}
-          disabled={markDmSentMutation.isPending || markedDone}
+          disabled={
+            lead.completenessEligible !== true ||
+            markDmSentMutation.isPending ||
+            markedDone
+          }
         >
           {markDmSentMutation.isPending ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />

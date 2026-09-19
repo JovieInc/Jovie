@@ -14,6 +14,7 @@ interface DmQueueLead {
   priorityScore: number | null;
   dmCopy: string | null;
   outreachStatus: string;
+  completenessEligible?: boolean;
 }
 
 interface DmQueueResponse {

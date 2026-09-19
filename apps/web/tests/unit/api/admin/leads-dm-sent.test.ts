@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockCompleteness = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/profile/completeness.server', () => ({
+  loadProfileCompleteness: mockCompleteness,
+}));
+
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
@@ -65,6 +70,9 @@ import { PATCH } from '@/app/api/admin/leads/[id]/dm-sent/route';
 describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCompleteness.mockResolvedValue(
+      new Map([['profile-1', { eligible: true }]])
+    );
 
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
@@ -78,6 +86,7 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
     mockSelectLimit.mockResolvedValue([
       {
         id: 'lead-1',
+        creatorProfileId: 'profile-1',
         firstContactedAt: originalFirstContactedAt,
       },
     ]);
@@ -101,6 +110,21 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
       }),
       { idempotent: true }
     );
+  });
+
+  it('rejects stale DM actions without recording a send', async () => {
+    mockSelectLimit.mockResolvedValue([
+      { id: 'lead-1', creatorProfileId: 'profile-1' },
+    ]);
+    mockCompleteness.mockResolvedValue(
+      new Map([['profile-1', { eligible: false }]])
+    );
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: 'lead-1' }),
+    });
+    expect(response.status).toBe(409);
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the lead does not exist', async () => {
