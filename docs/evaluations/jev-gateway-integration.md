@@ -79,7 +79,8 @@ existing run outcomes, attach the returned `.shadow` using
 retain the full evaluation receipt alongside it. A shadow cannot set certification.
 `evaluated` and `supported` are advisory results, never human certification.
 The synchronous shadow classifier also turns evaluator exceptions into
-`insufficient` without exposing the raw error. Optional advice cannot prevent
+`insufficient` without exposing the raw error, and consumes rejected asynchronous
+results while keeping them insufficient. Optional advice cannot prevent
 the deterministic result from being returned or persisted.
 
 ## Design and landing review sequence

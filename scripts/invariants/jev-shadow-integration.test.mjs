@@ -44,13 +44,16 @@ const receipt = {
   ],
 };
 
-test('unbound and throwing advice preserve a certified outcome and its persistence', () => {
+test('unbound, throwing and rejecting advice preserve outcomes and persistence', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'jev-advice-persistence-'));
   try {
     for (const evaluate of [
       undefined,
       () => {
         throw new Error('synthetic provider failure');
+      },
+      async () => {
+        throw new Error('synthetic asynchronous provider failure');
       },
     ]) {
       const outcome = verifyRunOutcome({
@@ -77,6 +80,8 @@ test('unbound and throwing advice preserve a certified outcome and its persisten
       assert.equal(saved.shadow.certified, false);
       assert.equal(saved.shadow.blocking, false);
       assert.doesNotMatch(saved.shadow.reason, /synthetic provider failure/);
+      // Let a real rejected Promise settle: an unhandled rejection fails the runner.
+      await new Promise(resolve => setImmediate(resolve));
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
