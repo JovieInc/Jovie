@@ -4,7 +4,7 @@ import { ArtistsDirectory } from '@/components/organisms/ArtistsDirectory';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { loadArtistsDirectoryProfiles } from '@/lib/profile/public-discovery-catalog';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export default async function ArtistsPage() {
   const catalog = await loadArtistsDirectoryProfiles();

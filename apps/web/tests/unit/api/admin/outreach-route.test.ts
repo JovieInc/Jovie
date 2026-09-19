@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/profile/completeness.server', () => ({
+  loadProfileCompleteness: vi.fn().mockResolvedValue(new Map()),
+}));
+
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
@@ -261,6 +265,9 @@ describe('GET /api/admin/outreach', () => {
       {
         id: 'lead-1',
         createdAt: '2025-01-01T00:00:00.000Z',
+        dmCopy: null,
+        claimToken: null,
+        completenessEligible: false,
       },
     ]);
     expect(data.pendingTotal).toBe(1);
