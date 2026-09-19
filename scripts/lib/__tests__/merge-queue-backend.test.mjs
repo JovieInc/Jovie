@@ -639,8 +639,8 @@ function exactProductionMarkerEvidence({
 function executeHoldIntakePreflight({
   closureIntakeAllowed,
   cohortIntakeAllowed,
-  closureStatus,
-  closureReasons,
+  closureStatus = undefined,
+  closureReasons = undefined,
 }) {
   const receipt = {
     schema: 'jovie-fleet-gate/v1',
