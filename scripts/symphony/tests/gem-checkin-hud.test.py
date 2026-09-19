@@ -431,6 +431,15 @@ class ReadableWorkTests(unittest.TestCase):
 
 
 class StableCanvasTests(unittest.TestCase):
+    def test_hotplug_small_console_never_expands_beyond_visible_cells(self):
+        for width, height in ((107, 22), (60, 18), (160, 45)):
+            with self.subTest(width=width, height=height):
+                with mock.patch.object(HUD.shutil, "get_terminal_size", return_value=HUD.os.terminal_size((width, height))):
+                    self.assertEqual(HUD.terminal_size(), (width, height))
+                text = strip(paint(width=width, height=height))
+                self.assertEqual(len(text.splitlines()), height)
+                self.assertTrue(all(len(line) <= width for line in text.splitlines()))
+
     def test_service_reads_actual_console_geometry(self):
         import fcntl
         import os
