@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { IMPLEMENTATION_SHA256 } from './implementation-digest.mjs';
 
-const files = ['gateway.mjs', 'shadow.mjs', 'fingerprint.mjs'];
+const files = ['gateway.mjs', 'fingerprint.mjs'];
 const hash = createHash('sha256');
 for (const file of files) {
   hash
