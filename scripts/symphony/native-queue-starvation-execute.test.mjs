@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { generateKeyPairSync, verify } from 'node:crypto';
+import { generateKeyPairSync, sign, verify } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,7 +25,11 @@ import {
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
 } from './native-queue-starvation-execute.mjs';
-import { canonical } from './summer-symphony-outbox-consumer.mjs';
+import {
+  canonical,
+  createFileJournal,
+  signOutcomeV2,
+} from './summer-symphony-outbox-consumer.mjs';
 
 function pair() {
   const keys = generateKeyPairSync('ed25519');
@@ -627,6 +631,7 @@ describe('native queue execution command delivery status', () => {
         import cp from 'node:child_process';
         import {syncBuiltinESMExports} from 'node:module';
         cp.spawnSync = (command, args) => {
+          if (process.env.FIXTURE_ACK === 'recorded') throw new Error('replay-must-not-run-command');
           if (command !== 'gh' || args[0] !== 'pr' || args[1] !== 'list')
             throw new Error('unexpected-command');
           return {status:0,stdout:'[]',stderr:''};
@@ -635,6 +640,7 @@ describe('native queue execution command delivery status', () => {
         globalThis.fetch = async (url, options) => {
           const body = JSON.parse(options.body);
           if (url === 'https://api.linear.app/graphql') {
+            if (process.env.FIXTURE_ACK === 'recorded') throw new Error('replay-must-not-claim');
             if (body.query.includes('issueUpdate')) return Response.json({data:{issueUpdate:{success:true,issue:{identifier:'JOV-6383',state:{name:'In Progress'},assignee:null}}}});
             return Response.json({data:{issue:{id:'fixture-issue',identifier:'JOV-6383',state:{name:'Todo'}}}});
           }
@@ -644,7 +650,69 @@ describe('native queue execution command delivery status', () => {
         };
       `
       );
+      const company = pair();
+      const task = {
+        schema: 'jovie-symphony-repair-task/v2',
+        taskKey: TASK_KEY,
+        decisionFingerprint: TASK_KEY,
+        createdAt: '2026-09-19T00:00:00Z',
+        owner: 'symphony',
+        route: 'symphony',
+        authority: 'linear-child-projection-only',
+        action: NATIVE_QUEUE_ACTION,
+        safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+        selected: {
+          id: 'native-queue-starvation',
+          sourceRevision: SOURCE.sourceVersion,
+          sourceDigest: 'd'.repeat(64),
+          owner: 'Summer',
+          handle: 'symphony',
+        },
+        source: SOURCE,
+        linearProjection: {
+          mutation: 'create-child-issue',
+          team: 'JOV',
+          parentIssue: 'JOV-5853',
+          title: `[summer-task:${TASK_KEY}] native-queue-starvation`,
+          description: `[summer-task:${TASK_KEY}]\n\nSelected: native-queue-starvation\nAction: ${NATIVE_QUEUE_ACTION}\nSource: ${SOURCE.sourceVersion}`,
+          initialState: 'Todo',
+          labels: ['symphony'],
+        },
+      };
+      const unsigned = {
+        schema: 'jovie.eve.symphony-repair-outbox/v2',
+        destination: 'symphony',
+        idempotencyKey: TASK_KEY,
+        status: 'ready',
+        task,
+        signatureKeyId: 'company-fixture',
+      };
+      const record = {
+        ...unsigned,
+        signature: `ed25519=${sign(null, Buffer.from(`${unsigned.schema}\0${canonical(unsigned)}`), company.privateKey).toString('base64url')}`,
+      };
+      const outcome = signOutcomeV2(
+        task,
+        { identifier: 'JOV-6383', createdAt: '2026-09-19T00:01:00Z' },
+        host.privateKey,
+        'host-fixture'
+      );
+      const journal = createFileJournal(
+        directory,
+        new Map([['company-fixture', company.publicKey]]),
+        host.publicKey
+      );
       for (const mode of ['missing', 'recorded', 'replay']) {
+        if (mode !== 'recorded')
+          journal.write({
+            schema: 'jovie.summer-symphony-consumer-state/v1',
+            active: {
+              phase: 'execution-ready',
+              taskKey: TASK_KEY,
+              record,
+              outcome,
+            },
+          });
         const result = spawnSync(
           process.execPath,
           [
@@ -664,6 +732,9 @@ describe('native queue execution command delivery status', () => {
             timeout: 10000,
             env: {
               FIXTURE_ACK: mode,
+              GEM_WORKSPACE: directory,
+              SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON:
+                JSON.stringify({ 'company-fixture': company.publicKey }),
               SUMMER_LINEAR_GOVERNOR_API_KEY: 'fixture',
               SUMMER_BOTTLENECK_ORIGIN: 'https://summer.example',
               SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID: 'host-fixture',
@@ -680,6 +751,10 @@ describe('native queue execution command delivery status', () => {
         );
         assert.equal(output.decision.status, 'failed');
         assert.equal(output.terminal.state, 'In Progress');
+        assert.equal(
+          journal.read().active.phase,
+          mode === 'missing' ? 'execution-pending' : 'execution-recorded'
+        );
       }
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -749,6 +824,69 @@ describe('execution action protocol', () => {
         /native-queue-action-required/
       );
       assert.equal(claims, 0);
+    }
+  });
+});
+
+describe('retained execution delivery binding', () => {
+  it('rejects cross-bound replay before posting or repeating any mutation', async () => {
+    const host = pair();
+    const record = signNativeQueueExecution(
+      {
+        action: NATIVE_QUEUE_ACTION,
+        taskKey: TASK_KEY,
+        issueIdentifier: 'JOV-6418',
+        source: SOURCE,
+        decision: decideNativeQueueExecution({
+          action: NATIVE_QUEUE_ACTION,
+          greenReadyPrs: [],
+        }),
+        completedAt: '2026-09-19T14:00:00Z',
+        claim: { state: 'In Progress', assignee: null },
+        signatureKeyId: 'host',
+      },
+      host.privateKey
+    );
+    for (const change of [
+      { delivery: null },
+      { taskKey: 'f'.repeat(64) },
+      { issueIdentifier: 'JOV-6417' },
+      { admission: { action: RELEASE_CERT_ACTION } },
+      { source: { ...SOURCE, snapshotDigest: 'f'.repeat(64) } },
+      { source: { ...SOURCE, sourceVersion: 'f'.repeat(40) } },
+      {
+        retainedRecord: {
+          ...record,
+          source: { ...record.source, action: RELEASE_CERT_ACTION },
+        },
+      },
+    ]) {
+      await assert.rejects(
+        executeNativeQueueStarvation({
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          admission: { action: NATIVE_QUEUE_ACTION },
+          source: SOURCE,
+          signatureKeyId: 'host',
+          privateKeyPem: host.privateKey,
+          delivery: {},
+          retainedRecord: record,
+          claimIssue: async () => {
+            throw new Error('unexpected claim');
+          },
+          completeIssue: async () => {
+            throw new Error('unexpected completion');
+          },
+          enrollPr: async () => {
+            throw new Error('unexpected mutation');
+          },
+          writeExecution: async () => {
+            throw new Error('unexpected write');
+          },
+          ...change,
+        }),
+        /execution-replay-cross-bound/
+      );
     }
   });
 });

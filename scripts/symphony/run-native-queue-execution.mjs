@@ -13,6 +13,12 @@ import {
   WAITING_DURABLE_ORACLE,
 } from './native-queue-starvation-execute.mjs';
 
+import {
+  configFromEnvironment,
+  createExecutionDelivery,
+  createFileJournal,
+} from './summer-symphony-outbox-consumer.mjs';
+
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
 const DONE = 'a95b08f1-61f8-438f-ba39-ebd8f8ae6471';
 
@@ -365,11 +371,20 @@ if (
   );
 }
 
+const config = configFromEnvironment();
+const delivery = createExecutionDelivery(
+  createFileJournal(config.workspace, config.keys, config.outcomePublicKey),
+  { taskKey, issueIdentifier, sourceVersion, snapshotDigest, action },
+  config
+);
+const retainedRecord = delivery.begin();
 const result = await executeNativeQueueStarvation({
+  delivery,
+  retainedRecord,
   taskKey,
   issueIdentifier,
   source: { sourceVersion, snapshotDigest },
-  admission: { ...fleetAdmission(fleetPath), action },
+  admission: { ...(retainedRecord ? {} : fleetAdmission(fleetPath)), action },
   signatureKeyId: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID'),
   privateKeyPem: required(
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'

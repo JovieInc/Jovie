@@ -309,6 +309,8 @@ export async function executeNativeQueueStarvation({
   completeIssue,
   enrollPr,
   writeExecution,
+  delivery = null,
+  retainedRecord = null,
 }) {
   if (!/^[a-f0-9]{64}$/u.test(taskKey ?? '')) {
     throw new Error('task-key-invalid');
@@ -317,6 +319,30 @@ export async function executeNativeQueueStarvation({
     throw new Error('issue-identifier-invalid');
   }
   const action = admission?.action;
+  if (retainedRecord) {
+    if (
+      !delivery ||
+      retainedRecord.taskKey !== taskKey ||
+      retainedRecord.issueIdentifier !== issueIdentifier ||
+      retainedRecord.action !== action ||
+      retainedRecord.source.action !== action ||
+      retainedRecord.source.sourceVersion !== source.sourceVersion ||
+      retainedRecord.source.snapshotDigest !== source.snapshotDigest
+    ) {
+      throw new Error('execution-replay-cross-bound');
+    }
+    return deliverExecution(retainedRecord, {
+      decision: {
+        status: retainedRecord.status,
+        detail: retainedRecord.detail,
+        ...retainedRecord.execution,
+      },
+      claim: retainedRecord.claim,
+      writeExecution,
+      completeIssue,
+      delivery,
+    });
+  }
   const decision = decideNativeQueueExecution({
     ...admission,
     action,
@@ -414,6 +440,23 @@ export async function executeNativeQueueStarvation({
     },
     privateKeyPem
   );
+  delivery?.persist(record);
+  return deliverExecution(record, {
+    decision: finalDecision,
+    claim,
+    writeExecution,
+    completeIssue,
+    delivery,
+  });
+}
+
+async function deliverExecution(
+  record,
+  { decision, claim, writeExecution, completeIssue, delivery }
+) {
+  const { taskKey, issueIdentifier } = record;
+  let finalDecision = decision;
+  delivery?.attempt(record);
   let acknowledgement;
   try {
     acknowledgement = await writeExecution(record);
@@ -457,6 +500,8 @@ export async function executeNativeQueueStarvation({
       state: 'Done',
     });
   }
+  if (acknowledgement.status !== 'execution-write-failed')
+    delivery?.accepted(record, acknowledgement);
   return {
     status:
       acknowledgement.status === 'execution-write-failed'
