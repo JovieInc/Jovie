@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "c08876df6d30729eddd8d7c8ec3e36b2338298c97cc54a463ef6b864e3591e26"
+    "bodySha256": "3d1f6b7ab299fc933adb480ad8d2cce123f554841f84cb84d46c70180ca2786b"
   },
   {
     "file": ".claude/rules/db.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "d4c714ad1d20c53284aabdcbaf63cd465a47ee30d502d867f1f62ba38f21a8c2"
+    "bodySha256": "e3a9efa6f44928c178bb251aec4c322549f491e7fea16764f43e75c1aa39b5c6"
   },
   {
     "file": ".claude/rules/gstack.md",
