@@ -225,7 +225,9 @@ describe('green-source controller contract', () => {
     expect(fleetScript).toContain('17156');
     expect(fleetScript).not.toContain('17453');
     expect(fleetScript).not.toContain('17929');
-    expect(fleetScript).toContain('PROTECTED_PRS="$(node "$CLASSIFY_LIB" protected)"');
+    expect(fleetScript).toContain(
+      'PROTECTED_PRS="$(node "$CLASSIFY_LIB" protected)"'
+    );
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
       fleetScript.indexOf('gh_retry pr ready "$n" -R "$REPO" >/dev/null')
     );
