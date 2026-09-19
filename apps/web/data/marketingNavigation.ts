@@ -28,9 +28,12 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
   label: 'CLI',
 };
 
+// JOV-6432: truthful interim links within the existing shared header. Publish
+// Product/solution destinations through JOV-4491 before changing to that taxonomy.
+// Vocabulary and migration contract: docs/marketing/LANGUAGE.md.
 export const MARKETING_NAV_LINKS = [
-  { href: APP_ROUTES.ARTISTS, label: 'Artists' },
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
+  { href: APP_ROUTES.ABOUT, label: 'About' },
+  { href: APP_ROUTES.ARTIST_PROFILES, label: 'For Artists' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
 ] as const satisfies readonly MarketingNavLink[];
 
@@ -39,26 +42,13 @@ export const MARKETING_NAV_UTILITIES = [
   { href: APP_ROUTES.START, label: 'Find yourself' },
 ] as const satisfies readonly MarketingNavLink[];
 
+// Future audience menus may expose only useful, publication-eligible solutions.
+// About is company information; Blog is editorial. Neither is a persona page.
 export const MARKETING_FOR_FLYOUT_LINKS = [
   {
     href: APP_ROUTES.ARTIST_PROFILES,
     label: 'Artists',
-    description: 'Release pages, audience capture, and fan reactivation.',
-  },
-  {
-    href: APP_ROUTES.ABOUT,
-    label: 'Founders',
-    description: 'A compact view of the company and operating principles.',
-  },
-  {
-    href: APP_ROUTES.ARTIST_PROFILES,
-    label: 'Creators',
-    description: 'Turn profile traffic into durable audience ownership.',
-  },
-  {
-    href: APP_ROUTES.BLOG,
-    label: 'Authors',
-    description: 'Editorial context for launches, profiles, and growth.',
+    description: 'Music, shows, and links on one profile.',
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[];
 
@@ -81,7 +71,7 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = [
   {
     href: APP_ROUTES.CLI,
     label: 'CLI',
-    description: 'Use Jovie workflows from the command line.',
+    description: 'Read public artist data from the command line.',
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[];
 
@@ -89,25 +79,18 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.PAY, label: 'Pay' },
+      { href: APP_ROUTES.ABOUT, label: 'Overview' },
+      { href: APP_ROUTES.DOWNLOAD, label: 'Download' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
   },
   {
-    title: 'Features',
+    title: 'For Artists',
     links: [
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Fan Capture',
-      },
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
-        label: 'Fan Reactivation',
-      },
-      { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-      { href: APP_ROUTES.LAUNCH, label: 'Release System' },
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Fan Notifications' },
+      { href: APP_ROUTES.PAY, label: 'Payments' },
+      { href: APP_ROUTES.LAUNCH, label: 'Music Releases' },
     ],
   },
   {
@@ -126,8 +109,8 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
-      { href: APP_ROUTES.COMPARE, label: 'Compare' },
-      { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
+      { href: APP_ROUTES.ARTISTS, label: 'Artist Directory' },
+      { href: APP_ROUTES.DEMO_VIDEO, label: 'Music Demo' },
       { href: 'https://status.jov.ie', label: 'Status', external: true },
     ],
   },

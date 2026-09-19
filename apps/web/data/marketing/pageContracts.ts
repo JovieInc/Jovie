@@ -1,8 +1,20 @@
 import { APP_ROUTES } from '@/constants/routes';
 
+/**
+ * Language scope describes the page's subject, never the visitor's
+ * identity. Shared pages support unknown and multi-role visitors.
+ * Editorial pages scope terminology to each article/comparison. This is
+ * not a capability or publishing permission; those remain with the
+ * existing offer/publication contracts.
+ * See docs/marketing/LANGUAGE.md before adding or changing
+ * customer-facing copy.
+ */
+export type MarketingCopyScope = 'shared' | 'music' | 'video' | 'editorial';
+
 export interface MarketingPageContract {
   readonly routeGlob: string;
   readonly url: string;
+  readonly copyScope: MarketingCopyScope;
   readonly job: string;
   readonly proof: string;
   readonly successEvent: string;
@@ -25,14 +37,16 @@ const CLAIM_PROFILE_CTA = {
 export const MARKETING_PAGE_CONTRACTS = {
   '(home)/page.tsx': {
     routeGlob: '(home)/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'orient an artist to the highest-value next move',
-    proof: 'catalog, audience, and artist-presence workspace preview',
+    job: 'help visitors understand their public presence and start with their profile',
+    proof: 'published profile and relationship examples',
     successEvent: 'visitor starts the onboarding handoff',
     primaryCta: START_CTA,
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.LANDING_NEW,
     job: 'explain the release operating system',
     proof: 'homepage v2 system overview and pricing evidence',
@@ -41,22 +55,25 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/pricing/page.tsx': {
     routeGlob: '(marketing)/pricing/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.PRICING,
     job: 'compare plan value and reduce pricing ambiguity',
-    proof: 'tier cards, comparison, and social proof',
+    proof: 'published plan terms and supported feature comparison',
     successEvent: 'visitor chooses a plan or starts onboarding',
     primaryCta: START_CTA,
   },
   '(marketing)/artist-profiles/page.tsx': {
     routeGlob: '(marketing)/artist-profiles/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.ARTIST_PROFILES,
-    job: 'show artists how profiles convert attention into owned fans',
+    job: 'show artists how profiles connect music, links, and permissioned fan updates',
     proof: 'profile gallery, capture flow, and conversion sections',
     successEvent: 'artist claims a profile',
     primaryCta: CLAIM_PROFILE_CTA,
   },
   '(marketing)/artist-profile/page.tsx': {
     routeGlob: '(marketing)/artist-profile/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.ARTIST_PROFILE_LEGACY,
     job: 'preserve the legacy artist profile landing path',
     proof: 'same profile conversion system as the canonical plural route',
@@ -65,6 +82,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/artist-notifications/page.tsx': {
     routeGlob: '(marketing)/artist-notifications/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.ARTIST_NOTIFICATIONS,
     job: 'explain automatic fan notification value',
     proof: 'capture, opt-in, and reactivation flow evidence',
@@ -73,6 +91,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/download/page.tsx': {
     routeGlob: '(marketing)/download/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.DOWNLOAD,
     job: 'route visitors to install the app',
     proof: 'platform setup steps and support content',
@@ -81,6 +100,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/pay/page.tsx': {
     routeGlob: '(marketing)/pay/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.PAY,
     job: 'explain the artist payment surface',
     proof: 'pay landing capability and money-flow copy',
@@ -89,6 +109,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/voice/page.tsx': {
     routeGlob: '(marketing)/voice/page.tsx',
+    copyScope: 'shared',
     url: '/voice',
     job: 'describe the voice feature promise',
     proof: 'feature-grid and split-section capability evidence',
@@ -97,6 +118,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/instant-merch/page.tsx': {
     routeGlob: '(marketing)/instant-merch/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.INSTANT_MERCH,
     job: 'show how artists generate merch concepts quickly',
     proof: 'merch concept preview and workflow steps',
@@ -105,6 +127,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/youtube-thumbnails/page.tsx': {
     routeGlob: '(marketing)/youtube-thumbnails/page.tsx',
+    copyScope: 'video',
     url: APP_ROUTES.YOUTUBE_THUMBNAILS,
     job: 'show creators how to package YouTube videos',
     proof: 'paste-channel before/after preview, workflow, and safeguards',
@@ -113,6 +136,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/launch/page.tsx': {
     routeGlob: '(marketing)/launch/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.LAUNCH,
     job: 'explain the release launch system',
     proof: 'release-cycle sections, comparison, and final CTA',
@@ -121,6 +145,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/about/page.tsx': {
     routeGlob: '(marketing)/about/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.ABOUT,
     job: 'state what Jovie is and why it exists',
     proof: 'company story and FAQ context',
@@ -129,6 +154,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/support/page.tsx': {
     routeGlob: '(marketing)/support/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.SUPPORT,
     job: 'help visitors find support and answers',
     proof: 'support channels and FAQ content',
@@ -137,14 +163,17 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/cli/page.tsx': {
     routeGlob: '(marketing)/cli/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.CLI,
-    job: 'explain command-line access to Jovie workflows',
-    proof: 'command examples, FAQ, and policy links',
-    successEvent: 'developer starts from the CLI surface',
+    job: 'explain read-only command-line access to public artist data',
+    proof: 'documented artist GET commands, FAQ, and policy links',
+    successEvent:
+      'developer reads the CLI installation and public artist command examples',
     primaryCta: START_CTA,
   },
   '(marketing)/compare/[slug]/page.tsx': {
     routeGlob: '(marketing)/compare/[slug]/page.tsx',
+    copyScope: 'editorial',
     url: `${APP_ROUTES.COMPARE}/*`,
     job: 'compare Jovie against a known alternative',
     proof: 'comparison table, FAQ, and fit criteria',
@@ -153,6 +182,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/alternatives/[slug]/page.tsx': {
     routeGlob: '(marketing)/alternatives/[slug]/page.tsx',
+    copyScope: 'editorial',
     url: `${APP_ROUTES.ALTERNATIVES}/*`,
     job: 'explain an alternative category and Jovie fit',
     proof: 'category prose, feature grid, and FAQ',
@@ -161,6 +191,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/blog/page.tsx': {
     routeGlob: '(marketing)/blog/page.tsx',
+    copyScope: 'editorial',
     url: APP_ROUTES.BLOG,
     job: 'help visitors browse Jovie essays and updates',
     proof: 'blog feed and editorial categories',
@@ -169,6 +200,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/blog/category/[slug]/page.tsx': {
     routeGlob: '(marketing)/blog/category/[slug]/page.tsx',
+    copyScope: 'editorial',
     url: `${APP_ROUTES.BLOG}/category/*`,
     job: 'help visitors browse a focused editorial category',
     proof: 'category-scoped article feed',
@@ -177,6 +209,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   'waitlist/page.tsx': {
     routeGlob: 'waitlist/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.WAITLIST,
     job: 'collect public waitlist intent without a retired questionnaire',
     proof: 'splash-B waitlist sign-up shell',
@@ -222,10 +255,9 @@ export function normalizeMarketingPathname(
 export function getMarketingPageContractForRouteGlob(
   routeGlob: string
 ): MarketingPageContract | null {
-  return (
-    MARKETING_PAGE_CONTRACTS[routeGlob as MarketingPageContractRouteGlob] ??
-    null
-  );
+  if (!Object.hasOwn(MARKETING_PAGE_CONTRACTS, routeGlob)) return null;
+
+  return MARKETING_PAGE_CONTRACTS[routeGlob as MarketingPageContractRouteGlob];
 }
 
 export function getMarketingPageContractForPathname(
