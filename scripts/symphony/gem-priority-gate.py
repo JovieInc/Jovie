@@ -2728,10 +2728,10 @@ def persist_live_receipt(
         )
         if persisted_at is not None and persisted_at >= now and not remint:
             try:
-                read_json(state_dir / "latest.json")
+                return read_json(state_dir / "latest.json")
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 warn_live_receipt_not_persisted(error)
-            return receipt
+                return receipt
         if remint:
             seats = approved_dispatch_concurrency(receipt)
             prefix = (
