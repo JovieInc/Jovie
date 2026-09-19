@@ -77,6 +77,22 @@ def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
     }
 
 
+def _stale_red_hold_receipt(**overrides):
+    """Sep 5 released-with-red-narrative receipt from the live hold incident."""
+    payload = {
+        "schema": "symphony-closure-hold/v1",
+        "status": "released",
+        "reason": "closure-health-not-green",
+        "closureStatus": "red",
+        "newIssueIntakeAllowed": False,
+        "observedAt": "2026-09-05T16:00:00Z",
+        "holdSleepSecondsUsed": 0,
+        "maxGateSleepSeconds": 3900,
+    }
+    payload.update(overrides)
+    return payload
+
+
 def _closure_run_args(tmp):
     """Green fleet-gate fixture plus hermetic stop-line paths for run tests."""
     closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
@@ -1606,6 +1622,177 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(returncode, 0)
             self.assertIn("observe-only-child-ran", out.getvalue())
             self.assertFalse(hold.exists())
+
+    def test_stale_red_hold_autoclears_when_live_gate_is_green(self):
+        helper = _load_helper()
+        for stale_status in ("holding", "exhausted", "released"):
+            with self.subTest(stale_status=stale_status):
+                with tempfile.TemporaryDirectory() as tmp:
+                    closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+                    hold = pathlib.Path(tmp) / "closure-hold.json"
+                    closure_gate.write_text(
+                        json.dumps(_fleet_gate_payload()), encoding="utf-8"
+                    )
+                    hold.write_text(
+                        json.dumps(_stale_red_hold_receipt(status=stale_status)),
+                        encoding="utf-8",
+                    )
+                    closure = helper.ClosureStopLine(
+                        receipt_path=closure_gate,
+                        hold_receipt_path=hold,
+                        dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                    )
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        returncode = helper.run_official_binary(
+                            ["python3", "-c", "print('stale-hold-autocleared-child-ran')"],
+                            gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                            closure=closure,
+                            max_gate_sleep_seconds=300,
+                        )
+                    self.assertEqual(returncode, 0)
+                    self.assertIn("stale-hold-autocleared-child-ran", out.getvalue())
+                    self.assertIn("closure_hold_autoclear", out.getvalue())
+                    receipt = json.loads(hold.read_text(encoding="utf-8"))
+                    self.assertEqual(receipt["schema"], helper.CLOSURE_HOLD_SCHEMA)
+                    self.assertEqual(receipt["schema"], "symphony-closure-hold/v1")
+                    self.assertEqual(receipt["status"], "released")
+                    self.assertEqual(
+                        receipt["reason"], helper.CLOSURE_HOLD_AUTOCLEAR_REASON
+                    )
+                    self.assertTrue(receipt["reason"])
+                    self.assertRegex(receipt["reason"], r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+                    self.assertEqual(receipt["gateState"], "GREEN")
+                    self.assertEqual(receipt["clearedBy"], helper.CLOSURE_HOLD_CLEARED_BY)
+                    self.assertEqual(receipt["clearedBy"], "symphony-official-runtime")
+                    self.assertEqual(
+                        receipt["priorStale"],
+                        {
+                            "closureStatus": "red",
+                            "observedAt": "2026-09-05T16:00:00Z",
+                            "reason": "closure-health-not-green",
+                            "status": stale_status,
+                        },
+                    )
+
+    def test_stale_red_hold_autoclears_when_observe_only_not_enforcing(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            red_gate = _fleet_gate_payload(status="red", intake=False)
+            red_gate["state"] = "RED"
+            closure_gate.write_text(json.dumps(red_gate), encoding="utf-8")
+            hold.write_text(
+                json.dumps(_stale_red_hold_receipt(status="holding")),
+                encoding="utf-8",
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper.read_closure_stop_line(closure_gate)
+            self.assertTrue(verdict["hold"])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                returncode = helper.run_official_binary(
+                    ["python3", "-c", "print('observe-only-stale-hold-cleared')"],
+                    gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                    closure=closure,
+                    closure_observe_only=True,
+                    max_gate_sleep_seconds=300,
+                )
+            self.assertEqual(returncode, 0)
+            self.assertIn("observe-only-stale-hold-cleared", out.getvalue())
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], helper.CLOSURE_HOLD_SCHEMA)
+            self.assertEqual(receipt["status"], "released")
+            self.assertEqual(receipt["reason"], helper.CLOSURE_HOLD_AUTOCLEAR_REASON)
+            self.assertEqual(receipt["gateState"], "RED")
+            self.assertEqual(
+                receipt["closureStatus"], helper.CLOSURE_HOLD_OBSERVE_ONLY_STATUS
+            )
+            self.assertEqual(receipt["clearedBy"], helper.CLOSURE_HOLD_CLEARED_BY)
+            self.assertEqual(receipt["priorStale"]["status"], "holding")
+            self.assertEqual(receipt["priorStale"]["closureStatus"], "red")
+
+    def test_stale_red_hold_stays_when_live_gate_is_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                encoding="utf-8",
+            )
+            hold.write_text(json.dumps(_stale_red_hold_receipt()), encoding="utf-8")
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            out = io.StringIO()
+            with mock.patch.object(helper.time, "sleep", lambda _seconds: None):
+                with contextlib.redirect_stdout(out):
+                    returncode = helper.run_official_binary(
+                        ["python3", "-c", "print('must-not-run-while-red')"],
+                        gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=0,
+                    )
+            self.assertEqual(returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+            self.assertNotIn("must-not-run-while-red", out.getvalue())
+            self.assertNotIn("closure_hold_autoclear", out.getvalue())
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], helper.CLOSURE_HOLD_SCHEMA)
+            self.assertEqual(receipt["status"], "exhausted")
+            self.assertEqual(receipt["reason"], "closure-health-not-green")
+            self.assertNotIn("clearedBy", receipt)
+            self.assertNotIn("priorStale", receipt)
+
+    def test_maybe_autoclear_stale_closure_hold_requires_kebab_reason(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload()), encoding="utf-8"
+            )
+            hold.write_text(json.dumps(_stale_red_hold_receipt()), encoding="utf-8")
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper._read_stop_line(closure)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["gateState"], "GREEN")
+            with self.assertRaises(ValueError):
+                helper.maybe_autoclear_stale_closure_hold(
+                    closure, verdict, observe_only=False, reason="Not A Kebab"
+                )
+            self.assertEqual(
+                json.loads(hold.read_text(encoding="utf-8"))["reason"],
+                "closure-health-not-green",
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                cleared = helper.maybe_autoclear_stale_closure_hold(
+                    closure, verdict, observe_only=False
+                )
+            self.assertIsNotNone(cleared)
+            self.assertEqual(cleared["schema"], helper.CLOSURE_HOLD_SCHEMA)
+            self.assertEqual(cleared["status"], "released")
+            self.assertEqual(cleared["reason"], helper.CLOSURE_HOLD_AUTOCLEAR_REASON)
+            self.assertEqual(cleared["gateState"], "GREEN")
+            self.assertEqual(cleared["clearedBy"], "symphony-official-runtime")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertIsNone(
+                    helper.maybe_autoclear_stale_closure_hold(
+                        closure, verdict, observe_only=False
+                    )
+                )
 
     def test_closure_hold_pauses_live_scheduler_without_terminating_child(self):
         helper = _load_helper()

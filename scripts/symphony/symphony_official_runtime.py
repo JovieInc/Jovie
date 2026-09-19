@@ -71,6 +71,22 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+CLOSURE_HOLD_ACTIVE_STATUSES = frozenset({"holding", "exhausted"})
+CLOSURE_HOLD_AUTOCLEAR_REASON = (
+    "auto-cleared-stale-red-while-gate-green-observe-only"
+)
+CLOSURE_HOLD_CLEARED_BY = "symphony-official-runtime"
+CLOSURE_HOLD_OBSERVE_ONLY_STATUS = "observe-only-not-enforcing"
+CLOSURE_HOLD_REASON_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+CLOSURE_HOLD_PRIOR_STALE_FIELDS = ("closureStatus", "observedAt", "reason", "status")
+CLOSURE_HOLD_GREEN_REASONS = frozenset(
+    {
+        "closure-health-green",
+        "closure-health-product-independent",
+        "closure-health-repair-feed",
+        CLOSURE_HOLD_AUTOCLEAR_REASON,
+    }
+)
 # Typed dispatch admission (dispatch-preflight output). The flat keys
 # (allowed/reason/mode/productId/maxConcurrent) remain the machine contract
 # consumed by the fallback pickup check (symphony-codex-exhausted); the
@@ -1178,6 +1194,8 @@ def _closure_snapshot_verdict(
         "maxReceiptAgeSeconds": max_age_seconds,
         "closurePurpose": purpose,
     }
+    if isinstance(payload.get("state"), str):
+        details["gateState"] = payload["state"]
     if age_seconds < -FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS:
         return hold("fleet-gate-receipt-future", **details)
     if age_seconds > max_age_seconds:
@@ -1459,13 +1477,20 @@ def write_closure_hold_receipt(
     sleep_seconds_used: int,
     max_sleep_seconds: int | None,
     now: dt.datetime | None = None,
+    reason: str | None = None,
+    gate_state: object = None,
+    prior_stale: dict[str, Any] | None = None,
+    cleared_by: str | None = None,
+    closure_status: object = None,
 ) -> dict[str, Any]:
     """Durable symphony-closure-hold/v1 receipt for one hold decision."""
-    payload = {
+    payload: dict[str, Any] = {
         "schema": CLOSURE_HOLD_SCHEMA,
         "status": status,
-        "reason": verdict.get("reason"),
-        "closureStatus": verdict.get("closureStatus"),
+        "reason": verdict.get("reason") if reason is None else reason,
+        "closureStatus": (
+            verdict.get("closureStatus") if closure_status is None else closure_status
+        ),
         "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
         "receiptPath": verdict.get("path"),
         "receiptObservedAt": verdict.get("receiptObservedAt"),
@@ -1474,19 +1499,119 @@ def write_closure_hold_receipt(
         "maxGateSleepSeconds": max_sleep_seconds,
         "observedAt": _iso(now or _now()),
     }
+    if gate_state is not None:
+        payload["gateState"] = gate_state
+    if prior_stale is not None:
+        payload["priorStale"] = prior_stale
+    if cleared_by is not None:
+        payload["clearedBy"] = cleared_by
     _write_json_receipt(path, payload)
     return payload
 
 
-def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
+def _read_closure_hold_receipt(path: pathlib.Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
         return None
+    return payload
+
+
+def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
+    payload = _read_closure_hold_receipt(path)
+    if payload is None:
+        return None
     status = payload.get("status")
     return status if isinstance(status, str) else None
+
+
+def _require_closure_hold_reason(reason: object) -> str:
+    if not isinstance(reason, str) or not CLOSURE_HOLD_REASON_RE.fullmatch(reason):
+        raise ValueError("closure-hold reason must be a non-empty kebab-case string")
+    return reason
+
+
+def _prior_stale_hold_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
+    return {field: payload.get(field) for field in CLOSURE_HOLD_PRIOR_STALE_FIELDS}
+
+
+def _hold_receipt_is_stale_red(payload: dict[str, Any]) -> bool:
+    """True when an existing hold receipt still carries a red/active hold."""
+    status = payload.get("status")
+    if status in CLOSURE_HOLD_ACTIVE_STATUSES:
+        return True
+    if status != "released":
+        return False
+    if payload.get("reason") == CLOSURE_HOLD_AUTOCLEAR_REASON:
+        return False
+    if payload.get("closureStatus") == "red":
+        return True
+    reason = payload.get("reason")
+    return isinstance(reason, str) and reason not in CLOSURE_HOLD_GREEN_REASONS
+
+
+def _preflight_allows_hold_autoclear(
+    verdict: dict[str, Any], *, observe_only: bool
+) -> bool:
+    """GREEN / not-holding preflight, or observe-only (not enforcing)."""
+    return observe_only or not verdict.get("hold")
+
+
+def maybe_autoclear_stale_closure_hold(
+    stop_line: ClosureStopLine,
+    verdict: dict[str, Any],
+    *,
+    observe_only: bool,
+    sleep_seconds_used: int = 0,
+    max_sleep_seconds: int | None = None,
+    now: dt.datetime | None = None,
+    reason: str = CLOSURE_HOLD_AUTOCLEAR_REASON,
+) -> dict[str, Any] | None:
+    """Release a stale red hold when live preflight is GREEN or observe-only.
+
+    Does not require a human or founder. Leaves the receipt untouched when the
+    live gate is actually red / intake-blocked and enforcement is on.
+    """
+    if not _preflight_allows_hold_autoclear(verdict, observe_only=observe_only):
+        return None
+    previous = _read_closure_hold_receipt(stop_line.hold_receipt_path)
+    if previous is None or not _hold_receipt_is_stale_red(previous):
+        return None
+    kebab_reason = _require_closure_hold_reason(reason)
+    closure_status = (
+        CLOSURE_HOLD_OBSERVE_ONLY_STATUS
+        if observe_only
+        else verdict.get("closureStatus")
+    )
+    payload = write_closure_hold_receipt(
+        stop_line.hold_receipt_path,
+        verdict,
+        status="released",
+        sleep_seconds_used=sleep_seconds_used,
+        max_sleep_seconds=max_sleep_seconds,
+        now=now,
+        reason=kebab_reason,
+        gate_state=verdict.get("gateState"),
+        prior_stale=_prior_stale_hold_snapshot(previous),
+        cleared_by=CLOSURE_HOLD_CLEARED_BY,
+        closure_status=closure_status,
+    )
+    print(
+        json.dumps(
+            {
+                "kind": "closure_hold_autoclear",
+                "reason": kebab_reason,
+                "clearedBy": CLOSURE_HOLD_CLEARED_BY,
+                "gateState": payload.get("gateState"),
+                "priorStale": payload.get("priorStale"),
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    return payload
 
 
 def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
@@ -1853,6 +1978,13 @@ def run_official_binary(
     closure_sleep_used = 0
     while True:
         verdict = _read_stop_line(closure)
+        maybe_autoclear_stale_closure_hold(
+            closure,
+            verdict,
+            observe_only=closure_observe_only,
+            sleep_seconds_used=closure_sleep_used,
+            max_sleep_seconds=max_gate_sleep_seconds,
+        )
         if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
             # work belongs to a live scheduler process (or none has started
@@ -1889,19 +2021,6 @@ def run_official_binary(
                     sort_keys=True,
                 ),
                 flush=True,
-            )
-        elif _closure_hold_receipt_status(closure.hold_receipt_path) in {
-            "holding",
-            "exhausted",
-        }:
-            # A previous bounded episode ended mid-hold; record that admission
-            # resumed instead of leaving a stale hold receipt behind.
-            write_closure_hold_receipt(
-                closure.hold_receipt_path,
-                verdict,
-                status="released",
-                sleep_seconds_used=closure_sleep_used,
-                max_sleep_seconds=max_gate_sleep_seconds,
             )
         gate = read_rate_limit_gate(gate_file)
         if gate["active"]:
