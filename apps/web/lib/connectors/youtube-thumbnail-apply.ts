@@ -133,7 +133,10 @@ export async function applyYouTubeThumbnail(
   if (!YOUTUBE_THUMBNAIL_ARTIFACT_SHA256_PATTERN.test(input.artifactSha256)) {
     return { ok: false, error: 'artifact-mismatch' };
   }
-  if (sha256(input.bytes) !== input.artifactSha256) {
+  if (
+    input.artifactSha256 !== payload.artifactSha256 ||
+    sha256(input.bytes) !== input.artifactSha256
+  ) {
     return { ok: false, error: 'artifact-mismatch' };
   }
   if (input.bytes.length > MAX_THUMBNAIL_BYTES) {

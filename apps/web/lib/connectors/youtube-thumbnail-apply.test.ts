@@ -88,6 +88,28 @@ describe('applyYouTubeThumbnail', () => {
     expect(result).toEqual({ ok: false, error });
   });
 
+  it('rejects substituted bytes even when their supplied hash is valid', async () => {
+    const substitutedBytes = new Uint8Array([...bytes, 0x01]);
+    const substitutedHash = createHash('sha256')
+      .update(substitutedBytes)
+      .digest('hex');
+    const setThumbnail = vi.fn(async () => ({
+      operationId: 'unapproved-operation',
+      beforeSha256: 'b'.repeat(64),
+      afterSha256: substitutedHash,
+    }));
+
+    const result = await applyYouTubeThumbnail({
+      ...base,
+      bytes: substitutedBytes,
+      artifactSha256: substitutedHash,
+      provider: { setThumbnail },
+    });
+
+    expect(result).toEqual({ ok: false, error: 'artifact-mismatch' });
+    expect(setThumbnail).not.toHaveBeenCalled();
+  });
+
   it('rejects media mismatches and ambiguous provider success', async () => {
     expect(
       await applyYouTubeThumbnail({ ...base, mediaType: 'image/jpeg' })
