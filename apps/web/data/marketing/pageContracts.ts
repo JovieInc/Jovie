@@ -123,6 +123,19 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/card/page.tsx': {
+    routeGlob: '(marketing)/card/page.tsx',
+    url: APP_ROUTES.CARD,
+    job: 'explain the planned in-person profile-sharing product and how to get access updates',
+    proof:
+      'illustrative Wallet-card preview paired with an approved public-profile capture',
+    successEvent:
+      'visitor persists or confirms a deduplicated Jovie Card interest request',
+    primaryCta: {
+      href: `${APP_ROUTES.CARD}#join-the-list`,
+      label: 'Join the list',
+    },
+  },
   '(marketing)/launch/page.tsx': {
     routeGlob: '(marketing)/launch/page.tsx',
     url: APP_ROUTES.LAUNCH,

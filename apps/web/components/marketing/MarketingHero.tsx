@@ -1,6 +1,6 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
-import type { ElementType, ReactNode } from 'react';
+import type { CSSProperties, ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
@@ -55,6 +55,8 @@ export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
  * button system, and the distributor logo bar as the proof element.
  */
 export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
+  readonly sectionVariant?: string;
+  readonly headlineMaxLines?: 2 | 3;
   /** One-line value prop. 56px Inter at `--font-weight-bold` (680). */
   readonly headline: string;
   /** 1-2 line supporting copy. 18px Inter at 400. */
@@ -157,15 +159,32 @@ function MarketingHeroTitle({
   id,
   testId,
   className,
+  maxLines = 2,
   children,
 }: Readonly<{
   id?: string;
   testId?: string;
   className: string;
+  maxLines?: 2 | 3;
   children: ReactNode;
 }>) {
   return (
-    <h1 id={id} data-testid={testId} className={cn('line-clamp-2', className)}>
+    <h1
+      id={id}
+      data-testid={testId}
+      className={cn(
+        maxLines === 3 ? 'line-clamp-3' : 'line-clamp-2',
+        className
+      )}
+      style={
+        maxLines === 3
+          ? ({
+              WebkitLineClamp: 3,
+              maxBlockSize: 'calc(3 * 1lh)',
+            } satisfies CSSProperties)
+          : undefined
+      }
+    >
       {children}
     </h1>
   );
@@ -250,6 +269,8 @@ function MarketingHeroContent({
   headingId,
   testId,
   className,
+  sectionVariant,
+  headlineMaxLines = 2,
   linkComponent = Link,
 }: MarketingHeroContentProps) {
   const layout = media ? 'split' : align;
@@ -259,13 +280,18 @@ function MarketingHeroContent({
       className={cn('marketing-hero', `marketing-hero--${layout}`, className)}
       headingId={headingId}
       testId={testId}
+      sectionVariant={sectionVariant}
     >
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
             <MarketingHeroTitle
               id={headingId}
-              className='marketing-hero-headline marketing-h1-max-two-lines'
+              maxLines={headlineMaxLines}
+              className={cn(
+                'marketing-hero-headline',
+                headlineMaxLines === 2 && 'marketing-h1-max-two-lines'
+              )}
             >
               {headline}
             </MarketingHeroTitle>

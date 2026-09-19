@@ -226,6 +226,36 @@ describe('POST /api/changelog/subscribe', () => {
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
   });
+  it('persists Jovie Card attribution and deduplicates a verified repeat request', async () => {
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const request = {
+      email: 'founder@example.com',
+      turnstileToken: 'token',
+      source: 'marketing:/card:coming-soon',
+    };
+
+    const created = await POST(buildRequest(request) as never);
+    expect(created.status).toBe(201);
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'founder@example.com',
+        source: 'marketing:/card:coming-soon',
+      })
+    );
+
+    mockSelectLimit.mockResolvedValue([
+      { id: 'existing', verified: true, unsubscribedAt: null },
+    ]);
+    mockInsertValues.mockClear();
+    mockSendEmail.mockClear();
+
+    const repeated = await POST(buildRequest(request) as never);
+    expect(repeated.status).toBe(200);
+    expect(await repeated.json()).toMatchObject({ state: 'subscribed' });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
   it('returns the subscribed state without writing or sending another confirmation', async () => {
     mockSelectLimit.mockResolvedValue([
       { id: 'existing', verified: true, unsubscribedAt: null },
