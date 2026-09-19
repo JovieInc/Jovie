@@ -7,8 +7,13 @@ but now forwards CI failures to the Hyperagent remediator webhook.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
+import os
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -157,6 +162,176 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
             "actions/workflows/ha-ci-remediator-poke.yml/runs?head_sha=$HEAD_SHA&status=success",
             text,
         )
+
+
+    def _run_poke_shell(self, response_body, http_code, fail_success=False):
+        'Run the workflow Poke step with local gh and curl fixtures.'
+        workflow = POKE.read_text(encoding="utf-8")
+        step = workflow[workflow.index("      - name: Poke Hyperagent CI remediator\n"):]
+        script = step.split("        run: |\n", 1)[1]
+        script = "\n".join(
+            line[10:] if line.startswith(" " * 10) else line
+            for line in script.splitlines()
+        ) + "\n"
+
+        with tempfile.TemporaryDirectory(prefix="ha-poke-fixture-") as directory:
+            root = pathlib.Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            response_path = root / "response"
+            response_path.write_bytes(response_body)
+            gh_log = root / "gh.jsonl"
+            curl_log = root / "curl.jsonl"
+            output_path = root / "github-output"
+
+            gh_fixture = bin_dir / "gh"
+            gh_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+fields = {}
+index = 0
+while index < len(args):
+    if args[index] == "-f" and index + 1 < len(args):
+        key, value = args[index + 1].split("=", 1)
+        fields[key] = value
+        index += 2
+    else:
+        index += 1
+fail_success = fields.get("state") == "success" and os.environ.get("GH_FAIL_SUCCESS") == "1"
+with open(os.environ["GH_FIXTURE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"args": args, "fields": fields, "persisted": not fail_success}) + "\\n")
+if fail_success:
+    print("fixture status write failed", file=sys.stderr)
+    raise SystemExit(1)
+print("{}")
+''',
+                encoding="utf-8",
+            )
+            curl_fixture = bin_dir / "curl"
+            curl_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import sys
+
+args = sys.argv[1:]
+output = pathlib.Path(args[args.index("-o") + 1])
+payload = args[args.index("-d") + 1]
+with open(os.environ["CURL_FIXTURE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"payload": payload}) + "\\n")
+output.write_bytes(pathlib.Path(os.environ["CURL_FIXTURE_RESPONSE"]).read_bytes())
+print(os.environ["CURL_FIXTURE_CODE"])
+''',
+                encoding="utf-8",
+            )
+            gh_fixture.chmod(0o755)
+            curl_fixture.chmod(0o755)
+
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{bin_dir}:{environment['PATH']}",
+                    "GH_FIXTURE_LOG": str(gh_log),
+                    "CURL_FIXTURE_LOG": str(curl_log),
+                    "CURL_FIXTURE_RESPONSE": str(response_path),
+                    "CURL_FIXTURE_CODE": str(http_code),
+                    "GH_FAIL_SUCCESS": "1" if fail_success else "",
+                    "GITHUB_OUTPUT": str(output_path),
+                    "WEBHOOK_URL": "https://fixture.invalid/hyperagent",
+                    "WEBHOOK_SECRET": "fixture-secret",
+                    "GH_TOKEN": "fixture-token",
+                    "PR_NUMBER": "18003",
+                    "HEAD_SHA": "a" * 40,
+                    "RUN_URL": "https://github.com/JovieInc/Jovie/actions/runs/123",
+                    "REPO": "JovieInc/Jovie",
+                    "EVENT": "pull_request",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", script],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            statuses = [
+                json.loads(line)
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if gh_log.exists() else []
+            requests = [
+                json.loads(line)
+                for line in curl_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if curl_log.exists() else []
+            return completed, statuses, requests
+
+    def test_poke_persists_valid_202_run_id_and_exact_payload_fingerprint(self):
+        run_id = "r" * 48
+        completed, statuses, requests = self._run_poke_shell(
+            json.dumps({"runId": run_id, "status": "accepted"}).encode(), 202
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "success"])
+        payload = requests[0]["payload"]
+        fingerprint = hashlib.sha256(payload.encode()).hexdigest()
+        description = statuses[-1]["fields"]["description"]
+        self.assertEqual(
+            description,
+            f"ha-receipt accepted run={run_id} fp={fingerprint}",
+        )
+        self.assertLessEqual(len(description), 140)
+
+    def test_poke_preserves_pending_for_missing_malformed_and_wrong_202_bodies(self):
+        fixtures = (
+            b"",
+            b"not-json",
+            b'{"status":"accepted"}',
+            b'{"runId":"provider-run-123","status":"running"}',
+            json.dumps({"runId": "provider-run-123\n", "status": "accepted"}).encode(),
+            json.dumps({"runId": "provider-run-123\x00123", "status": "accepted"}).encode(),
+            json.dumps({"runId": "r" * 49, "status": "accepted"}).encode(),
+        )
+        for response_body in fixtures:
+            with self.subTest(response_body=response_body):
+                completed, statuses, requests = self._run_poke_shell(response_body, 202)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(len(requests), 1)
+                self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending"])
+                description = statuses[0]["fields"]["description"]
+                self.assertIn("ha-receipt pending fp=", description)
+                self.assertNotIn("accepted run=", description)
+
+    def test_poke_fails_closed_when_accepted_receipt_cannot_persist(self):
+        completed, statuses, requests = self._run_poke_shell(
+            b'{"runId":"provider-run-123","status":"accepted"}',
+            202,
+            fail_success=True,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "success"])
+        self.assertTrue(statuses[0]["persisted"])
+        self.assertFalse(statuses[1]["persisted"])
+        self.assertIn("failing closed", completed.stdout)
+
+    def test_poke_keeps_non_202_failure_receipt_and_does_not_replay(self):
+        completed, statuses, requests = self._run_poke_shell(
+            b'{"error":"temporarily unavailable"}', 503
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "failure"])
+        payload = requests[0]["payload"]
+        fingerprint = hashlib.sha256(payload.encode()).hexdigest()
+        self.assertIn(f"http=503 fp={fingerprint}", statuses[-1]["fields"]["description"])
 
 
 if __name__ == "__main__":
