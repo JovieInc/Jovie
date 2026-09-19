@@ -225,6 +225,7 @@
     "@jovie/agent-transport-contracts": "workspace:^",
     "@jovie/audio-contracts": "workspace:*",
     "@jovie/auth-routing": "workspace:*",
+    "@jovie/jev-evaluation": "workspace:*",
     "@jovie/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@noble/hashes": "2.4.0",
