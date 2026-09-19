@@ -21,6 +21,7 @@ import {
   getSenderPolicy,
 } from '@/lib/notifications/sender-policy';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import { requireProfileCompleteness } from '@/lib/profile/completeness.server';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
@@ -167,6 +168,8 @@ export async function processSendClaimInviteJob(
       detail: 'Profile already claimed',
     };
   }
+
+  await requireProfileCompleteness(profile.id, tx);
 
   // Always generate a fresh token pair per email send.
   // The raw token is never stored at rest — only the hash is persisted in the DB.

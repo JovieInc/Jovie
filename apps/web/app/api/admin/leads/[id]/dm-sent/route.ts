@@ -5,6 +5,7 @@ import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
+import { loadProfileCompleteness } from '@/lib/profile/completeness.server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -37,6 +38,7 @@ export async function PATCH(
     const [existingLead] = await db
       .select({
         id: leads.id,
+        creatorProfileId: leads.creatorProfileId,
         firstContactedAt: leads.firstContactedAt,
       })
       .from(leads)
@@ -49,6 +51,19 @@ export async function PATCH(
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    const completeness = existingLead.creatorProfileId
+      ? (await loadProfileCompleteness([existingLead.creatorProfileId])).get(
+          existingLead.creatorProfileId
+        )
+      : null;
+    if (!completeness?.eligible)
+      return NextResponse.json(
+        {
+          error: 'Profile completeness certification required before outreach',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
 
     const [updated] = await db
       .update(leads)
