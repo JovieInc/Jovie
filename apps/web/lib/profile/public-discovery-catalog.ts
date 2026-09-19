@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { loadProfileCompleteness } from './completeness.server';
 import { filterPublicDiscoveryIdentities } from './public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from './public-release-eligibility';
 
@@ -83,7 +84,8 @@ export function decodeArtistsDirectoryCursor(
 }
 
 export function toArtistsDirectoryProfiles(
-  rows: readonly ArtistsDirectoryCatalogRow[] | null | undefined
+  rows: readonly ArtistsDirectoryCatalogRow[] | null | undefined,
+  eligibleIds: ReadonlySet<string> = new Set()
 ): ArtistsDirectoryCatalogProfile[] {
   if (!Array.isArray(rows)) return [];
 
@@ -92,13 +94,15 @@ export function toArtistsDirectoryProfiles(
       ...row,
       handle: row.handle ?? row.username,
     }))
-  ).map(row => ({
-    id: row.id,
-    username: row.username,
-    displayName: row.displayName,
-    avatarUrl: row.avatarUrl,
-    bio: row.bio,
-  }));
+  )
+    .filter(row => Boolean(row.avatarUrl) && eligibleIds.has(row.id))
+    .map(row => ({
+      id: row.id,
+      username: row.username,
+      displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
+      bio: row.bio,
+    }));
 }
 
 const PUBLIC_DIRECTORY_PREDICATE = and(
@@ -172,9 +176,15 @@ async function queryArtistsDirectoryCatalog(
           })
         : null;
 
+    const assessments = await loadProfileCompleteness(
+      pageRows.map(row => row.id)
+    );
+    const eligibleIds = new Set(
+      [...assessments].filter(([, result]) => result.eligible).map(([id]) => id)
+    );
     return {
       status: 'ok',
-      profiles: toArtistsDirectoryProfiles(pageRows),
+      profiles: toArtistsDirectoryProfiles(pageRows, eligibleIds),
       nextCursor,
     };
   } catch (error) {
@@ -203,14 +213,8 @@ async function queryArtistsDirectoryCount(): Promise<number | null> {
   }
 }
 
-export const loadArtistsDirectoryProfiles = unstable_cache(
-  queryArtistsDirectoryCatalog,
-  ['artists-directory-v2'],
-  {
-    revalidate: 3600,
-    tags: [CACHE_TAGS.ARTISTS_DIRECTORY, CACHE_TAGS.PUBLIC_PROFILE],
-  }
-);
+// Certification expiry and profile edits must take effect on the next request.
+export const loadArtistsDirectoryProfiles = queryArtistsDirectoryCatalog;
 
 export const loadArtistsDirectoryCount = unstable_cache(
   queryArtistsDirectoryCount,

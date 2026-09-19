@@ -1,59 +1,68 @@
-/**
- * Instantly Push — Timeout Behavior Tests
- *
- * Verifies the 15s AbortSignal.timeout is applied to the Instantly API fetch.
- */
-
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-
-const { mockPipelineLog } = vi.hoisted(() => ({
-  mockPipelineLog: vi.fn(),
+const { requireCompleteness } = vi.hoisted(() => ({
+  requireCompleteness: vi.fn(),
 }));
-
+vi.mock('@/lib/profile/completeness.server', () => ({
+  requireLeadCompleteness: requireCompleteness,
+}));
 vi.mock('@/lib/leads/pipeline-logger', () => ({
-  pipelineLog: mockPipelineLog,
+  pipelineLog: vi.fn(),
+  pipelineError: vi.fn(),
 }));
 
-describe('Instantly push timeout', () => {
-  it('fetch call includes AbortSignal.timeout(15000)', async () => {
-    // We verify the timeout is configured by checking that the fetch
-    // call receives a signal option. This tests the integration point.
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ lead_id: 'inst-1' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
+import { pushLeadToInstantly } from '@/lib/leads/instantly';
 
-    // Dynamic import to get fresh module after global mock
-    vi.resetModules();
-
-    const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
-
-    // Need to mock env for API key
+const params = {
+  leadId: 'lead-1',
+  email: 'artist@example.com',
+  firstName: 'River',
+  claimLink: 'https://jov.ie/claim/token',
+  artistName: 'River Lane',
+  priorityScore: 50,
+};
+describe('Instantly completeness send boundary', () => {
+  beforeEach(() => {
     vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
     vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'campaign-1');
-
-    try {
-      await pushLeadToInstantly({
-        email: 'test@example.com',
-        firstName: 'Test',
-        claimLink: 'https://app/claim/tok',
-        artistName: 'Test',
-        priorityScore: 50,
-      });
-    } catch {
-      // May fail due to missing env in test — that's ok
-    }
-
-    if (mockFetch.mock.calls.length > 0) {
-      const fetchOptions = mockFetch.mock.calls[0][1];
-      expect(fetchOptions).toHaveProperty('signal');
-    }
-
+    requireCompleteness.mockReset();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ lead_id: 'inst-1' }),
+      })
+    );
+  });
+  afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+  it('checks the current lead certificate before a timed outbound request', async () => {
+    requireCompleteness.mockResolvedValue(undefined);
+    await expect(pushLeadToInstantly(params)).resolves.toBe('inst-1');
+    expect(requireCompleteness).toHaveBeenCalledWith('lead-1');
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      'https://api.instantly.ai/api/v2/leads',
+      expect.objectContaining({
+        method: 'POST',
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(requireCompleteness.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(fetch).mock.invocationCallOrder[0]
+    );
+  });
+  it.each([
+    'missing photo',
+    'stale evaluation',
+    'profile changed',
+    'database unavailable',
+  ])('sends nothing when completeness fails: %s', async reason => {
+    requireCompleteness.mockRejectedValue(new Error(reason));
+    await expect(pushLeadToInstantly(params)).rejects.toThrow(reason);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
