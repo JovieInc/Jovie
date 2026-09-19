@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as renderUI, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthShell } from '@/components/organisms/AuthShell';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -89,6 +91,18 @@ vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => <button type='button'>Mobile Profile</button>,
 }));
 
+function render(ui: ReactNode) {
+  return renderUI(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 function renderAuthShell(showMobileTabs = false) {
   return render(
     <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
@@ -112,6 +126,28 @@ function renderOvAuthShell() {
     </AppFlagProvider>
   );
 }
+
+describe('AuthShell runtime update wiring', () => {
+  it('renders the shell frame inside the runtime update provider', () => {
+    renderUI(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+          <SidebarProvider>
+            <AuthShell section='dashboard' breadcrumbs={[]}>
+              <div>Shell Content</div>
+            </AuthShell>
+          </SidebarProvider>
+        </AppFlagProvider>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByTestId('app-shell-frame')).toBeInTheDocument();
+  });
+});
 
 describe('AuthShell canonical wiring', () => {
   it('uses the single shell frame and in-sidebar collapse control', () => {
