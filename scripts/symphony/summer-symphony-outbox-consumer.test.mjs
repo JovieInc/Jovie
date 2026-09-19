@@ -316,6 +316,78 @@ describe('Summer outbox record authority', () => {
     );
   });
 
+  it('accepts the closure-health-red repair task bound to its action', () => {
+    const closureTask = task({
+      action: 'reconcile-closure-health-red',
+      selected: {
+        id: 'closure-health-red',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(closureTask), keys),
+      closureTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-closure-health-red',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
+    );
+  });
+
+  it('accepts the runner-capacity-starvation repair task bound to its action', () => {
+    const runnerTask = task({
+      action: 'reconcile-runner-capacity-starvation',
+      selected: {
+        id: 'runner-capacity-starvation',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(runnerTask), keys),
+      runnerTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-runner-capacity-starvation',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
+    );
+  });
+
   it('rejects cross-source, cross-action, cross-task, and extra-field records', () => {
     const crossSource = task({
       source: { sourceVersion: 'e'.repeat(40), snapshotDigest: 'd'.repeat(64) },
