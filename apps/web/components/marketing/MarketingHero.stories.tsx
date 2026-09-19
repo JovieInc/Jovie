@@ -50,3 +50,28 @@ export const SourceBackedDefault: Story = {
   name: 'source-backed default',
   args: MARKETING_HERO_DEFAULT_PROPS,
 };
+
+/** Conditional landing mode shared by /voice and /instant-merch.
+ * Generic content exercises the action family without certifying route claims.
+ */
+export const LandingActions: Story = {
+  name: 'landing actions',
+  parameters: {
+    pen: {
+      proofScope: 'landing-action-conformance-only',
+      outstanding:
+        'Current native save/readback and complete route certification remain unverified.',
+    },
+  },
+  args: {
+    eyebrow: 'Action contract',
+    headingId: 'landing-actions-heading',
+    title: 'Marketing hero actions',
+    body: 'Primary and secondary destinations use the shared action family.',
+    media: null,
+    primaryCtaLabel: 'Get started',
+    primaryCtaHref: '/start',
+    secondaryCtaLabel: 'See pricing',
+    secondaryCtaHref: '/pricing',
+  },
+};
