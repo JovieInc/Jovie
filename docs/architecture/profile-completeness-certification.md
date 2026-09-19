@@ -26,6 +26,8 @@ The shared Jev server adapter owns transport admission and model execution. Cons
 
 The current implementation does not establish unattended production evaluation authority. Existing ingestion jobs and cron are the preferred scheduling substrate once the adapter's admission contract can authorize the exact snapshot and current source. Do not run model transport inside the legacy ingestion transaction.
 
+The database binding exposes `prepareStoredProfileCompletenessEvaluation` for exact-request review and `runStoredProfileCompletenessEvaluation` for admitted execution. It supplies no credentials or approval defaults and derives the transport's current fingerprint from fresh database reads. This is a callable producer boundary, not evidence of a commissioned scheduler or backfill.
+
 ## Release order and unresolved gates
 
 1. Refresh aggregate production impact using an authorized read-only database surface: public/claimed profile count, missing photo/content, approved leads, and pending email/DM candidates. Counts are currently UNKNOWN because the previously installed query connector is not callable. Do not extract credentials or bypass denied Doppler access.

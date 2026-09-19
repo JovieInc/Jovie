@@ -65,6 +65,7 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   profileViews: 2_847,
   profileEditVersion: 1,
   onboardingCompletedAt: now,
+  completenessJudgment: null,
   settings: {},
   theme: {},
   notificationPreferences: {
