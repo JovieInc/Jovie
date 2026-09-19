@@ -168,6 +168,19 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
+  it('uses pearlQuiet top chrome without IconButton restyle classes', () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    renderSurface({ allowSignedInEscape: true });
+
+    const back = screen.getByRole('button', { name: 'Back' });
+    const menu = screen.getByRole('button', { name: 'Menu' });
+
+    expect(back).not.toHaveClass('profile-top-chrome-icon');
+    expect(back).not.toHaveClass('text-white');
+    expect(menu).not.toHaveClass('profile-top-chrome-icon');
+    expect(menu).not.toHaveClass('text-white');
+  });
+
   it('shows the back control on the public profile root for a signed-in session', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
     const onBack = vi.fn();

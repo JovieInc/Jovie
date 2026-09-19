@@ -468,8 +468,6 @@ export function ProfileCompactSurface({
     renderMode === 'preview' || !renderSemanticHeading ? 'p' : 'h1';
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
-  const topChromeButtonClassName =
-    'profile-top-chrome-icon text-white dark:text-white';
   // The 20px glyph sits inside an explicit 44×44 target. Targets participate
   // in the identity grid normally so adjacent social actions never overlap.
   const socialIconClassName =
@@ -686,7 +684,6 @@ export function ProfileCompactSurface({
                   onClick={onBack}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
                   <ChevronLeft className='h-5 w-5' />
@@ -716,7 +713,6 @@ export function ProfileCompactSurface({
                   onClick={onOpenMenu}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Menu'
                 >
                   {/* The drawer is an overflow menu (Share / Pay / Contact), so
