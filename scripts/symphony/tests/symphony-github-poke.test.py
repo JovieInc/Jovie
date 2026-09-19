@@ -7,9 +7,15 @@ but now forwards CI failures to the Hyperagent remediator webhook.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
+import os
 import pathlib
+import subprocess
+import tempfile
 import unittest
+from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 POKE = ROOT / ".github/workflows/ha-ci-remediator-poke.yml"
@@ -157,6 +163,403 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
             "actions/workflows/ha-ci-remediator-poke.yml/runs?head_sha=$HEAD_SHA&status=success",
             text,
         )
+
+
+    def _run_poke_shell(self, response_body, http_code, fail_success=False):
+        'Run the workflow Poke step with local gh and curl fixtures.'
+        workflow = POKE.read_text(encoding="utf-8")
+        step = workflow[workflow.index("      - name: Poke Hyperagent CI remediator\n"):]
+        script = step.split("        run: |\n", 1)[1]
+        script = "\n".join(
+            line[10:] if line.startswith(" " * 10) else line
+            for line in script.splitlines()
+        ) + "\n"
+
+        with tempfile.TemporaryDirectory(prefix="ha-poke-fixture-") as directory:
+            root = pathlib.Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            response_path = root / "response"
+            response_path.write_bytes(response_body)
+            gh_log = root / "gh.jsonl"
+            curl_log = root / "curl.jsonl"
+            output_path = root / "github-output"
+
+            gh_fixture = bin_dir / "gh"
+            gh_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+fields = {}
+index = 0
+while index < len(args):
+    if args[index] == "-f" and index + 1 < len(args):
+        key, value = args[index + 1].split("=", 1)
+        fields[key] = value
+        index += 2
+    else:
+        index += 1
+fail_success = fields.get("state") == "success" and os.environ.get("GH_FAIL_SUCCESS") == "1"
+with open(os.environ["GH_FIXTURE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"args": args, "fields": fields, "persisted": not fail_success}) + "\\n")
+if fail_success:
+    print("fixture status write failed", file=sys.stderr)
+    raise SystemExit(1)
+print("{}")
+''',
+                encoding="utf-8",
+            )
+            curl_fixture = bin_dir / "curl"
+            curl_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import sys
+
+args = sys.argv[1:]
+output = pathlib.Path(args[args.index("-o") + 1])
+payload = args[args.index("-d") + 1]
+with open(os.environ["CURL_FIXTURE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"payload": payload}) + "\\n")
+output.write_bytes(pathlib.Path(os.environ["CURL_FIXTURE_RESPONSE"]).read_bytes())
+print(os.environ["CURL_FIXTURE_CODE"])
+''',
+                encoding="utf-8",
+            )
+            gh_fixture.chmod(0o755)
+            curl_fixture.chmod(0o755)
+
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{bin_dir}:{environment['PATH']}",
+                    "GH_FIXTURE_LOG": str(gh_log),
+                    "CURL_FIXTURE_LOG": str(curl_log),
+                    "CURL_FIXTURE_RESPONSE": str(response_path),
+                    "CURL_FIXTURE_CODE": str(http_code),
+                    "GH_FAIL_SUCCESS": "1" if fail_success else "",
+                    "GITHUB_OUTPUT": str(output_path),
+                    "WEBHOOK_URL": "https://fixture.invalid/hyperagent",
+                    "WEBHOOK_SECRET": "fixture-secret",
+                    "GH_TOKEN": "fixture-token",
+                    "PR_NUMBER": "18003",
+                    "HEAD_SHA": "a" * 40,
+                    "RUN_URL": "https://github.com/JovieInc/Jovie/actions/runs/123",
+                    "REPO": "JovieInc/Jovie",
+                    "EVENT": "pull_request",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", script],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            statuses = [
+                json.loads(line)
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if gh_log.exists() else []
+            requests = [
+                json.loads(line)
+                for line in curl_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if curl_log.exists() else []
+            return completed, statuses, requests
+
+
+    def _run_gate_shell(
+        self,
+        *,
+        pr_number,
+        head_sha,
+        statuses_by_head,
+        workflow_runs,
+        gate_now=2_000_000_000,
+        force=False,
+    ):
+        'Run the workflow Gate step with local GitHub API and clock fixtures.'
+        workflow = POKE.read_text(encoding="utf-8")
+        start = workflow.index("      - name: Gate duplicate, merged, closed, and cooldown keys\n")
+        end = workflow.index("      - name: Poke Hyperagent CI remediator\n", start)
+        step = workflow[start:end]
+        script = step.split("        run: |\n", 1)[1]
+        script = "\n".join(
+            line[10:] if line.startswith(" " * 10) else line
+            for line in script.splitlines()
+        ) + "\n"
+
+        with tempfile.TemporaryDirectory(prefix="ha-gate-fixture-") as directory:
+            root = pathlib.Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            statuses_path = root / "statuses.json"
+            statuses_path.write_text(json.dumps(statuses_by_head), encoding="utf-8")
+            runs_path = root / "runs.json"
+            runs_path.write_text(json.dumps({"workflow_runs": workflow_runs}), encoding="utf-8")
+            gh_log = root / "gh.jsonl"
+            output_path = root / "github-output"
+
+            gh_fixture = bin_dir / "gh"
+            gh_fixture.write_text(
+                '''#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+endpoint = args[1] if len(args) > 1 and args[0] == "api" else ""
+with open(os.environ["GH_GATE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(json.dumps({"args": args, "endpoint": endpoint}) + "\\n")
+if "/pulls/" in endpoint:
+    print(json.dumps({
+        "merged": os.environ.get("GATE_PR_MERGED") == "true",
+        "state": os.environ.get("GATE_PR_STATE", "open"),
+    }))
+elif "/commits/" in endpoint and "/statuses" in endpoint:
+    head = endpoint.split("/commits/", 1)[1].split("/statuses", 1)[0]
+    with open(os.environ["GATE_STATUS_MAP"], encoding="utf-8") as handle:
+        status_map = json.load(handle)
+    print(json.dumps(status_map.get(head, [])))
+elif "/actions/workflows/ha-ci-remediator-poke.yml/runs" in endpoint:
+    with open(os.environ["GATE_RUNS"], encoding="utf-8") as handle:
+        print(handle.read())
+else:
+    print("{}")
+''',
+                encoding="utf-8",
+            )
+            date_fixture = bin_dir / "date"
+            date_fixture.write_text(
+                '''#!/usr/bin/env python3
+import os
+import sys
+
+if sys.argv[1:] == ["-u", "+%s"]:
+    print(os.environ["GATE_NOW"])
+else:
+    raise SystemExit("unexpected date invocation")
+''',
+                encoding="utf-8",
+            )
+            gh_fixture.chmod(0o755)
+            date_fixture.chmod(0o755)
+
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{bin_dir}:{environment['PATH']}",
+                    "GH_GATE_LOG": str(gh_log),
+                    "GATE_STATUS_MAP": str(statuses_path),
+                    "GATE_RUNS": str(runs_path),
+                    "GATE_NOW": str(gate_now),
+                    "GITHUB_OUTPUT": str(output_path),
+                    "GH_TOKEN": "fixture-token",
+                    "PR_NUMBER": str(pr_number),
+                    "HEAD_SHA": head_sha,
+                    "FORCE": "true" if force else "false",
+                    "REPO": "JovieInc/Jovie",
+                    "RUN_ID": "999999",
+                    "GATE_PR_STATE": "open",
+                    "GATE_PR_MERGED": "false",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", script],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            output = output_path.read_text(encoding="utf-8") if output_path.exists() else ""
+            calls = [
+                json.loads(line)
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if line
+            ] if gh_log.exists() else []
+            return completed, output, calls
+
+    def test_poke_persists_valid_202_run_id_and_exact_payload_fingerprint(self):
+        run_id = "r" * 48
+        completed, statuses, requests = self._run_poke_shell(
+            json.dumps({"runId": run_id, "status": "accepted"}).encode(), 202
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "success"])
+        payload = requests[0]["payload"]
+        fingerprint = hashlib.sha256(payload.encode()).hexdigest()
+        description = statuses[-1]["fields"]["description"]
+        self.assertEqual(
+            description,
+            f"ha-receipt accepted run={run_id} fp={fingerprint}",
+        )
+        self.assertLessEqual(len(description), 140)
+
+    def test_poke_preserves_pending_for_missing_malformed_and_wrong_202_bodies(self):
+        fixtures = (
+            b"",
+            b"not-json",
+            b'{"status":"accepted"}',
+            b'{"runId":"provider-run-123","status":"running"}',
+            json.dumps({"runId": "provider-run-123\n", "status": "accepted"}).encode(),
+            json.dumps({"runId": "provider-run-123\x00123", "status": "accepted"}).encode(),
+            json.dumps({"runId": "r" * 49, "status": "accepted"}).encode(),
+        )
+        for response_body in fixtures:
+            with self.subTest(response_body=response_body):
+                completed, statuses, requests = self._run_poke_shell(response_body, 202)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(len(requests), 1)
+                self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending"])
+                description = statuses[0]["fields"]["description"]
+                self.assertIn("ha-receipt pending fp=", description)
+                self.assertNotIn("accepted run=", description)
+
+    def test_poke_fails_closed_when_accepted_receipt_cannot_persist(self):
+        completed, statuses, requests = self._run_poke_shell(
+            b'{"runId":"provider-run-123","status":"accepted"}',
+            202,
+            fail_success=True,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "success"])
+        self.assertTrue(statuses[0]["persisted"])
+        self.assertFalse(statuses[1]["persisted"])
+        self.assertIn("failing closed", completed.stdout)
+
+    def test_gate_cooldown_protects_failed_attempts_and_non_202_is_not_replayed(self):
+        completed, statuses, requests = self._run_poke_shell(
+            b'{"error":"temporarily unavailable"}', 503
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual([entry["fields"]["state"] for entry in statuses], ["pending", "failure"])
+        payload = requests[0]["payload"]
+        fingerprint = hashlib.sha256(payload.encode()).hexdigest()
+        self.assertIn(f"http=503 fp={fingerprint}", statuses[-1]["fields"]["description"])
+
+        old_head = "a" * 40
+        new_head = "b" * 40
+        gate_now = 2_000_000_000
+
+        def created_at(age):
+            return datetime.fromtimestamp(gate_now - age, timezone.utc).isoformat().replace("+00:00", "Z")
+
+        def workflow_run(pr_number=18003, age=100, status="completed", conclusion="failure"):
+            return {
+                "id": 1234,
+                "display_title": f"ha-remediate/PR{pr_number}/{old_head}",
+                "status": status,
+                "conclusion": conclusion,
+                "created_at": created_at(age),
+            }
+
+        accepted_failed, accepted_statuses, accepted_requests = self._run_poke_shell(
+            b'{"runId":"provider-run-123","status":"accepted"}',
+            202,
+            fail_success=True,
+        )
+        self.assertEqual(accepted_failed.returncode, 1)
+        self.assertEqual(len(accepted_requests), 1)
+        old_pending = [
+            {
+                "context": entry["fields"]["context"],
+                "state": entry["fields"]["state"],
+                "description": entry["fields"]["description"],
+                "target_url": entry["fields"]["target_url"],
+            }
+            for entry in accepted_statuses
+            if entry["persisted"] and entry["fields"]["state"] == "pending"
+        ]
+        self.assertEqual(len(old_pending), 1)
+
+        # Cross-step regression: an accepted provider delivery followed by a
+        # failed success-receipt write produces a failed workflow run and an
+        # old-head pending receipt. A new head must still be held by cooldown.
+        cross_step, output, calls = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={old_head: old_pending, new_head: []},
+            workflow_runs=[workflow_run(conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(cross_step.returncode, 0, cross_step.stderr)
+        self.assertNotIn("proceed=true", output)
+        self.assertTrue(any("/actions/workflows/ha-ci-remediator-poke.yml/runs" in call["endpoint"] for call in calls))
+        self.assertTrue(all(call["args"][0] == "api" for call in calls))
+
+        same_head, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=old_head,
+            statuses_by_head={old_head: old_pending},
+            workflow_runs=[],
+            gate_now=gate_now,
+        )
+        self.assertEqual(same_head.returncode, 0, same_head.stderr)
+        self.assertNotIn("proceed=true", output)
+
+        for conclusion in ("success", "failure", "cancelled", "timed_out", None, "unknown"):
+            with self.subTest(conclusion=conclusion):
+                completed_run, output, _ = self._run_gate_shell(
+                    pr_number=18003,
+                    head_sha=new_head,
+                    statuses_by_head={new_head: []},
+                    workflow_runs=[workflow_run(conclusion=conclusion)],
+                    gate_now=gate_now,
+                )
+                self.assertEqual(completed_run.returncode, 0, completed_run.stderr)
+                self.assertNotIn("proceed=true", output)
+
+        for status in ("queued", "in_progress"):
+            with self.subTest(status=status):
+                active_run, output, _ = self._run_gate_shell(
+                    pr_number=18003,
+                    head_sha=new_head,
+                    statuses_by_head={new_head: []},
+                    workflow_runs=[workflow_run(status=status, age=10_000, conclusion=None)],
+                    gate_now=gate_now,
+                )
+                self.assertEqual(active_run.returncode, 0, active_run.stderr)
+                self.assertNotIn("proceed=true", output)
+
+        exact_boundary, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(age=2700, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(exact_boundary.returncode, 0, exact_boundary.stderr)
+        self.assertNotIn("proceed=true", output)
+
+        expired, output, _ = self._run_gate_shell(
+            pr_number=18003,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(age=2701, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(expired.returncode, 0, expired.stderr)
+        self.assertIn("proceed=true", output)
+
+        isolated, output, _ = self._run_gate_shell(
+            pr_number=18004,
+            head_sha=new_head,
+            statuses_by_head={new_head: []},
+            workflow_runs=[workflow_run(pr_number=18003, age=100, conclusion="failure")],
+            gate_now=gate_now,
+        )
+        self.assertEqual(isolated.returncode, 0, isolated.stderr)
+        self.assertIn("proceed=true", output)
 
 
 if __name__ == "__main__":

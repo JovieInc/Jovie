@@ -19,7 +19,11 @@ name: HA CI remediator poke
 #     poke-run Actions `head_sha` is the default-branch tip that holds this file,
 #     not the failing PR head, so that filter stays ~0.
 #   - `force: true` on workflow_dispatch is the only bounded-retry escape hatch.
-#   - Successful HTTP 202 writes the status receipt; non-202 must stay retryable.
+#   - HTTP 202 is accepted only for delivery. When its documented JSON body is
+#     valid (`{runId:string,status:"accepted"}`), persist that exact runId and
+#     the SHA-256 fingerprint of the exact sent payload in the existing receipt.
+#     Missing or malformed 202 bodies remain pending/unknown; they never invent
+#     an identifier or unlock a retry. Non-202 retains the existing failure receipt.
 run-name: ha-remediate/PR${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}/${{ github.event.workflow_run.head_sha || github.sha }}
 on:
   workflow_run:
@@ -101,7 +105,7 @@ jobs:
                     | select(
                         (.status == "in_progress" or .status == "queued")
                         or (
-                          .conclusion == "success"
+                          .status == "completed"
                           and ((.created_at | fromdateiso8601) as $created | ($now - $created) <= 2700)
                         )
                       )
@@ -148,8 +152,6 @@ jobs:
               -f target_url="$RUN_URL"
           }
 
-          write_receipt pending "HA remediator poke in flight"
-
           payload=$(jq -n \
             --arg repo "$REPO" \
             --arg pr_number "$PR_NUMBER" \
@@ -158,6 +160,12 @@ jobs:
             --arg event "$EVENT" \
             --arg idempotency_key "ha-ci-remediator:${REPO}:PR${PR_NUMBER}:${HEAD_SHA}" \
             '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke", idempotency_key: $idempotency_key}')
+
+          # GitHub commit-status descriptions are capped at 140 characters.
+          # Keep the full payload digest and accept only run IDs short enough
+          # to persist losslessly; never truncate a provider identifier.
+          payload_fingerprint=$(printf '%s' "$payload" | sha256sum | cut -d' ' -f1)
+          write_receipt pending "ha-receipt pending fp=$payload_fingerprint"
 
           timestamp=$(date -u +%s)
           signature=$(printf '%s.%s' "$timestamp" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
@@ -174,12 +182,36 @@ jobs:
           if [ "$http_code" != "202" ]; then
             echo "::error::Hyperagent CI webhook returned HTTP $http_code (expected 202). Response:"
             cat /tmp/hyperagent-response
-            write_receipt failure "HA remediator poke failed HTTP $http_code" || true
+            write_receipt failure "ha-receipt failed http=$http_code fp=$payload_fingerprint" || true
             exit 1
           fi
 
-          if ! write_receipt success "HA remediator poke delivered"; then
-            echo "::warning::Failed to write ha-ci-remediator-poke commit status for $HEAD_SHA after HTTP 202."
+          response_run_id=""
+          # Validate the provider string before jq -r extraction. The shell
+          # command substitution strips trailing newlines and NULs, so accepting
+          # them here would persist an altered runId rather than the response.
+          if jq -e \
+            'type == "object" and .status == "accepted" and (.runId | type == "string") and ((.runId | length) > 0) and ((.runId | length) <= 48) and ((.runId | test("[^A-Za-z0-9._:/-]") | not))' \
+            /tmp/hyperagent-response >/dev/null 2>&1; then
+            response_run_id=$(jq -r '.runId' /tmp/hyperagent-response)
           fi
 
-          echo "::notice::Hyperagent CI remediator poke accepted (HTTP 202)."
+          run_id_valid=true
+          if [ -z "$response_run_id" ] || [ "${#response_run_id}" -gt 48 ]; then
+            run_id_valid=false
+          else
+            case "$response_run_id" in
+              *[!A-Za-z0-9._:/-]*) run_id_valid=false ;;
+            esac
+          fi
+          if [ "$run_id_valid" != "true" ]; then
+            echo "::warning::Hyperagent returned HTTP 202 without a bounded accepted runId; preserving the pending receipt as accepted-but-unbound/unknown."
+            exit 0
+          fi
+
+          if ! write_receipt success "ha-receipt accepted run=$response_run_id fp=$payload_fingerprint"; then
+            echo "::error::Failed to persist the accepted Hyperagent runId and payload fingerprint for $HEAD_SHA after HTTP 202; keeping the pending receipt and failing closed."
+            exit 1
+          fi
+
+          echo "::notice::Hyperagent CI remediator poke accepted (HTTP 202); HA remediator poke delivered with provider runId; terminal outcome remains unknown."

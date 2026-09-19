@@ -116,7 +116,8 @@ def test_per_pr_cooldown_uses_run_name_not_actions_head_sha() -> None:
     assert "runs?per_page=30" in workflow
     assert "<= 2700" in workflow
     assert '.status == "in_progress" or .status == "queued"' in workflow
-    assert '.conclusion == "success"' in workflow
+    assert '.status == "completed"' in workflow
+    assert '.conclusion == "success"' not in workflow
     assert "remediator already poked for this PR within cooldown / in flight" in workflow
     assert "display_title" in workflow
 
