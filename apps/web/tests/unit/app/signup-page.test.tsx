@@ -70,7 +70,8 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
-vi.mock('@/lib/auth/plan-intent', () => ({
+vi.mock('@/lib/auth/plan-intent', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/auth/plan-intent')>()),
   setPlanIntent: setPlanIntentMock,
   validatePlan: validatePlanMock,
 }));
@@ -107,10 +108,33 @@ describe('signup page', () => {
     sessionStorage.clear();
     trackMock.mockReset();
     validatePlanMock.mockReset();
-    validatePlanMock.mockImplementation(plan => plan);
+    validatePlanMock.mockImplementation(plan =>
+      ['free', 'pro', 'max', 'team', 'enterprise'].includes(plan) ? plan : null
+    );
     document.cookie =
       '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     globalThis.history.replaceState(null, '', '/signup');
+  });
+
+  it('does not overwrite offer extras while capturing the signup claim', () => {
+    searchParamsState.value = 'plan=pro&interval=monthly&artist=Tim%20White';
+    render(<SignUpPageClient />);
+    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', {
+      interval: 'monthly',
+      artist: 'Tim White',
+    });
+    expect(persistSignupClaimValueMock).toHaveBeenCalledWith(
+      'signup_artist_name',
+      'Tim White',
+      expect.any(Number)
+    );
+  });
+
+  it('keeps a recovered artist claim when signup resumes without query context', () => {
+    render(<SignUpPageClient />);
+    expect(clearSignupClaimValueMock).not.toHaveBeenCalledWith(
+      'signup_artist_name'
+    );
   });
 
   it('renders AuthShell with the expected auth props', () => {

@@ -2,6 +2,11 @@ import { AUTH_STATE_PARAM } from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
+  type AuthOfferHandoff,
+  readAuthOfferHandoff,
+  resolveAuthenticatedOfferRedirect,
+} from './auth-shell-offer';
+import {
   CanonicalUserState,
   getRedirectForState,
 } from './canonical-user-state';
@@ -48,6 +53,8 @@ export function getAuthenticatedAuthRouteRedirect(
   options?: {
     readonly redirectUrl?: string | null;
     readonly authState?: string | null;
+    readonly offerHandoff?: AuthOfferHandoff | null;
+    readonly isPaidSubscriber?: boolean;
   }
 ): string {
   const sanitizedRedirect = sanitizeRedirectUrl(options?.redirectUrl ?? null);
@@ -78,11 +85,53 @@ export function getAuthenticatedAuthRouteRedirect(
     return stateRedirect;
   }
 
+  // A paid offer link must not send an existing subscriber into a new checkout,
+  // even when the original CTA includes an explicit checkout return target.
+  if (
+    options?.isPaidSubscriber &&
+    options.offerHandoff &&
+    options.offerHandoff.plan !== 'free'
+  ) {
+    return APP_ROUTES.SETTINGS_BILLING;
+  }
+
   if (sanitizedRedirect && !isAuthEntryRedirect(sanitizedRedirect)) {
     return sanitizedRedirect;
   }
 
-  return APP_ROUTES.DASHBOARD;
+  return (
+    resolveAuthenticatedOfferRedirect({
+      handoff: options?.offerHandoff ?? null,
+      isPaidSubscriber: options?.isPaidSubscriber,
+    }) ?? APP_ROUTES.DASHBOARD
+  );
+}
+
+export type AuthEntryPageSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
+export function getAuthEntrySearchParam(
+  params: AuthEntryPageSearchParams,
+  key: string
+): string | null {
+  const value = params[key];
+  return typeof value === 'string' ? value : null;
+}
+
+export function getAuthenticatedAuthEntryRedirectFromParams(
+  state: CanonicalUserState,
+  params: AuthEntryPageSearchParams,
+  options?: { readonly isPaidSubscriber?: boolean }
+): string {
+  const get = (key: string) => getAuthEntrySearchParam(params, key);
+  return getAuthenticatedAuthRouteRedirect(state, {
+    redirectUrl: get('redirect_url'),
+    authState: get('auth_state'),
+    offerHandoff: readAuthOfferHandoff({ get }),
+    isPaidSubscriber: options?.isPaidSubscriber,
+  });
 }
 
 type AuthEntrySearchParams = {
