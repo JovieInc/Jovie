@@ -134,6 +134,8 @@ export function classifyJevShadow({
     try {
       const raw = evaluate({ claim, evidence, model: resolvedModel });
       if (raw && typeof raw.then === 'function') {
+        // This synchronous classifier cannot use async advice, but owns its rejection.
+        void Promise.resolve(raw).catch(() => {});
         alignment = 'insufficient';
         reason = 'async Jev transport is not bound in this shadow';
         issues.push(reason);
