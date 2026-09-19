@@ -7,12 +7,17 @@ import {
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
-  NATIVE_QUEUE_ACTION,
   nativeQueueEnrollPlan,
   readCapturedMergeQueueEntryId,
   selectGreenReadyPrs,
   WAITING_DURABLE_ORACLE,
 } from './native-queue-starvation-execute.mjs';
+
+import {
+  configFromEnvironment,
+  createExecutionDelivery,
+  createFileJournal,
+} from './summer-symphony-outbox-consumer.mjs';
 
 const IN_PROGRESS = '721e032a-fe72-4374-9a61-d9976d079e1e';
 const DONE = 'a95b08f1-61f8-438f-ba39-ebd8f8ae6471';
@@ -352,24 +357,34 @@ const issueIdentifier = process.argv[3];
 const sourceVersion = process.argv[4];
 const snapshotDigest = process.argv[5];
 const fleetPath = process.argv[6];
-const action = process.argv[7] || NATIVE_QUEUE_ACTION;
+const action = process.argv[7];
 if (
   !taskKey ||
   !issueIdentifier ||
   !sourceVersion ||
   !snapshotDigest ||
-  !fleetPath
+  !fleetPath ||
+  !action
 ) {
   throw new Error(
-    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> [action]'
+    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> <action>'
   );
 }
 
+const config = configFromEnvironment();
+const delivery = createExecutionDelivery(
+  createFileJournal(config.workspace, config.keys, config.outcomePublicKey),
+  { taskKey, issueIdentifier, sourceVersion, snapshotDigest, action },
+  config
+);
+const retainedRecord = delivery.begin();
 const result = await executeNativeQueueStarvation({
+  delivery,
+  retainedRecord,
   taskKey,
   issueIdentifier,
   source: { sourceVersion, snapshotDigest },
-  admission: { ...fleetAdmission(fleetPath), action },
+  admission: { ...(retainedRecord ? {} : fleetAdmission(fleetPath)), action },
   signatureKeyId: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID'),
   privateKeyPem: required(
     'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
@@ -394,3 +409,6 @@ process.stdout.write(
     decision: result.decision,
   })}\n`
 );
+
+// Delivery is incomplete until Summer accepts the correlated execution.
+if (result.status !== 'execution-recorded') process.exitCode = 1;
