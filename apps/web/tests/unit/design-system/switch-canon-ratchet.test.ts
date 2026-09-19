@@ -42,6 +42,11 @@ describe('Switch canonicalization ratchet', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps switch semantics on the canonical owner', () => {
+    const detached = filesWithRawSwitchRoles();
+    expect(detached).toEqual([]);
+  });
+
   it('keeps the Radix switch dependency owned by the shared UI package', () => {
     const webPackage = JSON.parse(
       readFileSync(join(REPO_ROOT, 'apps/web/package.json'), 'utf8')
@@ -54,3 +59,16 @@ describe('Switch canonicalization ratchet', () => {
     expect(uiPackage.dependencies?.['@radix-ui/react-switch']).toBeDefined();
   });
 });
+
+function filesWithRawSwitchRoles(): string[] {
+  const files: string[] = [];
+  for (const dir of RUNTIME_SOURCE_DIRS) walk(dir, files);
+
+  return files
+    .filter(file => !file.endsWith(SWITCH_OWNER))
+    .filter(file => !/\.(stories|test)\.(tsx?|jsx?)$/.test(file))
+    .filter(file =>
+      /role\s*=\s*['"]switch['"]/.test(readFileSync(file, 'utf8'))
+    )
+    .map(file => relative(REPO_ROOT, file).replaceAll('\\', '/'));
+}

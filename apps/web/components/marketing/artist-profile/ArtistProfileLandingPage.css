@@ -1846,7 +1846,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
     border-color var(--system-b-duration-fast) var(--system-b-ease);
 }
 
-:where(.system-b-pricing-switch[data-state="annual"]) {
+:where(.system-b-pricing-switch[data-state="checked"]) {
   border-color: color-mix(
     in oklab,
     var(--system-b-accent-cyan) 38%,
@@ -1862,7 +1862,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-switch-thumb) {
   position: absolute;
   top: var(--space-0-5);
-  left: var(--space-0-5);
+  inset-inline-start: var(--space-0-5);
   width: var(--space-5);
   height: var(--space-5);
   border-radius: var(--radius-full);
@@ -1871,9 +1871,17 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(
-  .system-b-pricing-switch[data-state="annual"] .system-b-pricing-switch-thumb
+  .system-b-pricing-switch[data-state="checked"] .system-b-pricing-switch-thumb
 ) {
   transform: translateX(calc(var(--space-5) - var(--space-0-5)));
+}
+
+:where(
+  [dir="rtl"]
+    .system-b-pricing-switch[data-state="checked"]
+    .system-b-pricing-switch-thumb
+) {
+  transform: translateX(calc(var(--space-0-5) - var(--space-5)));
 }
 
 :where(.system-b-pricing-chart-badge) {
