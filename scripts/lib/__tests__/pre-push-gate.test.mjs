@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -8,8 +9,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const resolverPath = resolve(repoRoot, 'scripts/hooks/resolve-repo-node.sh');
@@ -192,4 +194,209 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
     expect(setupSh).toContain('config core.sshCommand');
     expect(huskyPrePush).toContain('SIGPIPE');
   });
+});
+
+describe('publication range failures', () => {
+  const fixtures = [];
+
+  afterEach(() => {
+    for (const root of fixtures.splice(0)) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function fixture({
+    missingBase = false,
+    unrelated = false,
+    empty = false,
+  } = {}) {
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-publication-range-'));
+    fixtures.push(root);
+    const bin = resolve(root, 'bin');
+    mkdirSync(bin);
+    const env = {
+      PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+      HOME: root,
+      GIT_CONFIG_COUNT: '3',
+      GIT_CONFIG_KEY_0: 'maintenance.auto',
+      GIT_CONFIG_VALUE_0: 'false',
+      GIT_CONFIG_KEY_1: 'maintenance.autoDetach',
+      GIT_CONFIG_VALUE_1: 'false',
+      GIT_CONFIG_KEY_2: 'gc.auto',
+      GIT_CONFIG_VALUE_2: '0',
+      GITLEAKS_BIN: resolve(bin, 'gitleaks'),
+      TRUFFLEHOG_BIN: resolve(bin, 'trufflehog'),
+      SCAN_LOG: resolve(root, 'scan.log'),
+    };
+    const git = (...args) => {
+      const result = spawnSync('/usr/bin/git', args, {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    for (const name of ['gitleaks', 'trufflehog']) {
+      const file = resolve(bin, name);
+      writeFileSync(
+        file,
+        `#!/bin/sh\nprintf '%s\\n' '${name}' "$*" >> "$SCAN_LOG"\n[ "\${SCAN_FAILURE:-}" != '${name}' ]\n`
+      );
+      chmodSync(file, 0o755);
+    }
+    for (const file of [
+      'scripts/hooks/pre-push-gate.sh',
+      'scripts/hooks/resolve-repo-node.sh',
+      'scripts/security/scan-secrets.sh',
+      '.nvmrc',
+    ]) {
+      mkdirSync(dirname(resolve(root, file)), { recursive: true });
+      copyFileSync(resolve(repoRoot, file), resolve(root, file));
+    }
+    for (const file of [
+      'scripts/ci-branching-guard.mjs',
+      'scripts/lib/policy-gate-liveness.mjs',
+      'scripts/hooks/pre-push-gate.test.mjs',
+    ]) {
+      mkdirSync(dirname(resolve(root, file)), { recursive: true });
+      writeFileSync(resolve(root, file), '');
+    }
+    git('init', '-q');
+    git('config', 'user.name', 'Fixture');
+    git('config', 'user.email', 'fixture@example.invalid');
+    writeFileSync(resolve(root, 'seed.txt'), 'seed\n');
+    git('add', 'seed.txt');
+    git('commit', '-qm', 'seed');
+    if (!missingBase) git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    if (!empty) {
+      writeFileSync(resolve(root, 'candidate.txt'), 'candidate\n');
+      git('add', 'candidate.txt');
+      git('commit', '-qm', 'candidate');
+    }
+    if (unrelated) {
+      git('checkout', '--orphan', 'unrelated');
+      git('commit', '-qm', 'unrelated root');
+    }
+    return {
+      root,
+      env,
+      run(script, extraEnv = {}) {
+        return spawnSync(
+          '/bin/bash',
+          ['-x', resolve(root, script), 'publication', 'origin/main'],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            env: { ...env, PS4: '+TRACE:${LINENO}: ', ...extraEnv },
+          }
+        );
+      },
+      scanLog() {
+        try {
+          return readFileSync(env.SCAN_LOG, 'utf8');
+        } catch (error) {
+          if (error.code === 'ENOENT') return '';
+          throw error;
+        }
+      },
+    };
+  }
+
+  it.each([
+    ['missing base', { missingBase: true }],
+    ['unrelated histories', { unrelated: true }],
+  ])(
+    'rejects %s before either publication scanner can report success',
+    (_label, options) => {
+      const f = fixture(options);
+      for (const script of [
+        'scripts/hooks/pre-push-gate.sh',
+        'scripts/security/scan-secrets.sh',
+      ]) {
+        const result = f.run(script);
+        expect(result.status, result.stdout + result.stderr).not.toBe(0);
+        expect(f.scanLog()).toBe('');
+        expect(result.stdout).not.toContain('PASS: secret scan');
+      }
+    }
+  );
+
+  it('propagates a changed-file enumeration failure instead of accepting no files', () => {
+    const f = fixture();
+    const wrapper = resolve(f.root, 'bin/git');
+    writeFileSync(
+      wrapper,
+      '#!/bin/sh\nif [ "$1" = diff ] && [ "$2" = --name-only ]; then exit 7; fi\nexec /usr/bin/git "$@"\n'
+    );
+    chmodSync(wrapper, 0o755);
+    const result = f.run('scripts/security/scan-secrets.sh');
+    expect(result.status, result.stdout + result.stderr).not.toBe(0);
+    expect(result.stdout).not.toContain('PASS: secret scan');
+    expect(f.scanLog()).not.toContain('trufflehog');
+  });
+
+  it('scans a real candidate file through both scanners on a valid publication', () => {
+    const f = fixture();
+    for (const script of [
+      'scripts/hooks/pre-push-gate.sh',
+      'scripts/security/scan-secrets.sh',
+    ]) {
+      const result = f.run(script);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stdout).toContain('PASS: secret scan (publication)');
+    }
+    expect(f.scanLog()).toContain('gitleaks');
+    expect(f.scanLog()).toContain('trufflehog');
+    expect(f.scanLog()).toContain('candidate.txt');
+    expect(f.scanLog()).not.toContain('seed.txt');
+  });
+
+  it('accepts a verified empty range without confusing it with failed enumeration', () => {
+    const f = fixture({ empty: true });
+    for (const script of [
+      'scripts/hooks/pre-push-gate.sh',
+      'scripts/security/scan-secrets.sh',
+    ]) {
+      const result = f.run(script);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stdout).toContain('PASS: secret scan (publication)');
+    }
+    expect(f.scanLog()).toContain('gitleaks');
+    expect(f.scanLog()).not.toContain('trufflehog');
+  });
+
+  it.each(['gitleaks', 'trufflehog'])('preserves %s scan failures', scanner => {
+    const f = fixture();
+    const result = f.run('scripts/hooks/pre-push-gate.sh', {
+      SCAN_FAILURE: scanner,
+    });
+    expect(result.status, result.stdout + result.stderr).not.toBe(0);
+    expect(result.stdout).not.toContain('PASS: secret scan');
+  });
+});
+
+it('discovers publication behavior tests in CI for source-only guard edits', () => {
+  const workflow = readFileSync(
+    resolve(repoRoot, '.github/workflows/ci.yml'),
+    'utf8'
+  );
+  const pattern = workflow.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  expect(pattern).toBeTruthy();
+  for (const file of [
+    'scripts/hooks/pre-push-gate.sh',
+    'scripts/security/scan-secrets.sh',
+  ]) {
+    expect(
+      spawnSync('grep', ['-Eq', pattern], {
+        input: `${file}\n`,
+        encoding: 'utf8',
+      }).status
+    ).toBe(0);
+    const plan = buildAffectedTestPlan([file], { isFileAvailable: () => true });
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/pre-push-gate.test.mjs'
+    );
+  }
 });

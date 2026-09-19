@@ -153,13 +153,19 @@ run_trufflehog_pre_commit() {
 
 run_trufflehog_publication() {
   local -a changed_files=()
-  local file
+  local file changed_paths
+
+  # Process substitutions do not propagate git failures to this shell.
+  if ! changed_paths="$(git diff --name-only --diff-filter=ACMR "${BASE_REF}...HEAD")"; then
+    echo "::error title=Publication secret scan incomplete::Could not enumerate changed files; refusing an empty success." >&2
+    return 1
+  fi
 
   while IFS= read -r file; do
     if [[ -n "$file" && -f "$file" ]] && ! is_trufflehog_excluded "$file"; then
       changed_files+=("$file")
     fi
-  done < <(git diff --name-only --diff-filter=ACMR "${BASE_REF}...HEAD")
+  done <<<"$changed_paths"
 
   if [[ ${#changed_files[@]} -eq 0 ]]; then
     echo "No changed files for draft-publication trufflehog scan."
@@ -413,6 +419,15 @@ usage() {
   echo "Usage: $0 {pre-commit|publication|ci-pr|ci-pr-trufflehog|full|full-trufflehog} [base-ref]" >&2
   exit 1
 }
+
+# Validate before scanner startup: an unresolved or unrelated base is not an
+# empty publication, even when a scanner exits successfully with zero findings.
+if [[ "$MODE" == publication ]]; then
+  if ! git merge-base "$BASE_REF" HEAD >/dev/null; then
+    echo "::error title=Publication secret scan range unavailable::Fetch the base and restore shared history before publishing." >&2
+    exit 1
+  fi
+fi
 
 ensure_gitleaks
 ensure_trufflehog
