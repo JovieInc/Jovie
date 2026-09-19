@@ -28,6 +28,8 @@ export interface UserBillingFields {
   stripeSubscriptionId: string | null;
   /** Stripe price ID associated with the active subscription */
   stripePriceId: string | null;
+  /** Timestamp when the user's current trial ends */
+  trialEndsAt: Date | null;
   /** Optimistic locking version for concurrent update protection */
   billingVersion: number;
   /** Timestamp of the last processed billing event for event ordering */
@@ -77,6 +79,7 @@ export const BILLING_FIELDS_FULL = [
   'stripeCustomerId',
   'stripeSubscriptionId',
   'stripePriceId',
+  'trialEndsAt',
   'billingVersion',
   'lastBillingEventAt',
 ] as const satisfies readonly UserBillingFieldKey[];
@@ -118,6 +121,7 @@ export const LEGACY_FIELDS: readonly UserBillingFieldKey[] = [
   'stripeCustomerId',
   'stripeSubscriptionId',
   'stripePriceId',
+  'trialEndsAt',
 ] as const;
 
 /**
@@ -131,6 +135,8 @@ export type BillingAuditEventType =
   | 'subscription_downgraded'
   | 'payment_succeeded'
   | 'payment_failed'
+  | 'charge_refunded'
+  | 'charge_disputed'
   | 'reconciliation_fix'
   | 'customer_created'
   | 'customer_linked';
@@ -239,6 +245,7 @@ export function buildSelectObject<T extends readonly UserBillingFieldKey[]>(
     stripeCustomerId: users.stripeCustomerId,
     stripeSubscriptionId: users.stripeSubscriptionId,
     stripePriceId: users.stripePriceId,
+    trialEndsAt: users.trialEndsAt,
     billingVersion: users.billingVersion,
     lastBillingEventAt: users.lastBillingEventAt,
   } as const;

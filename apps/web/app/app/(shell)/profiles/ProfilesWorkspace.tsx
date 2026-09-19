@@ -15,7 +15,6 @@ import {
   CircleX,
   ExternalLink,
   Globe2,
-  LockKeyhole,
   MoreHorizontal,
   Orbit,
   Plus,
@@ -66,6 +65,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
+  getPresenceEntityName,
+  getPresenceHandle,
+  getPresencePlatformLabel,
+} from '@/lib/profile-surfaces/presence-identity';
+import {
   filterProfileWorkspaceRows,
   formatProfileRankChange,
   getConnectionPrimaryAction,
@@ -87,6 +91,12 @@ import type {
   ProfileWorkspaceRow,
   ProfileWorkspaceSurfaceRow,
 } from './data';
+import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
+import { PresenceLockAffordance } from './PresenceLockAffordance';
+import {
+  PresenceOutcomeStrip as PresenceOutcomeBoard,
+  presenceFilterForGroup,
+} from './PresenceOutcomes';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested';
@@ -505,27 +515,26 @@ function StatusCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
 const MONITORING_LABELS = {
   active: 'Active',
   paused: 'Paused',
-  locked: 'Requires Upgrade',
+  locked: 'Restricted',
   unavailable: 'Unavailable',
 } as const;
 
 function MonitoringCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const monitoringState = row.monitoringState;
+  if (monitoringState === 'locked') {
+    return <PresenceLockAffordance />;
+  }
   return (
     <span className='inline-flex min-w-20 items-center gap-1.5 text-xs text-secondary-token'>
-      {monitoringState === 'locked' ? (
-        <LockKeyhole className='h-3 w-3' aria-hidden />
-      ) : (
-        <span
-          className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            monitoringState === 'active' && 'bg-success',
-            monitoringState === 'paused' && 'bg-warning',
-            monitoringState === 'unavailable' && 'bg-disabled'
-          )}
-          aria-hidden
-        />
-      )}
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          monitoringState === 'active' && 'bg-success',
+          monitoringState === 'paused' && 'bg-warning',
+          monitoringState === 'unavailable' && 'bg-disabled'
+        )}
+        aria-hidden
+      />
       {MONITORING_LABELS[monitoringState]}
     </span>
   );
@@ -536,18 +545,7 @@ function RankCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
     return <EmptyCell tooltip='Search rank is not available for connectors.' />;
   }
   if (row.monitoringState === 'locked') {
-    return (
-      <SimpleTooltip content='Upgrade required to monitor this page.'>
-        <span
-          role='img'
-          aria-label='Rank Unavailable. Upgrade Required.'
-          className='inline-flex items-center gap-1 text-tertiary-token'
-        >
-          <LockKeyhole className='h-3 w-3' aria-hidden />
-          <span>—</span>
-        </span>
-      </SimpleTooltip>
-    );
+    return <PresenceLockAffordance />;
   }
   if (row.rank === null) {
     return <EmptyCell tooltip='No rank has been measured yet.' />;
@@ -586,20 +584,36 @@ function ConnectionRail({
         row ? (
           <EntityHeaderCard
             image={
-              <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-                <ConnectionBrandIcon row={row} className='h-6 w-6' emphasized />
-              </div>
+              row.rowType === 'connector' ? (
+                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
+                  <ConnectionBrandIcon
+                    row={row}
+                    className='h-6 w-6'
+                    emphasized
+                  />
+                </div>
+              ) : (
+                <PresenceIdentityPhoto
+                  subject={row}
+                  artistName={data.artist.name}
+                  size='xl'
+                  showSource
+                />
+              )
             }
-            title={row.label}
-            subtitle={
-              <span className='flex min-w-0 items-center gap-1.5'>
-                <ConnectionTypeGlyph row={row} className='h-3 w-3' />
-                <span className='truncate'>
-                  {kindLabel(row)} · {data.artist.name}
-                </span>
-              </span>
+            title={getPresenceEntityName(row, data.artist.name)}
+            subtitle={getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+            meta={
+              <ShareableLinkRow
+                url={
+                  row.rowType === 'surface' && row.kind === 'social'
+                    ? (row.trackedUrl ?? row.url)
+                    : row.url
+                }
+                density='rail'
+                testId='profiles-rail-shareable-link'
+              />
             }
-            meta={<ConnectionUrlDisplay row={row} />}
             stableLayout
             titleLineClamp={1}
             subtitleLineClamp={1}
@@ -641,19 +655,9 @@ function ConnectionRail({
                 hint: rankChange === '—' ? 'No change yet' : rankChange,
               },
             ]}
-            footer={
-              <ShareableLinkRow
-                url={
-                  row.rowType === 'surface' && row.kind === 'social'
-                    ? (row.trackedUrl ?? row.url)
-                    : row.url
-                }
-                density='rail'
-                testId='profiles-rail-shareable-link'
-              />
-            }
+            footer={null}
             stableLayout
-            reserveFooterSlot
+            reserveFooterSlot={false}
             testId='profiles-rail-summary'
           />
           <DrawerSection title='Profile / Page' sectionKind='facts'>
@@ -741,8 +745,10 @@ const CANONICAL_SOURCE_DRILLS: ReadonlyArray<{
   readonly searchPath: string;
 }> = [
   { label: 'Genius', searchPath: 'https://genius.com/search?q=' },
+  // ui-casing-allow: canonical directory brand lockup
   { label: 'Last.fm', searchPath: 'https://www.last.fm/search?q=' },
   {
+    // ui-casing-allow: canonical directory brand lockup
     label: 'MusicBrainz',
     searchPath: 'https://musicbrainz.org/search?type=artist&query=',
   },
@@ -813,101 +819,6 @@ function PresenceSignalSection({
         ))}
       </ul>
     </DrawerSection>
-  );
-}
-
-function PresenceOutcomeStrip({
-  data,
-}: Readonly<{ data: ProfilesWorkspaceData }>) {
-  const publicProfileHref =
-    data.artist.isPublic && data.artist.username
-      ? `/${encodeURIComponent(data.artist.username)}`
-      : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
-  const monitoredPages =
-    data.monitoringLimit === null
-      ? String(data.monitoredCount)
-      : `${data.monitoredCount} of ${data.monitoringLimit}`;
-  const outcomes: ReadonlyArray<{
-    readonly label: string;
-    readonly value: string;
-    readonly detail: string;
-    readonly href?: string;
-  }> = [
-    {
-      label: 'Search Visibility',
-      value: !data.providerAvailable
-        ? 'Unavailable'
-        : data.bestJovieRank === null
-          ? 'Not Measured'
-          : `#${data.bestJovieRank}`,
-      detail: 'Ranking across public profile pages',
-    },
-    {
-      label: 'Answer Visibility',
-      value: data.artist.isPublic ? 'Published' : 'Draft',
-      detail: 'Structured artist facts and FAQs',
-      href: publicProfileHref,
-    },
-    {
-      label: 'Audience Quality',
-      value: 'Engagement Scored',
-      detail: 'Filter fans by source, segment, and activity',
-      href: APP_ROUTES.CONTACTS,
-    },
-    {
-      label: 'Monitored Pages',
-      value: monitoredPages,
-      detail: 'Profiles and pages tracked for changes',
-    },
-  ];
-
-  return (
-    <section
-      aria-label='Artist Presence Outcomes'
-      data-testid='presence-outcomes'
-      className='grid shrink-0 grid-cols-2 border-b border-subtle lg:grid-cols-4'
-    >
-      {outcomes.map(outcome => {
-        const content = (
-          <>
-            <span className='block text-2xs font-medium text-tertiary-token'>
-              {outcome.label}
-            </span>
-            <span className='mt-1 flex items-center gap-1.5 text-sm font-semibold text-primary-token'>
-              {outcome.value}
-              {outcome.href ? (
-                <ArrowUpRight
-                  className='h-3.5 w-3.5 text-tertiary-token'
-                  aria-hidden
-                />
-              ) : null}
-            </span>
-            <span className='mt-1 block text-2xs leading-4 text-tertiary-token'>
-              {outcome.detail}
-            </span>
-          </>
-        );
-        const className =
-          'min-h-22 border-b border-subtle px-3 py-3 text-left even:border-l lg:min-h-20 lg:border-b-0 lg:border-l lg:first:border-l-0';
-
-        return outcome.href ? (
-          <Link
-            key={outcome.label}
-            href={outcome.href}
-            className={cn(
-              className,
-              'transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'
-            )}
-          >
-            {content}
-          </Link>
-        ) : (
-          <div key={outcome.label} className={className}>
-            {content}
-          </div>
-        );
-      })}
-    </section>
   );
 }
 
@@ -1404,19 +1315,38 @@ export function ProfilesWorkspace({
           const row = context.row.original;
           return (
             <div className='flex min-w-0 items-center gap-2.5'>
-              <ConnectionBrandIcon
-                row={row}
-                className='h-5 w-5 shrink-0'
-                emphasized={selected?.id === row.id}
-              />
+              {row.rowType === 'connector' ? (
+                <ConnectionBrandIcon
+                  row={row}
+                  className='h-5 w-5 shrink-0'
+                  emphasized={selected?.id === row.id}
+                />
+              ) : (
+                <PresenceIdentityPhoto
+                  subject={row}
+                  artistName={data?.artist.name ?? row.label}
+                  size='lg'
+                />
+              )}
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
-                  {row.label}
+                  {getPresenceEntityName(row, data?.artist.name ?? row.label)}
                 </div>
-                <ConnectionUrlDisplay
-                  row={row}
-                  className='text-xs text-tertiary-token max-sm:hidden'
-                />
+                {row.rowType === 'connector' ? (
+                  <ConnectionUrlDisplay
+                    row={row}
+                    className='text-xs text-tertiary-token max-sm:hidden'
+                  />
+                ) : (
+                  <div
+                    className='truncate text-xs text-tertiary-token max-sm:hidden'
+                    title={
+                      getPresenceHandle(row) ?? getPresencePlatformLabel(row)
+                    }
+                  >
+                    {getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1516,7 +1446,7 @@ export function ProfilesWorkspace({
         },
       }),
     ],
-    [getContextMenuItems, selected?.id]
+    [data?.artist.name, getContextMenuItems, selected?.id]
   );
 
   useRegisterRightPanel(
@@ -1610,7 +1540,17 @@ export function ProfilesWorkspace({
         />
       }
     >
-      <PresenceOutcomeStrip data={data} />
+      <PresenceOutcomeBoard
+        data={data}
+        rows={rows}
+        onSelectGroup={group => {
+          setFilter(presenceFilterForGroup(group));
+          setSelected(null);
+        }}
+        onSelectRow={row => {
+          if (!row.id.startsWith('preview:')) setSelected(row);
+        }}
+      />
       {filter === 'suggested' ? (
         <SuggestedConnectionsReview
           groups={suggestedGroups}
@@ -1640,6 +1580,7 @@ export function ProfilesWorkspace({
           }}
           getContextMenuItems={getContextMenuItems}
           rowHeight={56}
+          containerClassName='min-h-0 flex-1'
           minWidth='390px'
           isRowSelected={row =>
             !row.id.startsWith('preview:') && selected?.id === row.id

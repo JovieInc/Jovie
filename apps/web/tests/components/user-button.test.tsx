@@ -58,6 +58,7 @@ import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { FALLBACK_VERIFIED_PRICE_LABEL } from '@/lib/billing/verified-upgrade';
 import {
   useBillingStatusQuery,
   useChatUsageQuery,
@@ -88,6 +89,7 @@ const mockUseRouter = vi.mocked(useRouter);
 const mockUsePathname = vi.mocked(usePathname);
 
 const originalLocation = window.location;
+const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
@@ -235,6 +237,18 @@ describe('UserButton billing actions', () => {
     });
   });
 
+  it('keeps the calm workspace identity and account menu together', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton calm showUserInfo profileHref='/adele' />);
+    expect(screen.getByText('Jovie workspace')).toBeVisible();
+    await userEvent.click(screen.getByText('Adele Adkins'));
+    expect(await screen.findByText('Settings')).toBeVisible();
+  });
+
   it('renders the compact trigger avatar on the canonical app frame size', () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
@@ -279,7 +293,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown menu to render
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -335,7 +349,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -383,7 +397,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();

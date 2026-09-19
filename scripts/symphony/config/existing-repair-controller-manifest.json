@@ -6,5 +6,6 @@
   "launcherRelativePath": ".local/bin/symphony-codex-exhausted.py",
   "releaseControllerRelativePath": ".local/bin/.symphony-codex-auth-fallback/current/symphony-codex-exhausted.py",
   "releaseValidatorRelativePath": ".local/bin/.symphony-codex-auth-fallback/current/existing_pr_repair.py",
+  "releaseResolverRelativePath": ".local/bin/.symphony-codex-auth-fallback/current/symphony-existing-repair-resolv.conf",
   "installer": "scripts/symphony/symphony-codex-exhausted.py install"
 }

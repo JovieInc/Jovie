@@ -337,14 +337,19 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
   });
 
-  it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
+  it('keeps the signed-in first render deterministic and does not blank after hydration', async () => {
     authState.isSignedIn = true;
 
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-ready="true"');
     expect(serverMarkup).toContain('Send sign-in code');
 
-    const { container } = render(<AuthShell mode='sign-in' />);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    render(<AuthShell mode='sign-up' />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /send sign-in code/i })
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
   });
 });

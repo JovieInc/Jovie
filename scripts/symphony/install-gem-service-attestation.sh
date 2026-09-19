@@ -87,9 +87,35 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/gem-service-attestation-${STAMP}"
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/state" "${UNIT_ROOT}"
 
 # Pause only the existing attestation timer; do not restart Symphony.
+timer_was_active=false
 if systemctl --user is-active --quiet "${TIMER}"; then
+  timer_was_active=true
   systemctl --user stop "${TIMER}"
 fi
+install_started=false
+install_complete=false
+finish_or_rollback() {
+  local status="$?" index target_path temporary
+  if [[ "${install_complete}" != true && "${install_started}" == true ]]; then
+    systemctl --user stop "${TIMER}" || true
+    for index in "${!TARGETS[@]}"; do
+      target_path="${TARGETS[$index]}"
+      if [[ -e "${BACKUP_DIR}/${index}.existed" ]]; then
+        temporary="${target_path}.rollback.$$"
+        cp -p "${BACKUP_DIR}/${index}" "${temporary}"
+        mv "${temporary}" "${target_path}"
+      else
+        rm -f "${target_path}"
+      fi
+    done
+    systemctl --user daemon-reload || true
+  fi
+  if [[ "${install_complete}" != true && "${timer_was_active}" == true ]]; then
+    systemctl --user start "${TIMER}" || true
+  fi
+  exit "${status}"
+}
+trap finish_or_rollback EXIT
 for _ in $(seq 1 30); do
   systemctl --user is-active --quiet "${SERVICE}" || break
   sleep 1
@@ -99,13 +125,19 @@ if systemctl --user is-active --quiet "${SERVICE}"; then
   exit 2
 fi
 
-for index in "${!RELATIVE_SOURCES[@]}"; do
-  source_path="${SOURCE_ROOT}/${RELATIVE_SOURCES[$index]}"
+for index in "${!TARGETS[@]}"; do
   target_path="${TARGETS[$index]}"
   if [[ -e "${target_path}" ]]; then
-    cp -a "${target_path}" "${BACKUP_DIR}/$(basename "${target_path}")"
+    cp -p "${target_path}" "${BACKUP_DIR}/${index}"
+    : >"${BACKUP_DIR}/${index}.existed"
   fi
-  install -D -m 0644 "${source_path}" "${target_path}"
+done
+install_started=true
+for index in "${!RELATIVE_SOURCES[@]}"; do
+  target_path="${TARGETS[$index]}"
+  temporary="${target_path}.install.$$"
+  install -D -m 0644 "${SOURCE_ROOT}/${RELATIVE_SOURCES[$index]}" "${temporary}"
+  mv "${temporary}" "${target_path}"
 done
 chmod 0755 "${GEM_ROOT}/scripts/emit-gem-service-attestation.py"
 
@@ -121,18 +153,12 @@ python3 "${GEM_ROOT}/scripts/emit-gem-service-attestation.py" \
 check_status=$?
 set -e
 if [[ "${check_status}" -ne 0 ]]; then
-  printf 'pre-install --check failed with exit %s; leaving timer stopped and backups in %s\n' \
+  printf 'pre-install --check failed with exit %s; restoring previous source and timer state from %s\n' \
     "${check_status}" "${BACKUP_DIR}" >&2
   exit "${check_status}"
 fi
 
 systemctl --user daemon-reload
-# Resume the same existing timer; this repo does not ship a replacement timer.
-if systemctl --user list-unit-files "${TIMER}" | grep -q "${TIMER}"; then
-  systemctl --user start "${TIMER}"
-else
-  printf 'warning: %s is not installed as a user unit; publisher files installed but timer not started\n' "${TIMER}" >&2
-fi
 
 # Publish one fresh observation for activation verify.
 set +e
@@ -149,4 +175,14 @@ if [[ "${publish_status}" -ne 0 ]]; then
   exit "${publish_status}"
 fi
 
+# Publish successfully before resuming the same timer. A failed publisher must
+# not leave a newly active timer reading files during source rollback.
+if systemctl --user list-unit-files "${TIMER}" | grep -q "${TIMER}"; then
+  systemctl --user start "${TIMER}"
+else
+  printf 'warning: %s is not installed as a user unit; publisher files installed but timer not started\n' "${TIMER}" >&2
+fi
+
 printf 'gem-service-attestation publisher installed (backup=%s)\n' "${BACKUP_DIR}"
+install_complete=true
+trap - EXIT

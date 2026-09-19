@@ -25,6 +25,7 @@ describe('avatar contract', () => {
       'xs',
       'sm',
       'md',
+      'sidebar',
       'lg',
       'xl',
       '2xl',
@@ -39,6 +40,7 @@ describe('avatar contract', () => {
     expect(getAvatarSizePx('xs')).toBe(16);
     expect(getAvatarSizePx('sm')).toBe(20);
     expect(getAvatarSizePx('md')).toBe(24);
+    expect(getAvatarSizePx('sidebar')).toBe(28);
     expect(getAvatarSizePx('lg')).toBe(32);
     expect(getAvatarSizePx('xl')).toBe(40);
     expect(getAvatarSizePx('2xl')).toBe(96);

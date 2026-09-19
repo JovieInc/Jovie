@@ -12,22 +12,26 @@ interface ThemeToggleSkeletonProps
   extends Readonly<{
     readonly appearance: 'icon' | 'segmented';
     readonly className?: string;
+    readonly size?: 'default' | 'footer';
   }> {}
 
 export function ThemeToggleSkeleton({
   appearance,
   className = '',
+  size = 'default',
 }: ThemeToggleSkeletonProps) {
   if (appearance === 'segmented') {
+    const buttonClass = size === 'footer' ? 'h-7 w-11 px-3' : 'h-7 w-7';
+    const containerClass = size === 'footer' ? 'h-11 px-0 py-2' : 'p-0';
     return (
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
+        className={`inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 ${containerClass} ${className}`}
       >
-        <Skeleton className='h-7 w-7' rounded='full' />
-        <Skeleton className='h-7 w-7' rounded='full' />
-        <Skeleton className='h-7 w-7' rounded='full' />
+        <Skeleton className={buttonClass} rounded='full' />
+        <Skeleton className={buttonClass} rounded='full' />
+        <Skeleton className={buttonClass} rounded='full' />
       </div>
     );
   }

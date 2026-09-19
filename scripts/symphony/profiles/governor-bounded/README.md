@@ -11,6 +11,15 @@ drop-in against that immutable source. Missing, additional, or changed drop-ins
 remain unhealthy. The only workflow overlay is concurrency reduced within 1..5.
 The canonical profile remains the default.
 
+The fleet installer reads this persisted selection on every rerun and upgrade.
+A conflicting process override, unknown profile or untrusted profile file
+fails before installation. The restricted workflow retains any lower current
+concurrency ceiling; an upgrade never authorizes more capacity. The installer
+verifies the selected profile, including Codex OUT and the project/label scope.
+The attestation installer restores its prior source and timer activity if
+preflight or publication fails, so a failed deployment cannot silently stop
+future real observations.
+
 The project, required label, workspace, one-retry ceiling and five-slot maximum
 are retained. The canonical installed `before_run` verifier is restored.
 Native Codex is explicitly disabled by `/usr/bin/false`; this profile cannot
@@ -31,7 +40,11 @@ delivery. Back up the current workflow, five drop-ins, publisher inputs and
 runtime-input environment; record their hashes and the service invocation.
 Install this workflow at `~/.config/symphony/WORKFLOW.md`, retire the old
 `five-pr-trial.conf`, and install the five exact profile drop-ins. Preserve the
-separate signing environment and verified Symphony 3f3e3d5 release. Align the
+separate signing environment. Use verified Symphony release
+`dae31f823850c9ef2dea121433e5b60f09af26fa`, published as
+`symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa` after successful
+make-all run `34870559167` (attempt 1) and release run `34870865399`.
+Verify its package digest and provenance before the safe transition. Align the
 other compared policy/gate/closure/unit files to the same reviewed configuration
 revision through their existing delivery owner. Do not pin around a mismatch.
 Update `SYMPHONY_RUNTIME_WORKFLOW` to the actual new workflow only as part of

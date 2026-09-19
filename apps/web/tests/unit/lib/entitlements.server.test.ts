@@ -23,6 +23,11 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
 }));
 
+vi.mock('@/lib/stripe/config', () => ({
+  isLegacyFanSendPrice: (id: string | null | undefined) =>
+    id === 'legacy-price',
+}));
+
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
@@ -260,6 +265,7 @@ describe('getCurrentUserEntitlements', () => {
         plan: 'pro',
         stripeCustomerId: 'cus_123',
         stripeSubscriptionId: 'sub_123',
+        stripePriceId: 'legacy-price',
       },
     });
 
@@ -316,6 +322,33 @@ describe('getCurrentUserEntitlements', () => {
       chatFileUploadLimit: null,
       profileMonitoringLimit: 25,
     });
+  });
+
+  it('fails closed for the current visibility price without changing other Pro features', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_visibility' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'visibility@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'visibility@example.com',
+        isAdmin: false,
+        isPro: true,
+        plan: 'pro',
+        stripeCustomerId: 'cus_visibility',
+        stripeSubscriptionId: 'sub_visibility',
+        stripePriceId: 'visibility-price',
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.canSendNotifications).toBe(false);
+    expect(entitlements.canExportContacts).toBe(true);
+    expect(entitlements.plan).toBe('pro');
   });
 
   it('normalizes stale free plan rows to pro when billing says isPro=true', async () => {
@@ -398,6 +431,7 @@ describe('getCurrentUserEntitlements', () => {
         plan: 'growth',
         stripeCustomerId: 'cus_456',
         stripeSubscriptionId: 'sub_456',
+        stripePriceId: 'legacy-price',
       },
     });
 

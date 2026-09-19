@@ -1,15 +1,26 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AudioLines, Pause, Play, X } from 'lucide-react';
+import { AudioLines, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
+import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
+import {
+  readAudioBarDismissed,
+  shouldShowAudioBar,
+  subscribeAudioBarDismissal,
+  writeAudioBarDismissed,
+} from '@/components/shell/audio-bar-dismissal';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
@@ -61,6 +72,7 @@ export function PersistentAudioBar() {
   // Keep its idle slot mounted at zero height; the tray itself only opens on an
   // explicit player shortcut so route content never gains surprise chrome.
   const [idleTrayOpen, setIdleTrayOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(() => readAudioBarDismissed());
   const [waveformOn, setWaveformOn] = useState(true);
   // Cinematic reveal (JOV-3487): the shell bar lands into place from the
   // bottom on first play. Starts un-revealed so the CSS transition has an
@@ -135,6 +147,13 @@ export function PersistentAudioBar() {
     toggleTrack,
   ]);
 
+  const handleDismiss = useCallback(() => {
+    writeAudioBarDismissed(true);
+    stop();
+  }, [stop]);
+
+  useEffect(() => subscribeAudioBarDismissal(setDismissed), []);
+
   const handleCloseLyrics = useCallback(() => {
     router.push(
       resolveLyricsReturnRoute(
@@ -166,7 +185,12 @@ export function PersistentAudioBar() {
 
   const activeTrackId = playbackState.activeTrackId;
   const hasActiveTrack = Boolean(activeTrackId);
-  const compactPlayerVisible = Boolean(activeTrackId) && barCollapsed;
+  const showPlayerBar = shouldShowAudioBar({
+    dismissed,
+    hasActiveTrack,
+    explicitPlay: false,
+  });
+  const compactPlayerVisible = showPlayerBar && barCollapsed;
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -247,7 +271,7 @@ export function PersistentAudioBar() {
   ]);
 
   useEffect(() => {
-    if (!activeTrackId) {
+    if (!showPlayerBar || !activeTrackId) {
       resetAudioChromeSnapshot();
       return;
     }
@@ -257,13 +281,13 @@ export function PersistentAudioBar() {
       compactPlayerVisible,
       fullPlayerVisible: !compactPlayerVisible,
     });
-  }, [activeTrackId, compactPlayerVisible]);
+  }, [activeTrackId, compactPlayerVisible, showPlayerBar]);
 
   useEffect(() => {
     return resetAudioChromeSnapshot;
   }, []);
 
-  if (!activeTrackId) {
+  if (!showPlayerBar || !activeTrackId) {
     const isLibraryRoute = pathname === APP_ROUTES.LIBRARY;
     const idleTray = (testId: string, className?: string) => (
       <section
@@ -360,15 +384,10 @@ export function PersistentAudioBar() {
   const isPreview = playbackState.duration > 0 && playbackState.duration < 45;
 
   let playButtonLabel = 'Resume playback';
-  let playButtonIcon = <Play className='h-3 w-3' />;
   if (isLoading) {
     playButtonLabel = 'Loading track';
-    playButtonIcon = (
-      <div className='h-3 w-3 animate-pulse rounded-full bg-current' />
-    );
   } else if (playbackState.isPlaying) {
     playButtonLabel = 'Pause playback';
-    playButtonIcon = <Pause className='h-3 w-3' />;
   }
 
   const mobileBar = (className?: string) => (
@@ -384,15 +403,17 @@ export function PersistentAudioBar() {
       <div className='flex items-center gap-3'>
         {/* Artwork */}
         {playbackState.artworkUrl && !imgError ? (
-          <Image
-            src={playbackState.artworkUrl}
-            alt=''
-            width={36}
-            height={36}
-            className='h-9 w-9 shrink-0 rounded-lg object-cover'
-            unoptimized
-            onError={() => setImgError(true)}
-          />
+          <ArtworkFrame size={36} className='h-9 w-9 shrink-0 bg-surface-2'>
+            <Image
+              src={playbackState.artworkUrl}
+              alt=''
+              fill
+              sizes='36px'
+              className={ARTWORK_FIT_CLASSNAME}
+              unoptimized
+              onError={() => setImgError(true)}
+            />
+          </ArtworkFrame>
         ) : (
           <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
             <Play className='h-3.5 w-3.5 text-tertiary-token' />
@@ -442,20 +463,18 @@ export function PersistentAudioBar() {
         </div>
 
         {/* Play/pause button — 28px visible, 44px touch target via before pseudo-element */}
-        <button
-          type='button'
+        <AudioPlayButton
+          isPlaying={playbackState.isPlaying}
+          isLoading={isLoading}
           onClick={handleToggle}
-          disabled={isLoading}
-          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
-          aria-label={playButtonLabel}
-        >
-          {playButtonIcon}
-        </button>
+          label={playButtonLabel}
+          size='persistent'
+        />
 
         {/* Dismiss button — 24px visible, 44px touch target via before pseudo-element */}
         <button
           type='button'
-          onClick={stop}
+          onClick={handleDismiss}
           className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss Player'
         >
@@ -528,7 +547,7 @@ export function PersistentAudioBar() {
                 : undefined
             }
             onCollapse={() => setBarCollapsed(true)}
-            onDismiss={stop}
+            onDismiss={handleDismiss}
             currentTime={playbackState.currentTime}
             duration={playbackState.duration}
             onSeek={seek}

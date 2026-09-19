@@ -54,38 +54,40 @@ export const HOMEPAGE_LAUNCH_COPY = {
     sections: [
       {
         id: 'connected',
+        eyebrow: 'ONE LIVING PROFILE',
         headline: 'Everything about you, connected.',
-        body: 'Your work, links, story, and presence—organized into one living profile.',
-      },
-      {
-        id: 'found',
-        headline: 'Be found. Be understood.',
-        body: 'Share the right version of you, legible wherever people want to know how you can help.',
-      },
-      {
-        id: 'know',
-        headline: 'Know who cares.',
-        body: 'See who is paying attention, what brought them to you, and what they may want next.',
+        body: 'Your work, links, and story. One living profile.',
       },
       {
         id: 'relationships',
         headline: 'Turn attention into relationships.',
         body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-      },
-      {
-        id: 'smarter',
-        headline: 'A presence that gets smarter.',
-        body: 'Every interaction improves what you know, what you show, and what you do next.',
-      },
-      {
-        id: 'built',
-        headline: 'Built around who you are.',
-        body: 'Jovie adapts to your work without reducing you to a category.',
+        outcomes: [
+          {
+            id: 'found',
+            headline: 'Be found. Be understood.',
+            body: 'Share the right version of you, legible wherever people want to know how you can help.',
+          },
+          {
+            id: 'know',
+            headline: 'Know who cares.',
+            body: 'See who is paying attention, what brought them to you, and what they may want next.',
+          },
+          {
+            id: 'built',
+            headline: 'Built around who you are.',
+            body: 'Jovie adapts to your work without reducing you to a category.',
+          },
+        ],
       },
     ],
     close: {
       headline: 'See what the world sees.',
       support: 'Start with your name.',
+    },
+    changelog: {
+      headline: "What's new in Jovie",
+      allPostsLabel: 'All posts',
     },
   },
   workspace: {

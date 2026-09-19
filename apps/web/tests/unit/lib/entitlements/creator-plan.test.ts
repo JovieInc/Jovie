@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  canCreatorSendNotifications,
   getBatchCreatorEntitlements,
   getCreatorEntitlements,
+  getCreatorOwnerUserId,
+  getCreatorPlanEntitlements,
 } from '@/lib/entitlements/creator-plan';
 import { getEntitlements } from '@/lib/entitlements/registry';
 
 const {
   loggerErrorMock,
+  loggerWarnMock,
   selectMock,
   fromMock,
   leftJoinMock,
@@ -16,6 +20,7 @@ const {
   withRetryMock,
 } = vi.hoisted(() => ({
   loggerErrorMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
   selectMock: vi.fn(),
   fromMock: vi.fn(),
   leftJoinMock: vi.fn(),
@@ -34,9 +39,15 @@ vi.mock('@/lib/db', () => ({
   withRetry: withRetryMock,
 }));
 
+vi.mock('@/lib/stripe/config', () => ({
+  isLegacyFanSendPrice: (id: string | null | undefined) =>
+    id === 'legacy-price',
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     error: loggerErrorMock,
+    warn: loggerWarnMock,
   },
 }));
 
@@ -92,6 +103,7 @@ describe('getCreatorEntitlements', () => {
       {
         claimedUserId: 'user_claimed',
         claimedPlan: 'pro',
+        claimedStripePriceId: 'legacy-price',
         legacyUserId: 'user_legacy',
         legacyPlan: 'free',
       },
@@ -114,6 +126,7 @@ describe('getCreatorEntitlements', () => {
         claimedPlan: null,
         legacyUserId: 'user_legacy',
         legacyPlan: 'pro',
+        legacyStripePriceId: 'legacy-price',
       },
     ]);
 
@@ -170,7 +183,7 @@ describe('getBatchCreatorEntitlements', () => {
         },
       ],
       [
-        { id: 'user_a', plan: 'pro' },
+        { id: 'user_a', plan: 'pro', stripePriceId: 'legacy-price' },
         { id: 'user_z', plan: 'free' },
       ]
     );
@@ -293,5 +306,82 @@ describe('trial expiry (read-time normalization)', () => {
       plan: 'free',
       entitlements: getEntitlements('free'),
     });
+  });
+});
+
+describe('paid fan send provenance', () => {
+  it.each(['pro', 'max'] as const)(
+    'preserves %s only for a verified legacy price',
+    plan => {
+      expect(getCreatorPlanEntitlements(plan, 'legacy-price')).toEqual(
+        getEntitlements(plan)
+      );
+
+      for (const price of [
+        'visibility-price',
+        'unknown-price',
+        null,
+        undefined,
+      ]) {
+        const result = getCreatorPlanEntitlements(plan, price);
+        expect(result.booleans.canSendNotifications).toBe(false);
+        expect(result.limits).toEqual(getEntitlements(plan).limits);
+      }
+    }
+  );
+
+  it('does not let the convenience helper bypass resolved price provenance', async () => {
+    installQueryResult([
+      {
+        claimedUserId: 'owner',
+        claimedPlan: 'pro',
+        claimedStripePriceId: 'visibility-price',
+      },
+    ]);
+
+    expect(await canCreatorSendNotifications('artist')).toBe(false);
+  });
+
+  it('applies price provenance in the batch lookup', async () => {
+    installBatchQueryResults(
+      [
+        {
+          creatorProfileId: 'artist',
+          claimedUserId: 'owner',
+          legacyUserId: null,
+        },
+      ],
+      [{ id: 'owner', plan: 'pro', stripePriceId: 'visibility-price' }]
+    );
+
+    expect(
+      (await getBatchCreatorEntitlements(['artist'])).get('artist')
+        ?.entitlements.booleans.canSendNotifications
+    ).toBe(false);
+  });
+});
+
+describe('getCreatorOwnerUserId', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it.each([
+    [{ claimedUserId: 'claimed', legacyUserId: 'legacy' }, 'claimed'],
+    [{ claimedUserId: null, legacyUserId: 'legacy' }, 'legacy'],
+    [{ claimedUserId: null, legacyUserId: null }, null],
+  ])(
+    'uses claimed ownership before legacy ownership',
+    async (row, expected) => {
+      installQueryResult([row]);
+      expect(await getCreatorOwnerUserId('artist')).toBe(expected);
+      expect(orderByMock).toHaveBeenCalledOnce();
+    }
+  );
+  it('returns null for a missing creator', async () => {
+    installQueryResult([]);
+    expect(await getCreatorOwnerUserId('missing')).toBeNull();
+  });
+  it('propagates lookup failure to prevent unreserved sends', async () => {
+    installQueryResult([]);
+    limitMock.mockRejectedValueOnce(new Error('offline'));
+    await expect(getCreatorOwnerUserId('artist')).rejects.toThrow('offline');
   });
 });

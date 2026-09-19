@@ -23,6 +23,7 @@ export interface SendEmailOptions {
   html: string;
   from?: string;
   replyTo?: string;
+  idempotencyKey?: string;
 }
 
 export interface SendEmailResult {
@@ -49,6 +50,7 @@ export async function sendEmail(
     html: options.html,
     from: options.from,
     replyTo: options.replyTo,
+    idempotencyKey: options.idempotencyKey,
   });
 
   if (result.status === 'sent') {

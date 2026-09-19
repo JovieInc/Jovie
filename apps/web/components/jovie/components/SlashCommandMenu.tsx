@@ -24,7 +24,7 @@ import {
   Music2,
   UserCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   flattenSections,
   InlinePalette,
@@ -51,7 +51,7 @@ import {
   releaseRowToEntityRef,
 } from './entity-mappers';
 import { eventRowMatches, eventToEntityRef } from './event-provider';
-import type { PickerItem } from './picker-rows';
+import type { PickerActionItem, PickerItem } from './picker-rows';
 import { type PickerState } from './useChatPicker';
 
 // Re-export EntityRefMeta from a single canonical home for picker consumers.
@@ -108,6 +108,8 @@ interface SlashCommandMenuProps {
    * textarea can mirror it onto `aria-activedescendant`.
    */
   readonly onActiveRowChange?: (id: string | null) => void;
+  readonly attachmentActions?: readonly PickerActionItem[];
+  readonly onQueryChange?: (query: string) => void;
   readonly promptActions?: readonly SlashPromptAction[];
   readonly onSelectPrompt?: (prompt: string) => void;
 }
@@ -418,7 +420,13 @@ export function SlashCommandMenu({
   onActiveRowChange,
   promptActions,
   onSelectPrompt,
+  attachmentActions,
+  onQueryChange,
 }: SlashCommandMenuProps) {
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (onQueryChange) filterInputRef.current?.focus();
+  }, [onQueryChange]);
   const { sections, isLoading } = useSlashItems(state, profileId);
   const query = state.status === 'closed' ? '' : state.query;
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
@@ -467,8 +475,20 @@ export function SlashCommandMenu({
         items: promptItems,
       });
     }
+    const attachments =
+      state.status === 'root'
+        ? (attachmentActions ?? []).filter(item =>
+            fuzzyMatch(`${item.action.label} ${item.action.description}`, query)
+          )
+        : [];
+    if (attachments.length)
+      mappedSections.unshift({
+        id: 'attachments',
+        label: 'Attachments',
+        items: attachments,
+      });
     return mappedSections;
-  }, [promptItems, sections]);
+  }, [promptItems, sections, attachmentActions, state.status, query]);
   const flatItems = useMemo(
     () => flattenSections(paletteSections),
     [paletteSections]
@@ -476,7 +496,9 @@ export function SlashCommandMenu({
 
   const handleCommit = useCallback(
     (pickerItem: PickerItem) => {
-      if (pickerItem.kind === 'skill') {
+      if (pickerItem.kind === 'action') {
+        pickerItem.action.onSelect();
+      } else if (pickerItem.kind === 'skill') {
         onSelectSkill(pickerItem.skill);
       } else if (pickerItem.kind === 'entity') {
         onSelectEntity(pickerItem.entity);
@@ -503,6 +525,7 @@ export function SlashCommandMenu({
         e.preventDefault();
         onMoveSelected(-1, flatItems.length);
       } else if (e.key === 'Enter') {
+        e.preventDefault();
         const selectedIdx =
           flatItems.length === 0
             ? -1
@@ -538,7 +561,31 @@ export function SlashCommandMenu({
         setSelectedIndex={onSetSelected}
         onCommit={handleCommit}
         variant={variant}
-        header={<SlashHeader state={state} />}
+        header={
+          onQueryChange ? (
+            <div className='system-b-slash-header'>
+              <input
+                ref={filterInputRef}
+                role='combobox'
+                aria-expanded='true'
+                aria-controls={listIdProp}
+                aria-activedescendant={
+                  listIdProp && flatItems.length
+                    ? `${listIdProp}-row-${Math.min(state.selectedIndex, flatItems.length - 1)}`
+                    : undefined
+                }
+                aria-autocomplete='list'
+                aria-label='Filter Commands And References'
+                className='min-w-0 flex-1 bg-transparent text-primary-token outline-none'
+                placeholder='Filter files, skills and references'
+                value={query}
+                onChange={event => onQueryChange(event.target.value)}
+              />
+            </div>
+          ) : (
+            <SlashHeader state={state} />
+          )
+        }
         emptyHint={isLoading ? 'Searching…' : 'No matches'}
         listIdProp={listIdProp}
         onActiveRowChange={onActiveRowChange}

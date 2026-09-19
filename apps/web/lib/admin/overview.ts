@@ -242,6 +242,14 @@ function mapStripeEventToActivity(event: {
       action = 'Subscription cancelled';
       status = 'warning';
       break;
+    case 'charge.refunded':
+      action = 'Charge refunded';
+      status = 'warning';
+      break;
+    case 'charge.dispute.created':
+      action = 'Charge disputed';
+      status = 'error';
+      break;
     default:
       action = event.type;
       status = 'success';

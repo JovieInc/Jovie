@@ -14,7 +14,9 @@ import {
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
+import { MarketingFooterControls } from './MarketingFooterControls';
 import { MarketingFooterCta } from './MarketingFooterCta';
 
 /**
@@ -72,11 +74,11 @@ function resolveFooterVariant(
 }
 
 const markLinkClassName =
-  'mf-logo-link -m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75';
+  'mf-logo-link -m-1.5 inline-flex rounded-full p-1.5 transition-opacity duration-subtle hover:opacity-75';
 const footerLinkClassName =
-  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white';
+  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] transition-colors duration-subtle';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70';
+  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight transition-colors duration-subtle';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -100,7 +102,7 @@ function FooterBrandMark() {
       aria-label='Jovie Home'
       className={markLinkClassName}
     >
-      <BrandLogo size='chrome' tone='white' rounded={false} aria-hidden />
+      <BrandLogo size='chrome' tone='auto' rounded={false} aria-hidden />
     </Link>
   );
 }
@@ -133,10 +135,7 @@ export function MarketingFooter({
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns =
-    pathname === APP_ROUTES.HOME
-      ? MARKETING_FOOTER_COLUMNS.filter(column => column.title !== 'Connect')
-      : MARKETING_FOOTER_COLUMNS;
+  const footerColumns = MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer
@@ -208,8 +207,8 @@ export function MarketingFooter({
           <span className='mf-copyright'>
             © {new Date().getFullYear()} Jovie Technology Inc.
           </span>
-          {isMinimal ? (
-            <div className='mf-baseband__meta'>
+          <div className='mf-baseband__meta'>
+            {isMinimal ? (
               <nav
                 aria-label='Resources'
                 className='flex flex-wrap items-center gap-6'
@@ -217,11 +216,10 @@ export function MarketingFooter({
                 <FooterLink link={MARKETING_DEVELOPER_LINK} />
                 <FooterLink link={MARKETING_CLI_LINK} />
               </nav>
-              <FooterLegalNav />
-            </div>
-          ) : (
+            ) : null}
             <FooterLegalNav />
-          )}
+            <MarketingFooterControls enabled={isThemeRoute(pathname ?? '')} />
+          </div>
         </div>
       </div>
     </footer>

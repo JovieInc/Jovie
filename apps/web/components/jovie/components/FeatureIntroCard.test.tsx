@@ -107,6 +107,10 @@ describe('FeatureIntroCard', () => {
       'whatsNew'
     );
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+      'role',
+      'region'
+    );
+    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-source-id',
       'changelog:26.8.1'
     );
@@ -116,6 +120,8 @@ describe('FeatureIntroCard', () => {
     ).toBeInTheDocument();
     const andMore = screen.getByTestId('feature-intro-and-more');
     expect(andMore).toHaveAttribute('href', APP_ROUTES.CHANGELOG);
+    expect(andMore).toHaveClass('h-auto', 'min-h-0', 'before:hidden');
+    expect(andMore).not.toHaveClass('min-h-7');
     expect(screen.queryByTestId('feature-intro-cta')).toBeNull();
   });
 });

@@ -28,6 +28,11 @@ export interface RateLimitResult {
    * user-critical paths may treat a degraded limit as advisory.
    */
   degraded?: boolean;
+  /**
+   * Backend that produced this decision. Reports the path actually taken,
+   * not merely whether a Redis client object exists.
+   */
+  backend?: 'redis' | 'memory' | 'unavailable';
 }
 
 /**

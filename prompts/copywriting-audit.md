@@ -124,7 +124,7 @@ Then output a consolidated changelist — every before/after in one place, ready
 1. **Never output code.** Only suggest copy changes as plain text before/after pairs.
 2. **Never skip the scoring.** Every criterion must have a number, every iteration.
 3. **Never pass a section with any score below 8.** The loop is mandatory.
-4. **Preserve the brand voice.** Jovie is for independent musicians. Confident, clear, zero jargon. Not corporate, not try-hard.
-5. **Assume the reader is an independent artist** who is mass-DMed by 10 link-in-bio tools a week. Skeptical, busy, scrolling fast.
+4. **Preserve the brand voice.** Jovie is one product for presence, relationships, and growth. Confident, clear, zero jargon. Not corporate, not try-hard.
+5. **Match the page audience.** A labeled Artists page may speak to independent musicians. General company copy must not assume a Spotify catalog, a follower threshold, or a music-only reader.
 6. **Headlines do the heavy lifting.** If the headline doesn't hook, nothing else matters.
 7. **Be specific about Jovie's differentiators:** first-party fan data/CRM, AI-adaptive link modes, automatic release smart links, and fan notifications — things Linktree doesn't do.

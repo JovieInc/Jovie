@@ -46,6 +46,18 @@ describe('ThemeToggle', () => {
     ).toHaveClass('sr-only');
   });
 
+  it('keeps the footer root target while preserving the 28px visible segments', () => {
+    render(<ThemeToggle appearance='segmented' size='footer' />);
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Theme' });
+    expect(toolbar).toHaveClass('h-11', 'px-0', 'py-2');
+    expect(screen.getByRole('button', { name: 'Dark Theme' })).toHaveClass(
+      'h-7',
+      'w-11',
+      'px-3'
+    );
+  });
+
   it('uses the linear token treatment for icon appearance', () => {
     render(<ThemeToggle variant='linear' />);
 

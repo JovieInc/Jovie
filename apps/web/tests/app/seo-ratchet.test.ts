@@ -158,14 +158,24 @@ describe('SEO/AEO ratchet (#11044)', () => {
       expect(result.violations.join('\n')).toMatch(/empty/i);
     });
 
-    it('requires lastmod on every url entry', () => {
+    it('accepts omitted lastmod when the content revision is unknown', () => {
       const body = `<?xml version="1.0"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://jov.ie/</loc></url>
 </urlset>`;
       const result = validateSitemapXmlBody(body);
+      expect(result.ok).toBe(true);
+      expect(result.urlCount).toBe(1);
+    });
+
+    it('rejects an unparseable lastmod', () => {
+      const body = `<?xml version="1.0"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://jov.ie/</loc><lastmod>not-a-date</lastmod></url>
+</urlset>`;
+      const result = validateSitemapXmlBody(body);
       expect(result.ok).toBe(false);
-      expect(result.violations.join('\n')).toMatch(/lastmod/i);
+      expect(result.violations.join('\n')).toMatch(/invalid <lastmod>/i);
     });
 
     it('accepts non-empty sitemap with lastmod', () => {
@@ -355,20 +365,18 @@ describe('seo-ratchet live surface validators', () => {
     expect(violations).toEqual([]);
   });
 
-  it('requires lastmod on every sitemap URL block', () => {
+  it('accepts omitted lastmod and still requires at least one URL', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://jov.ie</loc></url>
 </urlset>`;
 
     const violations = validateSitemapXmlSurface(xml, {
-      requireLastModified: true,
+      requireLastModified: false,
       minEntryCount: 1,
     });
 
-    expect(
-      violations.some(violation => violation.check === 'sitemap-lastmod')
-    ).toBe(true);
+    expect(violations).toEqual([]);
   });
 
   it('accepts non-empty sitemap XML with lastmod entries', () => {
@@ -387,10 +395,12 @@ describe('seo-ratchet live surface validators', () => {
 });
 
 describe('seo-ratchet sitemap.xml shape', () => {
-  it('serializes non-empty sitemap XML with lastmod on every URL', {
+  it('serializes non-empty canonical sitemap XML without request-time lastmod', {
     timeout: 15_000,
   }, async () => {
     vi.resetModules();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-16T20:30:02.784Z'));
     vi.doMock('next/cache', () => ({
       unstable_cache: (callback: () => Promise<unknown>) => callback,
     }));
@@ -405,21 +415,32 @@ describe('seo-ratchet sitemap.xml shape', () => {
       slugifyCategory: (value: string) => value.toLowerCase(),
     }));
 
-    const { default: sitemap } = await import('../../app/sitemap');
-    const entries = await sitemap();
+    try {
+      const { default: sitemap } = await import('../../app/sitemap');
+      const entries = await sitemap();
+      const generatedAt = new Date('2026-09-16T20:30:02.784Z');
 
-    expect(entries.length).toBeGreaterThan(0);
-    for (const entry of entries) {
-      expect(
-        entry.lastModified,
-        `${entry.url} missing lastModified`
-      ).toBeDefined();
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries.map(entry => entry.url)).toEqual(
+        expect.arrayContaining([
+          'https://jov.ie',
+          'https://jov.ie/artist-profiles',
+          'https://jov.ie/pricing',
+        ])
+      );
+      for (const entry of entries) {
+        if (!entry.lastModified) continue;
+        expect(new Date(entry.lastModified).getTime()).not.toBe(
+          generatedAt.getTime()
+        );
+      }
+
+      const xml = serializeSitemapXml(entries);
+      expect(xml).toContain('<?xml');
+      expect(xml).toContain('<urlset>');
+      expect(xml).toContain('<loc>https://jov.ie/artist-profiles</loc>');
+    } finally {
+      vi.useRealTimers();
     }
-
-    const xml = serializeSitemapXml(entries);
-    expect(xml).toContain('<?xml');
-    expect(xml).toContain('<urlset>');
-    expect(xml).toContain('<lastmod>');
-    expect((xml.match(/<lastmod>/g) ?? []).length).toBe(entries.length);
   });
 });

@@ -85,10 +85,9 @@ describe('AudioBar', () => {
     );
     const idleRegion = screen.getByRole('region', { name: 'Audio Player' });
     const idleClassName = idleRegion.className;
-    expect(screen.getByRole('button', { name: /^Play/ })).toHaveClass(
-      'h-8',
-      'w-8'
-    );
+    const playButton = screen.getByRole('button', { name: /^Play/ });
+    expect(playButton).toHaveAttribute('type', 'button');
+    expect(playButton).toHaveClass('h-8', 'w-8', 'rounded-full');
 
     rerender(<AudioBar {...baseProps} isPlaying onDismiss={() => {}} />);
 

@@ -38,6 +38,7 @@ FALLBACK_FINALIZER = SOURCE_DIR / "symphony-fallback-finalize.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
 PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
 EXISTING_PR_REPAIR = SOURCE_DIR / "existing_pr_repair.py"
+RESOLV_CONF = SOURCE_DIR / "symphony-existing-repair-resolv.conf"
 PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
 PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
 QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
@@ -53,6 +54,7 @@ RUNTIME_ARTIFACTS = (
     MODEL_REGISTRY,
     PROVIDER_CAPACITY,
     EXISTING_PR_REPAIR,
+    RESOLV_CONF,
     PROMOTION_SCRIPT,
     PROMOTION_LIB,
     QUEUE_DEFERRAL_LIB,
@@ -809,7 +811,9 @@ PY
         source.mkdir()
         for path in RUNTIME_ARTIFACTS:
             target = source / path.name
-            suffix = b"\n" if path == MODEL_REGISTRY else f"\n# {label}-{path.name}\n".encode()
+            suffix = b"\n" if path == MODEL_REGISTRY else (
+                b"" if path == RESOLV_CONF else f"\n# {label}-{path.name}\n".encode()
+            )
             target.write_bytes(path.read_bytes() + suffix)
             target.chmod(path.stat().st_mode)
         return source / CONTROLLER.name

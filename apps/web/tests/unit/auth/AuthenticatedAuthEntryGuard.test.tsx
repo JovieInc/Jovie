@@ -99,18 +99,18 @@ describe('AuthenticatedAuthEntryGuard', () => {
     });
   });
 
-  it('waits for Clerk when only the activity cookie is present', async () => {
+  it('keeps the auth form visible when only an activity cookie is present', async () => {
     document.cookie = '__client_uat=1700000000';
     authState.isLoaded = false;
     authState.isSignedIn = false;
 
-    const { queryByText } = render(
+    const { getByText } = render(
       <AuthenticatedAuthEntryGuard>
         <div>Sign-in form</div>
       </AuthenticatedAuthEntryGuard>
     );
 
-    expect(queryByText('Sign-in form')).not.toBeInTheDocument();
+    expect(getByText('Sign-in form')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(replaceMock).not.toHaveBeenCalled();
@@ -131,6 +131,55 @@ describe('AuthenticatedAuthEntryGuard', () => {
     await waitFor(() => {
       expect(getByText('Sign-in form')).toBeInTheDocument();
       expect(replaceMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('redirects when a session appears after hydration', async () => {
+    authState.isLoaded = false;
+    authState.isSignedIn = false;
+
+    const { getByText, queryByText, rerender } = render(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-in form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+
+    expect(getByText('Sign-in form')).toBeInTheDocument();
+
+    authState.isLoaded = true;
+    authState.isSignedIn = true;
+    rerender(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-in form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    });
+    expect(queryByText('Sign-in form')).not.toBeInTheDocument();
+  });
+
+  it('re-checks a restored BFCache page and redirects a signed-in visitor', async () => {
+    authState.isSignedIn = true;
+
+    render(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-in form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    });
+    replaceMock.mockClear();
+
+    const pageShow = new Event('pageshow');
+    Object.defineProperty(pageShow, 'persisted', { value: true });
+    globalThis.dispatchEvent(pageShow);
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
     });
   });
 

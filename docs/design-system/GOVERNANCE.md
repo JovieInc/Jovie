@@ -108,6 +108,12 @@ not expand `design-conformance:gate`, unit tests, or e2e.
 Exception (JOV-5447): `design-exception-registry` compares inventoried
 design-debt registries to the trusted ci-fast base and fails closed on growth.
 
+Exception (JOV-6280): the remaining-group `shadcn-lint-contracts` lane runs the
+shipped ESLint config against `@jovie/ui` Button/Card/Input fixtures plus an
+enrollment/shrink-only assertion. It is a cheap Vitest of those contracts, not
+full `lint:eslint`. Full-tree `lint:eslint` remains WARN until its dedicated
+blocking lane lands.
+
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.
 

@@ -11,6 +11,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/billing/offer-truth';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
@@ -42,8 +43,8 @@ function getAnnualSavingsPercent(
 const PRO_HIGHLIGHTS = [
   {
     icon: Bell,
-    label: 'Release Notifications',
-    detail: 'Notify fans the moment you drop',
+    label: 'Visibility Monitoring',
+    detail: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
   },
   {
     icon: BarChart3,

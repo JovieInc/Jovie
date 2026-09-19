@@ -166,6 +166,10 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
+  STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: z
+    .string()
+    .startsWith('price_')
+    .optional(),
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
@@ -513,6 +517,7 @@ export const ENV_KEYS = [
   'PRINTFUL_STORE_ID',
   'PRINTFUL_WEBHOOK_SECRET',
   'STRIPE_PRICE_FOUNDING_MONTHLY',
+  'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',

@@ -424,6 +424,66 @@ class GemDiskReclaimTests(unittest.TestCase):
         self.assertEqual(capacity["reason"], "disk-free-critical")
         self.assertEqual(capacity["source"], "gem-disk-reclaim")
 
+    def test_oversized_receipt_is_compacted_unparsed_and_apply_exits_2(self) -> None:
+        prior_bytes = 200_000
+        self.receipt.write_bytes(b"x" * prior_bytes)
+        workspace = self.make_workspace()
+        artifact = self.make_workspace_artifact(workspace)
+
+        first = self.reclaim("--apply", "--receipt-max-bytes", "4096")
+        second = self.reclaim("--apply", "--receipt-max-bytes", "4096")
+
+        self.assertEqual(first.returncode, 2, first.stderr)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertLessEqual(self.receipt.stat().st_size, 4096)
+        self.assertFalse(artifact.exists())
+        receipt = self.receipt_json()
+        self.assertEqual(receipt["schema"], "gem-disk-reclaim/v1")
+        self.assertEqual(receipt["bounded"]["receiptMaxBytes"], 4096)
+        self.assertLessEqual(receipt["bounded"]["receiptBytes"], 4096)
+        first_receipt = json.loads(first.stdout)
+        self.assertEqual(first_receipt["status"], "error")
+        self.assertEqual(first_receipt["priorReceipt"]["bytes"], prior_bytes)
+        self.assertEqual(first_receipt["priorReceipt"]["reason"], "receipt_oversized_unparsed")
+        self.assertTrue(first_receipt["priorReceipt"]["compacted"])
+
+    def test_pnpm_store_path_flood_stays_out_of_receipt_and_is_not_deleted(self) -> None:
+        workspace = self.make_workspace("JOV-4")
+        artifact = self.make_workspace_artifact(workspace)
+        store = workspace / ".symphony" / "package-cache" / "pnpm-store" / "v3" / "files"
+        nested = store / "ab" / "pkg" / "node_modules" / "dep"
+        nested.mkdir(parents=True)
+        for index in range(80):
+            (store / "ab" / f"file-{index}.txt").write_text(f"blob-{index}\n", encoding="utf-8")
+        (nested / "index.js").write_text("store\n", encoding="utf-8")
+
+        result = self.reclaim("--apply", "--receipt-max-bytes", str(46 * 1024))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(artifact.exists())
+        self.assertTrue((nested / "index.js").exists())
+        self.assertLessEqual(self.receipt.stat().st_size, 46 * 1024)
+        receipt = self.receipt_json()
+        encoded = json.dumps(receipt)
+        self.assertNotIn("pnpm-store", encoded)
+        self.assertNotIn("package-cache", encoded)
+        self.assertEqual(receipt["bounded"]["receiptMaxBytes"], 46 * 1024)
+        self.assertLessEqual(receipt["bounded"]["receiptBytes"], 46 * 1024)
+        candidates = receipt["workspaces"]["roots"][0]["workspaces"][0]["candidates"]
+        self.assertTrue(all("pnpm-store" not in item["path"] for item in candidates))
+
+    def test_default_receipt_budget_is_the_live_compacted_size(self) -> None:
+        module = load_reclaim_module()
+        self.assertEqual(module.RECEIPT_MAX_BYTES, 46 * 1024)
+        clean_env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("GEM_DISK_RECLAIM_")
+        }
+        with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(os.environ, clean_env, clear=True):
+            parsed = module.parse_args(["--dry-run"])
+        self.assertEqual(parsed.receipt_max_bytes, 46 * 1024)
+
 
 if __name__ == "__main__":
     unittest.main()

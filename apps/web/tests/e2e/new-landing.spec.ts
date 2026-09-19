@@ -36,7 +36,7 @@ test.describe('/new landing page', () => {
 
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
-      headerNav.getByRole('link', { name: 'Customers', exact: true })
+      headerNav.getByRole('link', { name: 'Artists', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.ARTISTS);
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
@@ -98,7 +98,7 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to waitlist', async ({ page }) => {
+  test('navigates hero CTA to signup', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(

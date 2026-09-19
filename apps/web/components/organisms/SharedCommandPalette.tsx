@@ -156,6 +156,11 @@ export function filterAdditionalSections(
             lower
           );
         }
+        if (item.kind === 'action')
+          return fuzzyMatch(
+            `${item.action.label} ${item.action.description}`,
+            lower
+          );
         if (item.kind === 'nav') {
           return fuzzyMatch(`${item.nav.label} ${item.nav.description}`, lower);
         }
@@ -220,9 +225,11 @@ function CmdKPaletteRow({
         e.preventDefault();
         onCommit(index);
       }}
+      chrome='shell'
+      density='standard'
       isSelected={isActive}
       interactive
-      className='system-b-table-row-shell flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left'
+      className='flex w-full items-center gap-2 px-3 text-left'
     >
       <RowVisual item={item} variant='dense' />
       <RowBody item={item} variant='dense' />

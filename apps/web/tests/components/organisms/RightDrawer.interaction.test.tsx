@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 
@@ -92,6 +93,32 @@ describe('RightDrawer', () => {
     );
   });
 
+  it('handles Escape on the active mobile drawer without treating itself as another modal', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+    const onKeyDown = vi.fn();
+
+    render(
+      <RightDrawer
+        isOpen
+        width={360}
+        ariaLabel='Mobile keyboard drawer'
+        onKeyDown={onKeyDown}
+      >
+        <button type='button'>Inside</button>
+      </RightDrawer>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Mobile keyboard drawer')).toHaveAttribute(
+        'aria-modal',
+        'true'
+      )
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+  });
+
   it('does not handle Escape when a modal dialog is open above the drawer', () => {
     const onKeyDown = vi.fn();
 
@@ -112,6 +139,36 @@ describe('RightDrawer', () => {
     );
 
     fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('does not handle Escape when a child popup has already prevented dismissal', () => {
+    const onKeyDown = vi.fn();
+
+    render(
+      <RightDrawer
+        isOpen={true}
+        width={360}
+        ariaLabel='Popup-aware drawer'
+        onKeyDown={onKeyDown}
+      >
+        <button
+          type='button'
+          onKeyDown={event => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+            }
+          }}
+        >
+          Nested popup item
+        </button>
+      </RightDrawer>
+    );
+
+    const popupItem = screen.getByRole('button', { name: 'Nested popup item' });
+    popupItem.focus();
+    fireEvent.keyDown(popupItem, { key: 'Escape' });
+
     expect(onKeyDown).not.toHaveBeenCalled();
   });
 
@@ -305,6 +362,169 @@ describe('RightDrawer', () => {
     );
 
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('restores a valid page target when an open drawer unmounts after its opener is removed', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    const { rerender } = render(
+      <>
+        <button key='original-opener' type='button'>
+          Open details
+        </button>
+        <button type='button'>Page fallback</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Unmounting drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </>
+    );
+
+    const opener = screen.getByRole('button', { name: 'Open details' });
+    opener.focus();
+
+    rerender(
+      <>
+        <button key='original-opener' type='button'>
+          Open details
+        </button>
+        <button type='button'>Page fallback</button>
+        <RightDrawer isOpen width={360} ariaLabel='Unmounting drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Drawer action' })
+      ).toHaveFocus()
+    );
+
+    rerender(
+      <>
+        <div key='replacement-opener'>Replacement opener</div>
+        <button type='button'>Page fallback</button>
+      </>
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Page fallback' })
+      ).toHaveFocus()
+    );
+    expect(document.body).not.toHaveFocus();
+  });
+
+  it('does not steal focus from unrelated navigation when the drawer closes', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    const { rerender } = render(
+      <>
+        <button type='button'>Open details</button>
+        <button type='button' data-modal-backdrop>
+          Navigate elsewhere
+        </button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Navigation drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </>
+    );
+
+    const opener = screen.getByRole('button', { name: 'Open details' });
+    const navigation = screen.getByRole('button', {
+      name: 'Navigate elsewhere',
+    });
+    opener.focus();
+
+    rerender(
+      <>
+        <button type='button'>Open details</button>
+        <button type='button' data-modal-backdrop>
+          Navigate elsewhere
+        </button>
+        <RightDrawer isOpen width={360} ariaLabel='Navigation drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Drawer action' })
+      ).toHaveFocus()
+    );
+    navigation.focus();
+    expect(navigation).toHaveFocus();
+
+    rerender(
+      <>
+        <button type='button'>Open details</button>
+        <button type='button' data-modal-backdrop>
+          Navigate elsewhere
+        </button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Navigation drawer'>
+          <button type='button'>Drawer action</button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() => expect(navigation).toHaveFocus());
+  });
+
+  it('restores focus once when a drawer closes under StrictMode', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    const { rerender } = render(
+      <React.StrictMode>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Strict drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </React.StrictMode>
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Open details' });
+    trigger.focus();
+    const focusSpy = vi.spyOn(trigger, 'focus');
+
+    rerender(
+      <React.StrictMode>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen width={360} ariaLabel='Strict drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Drawer action
+          </button>
+        </RightDrawer>
+      </React.StrictMode>
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Drawer action' })
+      ).toHaveFocus()
+    );
+
+    rerender(
+      <React.StrictMode>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Strict drawer'>
+          <button type='button'>Drawer action</button>
+        </RightDrawer>
+      </React.StrictMode>
+    );
+
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(focusSpy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps mobile focus within the drawer and locks background interaction', async () => {

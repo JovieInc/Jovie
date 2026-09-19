@@ -55,6 +55,7 @@ else
   fi
 fi
 if [[ "${JOVIE_CONFIGURATION_SOURCE_REVISION}" == "${TIP}" ]]; then
+  chmod 0600 "${ENV_FILE}"
   printf 'already aligned to %s\n' "${TIP}"
   exit 0
 fi
@@ -69,6 +70,6 @@ awk -v tip="${TIP}" '
   { print }
   END { if (!done) print "JOVIE_CONFIGURATION_SOURCE_REVISION=" tip }
 ' "${ENV_FILE}" > "${tmp}"
+chmod 0600 "${tmp}"
 mv "${tmp}" "${ENV_FILE}"
-chmod 0644 "${ENV_FILE}"
 printf 'aligned to %s (backup %s)\n' "${TIP}" "${ENV_FILE}.bak-${stamp}"

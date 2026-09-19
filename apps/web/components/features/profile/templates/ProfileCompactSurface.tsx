@@ -72,6 +72,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
+import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 
 const ProfileUnifiedDrawer = dynamic(() =>
   import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
@@ -401,6 +402,11 @@ export function ProfileCompactSurface({
   });
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
+  const shouldUseOverflowScroll = useProfileMobileOverflow({
+    surface: notificationsPortalContainer,
+    isHomeMode,
+    isPreviewEmbedded,
+  });
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -600,6 +606,10 @@ export function ProfileCompactSurface({
       data-testid={dataTestId}
       data-render-mode={renderMode}
       data-profile-mode={activeMode}
+      data-profile-home-mode={isHomeMode ? 'true' : undefined}
+      data-profile-overflow-mode={
+        shouldUseOverflowScroll ? 'scroll' : undefined
+      }
       data-tab-bar-arm={profilePacAssignment.tabBar}
       data-tab-bar-visible={showBottomNav ? 'true' : 'false'}
     >
@@ -609,6 +619,9 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-mode={activeVisiblePrimaryTab}
         data-presentation={presentation}
+        data-profile-overflow-mode={
+          shouldUseOverflowScroll ? 'scroll' : undefined
+        }
       >
         {!isHomeMode && renderMode !== 'preview' ? (
           <IdentityHeading className='sr-only' data-testid='profile-header'>

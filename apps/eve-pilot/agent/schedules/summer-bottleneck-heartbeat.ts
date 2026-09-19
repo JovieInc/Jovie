@@ -97,9 +97,9 @@ export async function runSummerBottleneckHeartbeat(
 export default defineSchedule({
   cron: '*/15 * * * *',
   run({ waitUntil }) {
-    // Event ingress is the primary engine. This cadence recovers durable events
-    // that lack a terminal receipt and, when governed dispatch selects Cursor
-    // recovery (Gem dark / attestation unavailable), advances the outbox.
+    // Missed-event recovery only. Liveness is the separate Eve-owned
+    // summer-liveness-heartbeat trigger. Backlog rerank stays event-driven
+    // (land/CI/signal/founder/GSC/intake) and is not invoked here.
     waitUntil(runSummerBottleneckHeartbeat());
   },
 });

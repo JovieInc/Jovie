@@ -12,13 +12,41 @@ import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
+import {
+  importYouTubeChannelPage,
+  loadYouTubeImportSnapshot,
+} from '@/lib/youtube-library/import-channel';
 import { syncChannelVideos } from '@/lib/youtube-library/sync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const bodySchema = z.object({ creatorProfileId: z.string().uuid() });
+const bodySchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  mode: z.enum(['full', 'page']).optional(),
+});
+const profileIdSchema = z.string().uuid();
 const REFRESH_BUSY_RETRY_AFTER_SECONDS = 5;
+
+export async function GET(request: Request) {
+  const { userId } = await getCachedAuth();
+  if (!userId)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const creatorProfileId = new URL(request.url).searchParams.get(
+    'creatorProfileId'
+  );
+  const parsed = profileIdSchema.safeParse(creatorProfileId);
+  if (!parsed.success)
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  const access = await getExactProfileAccess(db, userId, parsed.data);
+  if (!access.ok)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const snapshot = await loadYouTubeImportSnapshot({
+    userId,
+    creatorProfileId: parsed.data,
+  });
+  return NextResponse.json(snapshot);
+}
 
 export async function POST(request: Request) {
   const { userId } = await getCachedAuth();
@@ -82,10 +110,20 @@ export async function POST(request: Request) {
       );
     }
     const now = new Date();
+    const provider = createYouTubeLibraryProvider({ accessToken });
+    if (parsed.data.mode === 'page') {
+      const snapshot = await importYouTubeChannelPage({
+        userId,
+        creatorProfileId: profileId,
+        provider,
+        now,
+      });
+      return NextResponse.json(snapshot);
+    }
     const result = await syncChannelVideos({
       creatorProfileId: profileId,
       channelId,
-      provider: createYouTubeLibraryProvider({ accessToken }),
+      provider,
       now,
     });
     await db

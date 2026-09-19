@@ -38,13 +38,23 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("- Merging", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()
-        self.assertIn('SYMPHONY_VERSION="v0.0.2-jovie.2"', installer)
+        self.assertIn('SYMPHONY_VERSION="dae31f823850c9ef2dea121433e5b60f09af26fa"', installer)
+        self.assertIn("symphony-build-${SYMPHONY_VERSION}", installer)
+        self.assertNotIn("v0.0.2-jovie.2", installer)
         self.assertIn("github.com/JovieInc/symphony/releases/download", installer)
         self.assertIn("macos_arm64", installer)
         self.assertIn("shasum -a 256 -c", installer)
         self.assertIn('"$SYMPHONY_INSTALL_DIR/symphony"', installer)
         updater = (ROOT / "scripts/symphony/update-symphony-burrito.sh").read_text()
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', updater)
+        self.assertIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"',
+            updater,
+        )
+        self.assertIn("symphony_release_tag", updater)
+        self.assertIn("symphony-build-", updater)
+        self.assertNotIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', updater
+        )
         self.assertIn("github.com/JovieInc/symphony/releases/download", updater)
         self.assertIn("symphony-elixir.service", updater)
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)

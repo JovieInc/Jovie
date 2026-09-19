@@ -36,6 +36,13 @@
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
 #     0 = uncapped (bounded only by native queue depth), positive N re-caps
+#   DRAIN_RELEASE_WAVE_HOLD  bounded Production Controller release lease
+#     projection (1 pauses only new enrollment/re-entry; default 0)
+#   DRAIN_RELEASE_WAVE_REASON / DRAIN_RELEASE_WAVE_EXPIRES_AT /
+#     DRAIN_RELEASE_WAVE_RUN_ID  classifier receipt fields; an active hold
+#     must carry a bounded expiry and controller run identity
+#   DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS  maximum active-wave age (default
+#     1800, the documented 30-minute recovery window)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
 #                         draft-only, hold-intake, deferred-release-only,
 #                         or blocked
@@ -225,6 +232,63 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
+# Production Controller release-wave backpressure is a projection of the
+# existing workflow run, not a second queue or durable hold ledger. It pauses
+# only new admission/re-entry and expires from the observed controller run.
+DRAIN_RELEASE_WAVE_HOLD="${DRAIN_RELEASE_WAVE_HOLD:-0}"
+DRAIN_RELEASE_WAVE_REASON="${DRAIN_RELEASE_WAVE_REASON:-}"
+DRAIN_RELEASE_WAVE_EXPIRES_AT="${DRAIN_RELEASE_WAVE_EXPIRES_AT:-}"
+DRAIN_RELEASE_WAVE_RUN_ID="${DRAIN_RELEASE_WAVE_RUN_ID:-}"
+DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS="${DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS:-1800}"
+if [[ "$DRAIN_RELEASE_WAVE_HOLD" != "0" && "$DRAIN_RELEASE_WAVE_HOLD" != "1" ]]; then
+  echo "::error::DRAIN_RELEASE_WAVE_HOLD must be 0 or 1" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS < 60 )) \
+  || (( DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS > 3600 )); then
+  echo "::error::DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS must be 60-3600" >&2
+  exit 2
+fi
+RELEASE_WAVE_HOLD_ACTIVE=0
+if [[ "$DRAIN_RELEASE_WAVE_HOLD" == "1" ]]; then
+  if [[ ! "$DRAIN_RELEASE_WAVE_REASON" =~ ^[a-z0-9-]+$ ]]; then
+    echo "::error::Active release-wave hold requires a typed reason" >&2
+    exit 2
+  fi
+  if [[ "$DRAIN_RELEASE_WAVE_REASON" == "controller-state-unavailable" ]]; then
+    echo "::error::Unavailable release-wave evidence must block before drain; no expiring fallback is accepted" >&2
+    exit 2
+  fi
+  if [[ ! "$DRAIN_RELEASE_WAVE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+    echo "::error::Active release-wave hold requires a controller run id" >&2
+    exit 2
+  fi
+  release_wave_expiry_limit="$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS"
+  release_wave_state="$(node -e '
+    const [expiry, maxSeconds] = process.argv.slice(1);
+    const parsed = Date.parse(expiry || "");
+    const max = Number(maxSeconds);
+    const now = Date.now();
+    if (!Number.isFinite(parsed) || !Number.isInteger(max) || max <= 0) process.exit(2);
+    if (parsed <= now) process.stdout.write("expired");
+    else if (parsed > now + max * 1000 + 60_000) process.exit(3);
+    else process.stdout.write("active");
+  ' "$DRAIN_RELEASE_WAVE_EXPIRES_AT" "$release_wave_expiry_limit" 2>/dev/null)" || {
+    echo "::error::Release-wave hold expiry is malformed or exceeds its bound" >&2
+    exit 2
+  }
+  if [[ "$release_wave_state" == "active" ]]; then
+    RELEASE_WAVE_HOLD_ACTIVE=1
+    echo "::notice::Release-wave admission hold active ($DRAIN_RELEASE_WAVE_REASON, controller run $DRAIN_RELEASE_WAVE_RUN_ID, expires $DRAIN_RELEASE_WAVE_EXPIRES_AT); new native enrollment/re-entry is deferred"
+  else
+    echo "::notice::Release-wave admission hold expired at $DRAIN_RELEASE_WAVE_EXPIRES_AT; normal enrollment may resume"
+    DRAIN_RELEASE_WAVE_HOLD=0
+    DRAIN_RELEASE_WAVE_REASON='release-wave-expired'
+    DRAIN_RELEASE_WAVE_RUN_ID=''
+    DRAIN_RELEASE_WAVE_EXPIRES_AT=''
+  fi
+fi
 # Missing-CI class (2026-09-03): a non-draft main PR can sit for days with zero
 # check-runs for the required source contexts on its exact head, so it never
 # becomes green and never enrolls. Close+reopen re-fires the pull_request source
@@ -343,7 +407,13 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.authority == "Summer" and
         (.closureAdmission.status | IN("healthy", "grace", "red")) and
         (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
-        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
+        (
+          .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy")
+          or (
+            (.closureAdmission.status | IN("grace", "red"))
+            and .closureAdmission.newIssueIntakeAllowed == true
+          )
+        ) and
         .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
@@ -1196,6 +1266,7 @@ restore_deferred_hold() {  # restore_deferred_hold <num>
 # an unproven revision.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
+  [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]] && return 0
 
   echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
   echo "  ~ no typed pressure-deferral provenance; owner release required"
@@ -2724,7 +2795,13 @@ echo "=== ENROLL (mergeable + not failing → queue admission) ==="
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
-if waiting_lane_allows_clean_enroll; then
+if [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]]; then
+  # The active release lease only pauses new enrollment/re-entry. Existing
+  # native members have already passed admission and remain under the normal
+  # safety dequeue/reconciliation passes above.
+  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  ENROLL_SLOTS=0
+elif waiting_lane_allows_clean_enroll; then
   QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
@@ -2751,7 +2828,9 @@ fi
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
 if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
-  if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+  if [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]]; then
+    echo "  admission scope: release-wave hold ($DRAIN_RELEASE_WAVE_REASON; no new enrollment/re-entry)"
+  elif [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
     echo "  admission scope: no primary target (bounded missed-admission recovery enabled)"
   else
     echo "  admission scope: maintenance-only (no new enrollment)"
@@ -2859,7 +2938,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
 # returned success and left the PR invisible until an unrelated event happened.
 # Fail with a classified machine-owned condition so Delivery Control Receipts
 # emits a durable Gem repair task; it still cannot merge or bypass any gate.
-if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
+if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" ]]; then
   ADMISSION_DISPOSITION="$(echo "$SNAP" | node scripts/merge-queue-backend.mjs explain-selector \
     "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD" "$DRAIN_PROMOTION_MODE" "$ENROLL_SLOTS")"
   ADMISSION_TARGET_OBSERVED="$(jq -r '.observed' <<<"$ADMISSION_DISPOSITION")"
@@ -2924,7 +3003,7 @@ fi
 # heads: exact admission already strips that label, but a main-push recovery
 # used to filter them out and left CI-green Symphony heads (#16187) parked.
 # Legacy human, taste, and no-auto labels never exclude recovery.
-if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]]; then
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
     stop_if_budget_exhausted && break

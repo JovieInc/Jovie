@@ -12,10 +12,12 @@ Linear leases.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -36,12 +38,18 @@ from closure_health import (  # noqa: E402 - sibling executable module
     bounded_stack_health,
     build_product_closure_health,
     empty_stack_health,
+    issue_intake_allowed,
     observe_closure_health,
     project_product_admission,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
+from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
+    CAPACITY_MAX_TARGET,
     V2_PROOF_SCHEMA,
+    assert_repo_sidecar_path,
+    fleet_sidecar_path,
+    gate_state_dir,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
@@ -63,6 +71,27 @@ CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
+CLOSURE_HEALTH_PLACEHOLDER_REASON = "closure-health-receipt-missing-or-malformed"
+GATE_EVALUATION_FAILED_REASON = "gate-evaluation-failed"
+LIVE_PERSIST_ALLOW_ENV = "FLEET_GATE_ALLOW_LIVE_PERSIST"
+LIVE_PERSIST_WRITER = "gem-priority-gate.persist_live_receipt"
+UNSAFE_LIVE_PERSIST_REASONS = frozenset(
+    {
+        CLOSURE_HEALTH_PLACEHOLDER_REASON,
+        GATE_EVALUATION_FAILED_REASON,
+    }
+)
+# Transient trust-context loss after a mac.lan / host flap. These close
+# dispatch in the live evaluation but must not pin latest.json at max0
+# when a persistable approved receipt is already on disk, and they must
+# remint once approved evidence is live again.
+FLAP_CAPACITY_REASONS = frozenset(
+    {
+        "capacity-evidence-trust-context-unavailable",
+        "capacity-evidence-trust-context-missing",
+        "capacity-evidence-trust-context-invalid",
+    }
+)
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
@@ -72,6 +101,7 @@ RECEIPT_STALE_AFTER = timedelta(minutes=10)
 # deadlocks controller repair against the outage it exists to fix.
 REPAIR_FEED_REASONS = frozenset(
     {
+        "expired-held-prs",
         "internally-repairable-prs-open",
         "no-merge-progress-over-1h",
         "queue-controller-red-over-10m",
@@ -87,6 +117,34 @@ SEVERE_REASONS = {
 }
 DEFAULT_GEM_CONCURRENCY = 4
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
+# JOV-6462 / concurrency-ratchet-v1: after a sticky useful prove at N,
+# raise the approved capacity target to N+1 toward the gate baseline,
+# never past the useful-turn envelope. Remint-from-zero is recovery only.
+CONCURRENCY_RATCHET_SCHEMA = "concurrency-ratchet/v1"
+CONCURRENCY_RATCHET_POLICY = "concurrency-ratchet-v1"
+CAPACITY_ENVELOPE = CAPACITY_MAX_TARGET
+# JOV-5913: production-unbound is a deploy hold only (deploymentsAllowed stays
+# False). Unbound-repair concurrency follows live Grok/Kimi OAuth seats, never
+# Codex account state: an exhausted Codex pool must not serialize the fallback
+# lanes (symphony-concurrency-autoscale-v1 / prod-unbound-is-deploy-hold-v1).
+FALLBACK_SEAT_SCHEMA = "gem-fallback-seats/v1"
+FALLBACK_SEAT_PROVIDERS = ("grok", "kimi")
+# One live OAuth seat safely runs four workers on Gem (16c/62GB), matching the
+# historical DEFAULT_GROK_MAX worker budget. Codex-exhausted.py no longer
+# pins a provider ceiling; this budget is local to unbound-repair admission.
+FALLBACK_SEAT_WORKER_BUDGET = 4
+UNBOUND_REPAIR_MIN_CONCURRENCY = 1
+# Same incident-only receipt ceiling as fleet_admission_receipt.py.
+UNBOUND_REPAIR_MAX_CONCURRENCY = 40
+DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS = 20.0
+MAX_FALLBACK_PROBE_TIMEOUT_SECONDS = 30.0
+# Keep in sync with model-router.py QUOTA_RE.
+FALLBACK_QUOTA_RE = re.compile(
+    r"(429|402|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
+    r"insufficient (credit|quota)|weekly usage|limit reached|can only afford|"
+    r"max_tokens)",
+    re.I,
+)
 CONTROL_PLANE_PREFIXES = (
     "canon/",
     "scripts/backlog-orchestrator/",
@@ -188,10 +246,8 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
         and candidate.get("remediationContinues") is True
         and isinstance(candidate.get("reasons"), list)
         and all(isinstance(reason, str) for reason in candidate.get("reasons", []))
-        and (
-            candidate.get("newIssueIntakeAllowed")
-            is (candidate.get("status") == "healthy")
-        )
+        and candidate.get("newIssueIntakeAllowed")
+        is issue_intake_allowed(candidate.get("status"), candidate.get("reasons"))
     )
     if valid:
         result = dict(candidate)
@@ -219,7 +275,7 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "reasons": [CLOSURE_HEALTH_PLACEHOLDER_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -659,6 +715,246 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
 
 
+def _fallback_probe_timeout() -> float:
+    try:
+        value = float(
+            os.environ.get(
+                "GEM_FALLBACK_PROBE_TIMEOUT_SECONDS",
+                DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS,
+            )
+        )
+    except (TypeError, ValueError):
+        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
+    if value <= 0:
+        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
+    return min(value, MAX_FALLBACK_PROBE_TIMEOUT_SECONDS)
+
+
+def _fallback_registry_path(configured: Path | None) -> Path | None:
+    env_value = os.environ.get("GEM_MODEL_REGISTRY")
+    explicit = configured or (Path(env_value).expanduser() if env_value else None)
+    if explicit is not None:
+        return explicit if explicit.is_file() else None
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / "config" / "model-registry.json",
+        script_dir / "model-registry.json",
+        # Installed Symphony fallback bundle on the Gem host.
+        Path.home()
+        / ".local/bin/.symphony-codex-auth-fallback/current/model-registry.json",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _resolve_seat_executable(model: dict[str, Any]) -> str | None:
+    candidates: list[str] = []
+    env_key = model.get("executable_env")
+    if isinstance(env_key, str) and env_key:
+        explicit = os.environ.get(env_key)
+        if explicit:
+            candidates.append(explicit)
+    if model.get("provider") == "grok":
+        alias = os.environ.get("GEM_GROK_BIN")
+        if alias:
+            candidates.append(alias)
+        home = Path.home()
+        candidates.extend([str(home / ".local/bin/grok"), str(home / ".grok/bin/grok")])
+    default = model.get("executable_default")
+    if isinstance(default, str) and default:
+        candidates.append(default)
+    for candidate in candidates:
+        expanded = Path(candidate).expanduser()
+        resolved = (
+            str(expanded) if expanded.is_absolute() else shutil.which(candidate)
+        )
+        if resolved and os.access(resolved, os.X_OK):
+            return resolved
+    return None
+
+
+def _probe_fallback_seat(model: dict[str, Any], timeout: float) -> tuple[bool, str]:
+    """Prove one fallback OAuth seat with the registry's own probe definition."""
+    executable = _resolve_seat_executable(model)
+    if executable is None:
+        return False, "executable-missing"
+    argv_template = model.get("probe_argv")
+    if (
+        not isinstance(argv_template, list)
+        or not argv_template
+        or not all(isinstance(part, str) for part in argv_template)
+    ):
+        return False, "probe-undefined"
+    argv = [
+        part.format(executable=executable, model=model["model"])
+        for part in argv_template
+    ]
+    try:
+        result = subprocess.run(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False, "probe-failed"
+    raw = (result.stdout or b"") + b"\n" + (result.stderr or b"")
+    output = raw.decode(errors="replace")
+    lowered = output.lower()
+    forbidden = [
+        pattern.lower()
+        for pattern in (model.get("probe_forbidden_patterns") or [])
+        if isinstance(pattern, str) and pattern
+    ]
+    if any(pattern in lowered for pattern in forbidden):
+        return False, "auth-or-runtime-failed"
+    if FALLBACK_QUOTA_RE.search(output):
+        return False, "pool-quota-exhausted"
+    if model.get("probe_mode") == "json-model-key":
+        try:
+            payload = json.loads(result.stdout.decode(errors="replace"))
+        except (ValueError, UnicodeDecodeError):
+            return False, "probe-invalid-json"
+        models = payload.get("models") if isinstance(payload, dict) else None
+        if result.returncode != 0 or not isinstance(models, dict) or model["model"] not in models:
+            return False, "model-unlisted"
+        return True, "ready"
+    if result.returncode != 0:
+        return False, "probe-failed"
+    if model.get("provider") == "grok" and model["model"] not in output:
+        return False, "model-unlisted"
+    return True, "ready"
+
+
+def _unavailable_fallback_seats(reason: str) -> dict[str, Any]:
+    return {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "availableSeats": 0,
+        "providers": {},
+        "reason": reason,
+    }
+
+
+def observe_fallback_seats(
+    now: datetime, registry_path: Path | None = None
+) -> dict[str, Any]:
+    """Count live Grok/Kimi OAuth seats from the model registry probes.
+
+    Observation only: a missing registry, an unresolvable executable, or a
+    failed probe degrades the seat to unavailable and the receipt falls back
+    to the fail-closed floor. Codex account state is never consulted, so a
+    Codex outage cannot shrink fallback repair capacity.
+    """
+    path = _fallback_registry_path(registry_path)
+    if path is None:
+        return _unavailable_fallback_seats("model-registry-missing")
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return _unavailable_fallback_seats("model-registry-malformed")
+    models = registry.get("models") if isinstance(registry, dict) else None
+    if not isinstance(models, list):
+        return _unavailable_fallback_seats("model-registry-malformed")
+    selected: dict[str, dict[str, Any]] = {}
+    for model in models:
+        provider = model.get("provider") if isinstance(model, dict) else None
+        if (
+            provider in FALLBACK_SEAT_PROVIDERS
+            and provider not in selected
+            and isinstance(model.get("model"), str)
+        ):
+            selected[provider] = model
+    missing = [name for name in FALLBACK_SEAT_PROVIDERS if name not in selected]
+    if missing:
+        return _unavailable_fallback_seats(
+            f"fallback-providers-missing:{','.join(missing)}"
+        )
+    timeout = _fallback_probe_timeout()
+    providers: dict[str, dict[str, Any]] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected)) as pool:
+        futures = {
+            pool.submit(_probe_fallback_seat, model, timeout): name
+            for name, model in selected.items()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            name = futures[future]
+            try:
+                available, reason = future.result()
+            except Exception:
+                available, reason = False, "probe-error"
+            providers[name] = {"available": available, "reason": reason}
+    return {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "observedAt": isoformat(now),
+        "providers": providers,
+        "availableSeats": sum(
+            1 for entry in providers.values() if entry["available"]
+        ),
+    }
+
+
+def normalize_fallback_seats(value: object) -> dict[str, Any]:
+    """Fail-closed normalization of the fallback seat signal."""
+    if not isinstance(value, dict) or value.get("schema") != FALLBACK_SEAT_SCHEMA:
+        return _unavailable_fallback_seats("fallback-seat-evidence-unavailable")
+    providers = value.get("providers")
+    if not isinstance(providers, dict):
+        return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
+    normalized: dict[str, dict[str, Any]] = {}
+    for name in FALLBACK_SEAT_PROVIDERS:
+        entry = providers.get(name)
+        if not isinstance(entry, dict) or not isinstance(entry.get("available"), bool):
+            return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
+        normalized[name] = {
+            "available": entry["available"],
+            "reason": str(entry.get("reason") or "unknown"),
+        }
+    result: dict[str, Any] = {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "providers": normalized,
+        "availableSeats": sum(
+            1 for entry in normalized.values() if entry["available"]
+        ),
+    }
+    observed_at = value.get("observedAt")
+    if isinstance(observed_at, str) and observed_at:
+        result["observedAt"] = observed_at
+    return result
+
+
+def unbound_repair_concurrency(seats: dict[str, Any]) -> int:
+    """Seat-derived unbound-repair concurrency.
+
+    Missing or malformed seat evidence fails closed to the floor. Host
+    pressure is enforced separately at the worker launch layer, so this
+    admission never re-introduces a Codex-exhaustion cap on Grok/Kimi.
+    """
+    available = seats.get("availableSeats")
+    if not isinstance(available, int) or isinstance(available, bool) or available < 0:
+        return UNBOUND_REPAIR_MIN_CONCURRENCY
+    derived = available * FALLBACK_SEAT_WORKER_BUDGET
+    return max(
+        UNBOUND_REPAIR_MIN_CONCURRENCY,
+        min(UNBOUND_REPAIR_MAX_CONCURRENCY, derived),
+    )
+
+
+def unbound_repair_slots(seats: dict[str, Any], gem_concurrency: int) -> int:
+    """Prefer live Grok/Kimi OAuth seats; else useful-turn scale; else 1."""
+    if seats.get("schema") == FALLBACK_SEAT_SCHEMA and seats.get("reason") is None:
+        return unbound_repair_concurrency(seats)
+    if (
+        isinstance(gem_concurrency, int)
+        and not isinstance(gem_concurrency, bool)
+        and gem_concurrency >= 1
+    ):
+        return min(gem_concurrency, UNBOUND_REPAIR_MAX_CONCURRENCY)
+    return UNBOUND_REPAIR_MIN_CONCURRENCY
+
+
 def validate_independent_review(
     receipt: object, expected_head_sha: object, now: datetime
 ) -> dict[str, Any]:
@@ -867,6 +1163,11 @@ def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
 
 
 def write_queue_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
+    if snapshot.get("schema") == QUEUE_SNAPSHOT_SCHEMA:
+        repository = snapshot.get("repository")
+        if not isinstance(repository, str) or not repository.strip():
+            raise ValueError("queue snapshot must name its repository")
+        assert_repo_sidecar_path(path, repository, "queue-snapshot.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(
@@ -1033,6 +1334,42 @@ def valid_lane_capacity_receipt(value: object, now: datetime) -> bool:
     )
 
 
+def queue_starvation_blocked_since(
+    green_ready: object,
+    previous_blocked_since: object,
+    observed_at: str,
+) -> str | None:
+    """Stable empty-MQ clock for Summer ranking. Do not tick this every observe."""
+    if (
+        not isinstance(green_ready, int)
+        or isinstance(green_ready, bool)
+        or green_ready <= 0
+    ):
+        return None
+    if isinstance(previous_blocked_since, str) and previous_blocked_since.strip():
+        return previous_blocked_since
+    if isinstance(observed_at, str) and observed_at.strip():
+        return observed_at
+    return None
+
+
+def attach_queue_starvation_clock(
+    queue: dict[str, Any], observed_at: str
+) -> dict[str, Any]:
+    """Put signals.queue.blockedSince on starving CLEAN demand, else omit it."""
+    attached = dict(queue)
+    blocked = queue_starvation_blocked_since(
+        attached.get("greenReadyPrs"),
+        attached.get("blockedSince"),
+        observed_at,
+    )
+    if blocked is None:
+        attached.pop("blockedSince", None)
+    else:
+        attached["blockedSince"] = blocked
+    return attached
+
+
 def load_last_known_queue(
     path: Path, now: datetime, target: int, repo: str
 ) -> dict[str, Any] | None:
@@ -1065,7 +1402,7 @@ def load_last_known_queue(
         or lane_capacity.get("repositories", {}).get(repo, {}).get("budget") != target
     ):
         return None
-    return {
+    restored = {
         "status": "known",
         "repository": repo,
         "eligiblePrs": eligible,
@@ -1075,6 +1412,12 @@ def load_last_known_queue(
         "observedAt": data.get("observedAt"),
         "laneCapacity": lane_capacity,
     }
+    blocked = queue_starvation_blocked_since(
+        green_ready, data.get("blockedSince"), data.get("observedAt")
+    )
+    if blocked is not None:
+        restored["blockedSince"] = blocked
+    return restored
 
 
 def observe_queue(
@@ -1093,6 +1436,17 @@ def observe_queue(
     reuse a fresh last-known snapshot instead of emitting queue-unknown.
     """
     observed_at = now or utc_now()
+    if snapshot_path is not None:
+        try:
+            assert_repo_sidecar_path(snapshot_path, repo, "queue-snapshot.json")
+        except ValueError as error:
+            return {
+                "status": "unknown",
+                "repository": repo,
+                "eligiblePrs": None,
+                "target": target,
+                "error": f"queue-observation-failed: {error}",
+            }
     try:
         result = run_gh_queue_snapshot(repo)
         prs = json.loads(result.stdout)
@@ -1105,6 +1459,14 @@ def observe_queue(
             }.intersection({"queue-deferred"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
+        previous: dict[str, Any] = {}
+        if snapshot_path is not None and snapshot_path.exists():
+            try:
+                loaded = read_json(snapshot_path)
+                if isinstance(loaded, dict) and loaded.get("repository") == repo:
+                    previous = loaded
+            except (OSError, ValueError, json.JSONDecodeError):
+                previous = {}
         observed = {
             "status": "known",
             "repository": repo,
@@ -1121,6 +1483,13 @@ def observe_queue(
                 default_lane_budget,
             ),
         }
+        blocked = queue_starvation_blocked_since(
+            len(green_ready),
+            previous.get("blockedSince"),
+            observed["observedAt"],
+        )
+        if blocked is not None:
+            observed["blockedSince"] = blocked
         if snapshot_path is not None:
             write_queue_snapshot(
                 snapshot_path,
@@ -1175,7 +1544,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else {"status": "unknown"}
     )
     queue_value = signals.get("queue")
-    queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
+    queue = (
+        attach_queue_starvation_clock(queue_value, observed_at)
+        if isinstance(queue_value, dict)
+        else {"status": "unknown"}
+    )
     closure_health = validate_closure_health(signals.get("closureHealth"))
     product_closures = build_product_closure_health(
         closure_health, signals.get("productClosureHealth")
@@ -1200,11 +1573,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "reason": capacity_reason,
         "acceptedEvidence": capacity_proofs,
     }
+    fallback_seats = normalize_fallback_seats(signals.get("fallbackSeats"))
     normalized_signals = {
         **signals,
+        "queue": queue,
         "closureHealth": closure_health,
         "productClosureHealth": product_closures,
         "concurrencyEvidence": concurrency_evidence,
+        "fallbackSeats": fallback_seats,
     }
     review = validate_independent_review(
         signals.get("independentReview"),
@@ -1370,7 +1746,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
     remediation_concurrency = gem_concurrency
-    unbound_repair_concurrency = min(gem_concurrency, 40)
+    # JOV-5913: live Grok/Kimi OAuth seats scale unbound repair. Useful-turn
+    # proofs remain the gem dispatch authority and a fallback scale when seat
+    # evidence is missing. Codex exhaustion cannot cap this lane.
+    unbound_repair_max_concurrent = unbound_repair_slots(
+        fallback_seats, gem_concurrency
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1433,8 +1814,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and controller.get("status") == "green"
         and production_unbound
         and review_allowed
-        and capacity_fresh
-        and gem_concurrency >= 1
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )
@@ -1502,9 +1881,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
         work_activities = ["tests", "review"]
     else:
-        new_implementation_allowed = (
-            capacity_fresh and queue_shape_valid and repository_capacity_available
-        )
+        # Capacity evidence governs mutation seats, not Linear-child intake.
+        # Missing useful-turn proofs must not freeze Eve's v2 projection.
+        # Queue backpressure (ready >= budget) still holds new leases.
+        new_implementation_allowed = queue_shape_valid and repository_capacity_available
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [
@@ -1611,7 +1991,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
+            # Seat-derived when live Grok/Kimi OAuth evidence exists; never 1
+            # by fiat and never reduced by Codex exhaustion. Deployments stay
+            # forbidden: unbound is a deploy hold, not a repair blocker.
+            "maxConcurrent": (
+                unbound_repair_max_concurrent if unbound_repair_allowed else 0
+            ),
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
@@ -1662,6 +2047,334 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "symphonyImplementation": "event-driven-backpressure",
         },
     }
+
+
+class LivePersistFenceError(RuntimeError):
+    """Refuse-closed live persist. Never converted into a persisted receipt."""
+
+
+def live_persist_override_is_nonzero(raw: str | None) -> bool:
+    """True when FLEET_GATE_ALLOW_LIVE_PERSIST is a nonzero/truthy spelling."""
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    return value not in {"", "0", "false", "no", "off"}
+
+
+def refuse_unsafe_live_persist_override() -> bool:
+    """Return True when live persist must be skipped due to override env.
+
+    The env var is not an enable switch. Any nonzero spelling refuse-closes the
+    *write* only — callers must still emit a schema-valid receipt on stdout.
+    """
+    raw = os.environ.get(LIVE_PERSIST_ALLOW_ENV)
+    return live_persist_override_is_nonzero(raw)
+
+
+def _receipt_reason_codes(receipt: dict[str, Any]) -> set[str]:
+    codes: set[str] = set()
+    for item in receipt.get("reasons") or []:
+        if isinstance(item, str):
+            codes.add(item)
+        elif isinstance(item, dict):
+            code = item.get("code")
+            if isinstance(code, str):
+                codes.add(code)
+    signals = receipt.get("signals")
+    closure = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if isinstance(closure, dict):
+        for item in closure.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    admission = receipt.get("closureAdmission")
+    if isinstance(admission, dict):
+        for item in admission.get("reasons") or []:
+            if isinstance(item, str):
+                codes.add(item)
+    return codes
+
+
+def live_persist_rejection_reason(receipt: dict[str, Any]) -> str | None:
+    """Return why a candidate must not replace latest.json, or None if safe."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected malformed receipt schema"
+    if parse_time(receipt.get("observedAt")) is None:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without a typed observedAt"
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed signals"
+    main = signals.get("main")
+    sha = main.get("sha") if isinstance(main, dict) else None
+    if not valid_commit_sha(sha, exact=True) or sha == UNKNOWN_MAIN_SHA:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected receipt without exact source/main identity"
+        )
+    closure = signals.get("closureHealth")
+    if not isinstance(closure, dict) or closure.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed closure-health"
+    if closure.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without closure-health authority"
+    if closure.get("status") not in {"healthy", "grace", "red"}:
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt with untyped closure-health status"
+    unsafe = _receipt_reason_codes(receipt) & UNSAFE_LIVE_PERSIST_REASONS
+    if CLOSURE_HEALTH_PLACEHOLDER_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected placeholder closure-health "
+            f"({CLOSURE_HEALTH_PLACEHOLDER_REASON})"
+        )
+    if GATE_EVALUATION_FAILED_REASON in unsafe:
+        return (
+            f"{LIVE_PERSIST_WRITER}: rejected failed-evaluation receipt "
+            f"({GATE_EVALUATION_FAILED_REASON})"
+        )
+    work = receipt.get("workAdmission")
+    if not isinstance(work, dict) or not isinstance(work.get("allowed"), bool):
+        return f"{LIVE_PERSIST_WRITER}: rejected receipt without typed workAdmission"
+    return None
+
+
+def approved_dispatch_concurrency(receipt: dict[str, Any] | None) -> int | None:
+    """Return approved mutation seats, or None when dispatch is unproven."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return None
+    concurrency = receipt.get("concurrency")
+    signals = receipt.get("signals")
+    if not isinstance(concurrency, dict) or not isinstance(signals, dict):
+        return None
+    gem = concurrency.get("gem")
+    evidence = signals.get("concurrencyEvidence")
+    if not isinstance(gem, dict) or not isinstance(evidence, dict):
+        return None
+    maximum = gem.get("maxConcurrent")
+    if (
+        gem.get("evidenceAccepted") is True
+        and evidence.get("accepted") is True
+        and isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+    ):
+        return maximum
+    return None
+
+
+def _persisted_max_concurrent(receipt: dict[str, Any] | None) -> int | None:
+    if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
+        return None
+    gem = (receipt.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict):
+        return None
+    maximum = gem.get("maxConcurrent")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
+        return None
+    return maximum
+
+
+def should_remint_lagging_zero_concurrency(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """True when approved live seats must replace a stale persisted max0 gate.
+
+    After a mac.lan flap the persisted receipt can stay at maxConcurrent=0
+    even though capacity evidence is already accepted. A newer-or-equal
+    observedAt on that max0 receipt must not block the remint.
+    """
+    if approved_dispatch_concurrency(live) is None:
+        return False
+    if live_persist_rejection_reason(live) is not None:
+        return False
+    return _persisted_max_concurrent(persisted) == 0
+
+
+def should_preserve_approved_concurrency(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """Keep last-good approved seats when a flap only closes live dispatch.
+
+    Genuine stale/missing evidence and RED integrity still replace latest.json.
+    """
+    if approved_dispatch_concurrency(live) is not None:
+        return False
+    if approved_dispatch_concurrency(persisted) is None:
+        return False
+    if live.get("state") == "RED":
+        return False
+    if live_persist_rejection_reason(persisted) is not None:
+        return False
+    evidence = (live.get("signals") or {}).get("concurrencyEvidence")
+    reason = evidence.get("reason") if isinstance(evidence, dict) else None
+    return reason in FLAP_CAPACITY_REASONS
+
+
+def _read_persisted_receipt(state_dir: Path) -> dict[str, Any] | None:
+    try:
+        persisted = read_json(state_dir / "latest.json")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if persisted.get("schema") != SCHEMA:
+        return None
+    return persisted
+
+
+def ratchet_ceiling(
+    baseline: int = DEFAULT_GEM_CONCURRENCY, envelope: int = CAPACITY_ENVELOPE
+) -> int:
+    """Highest automatic target: gate baseline, never past the proof envelope."""
+    return min(baseline, envelope)
+
+
+def useful_proof_fingerprint(
+    receipt: dict[str, Any] | None,
+) -> frozenset[tuple[str, str]]:
+    """Stable marks for accepted useful-turn rows on a fleet receipt."""
+    if not isinstance(receipt, dict):
+        return frozenset()
+    evidence = (receipt.get("signals") or {}).get("concurrencyEvidence")
+    rows = evidence.get("acceptedEvidence") if isinstance(evidence, dict) else None
+    if not isinstance(rows, list):
+        return frozenset()
+    marks: set[tuple[str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        digest = row.get("outputDigest")
+        completed = row.get("completedAt")
+        if (
+            isinstance(digest, str)
+            and digest
+            and isinstance(completed, str)
+            and completed
+        ):
+            marks.add((digest, completed))
+    return frozenset(marks)
+
+
+def approved_capacity_target(receipt: dict[str, Any] | None) -> int | None:
+    """Persisted approved target, or the live approved seat count."""
+    if not isinstance(receipt, dict):
+        return None
+    gem = (receipt.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict):
+        return None
+    target = gem.get("approvedCapacityTarget")
+    if isinstance(target, bool) or not isinstance(target, int) or target < 1:
+        return approved_dispatch_concurrency(receipt)
+    return target
+
+
+def has_new_sticky_useful_proof(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> bool:
+    """True when live accepted proofs are not a subset of the last persist."""
+    live_marks = useful_proof_fingerprint(live)
+    if not live_marks:
+        return False
+    return not live_marks.issubset(useful_proof_fingerprint(persisted))
+
+
+def should_raise_approved_capacity_target(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> int | None:
+    """Return N+1 after a sticky useful prove at approved N, else None.
+
+    Fail closed: never raise while evidenceAccepted=false, maxConcurrent=0,
+    unproven, or remint-from-zero. First persist and same-proof refreshes
+    stay at the current target. Ceiling is min(baseline, envelope).
+    """
+    live_n = approved_dispatch_concurrency(live)
+    if live_n is None or live_n < LOCAL_REMEDIATION_CONCURRENCY_FLOOR:
+        return None
+    if persisted is None:
+        return None
+    if approved_dispatch_concurrency(persisted) is None:
+        return None
+    if _persisted_max_concurrent(persisted) == 0:
+        return None
+    gem = (persisted.get("concurrency") or {}).get("gem")
+    if not isinstance(gem, dict) or gem.get("evidenceAccepted") is not True:
+        return None
+    if live_persist_rejection_reason(live) is not None:
+        return None
+    current = approved_capacity_target(persisted)
+    if current is None or current < LOCAL_REMEDIATION_CONCURRENCY_FLOOR:
+        return None
+    ceiling = ratchet_ceiling()
+    if current >= ceiling:
+        return None
+    if not has_new_sticky_useful_proof(live, persisted):
+        return None
+    return min(current + 1, ceiling)
+
+
+def apply_approved_capacity_target(
+    receipt: dict[str, Any],
+    target: int,
+    *,
+    apply_seats: bool,
+    raised_from: int | None = None,
+) -> dict[str, Any]:
+    """Stamp the approved target; optionally raise live mutation seats with it."""
+    updated = json.loads(json.dumps(receipt))
+    gem = updated.setdefault("concurrency", {}).setdefault("gem", {})
+    gem["approvedCapacityTarget"] = target
+    ratchet = {
+        "schema": CONCURRENCY_RATCHET_SCHEMA,
+        "policy": CONCURRENCY_RATCHET_POLICY,
+        "ceiling": ratchet_ceiling(),
+    }
+    if raised_from is not None:
+        ratchet["raisedFrom"] = raised_from
+        ratchet["raisedTo"] = target
+    gem["ratchet"] = ratchet
+    if apply_seats:
+        gem["maxConcurrent"] = target
+        remediation = updated.get("remediationAdmission")
+        if isinstance(remediation, dict):
+            remediation["maxConcurrent"] = target
+    return updated
+
+
+def apply_concurrency_ratchet(
+    live: dict[str, Any], persisted: dict[str, Any] | None
+) -> tuple[dict[str, Any], str | None]:
+    """Restore or raise the approved target. Never opens seats while unproven."""
+    ceiling = ratchet_ceiling()
+    persisted_target = approved_capacity_target(persisted)
+    live_n = approved_dispatch_concurrency(live)
+    if live_n is None:
+        if persisted_target is None:
+            return live, None
+        return (
+            apply_approved_capacity_target(
+                live, min(persisted_target, ceiling), apply_seats=False
+            ),
+            None,
+        )
+    raised = should_raise_approved_capacity_target(live, persisted)
+    target = live_n
+    if persisted_target is not None:
+        target = max(target, persisted_target)
+    if raised is not None:
+        target = max(target, raised)
+    target = min(target, ceiling)
+    if raised is not None and target > live_n:
+        return (
+            apply_approved_capacity_target(
+                live, target, apply_seats=True, raised_from=live_n
+            ),
+            (
+                f"fleet gate raised approved capacity target {live_n} -> {target} "
+                f"after sticky useful prove ({CONCURRENCY_RATCHET_POLICY})"
+            ),
+        )
+    if target > live_n:
+        return (
+            apply_approved_capacity_target(live, target, apply_seats=True),
+            (
+                f"fleet gate restored approved capacity target {target} "
+                f"above measured {live_n} ({CONCURRENCY_RATCHET_POLICY})"
+            ),
+        )
+    return apply_approved_capacity_target(live, target, apply_seats=False), None
 
 
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
@@ -1795,7 +2508,7 @@ def failed_evaluation_receipt(
             "new-implementation",
             "fallback-pr-generation",
         ],
-        "reasons": ["gate-evaluation-failed"],
+        "reasons": [GATE_EVALUATION_FAILED_REASON],
         "stackHealth": empty_stack_health(),
         "repairActions": [],
     }
@@ -1828,7 +2541,7 @@ def failed_evaluation_receipt(
         },
         "reasons": [
             typed_reason(
-                "gate-evaluation-failed",
+                GATE_EVALUATION_FAILED_REASON,
                 "integrity",
                 "critical",
                 str(error),
@@ -1852,7 +2565,7 @@ def failed_evaluation_receipt(
             "fallbackPrGenerationAllowed": False,
             "authority": CLOSURE_HEALTH_AUTHORITY,
             "status": "red",
-            "reasons": ["gate-evaluation-failed"],
+            "reasons": [GATE_EVALUATION_FAILED_REASON],
             "promotionContinues": True,
             "remediationContinues": True,
             "products": project_product_admission(product_closures),
@@ -1929,20 +2642,75 @@ def persist_live_receipt(
     cannot create the Gem state dir. Throwing there used to replace a complete
     live receipt with an incomplete stub. Consumers must still receive the
     live evaluation so Auto-Enroll can skip or admit from schema-valid JSON.
+
+    Placeholder, failed-evaluation, and untyped candidates never replace
+    latest.json. A prior valid receipt stays in place. The live-persist
+    env override is not an enable switch: any nonzero spelling hard-fails
+    before the writer lock is taken, except the flap remint class: when
+    persisted latest.json is maxConcurrent=0 and the live receipt already
+    holds approved capacity, remint without a manual ALLOW dance.
     """
+    remint = False
+    persisted = None
+    try:
+        persisted = _read_persisted_receipt(state_dir)
+        remint = should_remint_lagging_zero_concurrency(receipt, persisted)
+    except (OSError, ValueError, json.JSONDecodeError):
+        persisted = None
+        remint = False
+    if refuse_unsafe_live_persist_override() and not remint:
+        warn_live_receipt_not_persisted(
+            LivePersistFenceError(
+                f"{LIVE_PERSIST_WRITER}: {LIVE_PERSIST_ALLOW_ENV} is present and "
+                "nonzero; live persist is refuse-closed (evaluation still emitted)"
+            )
+        )
+        return receipt
+    rejected = live_persist_rejection_reason(receipt)
+    if rejected is not None:
+        warn_live_receipt_not_persisted(LivePersistFenceError(rejected))
+        return receipt
     try:
         lock_fd = acquire_writer_lock(state_dir)
     except (OSError, TimeoutError) as error:
         warn_live_receipt_not_persisted(error)
         return receipt
     try:
-        persisted_at = persisted_observed_at(state_dir)
-        if persisted_at is not None and persisted_at >= now:
+        persisted = _read_persisted_receipt(state_dir)
+        remint = should_remint_lagging_zero_concurrency(receipt, persisted)
+        if should_preserve_approved_concurrency(receipt, persisted):
+            warn_live_receipt_not_persisted(
+                LivePersistFenceError(
+                    f"{LIVE_PERSIST_WRITER}: kept last-good approved concurrency "
+                    "after flap-class dispatch close"
+                )
+            )
+            return persisted
+        persisted_at = (
+            parse_time(persisted.get("observedAt")) if persisted is not None else None
+        )
+        if persisted_at is not None and persisted_at >= now and not remint:
             try:
                 return read_json(state_dir / "latest.json")
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 warn_live_receipt_not_persisted(error)
                 return receipt
+        if remint:
+            seats = approved_dispatch_concurrency(receipt)
+            prefix = (
+                "::notice::" if os.environ.get("GITHUB_ACTIONS") == "true" else "INFO:"
+            )
+            print(
+                f"{prefix} fleet gate reminted lagging maxConcurrent=0 to "
+                f"{seats} from approved capacity evidence",
+                file=sys.stderr,
+            )
+        receipt, ratchet_notice = apply_concurrency_ratchet(receipt, persisted)
+        if ratchet_notice:
+            prefix = (
+                "::notice::" if os.environ.get("GITHUB_ACTIONS") == "true" else "INFO:"
+            )
+            print(f"{prefix} {ratchet_notice}", file=sys.stderr)
         write_receipt(receipt, state_dir)
         verify_persisted_receipt(state_dir, receipt)
         return receipt
@@ -2000,15 +2768,26 @@ def parse_args() -> argparse.Namespace:
         "--state-dir",
         type=Path,
         default=Path(
-            os.environ.get(
-                "GEM_PRIORITY_GATE_STATE_DIR",
-                "/home/timwhite/gem-workspace/state/gem-priority-gate",
+            os.environ.get("GEM_PRIORITY_GATE_STATE_DIR")
+            # Per-repo isolation: non-Jovie repos resolve their own state dir
+            # so sibling singletons never collide with Jovie's (JOV-INV).
+            or gate_state_dir(
+                Path(
+                    os.environ.get(
+                        "GEM_WORKSPACE",
+                        "/home/timwhite/gem-workspace",
+                    )
+                ),
+                os.environ.get("GEM_PRIORITY_GATE_REPO")
+                or os.environ.get("GEM_PR_DRAIN_REPO")
+                or "JovieInc/Jovie",
             )
         ),
     )
     parser.add_argument("--integrity-receipt", type=Path)
     parser.add_argument("--concurrency-evidence", type=Path)
     parser.add_argument("--independent-review-receipt", type=Path)
+    parser.add_argument("--model-registry", type=Path)
     return parser.parse_args()
 
 
@@ -2030,14 +2809,17 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     )
     review_path = (
         args.independent_review_receipt
-        or args.state_dir.parent / "independent-review.json"
+        or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
+    closure = observe_closure_health(args.repo, previous_closure_health(args.state_dir), now)
     return {
         "main": main,
         "production": observe_production(args.production_url),
         "controller": observe_controller(
             args.symphony_url,
-            snapshot_path=args.state_dir.parent / "controller-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "controller-snapshot.json"
+            ),
             now=now,
         ),
         "integrity": observe_integrity(integrity_path),
@@ -2045,15 +2827,18 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.repo,
             args.queue_target,
             default_lane_budget,
-            snapshot_path=args.state_dir.parent / "queue-snapshot.json",
+            snapshot_path=fleet_sidecar_path(
+                args.state_dir, args.repo, "queue-snapshot.json"
+            ),
             now=now,
         ),
-        "closureHealth": observe_closure_health(
-            args.repo,
-            previous_closure_health(args.state_dir),
-            now,
-        ),
+        "closureHealth": closure,
+        "ciAudit": observe_ci_audit(args.repo, main.get("sha"), gh_json,
+                                    targets=closure.get("lifecycleActions", []) if isinstance(closure, dict) else []),
         "concurrencyEvidence": concurrency,
+        "fallbackSeats": observe_fallback_seats(
+            now, registry_path=getattr(args, "model_registry", None)
+        ),
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now
         ),

@@ -120,9 +120,10 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(
-      header.getByRole('link', { name: 'Customers' })
-    ).toHaveAttribute('href', '/artists');
+    await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
@@ -146,7 +147,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Get started' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    ).toHaveAttribute('href', '/signup');
   });
 
   test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
@@ -852,7 +853,7 @@ test.describe('Homepage', () => {
     ).toHaveAttribute('href', '/signin');
     await expect(
       mobileNav.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    ).toHaveAttribute('href', '/signup');
   });
 
   test('has no horizontal overflow across common viewports', async ({
@@ -1181,11 +1182,10 @@ test.describe('Homepage', () => {
   });
 
   /**
-   * JOV-5334: Public waitlist-first conversion CTAs land on the production
-   * waitlist URL. /start remains the post-auth capture chat, not the public
-   * Get started.
+   * JOV-6436: Public Get started CTAs land on same-origin /signup.
+   * /start remains the post-auth capture chat; /waitlist is the receipt.
    */
-  test('all data-cta-sign-up elements navigate to the public waitlist (JOV-5334)', async ({
+  test('all data-cta-sign-up elements navigate to signup (JOV-6436)', async ({
     page,
   }) => {
     await gotoHomepage(page);
@@ -1206,12 +1206,13 @@ test.describe('Homepage', () => {
 
       if (tagName === 'a') {
         const href = await cta.getAttribute('href');
-        const isWaitlistRoute =
+        const isSignupRoute =
           href === PUBLIC_WAITLIST_URL ||
-          (href?.startsWith('/waitlist') ?? false);
+          href === '/signup' ||
+          (href?.startsWith('/signup?') ?? false);
         expect(
-          isWaitlistRoute,
-          `CTA at index ${i} (href="${href}") must route to the public waitlist`
+          isSignupRoute,
+          `CTA at index ${i} (href="${href}") must route to /signup`
         ).toBe(true);
       }
     }

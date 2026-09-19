@@ -29,6 +29,13 @@ vi.mock('@/lib/rate-limit', () => ({
     limit: vi.fn().mockResolvedValue({ success: true }),
   },
   createRateLimitHeaders: vi.fn().mockReturnValue({}),
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'This action is temporarily unavailable. Please try again later.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 
 // Mock database
@@ -63,6 +70,7 @@ vi.mock('@/lib/stripe/client', () => ({
 
 // Import the route after mocks are set up
 import { POST } from '@/app/api/create-tip-intent/route';
+import { paymentIntentLimiter } from '@/lib/rate-limit';
 
 describe('POST /api/create-tip-intent', () => {
   beforeEach(() => {
@@ -123,6 +131,26 @@ describe('POST /api/create-tip-intent', () => {
 
     expect(response.status).toBe(400);
     expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the durable payment limiter is unavailable', async () => {
+    vi.mocked(paymentIntentLimiter.limit).mockResolvedValueOnce({
+      success: false,
+      limit: 10,
+      remaining: 0,
+      reset: new Date(),
+      unavailable: true,
+      backend: 'unavailable',
+    });
+    const response = await POST(
+      new NextRequest('http://localhost/api/create-tip-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 500, handle: 'validartist' }),
+      })
+    );
+    expect(response.status).toBe(503);
     expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
   });
 

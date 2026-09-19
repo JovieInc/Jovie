@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   createHash,
   createPrivateKey,
@@ -25,8 +25,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { isIP } from 'node:net';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 export const READ_DOMAIN = 'summer.symphony-outbox-read/v1';
 export const OUTBOX_DOMAIN = 'jovie.eve.symphony-repair-outbox/v1';
@@ -42,6 +43,46 @@ export const OUTBOX_PATH = '/summer/v1/symphony/outbox';
 export const OUTCOME_PATH = '/summer/v1/symphony/outcomes';
 export const EXECUTION_HOLD =
   'v1-missing-explicit-execution-target-and-decision-fingerprint';
+const TASK_ACCEPTANCE_SCHEMA = 'symphony-existing-repair-task-acceptance/v1';
+export const SOURCE_EVALUATION_SCHEMA =
+  'symphony-existing-repair-source-evaluation/v1';
+const EXECUTION_EVIDENCE_KEYS =
+  'runId provider model authPoolIdentity leaseIdentity evidenceDigest assignmentDigest providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest baseHead finalHead outputDigest sourceEvaluation verification'.split(
+    ' '
+  );
+const SOURCE_EVALUATION_KEYS =
+  'schema taskKey taskSelectionDigest sourceVersion snapshotDigest targetDigest identifier issueId repository pr baseHead finalHead targetObserved observedIssueId observedIssueRevision observedPrNumber observedPrHead observedRepository prMergeStateStatus mergeable workerAttested selectedEvidence taskResolved reason digest'.split(
+    ' '
+  );
+const VERIFICATION_KEYS =
+  'schema claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved headChanged taskAccepted'.split(
+    ' '
+  );
+const SOURCE_EVALUATION_REASONS = new Set([
+  'target-observation-unavailable',
+  'target-identity-mismatch',
+  'head-unchanged',
+  'task-check-unresolved',
+  'task-check-evidence-unavailable',
+  'task-check-passed',
+]);
+const CONTROLLER_TIMEOUT_MS = (5400 + 30) * 1000;
+const CONTROLLER_OUTPUT_LIMIT = 128 * 1024;
+export const OWNED_REPAIR_CONTROLLER_PACKAGE_SCHEMA =
+  'symphony-existing-repair-controller-package/v1';
+const OWNED_REPAIR_CONTROLLER_MANIFEST =
+  'existing-repair-controller-manifest.json';
+const OWNED_REPAIR_CONTROLLER_MANIFEST_KEYS = [
+  'schema',
+  'packageId',
+  'command',
+  'arguments',
+  'launcherRelativePath',
+  'releaseControllerRelativePath',
+  'releaseValidatorRelativePath',
+  'releaseResolverRelativePath',
+  'installer',
+];
 
 const DIGEST = /^[a-f0-9]{64}$/u;
 const SHA = /^[a-f0-9]{40}$/u;
@@ -61,6 +102,7 @@ class OutboxPageLimitError extends Error {
 
 const ACTIONS = new Set([
   'reconcile-release-certification-starvation',
+  'reconcile-native-queue-starvation',
   'remediate-selected-ci-audit-class',
 ]);
 const CI_IDS = new Set([
@@ -83,12 +125,73 @@ export function canonical(value) {
   return JSON.stringify(value);
 }
 
+function digest(value) {
+  return createHash('sha256').update(canonical(value)).digest('hex');
+}
+
+function taskAcceptanceDigestV3(taskKey, existingRepair) {
+  return digest({
+    schema: TASK_ACCEPTANCE_SCHEMA,
+    taskKey,
+    assignmentDigest: existingRepair.assignmentDigest,
+    existingRepair,
+  });
+}
+
+export function symphonyTaskSelectionDigestV3(task) {
+  return digest({
+    taskKey: task.taskKey,
+    action: task.action,
+    selected: task.selected,
+    source: task.source,
+  });
+}
+
+export function symphonySourceEvaluationDigestV3(evaluation) {
+  const { digest: _digest, ...unsigned } = evaluation;
+  return digest({ schema: SOURCE_EVALUATION_SCHEMA, ...unsigned });
+}
+
 function exactKeys(value, keys) {
   return (
     value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.keys(value).sort().join('\0') === [...keys].sort().join('\0')
+  );
+}
+
+const SELECTED_CHECK_EVIDENCE_KEYS = [
+  'id',
+  'handle',
+  'check',
+  'result',
+  'source',
+];
+
+function selectedCheckEvidenceShapeValid(value) {
+  if (value === null) return true;
+  return (
+    exactKeys(value, SELECTED_CHECK_EVIDENCE_KEYS) &&
+    typeof value.id === 'string' &&
+    typeof value.handle === 'string' &&
+    typeof value.check === 'string' &&
+    value.id.length > 0 &&
+    value.handle.length > 0 &&
+    value.check.length > 0 &&
+    value.result === 'SUCCESS' &&
+    value.source === 'github-status-check-rollup'
+  );
+}
+
+function selectedCheckEvidenceValid(value, boundTask) {
+  if (!selectedCheckEvidenceShapeValid(value) || value === null) return false;
+  const selected = boundTask?.selected;
+  if (!selected) return true;
+  return (
+    value.id === selected.id &&
+    value.handle === selected.handle &&
+    (value.check === selected.id || value.check === selected.handle)
   );
 }
 
@@ -213,11 +316,15 @@ export function validateTask(task) {
     throw new Error('outbox-task-invalid-or-cross-bound');
   }
   const release = task.selected.id === 'release-certification-starvation';
+  const queueStarvation = task.selected.id === 'native-queue-starvation';
   if (
     !isV3 &&
     ((release &&
       task.action !== 'reconcile-release-certification-starvation') ||
+      (queueStarvation &&
+        task.action !== 'reconcile-native-queue-starvation') ||
       (!release &&
+        !queueStarvation &&
         (!CI_IDS.has(task.selected.id) ||
           task.action !== 'remediate-selected-ci-audit-class')))
   ) {
@@ -231,7 +338,7 @@ export function validateTask(task) {
       task.decisionFingerprint !== task.taskKey ||
       lifetime <= 0 ||
       lifetime > 5400000 ||
-      (!release && !CI_IDS.has(task.selected.id))
+      (!release && !queueStarvation && !CI_IDS.has(task.selected.id))
     )
       throw new Error('existing-repair-task-cross-bound');
   }
@@ -387,6 +494,98 @@ export function signOutcomeV3(task, result, privateKey, keyId) {
   };
 }
 
+export function validateExecutionEvidenceV3(outcome, boundTask) {
+  const execution = outcome?.execution;
+  const verification = execution?.verification;
+  const sourceEvaluation = execution?.sourceEvaluation;
+  const target = outcome?.existingRepair;
+  const sourceTaskResolved =
+    sourceEvaluation?.targetObserved &&
+    sourceEvaluation.finalHead !== sourceEvaluation.baseHead &&
+    sourceEvaluation.prMergeStateStatus === 'CLEAN' &&
+    sourceEvaluation.mergeable === 'MERGEABLE' &&
+    selectedCheckEvidenceValid(sourceEvaluation?.selectedEvidence, boundTask);
+  const sourceObservationMatches =
+    !sourceEvaluation?.targetObserved ||
+    (sourceEvaluation.observedIssueId === target?.issueId &&
+      sourceEvaluation.observedIssueRevision === target?.issueRevision &&
+      sourceEvaluation.observedPrNumber === target?.pr &&
+      sourceEvaluation.observedPrHead === execution?.finalHead &&
+      sourceEvaluation.observedRepository === target?.repository);
+  if (
+    !exactKeys(execution, EXECUTION_EVIDENCE_KEYS) ||
+    !exactKeys(sourceEvaluation, SOURCE_EVALUATION_KEYS) ||
+    !exactKeys(verification, VERIFICATION_KEYS) ||
+    verification.schema !== 'symphony-existing-repair-evidence/v1' ||
+    ![
+      'claimRecorded',
+      'acceptanceRecorded',
+      'runStarted',
+      'runTerminal',
+      'resultPersisted',
+      'leaseHeld',
+      'workspaceBound',
+      'headObserved',
+    ].every(key => verification[key] === true) ||
+    typeof verification.headChanged !== 'boolean' ||
+    typeof verification.taskAccepted !== 'boolean' ||
+    !DIGEST.test(execution.assignmentDigest) ||
+    !DIGEST.test(execution.providerGrantDigest) ||
+    !DIGEST.test(execution.acceptanceDigest) ||
+    !DIGEST.test(execution.runDigest) ||
+    !DIGEST.test(execution.taskAcceptanceDigest) ||
+    !DIGEST.test(execution.outputDigest) ||
+    !SHA.test(execution.baseHead) ||
+    !SHA.test(execution.finalHead) ||
+    execution.baseHead !== target?.head ||
+    execution.taskAcceptanceDigest !==
+      taskAcceptanceDigestV3(outcome?.taskKey, outcome?.existingRepair) ||
+    verification.headChanged !== (execution.baseHead !== execution.finalHead) ||
+    sourceEvaluation.schema !== SOURCE_EVALUATION_SCHEMA ||
+    sourceEvaluation.taskKey !== outcome?.taskKey ||
+    !DIGEST.test(sourceEvaluation.taskSelectionDigest ?? '') ||
+    (boundTask &&
+      sourceEvaluation.taskSelectionDigest !==
+        symphonyTaskSelectionDigestV3(boundTask)) ||
+    sourceEvaluation.sourceVersion !== outcome?.source?.sourceVersion ||
+    sourceEvaluation.snapshotDigest !== outcome?.source?.snapshotDigest ||
+    sourceEvaluation.targetDigest !== digest(target) ||
+    sourceEvaluation.identifier !== target?.identifier ||
+    sourceEvaluation.issueId !== target?.issueId ||
+    sourceEvaluation.repository !== target?.repository ||
+    sourceEvaluation.pr !== target?.pr ||
+    sourceEvaluation.baseHead !== execution.baseHead ||
+    sourceEvaluation.finalHead !== execution.finalHead ||
+    typeof sourceEvaluation.targetObserved !== 'boolean' ||
+    typeof sourceEvaluation.workerAttested !== 'boolean' ||
+    !selectedCheckEvidenceShapeValid(sourceEvaluation.selectedEvidence) ||
+    typeof sourceEvaluation.taskResolved !== 'boolean' ||
+    !SOURCE_EVALUATION_REASONS.has(sourceEvaluation.reason) ||
+    sourceEvaluation.digest !==
+      symphonySourceEvaluationDigestV3(sourceEvaluation) ||
+    !sourceObservationMatches ||
+    (sourceEvaluation.taskResolved &&
+      sourceEvaluation.reason !== 'task-check-passed') ||
+    sourceEvaluation.taskResolved !== sourceTaskResolved ||
+    verification.taskAccepted !==
+      (sourceEvaluation.workerAttested && sourceEvaluation.taskResolved)
+  ) {
+    throw new Error('consumer-execution-evidence-invalid-or-cross-bound');
+  }
+  const { evidenceDigest: _evidenceDigest, ...unsigned } = execution;
+  const expected = digest({
+    schema: 'symphony-existing-repair-evidence/v1',
+    ...unsigned,
+  });
+  if (expected !== execution.evidenceDigest) {
+    throw new Error('consumer-execution-evidence-digest-invalid');
+  }
+  if (outcome?.status === 'succeeded' && !verification.headChanged) {
+    throw new Error('consumer-execution-success-without-head-change');
+  }
+  return outcome;
+}
+
 export function validateOutcomeV3(outcome, task, publicKey) {
   const execution = outcome?.execution;
   if (
@@ -422,6 +621,16 @@ export function validateOutcomeV3(outcome, task, publicKey) {
       'authPoolIdentity',
       'leaseIdentity',
       'evidenceDigest',
+      'assignmentDigest',
+      'providerGrantDigest',
+      'acceptanceDigest',
+      'runDigest',
+      'taskAcceptanceDigest',
+      'baseHead',
+      'finalHead',
+      'outputDigest',
+      'sourceEvaluation',
+      'verification',
     ]) ||
     !['runId', 'provider', 'model'].every(
       key =>
@@ -438,6 +647,7 @@ export function validateOutcomeV3(outcome, task, publicKey) {
   ) {
     throw new Error('consumer-execution-outcome-invalid-or-cross-bound');
   }
+  validateExecutionEvidenceV3(outcome, task);
   const { signature, ...unsigned } = outcome;
   if (
     !publicKey ||
@@ -453,35 +663,198 @@ export function validateOutcomeV3(outcome, task, publicKey) {
   return outcome;
 }
 
+function resolveOwnedRepairController(environment = process.env) {
+  const workspace = environment.GEM_WORKSPACE?.trim();
+  if (!workspace || !isAbsolute(workspace))
+    throw new Error('existing-repair-controller-package-unavailable');
+  const manifestPath = join(
+    workspace,
+    'config',
+    OWNED_REPAIR_CONTROLLER_MANIFEST
+  );
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    throw new Error('existing-repair-controller-package-unavailable');
+  }
+  if (
+    !exactKeys(manifest, OWNED_REPAIR_CONTROLLER_MANIFEST_KEYS) ||
+    manifest.schema !== OWNED_REPAIR_CONTROLLER_PACKAGE_SCHEMA ||
+    manifest.packageId !== 'symphony-codex-auth-fallback' ||
+    manifest.command !== 'symphony-codex-exhausted.py' ||
+    !Array.isArray(manifest.arguments) ||
+    manifest.arguments.length !== 1 ||
+    manifest.arguments[0] !== 'owned-repair' ||
+    manifest.installer !==
+      'scripts/symphony/symphony-codex-exhausted.py install'
+  ) {
+    throw new Error('existing-repair-controller-package-invalid');
+  }
+  const relativePaths = [
+    manifest.launcherRelativePath,
+    manifest.releaseControllerRelativePath,
+    manifest.releaseValidatorRelativePath,
+  ];
+  if (
+    relativePaths.some(
+      path =>
+        typeof path !== 'string' ||
+        path.length === 0 ||
+        path.startsWith('/') ||
+        path.includes('\\') ||
+        path.split('/').includes('..')
+    )
+  ) {
+    throw new Error('existing-repair-controller-package-path-invalid');
+  }
+  const home = (environment.HOME?.trim() || homedir()).replace(/\/$/u, '');
+  if (!isAbsolute(home))
+    throw new Error('existing-repair-controller-package-home-invalid');
+  const launcher = join(home, manifest.launcherRelativePath);
+  const releaseController = join(home, manifest.releaseControllerRelativePath);
+  const releaseValidator = join(home, manifest.releaseValidatorRelativePath);
+  for (const path of [launcher, releaseController, releaseValidator]) {
+    try {
+      if (!lstatSync(path).isFile())
+        throw new Error('existing-repair-controller-package-unavailable');
+    } catch (error) {
+      if (error?.message === 'existing-repair-controller-package-unavailable')
+        throw error;
+      throw new Error('existing-repair-controller-package-unavailable');
+    }
+  }
+  return { command: launcher, args: manifest.arguments };
+}
+
 /**
- * Existing host controller owns qualification and the shared lease; this is transport only.
- * @param {{run?: (...args: any[]) => any}} [options]
+ * Minimal controller child-process surface the executor actually consumes.
+ * Structural (not ChildProcess) so test fakes remain assignable.
+ *
+ * @typedef {object} OwnedRepairControllerProcess
+ * @property {{ on(event: string, listener: (chunk: any) => void): void }=} stdout
+ * @property {{ on(event: string, listener: (chunk: any) => void): void }=} stderr
+ * @property {{ end(input: string): void }=} stdin
+ * @property {((...args: any[]) => unknown)=} kill
+ * @property {(event: string, listener: (...args: any[]) => void) => void} once
  */
-export function createOwnedRepairExecutor({ run = spawnSync } = {}) {
+
+/**
+ * Injection points for the owned-repair executor. Both keys are optional;
+ * tests inject exactly one. Omit both to run the real controller launcher
+ * through node:child_process spawn.
+ *
+ * - `run` — synchronous spawnSync-shaped injection
+ *   `(binary, args, options) => { status, stdout, error? }`; the executor
+ *   passes the task JSON as `options.input`.
+ * - `spawnProcess` — async spawn-shaped injection
+ *   `(binary, args, options) => controllerProcess`; the executor pipes
+ *   `JSON.stringify(task)` to `stdin.end` and parses the collected stdout.
+ *
+ * @typedef {object} OwnedRepairExecutorOptions
+ * @property {((binary: string, args: string[], options: {
+ *   input: string, encoding: string, timeout: number, maxBuffer: number
+ * }) => { status: number | null, stdout: string, error?: Error })=} run
+ *   Synchronous controller invocation override.
+ * @property {((binary: string, args: readonly string[] | undefined, options: import('node:child_process').SpawnOptions | undefined) => OwnedRepairControllerProcess)=} spawnProcess
+ *   Asynchronous controller spawn override.
+ */
+
+/**
+ * @param {unknown} task
+ * @param {((binary: string, args: readonly string[] | undefined, options: import('node:child_process').SpawnOptions | undefined) => OwnedRepairControllerProcess)=} spawnProcess
+ * @returns {Promise<unknown>}
+ */
+function runOwnedRepairController(task, spawnProcess = spawn) {
+  return new Promise((resolve, reject) => {
+    let command;
+    try {
+      command = resolveOwnedRepairController();
+    } catch (_error) {
+      resolve({
+        status: 'held',
+        reason: 'qualified-isolated-repair-executor-unavailable',
+      });
+      return;
+    }
+    const child = spawnProcess(command.command, command.args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const append = (target, chunk) => {
+      const text = Buffer.isBuffer(chunk)
+        ? chunk.toString('utf8')
+        : String(chunk);
+      if (target === 'stdout') stdout += text;
+      else stderr += text;
+      if (
+        Buffer.byteLength(target === 'stdout' ? stdout : stderr) >
+        CONTROLLER_OUTPUT_LIMIT
+      ) {
+        child.kill('SIGTERM');
+        finish(new Error('existing-repair-controller-output-too-large'));
+      }
+    };
+    child.stdout?.on('data', chunk => append('stdout', chunk));
+    child.stderr?.on('data', chunk => append('stderr', chunk));
+    child.once('error', error => finish(error));
+    child.once('close', (status, signal) => {
+      if (settled) return;
+      if (status !== 0 || signal) {
+        finish(new Error('existing-repair-controller-unavailable'));
+        return;
+      }
+      try {
+        finish(null, JSON.parse(stdout));
+      } catch {
+        finish(new Error('existing-repair-controller-invalid-json'));
+      }
+    });
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      finish(new Error('existing-repair-controller-timeout'));
+    }, CONTROLLER_TIMEOUT_MS);
+    try {
+      child.stdin?.end(JSON.stringify(task));
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+/** Existing host controller owns qualification and the shared lease. */
+
+/**
+ * @param {OwnedRepairExecutorOptions=} executorOptions
+ */
+export function createOwnedRepairExecutor({ run, spawnProcess = spawn } = {}) {
   return {
     async execute(task) {
       validateTask(task);
       if (task.schema !== 'jovie-symphony-repair-task/v3')
         throw new Error('existing-repair-v3-required');
-      const result = run(
-        'python3',
-        [
-          join(
-            dirname(fileURLToPath(import.meta.url)),
-            'symphony-codex-exhausted.py'
-          ),
-          'owned-repair',
-        ],
-        {
+      if (run) {
+        const command = resolveOwnedRepairController();
+        const result = run(command.command, command.args, {
           input: JSON.stringify(task),
           encoding: 'utf8',
-          timeout: 30000,
-          maxBuffer: 32768,
-        }
-      );
-      if (result.error || result.status !== 0)
-        throw new Error('existing-repair-controller-unavailable');
-      return JSON.parse(result.stdout);
+          timeout: CONTROLLER_TIMEOUT_MS,
+          maxBuffer: CONTROLLER_OUTPUT_LIMIT,
+        });
+        if (result.error || result.status !== 0)
+          throw new Error('existing-repair-controller-unavailable');
+        return JSON.parse(result.stdout);
+      }
+      return runOwnedRepairController(task, spawnProcess);
     },
   };
 }
@@ -1075,6 +1448,9 @@ export async function runCycle({
     taskKey: task.taskKey,
     issueIdentifier: state.active.outcome.result.issueIdentifier,
     acknowledgement: acknowledgement.status,
+    action: task.action,
+    sourceVersion: task.source.sourceVersion,
+    snapshotDigest: task.source.snapshotDigest,
   };
 }
 
@@ -1140,6 +1516,12 @@ async function linearGraphql(config, query, variables, fetchImpl) {
   return payload.data;
 }
 
+function linearMarkdown(value) {
+  return String(value ?? '')
+    .replace(/\\\[/g, '[')
+    .replace(/\\\]/g, ']');
+}
+
 function validateProjectedIssue(issue, projection) {
   const labels = issue?.labels?.nodes?.map(label => label?.name);
   if (
@@ -1147,7 +1529,7 @@ function validateProjectedIssue(issue, projection) {
     !/^JOV-[1-9][0-9]*$/u.test(issue?.identifier ?? '') ||
     issue.identifier === projection.parentIssue ||
     issue.title !== projection.title ||
-    issue.description !== projection.description ||
+    linearMarkdown(issue.description) !== projection.description ||
     !validTimestamp(issue.createdAt) ||
     issue.parent?.identifier !== projection.parentIssue ||
     issue.team?.key !== projection.team ||

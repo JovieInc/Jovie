@@ -1,5 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
 
 /**
  * Canonical plan IDs for the marketing pricing page.
@@ -95,12 +95,15 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'AI assistant (250 messages/week)',
     ],
     accent: 'violet',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=max`,
+    ctaLabel: ARTIST_VISIBILITY_OFFER.enterprise.cta,
+    ctaHref: ARTIST_VISIBILITY_OFFER.enterprise.href,
   },
 ] as const;
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
+  if (planId === 'max') {
+    return ARTIST_VISIBILITY_OFFER.enterprise.href;
+  }
   return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
 }
 

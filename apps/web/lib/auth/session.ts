@@ -181,12 +181,12 @@ export type IsolationLevel =
   | 'serializable';
 
 /**
- * Run DB operations with RLS session variables set.
- * Sets app.clerk_user_id via session-scoped set_config
- * before executing the operation.
+ * Run DB operations with RLS identity pinned to the same transaction.
+ * Sets app.clerk_user_id via is_local=true on `tx`, then runs
+ * `operation(tx, userId)`. Protected SQL must use that `tx` handle.
  *
  * @param operation The callback to execute with the transaction
- * @param options Optional Clerk user ID and isolation level override
+ * @param options Optional app user ID and isolation level override
  * @returns The result of the operation
  */
 export async function withDbSessionTx<T>(

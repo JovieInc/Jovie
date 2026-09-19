@@ -62,7 +62,10 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  ProfileDesktopLoadingPlaceholder,
+  PublicProfileLayoutShell,
+} from './PublicProfileLayoutShell';
 
 const ProfileDesktopSurface = dynamic(
   () =>
@@ -71,16 +74,7 @@ const ProfileDesktopSurface = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div
-        className='public-profile-layout-desktop-placeholder'
-        data-testid='profile-desktop-loading'
-        role='status'
-        aria-busy='true'
-      >
-        <span className='text-secondary-token'>Loading profile…</span>
-      </div>
-    ),
+    loading: () => <ProfileDesktopLoadingPlaceholder />,
   }
 );
 
@@ -306,6 +300,7 @@ export function ProfileCompactTemplate({
     getInitialIsDesktopLayout
   );
   const [isHydrated, setIsHydrated] = useState(false);
+  const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
@@ -364,6 +359,9 @@ export function ProfileCompactTemplate({
     const syncPresentation = () => {
       const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
       setIsDesktopLayout(ownsDesktopLayout);
+      if (!ownsDesktopLayout) {
+        setDesktopSurfaceReady(false);
+      }
       setDrawerPresentation(
         ownsDesktopLayout
           ? 'modal'
@@ -822,6 +820,10 @@ export function ProfileCompactTemplate({
     }
   }, [isSignedIn, requestedMode]);
 
+  const handleDesktopSurfaceReady = useCallback(() => {
+    setDesktopSurfaceReady(true);
+  }, []);
+
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
     try {
@@ -863,6 +865,7 @@ export function ProfileCompactTemplate({
         heroImageError={heroImageError}
         onHeroImageLoadError={() => setHeroImageError(true)}
         isDesktopLayout={isDesktopLayout}
+        desktopSurfaceReady={desktopSurfaceReady}
         shouldRenderHeading={shouldRenderTemplateHeading}
         profileAccentStyle={profileAccentStyle}
         showClaimFooter={showClaimFooter}
@@ -955,6 +958,7 @@ export function ProfileCompactTemplate({
         desktopSurface={
           <ProfileDesktopSurface
             presentation='modal'
+            onReady={handleDesktopSurfaceReady}
             artist={artist}
             socialLinks={socialLinks}
             contacts={contacts}

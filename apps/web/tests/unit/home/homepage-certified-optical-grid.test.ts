@@ -107,9 +107,9 @@ describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', 
 
   it('does not change locked section ownership, copy, or media pairing', () => {
     const source = readFileSync(path.join(webRoot, sectionsPath), 'utf8');
-    expect(source).toContain("data-align={index % 2 === 0 ? 'start' : 'end'}");
+    expect(source).toContain("data-align='start'");
     expect(source).toContain('HOMEPAGE_LAUNCH_COPY.certified');
-    expect(source).toContain("id === 'connected'");
-    expect(source).toContain("id === 'relationships'");
+    expect(source).toContain('ConnectedSection');
+    expect(source).toContain('RelationshipsSection');
   });
 });

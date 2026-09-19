@@ -50,6 +50,20 @@ export interface YouTubeVideoMetrics {
   readonly currency?: string | null;
 }
 
+export interface YouTubeImportSkip {
+  readonly videoId: string | null;
+  readonly reason: 'wrong_channel' | 'missing_id';
+}
+
+export interface YouTubeChannelVideosPage {
+  readonly channelId: string;
+  readonly channelTitle: string;
+  readonly uploadsPlaylistId: string;
+  readonly videos: readonly YouTubeChannelVideo[];
+  readonly nextPageToken: string | null;
+  readonly skipped: readonly YouTubeImportSkip[];
+}
+
 /**
  * Pluggable YouTube data source. The real implementation (JOV-3189) calls the
  * YouTube Data API v3 + YouTube Analytics API; tests use fakes.
@@ -57,6 +71,15 @@ export interface YouTubeVideoMetrics {
 export interface YouTubeLibraryProvider {
   /** List all videos for a channel. */
   listChannelVideos(channelId: string): Promise<YouTubeChannelVideo[]>;
+  /**
+   * One uploads-playlist page plus hydrated video metadata. Required for
+   * resumable library import (JOV-5352); full-channel `listChannelVideos`
+   * remains the scheduled-refresh path.
+   */
+  listChannelVideosPage?(
+    channelId: string,
+    input?: { readonly pageToken?: string | null }
+  ): Promise<YouTubeChannelVideosPage>;
   /** Fetch analytics for a set of videos over the given windows. */
   fetchVideoMetrics(
     channelId: string,

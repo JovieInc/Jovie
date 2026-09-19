@@ -133,6 +133,9 @@ interface ProfileDesktopSurfaceProps {
   readonly onTogglePref?: (key: NotificationContentType) => void;
   readonly onUnsubscribe?: () => void;
   readonly isUnsubscribing?: boolean;
+  /** Fired once the desktop surface has mounted so the layout shell can
+   *  retire the compact a11y tree (JOV-6434). */
+  readonly onReady?: () => void;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -278,9 +281,13 @@ export function ProfileDesktopSurface({
   onTogglePref = () => {},
   onUnsubscribe = () => {},
   isUnsubscribing = false,
+  onReady,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
-  useEffect(() => setIsHydrated(true), []);
+  useEffect(() => {
+    setIsHydrated(true);
+    onReady?.();
+  }, [onReady]);
   const isSignedIn = useIsAuthenticated();
   const hasHistoryDestination = useSyncExternalStore(
     subscribeToPublicProfileHistory,

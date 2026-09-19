@@ -13,6 +13,7 @@ import {
   getAudioChromeSnapshot,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
+import { writeAudioBarDismissed } from '@/components/shell/audio-bar-dismissal';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -150,6 +151,7 @@ describe('PersistentAudioBar', () => {
     mockPlaybackState = { ...basePlaybackState };
     mockPrefersReducedMotion = false;
     resetAudioChromeSnapshot();
+    globalThis.localStorage?.clear();
   });
 
   /** Flush the two requestAnimationFrame ticks the cinematic reveal waits on. */
@@ -185,6 +187,16 @@ describe('PersistentAudioBar', () => {
     expect(idleSurfaces[1]).not.toHaveClass(
       'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
     );
+  });
+
+  it('keeps compact playback artwork contained instead of cropping it', async () => {
+    setPlaying({ artworkUrl: 'https://x.invalid/art.jpg' });
+    render(<PersistentAudioBar />);
+    await flushReveal();
+
+    const artwork = screen.getAllByTestId('artwork-img')[0];
+    expect(artwork).toHaveClass('object-contain');
+    expect(artwork).not.toHaveClass('object-cover');
   });
 
   it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
@@ -338,6 +350,54 @@ describe('PersistentAudioBar', () => {
     );
 
     expect(stop).toHaveBeenCalled();
+  });
+
+  it('keeps a dismissed bar hidden after remount even if a track is still active', async () => {
+    const user = userEvent.setup();
+    setPlaying();
+    const { unmount } = render(<PersistentAudioBar />);
+
+    await user.click(
+      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
+        'button',
+        { name: 'Dismiss Player' }
+      )
+    );
+    unmount();
+
+    setPlaying();
+    render(<PersistentAudioBar />);
+
+    expect(
+      screen.queryByTestId('audio-surface-expanded-shell')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('audio-surface-idle-shell-desktop')
+    ).toBeInTheDocument();
+  });
+
+  it('reopens the bar when explicit play clears dismissal', async () => {
+    const user = userEvent.setup();
+    setPlaying();
+    render(<PersistentAudioBar />);
+
+    await user.click(
+      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
+        'button',
+        { name: 'Dismiss Player' }
+      )
+    );
+    expect(
+      screen.queryByTestId('audio-surface-expanded-shell')
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      writeAudioBarDismissed(false);
+    });
+
+    expect(
+      screen.getByTestId('audio-surface-expanded-shell')
+    ).toBeInTheDocument();
   });
 
   it('shows loading state with disabled seek bar', () => {

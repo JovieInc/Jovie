@@ -290,7 +290,7 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('does not launch any workflow from an unchanged ready transition', () => {
+  it('reacts to a ready transition only through the canonical admission controller', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
@@ -299,7 +299,13 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    expect(offenders).toEqual([]);
+    // A ready transition must never earn an unchanged head a second CI
+    // flight (trigger-hygiene rule 3, JOV-INV-029 intact). The sole
+    // exception is the canonical admission controller, which subscribes to
+    // re-evaluate exact-head admission without restarting CI; its Runner
+    // Heartbeat clock is the ownerless recovery wake. Every other workflow
+    // must keep ignoring the ready transition.
+    expect(offenders).toEqual(['merge-queue-autoenroll.yml']);
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -704,7 +710,19 @@ describe('merge_group workflow contract', () => {
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
     expect(coverage).toContain('.applicable');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
     expect(coverage).toContain('--bail 1');
     expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
     expect(coverage).toContain(

@@ -8,6 +8,7 @@ Synthetic monitoring runs automated tests against production to make sure a real
 
 The production suite is split by responsibility:
 
+- The M2 revenue-path canary (`m2-revenue-path-canary.yml`, JOV-6439) is a separate daily + deploy-hook HTTP probe: signed-out → claim → $199 Pro checkout → activation. It writes a timestamped receipt and files Slack + Linear with repro on red. It does not create Stripe sessions or identities and is not generic uptime.
 - `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
 - `synthetic-production-waitlist.spec.ts` reuses one reserved production email-OTP identity, proves the waitlist traversal and scoped durable receipt, and never deletes production identity data.
@@ -85,6 +86,15 @@ pnpm test:e2e:golden-path
 # Run with UI for debugging
 pnpm exec playwright test tests/e2e/golden-path.spec.ts --ui
 ```
+
+### M2 Revenue-Path Canary (JOV-6439)
+
+```bash
+# Daily / deploy-hook money path against prod (or staging that mirrors checkout)
+pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url https://jov.ie --receipt /tmp/m2-revenue-path-receipt.json
+```
+
+Red runs write Slack + a Linear issue with the receipt repro. This canary does not replace generic uptime (`canary-health-gate.yml`).
 
 ### Synthetic Monitoring Test
 

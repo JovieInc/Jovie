@@ -14,6 +14,11 @@ describe('ChatActionCard', () => {
       />
     );
 
+    expect(
+      screen
+        .getByTestId('chat-action-card')
+        .querySelector('.system-b-chat-action-card-icon')
+    ).toHaveClass('lucide-circle-alert');
     expect(screen.getByTestId('chat-action-card')).toHaveClass(
       'system-b-chat-action-card'
     );

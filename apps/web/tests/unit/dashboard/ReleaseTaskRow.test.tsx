@@ -42,6 +42,9 @@ describe('ReleaseTaskRow', () => {
     expect(
       container.querySelectorAll('[data-shell-list-row="true"]')
     ).toHaveLength(1);
+    const row = container.querySelector('[data-shell-list-row="true"]');
+    expect(row?.className).toContain('min-h-8');
+    expect(row?.className).toContain('py-1');
   });
 
   it('toggles the shared checkbox control from the full row', () => {
@@ -108,6 +111,9 @@ describe('ReleaseTaskCompactRow', () => {
     expect(
       container.querySelectorAll('[data-shell-list-row="true"]')
     ).toHaveLength(1);
+    const row = container.querySelector('[data-shell-list-row="true"]');
+    expect(row?.className).toContain('min-h-7');
+    expect(row?.className).toContain('py-0.5');
   });
 
   it('keeps compact navigation and checkbox behavior separate', () => {

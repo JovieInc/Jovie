@@ -38,6 +38,8 @@ export {
   AUTH_RLS_SET_CONFIG_FAILED,
   applyRlsSessionUser,
   applyRlsTransactionUser,
+  applyUnpinnedRlsSessionUser,
+  getRlsIdentityReadSql,
   getRlsSessionResetSql,
   getRlsSessionSetSql,
   getRlsTransactionSessionSetSql,

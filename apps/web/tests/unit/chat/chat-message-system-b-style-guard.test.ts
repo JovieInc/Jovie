@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const appRoot = resolve(__dirname, '../../..');
@@ -64,6 +65,24 @@ describe('ChatMessage System B source contract', () => {
     expect(source).not.toContain('system-b-chat-copy-button');
     expect(styles).not.toContain('system-b-chat-copy-button');
   });
+
+  it.each(['system-b-chat-user-text', 'system-b-chat-message-reply'])(
+    '%s owns body weight even inside an actionable preview button',
+    className => {
+      const css = postcss.parse(
+        readFileSync(resolve(appRoot, designSystemPath), 'utf8')
+      );
+      const declarations: string[] = [];
+      css.walkRules(rule => {
+        if (rule.selector === `:where(.${className})`) {
+          rule.walkDecls('font-weight', declaration => {
+            declarations.push(declaration.value);
+          });
+        }
+      });
+      expect(declarations).toEqual(['var(--font-weight-book)']);
+    }
+  );
 
   it('keeps user-bubble light-surface text on the canonical System B alias', () => {
     const styles = [

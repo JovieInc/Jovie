@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   authShellMock,
+  authState,
   clearSignupClaimValueMock,
   authLayoutMock,
   fetchMock,
   persistSignupClaimValueMock,
+  replaceMock,
   routerPrefetchMock,
   searchParamsState,
   setPlanIntentMock,
@@ -15,10 +17,15 @@ const {
   validatePlanMock,
 } = vi.hoisted(() => ({
   authShellMock: vi.fn(),
+  authState: {
+    isLoaded: true,
+    isSignedIn: false,
+  },
   clearSignupClaimValueMock: vi.fn(),
   authLayoutMock: vi.fn(),
   fetchMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
+  replaceMock: vi.fn(),
   routerPrefetchMock: vi.fn(),
   searchParamsState: { value: '' },
   setPlanIntentMock: vi.fn(),
@@ -28,6 +35,13 @@ const {
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  useRouter: () => ({
+    replace: replaceMock,
+  }),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => authState,
 }));
 
 vi.mock('@/features/auth', async () => {
@@ -72,14 +86,17 @@ vi.mock('@/lib/auth/signup-claim-storage', () => ({
 global.fetch = fetchMock as unknown as typeof fetch;
 
 import { APP_ROUTES } from '@/constants/routes';
-import SignUpPage from '../../../app/(auth)/signup/page';
+import { SignUpPageClient } from '../../../app/(auth)/signup/SignUpPageClient';
 
 describe('signup page', () => {
   beforeEach(() => {
     authShellMock.mockReset();
+    authState.isLoaded = true;
+    authState.isSignedIn = false;
     clearSignupClaimValueMock.mockReset();
     authLayoutMock.mockReset();
     fetchMock.mockReset();
+    replaceMock.mockReset();
     fetchMock.mockResolvedValue({
       json: async () => ({ available: true }),
     });
@@ -91,11 +108,13 @@ describe('signup page', () => {
     trackMock.mockReset();
     validatePlanMock.mockReset();
     validatePlanMock.mockImplementation(plan => plan);
+    document.cookie =
+      '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     globalThis.history.replaceState(null, '', '/signup');
   });
 
   it('renders AuthShell with the expected auth props', () => {
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
@@ -125,7 +144,7 @@ describe('signup page', () => {
   it('shows handle availability without writing pending claim session state', async () => {
     searchParamsState.value = 'handle=TestHandle';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -152,7 +171,7 @@ describe('signup page', () => {
     );
     const replaceStateSpy = vi.spyOn(globalThis.history, 'replaceState');
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'An account with this email already exists. Try signing in instead.'
@@ -185,7 +204,7 @@ describe('signup page', () => {
       '/signup?oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings'
     );
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(
       screen.getByRole('link', { name: 'Sign in instead' })
@@ -195,7 +214,7 @@ describe('signup page', () => {
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -208,7 +227,7 @@ describe('signup page', () => {
   it('uses desktop_return for desktop browser auth fallback and sign-in link', async () => {
     searchParamsState.value = 'desktop_return=%2Fstart%3Fintent_id%3Dabc';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -221,7 +240,7 @@ describe('signup page', () => {
   it('uses mobile_return for mobile browser auth fallback and sign-in link', async () => {
     searchParamsState.value = 'mobile_return=%2Fapp';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -235,7 +254,7 @@ describe('signup page', () => {
     searchParamsState.value = 'plan=not-a-plan&handle=TestHandle';
     validatePlanMock.mockReturnValue(null);
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(validatePlanMock).toHaveBeenCalledWith('not-a-plan');
     expect(setPlanIntentMock).not.toHaveBeenCalled();
@@ -250,7 +269,7 @@ describe('signup page', () => {
         throw new Error('quota exceeded');
       });
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -271,7 +290,7 @@ describe('signup page', () => {
       json: async () => ({ available: false }),
     });
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(
       await screen.findByText(
@@ -284,7 +303,7 @@ describe('signup page', () => {
     searchParamsState.value = 'handle=BrokenHandle';
     fetchMock.mockRejectedValueOnce(new Error('network down'));
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(
       await screen.findByText(
@@ -302,7 +321,7 @@ describe('signup page', () => {
       '/signup?oauth_error=access_denied&redirect_url=%2Fonboarding%3Fhandle%3Dartist'
     );
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Sign-in was cancelled. Try again, or pick a different method.'
@@ -330,10 +349,31 @@ describe('signup page', () => {
       '/signup?oauth_error=account_exists&email=artist%40example.com'
     );
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('artist@example.com');
     expect(alert).toHaveTextContent('already exists');
+  });
+
+  it('redirects signed-in visitors instead of leaving a blank auth card', async () => {
+    authState.isSignedIn = true;
+
+    const { queryByTestId } = render(<SignUpPageClient />);
+
+    expect(queryByTestId('auth-shell')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    });
+  });
+
+  it('keeps email/SSO controls after a second signed-out mount', () => {
+    const first = render(<SignUpPageClient />);
+    expect(first.getByTestId('auth-shell')).toBeInTheDocument();
+    first.unmount();
+
+    const second = render(<SignUpPageClient />);
+    expect(second.getByTestId('auth-shell')).toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 });

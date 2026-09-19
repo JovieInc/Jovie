@@ -72,7 +72,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **PR gate** (must stay fast) | typecheck, lint, exact-source-head web coverage (changed-line 60% ratchet), portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
 | **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
-| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
+| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; JOV-INV-033 Done-sprint production HTML rescan (`DONE_INVARIANT_RESCAN=release`) against that same URL; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
 
 Rules:
@@ -98,19 +98,29 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Admission is independent of prior production deployment.** A pending, missing,
-  or failed release checkpoint does not block an otherwise qualified source PR.
-  Exact-head source checks, explicit scoped incident holds, and required native
-  merge-group correctness, provenance, and ancestry checks remain enforced.
-  Admission receipts say `source-qualified`; they never certify production.
+- **Source qualification is separate from production certification.** A pending,
+  missing, or failed release checkpoint by itself does not make an otherwise
+  qualified source PR ineligible. Exact-head source checks, explicit scoped
+  incident holds, and required native merge-group correctness, provenance, and
+  ancestry checks remain enforced. Admission receipts say `source-qualified`;
+  they never certify production.
   The production controller owns deployment serialization and exact runtime
   certification. When main and production are healthy, exact-main review is
   current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: qualified PRs continue through the native queue,
-  while controller containment still holds new implementation and deployment.
+  lag select `hold-intake`: clean exact-head PRs may enter the native queue
+  while new implementation and deployment stay held, subject to the separate
+  release-wave pause below.
+  A separate active release-wave lease pauses only new native queue enrollment
+  and re-entry while a Production Controller run is queued or in progress. The
+  workflow fixes each run's deadline at 30 minutes from `created_at`. Terminal
+  completion releases that run's hold sooner; another queued or in-progress run
+  can keep the pause active against its own deadline. Repeated observations do
+  not restart a run's deadline. Already-admitted native entries remain in the
+  queue, subject to ordinary safety-dequeue checks, throughout the pause.
+  Unavailable or malformed controller state fails closed before enrollment.
   Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An
-  existing incident hold is cleared only by its own evidence.
+  source/review/integrity evidence still blocks admission. An existing incident
+  hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;

@@ -1352,7 +1352,7 @@ describe('marketing adversarial-review invariants', () => {
 
 // Source inventory checks only. Mounted identity remains the route-health gate.
 describe('current acquisition source inventory (JOV-4065)', () => {
-  it('retains all six homepage beats and their actual outer-section owners', async () => {
+  it('retains the locked homepage beats and their actual outer-section owners', async () => {
     const { HOMEPAGE_LAUNCH_COPY } = await import('@/data/homepageLaunchCopy');
     const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
     const bindings = entry.renderedSections.filter(
@@ -1360,26 +1360,18 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
     const rows = HOMEPAGE_LAUNCH_COPY.certified.sections;
-    expect(bindings.slice(2, -1).map(binding => binding.occurrenceId)).toEqual(
+    expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
     );
-    expect(rows.map(row => row.id)).toEqual([
-      'connected',
-      'found',
-      'know',
-      'relationships',
-      'smarter',
-      'built',
-    ]);
+    expect(rows.map(row => row.id)).toEqual(['connected', 'relationships']);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
-      'logo-cloud',
       ...rows.map(() => 'feature-split'),
       'cta',
     ]);
     expect(bindings.map(binding => binding.componentPath)).toEqual([
       'apps/web/components/homepage/HomepageEditorialHero.tsx',
-      ...Array(rows.length + 1).fill(
+      ...Array(rows.length).fill(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx'
       ),
       'apps/web/components/homepage/HomepageClose.tsx',
@@ -1388,7 +1380,6 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     expect(entry.bindingEvidence.status).toBe('unverified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
       'centered-none',
-      'inline-strip',
       ...rows.map(() => 'editorial'),
       'editorial-search',
     ]);

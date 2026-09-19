@@ -40,8 +40,8 @@ const NAV_LINK_BY_LABEL = Object.fromEntries(
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
   {
-    href: NAV_LINK_BY_LABEL.Customers.href,
-    label: NAV_LINK_BY_LABEL.Customers.label,
+    href: NAV_LINK_BY_LABEL.Artists.href,
+    label: NAV_LINK_BY_LABEL.Artists.label,
     treatment: 'leading',
   },
   {

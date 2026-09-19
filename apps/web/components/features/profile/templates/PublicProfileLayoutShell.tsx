@@ -4,6 +4,18 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ProfileClaimFooter } from '@/features/profile/ProfileClaimFooter';
 import { cn } from '@/lib/utils';
 
+export function ProfileDesktopLoadingPlaceholder() {
+  return (
+    <div
+      className='public-profile-layout-desktop-placeholder'
+      data-testid='profile-desktop-loading'
+      aria-hidden='true'
+    >
+      <span className='text-secondary-token'>Loading profile…</span>
+    </div>
+  );
+}
+
 interface PublicProfileLayoutShellProps {
   readonly artistName: string;
   readonly heroImageUrl: string | null;
@@ -12,6 +24,10 @@ interface PublicProfileLayoutShellProps {
    *  switched to a CSS-only radial gradient (JOV-2263). */
   readonly onHeroImageLoadError?: () => void;
   readonly isDesktopLayout: boolean;
+  /** True once the desktop surface has mounted. Compact stays in the
+   *  accessibility tree until then so `main` cannot remain a loading status
+   *  (JOV-6434). */
+  readonly desktopSurfaceReady?: boolean;
   readonly shouldRenderHeading: boolean;
   readonly profileAccentStyle: CSSProperties;
   readonly compactSurface: ReactNode;
@@ -33,6 +49,7 @@ export function PublicProfileLayoutShell({
   heroImageUrl,
   heroImageError,
   isDesktopLayout,
+  desktopSurfaceReady = false,
   shouldRenderHeading,
   profileAccentStyle,
   compactSurface,
@@ -57,6 +74,7 @@ export function PublicProfileLayoutShell({
       style={profileAccentStyle}
       data-testid='public-profile-layout-shell'
       data-layout={isDesktopLayout ? 'desktop' : 'compact'}
+      data-desktop-ready={desktopSurfaceReady ? 'true' : undefined}
       data-profile-preview={embedded ? 'true' : undefined}
     >
       <div className='absolute inset-0' aria-hidden='true'>
@@ -89,7 +107,7 @@ export function PublicProfileLayoutShell({
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
           <div className='public-profile-layout-compact-slot'>
-            {!isDesktopLayout && embedded ? (
+            {isDesktopLayout && desktopSurfaceReady ? null : embedded ? (
               <div className='profile-preview-frame flex h-full min-h-0 w-full flex-col overflow-hidden rounded-(--profile-shell-card-radius) border border-(--profile-panel-border) bg-(--profile-content-bg) shadow-(--profile-panel-shadow)'>
                 <div className='flex min-h-11 shrink-0 items-center justify-between border-(--profile-panel-border) border-b px-4'>
                   <span
@@ -108,9 +126,9 @@ export function PublicProfileLayoutShell({
                 </div>
                 <div className='min-h-0 flex-1'>{compactSurface}</div>
               </div>
-            ) : !isDesktopLayout ? (
+            ) : (
               compactSurface
-            ) : null}
+            )}
           </div>
           <div
             className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
@@ -127,14 +145,7 @@ export function PublicProfileLayoutShell({
             {isDesktopLayout ? (
               desktopSurface
             ) : (
-              <div
-                className='public-profile-layout-desktop-placeholder'
-                data-testid='profile-desktop-loading'
-                role='status'
-                aria-busy='true'
-              >
-                <span className='text-secondary-token'>Loading profile…</span>
-              </div>
+              <ProfileDesktopLoadingPlaceholder />
             )}
           </div>
           {showClaimFooter && claimFooterHref ? (

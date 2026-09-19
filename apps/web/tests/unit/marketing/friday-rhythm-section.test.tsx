@@ -54,8 +54,8 @@ describe('FridayRhythmSection', () => {
       name: 'Build Your Release Rhythm',
     });
     expect(rhythmCta).toHaveAttribute('href');
-    // Front-door CTA lands on the founder-locked public waitlist (splash-B
-    // waitlist-first handoff), not the in-app /start path.
+    // Front-door CTA lands on same-origin /signup (JOV-6436), not /waitlist
+    // or the in-app /start path.
     expect(rhythmCta.getAttribute('href')).toBe(PUBLIC_WAITLIST_URL);
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();

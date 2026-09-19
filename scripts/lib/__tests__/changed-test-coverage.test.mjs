@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -106,11 +107,15 @@ describe('changed test coverage', () => {
       isCoverageSourcePath('apps/web/components/atoms/example.stories.tsx')
     ).toBe(false);
     expect(isCoverageSourcePath('scripts/lib/example.mjs')).toBe(false);
+    expect(isCoverageSourcePath('apps/web/scripts/vitest-wrapper.mjs')).toBe(
+      false
+    );
     expect(
       evaluateChangedLineCoverage({
         changedLines: new Map([
           ['apps/web/vitest.config.fast.mts', new Set([1])],
           ['scripts/lib/example.mjs', new Set([1])],
+          ['apps/web/scripts/vitest-wrapper.mjs', new Set([1])],
         ]),
         coverage: {},
       })
@@ -145,11 +150,50 @@ describe('changed test coverage', () => {
       'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"'
     );
     expect(coverage).toContain('has_web_coverage_changes');
+    const webPkg = JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, '../../../apps/web/package.json'),
+        'utf8'
+      )
+    );
+    // pnpm forwards a leading "--" into test:coverage; vitest then treats
+    // --changed as a filter and Exact-head runs the full tree (~1267 files).
+    expect(webPkg.scripts['test:coverage']).toContain('vitest-wrapper.mjs');
+    expect(webPkg.scripts['test:coverage']).toContain('--coverage');
+    expect(webPkg.scripts['test:coverage']).not.toBe('vitest run --coverage');
+    const wrapper = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../apps/web/scripts/vitest-wrapper.mjs'
+      ),
+      'utf8'
+    );
+    expect(wrapper).toContain("rawArgs[0] === '--'");
+    expect(wrapper).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(wrapper).toContain("args[index] === '--changed'");
+    expect(wrapper).toContain("'related'");
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
+    const coverageRun = coverage.slice(
+      coverage.indexOf('Run exact-head coverage and changed-behavior ratchet')
+    );
+    const runBody = coverageRun.slice(coverageRun.indexOf('        run: |'));
+    expect(runBody).not.toMatch(/^\s+#.*`/m);
     expect(coverage).toContain('--bail 1');
     expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(coverage).toContain('.coverageInclude // [] | .[]');
@@ -184,5 +228,26 @@ describe('changed test coverage', () => {
     }
     expect(mergeReady).toContain('Exact-head Coverage:$COVERAGE_RESULT');
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
+  });
+
+  it('maps Exact-head --changed onto planned related files only', () => {
+    expect(
+      rewriteVitestArgs(
+        ['run', '--coverage', '--changed', 'abc123', '--bail', '1'],
+        'constants/plans.ts\ndata/marketingPricingPlans.ts'
+      )
+    ).toEqual([
+      'related',
+      'constants/plans.ts',
+      'data/marketingPricingPlans.ts',
+      '--run',
+      '--coverage',
+      '--bail',
+      '1',
+    ]);
+    expect(rewriteVitestArgs(['--', 'run', '--coverage'], '')).toEqual([
+      'run',
+      '--coverage',
+    ]);
   });
 });
