@@ -13,19 +13,12 @@ import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 export const revalidate = false;
 
 const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
-const VISIBLE_PAID_PLANS = VISIBLE_PRICING_PLANS.filter(
-  plan => plan.id !== 'free'
-);
-const primaryPaidPlanName =
-  VISIBLE_PAID_PLANS.length === 1 ? VISIBLE_PAID_PLANS[0]?.name : null;
-const requestAccessCopy = primaryPaidPlanName
-  ? `Claim the profile first. Choose ${primaryPaidPlanName} when you want the release system turned on.`
-  : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
+const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
+const requestAccessCopy = `Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description:
-    'Artist profiles are free forever. Pro adds Jovie release tools when you need them.',
+  description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   keywords: [
     'Jovie pricing',
     'artist profile pricing',
@@ -35,16 +28,14 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
-    description:
-      'Artist profiles are free forever. Pro adds Jovie release tools when you need them.',
+    description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
     url: `${BASE_URL}/pricing`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
-    description:
-      'Artist profiles are free forever. Pro adds Jovie release tools when you need them.',
+    description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   },
   robots: {
     index: true,
@@ -77,7 +68,9 @@ function getPublicOfferSchema(plan: MarketingPricingPlan) {
       priceValidUntil: pricingSchemaValidUntil,
       billingIncrement: 'P1M',
     }),
-    availability: 'https://schema.org/InStock',
+    availability: claim.selfService
+      ? 'https://schema.org/InStock'
+      : 'https://schema.org/LimitedAvailability',
   };
 }
 
@@ -85,8 +78,7 @@ const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
-  description:
-    'Artist profiles are free forever. Pro adds Jovie release tools when you need them.',
+  description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',

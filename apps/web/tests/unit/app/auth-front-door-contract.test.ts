@@ -40,7 +40,7 @@ describe('auth front-door contract', () => {
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
 
-  it('unifies public acquisition CTAs onto working /signup paths (JOV-6436)', () => {
+  it('keeps free acquisition on signup and Pro on approved request-access routing', () => {
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.SIGNUP);
     expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.SIGNUP);
     expect(
@@ -48,7 +48,7 @@ describe('auth front-door contract', () => {
     ).toBe(`${APP_ROUTES.SIGNUP}?plan=free`);
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.ctaHref
-    ).toBe(`${APP_ROUTES.SIGNUP}?plan=pro`);
+    ).toBe(APP_ROUTES.WAITLIST);
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).not.toContain('/waitlist');
     expect(MARKETING_CTA_INTENTS.claimProfile.href).not.toContain('/waitlist');
   });

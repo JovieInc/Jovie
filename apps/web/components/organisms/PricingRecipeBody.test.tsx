@@ -3,23 +3,59 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import PricingPage from '@/app/(marketing)/pricing/page';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
 import { PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
-const paidPlans = getVisibleMarketingPricingPlans().filter(
-  plan => plan.id !== 'free'
-);
 const proPlan = getVisibleMarketingPricingPlans().find(
   plan => plan.id === 'pro'
 );
-const paidPlanName = paidPlans.length === 1 ? paidPlans[0]?.name : null;
-const expectedRequestAccessCopy = paidPlanName
-  ? `Claim the profile first. Choose ${paidPlanName} when you want the release system turned on.`
-  : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
+const expectedRequestAccessCopy = PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY;
 
 describe('PricingRecipeBody', () => {
+  it('renders the production pricing route with limited-access JSON-LD', () => {
+    const { container } = render(<PricingPage />);
+
+    expect(
+      screen.getByTestId('marketing-pricing-plan-free')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('marketing-pricing-plan-pro')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('marketing-pricing-plan-enterprise')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('marketing-pricing-plan-max')).toBeNull();
+    expect(
+      screen.getAllByRole('link', { name: 'Request access' })[0]
+    ).toHaveAttribute('href', '/waitlist');
+    expect(screen.queryByText('Automated follow-ups')).toBeNull();
+    expect(screen.queryByText('Email campaigns')).toBeNull();
+
+    const schemaScript = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    expect(schemaScript).not.toBeNull();
+    const schema = JSON.parse(schemaScript?.textContent ?? '{}') as {
+      mainEntity?: {
+        itemListElement?: Array<{
+          item?: { name?: string; offers?: { availability?: string } };
+        }>;
+      };
+    };
+    const items = schema.mainEntity?.itemListElement ?? [];
+    expect(items.map(item => item.item?.name)).toEqual([
+      'Jovie Free',
+      'Jovie Pro',
+      'Jovie Enterprise',
+    ]);
+    expect(items[1]?.item?.offers?.availability).toBe(
+      'https://schema.org/LimitedAvailability'
+    );
+  });
+
   it('renders the shipped pricing sections and exact injected production slots', () => {
     render(
       <PricingRecipeBody
@@ -37,27 +73,21 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Artist profiles built to convert',
-      })
-    ).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Capture fans once. Bring them back automatically.',
+        name: 'Public artist profile and audience capture',
       })
     ).toBeVisible();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Claim Your Profile' })
+      screen.getAllByRole('link', { name: 'Claim my free profile' })[0]
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
+      screen.getAllByRole('link', { name: 'Claim my free profile' })[1]
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Start Pro trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/waitlist');
     expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
       'href',
       'mailto:support@jov.ie'
@@ -70,7 +100,7 @@ describe('PricingRecipeBody', () => {
     );
   });
 
-  it('serializes the Pro plan, price, and signup intent before hydration', () => {
+  it('serializes the Pro plan, price, and access intent before hydration', () => {
     const markup = renderToStaticMarkup(
       <PricingRecipeBody
         requestAccessCopy={expectedRequestAccessCopy}
@@ -95,9 +125,7 @@ describe('PricingRecipeBody', () => {
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');
     expect(proCard?.textContent).toContain(proPlan?.ctaLabel ?? '');
-    expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
-      proPlan?.ctaHref
-    );
+    expect(proCard?.querySelector('a')?.getAttribute('href')).toBe('/waitlist');
   });
 
   it('shares one route/story body and records shipped zero-proof omissions', () => {

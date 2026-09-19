@@ -3,18 +3,24 @@ import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 /**
  * Canonical plan IDs for the marketing pricing page.
  *
- * These MUST match the canonical PlanId values in
- * apps/web/lib/entitlements/registry.ts (free / pro / max).
- * Do not add plan IDs here that don't exist in the entitlement registry.
+ * These are the public acquisition plans. Runtime entitlement IDs remain
+ * canonical in apps/web/lib/entitlements/registry.ts.
  */
-export const MARKETING_PRICING_PLAN_IDS = ['free', 'pro', 'max'] as const;
+export const MARKETING_PRICING_PLAN_IDS = [
+  'free',
+  'pro',
+  'enterprise',
+] as const;
 
 export type MarketingPricingPlanId =
   (typeof MARKETING_PRICING_PLAN_IDS)[number];
 
 const visiblePlanIds = (process.env.NEXT_PUBLIC_MARKETING_VISIBLE_PLANS ?? '')
   .split(',')
-  .map(plan => plan.trim())
+  .map(plan => {
+    const normalizedPlan = plan.trim();
+    return normalizedPlan === 'max' ? 'enterprise' : normalizedPlan;
+  })
   .filter((plan): plan is MarketingPricingPlanId =>
     (MARKETING_PRICING_PLAN_IDS as readonly string[]).includes(plan)
   );
@@ -37,7 +43,7 @@ export interface MarketingPricingPlan {
 
 const FREE_CLAIM = getPublicPriceClaim('free');
 const PRO_CLAIM = getPublicPriceClaim('pro');
-const MAX_CLAIM = getPublicPriceClaim('max');
+const ENTERPRISE_CLAIM = getPublicPriceClaim('enterprise');
 
 export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
   {
@@ -46,15 +52,8 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
     price: FREE_CLAIM.priceLabel,
     cadence: FREE_CLAIM.cadence ?? undefined,
     badge: FREE_CLAIM.badge,
-    body: 'Your artist profile, smart links, and public fan path stay free.',
-    features: [
-      'Artist profile',
-      'Smart release links',
-      'Listen buttons by platform',
-      'Basic audience signal',
-      'Up to 100 contacts',
-      'Manual release creation',
-    ],
+    body: FREE_CLAIM.note,
+    features: ['Public artist profile and audience capture'],
     accent: 'cyan',
     ctaLabel: FREE_CLAIM.ctaLabel,
     ctaHref: FREE_CLAIM.ctaHref,
@@ -65,42 +64,23 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
     price: PRO_CLAIM.priceLabel,
     cadence: PRO_CLAIM.cadence ?? undefined,
     badge: PRO_CLAIM.badge,
-    body: 'Fan notifications, presaves, and deeper release analytics.',
-    features: [
-      'Everything in Free',
-      'Release notifications to fans',
-      'Pre-save campaigns',
-      'Pre-release countdown pages',
-      'Extended analytics (180 days)',
-      'Unlimited contacts',
-      'Contact export',
-      'Tips & payments',
-      'Verified badge',
-      'AI assistant (70 messages/week)',
-    ],
+    body: PRO_CLAIM.note,
+    features: ['Public artist profile and audience capture'],
     accent: 'blue',
     ctaLabel: PRO_CLAIM.ctaLabel,
     ctaHref: PRO_CLAIM.ctaHref,
   },
   {
-    id: 'max',
-    name: MAX_CLAIM.displayName,
-    price: MAX_CLAIM.priceLabel,
-    cadence: MAX_CLAIM.cadence ?? undefined,
-    badge: 'Full stack',
-    body: 'Your entire release operation, automated end to end.',
-    features: [
-      'Everything in Pro',
-      'Release plan generation',
-      'Metadata submission agent',
-      'Unlimited analytics',
-      'Email campaigns',
-      'API access',
-      'AI assistant (250 messages/week)',
-    ],
+    id: 'enterprise',
+    name: ENTERPRISE_CLAIM.displayName,
+    price: ENTERPRISE_CLAIM.priceLabel,
+    cadence: ENTERPRISE_CLAIM.cadence ?? undefined,
+    badge: ENTERPRISE_CLAIM.badge,
+    body: ENTERPRISE_CLAIM.note,
+    features: [],
     accent: 'violet',
-    ctaLabel: MAX_CLAIM.ctaLabel,
-    ctaHref: MAX_CLAIM.ctaHref,
+    ctaLabel: ENTERPRISE_CLAIM.ctaLabel,
+    ctaHref: ENTERPRISE_CLAIM.ctaHref,
   },
 ] as const;
 

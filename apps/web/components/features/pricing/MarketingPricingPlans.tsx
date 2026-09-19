@@ -78,14 +78,16 @@ function MarketingPricingPlanCard({
         </Link>
       </Button>
 
-      <ul className='marketing-pricing-plan-card__features'>
-        {plan.features.map(feature => (
-          <li key={feature}>
-            <Check aria-hidden='true' size={15} strokeWidth={1.8} />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+      {plan.features.length > 0 ? (
+        <ul className='marketing-pricing-plan-card__features'>
+          {plan.features.map(feature => (
+            <li key={feature}>
+              <Check aria-hidden='true' size={15} strokeWidth={1.8} />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </article>
   );
 }

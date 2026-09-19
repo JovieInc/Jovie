@@ -4,7 +4,6 @@ import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
-  PRO_TRIAL_TRUTH,
 } from '@/lib/billing/offer-truth';
 
 /**
@@ -20,7 +19,7 @@ export const dynamic = 'force-static';
 export function GET() {
   const freeClaim = getPublicPriceClaim('free');
   const proClaim = getPublicPriceClaim('pro');
-  const maxClaim = getPublicPriceClaim('max');
+  const enterpriseClaim = getPublicPriceClaim('enterprise');
   const content = `# ${APP_NAME} — Full Documentation
 
 > ${APP_NAME} — ${COMPANY_IDENTITY.seoDescription} ${COMPANY_IDENTITY.support}
@@ -103,10 +102,10 @@ AI that knows your actual career data:
 
 ## Pricing
 
-- **Free tier (${formatPublicPriceDisplay(freeClaim)})**: Artist profile, smart links, basic analytics, 100 contacts — ${freeClaim.note}
-- **Pro tier (${formatPublicPriceDisplay(proClaim)})**: Fan notifications, unlimited contacts, CRM, export, advanced analytics, tipping, ad pixels, verified badge
-- **Max tier (${formatPublicPriceDisplay(maxClaim)})**: ${maxClaim.note}
-- ${PRO_TRIAL_TRUTH}
+- **Free tier (${formatPublicPriceDisplay(freeClaim)})**: Public artist profile and audience capture — ${freeClaim.note}
+- **Artist Visibility Pro (${formatPublicPriceDisplay(proClaim)})**: Public artist profile and audience capture — ${proClaim.note}
+- **Enterprise (${formatPublicPriceDisplay(enterpriseClaim)})**: Scope by agreement. Contact sales.
+- Continuous visibility monitoring, prioritized opportunities, and agentic fixes: Planned — not included today.
 
 ## Key URLs
 

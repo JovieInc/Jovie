@@ -5,8 +5,8 @@
  * - CANONICAL_PLANS in constants/plans.ts matches the entitlement registry plan IDs
  * - Prices in CANONICAL_PLANS match PLAN_PRICES (the canonical price source)
  * - Marketing pricing cards (marketingPricingPlans.ts) match canonical plan IDs
- * - No "waitlist" or "request access" copy in marketing plan labels or CTAs
- * - Signup hrefs include a `plan=<id>` query param so onboarding can read intent
+ * - Public acquisition claims expose limited-access CTAs without changing
+ *   internal canonical plan IDs or signup helpers
  */
 
 import { describe, expect, it } from 'vitest';
@@ -25,12 +25,7 @@ import {
 } from '@/lib/entitlements/registry';
 
 // Phrases banned from any public pricing CTA or label
-const BANNED_PRICING_PHRASES = [
-  'waitlist',
-  'request access',
-  'request_access',
-  'coming soon',
-] as const;
+const BANNED_PRICING_PHRASES = ['coming soon'] as const;
 
 const MAX_ONLY_MARKETING_FEATURES = [
   {
@@ -114,7 +109,7 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
     }
   });
 
-  it('no CTA label uses banned waitlist/request-access phrases', () => {
+  it('keeps canonical plan labels free of planned-state copy', () => {
     for (const plan of CANONICAL_PLANS) {
       const ctaLower = plan.ctaLabel.toLowerCase();
       for (const phrase of BANNED_PRICING_PHRASES) {
@@ -145,9 +140,10 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
 });
 
 describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (JOV-2178)', () => {
-  it('only contains plan IDs that exist in the entitlement registry', () => {
+  it('keeps runtime tiers separate from the public Enterprise acquisition card', () => {
     const validPlanIds = new Set<string>(Object.keys(ENTITLEMENT_REGISTRY));
     for (const plan of MARKETING_PRICING_PLANS) {
+      if (plan.id === 'enterprise') continue;
       expect(
         validPlanIds.has(plan.id),
         `Marketing plan "${plan.id}" is not a valid entitlement registry plan ID`
@@ -156,20 +152,20 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
   });
 
   it('uses the canonical public billing tiers and visible pricing excludes legacy tiers', () => {
-    expect(MARKETING_PRICING_PLAN_IDS).toEqual(['free', 'pro', 'max']);
+    expect(MARKETING_PRICING_PLAN_IDS).toEqual(['free', 'pro', 'enterprise']);
     expect(MARKETING_PRICING_PLANS.map(plan => plan.id)).toEqual([
       'free',
       'pro',
-      'max',
+      'enterprise',
     ]);
     expect(getVisibleMarketingPricingPlans().map(plan => plan.id)).toEqual([
       'free',
       'pro',
-      'max',
+      'enterprise',
     ]);
   });
 
-  it('no CTA label or badge uses banned waitlist/request-access phrases', () => {
+  it('keeps planned and unsupported copy out of public plan cards', () => {
     for (const plan of MARKETING_PRICING_PLANS) {
       const textToCheck = [plan.ctaLabel, plan.badge, plan.body]
         .join(' ')
@@ -199,6 +195,8 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
         expect(resolveCanonicalPlanId(signupUrl.searchParams.get('plan'))).toBe(
           plan.id
         );
+      } else if (plan.id === 'pro') {
+        expect(plan.ctaHref).toBe('/waitlist');
       } else {
         expect(plan.ctaHref.startsWith('mailto:')).toBe(true);
       }
@@ -212,24 +210,29 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
     expect(proPlan?.price).toBe(`$${PLAN_PRICES.pro.monthly}`);
   });
 
-  it('max plan price stays custom instead of a self-service amount', () => {
-    const maxPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'max');
-    const maxClaim = getPublicPriceClaim('max');
-    expect(maxPlan?.price).toBe(maxClaim.priceLabel);
-    expect(maxPlan?.price).not.toBe(`$${PLAN_PRICES.max.monthly}`);
+  it('enterprise price stays custom and Max remains absent from acquisition cards', () => {
+    const enterprisePlan = MARKETING_PRICING_PLANS.find(
+      p => p.id === 'enterprise'
+    );
+    const enterpriseClaim = getPublicPriceClaim('enterprise');
+    expect(enterprisePlan?.price).toBe(enterpriseClaim.priceLabel);
+    expect(enterprisePlan?.price).toBe('Custom');
+    expect(MARKETING_PRICING_PLANS.map(plan => plan.id)).not.toContain('max');
   });
 
-  it('does not include the legacy team or enterprise plan IDs', () => {
+  it('does not include the legacy team plan ID', () => {
     const planIds = MARKETING_PRICING_PLANS.map(p => p.id);
     expect(planIds).not.toContain('team');
-    expect(planIds).not.toContain('enterprise');
+    expect(planIds).toContain('enterprise');
   });
 
-  it('does not advertise Max-only release operations on Pro', () => {
+  it('does not advertise Max-only release operations on Pro or Enterprise', () => {
     const proPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'pro');
-    const maxPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'max');
+    const enterprisePlan = MARKETING_PRICING_PLANS.find(
+      p => p.id === 'enterprise'
+    );
     expect(proPlan).toBeDefined();
-    expect(maxPlan).toBeDefined();
+    expect(enterprisePlan).toBeDefined();
 
     for (const { label, entitlement } of MAX_ONLY_MARKETING_FEATURES) {
       expect(
@@ -241,7 +244,7 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
         `${label} must remain enabled for Max in the entitlement registry`
       ).toBe(true);
       expect(proPlan?.features).not.toContain(label);
-      expect(maxPlan?.features).toContain(label);
+      expect(enterprisePlan?.features).not.toContain(label);
       expect(ENTITLEMENT_REGISTRY.max.marketing.features).toContain(label);
     }
   });

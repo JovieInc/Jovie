@@ -53,7 +53,10 @@ describe('GET /llms-full.txt', () => {
     expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).not.toContain('**Instagram**: @meetjovie');
     expect(body).not.toContain('$149');
-    expect(body).toContain('Pro tier ($199/mo)');
-    expect(body).toContain('Max tier (Custom)');
+    expect(body).toContain('Artist Visibility Pro ($199/mo)');
+    expect(body).toContain('Enterprise (Custom)');
+    expect(body).toContain('Planned — not included today');
+    expect(body).not.toContain('Max tier');
+    expect(body).not.toContain('14-day Pro trial');
   });
 });

@@ -12,9 +12,7 @@ interface HomeTrustSectionProps {
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip' | 'artist-profile';
   readonly logoIds?: readonly TrustLogoAssetId[];
-  /** Label rendered above the logos. Artist-profile and release-notification
-   * surfaces use the default ("Trusted by artists and teams releasing on");
-   * the homepage hero historically used a shorter variant. */
+  /** Optional label rendered above the logos. */
   readonly label?: ReactNode;
   readonly ariaLabel?: string;
 }
@@ -52,7 +50,7 @@ export function HomeTrustSection({
   variant = 'default',
   className,
   presentation = 'card',
-  label = 'Trusted by artists and teams releasing on',
+  label,
   ariaLabel,
   logoIds,
 }: Readonly<HomeTrustSectionProps>) {
@@ -100,7 +98,7 @@ export function HomeTrustSection({
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
       )}
-      aria-label={`${accessibleLabel} major labels`}
+      aria-label={accessibleLabel}
     >
       <div
         className={cn(
@@ -110,16 +108,18 @@ export function HomeTrustSection({
           innerBoxClass
         )}
       >
-        <div
-          className={cn(
-            isInlineStrip
-              ? 'system-b-mounted-home-trust-strip-label'
-              : 'text-center font-medium tracking-wide text-xs text-white/56',
-            !isInlineStrip && labelMarginClass
-          )}
-        >
-          {label}
-        </div>
+        {label !== undefined && label !== null ? (
+          <div
+            className={cn(
+              isInlineStrip
+                ? 'system-b-mounted-home-trust-strip-label'
+                : 'text-center font-medium tracking-wide text-xs text-white/56',
+              !isInlineStrip && labelMarginClass
+            )}
+          >
+            {label}
+          </div>
+        ) : null}
         <div
           className={cn(
             isInlineStrip

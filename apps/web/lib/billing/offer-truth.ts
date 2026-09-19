@@ -1,8 +1,9 @@
 /**
  * Published offer truth for pricing + auth handoff (JOV-6202 / JOV-5814).
  *
- * Derives from billing/entitlement config and the implemented Pro trial.
- * JOV-6218 supersedes the older public Pro/Max offer; retain helpers for auth compatibility.
+ * Derives from billing/entitlement config and the published Artist Visibility offer.
+ * Retain the legacy trial and Max helpers for auth compatibility, but keep them out
+ * of the new-acquisition public claim collection.
  * Public marketing/pricing surfaces must read claims from this module.
  */
 
@@ -26,6 +27,8 @@ export type MaxOfferStatus = 'purchase' | 'early_access' | 'contact_sales';
 
 export const PRO_TRIAL_TRUTH =
   '14-day Pro trial. No credit card. Returns to Free unless you upgrade.';
+
+export const PRO_LIMITED_ACCESS_TRUTH = 'Limited access.';
 
 export const FREE_PROFILE_TRUTH =
   'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
@@ -117,8 +120,12 @@ export function getMaxOfferBadge(): string {
   return 'Contact sales';
 }
 
-/** Public merchandising plans. Max stays visible; checkout is contact-sales. */
-export const PUBLIC_PRICING_CLAIM_PLANS = ['free', 'pro', 'max'] as const;
+/** Public merchandising plans for new acquisition. Legacy Max remains lookup-only. */
+export const PUBLIC_PRICING_CLAIM_PLANS = [
+  'free',
+  'pro',
+  'enterprise',
+] as const;
 export type PublicPricingClaimPlan =
   (typeof PUBLIC_PRICING_CLAIM_PLANS)[number];
 
@@ -168,7 +175,7 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
       cadence: null,
       badge: 'Free forever',
       note: FREE_PROFILE_TRUTH,
-      ctaLabel: getPlanCtaLabel(plan),
+      ctaLabel: 'Claim my free profile',
       ctaHref: getPlanCtaHref(plan),
       selfService: true,
     };
@@ -183,11 +190,11 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
       annualPriceUsd: null,
       priceLabel: formatUsdAmount(priceUsd),
       cadence: '/mo',
-      badge: 'Recommended',
-      note: PRO_TRIAL_TRUTH,
-      ctaLabel: getPlanCtaLabel(plan),
-      ctaHref: getPlanCtaHref(plan),
-      selfService: true,
+      badge: 'Limited access',
+      note: PRO_LIMITED_ACCESS_TRUTH,
+      ctaLabel: 'Request access',
+      ctaHref: APP_ROUTES.WAITLIST,
+      selfService: false,
     };
   }
 
@@ -202,8 +209,9 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
     priceLabel: PUBLIC_CUSTOM_PRICE_LABEL,
     cadence: null,
     badge: getMaxOfferBadge(),
-    note: getPlanOfferNote(plan),
-    ctaLabel: getPlanCtaLabel(plan),
+    note:
+      plan === 'enterprise' ? 'Scope by agreement.' : getPlanOfferNote(plan),
+    ctaLabel: 'Contact sales',
     ctaHref: getPlanCtaHref(plan),
     selfService: false,
   };
