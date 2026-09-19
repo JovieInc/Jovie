@@ -15,7 +15,7 @@ echo ""
 
 # 0. CRITICAL: Verify Node.js version FIRST
 REQUIRED_NODE_MAJOR=$(cat "$PROJECT_DIR/.nvmrc" 2>/dev/null | cut -d. -f1)
-REQUIRED_NODE_MAJOR="${REQUIRED_NODE_MAJOR:-22}"
+REQUIRED_NODE_MAJOR="${REQUIRED_NODE_MAJOR:-24}"
 CURRENT_NODE_VERSION=$(node --version 2>/dev/null || echo "not found")
 CURRENT_NODE_MAJOR=$(echo "$CURRENT_NODE_VERSION" | sed 's/v\([0-9]*\).*/\1/')
 

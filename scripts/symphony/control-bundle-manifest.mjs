@@ -29,7 +29,7 @@ export const CONTROL_BUNDLE_POLICY = Object.freeze({
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SOURCE_SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-const NODE_22_PATTERN = /^v?22\.\d+\.\d+$/;
+const NODE_24_PATTERN = /^v?24\.\d+\.\d+$/;
 const PNPM_PATTERN = /^9\.15\.4$/;
 
 async function filesBelow(root) {
@@ -126,7 +126,7 @@ function validateManifestPolicy(manifest, expectedSourceSha) {
     throw new Error('manifest test receipt is not a passing hosted receipt');
   }
   if (
-    !NODE_22_PATTERN.test(manifest.toolchain?.node ?? '') ||
+    !NODE_24_PATTERN.test(manifest.toolchain?.node ?? '') ||
     !PNPM_PATTERN.test(manifest.toolchain?.pnpm ?? '')
   ) {
     throw new Error('manifest toolchain is missing or incompatible');

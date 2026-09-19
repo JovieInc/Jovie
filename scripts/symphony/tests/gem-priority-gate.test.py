@@ -3780,7 +3780,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
-        self.assertIn("node-version: '22'", content)
+        self.assertIn("node-version: '24'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         # pull_request_target Refresh must be a dry run (no live latest.json
         # write while the main gate is unfenced); every other event persists.

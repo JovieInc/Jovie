@@ -22,7 +22,7 @@ const markerPath = resolve(
 class RuntimePrerequisiteDriftError extends Error {}
 
 // Runner image builder contract:
-// 1. Install the exact lockfile with Node 22 and pnpm 9.15.4, then create the
+// 1. Install the exact lockfile with Node 24 and pnpm 9.15.4, then create the
 //    integrity-checked installed-tree archive at installedTreeRoot.
 // 2. Set PLAYWRIGHT_BROWSERS_PATH to playwrightBrowsersPath and run
 //    `pnpm --filter=@jovie/web exec playwright install --with-deps chromium`.

@@ -20,7 +20,7 @@ import {
   evaluateLiveObservation,
   LIVE_INVARIANTS,
   LIVE_VIEWPORTS,
-  qualifyNode22,
+  qualifyNode24,
   runLiveStorybookCertification,
   seededPassingObservations,
   selectLiveStoriesForChanges,
@@ -317,12 +317,12 @@ afterEach(() => {
 });
 
 describe('live Storybook component certification', () => {
-  it('qualifies exact Node 22 and rejects other majors', () => {
-    expect(qualifyNode22('22.23.2').ok).toBe(true);
-    expect(qualifyNode22('22.13.0').ok).toBe(true);
-    expect(qualifyNode22('20.19.0').ok).toBe(false);
-    expect(qualifyNode22('24.5.0').ok).toBe(false);
-    expect(qualifyNode22('24.5.0').detail).toMatch(/requires Node 22\.x/);
+  it('qualifies exact Node 24 and rejects other majors', () => {
+    expect(qualifyNode24('24.21.0').ok).toBe(true);
+    expect(qualifyNode24('24.5.0').ok).toBe(true);
+    expect(qualifyNode24('20.19.0').ok).toBe(false);
+    expect(qualifyNode24('22.23.2').ok).toBe(false);
+    expect(qualifyNode24('22.23.2').detail).toMatch(/requires Node 24\.x/);
   });
 
   it('computes Storybook CSF ids from title and export name', () => {
@@ -396,7 +396,7 @@ describe('live Storybook component certification', () => {
     }
     const result = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       observations: samples,
     });
     expect(result.ok).toBe(true);
@@ -504,7 +504,7 @@ describe('live Storybook component certification', () => {
     expect(
       runLiveStorybookCertification({
         headSha: HEAD,
-        nodeVersion: '22.23.2',
+        nodeVersion: '24.21.0',
         observations: seededPassingObservations(),
         redFixtures: [leaked],
       }).ok
@@ -585,7 +585,7 @@ describe('live Storybook component certification', () => {
     );
     const result = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       observations: samples,
     });
     expect(result.ok).toBe(false);
@@ -611,7 +611,7 @@ describe('live Storybook component certification', () => {
       skipRatchet: true,
       headSha: HEAD,
       liveObservations: seededPassingObservations(),
-      liveNodeVersion: '22.23.2',
+      liveNodeVersion: '24.21.0',
     });
     expect(live.ok).toBe(true);
     expect(live.sections.liveStorybookCertification.ok).toBe(true);
@@ -639,7 +639,7 @@ describe('live Storybook component certification', () => {
 
     const docsOnly = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['docs/README.md'],
       observations: [],
     });
@@ -651,7 +651,7 @@ describe('live Storybook component certification', () => {
     );
     const badgePass = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['packages/ui/atoms/badge.tsx'],
       observations: badgeOnly,
     });
@@ -664,7 +664,7 @@ describe('live Storybook component certification', () => {
 
     const badgeMissing = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['packages/ui/atoms/button.stories.tsx'],
       observations: badgeOnly,
     });

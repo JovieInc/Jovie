@@ -148,7 +148,7 @@ export function totalErrors(counts) {
 }
 
 export function isSupportedTypecheckNode(version = process.version) {
-  return /^v22\./.test(String(version));
+  return /^v24\./.test(String(version));
 }
 
 /**
@@ -286,7 +286,7 @@ export function evaluateTypecheckBaseline({
 }) {
   if (!isSupportedTypecheckNode(nodeVersion)) {
     console.error(
-      `[${prefix}] FAIL — refusing to typecheck or write the baseline on Node ${nodeVersion}; a real Node 22 compiler run is required.`
+      `[${prefix}] FAIL — refusing to typecheck or write the baseline on Node ${nodeVersion}; a real Node 24 compiler run is required.`
     );
     exit(1);
     return;

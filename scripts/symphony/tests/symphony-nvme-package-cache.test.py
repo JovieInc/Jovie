@@ -15,7 +15,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/symphony/symphony-nvme-package-cache.sh"
-NODE_VERSION = "22.23.2"
+NODE_VERSION = "24.21.0"
 PNPM_VERSION = "9.15.4"
 SCHEMA = "symphony-nvme-package-cache/v2"
 

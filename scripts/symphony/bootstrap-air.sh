@@ -146,13 +146,13 @@ require_cmd plutil
 require_cmd shasum
 
 NODE_VERSION="$(node --version)"
-if [[ ! "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]]; then
-  die "Node 22.x required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+if [[ ! "$NODE_VERSION" =~ ^v24\.([0-9]+)\.([0-9]+) ]]; then
+  die "Node 24.x required, found $NODE_VERSION. Run: nvm use 24 && corepack prepare pnpm@9.15.4 --activate"
 fi
 NODE_MINOR="${BASH_REMATCH[1]}"
 NODE_PATCH="${BASH_REMATCH[2]}"
-if ((10#$NODE_MINOR < 23 || (10#$NODE_MINOR == 23 && 10#$NODE_PATCH < 1))); then
-  die "Node >=22.23.2 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+if ((10#$NODE_MINOR < 21 || (10#$NODE_MINOR == 21 && 10#$NODE_PATCH < 0))); then
+  die "Node >=24.21.0 required, found $NODE_VERSION. Run: nvm use 24 && corepack prepare pnpm@9.15.4 --activate"
 fi
 ok "Node $NODE_VERSION supported"
 NODE_BIN_DIR="$(dirname "$(command -v node)")"

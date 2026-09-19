@@ -25,9 +25,9 @@ cache_target="/home/$owner/.local/bin/symphony-nvme-package-cache"
 boot_simulation_target="/home/$owner/.local/bin/gem-symphony-workspace-boot-simulate"
 reclaimer_target="/home/$owner/.local/bin/gem-disk-reclaim"
 migration_target="/usr/local/sbin/gem-workspace-migrate"
-node_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/node"
+node_target="/home/$owner/.nvm/versions/node/v24.21.0/bin/node"
 node_link="/home/$owner/.local/bin/node"
-pnpm_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/pnpm"
+pnpm_target="/home/$owner/.nvm/versions/node/v24.21.0/bin/pnpm"
 pnpm_link="/home/$owner/.local/bin/pnpm"
 corepack_home="/home/$owner/.cache/node/corepack"
 systemd_source="$source_root/systemd"
@@ -68,7 +68,7 @@ esac
 [[ -x "$pnpm_target" ]] || { echo "required pnpm launcher missing: $pnpm_target" >&2; exit 69; }
 tool_path="$(dirname "$node_target"):/usr/local/bin:/usr/bin:/bin"
 tool_env=(env "HOME=/home/$owner" "COREPACK_HOME=$corepack_home" COREPACK_ENABLE_NETWORK=0 "PATH=$tool_path")
-[[ "$("${tool_env[@]}" node --version)" == "v22.23.2" ]] || { echo "Node 22.23.2 validation failed" >&2; exit 69; }
+[[ "$("${tool_env[@]}" node --version)" == "v24.21.0" ]] || { echo "Node 24.21.0 validation failed" >&2; exit 69; }
 [[ "$("${tool_env[@]}" pnpm --version)" == "9.15.4" ]] || { echo "pnpm 9.15.4 validation failed" >&2; exit 69; }
 
 user_systemctl=(runuser -u "$owner" -- env "XDG_RUNTIME_DIR=/run/user/$owner_uid" systemctl --user)

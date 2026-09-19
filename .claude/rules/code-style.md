@@ -19,7 +19,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 22 LTS |
+| Runtime | Node.js 24 LTS |
 
 ## TypeScript
 
