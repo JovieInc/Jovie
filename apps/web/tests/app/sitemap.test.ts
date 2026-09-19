@@ -282,7 +282,7 @@ describe('sitemap', () => {
       .mockResolvedValueOnce([
         {
           username: 'artist',
-          displayName: 'Artist',
+          displayName: 'Artist Name',
           updatedAt: new Date('2026-01-01'),
         },
       ])
