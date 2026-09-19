@@ -379,6 +379,9 @@ importers:
       '@jovie/copy':
         specifier: workspace:*
         version: link:../../packages/copy
+      '@jovie/jev-evaluation':
+        specifier: workspace:*
+        version: link:../../packages/jev-evaluation
       '@jovie/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -857,6 +860,12 @@ importers:
         version: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(msw@2.12.4(@types/node@26.6.2)(typescript@6.0.3))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/extension-contracts: {}
+
+  packages/jev-evaluation:
+    dependencies:
+      ai-evaluation:
+        specifier: npm:ai@7.0.105
+        version: ai@7.0.105(zod@4.6.5)
 
   packages/jovie-cli:
     devDependencies:
@@ -28801,7 +28810,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.20.0)
+      retry-axios: 2.6.0(axios@1.20.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -33050,7 +33059,7 @@ snapshots:
       retext-stringify: 4.0.0
       unified: 11.0.5
 
-  retry-axios@2.6.0(axios@1.20.0):
+  retry-axios@2.6.0(axios@1.20.0(debug@4.4.3)):
     dependencies:
       axios: 1.20.0(debug@4.4.3)
     optional: true
