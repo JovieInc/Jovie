@@ -2087,7 +2087,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   font-size: clamp(2.5rem, 5.5556vw, 5rem);
-  font-weight: 650;
+  /* Canonical homepage exception: Satoshi-Latin variable face at 600. */
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.04;
   text-wrap: balance;
@@ -2129,6 +2130,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
     var(--homepage-name-search-inset) var(--space-4);
   border: 0;
   border-radius: var(--radius-pill);
+  outline: var(--space-px) solid var(--homepage-editorial-hairline);
+  outline-offset: -1px;
   background: var(--homepage-editorial-field);
 }
 
@@ -2177,7 +2180,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-editorial-hero__headline {
     max-width: min(16ch, 100%);
     font-size: 40px;
-    font-weight: 680;
+    font-weight: 600;
     line-height: 1.06;
     letter-spacing: -0.03em;
     white-space: normal;

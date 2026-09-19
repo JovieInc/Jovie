@@ -114,6 +114,21 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
+  it('binds the editorial headline to the canonical Satoshi variable face', () => {
+    const css = readHeroCss();
+    const layout = readFileSync(path.join(webRoot, 'app/layout.tsx'), 'utf8');
+
+    expect(layout).toContain("src: '../public/fonts/Satoshi-Latin.woff2'");
+    expect(layout).toContain("weight: '300 900'");
+    expect(css).toContain('var(--font-satoshi)');
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?font-weight: 600;/
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?font-weight: 600;/
+    );
+  });
+
   it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
     const css = readHeroCss();
 

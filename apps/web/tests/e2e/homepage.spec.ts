@@ -10,6 +10,7 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 const HOMEPAGE_NAVIGATION_TIMEOUT = 60_000;
 type PlaywrightPage = import('@playwright/test').Page;
+type PlaywrightContext = import('@playwright/test').BrowserContext;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
@@ -55,6 +56,35 @@ async function gotoHomepage(page: PlaywrightPage) {
   }
 
   throw new Error('Homepage rendered a transient Next.js dev overlay');
+}
+
+async function prepareConsentFixture(
+  page: PlaywrightPage,
+  context: PlaywrightContext
+) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // Match the consent fixture: middleware refreshes this flag from geo headers.
+  await page.setExtraHTTPHeaders({
+    'x-vercel-ip-country': 'DE',
+    'x-vercel-ip-country-region': 'BE',
+  });
+  await page.addInitScript(() => {
+    try {
+      localStorage.removeItem('jv_cc');
+    } catch {
+      // ignore
+    }
+  });
+  await context.addCookies([
+    {
+      name: 'jv_cc_required',
+      value: '1',
+      url: process.env.BASE_URL ?? 'http://localhost:3100',
+      sameSite: 'Lax',
+    },
+  ]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForHydration(page);
 }
 
 test.describe('Homepage', () => {
@@ -162,42 +192,17 @@ test.describe('Homepage', () => {
     page,
     context,
   }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    // Match the consent fixture: middleware refreshes this flag from geo headers.
-    await page.setExtraHTTPHeaders({
-      'x-vercel-ip-country': 'DE',
-      'x-vercel-ip-country-region': 'BE',
-    });
-    await page.addInitScript(() => {
-      try {
-        localStorage.removeItem('jv_cc');
-      } catch {
-        // ignore
-      }
-    });
-    await context.addCookies([
-      {
-        name: 'jv_cc_required',
-        value: '1',
-        url: process.env.BASE_URL ?? 'http://localhost:3100',
-        sameSite: 'Lax',
-      },
-    ]);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await prepareConsentFixture(page, context);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
-      // CookieBannerMount is independently gated by the root E2E/dev chrome
-      // state. Keep this homepage geometry check deterministic by proving the
-      // hero action and any mounted shell actions that are actually present;
-      // cookie controls have their own route-independent contract tests.
       const actions = page.locator(
-        '.homepage-header-auth a:visible, [data-testid="cookie-actions"] button:visible, [data-testid="homepage-primary-cta"]:visible'
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button:visible, [data-testid="homepage-primary-cta"]:visible'
       );
+      await expect(page.getByTestId('cookie-actions')).toBeVisible();
+      expect(await actions.count()).toBeGreaterThanOrEqual(4);
       await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
-      expect(await actions.count()).toBeGreaterThanOrEqual(1);
       for (const action of await actions.all()) {
         const geometry = await action.evaluate(element => {
           const face = element.getBoundingClientRect();
@@ -214,7 +219,7 @@ test.describe('Homepage', () => {
       }
 
       const consentAndHeader = page.locator(
-        '.homepage-header-auth a:visible, [data-testid="cookie-actions"] button:visible'
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button:visible'
       );
       const assertTargets = async () => {
         const targets = await consentAndHeader.evaluateAll(elements =>
@@ -296,6 +301,61 @@ test.describe('Homepage', () => {
         expect(grown.scrollHeight).toBeLessThanOrEqual(grown.clientHeight);
       }
       await assertTargets();
+    }
+  });
+
+  test('trust artwork stays within its visible slots at desktop and phone widths', async ({
+    page,
+    context,
+  }) => {
+    test.fixme(
+      true,
+      'Homepage trust logo strip is intentionally not mounted; the logo-bar owner will re-enable this independent regression when it returns.'
+    );
+    await prepareConsentFixture(page, context);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      const ink = await page
+        .locator('.homepage-trust-logo-slot:visible')
+        .evaluateAll(slots =>
+          slots.map(slot => {
+            const svg = slot.querySelector('svg');
+            if (!svg) throw new Error('Trust logo SVG missing');
+            const matrix = svg.getScreenCTM();
+            if (!matrix) throw new Error('Trust logo transform missing');
+            const bounds = svg.getBBox();
+            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
+              matrix
+            );
+            const rightBottom = new DOMPoint(
+              bounds.x + bounds.width,
+              bounds.y + bounds.height
+            ).matrixTransform(matrix);
+            const frame = slot.getBoundingClientRect();
+            return {
+              left: leftTop.x,
+              right: rightBottom.x,
+              top: leftTop.y,
+              bottom: rightBottom.y,
+              frameLeft: frame.left,
+              frameRight: frame.right,
+              frameTop: frame.top,
+              frameBottom: frame.bottom,
+            };
+          })
+        );
+      expect(ink.length).toBeGreaterThanOrEqual(4);
+      for (const logo of ink) {
+        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
+        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
+        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
+        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
+        expect(logo.left).toBeGreaterThanOrEqual(0);
+        expect(logo.right).toBeLessThanOrEqual(width);
+      }
     }
   });
 
