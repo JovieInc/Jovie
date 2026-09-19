@@ -103,6 +103,8 @@ class OutboxPageLimitError extends Error {
 const ACTIONS = new Set([
   'reconcile-release-certification-starvation',
   'reconcile-native-queue-starvation',
+  'reconcile-closure-health-red',
+  'reconcile-runner-capacity-starvation',
   'remediate-selected-ci-audit-class',
 ]);
 const CI_IDS = new Set([
@@ -317,14 +319,21 @@ export function validateTask(task) {
   }
   const release = task.selected.id === 'release-certification-starvation';
   const queueStarvation = task.selected.id === 'native-queue-starvation';
+  const closureHealth = task.selected.id === 'closure-health-red';
+  const runnerCapacity = task.selected.id === 'runner-capacity-starvation';
   if (
     !isV3 &&
     ((release &&
       task.action !== 'reconcile-release-certification-starvation') ||
       (queueStarvation &&
         task.action !== 'reconcile-native-queue-starvation') ||
+      (closureHealth && task.action !== 'reconcile-closure-health-red') ||
+      (runnerCapacity &&
+        task.action !== 'reconcile-runner-capacity-starvation') ||
       (!release &&
         !queueStarvation &&
+        !closureHealth &&
+        !runnerCapacity &&
         (!CI_IDS.has(task.selected.id) ||
           task.action !== 'remediate-selected-ci-audit-class')))
   ) {
@@ -338,7 +347,11 @@ export function validateTask(task) {
       task.decisionFingerprint !== task.taskKey ||
       lifetime <= 0 ||
       lifetime > 5400000 ||
-      (!release && !queueStarvation && !CI_IDS.has(task.selected.id))
+      (!release &&
+        !queueStarvation &&
+        !closureHealth &&
+        !runnerCapacity &&
+        !CI_IDS.has(task.selected.id))
     )
       throw new Error('existing-repair-task-cross-bound');
   }
