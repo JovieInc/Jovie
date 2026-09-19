@@ -205,22 +205,25 @@ function MarketingHeroCtaLink({
   cta,
   intent,
   linkComponent,
+  presentation = 'content',
 }: {
   readonly cta: MarketingHeroCta;
   readonly intent: 'primary' | 'secondary';
   readonly linkComponent: ElementType;
+  readonly presentation?: 'content' | 'landing-secondary';
 }) {
   const LinkComponent = linkComponent;
   const analyticsProps = cta.eventName
     ? { eventName: cta.eventName, eventProperties: cta.eventProperties }
     : {};
+  const isLandingSecondary = presentation === 'landing-secondary';
 
   return (
     <Button
       asChild
-      size='md'
+      size={isLandingSecondary ? 'marketing' : 'md'}
       variant={intent === 'primary' ? 'primary' : 'ghost'}
-      className='marketing-hero-cta'
+      className={isLandingSecondary ? undefined : 'marketing-hero-cta'}
     >
       <LinkComponent
         href={cta.href}
@@ -373,8 +376,10 @@ function MarketingHeroLanding({
 
                 {secondaryCtaLabel && secondaryCtaHref ? (
                   <MarketingHeroCtaLink
-                    cta={{ href: secondaryCtaHref, label: secondaryCtaLabel }}
+                    cta={{ label: secondaryCtaLabel, href: secondaryCtaHref }}
                     intent='secondary'
+                    linkComponent={Link}
+                    presentation='landing-secondary'
                   />
                 ) : null}
 
