@@ -1738,9 +1738,60 @@ class LaggingConcurrencyRemintTests(unittest.TestCase):
 
             persisted = self.read_latest(state_dir)
             self.assertEqual(persisted, seeded)
-            self.assertEqual(returned, seeded)
-            self.assertEqual(persisted["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertEqual(returned["promotionMode"], live["promotionMode"])
+            self.assertEqual(returned["state"], live["state"])
+            self.assertEqual(
+                returned["promotionAdmission"]["allowed"],
+                live["promotionAdmission"]["allowed"],
+            )
+            self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertFalse(returned["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
             self.assertTrue(persisted["concurrency"]["gem"]["evidenceAccepted"])
+            self.assertIn("kept last-good approved concurrency", stderr.getvalue())
+
+    def test_flap_close_does_not_print_stale_hold_intake_as_promotion_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            now = MODULE.utc_now()
+            observed_at = MODULE.isoformat(now - MODULE.timedelta(minutes=1))
+            amber_signals = dict(GREEN_SIGNALS)
+            amber_signals["production"] = {
+                "status": "green",
+                "deployedSha": "b" * 40,
+            }
+            amber_signals["controller"] = {
+                "status": "failed",
+                "error": "controller-observation-failed: Connection refused",
+            }
+            amber_signals["concurrencyEvidence"] = capacity_evidence(
+                observed_at=observed_at
+            )
+            amber_signals["independentReview"] = {
+                **GREEN_SIGNALS["independentReview"],
+                "observedAt": observed_at,
+            }
+            last_hold = MODULE.evaluate(amber_signals, observed_at)
+            self.assertEqual(last_hold["promotionMode"], "hold-intake")
+            self.assertEqual(MODULE.approved_dispatch_concurrency(last_hold), 4)
+            MODULE.write_receipt(last_hold, state_dir)
+            live = self.persistable_max0(
+                MODULE.isoformat(now),
+                reason="capacity-evidence-trust-context-unavailable",
+            )
+            self.assertEqual(live["state"], "GREEN")
+            self.assertTrue(live["promotionAdmission"]["allowed"])
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                returned = MODULE.persist_live_receipt(live, state_dir, now)
+
+            persisted = self.read_latest(state_dir)
+            self.assertEqual(persisted["promotionMode"], "hold-intake")
+            self.assertEqual(returned["state"], "GREEN")
+            self.assertEqual(returned["promotionMode"], "normal")
+            self.assertTrue(returned["promotionAdmission"]["allowed"])
+            self.assertEqual(returned["concurrency"]["gem"]["maxConcurrent"], 4)
+            self.assertFalse(returned["concurrency"]["gem"]["newMutationAllowed"])
             self.assertIn("kept last-good approved concurrency", stderr.getvalue())
 
     def test_genuine_stale_evidence_still_persists_max0(self):

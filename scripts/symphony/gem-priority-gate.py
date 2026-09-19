@@ -2185,6 +2185,43 @@ def should_remint_lagging_zero_concurrency(
     return _persisted_max_concurrent(persisted) == 0
 
 
+def overlay_preserved_dispatch_seats(
+    live: dict[str, Any], persisted: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep last-good seat counts without substituting persisted promotion.
+
+    Capacity bounds new agent dispatch only. A flap-class persist must not
+    print a stale Gem-local promotionMode as Auto-Enroll authority.
+    """
+    merged = json.loads(json.dumps(live))
+    persisted_gem = (persisted.get("concurrency") or {}).get("gem")
+    if not isinstance(persisted_gem, dict):
+        return merged
+    live_gem = merged.setdefault("concurrency", {}).setdefault("gem", {})
+    maximum = persisted_gem.get("maxConcurrent")
+    if (
+        isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+    ):
+        live_gem["maxConcurrent"] = maximum
+    target = persisted_gem.get("approvedCapacityTarget")
+    if isinstance(target, int) and not isinstance(target, bool) and target >= 1:
+        live_gem["approvedCapacityTarget"] = target
+    elif (
+        isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= 1
+    ):
+        live_gem["approvedCapacityTarget"] = maximum
+    live_gem["preserveQueuedWork"] = True
+    live_gem["newMutationAllowed"] = False
+    live_gem["evidenceAccepted"] = False
+    if not live_gem.get("reason"):
+        live_gem["reason"] = "capacity-evidence-unproven-dispatch-closed"
+    return merged
+
+
 def should_preserve_approved_concurrency(
     live: dict[str, Any], persisted: dict[str, Any] | None
 ) -> bool:
@@ -2685,16 +2722,16 @@ def persist_live_receipt(
                     "after flap-class dispatch close"
                 )
             )
-            return persisted
+            return overlay_preserved_dispatch_seats(receipt, persisted)
         persisted_at = (
             parse_time(persisted.get("observedAt")) if persisted is not None else None
         )
         if persisted_at is not None and persisted_at >= now and not remint:
             try:
-                return read_json(state_dir / "latest.json")
+                read_json(state_dir / "latest.json")
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 warn_live_receipt_not_persisted(error)
-                return receipt
+            return receipt
         if remint:
             seats = approved_dispatch_concurrency(receipt)
             prefix = (

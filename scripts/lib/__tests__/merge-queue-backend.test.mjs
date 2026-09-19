@@ -1235,6 +1235,10 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).not.toContain('DRAIN_PRODUCTION_CHECKPOINT_STATE');
     expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
     expect(enroll).toContain('needs.fleet-policy.outputs.mode');
+    expect(enroll).toContain('### Auto-Enroll fleet receipt');
+    expect(enroll).toContain('receipt_age_seconds');
+    expect(enroll).toContain('capacity_accepted');
+    expect(enroll).toContain('Capacity bounds new agent dispatch only');
   });
 
   it('observes production verification without making it merge authority', () => {

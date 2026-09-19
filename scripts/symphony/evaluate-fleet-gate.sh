@@ -127,6 +127,25 @@ deployment_allowed=false
 [[ "$(jq -r '.deploymentAdmission.allowed // false' "$receipt")" == "true" ]] && deployment_allowed=true
 promotion_mode="$(jq -r '.promotionMode // "blocked"' "$receipt")"
 state="$(jq -r '.state' "$receipt")"
+observed_at="$(jq -r '.observedAt // empty' "$receipt")"
+receipt_age_seconds=""
+if [[ -n "$observed_at" ]]; then
+  receipt_age_seconds="$(
+    python3 -c '
+from datetime import datetime, timezone
+import sys
+try:
+    observed = datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
+except ValueError:
+    raise SystemExit(0)
+print(int((datetime.now(timezone.utc) - observed).total_seconds()))
+' "$observed_at" 2>/dev/null || true
+  )"
+fi
+capacity_accepted="$(jq -r '.concurrency.gem.evidenceAccepted // false' "$receipt")"
+capacity_max_concurrent="$(jq -r '.concurrency.gem.maxConcurrent // 0' "$receipt")"
+capacity_reason="$(jq -r '.concurrency.gem.reason // "unknown"' "$receipt")"
+new_mutation_allowed="$(jq -r '.concurrency.gem.newMutationAllowed // false' "$receipt")"
 
 mode=blocked
 if [[ "$consumer" == "deployment" ]]; then
@@ -164,10 +183,36 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "promotion_mode=$promotion_mode"
     echo "mode=$mode"
     echo "state=$state"
+    echo "receipt_age_seconds=${receipt_age_seconds}"
+    echo "capacity_accepted=$capacity_accepted"
+    echo "capacity_max_concurrent=$capacity_max_concurrent"
+    echo "capacity_reason=$capacity_reason"
+    echo "new_mutation_allowed=$new_mutation_allowed"
     echo "receipt_path=$receipt"
     echo "receipt_b64=$receipt_b64"
   } >>"$GITHUB_OUTPUT"
 fi
 
-echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out new_issue_intake_allowed=$new_issue_intake_allowed deployment_allowed=$deployment_allowed mode=$mode)."
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    echo "### Fleet receipt"
+    echo
+    echo "| Field | Value |"
+    echo "| --- | --- |"
+    echo "| state | $state |"
+    echo "| promotion_mode | $promotion_mode |"
+    echo "| consumer_mode | $mode |"
+    echo "| receipt_age_seconds | ${receipt_age_seconds:-unknown} |"
+    echo "| capacity_accepted | $capacity_accepted |"
+    echo "| capacity_max_concurrent | $capacity_max_concurrent |"
+    echo "| capacity_reason | $capacity_reason |"
+    echo "| new_mutation_allowed | $new_mutation_allowed |"
+    echo "| promotion_allowed | $promotion_allowed |"
+    echo "| new_issue_intake_allowed | $new_issue_intake_allowed |"
+    echo
+    echo "Capacity bounds new agent dispatch only. Already-green promotion/enroll uses live promotionMode, not Gem-local seat flaps."
+  } >>"$GITHUB_STEP_SUMMARY"
+fi
+
+echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out new_issue_intake_allowed=$new_issue_intake_allowed deployment_allowed=$deployment_allowed mode=$mode promotion_mode=$promotion_mode receipt_age_seconds=${receipt_age_seconds:-unknown} capacity_accepted=$capacity_accepted capacity_max_concurrent=$capacity_max_concurrent)."
 exit 0
