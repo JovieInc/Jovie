@@ -35,6 +35,14 @@ const BATCH_DELAY_MS = 1_000;
 const MIN_HOURS_BETWEEN_SENDS = 24;
 const FORCE = process.argv.includes('--force');
 
+// Public-facing labels for CHANGELOG.md section keys, in render order.
+const SECTION_LABELS = Object.freeze({
+  added: 'New',
+  changed: 'Improved',
+  fixed: 'Fixed',
+  removed: 'Removed',
+});
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -51,21 +59,22 @@ function isPublicSummary(summary) {
   return summary && !isInternalEntry(summary);
 }
 
-function entriesToHtml(sections, summary) {
-  const sectionLabels = {
-    added: 'New',
-    changed: 'Improved',
-    fixed: 'Fixed',
-    removed: 'Removed',
-  };
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
+function entriesToHtml(sections, summary) {
   let html = '';
 
   if (isPublicSummary(summary)) {
     html += `<p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #333;">${escapeHtml(summary)}</p>`;
   }
 
-  for (const [key, label] of Object.entries(sectionLabels)) {
+  for (const [key, label] of Object.entries(SECTION_LABELS)) {
     const entries = filterPublicEntries(sections[key]);
     if (entries.length === 0) continue;
     html += `<p style="margin: 12px 0 4px; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #999;">${label}</p>`;
@@ -79,20 +88,13 @@ function entriesToHtml(sections, summary) {
 }
 
 function entriesToText(sections, summary) {
-  const sectionLabels = {
-    added: 'New',
-    changed: 'Improved',
-    fixed: 'Fixed',
-    removed: 'Removed',
-  };
-
   let text = '';
 
   if (isPublicSummary(summary)) {
     text += `${summary}\n`;
   }
 
-  for (const [key, label] of Object.entries(sectionLabels)) {
+  for (const [key, label] of Object.entries(SECTION_LABELS)) {
     const entries = filterPublicEntries(sections[key]);
     if (entries.length === 0) continue;
     text += `\n${label}:\n`;
@@ -101,14 +103,6 @@ function entriesToText(sections, summary) {
     }
   }
   return text.trim();
-}
-
-function escapeHtml(s) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 async function main() {
