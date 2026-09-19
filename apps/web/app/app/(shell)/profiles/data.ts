@@ -24,6 +24,7 @@ import {
   type ProfileSurfaceKind,
   redactLockedRank,
   selectAdditionalMonitoredSurfaceIds,
+  selectCanonicalProfileSurfaces,
 } from '@/lib/profile-surfaces/contracts';
 import {
   type PresenceIdentityPhoto,
@@ -203,7 +204,7 @@ export async function loadProfilesWorkspaceData(input: {
     monitoringLimit,
   });
 
-  const [profileRows, surfaces, preferences, providerHealth, latestRuns] =
+  const [profileRows, storedSurfaces, preferences, providerHealth, latestRuns] =
     await Promise.all([
       db
         .select({
@@ -266,6 +267,14 @@ export async function loadProfilesWorkspaceData(input: {
         .orderBy(desc(profileSearchRuns.fetchedAt))
         .limit(2),
     ]);
+
+  const surfaces = selectCanonicalProfileSurfaces(
+    storedSurfaces,
+    new URL(
+      `/${encodeURIComponent(profileRows[0]?.username ?? '')}`,
+      publicEnv.NEXT_PUBLIC_PROFILE_URL
+    ).toString()
+  );
 
   const latestRun = latestRuns[0] ?? null;
   const previousRun = latestRuns[1] ?? null;

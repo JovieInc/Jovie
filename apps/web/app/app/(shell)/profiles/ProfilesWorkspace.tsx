@@ -79,7 +79,12 @@ import {
   selectPresenceReviewRows,
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
-import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
+import {
+  FetchError,
+  fetchWithTimeout,
+  queryKeys,
+  STANDARD_CACHE,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,
@@ -1019,7 +1024,7 @@ function SuggestedConnectionsReview({
       {isError && groups.length === 0 ? (
         <SuggestedConnectionsState
           heading="Couldn't Load Suggestions"
-          description='Saved suggestions are still available. Try again.'
+          description='Suggestions could not be retrieved. Try again.'
           onRetry={onRetry}
           testId='suggested-connections-error-state'
         />
@@ -1109,6 +1114,9 @@ export function ProfilesWorkspace({
     queryFn: ({ signal }) =>
       fetchConnectionSuggestions(profileId ?? '', signal),
     enabled: Boolean(profileId),
+    retry: (failureCount, error) =>
+      failureCount < 2 &&
+      (!(error instanceof FetchError) || error.isRetryable()),
   });
   const connectionSuggestions = useMemo(
     () => connectionSuggestionsQuery.data ?? [],
