@@ -362,7 +362,7 @@ function MarketingHeroLanding({
                 {body}
               </div>
 
-              <div className='mt-8 flex flex-wrap items-center gap-3'>
+              <div className='mt-8 flex flex-wrap items-center gap-x-3 gap-y-4'>
                 <LandingCtaLink
                   href={primaryCtaHref}
                   label={primaryCtaLabel}
@@ -372,12 +372,9 @@ function MarketingHeroLanding({
                 />
 
                 {secondaryCtaLabel && secondaryCtaHref ? (
-                  <Link
-                    href={secondaryCtaHref}
-                    className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-                  >
-                    {secondaryCtaLabel}
-                  </Link>
+                  <Button asChild size='marketing' variant='ghost'>
+                    <Link href={secondaryCtaHref}>{secondaryCtaLabel}</Link>
+                  </Button>
                 ) : null}
 
                 {subcopy ? (
