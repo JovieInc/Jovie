@@ -12,7 +12,7 @@ teach Clerk as the live auth path. Identity is Better Auth only.
 
 ## Better Auth Architecture
 
-Jovie owns sessions on Neon + Drizzle + Upstash. Better Auth is configured in
+Jovie runs **self-hosted Better Auth**, with sessions on Neon Postgres + Drizzle and supporting Upstash storage. This is not the managed Neon Auth service. The installed version is pinned in `apps/web/package.json` and `pnpm-lock.yaml`; check those files instead of assuming a provider or SDK version from older notes. Better Auth is configured in
 `apps/web/lib/auth/better-auth.ts` and served at `/api/auth/[...all]` via
 `toNextJsHandler`.
 

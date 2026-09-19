@@ -21,6 +21,7 @@ import {
   LANE_COMMANDS,
   LANE_GROUPS,
   MARKETING_CERTIFICATION_COMMAND,
+  RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -191,6 +192,26 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects and runs alignment regressions for source-only changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/align-runner-source-revision.sh',
+      'scripts/symphony/tests/align-runner-source-revision.test.sh',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'bash scripts/symphony/tests/align-runner-source-revision.test.sh'"
+    );
+  });
+
   it('runs Linux restart boundary tests when the helper or its proof changes', () => {
     const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeTruthy();
@@ -287,6 +308,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'scripts-typecheck',
+      'shadcn-lint-contracts',
       'structural',
       'typecheck',
     ]);
@@ -621,6 +643,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes().map(lane => lane.id)).toEqual([
       'biome',
       'eslint-server-boundaries',
+      'shadcn-lint-contracts',
       'typecheck',
       'scripts-typecheck',
       'guardrails',
@@ -648,6 +671,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance': 'pnpm design:conformance:gate',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
+      'shadcn-lint-contracts':
+        'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
@@ -686,6 +711,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
+    expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
     expect(LANE_COMMANDS['design-conformance']).toBe(
       'pnpm design:conformance:gate'
     );
@@ -894,6 +920,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
   });
 
+  it('runs native queue delivery regressions with coverage for executor changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain(
+      '(run-native-queue-execution|native-queue-starvation-execute(?:\\.test)?)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs'
+    );
+  });
+
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -939,14 +978,15 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
       'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-      'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
       'python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py',
       'coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
       'python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py',
       'coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
       'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'python3 scripts/symphony/tests/test-model-router.py',
+      'python3 scripts/symphony/tests/run-model-state-gate.py',
       'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
       'python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py',
       'python3 scripts/symphony/tests/symphony-github-poke.test.py',
@@ -1323,9 +1363,20 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/test-model-router.py',
       'scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'scripts/symphony/tests/test_fleet_admission_receipt.py',
+      'scripts/lib/release-wave-admission.mjs',
+      'scripts/lib/__tests__/release-wave-admission.test.mjs',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }
+    expect(CI_FAST_SOURCE).toContain(
+      'RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      'lib/__tests__/release-wave-admission.test.mjs'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      '--coverage.include=release-wave-admission.mjs'
+    );
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
     expect(CI_FAST_SOURCE).toContain(

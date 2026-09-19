@@ -10,7 +10,11 @@ vi.mock('@/components/marketing/ProductScreenshotFrame', () => ({
   ),
 }));
 
-import { AuthBrandPanel } from '@/components/features/auth/AuthBrandPanel';
+import {
+  AuthBrandPanel,
+  DEFAULT_AUTH_BRAND_DESCRIPTION,
+  DEFAULT_AUTH_BRAND_HEADLINE,
+} from '@/components/features/auth/AuthBrandPanel';
 
 describe('AuthBrandPanel', () => {
   it('renders a single static first product frame instead of a carousel', () => {
@@ -72,5 +76,20 @@ describe('AuthBrandPanel', () => {
     expect(
       screen.queryByRole('heading', { name: 'Hidden copy' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the canonical company-identity defaults (JOV-6261)', () => {
+    render(<AuthBrandPanel />);
+
+    expect(
+      screen.getByRole('heading', { name: DEFAULT_AUTH_BRAND_HEADLINE })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(DEFAULT_AUTH_BRAND_DESCRIPTION)
+    ).toBeInTheDocument();
+    expect(DEFAULT_AUTH_BRAND_HEADLINE).toBe('Control how the world sees you.');
+    expect(DEFAULT_AUTH_BRAND_DESCRIPTION).toBe(
+      'Find what the internet knows. Turn it into relationships.'
+    );
   });
 });

@@ -11,6 +11,8 @@ import {
 export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.button',
   'atom.input',
+  'atom.separator',
+  'atom.switch',
   'atom.icon-button',
   'atom.link',
   'atom.brand-logo',
@@ -110,6 +112,49 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
         'long-placeholder',
       ],
       type: ['text', 'password', 'search', 'number'],
+    },
+  },
+  {
+    id: 'atom.separator',
+    layer: 'atom',
+    source: 'packages/ui/atoms/separator.tsx',
+    exportName: 'Separator',
+    storySource: 'packages/ui/atoms/separator.stories.tsx',
+    storybookTitle: 'UI/Atoms/Separator',
+    storyExport: 'ConformanceMatrix',
+    testSources: [
+      'apps/web/tests/e2e/storybook-separator.spec.ts',
+      'packages/ui/atoms/separator.test.tsx',
+    ],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen separator root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      orientation: ['horizontal', 'vertical'],
+      decorative: ['true', 'false'],
+    },
+  },
+  {
+    id: 'atom.switch',
+    layer: 'atom',
+    source: 'packages/ui/atoms/switch.tsx',
+    exportName: 'Switch',
+    storySource: 'packages/ui/atoms/switch.stories.tsx',
+    storybookTitle: 'UI/Atoms/Switch',
+    storyExport: 'ConformanceMatrix',
+    testSources: ['packages/ui/atoms/switch.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen switch root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      state: ['unchecked', 'checked', 'focus-visible', 'disabled', 'invalid'],
+      presentation: ['default', 'feature-thumb'],
     },
   },
   {

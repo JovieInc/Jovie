@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
 import {
   buildHarnessReceipt,
   validateHarnessContract,
@@ -12,6 +13,7 @@ import { validateQualityRatchet } from './quality-ratchet.mjs';
 // JOV-INV-029 is composed here so every CI invariant run checks the lifecycle.
 // JOV-INV-031 is composed here so every CI invariant run checks thread-blocking.
 // JOV-INV-032 is composed here so every CI invariant run checks iOS web scroll jank.
+// JOV-INV-033 is composed here so every CI invariant run rescans Done-sprint sources.
 
 import {
   readInvariantRegistry,
@@ -27,6 +29,8 @@ import {
 // the same way. It does not invent route-response-latency budgets.
 // JOV-INV-032 composes the ios-web-no-scroll-jank public-web gate the same
 // way. It does not invent scroll-FPS budgets or add an ESLint design lane.
+// JOV-INV-033 composes Done-sprint source locks the same way. Production HTML
+// rescan stays on the existing production-controller job (release mode).
 
 const harnessJson = process.argv.includes('--harness-json');
 
@@ -40,6 +44,10 @@ const latencyErrors = validateLatencySensitiveExecution(undefined, {
   registry,
 });
 const iosScrollErrors = validateIosWebNoScrollJank(undefined, { registry });
+const doneSprintErrors = await validateDoneSprintInvariants({
+  registry,
+  mode: 'source',
+});
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),
@@ -48,6 +56,7 @@ const errors = [
   ...lifecycleErrors.map(error => `pr-lifecycle: ${error}`),
   ...latencyErrors.map(error => `latency-sensitive: ${error}`),
   ...iosScrollErrors.map(error => `ios-web-no-scroll-jank: ${error}`),
+  ...doneSprintErrors.map(error => `done-sprint: ${error}`),
 ];
 
 const ok = errors.length === 0 && result.blockers.length === 0;

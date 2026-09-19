@@ -772,7 +772,8 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
             source, installed = root / "source", root / "installed"
             source.write_text(self.SOURCE)
             env = {"GEM_ROOT": str(root), "WORKFLOW_SOURCE": str(source), "WORKFLOW_TARGET": str(installed),
-                   "SOURCE_REVISION": "a" * 40, "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
+                   "SOURCE_REVISION": "a" * 40, "CONFIGURATION_PROFILE": "canonical",
+                   "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
             for prefix in ("UNIT", "POLICY", "GATE", "CLOSURE"):
                 env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
             with mock.patch.dict(MODULE.os.environ, env):
@@ -786,10 +787,20 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
                     self.assertNotIn("sourceRevision", receipt)
                     self.assertFalse((root / "state/gem-service-attestation.json").exists())
                     self.assertTrue(receipt["workflow"]["matches"])
+                    self.assertEqual(receipt["configurationProfile"], "canonical")
                     self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], int(value))
                 for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):
                     installed.write_text(text)
                     with self.assertRaises(SystemExit): exec(compile(code, str(installer), "exec"), {})
+            with mock.patch.dict(MODULE.os.environ, {**env, "CONFIGURATION_PROFILE": "governor-bounded"}):
+                installed.write_text(self.overlay("1"))
+                namespace = {}
+                with mock.patch("builtins.print"):
+                    exec(compile(code, str(installer), "exec"), namespace)
+                self.assertEqual(namespace["receipt"]["configurationProfile"], "governor-bounded")
+                installed.write_text(self.overlay("128"))
+                with self.assertRaises(SystemExit):
+                    exec(compile(code, str(installer), "exec"), {})
 
     def test_any_other_workflow_drift_fails_closed(self):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")

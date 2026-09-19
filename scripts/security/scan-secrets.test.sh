@@ -71,7 +71,7 @@ case "${SCAN_TEST_SCENARIO:-}" in
     echo 'verified secret detected' >&2
     exit 183
     ;;
-  widened | in-range-finding | mixed)
+  widened | in-range-finding | mixed | full-allowlisted | full-blocked)
     # Realistic human-format finding blocks; TRUFFLEHOG_FAKE_FINDING_COMMITS is
     # a space-separated list of attributions trufflehog prints per finding.
     for commit in ${TRUFFLEHOG_FAKE_FINDING_COMMITS:-}; do
@@ -235,6 +235,37 @@ fi
 if grep -q -- '--exclude-globs' "$TRUFFLEHOG_PRECOMMIT_ARGS"; then
   fail 'pre-commit filesystem scan must not receive git-mode-only --exclude-globs'
 fi
+
+run_full_scenario() {
+  local scenario="$1"
+  local finding_commits="${2:-}"
+  local output="$TEST_ROOT/$scenario.output"
+  local status=0
+  export GIT_CALLS="$TEST_ROOT/$scenario.git-calls"
+  export TRUFFLEHOG_COUNT="$TEST_ROOT/$scenario.trufflehog-count"
+  export SCAN_TEST_SCENARIO="$scenario"
+  export TRUFFLEHOG_FAKE_FINDING_COMMITS="$finding_commits"
+  : >"$GIT_CALLS"
+  rm -f "$TRUFFLEHOG_COUNT"
+
+  PATH="$BIN_DIR:$PATH" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
+    bash "$SCAN_SCRIPT" full-trufflehog >"$output" 2>&1 || status=$?
+  printf '%s\n' "$status"
+}
+
+FULL_ALLOWLISTED_COMMIT='304e0d95ae1b5f80f58c27b4ca6b7939b3a04584'
+FULL_BLOCKED_COMMIT='ffffffffffffffffffffffffffffffffffffffff'
+
+status="$(run_full_scenario full-allowlisted "$FULL_ALLOWLISTED_COMMIT")"
+[[ $status -eq 0 ]] \
+  || fail "allowlisted full-history commit must not fail the schedule scan: $status"
+grep -q '::warning title=Secret scan allowlisted historical commit' \
+  "$TEST_ROOT/full-allowlisted.output" \
+  || fail 'allowlisted full-history scan must classify the known commit'
+
+status="$(run_full_scenario full-blocked "$FULL_BLOCKED_COMMIT")"
+[[ $status -eq 183 ]] \
+  || fail "non-allowlisted full-history findings must still fail: $status"
 
 bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 

@@ -27,6 +27,7 @@ export interface SidebarNavItemProps {
 
 interface SidebarNavChromeOptions {
   readonly active?: boolean;
+  readonly calm?: boolean;
   readonly collapsed?: boolean;
   readonly nested?: boolean;
   readonly tight?: boolean;
@@ -79,6 +80,7 @@ export function getSidebarNavRowClassName({
   nested,
   tight,
   trailingOverlay,
+  calm,
   tone = 'default',
   className,
 }: SidebarNavChromeOptions) {
@@ -99,6 +101,10 @@ export function getSidebarNavRowClassName({
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
     getToneClassName({ active, nested, tone }),
+    calm &&
+      !collapsed &&
+      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
+    calm && active && 'border-subtle font-semibold',
     className
   );
 }
@@ -108,6 +114,7 @@ export function getSidebarNavIconClassName({
   nested,
   tight,
   tone,
+  calm,
   className,
 }: SidebarNavChromeOptions) {
   const inactiveIconColor = nested
@@ -124,6 +131,7 @@ export function getSidebarNavIconClassName({
       : active && tone !== 'secondary'
         ? 'text-accent-teal!'
         : inactiveIconColor,
+    calm && 'size-(--app-shell-sidebar-icon-size)',
     className
   );
 }

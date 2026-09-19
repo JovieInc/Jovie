@@ -5,6 +5,7 @@ import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
+import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
@@ -162,6 +163,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           {mobileBottomNav}
         </div>
       ) : null}
+      <OverlayInteractionGuard />
     </div>
   );
 });

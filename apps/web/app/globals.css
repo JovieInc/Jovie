@@ -45,6 +45,10 @@
 @source not "../**/*.test.*";
 @source not "../**/*.spec.*";
 @source not "../**/*.stories.*";
+/* DashboardThemeToggle is rendered by the app shell and has a small
+   route-owned utility set. Re-include only this file so its state paints are
+   present without scanning the dashboard tree into public CSS. */
+@source "../components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -122,6 +126,8 @@ html[data-desktop-runtime="electron"]
   [data-app-shell-frame="true"]:has([data-main-header-inset="true"])
   [data-electron-titlebar="true"] {
   width: var(--electron-controls-width);
+  /* With no sidebar beneath the controls, reveal the header/ambient plane. */
+  background: transparent;
 }
 
 html[data-desktop-runtime="electron"]
@@ -150,6 +156,12 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
+/* JOV-6340: route canvas/composer are never a window-drag region. */
+html[data-desktop-runtime="electron"] [data-app-shell-scroll],
+html[data-desktop-runtime="electron"] [data-testid="chat-composer-surface"] {
+  -webkit-app-region: no-drag;
+}
+
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   h1 {
@@ -158,7 +170,8 @@ html[data-desktop-runtime="electron"]
 }
 
 /* Match the existing sidebar rail's horizontal inset. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
 }

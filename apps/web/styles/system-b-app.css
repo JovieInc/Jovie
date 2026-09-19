@@ -3783,6 +3783,7 @@
 }
 
 :where(.system-b-chat-user-text) {
+  font-weight: var(--font-weight-book);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);
 }
@@ -3956,6 +3957,7 @@
 }
 
 :where(.system-b-chat-message-reply) {
+  font-weight: var(--font-weight-book);
   color: var(--color-text-primary-token);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);

@@ -116,6 +116,19 @@ describe('token-drift eval (shipped contrast ratchet)', () => {
     expect(countViolations([cleanPath])).toEqual({ ...ZERO_COUNTS });
   });
 
+  it('skips story and test files even when they mention raw color utilities', () => {
+    const testPath = join(fixtureRoot, 'DirtyContrast.test.tsx');
+    const storyPath = join(fixtureRoot, 'DirtyContrast.stories.tsx');
+    writeFileSync(testPath, "expect(el).not.toHaveClass('text-white');\n");
+    writeFileSync(
+      storyPath,
+      'export const Ghost = () => <p className="text-white">ghost</p>;\n'
+    );
+
+    expect(countViolations([testPath, storyPath])).toEqual({ ...ZERO_COUNTS });
+    expect(listViolations([testPath, storyPath])).toEqual([]);
+  });
+
   it('flags retired carbon #7170FF as arbitraryHex', () => {
     const counts = countViolations([carbonPath]);
     expect(counts.arbitraryHex).toBeGreaterThan(0);

@@ -8,6 +8,8 @@ import {
   createRateLimitHeaders,
   getClientIP,
   merchCheckoutLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -25,9 +27,15 @@ export async function POST(request: Request) {
   const rateLimit = await merchCheckoutLimiter.limit(ip);
   if (!rateLimit.success) {
     return NextResponse.json(
-      { error: 'Too many checkout requests. Please try again later.' },
       {
-        status: 429,
+        error: rateLimitDenialMessage(
+          rateLimit,
+          'Too many checkout requests. Please try again later.',
+          'Checkout is temporarily unavailable. Please try again later.'
+        ),
+      },
+      {
+        status: rateLimitDenialStatus(rateLimit),
         headers: {
           ...NO_STORE_HEADERS,
           ...createRateLimitHeaders(rateLimit),

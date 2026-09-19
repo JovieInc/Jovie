@@ -9,6 +9,7 @@ import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_LIVE_STORIES,
+  LIVE_PAINT_EVIDENCE,
   LIVE_VIEWPORTS,
   REPO_ROOT,
   resolveLiveStoriesForRun,
@@ -22,6 +23,7 @@ import {
   waitForUrl,
   withBoundedLifecycle,
 } from './component-live-storybook-lifecycle.mjs';
+import { oklchToRgb, parseOklch } from './lib/oklch.mjs';
 
 const require = createRequire(import.meta.url);
 const MIME = Object.freeze({
@@ -127,6 +129,7 @@ function assertIndexContainsCanonicalStories(index, repoRoot) {
 function ownerSelector(owner) {
   if (owner === 'atom.button') return 'button, [role="button"]';
   if (owner === 'atom.badge') return 'span[data-variant], span[data-tone]';
+  if (owner === 'atom.switch') return '[role="switch"]';
   return '[data-variant="hoverable"], [data-variant="default"]';
 }
 
@@ -214,20 +217,37 @@ function extractRadiusToken(className) {
 }
 
 function parseRgb(raw) {
-  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(
-    raw || ''
-  );
-  if (!rgb) return null;
-  const r = Number(rgb[1]) / 255;
-  const g = Number(rgb[2]) / 255;
-  const b = Number(rgb[3]) / 255;
+  const value = String(raw || '').trim();
+  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(value);
+  let r;
+  let g;
+  let b;
+  if (rgb) {
+    r = Number(rgb[1]) / 255;
+    g = Number(rgb[2]) / 255;
+    b = Number(rgb[3]) / 255;
+  } else if (/^oklch\(/i.test(value)) {
+    try {
+      const converted = oklchToRgb(parseOklch(value));
+      r = converted.r;
+      g = converted.g;
+      b = converted.b;
+    } catch {
+      return null;
+    }
+  } else {
+    return null;
+  }
+  r = Math.min(1, Math.max(0, r));
+  g = Math.min(1, Math.max(0, g));
+  b = Math.min(1, Math.max(0, b));
   const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
   return {
     r,
     g,
     b,
     luminance: luminance < 0.5 ? 'dark' : 'light',
-    raw,
+    raw: value,
   };
 }
 
@@ -242,6 +262,28 @@ function contrastRatio(a, b) {
     0.2126 * srgb(b.r) + 0.7152 * srgb(b.g) + 0.0722 * srgb(b.b),
   ];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+export function extractSwitchContrastPairs(switchPaints) {
+  return (Array.isArray(switchPaints) ? switchPaints : []).map(paint => {
+    const track = parseRgb(paint?.trackBackgroundColor);
+    const thumb = parseRgb(paint?.thumbBackgroundColor);
+    return {
+      id: `${paint?.label || 'switch'}:${paint?.state || 'unknown'}:thumb-track`,
+      label: paint?.label || '',
+      state: paint?.state,
+      disabled: paint?.disabled === true,
+      invalid: paint?.invalid === true,
+      boundary: 'thumb-track',
+      background: track,
+      foreground: thumb,
+      opacity: {
+        track: paint?.trackOpacity ?? null,
+        thumb: paint?.thumbOpacity ?? null,
+      },
+      ratio: contrastRatio(track, thumb),
+    };
+  });
 }
 
 async function measureStory(page, story, viewport, axePath) {
@@ -306,6 +348,24 @@ async function measureStory(page, story, viewport, axePath) {
       visit(el, 0);
       const classes = [classOf(el), ...paddingClassSource].join(' ');
       const style = getComputedStyle(el);
+      const switchPaints =
+        owner === 'atom.switch'
+          ? [...root.querySelectorAll(ownerSel)].map(node => {
+              const trackStyle = getComputedStyle(node);
+              const thumb = node.firstElementChild;
+              const thumbStyle = thumb ? getComputedStyle(thumb) : null;
+              return {
+                label: node.getAttribute('aria-label') || '',
+                state: node.getAttribute('data-state'),
+                disabled: node.hasAttribute('disabled'),
+                invalid: node.getAttribute('aria-invalid') === 'true',
+                trackBackgroundColor: trackStyle.backgroundColor,
+                thumbBackgroundColor: thumbStyle?.backgroundColor ?? null,
+                trackOpacity: trackStyle.opacity,
+                thumbOpacity: thumbStyle?.opacity ?? null,
+              };
+            })
+          : [];
       const opaqueBg = node => {
         let current = node;
         while (current && current !== document.documentElement) {
@@ -357,24 +417,34 @@ async function measureStory(page, story, viewport, axePath) {
         ? 'light'
         : 'dark';
       const role = el.getAttribute('role') || el.tagName.toLowerCase();
-      const interactive = role === 'button' || el.tagName === 'BUTTON';
+      const interactive =
+        role === 'button' || role === 'switch' || el.tagName === 'BUTTON';
       const matchesOwner =
         owner === 'atom.badge'
           ? el.tagName === 'SPAN' &&
             (el.hasAttribute('data-variant') || el.hasAttribute('data-tone'))
           : owner === 'atom.button'
-            ? interactive
-            : classOf(el).includes('rounded-(--system-b-radius-card)') &&
-              (el.getAttribute('data-variant') === 'default' ||
-                el.getAttribute('data-variant') === 'hoverable');
+            ? role === 'button' || el.tagName === 'BUTTON'
+            : owner === 'atom.switch'
+              ? role === 'switch'
+              : classOf(el).includes('rounded-(--system-b-radius-card)') &&
+                (el.getAttribute('data-variant') === 'default' ||
+                  el.getAttribute('data-variant') === 'hoverable');
 
       return {
         copy:
-          (el.innerText || el.textContent || '').trim().split('\n')[0] || '',
+          (
+            el.innerText ||
+            el.textContent ||
+            el.getAttribute('aria-label') ||
+            ''
+          )
+            .trim()
+            .split('\n')[0] || '',
         classes,
         variant: el.getAttribute('data-variant'),
         tone: el.getAttribute('data-tone'),
-        role: interactive ? 'button' : role,
+        role,
         interactive,
         accessibleName: (
           el.getAttribute('aria-label') ||
@@ -384,6 +454,7 @@ async function measureStory(page, story, viewport, axePath) {
         pageBackgroundColor: opaqueBg(document.body),
         backgroundColor: opaqueBg(el),
         color: style.color,
+        switchPaints,
         outerRadiusPx: parsePx(style.borderTopLeftRadius),
         innerRadiusPx: cssLengthToPx(
           style.getPropertyValue('--system-b-radius-card-inner')
@@ -420,7 +491,7 @@ async function measureStory(page, story, viewport, axePath) {
   }
 
   let keyboardReached = false;
-  if (story.owner === 'atom.button') {
+  if (story.owner === 'atom.button' || story.owner === 'atom.switch') {
     await page
       .locator('body')
       .click({ position: { x: 1, y: 1 } })
@@ -433,7 +504,8 @@ async function measureStory(page, story, viewport, axePath) {
         return Boolean(
           active &&
             (active.tagName === 'BUTTON' ||
-              active.getAttribute('role') === 'button')
+              active.getAttribute('role') === 'button' ||
+              active.getAttribute('role') === 'switch')
         );
       });
       if (keyboardReached) break;
@@ -485,6 +557,12 @@ async function measureStory(page, story, viewport, axePath) {
   const pageFill = parseRgb(snapshot.pageBackgroundColor);
   const fill = parseRgb(snapshot.backgroundColor);
   const foreground = parseRgb(snapshot.color);
+  const switchPaints = extractSwitchContrastPairs(snapshot.switchPaints);
+  const switchContrastRatio =
+    switchPaints.length === 0 ||
+    switchPaints.some(item => !Number.isFinite(item.ratio))
+      ? null
+      : Math.min(...switchPaints.map(item => item.ratio));
   const paddingTokens = extractPaddingTokens(snapshot.classes);
   const radiusToken = extractRadiusToken(snapshot.classes);
 
@@ -514,8 +592,16 @@ async function measureStory(page, story, viewport, axePath) {
       arbitrary: Boolean(radiusToken && /\[[^\]]+\]/.test(radiusToken)),
     },
     fill: pageFill ?? fill,
-    foreground,
-    contrastRatio: contrastRatio(fill, foreground),
+    // Switch contrast is measured from its painted thumb/track pair. The
+    // root color is inherited text styling and is intentionally excluded.
+    foreground: story.owner === 'atom.switch' ? null : foreground,
+    contrastRatio:
+      story.owner === 'atom.switch'
+        ? switchContrastRatio
+        : contrastRatio(fill, foreground),
+    contrastPairs: story.owner === 'atom.switch' ? switchPaints : undefined,
+    paintEvidence:
+      story.owner === 'atom.switch' ? LIVE_PAINT_EVIDENCE : undefined,
     axeViolations: axe,
     overflow: snapshot.overflow,
     zoomOverflow,

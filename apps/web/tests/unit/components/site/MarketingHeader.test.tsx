@@ -70,7 +70,7 @@ describe('MarketingHeader', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.header
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );
@@ -91,10 +91,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-first front-door contract.
+    // The shared public CTA follows the waitlist-on front-door contract on /signup.
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -105,7 +105,7 @@ describe('MarketingHeader', () => {
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Artists', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -136,7 +136,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -162,13 +162,13 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 

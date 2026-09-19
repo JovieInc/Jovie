@@ -437,7 +437,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(health["status"], "red")
         self.assertEqual(health["repository"], "JovieInc/Jovie")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
-        self.assertFalse(health["newIssueIntakeAllowed"])
+        self.assertTrue(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
         self.assertTrue(health["remediationContinues"])
         layers[-1]["headRefOid"] = "f" * 40
@@ -878,7 +878,7 @@ class ClosureClassificationTests(unittest.TestCase):
             now=NOW,
         )
         self.assertEqual(health["status"], "red")
-        self.assertFalse(health["newIssueIntakeAllowed"])
+        self.assertTrue(health["newIssueIntakeAllowed"])
         self.assertIn("internally-repairable-prs-open", health["reasons"])
         self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
@@ -1446,7 +1446,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
                 health = MODULE.evaluate_closure_health(observed, None, NOW)
 
                 self.assertEqual(health["status"], "red")
-                self.assertFalse(health["newIssueIntakeAllowed"])
+                self.assertTrue(health["newIssueIntakeAllowed"])
                 self.assertIn(
                     "lifecycle-action-inventory-incomplete", health["reasons"]
                 )
@@ -1554,7 +1554,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("duplicate-issue-lanes-unresolved", result["reasons"])
         self.assertIn("no-merge-progress-over-1h", result["reasons"])
-        self.assertFalse(result["newIssueIntakeAllowed"])
+        self.assertTrue(result["newIssueIntakeAllowed"])
 
     def test_unmergeable_native_queue_episode_crosses_bounded_red_threshold(self):
         churning = snapshot(
@@ -1597,7 +1597,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
             result["episodes"]["unmergeableQueue"]["since"],
             MODULE.isoformat(NOW),
         )
-        self.assertFalse(result["newIssueIntakeAllowed"])
+        self.assertTrue(result["newIssueIntakeAllowed"])
 
     def test_unmergeable_native_queue_episode_clears_when_mergeable(self):
         churning = snapshot(
@@ -1734,10 +1734,10 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         )
 
         self.assertEqual(jovie_empty_red["productId"], "jovie")
-        self.assertFalse(jovie_empty_red["newIssueIntakeAllowed"])
+        self.assertTrue(jovie_empty_red["newIssueIntakeAllowed"])
         self.assertIn("native-queue-empty-with-eligible-over-15m", jovie_empty_red["reasons"])
         self.assertEqual(jovie_unmergeable_red["productId"], "jovie")
-        self.assertFalse(jovie_unmergeable_red["newIssueIntakeAllowed"])
+        self.assertTrue(jovie_unmergeable_red["newIssueIntakeAllowed"])
         self.assertIn("native-queue-unmergeable", jovie_unmergeable_red["reasons"])
         self.assertEqual(lyb["productId"], "logyourbody")
         self.assertEqual(lyb["repository"], "JovieInc/LogYourBody")
@@ -1748,10 +1748,10 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
             MODULE.product_intake_allowed(jovie_empty_red, "logyourbody")
         )
         self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "ovie"))
-        self.assertFalse(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
+        self.assertTrue(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
 
         products = MODULE.build_product_closure_health(jovie_empty_red)
-        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
         self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["remediationContinues"])

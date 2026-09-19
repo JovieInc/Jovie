@@ -33,6 +33,16 @@ export {
   getDspBioUpdateSubject,
   getDspBioUpdateText,
 } from './templates/dsp-bio-update';
+export type { PaidWelcomeTemplateData } from './templates/paid-welcome';
+export {
+  buildPaidWelcomeActivationUrl,
+  buildPaidWelcomeBillingUrl,
+  buildPaidWelcomeSupportUrl,
+  getPaidWelcomeEmail,
+  getPaidWelcomeHtml,
+  getPaidWelcomeSubject,
+  getPaidWelcomeText,
+} from './templates/paid-welcome';
 export type { TipThankYouTemplateData } from './templates/tip-thank-you';
 export {
   getTipThankYouEmail,

@@ -1,8 +1,9 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -10,6 +11,7 @@ import {
   resolveRequestAuthIdentity,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 function canUseE2ETestAuthFallback(): boolean {
@@ -42,7 +44,8 @@ function WaitlistRouteWithContract({
  * seven-field waitlist questionnaire.
  *
  * WAITLIST_PENDING stays here. A real pending row is the only success
- * condition; missing receipts fail closed without false confirmation.
+ * condition; missing receipts recover to /signup instead of 404ing
+ * acquisition traffic (JOV-6436).
  *
  * /start is rewrite-exempt for waitlist users, so recovering to /start does
  * not re-enter the JOV-2161 proxy rewrite loop.
@@ -85,6 +88,20 @@ export default async function WaitlistPage() {
     );
   }
 
+  // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
+  // Canonical WAITLIST_PENDING is enough to render the receipt.
+  const waitlistGateEnabled = await isWaitlistGateEnabled();
+  if (
+    authResult.state === CanonicalUserState.WAITLIST_PENDING &&
+    !waitlistGateEnabled
+  ) {
+    return (
+      <WaitlistRouteWithContract>
+        <WaitlistSuccessView email={authResult.context.email} />
+      </WaitlistRouteWithContract>
+    );
+  }
+
   const access = authResult.context.email
     ? await getWaitlistAccess(authResult.context.email)
     : null;
@@ -96,5 +113,5 @@ export default async function WaitlistPage() {
     );
   }
 
-  notFound();
+  redirect(APP_ROUTES.SIGNUP);
 }

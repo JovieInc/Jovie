@@ -233,4 +233,5 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/symphony/tests/gem-checkin-hud.test.py
+          python3 scripts/symphony/tests/hold-autoresolve.test.py
           python3 scripts/symphony/tests/symphony-burrito-workflow.test.py

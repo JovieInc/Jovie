@@ -26,6 +26,16 @@ export const LIVE_CERT_SCHEMA =
 export const LIVE_CERT_CLAIM_BOUNDARY =
   'enrolled-canonical-primitive-stories-only';
 
+export const LIVE_PAINT_EVIDENCE = Object.freeze({
+  model: 'computed-style-background-pairs',
+  alphaCompositing: 'not-modeled',
+  opacityCompositing: 'not-modeled',
+  limitations: Object.freeze([
+    'Contrast uses computed thumb and track color channels without compositing translucent layers or ancestor backgrounds.',
+    'Element opacity is recorded when available but is not folded into the ratio; disabled-state ratios describe the uncomposited paints.',
+  ]),
+});
+
 export const LIVE_INVARIANTS = Object.freeze([
   'story-contract',
   'theme',
@@ -84,6 +94,13 @@ export const CANONICAL_LIVE_STORIES = Object.freeze([
     importPath: 'packages/ui/atoms/Card.stories.tsx',
     owner: 'atom.card',
   }),
+  Object.freeze({
+    id: 'ui-atoms-switch--conformance-matrix',
+    exportName: 'ConformanceMatrix',
+    title: 'UI/Atoms/Switch',
+    importPath: 'packages/ui/atoms/switch.stories.tsx',
+    owner: 'atom.switch',
+  }),
 ]);
 
 const INVARIANT_SET = new Set(LIVE_INVARIANTS);
@@ -108,6 +125,35 @@ const RADIUS_TOKEN =
   /^(--radius-[\w]+|--system-b-radius-[\w-]+|rounded-(?:none|xs|sm|md|lg|xl|2xl|3xl|full|pill)|rounded-\(--(?:radius|system-b-radius)[\w-]*\))$/;
 const ARBITRARY_UTIL = /\[[^\]]+\]/;
 const AA_TEXT_MIN = 4.5;
+const SWITCH_CONTRAST_STATES = Object.freeze(['checked', 'unchecked']);
+const SWITCH_CHECKED_TRACK_PAINT = Object.freeze({
+  r: 230 / 255,
+  g: 230 / 255,
+  b: 230 / 255,
+  luminance: 'light',
+  raw: 'rgb(230, 230, 230)',
+});
+const SWITCH_CHECKED_THUMB_PAINT = Object.freeze({
+  r: 2 / 255,
+  g: 3 / 255,
+  b: 7 / 255,
+  luminance: 'dark',
+  raw: 'rgb(2, 3, 7)',
+});
+const SWITCH_UNCHECKED_TRACK_PAINT = Object.freeze({
+  r: 21 / 255,
+  g: 27 / 255,
+  b: 42 / 255,
+  luminance: 'dark',
+  raw: 'rgb(21, 27, 42)',
+});
+const SWITCH_UNCHECKED_THUMB_PAINT = Object.freeze({
+  r: 230 / 255,
+  g: 230 / 255,
+  b: 230 / 255,
+  luminance: 'light',
+  raw: 'rgb(230, 230, 230)',
+});
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -160,6 +206,7 @@ const LIVE_FAMILY_BY_BASENAME = Object.freeze({
   badge: 'atom.badge',
   button: 'atom.button',
   card: 'atom.card',
+  switch: 'atom.switch',
 });
 
 export function liveFamilyFromComponentPath(componentPath) {
@@ -199,9 +246,9 @@ export function validateCanonicalStoryInventory(options = {}) {
   const stories = options.stories ?? CANONICAL_LIVE_STORIES;
   const issues = [];
   const allowSubset = options.allowSubset === true;
-  if (!Array.isArray(stories) || (!allowSubset && stories.length !== 5)) {
+  if (!Array.isArray(stories) || (!allowSubset && stories.length !== 6)) {
     issues.push(
-      `canonical live inventory must declare exactly 5 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
+      `canonical live inventory must declare exactly 6 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
     );
   }
   const ids = new Set();
@@ -486,17 +533,121 @@ export function evaluateLiveObservation(sample) {
   }
 
   if (check('aa-contrast')) {
-    const ratio =
-      typeof sample.contrastRatio === 'number'
-        ? sample.contrastRatio
-        : contrastFromPaints(sample.fill, sample.foreground);
-    if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
-      add('aa-contrast', 'contrast ratio is missing; fail closed');
-    } else if (ratio < AA_TEXT_MIN) {
-      add(
-        'aa-contrast',
-        `contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
-      );
+    const isSwitchObservation =
+      sample.owner === 'atom.switch' || inventory?.owner === 'atom.switch';
+    if (isSwitchObservation) {
+      const pairs = sample.contrastPairs;
+      if (!Array.isArray(pairs) || pairs.length === 0) {
+        add(
+          'aa-contrast',
+          'Switch requires nonempty rendered thumb/track contrast pairs; fail closed'
+        );
+      } else {
+        const states = new Set();
+        for (const pair of pairs) {
+          const label =
+            typeof pair?.label === 'string' && pair.label.trim()
+              ? pair.label.trim()
+              : typeof pair?.boundary === 'string' && pair.boundary.trim()
+                ? pair.boundary.trim()
+                : 'rendered contrast pair';
+          if (!isObject(pair)) {
+            add('aa-contrast', `${label} evidence is malformed; fail closed`);
+            continue;
+          }
+          const state = typeof pair.state === 'string' ? pair.state : '';
+          if (!SWITCH_CONTRAST_STATES.includes(state)) {
+            add(
+              'aa-contrast',
+              `${label} state must be checked|unchecked; fail closed`
+            );
+          } else {
+            states.add(state);
+          }
+          if (pair.boundary !== 'thumb-track') {
+            add(
+              'aa-contrast',
+              `${label} boundary must be thumb-track; fail closed`
+            );
+          }
+          const ratio = pair.ratio;
+          if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+            add(
+              'aa-contrast',
+              `${label} contrast ratio is missing; fail closed`
+            );
+            continue;
+          }
+          const measuredRatio = contrastFromPaints(
+            pair.background,
+            pair.foreground
+          );
+          if (
+            typeof measuredRatio !== 'number' ||
+            !Number.isFinite(measuredRatio)
+          ) {
+            add(
+              'aa-contrast',
+              `${label} rendered paint colors are missing; fail closed`
+            );
+            continue;
+          }
+          if (Math.abs(measuredRatio - ratio) > 0.01) {
+            add(
+              'aa-contrast',
+              `${label} reported contrast ${ratio.toFixed(2)}:1 does not match rendered paints ${measuredRatio.toFixed(2)}:1`
+            );
+          }
+          if (measuredRatio < AA_TEXT_MIN) {
+            add(
+              'aa-contrast',
+              `${label} contrast ${measuredRatio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
+            );
+          }
+        }
+        for (const state of SWITCH_CONTRAST_STATES) {
+          if (!states.has(state)) {
+            add(
+              'aa-contrast',
+              `Switch ${state} thumb/track contrast pair is missing; fail closed`
+            );
+          }
+        }
+      }
+    } else if (Array.isArray(sample.contrastPairs)) {
+      if (sample.contrastPairs.length === 0) {
+        add('aa-contrast', 'rendered contrast pairs are missing; fail closed');
+      }
+      for (const pair of sample.contrastPairs) {
+        const ratio = pair?.ratio;
+        const label =
+          typeof pair?.label === 'string' && pair.label.trim()
+            ? pair.label.trim()
+            : typeof pair?.boundary === 'string' && pair.boundary.trim()
+              ? pair.boundary.trim()
+              : 'rendered contrast pair';
+        if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+          add('aa-contrast', `${label} contrast ratio is missing; fail closed`);
+        } else if (ratio < AA_TEXT_MIN) {
+          add(
+            'aa-contrast',
+            `${label} contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
+          );
+        }
+      }
+    } else {
+      const ratio =
+        typeof sample.contrastRatio === 'number'
+          ? sample.contrastRatio
+          : contrastFromPaints(sample.fill, sample.foreground);
+      if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+        add('aa-contrast', 'contrast ratio is missing; fail closed');
+      } else if (ratio < AA_TEXT_MIN) {
+        add(
+          'aa-contrast',
+          `contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
+        );
+      }
     }
   }
 
@@ -575,9 +726,10 @@ export function evaluateLiveObservation(sample) {
 }
 
 function contractFor(owner, extraNa = {}) {
-  const interactive = owner === 'atom.button';
+  const interactive = owner === 'atom.button' || owner === 'atom.switch';
   const concentric = owner === 'atom.card';
-  const hover = owner === 'atom.button' || owner === 'atom.card';
+  const hover =
+    owner === 'atom.button' || owner === 'atom.card' || owner === 'atom.switch';
   const applicable = LIVE_INVARIANTS.filter(id => {
     if (id === 'keyboard' && !interactive) return false;
     if (id === 'concentric-radius' && !concentric) return false;
@@ -629,8 +781,14 @@ function observation(story, viewport, extra = {}) {
 }
 
 export function seededPassingObservations() {
-  const [badgeDefault, badgeTones, buttonPrimary, cardDefault, cardHoverable] =
-    CANONICAL_LIVE_STORIES;
+  const [
+    badgeDefault,
+    badgeTones,
+    buttonPrimary,
+    cardDefault,
+    cardHoverable,
+    switchConformance,
+  ] = CANONICAL_LIVE_STORIES;
   const samples = [];
   for (const viewport of LIVE_VIEWPORTS.map(item => item.id)) {
     samples.push(
@@ -686,6 +844,34 @@ export function seededPassingObservations() {
           keyboard:
             'hover treatment only; this story does not expose an activation role',
         },
+      }),
+      observation(switchConformance, viewport, {
+        copy: 'Keyboard toggle',
+        classes:
+          'relative inline-flex h-4 w-7 rounded-full px-0.5 bg-btn-primary',
+        variant: 'default',
+        interactive: true,
+        keyboardReached: true,
+        padding: { tokens: ['px-0.5'] },
+        radius: { token: 'rounded-full', px: 9999 },
+        contrastPairs: [
+          {
+            label: 'checked thumb against track',
+            state: 'checked',
+            boundary: 'thumb-track',
+            background: SWITCH_CHECKED_TRACK_PAINT,
+            foreground: SWITCH_CHECKED_THUMB_PAINT,
+            ratio: 16.52,
+          },
+          {
+            label: 'unchecked thumb against track',
+            state: 'unchecked',
+            boundary: 'thumb-track',
+            background: SWITCH_UNCHECKED_TRACK_PAINT,
+            foreground: SWITCH_UNCHECKED_THUMB_PAINT,
+            ratio: 13.77,
+          },
+        ],
       })
     );
   }
@@ -770,6 +956,39 @@ export const DELIBERATE_RED_LIVE_FIXTURES = Object.freeze([
     variant: 'default',
     contrastRatio: 1.2,
     padding: { tokens: ['px-2', 'py-0.5'] },
+    radius: { token: 'rounded-full', px: 9999 },
+  }),
+  observation(CANONICAL_LIVE_STORIES[5], 'desktop', {
+    id: 'deliberate-red.live.switch-thumb-track-contrast',
+    copy: 'Keyboard toggle',
+    classes: 'relative inline-flex h-4 w-7 rounded-full px-0.5 bg-surface-2',
+    variant: 'default',
+    // Keep the legacy scalar healthy so this fixture proves that the
+    // evaluator uses painted thumb/track evidence instead of root text.
+    contrastRatio: 7.2,
+    contrastPairs: [
+      {
+        label: 'unchecked thumb against track',
+        state: 'unchecked',
+        boundary: 'thumb-track',
+        background: {
+          r: 32 / 255,
+          g: 32 / 255,
+          b: 32 / 255,
+          luminance: 'dark',
+          raw: 'rgb(32, 32, 32)',
+        },
+        foreground: {
+          r: 32 / 255,
+          g: 32 / 255,
+          b: 32 / 255,
+          luminance: 'dark',
+          raw: 'rgb(32, 32, 32)',
+        },
+        ratio: 1,
+      },
+    ],
+    padding: { tokens: ['px-0.5'] },
     radius: { token: 'rounded-full', px: 9999 },
   }),
   observation(CANONICAL_LIVE_STORIES[0], 'desktop', {
@@ -918,6 +1137,7 @@ export function runLiveStorybookCertification(options = {}) {
         skipped: true,
         issues,
         claimBoundary: LIVE_CERT_CLAIM_BOUNDARY,
+        paintEvidence: LIVE_PAINT_EVIDENCE,
         liveVisualCertification: liveVisualCertification(true, [], {
           skipped: true,
           note: 'no enrolled canonical family changed',
@@ -1001,6 +1221,12 @@ export function runLiveStorybookCertification(options = {}) {
       viewport: sample.viewport,
       verdict: evaluation.ok ? 'pass' : 'block',
       findings: evaluation.findings,
+      contrastPairs:
+        sample.owner === 'atom.switch' && Array.isArray(sample.contrastPairs)
+          ? sample.contrastPairs
+          : undefined,
+      paintEvidence:
+        sample.owner === 'atom.switch' ? LIVE_PAINT_EVIDENCE : undefined,
     };
   });
 
@@ -1017,6 +1243,7 @@ export function runLiveStorybookCertification(options = {}) {
       ok,
       issues,
       claimBoundary: LIVE_CERT_CLAIM_BOUNDARY,
+      paintEvidence: LIVE_PAINT_EVIDENCE,
       liveVisualCertification: liveVisualCertification(ok, selected),
       inventory: inventory.stories.map(item => ({
         id: item.id,

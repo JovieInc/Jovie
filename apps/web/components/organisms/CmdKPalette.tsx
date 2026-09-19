@@ -219,7 +219,7 @@ export function CmdKPalette({
     if (item.kind === 'skill') {
       return `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
     }
-    if (item.kind === 'prompt') return null;
+    if (item.kind === 'prompt' || item.kind === 'action') return null;
     return resolveEntityHref(item.entity);
   }, [activeIndex, additionalIds, flatItems]);
 
@@ -252,6 +252,7 @@ export function CmdKPalette({
         if (item.kind === 'nav') id = item.nav.id;
         else if (item.kind === 'skill') id = item.skill.id;
         else if (item.kind === 'prompt') id = item.prompt.id;
+        else if (item.kind === 'action') id = item.action.id;
         else id = item.entity.id;
         onAdditionalSelect?.(id);
         handleClose();
@@ -267,6 +268,11 @@ export function CmdKPalette({
         const url = `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
         handleClose();
         router.push(url);
+        return;
+      }
+      if (item.kind === 'action') {
+        handleClose();
+        item.action.onSelect();
         return;
       }
       if (item.kind === 'prompt') {

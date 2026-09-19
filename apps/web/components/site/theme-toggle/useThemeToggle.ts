@@ -20,7 +20,6 @@ export interface UseThemeToggleReturn {
   indicatorX: number;
 }
 
-const BUTTON_SIZE_PX = 28;
 const GAP_PX = 0;
 
 const THEMES: ThemeOption[] = [
@@ -29,7 +28,10 @@ const THEMES: ThemeOption[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
-export function useThemeToggle(shortcutKey?: string): UseThemeToggleReturn {
+export function useThemeToggle(
+  shortcutKey?: string,
+  buttonSizePx = 28
+): UseThemeToggleReturn {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
 
@@ -68,7 +70,7 @@ export function useThemeToggle(shortcutKey?: string): UseThemeToggleReturn {
       ),
     [currentTheme]
   );
-  const indicatorX = activeIndex * (BUTTON_SIZE_PX + GAP_PX);
+  const indicatorX = activeIndex * (buttonSizePx + GAP_PX);
 
   return {
     mounted,

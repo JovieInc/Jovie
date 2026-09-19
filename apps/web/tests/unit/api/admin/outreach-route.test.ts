@@ -80,6 +80,7 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('@/constants/domains', () => ({
   getAppUrl: mockGetAppUrl,
+  SUPPORT_EMAIL: 'support@jov.ie',
 }));
 
 vi.mock('@/lib/db', () => ({

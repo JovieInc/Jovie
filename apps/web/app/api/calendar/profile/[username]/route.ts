@@ -136,7 +136,11 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
-      profile.usernameNormalized,
+      {
+        handle: profile.usernameNormalized,
+        displayName: profile.displayName,
+        isPublic: profile.isPublic,
+      },
       'Not found'
     );
     if (profileExclusion) {

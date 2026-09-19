@@ -36,6 +36,7 @@ describe('marketing CTA intent registry', () => {
 
     expect(intent).toBe(MARKETING_CTA_INTENTS.claimProfile);
     expect(intent.label).toBe('Get started');
+    expect(intent.href).toBe(APP_ROUTES.SIGNUP);
     expect(intent.href).toBe(PUBLIC_WAITLIST_URL);
     expect(intent.eventName).toBe('landing_cta_claim_profile');
     expect(intent.support.toLowerCase()).toContain('limited prelaunch access');
@@ -61,7 +62,8 @@ describe('marketing CTA intent registry', () => {
       'https://jov.ie'
     );
     expect(withHandle.origin).toBe('https://jov.ie');
-    expect(withHandle.pathname).toBe(APP_ROUTES.WAITLIST);
+    expect(withHandle.pathname).toBe(APP_ROUTES.SIGNUP);
+    expect(withHandle.pathname).not.toBe(APP_ROUTES.WAITLIST);
     expect(withHandle.searchParams.get('handle')).toBe('river-signal');
     expect(withHandle.searchParams.get('starter_prompt')).toContain(
       'jov.ie/river-signal'

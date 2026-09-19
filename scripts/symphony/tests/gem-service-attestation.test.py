@@ -292,6 +292,60 @@ class PublisherTests(unittest.TestCase):
             self.assertEqual(E.main(), 78)
             self.assertNotIn('secret text', str(output.call_args))
 
+    def test_restart_retry_reobserves_actual_service_and_keeps_writer_lock(self):
+        destination = self.root / 'receipt.json'
+        destination.write_text('previous observation')
+        attempts = []
+        self.fields['ActiveState'] = 'activating'
+        def measure():
+            attempts.append(self.fields['ActiveState'])
+            return self.observe()
+        def recover(seconds):
+            self.assertEqual(seconds, 5)
+            self.assertEqual(destination.read_text(), 'previous observation')
+            competing = mock.Mock()
+            with self.assertRaises(BlockingIOError):
+                E.publish(destination, competing)
+            competing.assert_not_called()
+            self.fields['ActiveState'] = 'active'
+            self.fields['InvocationID'] = 'new-running-invocation'
+        with mock.patch.object(E.time, 'sleep', side_effect=recover), mock.patch('sys.stderr', new_callable=io.StringIO):
+            receipt = E.publish(destination, lambda: E.observe_with_retry(measure))
+        self.assertEqual(attempts, ['activating', 'active'])
+        self.assertEqual(receipt['runtime']['invocationId'], 'new-running-invocation')
+        self.assertEqual(receipt['observedAt'], NOW.isoformat())
+        self.assertEqual(json.loads(destination.read_text()), receipt)
+
+    def test_retry_exhaustion_preserves_receipt_and_never_logs_secret_exception_text(self):
+        destination = self.root / 'receipt.json'
+        destination.write_text('previous observation')
+        errors = [subprocess.TimeoutExpired(['secret-command'], 10),
+                  OSError('secret-path'), ValueError('secret-response')]
+        observer = mock.Mock(side_effect=errors)
+        with mock.patch.object(E.time, 'sleep') as sleep, mock.patch('sys.stderr', new_callable=io.StringIO) as stderr:
+            with self.assertRaises(ValueError):
+                E.publish(destination, lambda: E.observe_with_retry(observer))
+        self.assertEqual(observer.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(5), mock.call(15)])
+        self.assertEqual(destination.read_text(), 'previous observation')
+        self.assertNotIn('secret', stderr.getvalue())
+        attempts = [json.loads(line) for line in stderr.getvalue().splitlines()]
+        self.assertEqual([row['retryInSeconds'] for row in attempts], [5, 15, None])
+        self.assertEqual(attempts[0]['reason'], 'observation-command-timeout')
+        self.assertEqual(E.failure_reason(subprocess.CalledProcessError(1, ['secret'])), 'observation-command-failed')
+
+    def test_publisher_entrypoint_retries_observation_but_not_a_definitively_unhealthy_receipt(self):
+        args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
+                '--source-revision', CONFIG, '--gem-root', str(self.gem)]
+        for receipt, code in [({'healthy': True}, 0), ({'healthy': False}, 2)]:
+            with mock.patch.object(sys, 'argv', args), \
+                 mock.patch.object(E, 'observe', side_effect=[ValueError('official listener ambiguous or unavailable'), receipt]) as observer, \
+                 mock.patch.object(E.time, 'sleep') as sleep, mock.patch('builtins.print'):
+                self.assertEqual(E.main(), code)
+                self.assertEqual(observer.call_count, 2)
+                sleep.assert_called_once_with(5)
+                self.assertEqual(json.loads((self.gem / 'state/gem-service-attestation.json').read_text()), receipt)
+
     def test_operator_profile_environment_and_explicit_override_reach_observer(self):
         args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
                 '--source-revision', CONFIG, '--check']
@@ -348,6 +402,80 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(rejected.returncode, 2)
         self.assertIn('not a git repository', rejected.stderr)
         self.assertEqual(rejected.stdout, '')
+
+    def test_failed_installer_restores_sources_and_previous_timer_activity(self):
+        for active, failure in ((a, f) for a in (True, False) for f in ("check", "publish", "timer-start")):
+            with self.subTest(timer_active=active, failure=failure), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                repo = root / 'repo'
+                base = repo / 'scripts/symphony'
+                (base / 'systemd').mkdir(parents=True)
+                names = ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
+                         'gem_gate_contract.py', 'systemd/gem-service-attestation.service']
+                for name in names:
+                    (base / name).write_text('new fixture source\n')
+                env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+                env.update(HOME=str(root), GEM_SERVICE_ATTESTATION_VERIFY_ONLY='false', FAILURE=failure,
+                           GIT_CONFIG_COUNT='3', GIT_CONFIG_KEY_0='maintenance.auto', GIT_CONFIG_VALUE_0='false',
+                           GIT_CONFIG_KEY_1='gc.auto', GIT_CONFIG_VALUE_1='0',
+                           GIT_CONFIG_KEY_2='maintenance.autoDetach', GIT_CONFIG_VALUE_2='false')
+                subprocess.run(['git', 'init', '-q', str(repo)], env=env, check=True)
+                subprocess.run(['git', '-C', str(repo), 'add', '.'], env=env, check=True)
+                subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture', '-c',
+                                'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], env=env, check=True)
+                config = root / '.config/symphony'
+                config.mkdir(parents=True)
+                (config / 'runner-source.env').write_text(
+                    f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}\n'
+                    f'JOVIE_CONFIGURATION_SOURCE_ROOT={repo}\n'
+                    f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}\n'
+                    'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n')
+                targets = [root / 'gem-workspace/scripts' / name for name in
+                           ['emit-gem-service-attestation.py', 'symphony_proof_context.py', 'gem_gate_contract.py']]
+                targets.append(root / '.config/systemd/user/gem-service-attestation.service')
+                for target in targets:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text('original source\n')
+                    target.chmod(0o644)
+                targets[0].chmod(0o755)
+                timer = root / 'timer-active'
+                if active: timer.touch()
+                bins = root / 'bin'
+                bins.mkdir()
+                (bins / 'systemctl').write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$HOME/systemctl.log"
+case "$*" in
+  "--user is-active --quiet gem-service-attestation.timer") test -f "$HOME/timer-active" ;;
+  "--user is-active --quiet gem-service-attestation.service") exit 1 ;;
+  "--user stop gem-service-attestation.timer") rm -f "$HOME/timer-active" ;;
+  "--user start gem-service-attestation.timer")
+    touch "$HOME/timer-active"
+    if [ "$FAILURE" = timer-start ] && [ ! -f "$HOME/start-failed" ]; then
+      touch "$HOME/start-failed"; exit 2
+    fi ;;
+  "--user list-unit-files gem-service-attestation.timer") printf 'gem-service-attestation.timer enabled\\n' ;;
+  *) exit 0 ;;
+esac
+''')
+                (bins / 'python3').write_text('''#!/bin/sh
+case "$*" in
+  *--check*) [ "$FAILURE" != check ] || exit 2 ;;
+  *) [ "$FAILURE" != publish ] || exit 2 ;;
+esac
+exit 0
+''')
+                for path in bins.iterdir(): path.chmod(0o755)
+                env['PATH'] = str(bins) + os.pathsep + env['PATH']
+                result = subprocess.run(['bash', str(Path(E.__file__).with_name('install-gem-service-attestation.sh')),
+                                         str(repo)], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(timer.exists(), active)
+                self.assertTrue(all(target.read_text() == 'original source\n' for target in targets))
+                self.assertEqual(targets[0].stat().st_mode & 0o777, 0o755)
+                calls = (root / 'systemctl.log').read_text()
+                self.assertIn('daemon-reload', calls)
+                self.assertNotIn('restart symphony', calls)
+                self.assertFalse((root / 'gem-workspace/state/gem-service-attestation.json').exists())
 
 
 if __name__ == '__main__':

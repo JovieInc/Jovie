@@ -16,6 +16,7 @@ describe('reliability detector registry (JOV-1855)', () => {
       expect.arrayContaining([
         'public-profile-canary',
         'auth-signup-onboarding-canary',
+        'm2-revenue-path-canary',
         'bug-to-test-rule',
         'flaky-quarantine-ledger',
         'nightly-testing-agent',

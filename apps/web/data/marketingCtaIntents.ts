@@ -78,12 +78,15 @@ export function buildClaimProfileStartHref(
     return CLAIM_PROFILE_WAITLIST_INTENT.href;
   }
 
-  const destination = new URL(PUBLIC_WAITLIST_URL);
+  const destination = new URL(
+    CLAIM_PROFILE_WAITLIST_INTENT.href,
+    'https://jov.ie'
+  );
   destination.search = new URLSearchParams({
     starter_prompt: `I want to claim jov.ie/${trimmed}.`,
     handle: trimmed,
   }).toString();
-  return destination.toString();
+  return `${destination.pathname}${destination.search}`;
 }
 
 export function getClaimProfileIntent(

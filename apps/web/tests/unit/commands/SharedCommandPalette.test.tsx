@@ -7,10 +7,17 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { FileAudio2, Paperclip } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+  CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+} from '@/components/jovie/chat-composer-copy';
+import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import {
+  filterAdditionalSections,
   fuzzyMatch,
   PaletteList,
 } from '@/components/organisms/SharedCommandPalette';
@@ -125,6 +132,34 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
     isError: false,
   }),
 }));
+
+function composerAttachmentActions(
+  onSelectAttach = vi.fn(),
+  onSelectAudio = vi.fn()
+): readonly PickerActionItem[] {
+  return [
+    {
+      kind: 'action',
+      action: {
+        id: 'attach-files',
+        label: 'Attach Files',
+        description: 'Drop or browse',
+        icon: Paperclip,
+        onSelect: onSelectAttach,
+      },
+    },
+    {
+      kind: 'action',
+      action: {
+        id: 'upload-audio',
+        label: CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+        description: CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+        icon: FileAudio2,
+        onSelect: onSelectAudio,
+      },
+    },
+  ];
+}
 
 describe('SharedCommandPalette (cmd+k surface)', () => {
   it('matches palette queries against the shared source', () => {
@@ -595,5 +630,78 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       { target: { value: 'Chat result' } }
     );
     expect(screen.getAllByText(/^Chat result \d$/)).toHaveLength(7);
+  });
+
+  it('filters additional composer actions by label and supported-audio hint', () => {
+    const attachments = composerAttachmentActions();
+    const sections = [
+      {
+        id: 'attachments',
+        label: 'Attachments',
+        items: attachments,
+      },
+    ];
+
+    expect(filterAdditionalSections('', sections)[0]?.items).toEqual(
+      attachments
+    );
+    expect(filterAdditionalSections('audio', sections)[0]?.items).toEqual([
+      attachments[1],
+    ]);
+    expect(filterAdditionalSections('flac', sections)[0]?.items).toEqual([
+      attachments[1],
+    ]);
+    expect(filterAdditionalSections('browse', sections)[0]?.items).toEqual([
+      attachments[0],
+    ]);
+    expect(filterAdditionalSections('files', sections)[0]?.items).toEqual([
+      attachments[0],
+    ]);
+    expect(filterAdditionalSections('zzzz-not-found', sections)).toEqual([]);
+  });
+
+  it('searches composer action descriptions and commits the action id', () => {
+    pushMock.mockClear();
+    prefetchMock.mockClear();
+    const onAdditionalSelect = vi.fn();
+    const onOpenChange = vi.fn();
+    const onSelectAttach = vi.fn();
+    const onSelectAudio = vi.fn();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={onOpenChange}
+        additionalSectionsAfter={[
+          {
+            id: 'attachments',
+            label: 'Attachments',
+            items: composerAttachmentActions(onSelectAttach, onSelectAudio),
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    prefetchMock.mockClear();
+    fireEvent.change(input, { target: { value: 'flac' } });
+
+    const audio = screen.getByRole('option', {
+      name: `${CHAT_COMPOSER_UPLOAD_AUDIO_LABEL} ${CHAT_COMPOSER_UPLOAD_AUDIO_HINT} ${CMD_LABEL}1`,
+    });
+    expect(audio).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();
+    expect(prefetchMock).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('upload-audio');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSelectAudio).not.toHaveBeenCalled();
+    expect(onSelectAttach).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });

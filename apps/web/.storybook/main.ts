@@ -10,6 +10,7 @@ const LIVE_CERT_STORIES = [
   '../../../packages/ui/atoms/badge.stories.tsx',
   '../../../packages/ui/atoms/button.stories.tsx',
   '../../../packages/ui/atoms/Card.stories.tsx',
+  '../../../packages/ui/atoms/switch.stories.tsx',
 ] as const;
 
 const FULL_CATALOG_STORIES = [
@@ -129,6 +130,14 @@ const config: StorybookConfig = {
         {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+        },
+        {
+          find: '@/lib/releases/release-matrix-loader',
+          replacement: require.resolve('./composer-catalog-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/tour-dates/actions',
+          replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },
         {
           find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
@@ -427,6 +436,24 @@ export default client;
       });
     };
     config.plugins = [
+      {
+        name: 'jovie-storybook-browser-tracing',
+        enforce: 'post',
+        // The Next mock plugin adds a server-only tracing alias in its config
+        // hook. Override it afterwards with the installed browser-safe API.
+        config: () => ({
+          resolve: {
+            alias: [
+              {
+                find: '@opentelemetry/api',
+                replacement: require.resolve('@opentelemetry/api', {
+                  paths: [require.resolve('@opentelemetry/sdk-node')],
+                }),
+              },
+            ],
+          },
+        }),
+      },
       reactDomClientInteropPlugin,
       rewriteNextReactPlugin,
       ...stripWorkflowPlugins(config.plugins),

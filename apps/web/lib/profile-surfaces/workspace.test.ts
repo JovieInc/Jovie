@@ -3,6 +3,7 @@ import type {
   ProfileWorkspaceConnectorRow,
   ProfileWorkspaceSurfaceRow,
 } from '@/app/app/(shell)/profiles/data';
+import { PRESENCE_STALE_AFTER_MS } from './presence-identity';
 import {
   filterProfileWorkspaceRows,
   getConnectionPrimaryAction,
@@ -28,7 +29,7 @@ function surface(
     monitoringState: 'active',
     rank: 4,
     previousRank: 6,
-    lastObservedAt: '2026-07-30T00:00:00.000Z',
+    lastObservedAt: '2026-09-16T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -187,5 +188,30 @@ describe('connections workspace helpers', () => {
     expect(
       summarizeProfileWorkspaceRows([surface()], false).monitoringLabel
     ).toBe('Unavailable');
+  });
+
+  it('treats stale observations as attention, not a zero score', () => {
+    const stale = surface({
+      id: 'stale',
+      rank: 3,
+      lastObservedAt: new Date(
+        Date.now() - PRESENCE_STALE_AFTER_MS - 1
+      ).toISOString(),
+    });
+    const pending = surface({
+      id: 'pending',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    });
+
+    expect(getConnectionStatus(stale)).toMatchObject({
+      label: 'Stale',
+      needsAttention: true,
+    });
+    expect(getConnectionStatus(pending)).toMatchObject({
+      label: 'Not Measured',
+      needsAttention: false,
+    });
   });
 });

@@ -39,7 +39,7 @@ On Windows PowerShell, use the Git Bash wrapper:
 ./scripts/setup.sh
 ```
 
-That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and syncs dev Clerk IDs when Doppler is available.
+That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and checks the configured Doppler environment. Authentication uses self-hosted Better Auth; local test users are provisioned through the app database.
 
 ## Cleanup
 
@@ -61,7 +61,7 @@ CODEX_CLEANUP_E2E_USERS=1 ./scripts/codex-cleanup.sh
 CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
 ```
 
-`CODEX_CLEANUP_E2E_USERS=1` runs the E2E Clerk cleanup through Doppler. `CODEX_ARCHIVE_ON_STOP=1` delegates to `scripts/archive.sh`, which removes build artifacts and dependencies for archived workspaces.
+`CODEX_CLEANUP_E2E_USERS=1` invokes the retired E2E cleanup script through Doppler; it reports that Clerk cleanup is retired and does not delete Better Auth users. `CODEX_ARCHIVE_ON_STOP=1` delegates to `scripts/archive.sh`, which removes build artifacts and dependencies for archived workspaces.
 
 ## Required Tooling
 

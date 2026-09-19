@@ -6,14 +6,14 @@ import { StoryBlogCard } from './StoryBlogCard';
 const post = STORY_BLOG_POSTS[0]!;
 
 describe('StoryBlogCard', () => {
-  it('renders title, excerpt, and author for the default variant', () => {
+  it('renders production title and category navigation for the default variant', () => {
     render(<StoryBlogCard post={post} />);
 
     const heading = screen.getByRole('heading', { name: post.title });
     expect(heading).toBeInTheDocument();
-    expect(heading).toHaveClass('line-clamp-2');
-    expect(screen.getByText(post.excerpt)).toBeInTheDocument();
-    expect(screen.getByText(post.author)).toBeInTheDocument();
+    expect(heading).not.toHaveClass('line-clamp-2');
+
+    expect(screen.getByText(`By ${post.author}`)).toBeInTheDocument();
     expect(screen.getByText(post.category)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: new RegExp(post.title) })
@@ -27,8 +27,11 @@ describe('StoryBlogCard', () => {
 
     const heading = screen.getByRole('heading', { name: post.title });
     expect(heading).toBeInTheDocument();
-    expect(heading).toHaveClass('line-clamp-2');
-    // featured uses larger padding / radius classes
-    expect(container.querySelector('article')?.className).toMatch(/p-8/);
+    expect(heading).not.toHaveClass('line-clamp-2');
+    // The fixture renders the actual production variant.
+    expect(container.querySelector('article')).toHaveAttribute(
+      'data-variant',
+      'featured'
+    );
   });
 });

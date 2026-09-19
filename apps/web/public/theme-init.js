@@ -2,12 +2,18 @@
   try {
     var root = document.documentElement;
     var pathname = globalThis.location?.pathname ?? '/';
-    var isThemeEnabledRoute =
-      pathname.startsWith('/app') ||
-      pathname.startsWith('/onboarding') ||
-      pathname.startsWith('/signin') ||
-      pathname.startsWith('/signup') ||
-      pathname.startsWith('/waitlist');
+    var policyNode = document.getElementById('jovie-theme-route-policy');
+    var policy = policyNode?.textContent
+      ? JSON.parse(policyNode.textContent)
+      : null;
+    var matchesRouteBoundary = function (route) {
+      return pathname === route || pathname.startsWith(route + '/');
+    };
+    var isThemeEnabledRoute = Boolean(
+      policy &&
+        (policy.exact?.includes(pathname) ||
+          policy.prefixes?.some(matchesRouteBoundary))
+    );
 
     if (isThemeEnabledRoute) {
       var storageValue =
@@ -39,9 +45,9 @@
         );
       }
     } else {
-      // Public/marketing routes: always dark — the design system assumes dark mode.
-      // Ignoring stored preference prevents hybrid light/dark rendering since the
-      // marketing layout hardcodes a .dark ancestor class.
+      // Routes outside the explicit policy remain dark. A missing or malformed
+      // policy therefore fails closed instead of leaking a stored preference
+      // into public profile, playlist, or other unrelated surfaces.
       if (!root.classList.contains('dark')) {
         root.classList.add('dark');
       }

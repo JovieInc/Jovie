@@ -1,14 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Maximize2, Minimize2 } from 'lucide-react';
-import { useCallback } from 'react';
+import { Maximize2, Minimize2, X } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveHudEscapeContract } from '@/lib/app-shell/escape-contract';
 
 export function HudFullscreenControl({
   action = 'enter',
 }: {
-  readonly action?: 'enter' | 'exit';
+  readonly action?: 'enter' | 'exit' | 'close';
 }) {
   const openFullscreen = useCallback(async () => {
     let token: string | null = null;
@@ -31,20 +32,43 @@ export function HudFullscreenControl({
     window.location.assign(next.toString());
   }, []);
 
-  const exitFullscreen = useCallback(() => {
-    window.location.assign(APP_ROUTES.HUD);
-  }, []);
+  const returnToShell = useCallback(() => {
+    const backTarget =
+      resolveHudEscapeContract(
+        action === 'close' ? 'packaged-mac-hud' : 'isolated-fullscreen'
+      ).backTarget ?? APP_ROUTES.HUD;
+    window.location.assign(backTarget);
+  }, [action]);
 
-  if (action === 'exit') {
+  useEffect(() => {
+    if (action !== 'exit' && action !== 'close') return;
+    const keyboard = resolveHudEscapeContract(
+      action === 'close' ? 'packaged-mac-hud' : 'isolated-fullscreen'
+    ).keyboard;
+    if (!keyboard.includes('Escape')) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      returnToShell();
+    }
+
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
+  }, [action, returnToShell]);
+
+  if (action === 'exit' || action === 'close') {
+    const label = action === 'close' ? 'Close' : 'Exit fullscreen';
+    const Icon = action === 'close' ? X : Minimize2;
     return (
       <Button
         type='button'
         variant='secondary'
         size='sm'
-        onClick={exitFullscreen}
+        onClick={returnToShell}
       >
-        <Minimize2 className='h-3.5 w-3.5' aria-hidden='true' />
-        Exit fullscreen
+        <Icon className='h-3.5 w-3.5' aria-hidden='true' />
+        {label}
       </Button>
     );
   }

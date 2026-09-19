@@ -32,6 +32,10 @@ const APP_ID_SCOPED_SOURCES = [
     relativePath: 'app/api/dashboard/pixels/route.ts',
     expectedPredicates: 3,
   },
+  {
+    relativePath: 'app/api/account/export/route.ts',
+    expectedPredicates: 1,
+  },
 ] as const;
 
 function readWebSource(relativePath: string): string {
@@ -66,15 +70,18 @@ describe('post-Better Auth app user ID contract', () => {
     expect(query.params).toEqual([appUserId]);
   });
 
-  it.each(
-    APP_ID_SCOPED_SOURCES
-  )('$relativePath uses the tested app-ID predicate', entry => {
-    const { expectedPredicates, relativePath } = entry;
-    const source = readWebSource(relativePath);
+  it.each(APP_ID_SCOPED_SOURCES)(
+    '$relativePath uses the tested app-ID predicate',
+    entry => {
+      const { expectedPredicates, relativePath } = entry;
+      const source = readWebSource(relativePath);
 
-    expect(source.match(/appUserIdFilter\(/g)).toHaveLength(expectedPredicates);
-    expect(source).not.toMatch(/eq\(users\.clerkId,\s*\w+\)/);
-  });
+      expect(source.match(/appUserIdFilter\(/g)).toHaveLength(
+        expectedPredicates
+      );
+      expect(source).not.toMatch(/eq\(users\.clerkId,\s*\w+\)/);
+    }
+  );
 
   it('persists sidebar settings with the authenticated app UUID', () => {
     const source = readWebSource(

@@ -1,6 +1,7 @@
 'use client';
 
-import { AlertCircle, ArrowRight, X } from 'lucide-react';
+import { ArrowRight, X } from 'lucide-react';
+import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 /**
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
  */
 interface ChatActionCardProps {
   readonly title: string;
+  readonly icon?: IconName | string;
   readonly body: string;
   readonly actionLabel: string;
   readonly ariaLabel?: string;
@@ -23,6 +25,7 @@ interface ChatActionCardProps {
 
 export function ChatActionCard({
   title,
+  icon = 'AlertCircle',
   body,
   actionLabel,
   ariaLabel,
@@ -37,7 +40,8 @@ export function ChatActionCard({
       data-starter-action-surface='primary'
     >
       <span className='system-b-chat-action-card-icon-shell' aria-hidden='true'>
-        <AlertCircle
+        <Icon
+          name={icon}
           className='system-b-chat-action-card-icon'
           strokeWidth={2.2}
         />

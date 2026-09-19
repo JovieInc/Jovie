@@ -209,7 +209,7 @@ test.describe('Public Profile', () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
-  test('profile subpages (/subscribe, /tip, /pay, /tour) load without 500', async ({
+  test('profile subpages (/subscribe, /tip, /pay, /tour, /shows, /events) load without 500', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -219,6 +219,8 @@ test.describe('Public Profile', () => {
       { mode: 'pay', route: 'tip' },
       { mode: 'pay', route: 'pay' },
       { mode: 'tour', route: 'tour' },
+      { mode: 'tour', route: 'shows' },
+      { mode: 'tour', route: 'events' },
     ] as const;
 
     for (const { mode, route } of subpages) {

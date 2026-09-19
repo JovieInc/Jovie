@@ -39,6 +39,12 @@ const GATE_RECEIPTS = {
 
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   [
+    'shared-jev-evaluation',
+    'shared-contract',
+    ['web'],
+    /^packages\/jev-evaluation\//,
+  ],
+  [
     'shared-agent-transport',
     'shared-contract',
     ['web'],

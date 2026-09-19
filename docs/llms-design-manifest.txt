@@ -237,7 +237,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-muted-rgb`: 112 116 124
 - `--app-shell-sidebar-seam`: rgba(0, 0, 0, 0.05)
 - `--app-shell-sidebar-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035)
-- `--app-shell-sidebar-width`: 224px
+- `--app-shell-sidebar-width`: 280px
 - `--app-shell-toolbar-gap`: 4px
 
 ### Public Shell

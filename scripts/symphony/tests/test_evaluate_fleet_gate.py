@@ -100,18 +100,20 @@ def signals(**overrides):
     return payload
 
 
-def run_wrapper(payload, *, consumer="fleet", expected_sha=None):
+def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None, dry_run="1"):
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp) / "github-output"
         receipt = pathlib.Path(tmp) / "receipt.json"
         env = os.environ.copy()
         env["FLEET_GATE_EVALUATE_JSON"] = json.dumps(payload)
-        env["FLEET_GATE_DRY_RUN"] = "1"
+        env["FLEET_GATE_DRY_RUN"] = dry_run
         env["FLEET_GATE_RECEIPT"] = str(receipt)
         env["FLEET_GATE_CONSUMER"] = consumer
         env["GITHUB_OUTPUT"] = str(out)
         if expected_sha is not None:
             env["EXPECTED_SHA"] = expected_sha
+        if extra_env:
+            env.update(extra_env)
         result = subprocess.run(
             ["bash", str(SCRIPT)],
             capture_output=True,
@@ -285,6 +287,25 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(receipt, {})
 
+    def test_live_persist_override_forces_dry_run_and_still_evaluates(self):
+        code, outputs, receipt = run_wrapper(
+            signals(),
+            dry_run="0",
+            extra_env={"FLEET_GATE_ALLOW_LIVE_PERSIST": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(outputs["mode"], "normal")
+
+    def test_dry_run_override_does_not_enable_persist_and_still_evaluates(self):
+        code, outputs, receipt = run_wrapper(
+            signals(),
+            extra_env={"FLEET_GATE_ALLOW_LIVE_PERSIST": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(outputs["mode"], "normal")
+
     def test_wrapper_transports_a_bounded_admission_projection(self):
         files = [f"apps/web/generated/File{index:04d}.tsx" for index in range(80)]
         closure = {
@@ -340,6 +361,36 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)
         self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
         self.assertIn("has(\"classifications\") | not", wrapper)
+
+    def test_wrapper_publishes_receipt_age_promotion_mode_and_capacity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = pathlib.Path(tmp) / "summary.md"
+            code, outputs, receipt = run_wrapper(
+                signals(), extra_env={"GITHUB_STEP_SUMMARY": str(summary)}
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(outputs["promotion_mode"], "normal")
+            self.assertEqual(outputs["mode"], "normal")
+            self.assertEqual(outputs["capacity_accepted"], "true")
+            self.assertEqual(outputs["capacity_max_concurrent"], "4")
+            self.assertRegex(outputs["receipt_age_seconds"], r"^-?\d+$")
+            self.assertTrue(summary.is_file())
+            published = summary.read_text()
+            self.assertIn("promotion_mode", published)
+            self.assertIn("receipt_age_seconds", published)
+            self.assertIn("capacity_accepted", published)
+            self.assertIn("Capacity bounds new agent dispatch only", published)
+
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        autoenroll = (
+            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+        ).read_text()
+        self.assertIn("receipt_age_seconds", action)
+        self.assertIn("capacity_accepted", action)
+        self.assertIn("receipt_age_seconds: ${{ steps.policy.outputs.receipt_age_seconds }}", autoenroll)
+        self.assertIn("### Auto-Enroll fleet receipt", autoenroll)
+        self.assertIn("FLEET_RECEIPT_AGE_SECONDS", autoenroll)
+        self.assertIn("FLEET_CAPACITY_ACCEPTED", autoenroll)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Section 9 of the certified homepage: the close. Repeats the hero's only conversion control — the existing name search — under the locked closing lines.",
+          'The homepage close repeats the name search and offers a read-only agent onboarding payload with a visible clipboard fallback.',
       },
     },
   },

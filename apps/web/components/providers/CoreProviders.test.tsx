@@ -34,9 +34,21 @@ describe('isThemeEnabledRoute', () => {
     expect(isThemeEnabledRoute('/waitlist')).toBe(true);
   });
 
-  it('keeps marketing surfaces dark', () => {
-    expect(isThemeEnabledRoute('/')).toBe(false);
+  it('enables only the declared marketing route families', () => {
+    expect(isThemeEnabledRoute('/')).toBe(true);
+    expect(isThemeEnabledRoute('/pricing')).toBe(true);
+    expect(isThemeEnabledRoute('/blog/linear')).toBe(true);
+    expect(isThemeEnabledRoute('/engineering/ship')).toBe(true);
+    expect(isThemeEnabledRoute('/compare/cursor')).toBe(true);
+    expect(isThemeEnabledRoute('/pricing-extra')).toBe(false);
+    expect(isThemeEnabledRoute('/blogroll')).toBe(false);
+  });
+
+  it('keeps unrelated public and nonmarketing surfaces outside the policy', () => {
     expect(isThemeEnabledRoute('/artistname')).toBe(false);
-    expect(isThemeEnabledRoute('/pricing')).toBe(false);
+    expect(isThemeEnabledRoute('/artistname/about')).toBe(false);
+    expect(isThemeEnabledRoute('/playlists')).toBe(false);
+    expect(isThemeEnabledRoute('/brand')).toBe(false);
+    expect(isThemeEnabledRoute('/pitch')).toBe(false);
   });
 });

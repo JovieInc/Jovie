@@ -308,4 +308,79 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
     expect(mockGetHandler).toHaveBeenCalledWith('invoice.payment_succeeded');
     expect(mockHandlerHandle).toHaveBeenCalled();
   });
+
+  it('handles charge.refunded events via handler delegation', async () => {
+    const event = {
+      id: 'evt_charge_refunded',
+      type: 'charge.refunded',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'ch_refund',
+          refunded: true,
+          customer: 'cus_123',
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['charge.refunded'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
+        body: 'test-body',
+      }
+    );
+
+    const response = await (await getPost())(request);
+    expect(response.status).toBe(200);
+    expect(mockGetHandler).toHaveBeenCalledWith('charge.refunded');
+    expect(mockHandlerHandle).toHaveBeenCalled();
+  });
+
+  it('handles charge.dispute.created events via handler delegation', async () => {
+    const event = {
+      id: 'evt_charge_disputed',
+      type: 'charge.dispute.created',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'dp_1',
+          charge: 'ch_1',
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['charge.dispute.created'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
+        body: 'test-body',
+      }
+    );
+
+    const response = await (await getPost())(request);
+    expect(response.status).toBe(200);
+    expect(mockGetHandler).toHaveBeenCalledWith('charge.dispute.created');
+    expect(mockHandlerHandle).toHaveBeenCalled();
+  });
 });

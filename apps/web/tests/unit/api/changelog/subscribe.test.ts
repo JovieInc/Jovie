@@ -220,9 +220,30 @@ describe('POST /api/changelog/subscribe', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
+      state: 'confirmation_required',
       message: 'Check your email to confirm your subscription!',
     });
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
+  });
+  it('returns the subscribed state without writing or sending another confirmation', async () => {
+    mockSelectLimit.mockResolvedValue([
+      { id: 'existing', verified: true, unsubscribedAt: null },
+    ]);
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'reader@example.com',
+        turnstileToken: 'token',
+      }) as never
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      state: 'subscribed',
+      message: 'Already subscribed!',
+    });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 });

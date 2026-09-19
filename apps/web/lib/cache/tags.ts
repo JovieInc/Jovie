@@ -40,6 +40,9 @@ export const CACHE_TAGS = {
   // Featured creators list
   FEATURED_CREATORS: 'featured-creators',
 
+  // Public /artists directory catalog
+  ARTISTS_DIRECTORY: 'artists-directory',
+
   // Billing/subscription data
   BILLING_DATA: 'billing-data',
 

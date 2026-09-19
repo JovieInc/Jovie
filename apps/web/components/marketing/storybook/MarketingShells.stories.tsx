@@ -159,7 +159,7 @@ export const MarketingFooterCtaDefault: Story = {
     <div className='bg-base'>
       <MarketingFooterCta
         title='Request Access to Jovie.'
-        body='Join the private launch list for the release platform built for independent artists.'
+        body='Join the private launch list for presence, relationships, and growth.'
       />
     </div>
   ),

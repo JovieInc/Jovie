@@ -3,6 +3,11 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, desc, sql as drizzleSql, eq, gt, isNull, or } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import {
+  PROOF_CLAIM_CAMPAIGN_KEY,
+  PROOF_CLAIM_FUNNEL_EVENTS,
+  proofClaimAttribution,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -443,6 +448,35 @@ export async function attributeLeadPaidConversionByAppUserId(
     },
     { idempotent: true, required: true }
   );
+
+  const [proofAttributed] = await db
+    .select({ id: leadFunnelEvents.id })
+    .from(leadFunnelEvents)
+    .where(
+      and(
+        eq(leadFunnelEvents.leadId, lead.id),
+        eq(leadFunnelEvents.campaignKey, PROOF_CLAIM_CAMPAIGN_KEY)
+      )
+    )
+    .limit(1);
+
+  if (proofAttributed) {
+    const proofAttribution = proofClaimAttribution();
+    await recordLeadFunnelEvent(
+      {
+        leadId: lead.id,
+        eventType: PROOF_CLAIM_FUNNEL_EVENTS.ACTIVATION,
+        campaignKey: proofAttribution.campaignKey,
+        variantKey: proofAttribution.variantKey,
+        metadata: {
+          signupUserId: appUserId,
+          stripeSubscriptionId: subscriptionId,
+          experimentId: proofAttribution.experimentId,
+        },
+      },
+      { idempotent: true, required: true }
+    );
+  }
 }
 
 export async function countLeadEventsSince(

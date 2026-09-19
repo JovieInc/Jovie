@@ -14,7 +14,7 @@ AI agents lack context about operational costs, API billing, and infrastructure 
 
 | Priority | Approach | When to Use |
 |----------|----------|-------------|
-| 1 | **Webhook / Event handler** | An external service (Stripe, Clerk, etc.) can notify you when state changes. **This is almost always the right answer.** |
+| 1 | **Webhook / Event handler** | An external service (Stripe, Resend, etc.) can notify you when state changes. **This is almost always the right answer.** |
 | 2 | **Inline after-action** | The work can happen synchronously after the triggering action (e.g., clean up a record right after it's used). |
 | 3 | **On-demand / lazy evaluation** | The work can happen when the data is next accessed (e.g., check if a token is expired when it's read, not on a timer). |
 | 4 | **Add to existing scheduled job** | If a nightly/periodic job already exists, add your logic there instead of creating a new one. |
@@ -35,7 +35,7 @@ AI agents lack context about operational costs, API billing, and infrastructure 
    - "Near real-time" requirements should use webhooks, not polling.
    - If you can't explain what bad thing happens between intervals, the interval is too frequent.
 
-4. **Cron jobs are NOT a substitute for proper event handling.** If Stripe, Clerk, or any external service provides webhooks:
+4. **Cron jobs are NOT a substitute for proper event handling.** If Stripe, Resend, or any external service provides webhooks:
    - Use the webhook to react to state changes in real time.
    - Do NOT poll the external API to check for changes.
    - Reconciliation jobs (if needed at all) should run at most daily and serve as a safety net, not the primary mechanism.
@@ -49,7 +49,7 @@ The `infra-guardrails-check.sh` hook blocks new `app/api/cron/*/route.ts` files 
 | Rule | Rationale |
 |------|-----------|
 | **NEVER iterate over all users to call an external API** | At 1,000 users hourly = 24,000 calls/day. At 10,000 users = 240,000. |
-| **NEVER poll external APIs for state you can receive via webhook** | Stripe, Clerk, Resend, and most services push state changes. Use those. |
+| **NEVER poll external APIs for state you can receive via webhook** | Stripe, Resend, and most services push state changes. Use those. |
 | **Batch where possible** | If you must call an external API, use batch/list endpoints instead of per-record fetches. |
 | **Cache aggressively** | If you need external data, cache it with appropriate TTLs. Don't re-fetch what hasn't changed. |
 | **Log and monitor call volume** | Any new external API integration must log call counts so we can track costs. |
@@ -133,7 +133,7 @@ rationale in the config.
 
 When a PR introduces or modifies any of the following, the PR description MUST include a **Cost Impact** section:
 
-- New external API calls (Stripe, Clerk, Resend, AI providers, etc.)
+- New external API calls (Stripe, Resend, AI providers, etc.)
 - New or modified cron job frequency
 - New database queries that run on a schedule
 - New third-party service integrations

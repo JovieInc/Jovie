@@ -33,11 +33,27 @@ const {
  * and components are in scope for the blocking layout tests) — must carry
  * an explicit wrap bound: `line-clamp-1`, `line-clamp-2`, `truncate`, or be
  * `sr-only`. Anything else can exceed two lines and is red. No baseline,
- * no allowlist.
+ * no blanket allowlist. The 2026-09-14 founder correction keeps editorial
+ * card titles complete with an explicit, per-row subgrid contract below.
  */
 
 const CLAMP_BOUND = /(line-clamp-1|line-clamp-2|truncate|sr-only)/;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
+
+/** Full editorial titles are intentional; all other shell headings remain bounded. */
+function hasEditorialTitleContract(
+  file: string,
+  attrs: string,
+  source: string
+): boolean {
+  return (
+    file === 'apps/web/app/(marketing)/blog/components/BlogCard.tsx' &&
+    /data-wrap=['"]editorial-title['"]/.test(attrs) &&
+    !CLAMP_BOUND.test(attrs) &&
+    /row-span-3 grid[^'"\n]*grid-rows-subgrid/.test(source) &&
+    /row-span-2 grid[^'"\n]*grid-rows-subgrid/.test(source)
+  );
+}
 
 function shellSurfaceFiles(): string[] {
   const roots = [
@@ -65,7 +81,38 @@ function shellSurfaceFiles(): string[] {
 }
 
 describe('mac-header-two-lines-v1', () => {
-  it('every shell header <h1>/<h2> carries an explicit ≤2-line wrap bound', () => {
+  it('requires the full-title marker and both shared grid tracks only on the editorial card', () => {
+    const file = 'apps/web/app/(marketing)/blog/components/BlogCard.tsx';
+    const attrs = "data-wrap='editorial-title'";
+    const tracks =
+      'row-span-3 grid grid-rows-subgrid; row-span-2 grid grid-rows-subgrid';
+    expect(hasEditorialTitleContract(file, attrs, tracks)).toBe(true);
+    expect(
+      hasEditorialTitleContract(
+        'apps/web/components/shell/Header.tsx',
+        attrs,
+        tracks
+      )
+    ).toBe(false);
+    expect(hasEditorialTitleContract(file, '', tracks)).toBe(false);
+    expect(hasEditorialTitleContract(file, attrs, 'grid')).toBe(false);
+    expect(
+      hasEditorialTitleContract(
+        file,
+        attrs,
+        'row-span-3 grid grid-rows-subgrid'
+      )
+    ).toBe(false);
+    expect(
+      hasEditorialTitleContract(
+        file,
+        `${attrs} className='line-clamp-2'`,
+        tracks
+      )
+    ).toBe(false);
+  });
+
+  it('every shell heading carries its bounded or full-editorial-title layout contract', () => {
     const files = shellSurfaceFiles();
     expect(files.length).toBeGreaterThan(0);
 
@@ -75,6 +122,8 @@ describe('mac-header-two-lines-v1', () => {
       for (const opening of jsxOpenings(source, /h[12]/)) {
         if (!/^h[12]$/.test(opening.tag)) continue;
         if (CLAMP_BOUND.test(opening.attrs)) continue;
+        if (hasEditorialTitleContract(repoPath(file), opening.attrs, source))
+          continue;
         violations.push({
           file: repoPath(file),
           detail: `<${opening.tag}> at L${lineOf(source, opening.index)} has no line-clamp-1/line-clamp-2/truncate — header can wrap past 2 lines on Mac`,

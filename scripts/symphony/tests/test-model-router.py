@@ -13,6 +13,73 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+class RoutingPriorityTests(unittest.TestCase):
+    def choose(self, ready, capability="review", excluded=()):
+        cfg = json.loads(CONFIG.read_text())
+        with mock.patch.object(MODULE, "load", return_value=(cfg, CONFIG)), \
+             mock.patch.object(MODULE, "state", return_value={}), \
+             mock.patch.object(MODULE, "probe", side_effect=lambda model, **kwargs: (model["id"] in ready, "fixture-unavailable")), \
+             mock.patch.object(MODULE, "executor", return_value={"executable": "fixture-no-execution"}), \
+             mock.patch.object(MODULE, "record_pool_use"), \
+             mock.patch.object(MODULE, "record_api_spend"):
+            return MODULE.choose("remediation", capability, exclude_pools=excluded)
+
+    def test_hyperagent_precedes_cheaper_gateway_for_every_eligible_review_model(self):
+        for model in ("hyperagent-glm-5.3", "hyperagent-deepseek-v4", "hyperagent-astra"):
+            with self.subTest(model=model):
+                result = self.choose({model, "deepseek-v4-flash"})
+                self.assertEqual(result["selected"]["id"], model)
+
+    def test_alternate_subscription_precedes_hyperagent_and_gateway(self):
+        result = self.choose({"codex-luna", "hyperagent-glm-5.3", "deepseek-v4-flash"})
+        self.assertEqual(result["selected"]["id"], "codex-luna")
+
+    def test_gateway_requires_no_eligible_subscription_or_hyperagent(self):
+        result = self.choose({"deepseek-v4-flash"})
+        self.assertEqual(result["selected"]["id"], "deepseek-v4-flash")
+        unavailable = {row["id"] for row in result["candidates"] if row["status"] == "unavailable"}
+        self.assertIn("grok-4.6", unavailable)
+        self.assertIn("hyperagent-glm-5.3", unavailable)
+
+    def test_incompatible_or_excluded_hyperagent_is_not_silently_substituted(self):
+        incompatible = self.choose({"hyperagent-glm-5.3-flash", "deepseek-v4-flash"})
+        self.assertEqual(incompatible["selected"]["id"], "deepseek-v4-flash")
+        excluded = self.choose({"hyperagent-glm-5.3", "deepseek-v4-flash"}, excluded=("hyperagent",))
+        self.assertEqual(excluded["selected"]["id"], "deepseek-v4-flash")
+
+    def test_direct_provider_api_routes_are_rejected_before_any_probe(self):
+        for provider in ("openai", "grok", "cursor", "kimi", "unknown"):
+            with self.subTest(provider=provider):
+                cfg = json.loads(CONFIG.read_text())
+                paid = next(model for model in cfg["models"] if model["id"] == "deepseek-v4-flash")
+                paid["provider"] = provider
+                with self.assertRaisesRegex(ValueError, "direct provider API"):
+                    MODULE.validate_registry(cfg)
+
+    def test_gateway_priority_preserves_same_family_and_existing_spend_guards(self):
+        cfg = json.loads(CONFIG.read_text())
+        gateway = dict(next(model for model in cfg["models"] if model["id"] == "deepseek-v4-flash"))
+        gateway.update(id="fixture-gateway-sol", family="gpt-5.6")
+        self.assertEqual(
+            MODULE.score_candidate(cfg, gateway, {}, "review", 1000)[1],
+            "family_sub_remaining",
+        )
+        exhausted = {
+            "pools": {pool: {"exhausted_until": 2000} for pool in ("codex", "cursor-other-models")},
+            "api_spend": {"gpt-5.6": 30},
+        }
+        ok, reason, rank, receipt = MODULE.score_candidate(cfg, gateway, exhausted, "review", 1000)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "renew_sub_not_api")
+        self.assertIsNone(rank)
+        self.assertEqual(receipt["renew_subscription"]["cap"], 30)
+        exhausted["api_spend"]["gpt-5.6"] = 0
+        ok, reason, rank, _ = MODULE.score_candidate(cfg, gateway, exhausted, "review", 1000)
+        self.assertTrue(ok)
+        self.assertEqual(reason, "api")
+        self.assertEqual(rank[0], 2)
+
+
 class StateTransactionTests(unittest.TestCase):
     def test_competing_writers_preserve_pool_rejections_usage_and_spend(self):
         context = multiprocessing.get_context("fork")
