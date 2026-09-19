@@ -8,14 +8,11 @@
 import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import Stripe from 'stripe';
-
-const stripePriceId =
-  process.env.STRIPE_PRICE_PRO_MONTHLY ||
-  process.env.STRIPE_PRICE_PRO_YEARLY ||
-  process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
-  process.env.STRIPE_PRICE_STANDARD_YEARLY;
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+import {
+  assertArtistVisibilityStripeTestPrice,
+  assertStripeTestAccount,
+  getRequiredStripeTestConfig,
+} from '@/lib/stripe/test-price-contract';
 
 export interface BillingStatus {
   isPro: boolean;
@@ -80,23 +77,16 @@ export async function getRequiredStripeTestContext(): Promise<{
   stripeClient: Stripe;
   priceId: string;
 }> {
-  if (!stripePriceId) {
-    throw new Error('Stripe price IDs are not configured');
-  }
-  if (!stripeSecretKey?.startsWith('sk_test_')) {
-    throw new Error('STRIPE_SECRET_KEY must be an sk_test_ key');
-  }
-  if (!stripeWebhookSecret) {
-    throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
-  }
+  const { accountId, priceId, secretKey } = getRequiredStripeTestConfig(
+    process.env
+  );
+  const stripeClient = new Stripe(secretKey);
+  const account = await stripeClient.accounts.retrieve();
+  assertStripeTestAccount(account.id, accountId);
+  const price = await stripeClient.prices.retrieve(priceId);
+  assertArtistVisibilityStripeTestPrice(price);
 
-  const stripeClient = new Stripe(stripeSecretKey);
-  const price = await stripeClient.prices.retrieve(stripePriceId);
-  if (price.livemode !== false) {
-    throw new Error('Configured Stripe price must have livemode=false');
-  }
-
-  return { stripeClient, priceId: stripePriceId };
+  return { stripeClient, priceId };
 }
 
 /** Fetch current billing status via the app's API. */
@@ -133,6 +123,7 @@ export function createSignedStripeWebhook(
   object: Stripe.Event.Data.Object,
   eventId = `evt_jovie_e2e_${Date.now()}`
 ): SignedStripeWebhook {
+  const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!stripeWebhookSecret) {
     throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
   }
