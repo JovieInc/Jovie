@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  CHAT_STARTER_ACTION_ORDER,
+  CHAT_STARTER_ACTIONS,
+} from '../starter-actions';
 import type { ChatActionCard } from '../types';
 import { ChatStarterActionsRail } from './ChatStarterActionsRail';
 
@@ -29,6 +33,35 @@ const cards: ChatActionCard[] = [
 ];
 
 describe('ChatStarterActionsRail', () => {
+  it.each(CHAT_STARTER_ACTION_ORDER)(
+    'uses the canonical %s intent icon, not an alert',
+    id => {
+      const action = CHAT_STARTER_ACTIONS[id];
+      const { container } = render(
+        <ChatStarterActionsRail
+          cards={[
+            {
+              id,
+              title: action.label,
+              body: action.description,
+              actionLabel: action.actionLabel,
+              prompt: action.prompt,
+            },
+          ]}
+          onAct={vi.fn()}
+          onDismiss={vi.fn()}
+        />
+      );
+      const icon = container.querySelector('.system-b-chat-action-card-icon');
+      const expected = action.icon
+        .replace(/([a-z])([A-Z0-9])/g, '$1-$2')
+        .toLowerCase();
+      expect(icon).toHaveClass(`lucide-${expected}`);
+      expect(icon).not.toHaveClass('lucide-circle-alert');
+      expect(icon).not.toHaveClass('lucide-alert-circle');
+    }
+  );
+
   it('uses direct pagination dots and keyboard navigation without auto-advance', async () => {
     const user = userEvent.setup();
     render(

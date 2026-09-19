@@ -29,6 +29,7 @@ paths = [
 
     # Example and template files
     '''\.env\.example$''',
+    '''env\.e2e\.example$''',
     '''\.env\.sample$''',
     '''\.env\.template$''',
 
@@ -104,13 +105,22 @@ regexes = [
 ]
 
 # Specific commit SHAs to ignore (for known false positives in history)
-# 75ef52d12 — introduced .claude/settings.local.json.backup (Neon connection strings)
-# and docs/testing-clerk.md (Clerk sk_test key) in screenshots auto-commit #10692.
-# Both were redacted in JOV-2940 (commit 77cbe76c5). Allowlist the introducing commit so
-# history scans (workflow_dispatch / scheduled full / `--log-opts` ranges that collapse to
-# near-full history on shallow fetches) don't flag already-remediated secrets.
+# JOV-2940 already redacted the live copies. Schedule/full-history still flags
+# the introducing commits (run 35215186887). Keep each SHA that gitleaks named:
+# 75ef52d12 — screenshots auto-commit #10692 (.claude/settings.local.json.backup
+#             Neon + docs/testing-clerk.md Clerk sk_test)
+# 43c4cb941 — .claude/settings.local.json.backup neon-postgres-connection-string
+# 62b9aaa58 — docs/testing-clerk.md clerk-secret-key
+# cf1705240 — .github/workflows/ci.yml clerk-secret-key (placeholder sk_test)
+# a42024fdc — env.e2e.example neon-postgres-connection-string (example URL)
+# 32fdcd9db — docs/neon-migrations.md + scripts/neon-migrate-preview.ts neon
 commits = [
     "75ef52d12656b4841c3080ea0d20ff2f74b37c63",
+    "43c4cb941945c42daba65a75b486004bd1ba1fdf",
+    "62b9aaa584cd952d3eeca24e36eb330a4d6fd208",
+    "cf17052409b43df7dc641777881d5ee219ff6c58",
+    "a42024fdc946a59d54e889ff482a2fe537e92dc2",
+    "32fdcd9db04562643a52e2dbc6e305f7ea5481f2",
 ]
 
 # =============================================================================

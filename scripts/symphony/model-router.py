@@ -63,6 +63,17 @@ REQUIRED_POLICY_RULES = (
 )
 
 
+def route_priority(model):
+    """Preserve included capacity, then Hyperagent overflow, then Gateway."""
+    if model.get("channel") in {"subscription", "local"}:
+        return 0
+    if model.get("provider") == "hyperagent":
+        return 1
+    if model.get("provider") == "vercel-ai-gateway":
+        return 2
+    raise ValueError(f"{model.get('id')}: direct provider API routes are forbidden")
+
+
 def validate_registry(data):
     if data.get("schema_version") != 1 or not data.get("deterministic_first"):
         raise ValueError("unsupported or non-deterministic registry")
@@ -87,6 +98,7 @@ def validate_registry(data):
             raise ValueError(f"forbidden model id: {mid}")
         if model["channel"] not in {"subscription", "api", "local"}:
             raise ValueError(f"{mid}: invalid channel")
+        route_priority(model)
         if not isinstance(model["capabilities"], list) or not model["capabilities"]:
             raise ValueError(f"{mid}: capabilities required")
         quality = model["quality"]
@@ -376,7 +388,7 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
             return False, "renew_sub_not_api", None, extra
 
     extra["marginal_usd"] = round(list_cost, 4)
-    return True, "api", (1, list_cost, -quality, model["id"]), extra
+    return True, "api", (route_priority(model), list_cost, -quality, model["id"]), extra
 
 
 def record_api_spend(st, family, amount):

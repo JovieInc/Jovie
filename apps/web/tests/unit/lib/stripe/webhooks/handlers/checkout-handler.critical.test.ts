@@ -75,6 +75,11 @@ vi.mock('@/lib/referrals/service', () => ({
   activateReferral: mockActivateReferral,
 }));
 
+vi.mock('@/lib/email/paid-welcome', () => ({
+  enqueuePaidWelcomeAfterEntitlement: vi.fn(),
+  maybeSendPaidWelcomeAfterEntitlement: vi.fn(),
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     warn: mockLoggerWarn,
@@ -82,6 +87,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 // Import after mocks are set up
+import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import {
   CheckoutSessionHandler,
   checkoutSessionHandler,
@@ -171,6 +177,13 @@ describe('@critical CheckoutSessionHandler', () => {
       expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledWith(
         betterAuthRow.id,
         'sub_123'
+      );
+      expect(enqueuePaidWelcomeAfterEntitlement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appUserId: betterAuthRow.id,
+          clerkUserId: betterAuthRow.id,
+          subscription: expect.objectContaining({ id: 'sub_123' }),
+        })
       );
 
       // Should not use fallback when metadata is present

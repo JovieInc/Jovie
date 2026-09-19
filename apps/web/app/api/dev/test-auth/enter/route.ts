@@ -4,6 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   buildBetterAuthSessionCookieDescriptor,
   buildDevTestAuthCookieDescriptors,
+  type DevTestAuthFixture,
   ensureDevTestAuthActor,
   getDevTestAuthAvailability,
   getSyntheticDevTestAuthActor,
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
   }
 
   const personaParam = request.nextUrl.searchParams.get('persona');
+  const fixtureParam = request.nextUrl.searchParams.get('fixture');
   const sessionParam = request.nextUrl.searchParams.get('session');
   const redirectParam = request.nextUrl.searchParams.get('redirect');
   const parsedPersona = parseDevTestAuthPersona(personaParam);
@@ -62,6 +64,16 @@ export async function GET(request: NextRequest) {
   }
 
   const persona = parsedPersona ?? 'creator';
+  const fixture =
+    fixtureParam === 'profiles-final-row'
+      ? ('profiles-final-row' satisfies DevTestAuthFixture)
+      : undefined;
+  if (fixtureParam && !fixture) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid fixture' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
   if (sessionParam && sessionParam !== 'better-auth') {
     return NextResponse.json(
       { success: false, error: 'Invalid session mode' },
@@ -79,7 +91,7 @@ export async function GET(request: NextRequest) {
 
   let actor;
   try {
-    actor = await ensureDevTestAuthActor(persona);
+    actor = await ensureDevTestAuthActor(persona, { fixture });
   } catch (error) {
     // PR visual capture intentionally runs without a database or secrets. It
     // still needs the test-mode cookie handoff to reach the requested route;

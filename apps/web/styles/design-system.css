@@ -97,7 +97,13 @@
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
      (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
-  --app-shell-sidebar-width: 224px;
+  --app-shell-sidebar-width: 280px;
+  --app-shell-sidebar-icon-size: 0.9375rem;
+  --app-shell-sidebar-badge-font-size: 0.5rem;
+  --app-shell-sidebar-history-font-size: 0.78125rem;
+  --app-shell-sidebar-nav-grid: var(--app-shell-sidebar-icon-size)
+    minmax(0, 1fr);
+  --app-shell-sidebar-history-grid: minmax(0, 1fr) auto;
   --app-shell-header-height: 40px;
   --app-shell-header-height-compact: 36px;
   --app-shell-header-padding-x: 12px;
@@ -930,9 +936,10 @@ html[data-profile-initial-mode]
 }
 
 @media (min-width: 1180px) {
-  /* Public desktop owns a deliberate wide composition. CSS owns the boundary
-     so the compact surface is already absent before the responsive client
-     state hydrates. Embedded editor/demo previews remain compact. */
+  /* Public desktop owns a deliberate wide composition. CSS hides the compact
+     surface visually before hydration so the phone card never flashes.
+     Compact stays in the accessibility tree until JS marks the desktop
+     surface ready (JOV-6434). Embedded editor/demo previews remain compact. */
   .profile-viewport:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
@@ -942,6 +949,19 @@ html[data-profile-initial-mode]
   }
 
   .profile-viewport:not(.profile-viewport--embedded)
+    .public-profile-layout-compact-slot {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]
     .public-profile-layout-compact-slot {
     display: none;
   }
@@ -1002,6 +1022,19 @@ html[data-profile-initial-mode]
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  /* Light aliases keep shared marketing chrome on the same Noir Ion token
+     family as the dark surface while the footer theme control is active. */
+  --noir-ion-text-strong: var(--color-text-primary-token);
+  --noir-ion-text-primary: var(--color-text-primary-token);
+  --noir-ion-text-secondary: var(--color-text-secondary-token);
+  --noir-ion-text-muted: var(--color-text-tertiary-token);
+  --noir-ion-text-tertiary: var(--color-text-quaternary-token);
+  --noir-ion-text-disabled: var(--color-text-disabled-token);
+  --noir-ion-text-inverse: var(--color-text-tooltip);
+  --noir-ion-border-subtle: var(--color-border-subtle);
+  --noir-ion-border-default: var(--color-border-default);
+  --noir-ion-border-strong: var(--color-border-strong);
+  --noir-ion-border-interactive: var(--color-border-focus);
 
   --app-shell-content-surface: var(--noir-ion-card);
 
@@ -2375,7 +2408,8 @@ html[data-profile-initial-mode]
   color-scheme: dark;
 }
 
-.system-b-marketing.dark {
+.system-b-marketing.dark,
+:root.dark .system-b-marketing {
   --color-bg-base: #030407;
   --color-bg-surface-0: #06080d;
   --color-bg-surface-1: #0f1420;
@@ -2447,27 +2481,33 @@ html[data-profile-initial-mode]
   color-scheme: dark;
 }
 
-.system-b-marketing.dark :where(.bg-base) {
+.system-b-marketing.dark :where(.bg-base),
+:root.dark .system-b-marketing :where(.bg-base) {
   background-color: var(--color-bg-base);
 }
 
-.system-b-marketing.dark :where(.bg-surface-page) {
+.system-b-marketing.dark :where(.bg-surface-page),
+:root.dark .system-b-marketing :where(.bg-surface-page) {
   background-color: var(--color-bg-page);
 }
 
-.system-b-marketing.dark :where(.bg-surface-0) {
+.system-b-marketing.dark :where(.bg-surface-0),
+:root.dark .system-b-marketing :where(.bg-surface-0) {
   background-color: var(--color-bg-surface-0);
 }
 
-.system-b-marketing.dark :where(.bg-surface-1) {
+.system-b-marketing.dark :where(.bg-surface-1),
+:root.dark .system-b-marketing :where(.bg-surface-1) {
   background-color: var(--color-bg-surface-1);
 }
 
-.system-b-marketing.dark :where(.bg-surface-2) {
+.system-b-marketing.dark :where(.bg-surface-2),
+:root.dark .system-b-marketing :where(.bg-surface-2) {
   background-color: var(--color-bg-surface-2);
 }
 
-.system-b-marketing.dark :where(.bg-surface-3) {
+.system-b-marketing.dark :where(.bg-surface-3),
+:root.dark .system-b-marketing :where(.bg-surface-3) {
   background-color: var(--color-bg-surface-3);
 }
 

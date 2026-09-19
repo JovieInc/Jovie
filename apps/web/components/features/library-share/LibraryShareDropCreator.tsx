@@ -200,7 +200,7 @@ export function LibraryShareDropCreator({
             setOpen(false);
             setSelectedIds(defaultSelectedIds);
           }}
-          className='mt-3 h-auto p-0 text-xs font-medium text-secondary-token normal-case hover:text-primary-token'
+          className='mt-3 p-0 text-xs font-medium text-secondary-token normal-case hover:text-primary-token'
           data-testid='library-share-done-button'
         >
           Done

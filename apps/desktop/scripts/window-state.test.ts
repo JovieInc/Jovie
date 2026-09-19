@@ -1,5 +1,9 @@
 import { expect, test, vi } from 'vitest';
-import { sanitizeWindowState } from '../src/window-state.ts';
+import {
+  persistNativeFullscreen,
+  sanitizeWindowState,
+  shouldRestoreNativeFullscreen,
+} from '../src/window-state.ts';
 
 const PRIMARY = { x: 0, y: 0, width: 1920, height: 1080 };
 const SECONDARY = { x: 1920, y: 0, width: 2560, height: 1440 };
@@ -66,4 +70,28 @@ test('missing x/y stays undefined so Electron picks the default position', () =>
 
   expect(state.x).toBeUndefined();
   expect(state.y).toBeUndefined();
+});
+
+test('persists native fullscreen independently of normal bounds', () => {
+  const saved = persistNativeFullscreen(
+    { x: 40, y: 80, width: 1280, height: 800 },
+    true
+  );
+
+  expect(saved.isFullScreen).toBe(true);
+  expect(saved.width).toBe(1280);
+  expect(shouldRestoreNativeFullscreen(saved)).toBe(true);
+  expect(shouldRestoreNativeFullscreen({ isFullScreen: false })).toBe(false);
+  expect(shouldRestoreNativeFullscreen({})).toBe(false);
+});
+
+test('sanitizes a persisted fullscreen flag without treating it as bounds', () => {
+  const state = sanitizeWindowState(
+    { x: 40, y: 80, width: 1280, height: 800, isFullScreen: true },
+    PRIMARY
+  );
+
+  expect(state.isFullScreen).toBe(true);
+  expect(state.width).toBe(1280);
+  expect(shouldRestoreNativeFullscreen(state)).toBe(true);
 });

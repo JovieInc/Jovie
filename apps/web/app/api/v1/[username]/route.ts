@@ -103,9 +103,11 @@ export async function GET(
       }
     );
   }
-  const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
-    profile.username
-  );
+  const profileExclusion = getPublicProfileDiscoveryExclusionResponse({
+    handle: profile.username,
+    displayName: profile.displayName,
+    isPublic: profile.isPublic,
+  });
   if (profileExclusion) {
     return addPublicApiHeaders(profileExclusion, rateLimitHeaders);
   }

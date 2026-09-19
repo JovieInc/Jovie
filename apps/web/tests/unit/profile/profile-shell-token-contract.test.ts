@@ -72,4 +72,22 @@ describe('profile shell token contract', () => {
     expect(desktopRule).toContain('var(--ds-public-content-max)');
     expect(desktopRule).not.toContain('--profile-shell-max-width');
   });
+
+  it('keeps compact in the a11y tree until the desktop surface is ready', () => {
+    const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const desktopMedia = designSystemContents.match(
+      /@media \(min-width: 1180px\) \{([\s\S]*?)\n\}/
+    )?.[1];
+
+    expect(desktopMedia).toContain(
+      '.profile-viewport:not(.profile-viewport--embedded)\n    .public-profile-layout-compact-slot'
+    );
+    expect(desktopMedia).toContain('clip: rect(0, 0, 0, 0)');
+    expect(desktopMedia).toContain(
+      '.profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]\n    .public-profile-layout-compact-slot'
+    );
+    expect(desktopMedia).toMatch(
+      /\[data-desktop-ready="true"\][\s\S]*?display:\s*none/
+    );
+  });
 });

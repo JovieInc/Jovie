@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import pathlib
+import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -23,6 +27,18 @@ _LEAKED_GIT_ENV_VARS = (
     "GIT_CONFIG_COUNT",
     "GIT_CONFIG_PARAMETERS",
 )
+
+
+@contextlib.contextmanager
+def _consumer_workspace_env():
+    """Give consumer receipt writes an owned, disposable GEM_WORKSPACE."""
+    with tempfile.TemporaryDirectory() as directory:
+        workspace = pathlib.Path(directory)
+        workspace.chmod(0o700)
+        with mock.patch.dict(
+            CYCLE.os.environ, {"GEM_WORKSPACE": str(workspace)}, clear=False
+        ):
+            yield workspace
 
 
 def _git_env() -> dict[str, str]:
@@ -209,6 +225,29 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(calls[1][0][-1], "--submit")
         self.assertIn("summer_bottleneck_producer.py", calls[1][0][1])
 
+    def test_repo_drain_failures_do_not_mask_successful_summer_delivery(self):
+        repos = [
+            SimpleNamespace(github="JovieInc/Jovie"),
+            SimpleNamespace(github="JovieInc/LogYourBody"),
+        ]
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if env.get("GEM_PR_DRAIN_REPO") == "JovieInc/Jovie":
+                return SimpleNamespace(returncode=1)
+            return SimpleNamespace(returncode=0)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
     def test_producer_failure_is_isolated_after_all_repository_cycles(self):
         repos = [
             SimpleNamespace(github="JovieInc/LogYourBody"),
@@ -236,13 +275,497 @@ class DeploymentContractTests(unittest.TestCase):
         ) as consumer, mock.patch.object(
             CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
         ):
-            self.assertEqual(CYCLE.main(), 0)
+            self.assertEqual(CYCLE.main(), 1)
 
         producer.assert_called_once_with()
         consumer.assert_called_once_with()
         self.assertEqual(drains, [repo.github for repo in repos])
         self.assertEqual(len(projections), 1)
         self.assertIn("symphony_capacity_evidence.py", projections[0])
+
+    def test_consumer_receipt_persists_start_before_idle_terminal_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            output = json.dumps(
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "idle",
+                    "secret": "must-not-persist",
+                }
+            )
+
+            def run(*args, **kwargs):
+                started = json.loads(receipt_path.read_text(encoding="utf-8"))
+                self.assertEqual(started["invocationState"], "started")
+                self.assertIsNone(started["finishedAt"])
+                self.assertIsNone(started["exitCode"])
+                return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+            with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], CYCLE.CONSUMER_INVOCATION_SCHEMA)
+            self.assertRegex(receipt["runId"], r"^[a-f0-9]{32}$")
+            self.assertEqual(receipt["invocationState"], "completed")
+            self.assertEqual(receipt["exitCode"], 0)
+            self.assertEqual(
+                receipt["outcome"],
+                {"schema": CYCLE.CONSUMER_CYCLE_SCHEMA, "status": "idle"},
+            )
+            self.assertIsNotNone(receipt["finishedAt"])
+            self.assertIsNone(receipt["previousInvocation"])
+            self.assertNotIn("must-not-persist", receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(stat.S_IMODE(receipt_path.stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE(receipt_path.parent.stat().st_mode), 0o700)
+
+    def test_consumer_receipt_distinguishes_typed_rejection_without_persisting_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            sensitive_reason = (
+                "v2-execution-configuration-missing; artist=Alex Rivera; "
+                "email=alex.rivera@example.com; unlabeled-token="
+                "ZXhhbXBsZS1zZWNyZXQtOTk5"
+            )
+            stderr = (
+                'SUMMER_SYMPHONY_CONSUMER_REJECTED '
+                f"reason={json.dumps(sensitive_reason)}\n"
+            )
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=78, stdout="", stderr=stderr),
+            ), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 78)
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "rejected")
+            self.assertEqual(receipt["exitCode"], 78)
+            self.assertEqual(receipt["outcome"]["status"], "rejected")
+            self.assertEqual(
+                receipt["outcome"]["reason"], CYCLE._CONSUMER_UNKNOWN_REJECTION
+            )
+            receipt_text = receipt_path.read_text(encoding="utf-8")
+            self.assertNotIn("Alex Rivera", receipt_text)
+            self.assertNotIn("alex.rivera@example.com", receipt_text)
+            self.assertNotIn("ZXhhbXBsZS1zZWNyZXQtOTk5", receipt_text)
+
+    def test_consumer_receipt_collapses_unrecognized_outcome_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            task_key = "b" * 64
+            sensitive_reason = (
+                "Alex Rivera alex.rivera@example.com "
+                "session=ZXhhbXBsZS1zZWNyZXQtOTk5"
+            )
+            output = json.dumps(
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "execution-held",
+                    "taskKey": task_key,
+                    "reason": sensitive_reason,
+                }
+            )
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=2, stdout=output, stderr=""),
+            ), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 2)
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "nonzero")
+            self.assertEqual(receipt["outcome"]["taskKey"], task_key)
+            self.assertEqual(receipt["outcome"]["reason"], CYCLE._CONSUMER_UNKNOWN_REASON)
+            receipt_text = receipt_path.read_text(encoding="utf-8")
+            self.assertNotIn("Alex Rivera", receipt_text)
+            self.assertNotIn("alex.rivera@example.com", receipt_text)
+            self.assertNotIn("ZXhhbXBsZS1zZWNyZXQtOTk5", receipt_text)
+
+    def test_consumer_receipt_keeps_validated_outcome_on_nonzero_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            task_key = "a" * 64
+            output = json.dumps(
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "execution-held",
+                    "taskKey": task_key,
+                    "reason": "qualified-isolated-repair-executor-unavailable",
+                    "secret": "drop-this-unknown-field",
+                }
+            )
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=2, stdout=output, stderr=""),
+            ), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 2)
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "nonzero")
+            self.assertEqual(receipt["exitCode"], 2)
+            self.assertEqual(
+                receipt["outcome"],
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "execution-held",
+                    "taskKey": task_key,
+                    "reason": "qualified-isolated-repair-executor-unavailable",
+                },
+            )
+            self.assertNotIn("drop-this-unknown-field", receipt_path.read_text(encoding="utf-8"))
+
+    def test_consumer_receipt_marks_invalid_json_without_persisting_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            secret_output = "not-json PRIVATE_KEY_SECRET"
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(
+                    returncode=0,
+                    stdout=secret_output,
+                    stderr="raw stderr PRIVATE_KEY_SECRET",
+                ),
+            ), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "invalid-output")
+            self.assertEqual(receipt["outcome"]["status"], "invalid-output")
+            self.assertNotIn(secret_output, receipt_path.read_text(encoding="utf-8"))
+            self.assertNotIn("PRIVATE_KEY_SECRET", receipt_path.read_text(encoding="utf-8"))
+
+    def test_consumer_receipt_records_interruption_and_next_run_marks_stale_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            env = {"GEM_WORKSPACE": str(workspace)}
+            with mock.patch.object(
+                CYCLE.subprocess, "run", side_effect=KeyboardInterrupt
+            ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                with self.assertRaises(KeyboardInterrupt):
+                    CYCLE.run_summer_symphony_consumer()
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            interrupted = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(interrupted["invocationState"], "interrupted")
+            self.assertIsNone(interrupted["exitCode"])
+
+            stale = {
+                **interrupted,
+                "runId": "b" * 32,
+                "startedAt": "2026-09-13T10:00:00.000Z",
+                "finishedAt": None,
+                "invocationState": "started",
+                "exitCode": None,
+                "outcome": None,
+                "previousInvocation": None,
+            }
+            CYCLE._write_consumer_receipt(receipt_path, stale)
+            idle = json.dumps(
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "idle",
+                }
+            )
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=0, stdout=idle, stderr=""),
+            ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "completed")
+            self.assertEqual(receipt["previousInvocation"]["state"], "stale-start")
+            self.assertEqual(receipt["previousInvocation"]["runId"], "b" * 32)
+
+    def test_consumer_state_guards_reject_relative_unsafe_and_foreign_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "workspace"
+            root.mkdir(mode=0o700)
+
+            with self.assertRaisesRegex(ValueError, "absolute"):
+                CYCLE.consumer_invocation_receipt_path("relative-workspace")
+
+            root.chmod(0o702)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(root)
+            root.chmod(0o700)
+
+            state = root / "state"
+            state.mkdir(mode=0o700)
+            private = state / "summer-symphony-consumer"
+            private.mkdir(mode=0o700)
+            private.chmod(0o750)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(root)
+
+            private.chmod(0o700)
+            with mock.patch.object(CYCLE.os, "getuid", return_value=os.getuid() + 1):
+                with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                    CYCLE._assert_owned_directory(root)
+
+            non_directory = pathlib.Path(directory) / "not-a-directory"
+            non_directory.write_text("file", encoding="utf-8")
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._assert_owned_directory(non_directory)
+
+            linked_state_root = pathlib.Path(directory) / "linked-root"
+            linked_state_root.mkdir(mode=0o700)
+            linked_target = pathlib.Path(directory) / "linked-target"
+            linked_target.mkdir(mode=0o700)
+            os.symlink(linked_target, linked_state_root / "state", target_is_directory=True)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(linked_state_root)
+
+    def test_consumer_state_guard_rejects_resolved_path_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "workspace"
+            root.mkdir(mode=0o700)
+            original_resolve = pathlib.Path.resolve
+
+            def resolve(path, *args, **kwargs):
+                resolved = original_resolve(path, *args, **kwargs)
+                if path.name == "summer-symphony-consumer":
+                    return pathlib.Path(directory) / "outside"
+                return resolved
+
+            with mock.patch.object(
+                pathlib.Path, "resolve", autospec=True, side_effect=resolve
+            ):
+                with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                    CYCLE._ensure_consumer_receipt_directory(root)
+
+    def test_consumer_receipt_writer_closes_fd_when_fdopen_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private = pathlib.Path(directory) / "state" / "summer-symphony-consumer"
+            private.mkdir(mode=0o700, parents=True)
+            receipt_path = private / CYCLE.CONSUMER_INVOCATION_RECEIPT
+            with mock.patch.object(
+                CYCLE.os, "fdopen", side_effect=OSError("fdopen failed")
+            ), mock.patch.object(CYCLE.os, "close", wraps=CYCLE.os.close) as close:
+                with self.assertRaisesRegex(OSError, "fdopen failed"):
+                    CYCLE._write_consumer_receipt(
+                        receipt_path,
+                        {"schema": CYCLE.CONSUMER_INVOCATION_SCHEMA},
+                    )
+
+            close.assert_called_once()
+            self.assertFalse(list(private.glob("*.tmp")))
+            self.assertFalse(receipt_path.exists())
+
+    def test_consumer_receipt_reader_rejects_malformed_and_unsafe_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            private = workspace / "state" / "summer-symphony-consumer"
+            private.mkdir(mode=0o700, parents=True)
+            receipt_path = private / CYCLE.CONSUMER_INVOCATION_RECEIPT
+            valid = {
+                "schema": CYCLE.CONSUMER_INVOCATION_SCHEMA,
+                "runId": "a" * 32,
+                "startedAt": "2026-09-13T10:00:00.000Z",
+                "invocationState": "started",
+            }
+
+            invalid_records = [
+                "not-json",
+                [],
+                {**valid, "schema": "unknown/v1"},
+                {**valid, "runId": "not-a-run-id"},
+                {**valid, "startedAt": "x" * 41},
+                {**valid, "invocationState": "unknown"},
+            ]
+            for record in invalid_records:
+                with self.subTest(record=record):
+                    receipt_path.write_text(
+                        record if isinstance(record, str) else json.dumps(record),
+                        encoding="utf-8",
+                    )
+                    receipt_path.chmod(0o600)
+                    with self.assertRaisesRegex(
+                        ValueError, "consumer-invocation-receipt-invalid"
+                    ):
+                        CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.write_text(json.dumps(valid), encoding="utf-8")
+            receipt_path.chmod(0o644)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.chmod(0o600)
+            with mock.patch.object(CYCLE.os, "getuid", return_value=os.getuid() + 1):
+                with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                    CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.unlink()
+            receipt_path.mkdir(mode=0o700)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.rmdir()
+            target = private / "target.json"
+            target.write_text(json.dumps(valid), encoding="utf-8")
+            target.chmod(0o600)
+            os.symlink(target, receipt_path)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+    def test_consumer_outcome_validation_rejects_unbounded_shapes_and_fields(self):
+        valid_task_key = "a" * 64
+        invalid_cases = [
+            (123, "consumer-output-not-text"),
+            ("[]", "consumer-output-shape-invalid"),
+            (
+                json.dumps({"schema": "unknown/v1", "status": "idle"}),
+                "consumer-output-schema-invalid",
+            ),
+            (
+                json.dumps({"schema": CYCLE.CONSUMER_CYCLE_SCHEMA, "status": "unknown"}),
+                "consumer-output-status-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                        "taskKey": valid_task_key,
+                        "reason": 7,
+                    }
+                ),
+                "consumer-output-reason-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                        "taskKey": "short",
+                        "reason": "consumer-reason-unknown",
+                    }
+                ),
+                "consumer-output-taskKey-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "projection-recorded",
+                        "taskKey": valid_task_key,
+                        "issueIdentifier": "JOV-0",
+                        "acknowledgement": "recorded",
+                    }
+                ),
+                "consumer-output-issueIdentifier-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-recorded",
+                        "taskKey": valid_task_key,
+                        "acknowledgement": "sent",
+                    }
+                ),
+                "consumer-output-acknowledgement-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                    }
+                ),
+                "consumer-output-fields-missing",
+            ),
+        ]
+        for stdout, expected_error in invalid_cases:
+            with self.subTest(expected_error=expected_error):
+                outcome, error = CYCLE._validated_consumer_outcome(stdout)
+                self.assertIsNone(outcome)
+                self.assertEqual(error, expected_error)
+
+        self.assertIsNone(CYCLE._rejection_reason_code(None))
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                "SUMMER_SYMPHONY_CONSUMER_REJECTED reason=not-json"
+            )
+        )
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                'SUMMER_SYMPHONY_CONSUMER_REJECTED reason=""'
+            )
+        )
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                "SUMMER_SYMPHONY_CONSUMER_REJECTED reason=123"
+            )
+        )
+
+    def test_consumer_receipt_records_spawn_error_and_invalid_return_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            env = {"GEM_WORKSPACE": str(workspace)}
+            with mock.patch.object(
+                CYCLE.subprocess, "run", side_effect=OSError("node unavailable")
+            ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                with self.assertRaises(OSError):
+                    CYCLE.run_summer_symphony_consumer()
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "spawn-error")
+            self.assertIsNone(receipt["exitCode"])
+            self.assertEqual(receipt["outcome"]["status"], "spawn-error")
+
+        for invalid_return_code in (True, "0"):
+            with self.subTest(invalid_return_code=invalid_return_code):
+                with tempfile.TemporaryDirectory() as directory:
+                    workspace = pathlib.Path(directory)
+                    env = {"GEM_WORKSPACE": str(workspace)}
+                    with mock.patch.object(
+                        CYCLE.subprocess,
+                        "run",
+                        return_value=SimpleNamespace(
+                            returncode=invalid_return_code,
+                            stdout="",
+                            stderr="",
+                        ),
+                    ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                        with self.assertRaises(TypeError):
+                            CYCLE.run_summer_symphony_consumer()
+
+                    receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+                    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                    self.assertEqual(receipt["invocationState"], "invalid-output")
+                    self.assertIsNone(receipt["exitCode"])
+                    self.assertEqual(receipt["outcome"]["status"], "invalid-output")
 
     def test_capacity_projection_runs_even_when_completion_reconcile_fails(self):
         repos = [SimpleNamespace(github="JovieInc/Jovie")]
@@ -301,6 +824,287 @@ class DeploymentContractTests(unittest.TestCase):
         ):
             self.assertEqual(CYCLE.run_capacity_projection(), 1)
 
+    def test_delivery_diagnostics_are_bounded_and_exclude_raw_credentials(self):
+        samples = [
+            (SimpleNamespace(returncode=1, stderr="Traceback\nHTTPError: HTTP Error 422: secret-token", stdout="secret-token"),
+             {"errorType": "HTTPError", "httpStatus": 422}),
+            (SimpleNamespace(returncode=78, stderr="secret-tokenError: hidden", stdout=""),
+             {"errorType": "child-process-failed"}),
+            (SimpleNamespace(returncode=0, stderr="secret-token", stdout=json.dumps({
+                "eve": {"receipt": {"eventId": "summer_abc", "status": "accepted"}},
+                "secret": "secret-token"})), {"eventId": "summer_abc", "status": "accepted"}),
+            (SimpleNamespace(returncode=0, stdout=json.dumps({"taskKey": "a" * 64,
+                "state": "held", "reason": "push-held", "eventId": "unsafe\nsecret-token"})),
+             {"taskKey": "a" * 64, "state": "held", "reason": "push-held"}),
+            (SimpleNamespace(returncode=0, stdout="not-json secret-token"), {}),
+            (SimpleNamespace(returncode=0, stdout="[]"), {}),
+            (SimpleNamespace(returncode=0, stdout='{"eve":null}'), {}),
+            (SimpleNamespace(returncode=0, stdout='{"eve":{"receipt":null}}'), {}),
+        ]
+        for process, expected in samples:
+            with self.subTest(process=process), contextlib.redirect_stdout(io.StringIO()) as output:
+                CYCLE.report_delivery("publication", process)
+                raw = output.getvalue()
+                self.assertNotIn("secret-token", raw)
+                self.assertLess(len(raw), 600)
+                value = json.loads(raw)
+                self.assertEqual(value["stage"], "publication")
+                for key, item in expected.items():
+                    self.assertEqual(value[key], item)
+
+    def test_native_queue_execution_binds_consumer_projection_and_skips_other_receipts(self):
+        fleet = pathlib.Path("/tmp/gem-workspace/state/gem-priority-gate/latest.json")
+        task_key = "a" * 64
+        source = "b" * 40
+        digest = "c" * 64
+        stdout = json.dumps({
+            "schema": "jovie.summer-symphony-consumer-cycle/v1",
+            "status": "projection-recorded",
+            "taskKey": task_key,
+            "issueIdentifier": "JOV-6329",
+            "acknowledgement": "recorded",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": source,
+            "snapshotDigest": digest,
+        })
+        argv = CYCLE.native_queue_execution_argv(stdout, fleet)
+        self.assertEqual(argv[0], "node")
+        self.assertTrue(argv[1].endswith("run-native-queue-execution.mjs"))
+        self.assertEqual(argv[2:], [
+            task_key, "JOV-6329", source, digest, str(fleet),
+            "reconcile-native-queue-starvation",
+        ])
+        release = json.dumps({
+            "schema": "jovie.summer-symphony-consumer-cycle/v1",
+            "status": "projection-recorded",
+            "taskKey": task_key,
+            "issueIdentifier": "JOV-6329",
+            "acknowledgement": "recorded",
+            "action": "reconcile-release-certification-starvation",
+            "sourceVersion": source,
+            "snapshotDigest": digest,
+        })
+        self.assertEqual(
+            CYCLE.native_queue_execution_argv(release, fleet)[7],
+            "reconcile-release-certification-starvation",
+        )
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({"status": "healthy-noop"}), fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-6329",
+                "action": "remediate-selected-ci-audit-class",
+                "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-6329",
+                "action": "reconcile-native-queue-starvation",
+                "sourceVersion": "0" * 40,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+        self.assertIsNone(CYCLE.native_queue_execution_argv("not-json", fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv("[]", fleet))
+        self.assertIsNone(CYCLE.native_queue_execution_argv(
+            json.dumps({
+                "status": "projection-recorded",
+                "taskKey": task_key,
+                "issueIdentifier": "JOV-0",
+                "action": "reconcile-native-queue-starvation",
+                "sourceVersion": source,
+                "snapshotDigest": digest,
+            }),
+            fleet,
+        ))
+
+    def test_consumer_success_runs_native_queue_execute_and_surfaces_its_failure(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if args[0] == "node" and str(args[1]).endswith("summer-symphony-outbox-consumer.mjs"):
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "status": "projection-recorded",
+                        "taskKey": "a" * 64,
+                        "issueIdentifier": "JOV-6401",
+                        "action": "reconcile-native-queue-starvation",
+                        "sourceVersion": "b" * 40,
+                        "snapshotDigest": "c" * 64,
+                    }),
+                    stderr="",
+                )
+            return SimpleNamespace(returncode=1, stdout="", stderr="execution-write-rejected")
+
+        with _consumer_workspace_env(), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 1)
+
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+        self.assertTrue(str(calls[1][1]).endswith("run-native-queue-execution.mjs"))
+        self.assertEqual(calls[1][2], "a" * 64)
+        self.assertEqual(calls[1][3], "JOV-6401")
+        stages = [json.loads(line)["stage"] for line in output.getvalue().splitlines() if line.strip()]
+        self.assertEqual(stages, ["outbox-consumption", "native-queue-execution"])
+
+    def test_consumer_failure_does_not_spawn_execute(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=78, stdout="", stderr="SUMMER_SYMPHONY_CONSUMER_REJECTED")
+
+        with _consumer_workspace_env(), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 78)
+        self.assertEqual(len(calls), 1)
+
+    def test_execute_spawn_failure_is_typed(self):
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6402",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=OSError("exec format error")), mock.patch.dict(
+            CYCLE.os.environ, {"GEM_WORKSPACE": "/tmp/gem-workspace"}, clear=False
+        ):
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+
+    def test_projection_recorded_unbound_action_is_named_not_silent_skip(self):
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6403",
+            "action": "remediate-selected-ci-audit-class",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 1)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["status"], "executor-unbound-action")
+        self.assertEqual(report["action"], "remediate-selected-ci-audit-class")
+
+    def test_projection_stdout_that_is_not_json_is_a_quiet_noop(self) -> None:
+        with mock.patch.object(CYCLE.subprocess, "run") as run:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute("not-json"), 0)
+            run.assert_not_called()
+
+    def test_execute_success_reports_a_single_native_queue_receipt(self) -> None:
+        stdout = json.dumps({
+            "status": "projection-recorded",
+            "taskKey": "a" * 64,
+            "issueIdentifier": "JOV-6404",
+            "action": "reconcile-native-queue-starvation",
+            "sourceVersion": "b" * 40,
+            "snapshotDigest": "c" * 64,
+        })
+
+        def run(args, **kwargs):
+            self.assertTrue(str(args[1]).endswith("run-native-queue-execution.mjs"))
+            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_native_queue_starvation_execute(stdout), 0)
+        stages = [json.loads(line)["stage"] for line in output.getvalue().splitlines() if line.strip()]
+        self.assertEqual(stages, ["native-queue-execution"])
+
+    def test_consumer_non_json_stdout_still_records_the_stage_once(self) -> None:
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="not-json", stderr="")
+
+        with _consumer_workspace_env(), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+
+    def test_report_receipt_surfaces_positive_pr_binding(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            CYCLE.report_delivery(
+                "outbox-consumption",
+                SimpleNamespace(returncode=0, stdout=json.dumps({"status": "projection-recorded", "pr": 17923})),
+            )
+        value = json.loads(output.getvalue())
+        self.assertEqual(value["pr"], 17923)
+
+    def test_report_receipt_rejects_unbounded_detail_strings(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            CYCLE.report_delivery(
+                "native-queue-execution",
+                SimpleNamespace(returncode=1, stdout="", stderr="boom"),
+                detail="multi\nline\x01secret-token",
+            )
+        raw = output.getvalue()
+        self.assertNotIn("secret-token", raw)
+        value = json.loads(raw)
+        self.assertNotIn("detail", value)
+
+    def test_consumer_healthy_noop_does_not_spawn_execute(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout='{"status":"healthy-noop"}', stderr="")
+
+        with _consumer_workspace_env(), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ):
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(str(calls[0][1]).endswith("summer-symphony-outbox-consumer.mjs"))
+
+    def test_gate_failure_stops_publication_and_consumer_reports_its_own_result(self):
+        with mock.patch.object(CYCLE.subprocess, "run", return_value=SimpleNamespace(
+                returncode=1, stderr="ValueError: invalid receipt")) as run, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_bottleneck_producer(), 1)
+            run.assert_called_once()
+            self.assertEqual(json.loads(output.getvalue())["stage"], "fleet-observation")
+        with _consumer_workspace_env(), mock.patch.object(
+            CYCLE.subprocess,
+            "run",
+            return_value=SimpleNamespace(
+                returncode=0, stdout='{"state":"healthy-noop"}', stderr=""
+            ),
+        ), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+            self.assertEqual(json.loads(output.getvalue())["state"], "healthy-noop")
+
+    def test_each_delivery_failure_marks_cycle_failed_without_suppressing_other_paths(self):
+        for producer, consumer in ((1, 0), (0, 78), (OSError("missing"), 0),
+                                   (0, subprocess.TimeoutExpired("consumer", 1)), (0, 0)):
+            with self.subTest(producer=producer, consumer=consumer), mock.patch.object(
+                    CYCLE, "pr_drain_repos", return_value=[]), mock.patch.object(
+                    CYCLE, "run_capacity_projection", return_value=0), mock.patch.object(
+                    CYCLE.symphony_accepted_completion, "reconcile"), mock.patch.object(
+                    CYCLE, "run_summer_bottleneck_producer", side_effect=producer if isinstance(producer, Exception) else None,
+                    return_value=producer) as publish, mock.patch.object(
+                    CYCLE, "run_summer_symphony_consumer", side_effect=consumer if isinstance(consumer, Exception) else None,
+                    return_value=consumer) as consume:
+                self.assertEqual(CYCLE.main(), int(bool(producer or consumer)))
+                publish.assert_called_once()
+                consume.assert_called_once()
+
     def test_activation_requires_exact_rehabilitation_attestation(self):
         workflow = ACTIVATION.read_text(encoding="utf-8")
         self.assertIn("install-gem-pr-rehabilitation.sh", workflow)
@@ -357,6 +1161,8 @@ class DeploymentContractTests(unittest.TestCase):
         stuck_service: bool = False,
         prior_enabled: bool = False,
         prior_active: bool = False,
+        defer_first_cycle: str = "false",
+        fail_first_cycle: bool = False,
     ) -> tuple[subprocess.CompletedProcess[str], pathlib.Path, pathlib.Path, pathlib.Path]:
         root = pathlib.Path(directory)
         fixture = root / "repo"
@@ -424,6 +1230,9 @@ case "$*" in
   *"disable gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ENABLED"; exit 0 ;;
   *"stop gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ACTIVE"; exit 0 ;;
   *"start gem-pr-drain.timer"*) : > "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"start gem-pr-drain.service"*)
+    if [ "$FAKE_FIRST_CYCLE_FAILURE" = true ]; then exit 9; else exit 0; fi
+    ;;
   *"show gem-pr-drain.service --property=Result --value"*)
     printf '%s\n' success
     exit 0
@@ -452,6 +1261,8 @@ exit 0
                 "FAKE_TIMER_ACTIVE": str(active),
                 "FAKE_ENABLE_FAILURE": "true" if fail_enable else "false",
                 "FAKE_STUCK_SERVICE": "true" if stuck_service else "false",
+                "GEM_REHABILITATION_DEFER_FIRST_CYCLE": defer_first_cycle,
+                "FAKE_FIRST_CYCLE_FAILURE": "true" if fail_first_cycle else "false",
             },
             text=True,
             capture_output=True,
@@ -479,6 +1290,68 @@ exit 0
         self.assertIn("--user is-enabled --quiet gem-pr-drain.timer", commands)
         self.assertTrue(receipt["timerEnabled"])
         self.assertTrue(receipt["timerActive"])
+        self.assertEqual(receipt["lastCycleResult"], "success")
+
+    def test_deferred_install_keeps_diagnostics_without_forcing_a_failed_cycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory, defer_first_cycle="true", fail_first_cycle=True
+            )
+            self.assertEqual(process.returncode, 0, process.stderr)
+            commands = log.read_text().splitlines()
+            self.assertNotIn("--user start gem-pr-drain.service", commands)
+            self.assertNotIn("--user show gem-pr-drain.service --property=Result --value", commands)
+            self.assertTrue(enabled.exists())
+            self.assertTrue(active.exists())
+            receipt = json.loads((pathlib.Path(directory) /
+                "gem/state/gem-pr-rehabilitation-attestation.json").read_text())
+            self.assertEqual(receipt["lastCycleResult"], "pending")
+            self.assertTrue(all(row["matches"] for row in receipt["artifacts"].values()))
+            # Execute the actual activation predicate: verified installation
+            # with an unobserved first cycle must not pass runtime activation.
+            match = re.search(
+                r'jq -e --arg sha "\$PRODUCTION_SHA" \'(\s*\.schema == '
+                r'"gem-pr-rehabilitation-attestation/v1".*?)\' '
+                r'"\$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json"',
+                ACTIVATION.read_text(), re.DOTALL,
+            )
+            self.assertIsNotNone(match)
+            for result, expected in (("pending", 1), ("success", 0)):
+                candidate = {**receipt, "lastCycleResult": result}
+                check = subprocess.run(
+                    ["jq", "-e", "--arg", "sha", receipt["sourceRevision"], match.group(1)],
+                    input=json.dumps(candidate), capture_output=True, text=True, check=False,
+                )
+                self.assertEqual(check.returncode, expected, check.stderr)
+
+    def test_default_first_cycle_failure_still_rolls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory, fail_first_cycle=True, prior_enabled=True, prior_active=True
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn("--user start gem-pr-drain.service", log.read_text())
+            self.assertTrue(enabled.exists())
+            self.assertTrue(active.exists())
+            self.assertFalse((pathlib.Path(directory) /
+                "gem/state/gem-pr-rehabilitation-attestation.json").exists())
+
+    def test_deferred_install_still_rolls_back_a_timer_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, _, enabled, active = self._install_runtime(
+                directory, defer_first_cycle="true", fail_enable=True
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertFalse(enabled.exists())
+            self.assertFalse(active.exists())
+
+    def test_invalid_defer_setting_fails_before_systemd_or_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, _, _ = self._install_runtime(directory, defer_first_cycle="yes")
+            self.assertEqual(process.returncode, 2)
+            self.assertIn("must be true or false", process.stderr)
+            self.assertFalse(log.exists())
+            self.assertFalse((pathlib.Path(directory) / "gem/scripts").exists())
 
     def test_installer_ships_priority_gate_runtime_dependencies(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -508,8 +1381,41 @@ exit 0
                     ).read_text(encoding="utf-8")
                 ),
             )
-            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py"):
+            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py",
+                         "summer_admissions.py", "summer_existing_repair.py", "summer_ci_audit.py"):
                 self.assertTrue((installed_gate.parent / name).is_file(), name)
+            # Execute the installed publisher and helpers, not just source
+            # imports: accepted aggregate capacity cannot replace attestation.
+            publisher_check = subprocess.run(
+                [sys.executable, "-c", """
+import json
+from datetime import datetime, timezone
+import summer_bottleneck_producer as publisher
+now = datetime.now(timezone.utc)
+at = now.isoformat()
+revision = "a" * 40
+fleet = {"schema": "jovie-fleet-gate/v1", "observedAt": at, "signals": {
+    "closureHealth": {"status": "healthy", "openPrs": 0},
+    "queue": {"status": "known", "source": "live", "greenReadyPrs": 0, "nativeQueueCount": 0},
+    "lease": {"observedAt": at, "status": "ok", "capacity": {"available": 0}},
+    "main": {"sha": revision}, "production": {"deployedSha": revision},
+    "concurrencyEvidence": {"accepted": False}}}
+runtime = {"generated_at": at, "running": [], "retrying": [], "blocked": []}
+attestation = {"schema": "gem-service-attestation/v1", "observedAt": at,
+    "service": "symphony-elixir.service", "sourceRevision": revision,
+    "active": True, "healthy": True, "listener": {"port": 4041, "boundToService": True}}
+snapshot = publisher.compose_snapshot(fleet, runtime, now, attestation)
+assert snapshot["signals"]["runner"]["sourceRevision"] == revision
+assert set(snapshot["signals"]["admissions"]) >= {
+    "newImplementation", "ownedRemediation", "push", "providerEligibility", "downstreamHealth"}
+assert snapshot["signals"]["admissions"]["providerEligibility"]["state"] == "UNKNOWN"
+print("installed-publisher-observation-verified")
+"""], cwd=installed_gate.parent,
+                env={"HOME": str(pathlib.Path(directory) / "home"), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(publisher_check.returncode, 0, publisher_check.stderr)
+            self.assertIn("installed-publisher-observation-verified", publisher_check.stdout)
             import_check = subprocess.run(
                 [sys.executable, str(installed_gate), "--help"],
                 cwd=installed_gate.parent,
@@ -531,6 +1437,9 @@ exit 0
         self.assertEqual(import_check.returncode, 0, import_check.stderr)
         self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
         self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerBottleneckProducer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerAdmissions"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerExistingRepair"]["matches"])
         self.assertTrue(
             receipt["artifacts"]["existingRepairControllerManifest"]["matches"]
         )
@@ -586,6 +1495,81 @@ exit 0
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):
+    def test_install_repairs_canonical_overwrite_under_existing_bounded_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            canonical = (fixture / "scripts/symphony/WORKFLOW.md").read_text()
+            paths["workflow"].write_text(canonical.replace("max_concurrent_agents: 8", "max_concurrent_agents: 1"))
+            process = self._install(fixture, env)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            expected = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            self.assertEqual(paths["workflow"].read_text(), expected.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1"))
+
+    def test_upgrade_preserves_persisted_governor_profile_and_smaller_ceiling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            bounded = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            expected = bounded.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1")
+            paths["workflow"].write_text(expected)
+            for _ in range(2):
+                process = self._install(fixture, env)
+                self.assertEqual(process.returncode, 0, process.stderr)
+                self.assertEqual(paths["workflow"].read_text(), expected)
+                receipt = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+                self.assertEqual(receipt["configurationProfile"], "governor-bounded")
+                self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], 1)
+                self.assertTrue(receipt["workflow"]["matches"])
+            # A later reviewed source upgrade retains the same operator scope.
+            source = fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md"
+            source.write_text(bounded + "\nReviewed fixture upgrade.\n")
+            subprocess.run(["git", "-C", str(fixture), "add", "."], check=True, env=_git_env())
+            subprocess.run(["git", "-C", str(fixture), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-qm", "upgrade"], check=True, env=_git_env())
+            process = self._install(fixture, env)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(paths["workflow"].read_text(), expected + "\nReviewed fixture upgrade.\n")
+            self.assertIn("command: /usr/bin/false", paths["workflow"].read_text())
+            self.assertIn("required_labels:", paths["workflow"].read_text())
+            self.assertIn("project_slug:", paths["workflow"].read_text())
+
+    def test_profile_conflict_unknown_duplicate_and_untrusted_file_fail_before_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            cases = [("governor-bounded", {"JOVIE_CONFIGURATION_PROFILE": "canonical"}, 0o600),
+                     ("unknown", {}, 0o600), ("governor-bounded", {}, 0o644),
+                     ("governor-bounded\nJOVIE_CONFIGURATION_PROFILE=canonical", {}, 0o600)]
+            for value, extra, mode in cases:
+                settings.write_text("JOVIE_CONFIGURATION_PROFILE=" + value + "\n")
+                settings.chmod(mode)
+                before = paths["workflow"].read_bytes()
+                process = self._install(fixture, {**env, **extra})
+                self.assertNotEqual(process.returncode, 0)
+                self.assertEqual(paths["workflow"].read_bytes(), before)
+                self.assertEqual(paths["gate"].read_text(), "old gate\n")
+
+    def test_bounded_profile_rejects_controller_ceiling_above_reviewed_maximum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            before = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            paths["workflow"].write_text(before)
+            process = self._install(fixture, env, workflow_overlay="128")
+            self.assertNotEqual(process.returncode, 0)
+            self.assertEqual(paths["workflow"].read_text(), before)
+
     def test_fixture_git_runs_without_detached_maintenance(self):
         env = _git_env()
 

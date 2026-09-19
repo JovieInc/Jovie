@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync, sign, verify } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import {
   chmodSync,
   mkdirSync,
@@ -37,6 +38,7 @@ import {
   signedReadHeaders,
   signOutcomeV2,
   signOutcomeV3,
+  validateExecutionEvidenceV3,
   validateOutcomeV3,
   validateState,
   validateTask,
@@ -275,6 +277,42 @@ describe('Summer outbox record authority', () => {
           keys
         ),
       /outbox-signature-invalid/
+    );
+  });
+
+  it('accepts the native-queue-starvation repair task bound to its action', () => {
+    const queueTask = task({
+      action: 'reconcile-native-queue-starvation',
+      selected: {
+        id: 'native-queue-starvation',
+        sourceRevision: 'b'.repeat(40),
+        sourceDigest: 'c'.repeat(64),
+        owner: 'Summer',
+        handle: 'symphony',
+      },
+    });
+    assert.deepEqual(
+      verifyOutboxRecord(signedOutbox(queueTask), keys),
+      queueTask
+    );
+    assert.throws(
+      () =>
+        verifyOutboxRecord(
+          signedOutbox(
+            task({
+              action: 'reconcile-native-queue-starvation',
+              selected: {
+                id: 'affected-only-unit-selection',
+                sourceRevision: 'b'.repeat(40),
+                sourceDigest: 'c'.repeat(64),
+                owner: 'ci-reliability',
+                handle: 'audit:affected-only',
+              },
+            })
+          ),
+          keys
+        ),
+      /action-cross-bound/
     );
   });
 
@@ -581,6 +619,9 @@ describe('bounded discovery and durable WIP=1 hold', () => {
       taskKey,
       issueIdentifier: 'JOV-6001',
       acknowledgement: 'recorded',
+      action: v2Task.action,
+      sourceVersion: v2Task.source.sourceVersion,
+      snapshotDigest: v2Task.source.snapshotDigest,
     });
     assert.ok(posted);
     assert.equal(posted.decisionFingerprint, taskKey);
@@ -1212,6 +1253,7 @@ describe('existing owned repair transport', () => {
       v => (v.execution.provider = 'codex'),
       v => (v.completedAt = '2026-09-06T01:00:00Z'),
       v => (v.execution.runId = 'other'),
+      v => (v.execution.taskAcceptanceDigest = '0'.repeat(64)),
     ]) {
       const changed = structuredClone(outcome);
       mutate(changed);
@@ -1219,25 +1261,374 @@ describe('existing owned repair transport', () => {
     }
   });
   it('uses the existing controller command and retains unsupported live execution explicitly', async () => {
+    const root = mkdtempSync(
+      join(tmpdir(), 'symphony-owned-repair-controller-')
+    );
+    roots.push(root);
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    mkdirSync(current, { recursive: true });
+    writeFileSync(
+      join(gem, 'config/existing-repair-controller-manifest.json'),
+      readFileSync(
+        new URL(
+          './config/existing-repair-controller-manifest.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    for (const path of [
+      join(home, '.local/bin/symphony-codex-exhausted.py'),
+      join(current, 'symphony-codex-exhausted.py'),
+      join(current, 'existing_pr_repair.py'),
+    ]) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, '#!/usr/bin/env python3\n');
+      chmodSync(path, 0o755);
+    }
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
     let calls = 0;
-    const executor = createOwnedRepairExecutor({
-      /** @type {any} */
-      run: (binary, args, options) => {
-        calls++;
-        assert.equal(binary, 'python3');
-        assert.equal(args[1], 'owned-repair');
-        assert.match(args[0], /symphony-codex-exhausted.py$/);
-        assert.deepEqual(JSON.parse(options.input), taskV3());
-        return {
+    try {
+      const executor = createOwnedRepairExecutor({
+        run: (binary, args, options) => {
+          calls++;
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(JSON.parse(options.input), taskV3());
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              status: 'held',
+              reason: 'qualified-isolated-repair-executor-unavailable',
+            }),
+          };
+        },
+      });
+      assert.equal((await executor.execute(taskV3())).status, 'held');
+      assert.equal(calls, 1);
+
+      const child = /** @type {import('node:events').EventEmitter & {
+        stdout: import('node:events').EventEmitter,
+        stderr: import('node:events').EventEmitter,
+        stdin: { end(input: string): void },
+        kill(signal?: string): void
+      }} */ (/** @type {unknown} */ (new EventEmitter()));
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = {
+        end(input) {
+          assert.deepEqual(JSON.parse(input), taskV3());
+          queueMicrotask(() => {
+            child.stdout.emit(
+              'data',
+              JSON.stringify({
+                status: 'held',
+                reason: 'qualified-isolated-repair-executor-unavailable',
+              })
+            );
+            child.emit('close', 0, null);
+          });
+        },
+      };
+      child.kill = signal => assert.equal(signal, 'SIGTERM');
+      const asyncExecutor = createOwnedRepairExecutor({
+        spawnProcess: (binary, args, options) => {
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(options.stdio, ['pipe', 'pipe', 'pipe']);
+          return child;
+        },
+      });
+      assert.equal((await asyncExecutor.execute(taskV3())).status, 'held');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+  it('rejects terminal evidence that is cross-bound, head-frozen on success, or wrongly signed', () => {
+    const value = taskV3();
+    const outcome = signOutcomeV3(
+      value,
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    assert.deepEqual(
+      validateOutcomeV3(outcome, value, host.publicKey),
+      outcome
+    );
+    for (const mutate of [
+      v => (v.execution.verification.claimRecorded = false),
+      v => (v.execution.baseHead = '0'.repeat(40)),
+      v => (v.execution.finalHead = v.execution.baseHead),
+    ]) {
+      const changed = structuredClone(outcome);
+      mutate(changed);
+      assert.throws(
+        () => validateExecutionEvidenceV3(changed),
+        /consumer-execution-evidence-(invalid-or-cross-bound|success-without-head-change)/
+      );
+    }
+    const reworded = structuredClone(outcome);
+    reworded.detail = 'tampered detail';
+    assert.throws(
+      () => validateOutcomeV3(reworded, value, host.publicKey),
+      /consumer-execution-outcome-signature-invalid/
+    );
+  });
+  it('holds when the controller package is missing or malformed and rejects process failures', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'symphony-owned-repair-hold-'));
+    roots.push(root);
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
+    const held = {
+      status: 'held',
+      reason: 'qualified-isolated-repair-executor-unavailable',
+    };
+    try {
+      // No manifest at all -> package unavailable, the cycle holds.
+      const missingManifest = createOwnedRepairExecutor();
+      assert.deepEqual(await missingManifest.execute(taskV3()), held);
+      // Malformed manifest -> invalid package, still held (never executed).
+      const manifest = JSON.parse(
+        readFileSync(
+          new URL(
+            './config/existing-repair-controller-manifest.json',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      );
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify({ ...manifest, packageId: 'not-the-published-package' })
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // Path-escape manifest -> path-invalid, still held.
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify({
+          ...manifest,
+          launcherRelativePath: '../escape/symphony-codex-exhausted.py',
+        })
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // Valid manifest but no launcher on disk -> unavailable, still held.
+      writeFileSync(
+        join(gem, 'config/existing-repair-controller-manifest.json'),
+        JSON.stringify(manifest)
+      );
+      assert.deepEqual(
+        await createOwnedRepairExecutor().execute(taskV3()),
+        held
+      );
+      // With the launcher present, process-level failures reject loudly.
+      mkdirSync(current, { recursive: true });
+      for (const path of [
+        join(home, '.local/bin/symphony-codex-exhausted.py'),
+        join(current, 'symphony-codex-exhausted.py'),
+        join(current, 'existing_pr_repair.py'),
+      ]) {
+        writeFileSync(path, '#!/usr/bin/env python3\n');
+        chmodSync(path, 0o755);
+      }
+      const failingExecutor = createOwnedRepairExecutor({
+        run: () => ({ status: 3, stdout: '' }),
+      });
+      await assert.rejects(
+        failingExecutor.execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      const invalidJsonExecutor = createOwnedRepairExecutor({
+        run: () => ({ status: 0, stdout: 'not-json' }),
+      });
+      await assert.rejects(
+        invalidJsonExecutor.execute(taskV3()),
+        /"not-json" is not valid JSON/
+      );
+      const streamErrorExecutor = createOwnedRepairExecutor({
+        run: () => ({
+          status: null,
+          stdout: '',
+          error: new Error('spawn boom'),
+        }),
+      });
+      await assert.rejects(
+        streamErrorExecutor.execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      const oversizedExecutor = createOwnedRepairExecutor({
+        run: () => ({
           status: 0,
-          stdout: JSON.stringify({
-            status: 'held',
-            reason: 'qualified-isolated-repair-executor-unavailable',
-          }),
-        };
-      },
-    });
-    assert.equal((await executor.execute(taskV3())).status, 'held');
-    assert.equal(calls, 1);
+          stdout: 'x'.repeat(128 * 1024 + 1),
+        }),
+      });
+      await assert.rejects(
+        oversizedExecutor.execute(taskV3()),
+        /is not valid JSON/
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+  it('bounds controller output and rejects failed, invalid, or unreadable controller streams', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'symphony-owned-repair-streams-'));
+    roots.push(root);
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    mkdirSync(current, { recursive: true });
+    writeFileSync(
+      join(gem, 'config/existing-repair-controller-manifest.json'),
+      readFileSync(
+        new URL(
+          './config/existing-repair-controller-manifest.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    for (const path of [
+      join(home, '.local/bin/symphony-codex-exhausted.py'),
+      join(current, 'symphony-codex-exhausted.py'),
+      join(current, 'existing_pr_repair.py'),
+    ]) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, '#!/usr/bin/env python3\n');
+      chmodSync(path, 0o755);
+    }
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
+    try {
+      const fakeChild = () => {
+        const child = /** @type {import('node:events').EventEmitter & {
+          stdout: import('node:events').EventEmitter,
+          stderr: import('node:events').EventEmitter,
+          stdin: { end(input: string): void },
+          kill(signal?: string): void
+        }} */ (/** @type {unknown} */ (new EventEmitter()));
+        child.stdout = new EventEmitter();
+        child.stderr = new EventEmitter();
+        child.kill = signal => assert.equal(signal, 'SIGTERM');
+        return child;
+      };
+      // stderr output is drained (append else-branch) and a nonzero close
+      // rejects as unavailable.
+      const failedChild = fakeChild();
+      failedChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            failedChild.stderr.emit('data', 'controller boomed');
+            failedChild.emit('close', 3, null);
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => failedChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      // A close with a signal is equally unavailable.
+      const signaledChild = fakeChild();
+      signaledChild.stdin = {
+        end() {
+          queueMicrotask(() => signaledChild.emit('close', null, 'SIGKILL'));
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => signaledChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-unavailable/
+      );
+      // Clean close with non-JSON stdout -> invalid JSON.
+      const invalidJsonChild = fakeChild();
+      invalidJsonChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            invalidJsonChild.stdout.emit('data', 'not-json');
+            invalidJsonChild.emit('close', 0, null);
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => invalidJsonChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-invalid-json/
+      );
+      // Output beyond the bounded buffer is killed, never trusted.
+      const oversizedChild = fakeChild();
+      oversizedChild.stdin = {
+        end() {
+          queueMicrotask(() => {
+            oversizedChild.stdout.emit(
+              'data',
+              Buffer.alloc(128 * 1024 + 1, 'x')
+            );
+          });
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => oversizedChild,
+        }).execute(taskV3()),
+        /existing-repair-controller-output-too-large/
+      );
+      // A stdin write failure finishes with the write error.
+      const brokenStdinChild = fakeChild();
+      brokenStdinChild.stdin = {
+        end() {
+          throw new Error('stdin pipe broken');
+        },
+      };
+      await assert.rejects(
+        createOwnedRepairExecutor({
+          spawnProcess: () => brokenStdinChild,
+        }).execute(taskV3()),
+        /stdin pipe broken/
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
   });
 });

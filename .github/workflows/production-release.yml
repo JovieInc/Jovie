@@ -1272,6 +1272,14 @@ jobs:
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
             if [ "$PROMOTION_RESULT" = "success" ] &&
+              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$PROMOTION_RESULT" = "success" ] &&
               [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
               [ "$ROLLBACK_RESULT" = "skipped" ]; then
               echo "::notice::Main advanced to $current_main after exact production promotion; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
@@ -1361,9 +1369,35 @@ jobs:
             --retry 2 --retry-all-errors
             --header "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET"
           )
-          # Alias metadata may settle before HTTP content. Retry only a valid
-          # but different build identity; transport/auth/schema failures stay
-          # terminal after curl's existing bounded transport retries.
+          preview_robots_policy_valid() {
+            awk '
+              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0; sitemap_advertised = 0 }
+              {
+                line = $0; sub(/\r$/, "", line); sub(/[[:space:]]*#.*/, "", line); line = trim(line)
+                if (line == "") next
+                separator = index(line, ":"); if (separator == 0) next
+                directive = tolower(trim(substr(line, 1, separator - 1)))
+                value = trim(substr(line, separator + 1))
+                if (directive == "sitemap") { sitemap_advertised = 1; next }
+                if (directive == "user-agent") {
+                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
+                  if (value == "*") wildcard_group = 1
+                  next
+                }
+                if (directive == "allow" || directive == "disallow") {
+                  group_has_rules = 1
+                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
+                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
+                }
+              }
+              END { exit(wildcard_disallow && !root_allow && !sitemap_advertised ? 0 : 1) }
+            '
+          }
+
+          # Alias metadata and each HTTP route converge independently. Accept only
+          # one complete exact-identity and private-policy observation. Valid
+          # stale content retries; transport/auth/schema failures stay terminal.
           build_info_path="$RUNNER_TEMP/staging-build-info.json"
           for identity_attempt in $(seq 1 5); do
             curl_status=0
@@ -1398,54 +1432,33 @@ jobs:
               echo "::error::Staging build-info response is not a valid build identity."
               exit 1
             fi
+            privacy_valid=false
             if [ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ] && [ "$observed_environment" = "preview" ]; then
-              break
+              privacy_valid=true
+              homepage_headers="$RUNNER_TEMP/staging-homepage-headers.txt"
+              curl "${curl_args[@]}" --dump-header "$homepage_headers" \
+                --output /dev/null https://staging.jov.ie/
+              if ! tr -d '\r' < "$homepage_headers" | \
+                grep -Eiq '^x-robots-tag:.*noindex'; then
+                echo "Staging homepage is missing the HTTP noindex policy."
+                privacy_valid=false
+              fi
+
+              robots="$(curl "${curl_args[@]}" https://staging.jov.ie/robots.txt)"
+              if ! printf '%s\n' "$robots" | preview_robots_policy_valid; then
+                echo "Staging robots policy is not private/noindex."
+                privacy_valid=false
+              fi
+              if [ "$privacy_valid" = true ]; then
+                break
+              fi
             fi
             if [ "$identity_attempt" -eq 5 ]; then
-              echo "::error::Staging build-info is not the exact preview SHA after 5 attempts."
+              echo "::error::Staging exact preview identity and privacy did not converge after 5 attempts."
               exit 1
             fi
             sleep 4
           done
-          homepage_headers="$RUNNER_TEMP/staging-homepage-headers.txt"
-          curl "${curl_args[@]}" --dump-header "$homepage_headers" \
-            --output /dev/null https://staging.jov.ie/
-          if ! tr -d '\r' < "$homepage_headers" | \
-            grep -Eiq '^x-robots-tag:.*noindex'; then
-            echo "::error::Staging homepage is missing the HTTP noindex policy."
-            exit 1
-          fi
-          preview_robots_policy_valid() {
-            awk '
-              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
-              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0; sitemap_advertised = 0 }
-              {
-                line = $0; sub(/\r$/, "", line); sub(/[[:space:]]*#.*/, "", line); line = trim(line)
-                if (line == "") next
-                separator = index(line, ":"); if (separator == 0) next
-                directive = tolower(trim(substr(line, 1, separator - 1)))
-                value = trim(substr(line, separator + 1))
-                if (directive == "sitemap") { sitemap_advertised = 1; next }
-                if (directive == "user-agent") {
-                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
-                  if (value == "*") wildcard_group = 1
-                  next
-                }
-                if (directive == "allow" || directive == "disallow") {
-                  group_has_rules = 1
-                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
-                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
-                }
-              }
-              END { exit(wildcard_disallow && !root_allow && !sitemap_advertised ? 0 : 1) }
-            '
-          }
-
-          robots="$(curl "${curl_args[@]}" https://staging.jov.ie/robots.txt)"
-          if ! printf '%s\n' "$robots" | preview_robots_policy_valid; then
-            echo "::error::Staging robots policy is not private/noindex."
-            exit 1
-          fi
 
       - name: Write typed staging deployment receipt
         id: receipt
@@ -1466,6 +1479,14 @@ jobs:
           set -euo pipefail
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; omitting a falsely current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             if [ "$PROMOTION_RESULT" = "success" ] &&
               [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
               [ "$ROLLBACK_RESULT" = "skipped" ]; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run model router regressions with coverage of concurrent state transitions."""
+"""Run model router regressions with coverage of routing and state transitions."""
 import ast
 import dis
 import json
@@ -12,7 +12,7 @@ import types
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/test-model-router.py"
 TARGETS = {
-    "model-router.py": {"update_state", "save_state", "mark_pool_exhausted", "record_pool_use", "record_api_spend"},
+    "model-router.py": {"route_priority", "score_candidate", "update_state", "save_state", "mark_pool_exhausted", "record_pool_use", "record_api_spend"},
 }
 
 

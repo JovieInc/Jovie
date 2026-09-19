@@ -1,155 +1,174 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import {
-  ArtistProfilePhoneFrame,
-  type ArtistProfilePhoneFrameSize,
-} from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
 export type HomepageCertifiedSectionId =
   (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number]['id'];
 
+/**
+ * Kept as a source-compatible input while the homepage transitions away from
+ * product screenshots in the locked editorial pass. The approved composition
+ * uses the conceptual identity artwork instead of a profile export.
+ */
 export interface HomepageCertifiedPreviews {
-  /** Real public-profile export shown beside "Everything about you, connected." */
-  readonly connected: MarketingExportImage;
-  /** Real public-profile exports shown beside "Turn attention into relationships." */
-  readonly relationships: readonly MarketingExportImage[];
+  readonly connected?: MarketingExportImage;
+  readonly relationships?: readonly MarketingExportImage[];
 }
 
 export interface HomepageCertifiedSectionsProps {
-  readonly previews: HomepageCertifiedPreviews;
+  readonly previews?: HomepageCertifiedPreviews;
 }
 
-const PHONE_SIZES = '(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 62vw';
+const IDENTITY_ARTWORK = {
+  src: '/assets/generated/homepage-identity-optical-v1.webp',
+  width: 1902,
+  height: 827,
+  alt: 'A conceptual photographic assembly of a profile identity',
+} as const;
 
-function ProfilePhone({
-  image,
-  size,
-}: {
-  readonly image: MarketingExportImage;
-  readonly size: ArtistProfilePhoneFrameSize;
-}) {
+type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
+type RelationshipSection = Extract<HomepageSection, { id: 'relationships' }>;
+
+function EditorialSection({
+  children,
+  dataMedia,
+  rhythm,
+  section,
+}: Readonly<{
+  children: ReactNode;
+  dataMedia: 'true' | 'false';
+  rhythm: 'product' | 'text';
+  section: HomepageSection;
+}>) {
   return (
-    <ArtistProfilePhoneFrame
-      className='homepage-certified-section__device'
-      size={size}
+    <section
+      id={section.id}
+      className={`homepage-certified-section homepage-certified-section--${section.id}`}
+      data-testid='marketing-section-feature-split'
+      data-homepage-testid={`homepage-section-${section.id}`}
+      data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
+      data-marketing-variant='editorial'
+      data-marketing-occurrence={section.id}
+      data-align='start'
+      data-media={dataMedia}
+      data-rhythm={rhythm}
+      aria-labelledby={`homepage-section-${section.id}-heading`}
     >
-      <Image
-        alt={image.alt}
-        className='homepage-certified-section__screen'
-        height={image.height}
-        loading='lazy'
-        quality={85}
-        sizes={PHONE_SIZES}
-        src={image.publicUrl}
-        width={image.width}
-      />
-    </ArtistProfilePhoneFrame>
+      {children}
+    </section>
   );
 }
 
-function sectionMedia(
-  id: HomepageCertifiedSectionId,
-  previews: HomepageCertifiedPreviews
-): ReactNode {
-  if (id === 'connected') {
-    return (
-      <div className='homepage-certified-section__phones' data-count='1'>
-        <ProfilePhone image={previews.connected} size='md' />
+function RelationshipOutcomes({
+  outcomes,
+}: Readonly<{ outcomes: RelationshipSection['outcomes'] }>) {
+  return (
+    <ol className='homepage-relationship-outcomes' aria-label='Relationships'>
+      {outcomes.map((outcome, index) => (
+        <li
+          key={outcome.id}
+          className='homepage-relationship-outcome'
+          data-homepage-testid={`homepage-outcome-${outcome.id}`}
+        >
+          <span
+            className='homepage-relationship-outcome__index'
+            aria-hidden='true'
+          >
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <div className='homepage-relationship-outcome__copy'>
+            <h3>{outcome.headline}</h3>
+            <p>{outcome.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ConnectedSection({
+  section,
+}: Readonly<{
+  section: Extract<HomepageSection, { id: 'connected' }>;
+}>) {
+  return (
+    <EditorialSection dataMedia='true' rhythm='product' section={section}>
+      <div className='homepage-certified-section__inner'>
+        <div className='homepage-connected-header'>
+          <div className='homepage-certified-section__copy'>
+            <p className='homepage-certified-section__eyebrow'>
+              {section.eyebrow}
+            </p>
+            <h2
+              id='homepage-section-connected-heading'
+              className='homepage-certified-section__headline'
+              data-homepage-section-heading
+            >
+              {section.headline}
+            </h2>
+          </div>
+          <p className='homepage-certified-section__body'>{section.body}</p>
+        </div>
+        <div className='homepage-connected-artwork'>
+          <Image
+            alt={IDENTITY_ARTWORK.alt}
+            className='homepage-connected-artwork__image'
+            height={IDENTITY_ARTWORK.height}
+            loading='lazy'
+            sizes='(min-width: 1024px) calc(100vw - 12rem), calc(100vw - 3rem)'
+            src={IDENTITY_ARTWORK.src}
+            width={IDENTITY_ARTWORK.width}
+          />
+        </div>
       </div>
-    );
-  }
-  if (id === 'relationships') {
-    return (
-      <div
-        className='homepage-certified-section__phones'
-        data-count={String(previews.relationships.length)}
-      >
-        {previews.relationships.map(image => (
-          <ProfilePhone image={image} key={image.publicUrl} size='sm' />
-        ))}
+    </EditorialSection>
+  );
+}
+
+function RelationshipsSection({
+  section,
+}: Readonly<{ section: RelationshipSection }>) {
+  return (
+    <EditorialSection dataMedia='false' rhythm='text' section={section}>
+      <div className='homepage-certified-section__inner'>
+        <div className='homepage-certified-section__copy'>
+          <h2
+            id='homepage-section-relationships-heading'
+            className='homepage-certified-section__headline'
+            data-homepage-section-heading
+          >
+            {section.headline}
+          </h2>
+          <p className='homepage-certified-section__body'>{section.body}</p>
+        </div>
+        <div className='homepage-certified-section__media'>
+          <RelationshipOutcomes outcomes={section.outcomes} />
+        </div>
       </div>
-    );
-  }
-  return null;
+    </EditorialSection>
+  );
 }
 
 /**
- * Sections 2-8 of the certified homepage. Copy is locked in
- * HOMEPAGE_LAUNCH_COPY.certified; this component only owns rhythm: one quiet
- * verified logos on the page background, then six
- * top-ruled editorial sections on the shared content column, alternating
- * sides, with real product exports where they exist and nothing where they do
- * not.
+ * Founder-locked editorial body. The unsupported logo proof strip is omitted
+ * until an attributable adoption or permission receipt exists. The shared
+ * full footer remains mounted by PublicPageShell.
  */
 export function HomepageCertifiedSections({
   previews,
 }: HomepageCertifiedSectionsProps) {
+  void previews;
   const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
 
   return (
     <>
-      <section
-        className='homepage-certified-proof'
-        data-testid='marketing-section-logo-cloud'
-        data-homepage-testid='homepage-proof'
-        data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
-        data-marketing-variant='inline-strip'
-        data-rhythm='proof'
-        aria-label='Proof'
-      >
-        <div className='homepage-certified-proof__logos system-b-mounted-home-trust-strip-shell'>
-          <HomeTrustSection
-            ariaLabel='People and teams who have created with Jovie'
-            // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Preserve the approved all-caps homepage proof label.
-            label="BUILT BY PEOPLE WHO'VE CREATED FOR"
-            logoIds={ARTIST_PROFILE_SOCIAL_PROOF.logos.map(logo => logo.id)}
-            presentation='inline-strip'
-          />
-        </div>
-      </section>
-      {sections.map((section, index) => {
-        const headingId = `homepage-section-${section.id}-heading`;
-        const media = sectionMedia(section.id, previews);
-
-        return (
-          <section
-            key={section.id}
-            id={section.id}
-            className='homepage-certified-section'
-            data-testid='marketing-section-feature-split'
-            data-homepage-testid={`homepage-section-${section.id}`}
-            data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
-            data-marketing-variant='editorial'
-            data-marketing-occurrence={section.id}
-            data-align={index % 2 === 0 ? 'start' : 'end'}
-            data-media={media ? 'true' : 'false'}
-            data-rhythm={media ? 'product' : 'text'}
-            aria-labelledby={headingId}
-          >
-            <div className='homepage-certified-section__inner'>
-              <div className='homepage-certified-section__copy'>
-                <h2
-                  id={headingId}
-                  className='homepage-certified-section__headline'
-                  data-homepage-section-heading
-                >
-                  {section.headline}
-                </h2>
-                <p className='homepage-certified-section__body'>
-                  {section.body}
-                </p>
-              </div>
-              {media ? (
-                <div className='homepage-certified-section__media'>{media}</div>
-              ) : null}
-            </div>
-          </section>
-        );
+      {sections.map((section): ReactNode => {
+        if (section.id === 'connected') {
+          return <ConnectedSection key={section.id} section={section} />;
+        }
+        return <RelationshipsSection key={section.id} section={section} />;
       })}
     </>
   );

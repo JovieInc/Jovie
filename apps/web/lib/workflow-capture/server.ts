@@ -66,6 +66,7 @@ export async function createWorkflowCaptureRequest(input: {
   });
   const requestedAt = new Date();
   const payload: WorkflowCaptureRequestPayload = {
+    audience: 'ovie',
     schemaVersion: WORKFLOW_CAPTURE_SCHEMA_VERSION,
     requestingTaskId: request.requestingTaskId,
     requestKey: request.requestKey,

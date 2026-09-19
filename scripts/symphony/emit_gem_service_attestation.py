@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 
 import symphony_proof_context as trust
@@ -37,6 +38,50 @@ BOUNDED_OVERRIDES = {
     "90-symphony-safe-restart-guard.conf", "build-pin.conf",
     "cursor-executable.conf", "summer-bottleneck-signing.conf", "governor-restricted.conf",
 }
+OBSERVATION_ERRORS = (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError)
+RETRY_DELAYS = (5, 15)
+
+
+def failure_reason(error: Exception) -> str:
+    # Only source-authored labels can enter the journal; never argv, paths or
+    # exception text from commands, network responses or process environment.
+    if isinstance(error, subprocess.TimeoutExpired):
+        return "observation-command-timeout"
+    if isinstance(error, subprocess.SubprocessError):
+        return "observation-command-failed"
+    if isinstance(error, OSError):
+        return "observation-io-failed"
+    if isinstance(error, ValueError) and str(error) in {
+        "official service inactive or unbound",
+        "official listener ambiguous or unavailable",
+        "runtime state observation stale",
+        "running application does not bind the release revision",
+        "runtime or configuration changed during observation",
+        "runtime release provenance mismatch",
+        "configuration source revision unavailable",
+    }:
+        return str(error).replace(" ", "-")
+    return "observation-shape-invalid"
+
+
+def observe_with_retry(observe_once) -> dict:
+    """Remeasure after a transient restart; never reuse or redate a receipt.
+
+    Three attempts and twenty seconds of total backoff stay inside the existing
+    timer invocation and writer lock. Exhaustion leaves the old receipt intact.
+    Definitively unhealthy observations are published as unhealthy immediately.
+    """
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            return observe_once()
+        except OBSERVATION_ERRORS as error:
+            print(json.dumps({"schema": "gem-service-attestation-observation-attempt/v1",
+                              "attempt": attempt + 1, "reason": failure_reason(error),
+                              "retryInSeconds": RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else None}),
+                  file=sys.stderr)
+            if attempt == len(RETRY_DELAYS):
+                raise
+            time.sleep(RETRY_DELAYS[attempt])
 
 
 def digest(data: bytes) -> str:
@@ -215,7 +260,8 @@ def main() -> int:
     observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, args.binary, args.gem_root,
                                   profile=args.profile)
     try:
-        receipt = observe_once() if args.check else publish(args.gem_root / "state/gem-service-attestation.json", observe_once)
+        receipt = observe_once() if args.check else publish(
+            args.gem_root / "state/gem-service-attestation.json", lambda: observe_with_retry(observe_once))
         print(json.dumps(receipt, sort_keys=True))
         if receipt["healthy"]:
             return 0
@@ -243,10 +289,11 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except OBSERVATION_ERRORS as error:
         # Do not serialize exception text: subprocess errors can carry argv.
         print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
-                          "reason": "runtime-or-source-observation-unverified"}))
+                          "reason": "runtime-or-source-observation-unverified",
+                          "failureReason": failure_reason(error)}))
         return 78
 
 

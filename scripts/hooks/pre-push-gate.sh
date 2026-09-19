@@ -51,14 +51,18 @@ run_publication() {
   # Draft publication is a feedback start, not a promotion qualification.
   # Keep the committed diff safe, then let rolling CI evaluate the broader
   # affected surface while implementation continues.
-  local head_ref
+  local head_ref publication_base
   head_ref="$(git branch --show-current)"
   node scripts/ci-branching-guard.mjs check \
     --head "$head_ref" --base main --mode warn
   git rev-parse --verify HEAD >/dev/null
   git diff --check
   git diff --cached --check
-  git diff --check "$(git merge-base origin/main HEAD)..HEAD"
+  if ! publication_base="$(git merge-base origin/main HEAD)"; then
+    echo "[pre-push-gate] cannot resolve publication range; fetch origin/main and restore shared history before publishing" >&2
+    return 1
+  fi
+  git diff --check "${publication_base}..HEAD"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs

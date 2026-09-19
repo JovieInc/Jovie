@@ -71,8 +71,12 @@ describe('social shortcut alias rewrite (JOV-5072)', () => {
     const rewrites = await nextConfig.rewrites();
 
     expect(Array.isArray(rewrites)).toBe(false);
-    expect(
-      (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? []
-    ).toHaveLength(0);
+    // beforeFiles runs ahead of the filesystem tree, so the social alias must
+    // never live there: concrete pages keep precedence over it. The one
+    // deliberate beforeFiles interceptor is the default /hud rewrite into the
+    // OV app shell, whose contract is pinned by ov-mode-routing.test.ts.
+    const beforeFiles =
+      (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? [];
+    expect(beforeFiles.filter(rule => rule.source !== '/hud')).toHaveLength(0);
   });
 });

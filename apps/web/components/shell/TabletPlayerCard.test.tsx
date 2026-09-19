@@ -76,8 +76,12 @@ describe('TabletPlayerCard', () => {
         onNext={onNext}
       />
     );
+    const playButton = screen.getByRole('button', { name: 'Play' });
+    expect(playButton).toHaveAttribute('type', 'button');
+    expect(playButton).toHaveClass('h-9', 'w-9', 'rounded-full');
+
     fireEvent.click(screen.getByLabelText('Previous'));
-    fireEvent.click(screen.getByLabelText('Play'));
+    fireEvent.click(playButton);
     fireEvent.click(screen.getByLabelText('Next'));
     expect(onPrevious).toHaveBeenCalledOnce();
     expect(onPlay).toHaveBeenCalledOnce();

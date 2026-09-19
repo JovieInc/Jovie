@@ -2,7 +2,7 @@ name: Merge Queue Auto-Enroll
 # JOV-INV-029: promotion is distinct from merge and requires exact-head handoff.
 
 # Event-driven, with ownerless recovery admitted only after exact main/head
-# validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
+# validation. Runner Heartbeat's existing remediation clock recovers missed wakes.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
@@ -37,13 +37,13 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    # Ready transitions do not restart CI. The owning agent pairs ready with
-    # native auto-merge intent; the first source CI flight remains authoritative.
+    # Ready transitions re-evaluate exact-head admission without restarting CI;
+    # the first source CI flight remains authoritative.
     # A successful native enqueue emits `enqueued`, which advances the next
     # bounded recovery cohort after the event target proves idempotently
     # already queued. A rejected noncanonical admission emits `dequeued`; that
     # exact head re-enters only through this controller and its checkpoint.
-    types: [reopened, labeled, unlabeled, enqueued, dequeued]
+    types: [ready_for_review, reopened, labeled, unlabeled, enqueued, dequeued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -199,6 +199,134 @@ jobs:
           else
             echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; release verification remains separate from source and native merge-group admission"
           fi
+      - name: Verify trusted release-wave policy availability
+        id: release-wave-policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # pull_request workflows execute this definition from the PR while
+          # the checkout above is deliberately pinned to trusted main. During
+          # the pre-land window, the trusted checkout may not contain the new
+          # helper yet. Probe only that trusted tree: never fetch or execute
+          # the PR head as a bootstrap shortcut.
+          {
+            echo 'available=false'
+            echo 'hold=0'
+            echo 'reason=trusted-main-release-wave-not-landed'
+            echo 'expires_at='
+            echo 'run_id='
+          } >>"$GITHUB_OUTPUT"
+          helper='scripts/lib/release-wave-admission.mjs'
+          workflow='.github/workflows/merge-queue-autoenroll.yml'
+          if [[ -f "$helper" ]]; then
+            echo 'available=true' >>"$GITHUB_OUTPUT"
+            echo 'Trusted main contains the release-wave classifier'
+            exit 0
+          fi
+          if ! grep -Fq -- '- name: Resolve active production release wave' "$workflow"; then
+            echo '::notice::Trusted main predates release-wave admission; preserving the pre-land maintenance path'
+            exit 0
+          fi
+          echo '::error::Trusted main declares release-wave admission but its classifier is missing' >&2
+          exit 2
+      - name: Resolve active production release wave
+        id: release-wave
+        if: steps.release-wave-policy.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          # Bound the admission hold to the documented 30-minute recovery
+          # window. Terminal controller runs release the hold earlier.
+          RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The endpoint is read-only. A queued or in-progress controller run
+          # owns the current release lease even when its head is older than the
+          # latest main SHA. That preserves the hold while the old wave drains.
+          controller_runs='[]'
+          read_failed=0
+          for status in queued in_progress; do
+            if ! status_pages="$(gh api --paginate --slurp \
+              "repos/$REPO/actions/workflows/production-controller.yml/runs?branch=main&status=$status&per_page=100" 2>/dev/null)"; then
+              read_failed=1
+              break
+            fi
+            if ! status_runs="$(jq -ce '
+              if type == "array" and all(.[]; type == "object" and (.workflow_runs | type == "array") and all(.workflow_runs[]; type == "object")) then
+                [ .[] | .workflow_runs ] | add // []
+              elif type == "object" and (.workflow_runs | type == "array") then
+                .workflow_runs
+              else
+                error("malformed controller run response")
+              end
+            ' <<<"$status_pages")"; then
+              read_failed=1
+              break
+            fi
+            controller_runs="$(jq -c --argjson additions "$status_runs" '. + $additions' <<<"$controller_runs")"
+          done
+
+          if [[ "$read_failed" -eq 1 ]]; then
+            # Unknown controller state must not open a new admission path. Do
+            # not manufacture an expiry here: each new workflow run would
+            # otherwise renew a supposedly bounded observation hold forever.
+            # Failing this job is an explicit, fail-closed blocker; the next
+            # normal event retries the read without any durable second ledger.
+            {
+              echo 'hold=1'
+              echo 'reason=controller-state-unavailable'
+              echo 'expires_at='
+              echo 'run_id=unknown'
+            } >>"$GITHUB_OUTPUT"
+            jq -n \
+              --arg reason controller-state-unavailable \
+              '{schema:"jovie-release-wave-admission/v1",hold:true,reason:$reason,expiresAt:null,blocker:"controller-state-unavailable"}' \
+              >>"$GITHUB_STEP_SUMMARY"
+            echo '::error::Production Controller state is unavailable or malformed; native enrollment is blocked until an authoritative read succeeds' >&2
+            exit 2
+          fi
+
+          if ! decision="$(printf '%s' "$controller_runs" \
+            | node scripts/lib/release-wave-admission.mjs classify \
+                --main-sha "$MAIN_SHA" \
+                --max-age-seconds "$RELEASE_WAVE_HOLD_MAX_AGE_SECONDS")"; then
+            echo '::error::Release-wave admission classifier failed closed' >&2
+            exit 2
+          fi
+          jq -e '
+            .schema == "jovie-release-wave-admission/v1" and
+            (.hold | type == "boolean") and
+            (.reason | type == "string" and test("^[a-z0-9-]+$")) and
+            (.expiresAt == null or (.expiresAt | type == "string"))
+          ' <<<"$decision" >/dev/null
+          hold_value="$(jq -r '.hold | if . then "1" else "0" end' <<<"$decision")"
+          reason_value="$(jq -r '.reason' <<<"$decision")"
+          case "$reason_value" in
+            controller-wave-active|controller-wave-draining|no-active-controller|release-wave-expired)
+              ;;
+            *)
+              echo "::error::Production Controller release-wave evidence is unknown ($reason_value); native enrollment is blocked" >&2
+              exit 2
+              ;;
+          esac
+          expires_value="$(jq -r '.expiresAt // empty' <<<"$decision")"
+          run_value="$(jq -r '.activeRunId // empty' <<<"$decision")"
+          {
+            echo "hold=$hold_value"
+            echo "reason=$reason_value"
+            echo "expires_at=$expires_value"
+            echo "run_id=$run_value"
+          } >>"$GITHUB_OUTPUT"
+          {
+            echo '### Release-wave admission receipt'
+            echo '```json'
+            echo "$decision"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
       - name: Resolve exact admission scope
         id: admission
         env:
@@ -508,6 +636,15 @@ jobs:
           # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A live Production Controller release lease pauses only new native
+          # enrollment/re-entry. Existing queue members and every safety
+          # dequeue path remain authoritative. The classifier gives this hold
+          # a terminal/expiry deadline so it can never become indefinite.
+          DRAIN_RELEASE_WAVE_HOLD: ${{ steps.release-wave.outputs.hold || steps.release-wave-policy.outputs.hold }}
+          DRAIN_RELEASE_WAVE_REASON: ${{ steps.release-wave.outputs.reason || steps.release-wave-policy.outputs.reason }}
+          DRAIN_RELEASE_WAVE_EXPIRES_AT: ${{ steps.release-wave.outputs.expires_at || steps.release-wave-policy.outputs.expires_at }}
+          DRAIN_RELEASE_WAVE_RUN_ID: ${{ steps.release-wave.outputs.run_id || steps.release-wave-policy.outputs.run_id }}
+          DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
           # A non-draft main PR whose required source checks never registered a
           # check-run on its exact head can never turn green and never enroll
           # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
@@ -533,6 +670,35 @@ jobs:
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
+          fi
+          # AMBER hold-intake may carry Summer issue-blocked red with intake
+          # still allowed. Main drain historically required
+          # intake==(status==healthy) and then painted this product PR
+          # UNSTABLE. Fail-closed alignment keeps promotion held and lets
+          # CLEAN source heads enroll; the drain jq now accepts the live
+          # receipt after this hop lands.
+          if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_FLEET_GATE_B64" ]]; then
+            receipt_json="$(printf '%s' "$DRAIN_FLEET_GATE_B64" | base64 -d 2>/dev/null || true)"
+            if [[ -n "$receipt_json" ]] && jq -e '
+              .promotionMode == "hold-intake" and
+              (.closureAdmission.status | IN("grace", "red")) and
+              .closureAdmission.newIssueIntakeAllowed == true
+            ' <<<"$receipt_json" >/dev/null; then
+              receipt_json="$(jq -c '
+                .closureAdmission.newIssueIntakeAllowed = false
+                | .closureAdmission.allowed = false
+                | .closureAdmission.newImplementationAllowed = false
+                | .closureAdmission.fallbackPrGenerationAllowed = false
+                | .alreadyAdmittedCohort.newIntakeAllowed = false
+                | .alreadyAdmittedCohort.semantics = "preserve-cohort-and-stop-new-implementation-intake"
+                | if .signals.closureHealth then
+                    .signals.closureHealth.newIssueIntakeAllowed = false
+                  else . end
+              ' <<<"$receipt_json")"
+              DRAIN_FLEET_GATE_B64="$(printf '%s' "$receipt_json" | base64 -w0 2>/dev/null || printf '%s' "$receipt_json" | base64 | tr -d '\n')"
+              export DRAIN_FLEET_GATE_B64
+              echo "hold-intake issue-blocked red aligned fail-closed so CLEAN source can enroll while promotion stays held"
+            fi
           fi
           set +e
           bash scripts/drain-pr-queue.sh
@@ -603,6 +769,10 @@ jobs:
             echo "delivery-control-failure dispatched for $failure #$pr_number at $head_sha (exit $drain_rc)"
             if [[ "$drain_rc" -eq 3 ]]; then
               echo "queue-noop is a controller disposition, not a product-quality failure"
+              exit 0
+            fi
+            if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && "$drain_rc" -eq 2 ]]; then
+              echo "hold-intake waiting-lane is a controller disposition, not a product-quality failure"
               exit 0
             fi
             echo "::error::dropped-controller-event fails closed (exit $drain_rc)" >&2

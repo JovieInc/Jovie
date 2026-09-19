@@ -133,6 +133,19 @@ export {
   getStoreSize,
   MemoryRateLimiter,
 } from './memory-limiter';
+export type {
+  RedisCallerUnavailableAction,
+  RedisDataConsumerPolicy,
+  RedisLimiterOutagePolicy,
+  RedisOutageClass,
+} from './outage-policy';
+export {
+  mandatoryLimitersMissingRequireRedis,
+  RATE_LIMIT_OUTAGE_POLICY,
+  REDIS_DATA_CONSUMERS,
+  unpinnedLimiterPolicies,
+  wrongPolicyLimiters,
+} from './outage-policy';
 // Plan-Aware Rate Limiter Factory
 export { createPlanAwareRateLimiter } from './plan-aware-limiter';
 export type { RateLimiterBackend, RateLimiterOptions } from './rate-limiter';
@@ -168,4 +181,7 @@ export {
   createRateLimitKey,
   formatTimeRemaining,
   getClientIP,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+  withDeniedRateLimitReason,
 } from './utils';

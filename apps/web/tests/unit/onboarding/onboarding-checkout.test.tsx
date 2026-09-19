@@ -28,6 +28,7 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/onboarding/checkout',
   useSearchParams: () =>
     new URLSearchParams('returnTo=%2Fapp%2Fdashboard%2Fearnings'),
 }));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +12,7 @@ import {
   REGISTRY_SCHEMA,
   registryDigest,
   runCommissioning,
+  validateRegistry,
   validateRuntimeReceipt,
 } from './commissioning.mjs';
 
@@ -85,6 +86,19 @@ async function fixtureDirectory() {
   return directory;
 }
 
+test('canonical registry validates and keeps COMM-006 fail-closed', () => {
+  const canonicalRegistry = validateRegistry(
+    loadRegistry(canonicalRegistryPath)
+  );
+  const linear = canonicalRegistry.capabilities.find(
+    item => item.id === 'SUMMER-COMM-006'
+  );
+  assert.equal(linear.implementationState, 'already_works');
+  assert.equal(linear.status, 'passing');
+  assert.equal(linear.probe.requiresRuntimeReceipt, true);
+  assert.deepEqual(canonicalRegistry.trustedAttestationKeyFingerprints, []);
+});
+
 test('direct commissioning rejects a noncanonical false-green registry', async t => {
   const repositoryRoot = await fixtureDirectory();
   t.after(() => rm(repositoryRoot, { recursive: true, force: true }));
@@ -121,10 +135,12 @@ test('completed empty heartbeat turns fail the canonical recurrence probe', () =
   const heartbeat = canonicalRegistry.capabilities.find(
     item => item.id === 'SUMMER-COMM-011'
   );
-  assert.equal(heartbeat.probe.version, '1.1.0');
-  assert.equal(
-    heartbeat.probe.fixture,
-    'scheduled-heartbeat-nonempty-receipt-across-restart/v2'
+  assert.equal(heartbeat.probe.version, '1.2.0');
+  assert.equal(heartbeat.implementationState, 'in_flight');
+  assert.equal(heartbeat.probe.fixture, 'eve-owned-15m-nonempty-receipt/v3');
+  assert.match(
+    heartbeat.canonicalPath.join('\n'),
+    /summer-liveness-heartbeat/u
   );
   assert.equal(
     heartbeat.probe.expectedState,
@@ -172,6 +188,19 @@ test('completed empty heartbeat turns fail the canonical recurrence probe', () =
     errors.join('\n'),
     /actualState does not satisfy expectedState/u
   );
+
+  for (const assertion of heartbeat.probe.sourceAssertions) {
+    const absolutePath = join(canonicalRepositoryRoot, assertion.path);
+    assert.equal(existsSync(absolutePath), true, assertion.path);
+    if (assertion.kind === 'file_exists') continue;
+    const contents = readFileSync(absolutePath, 'utf8');
+    const contains = contents.includes(assertion.value);
+    assert.equal(
+      contains,
+      assertion.kind === 'file_contains',
+      `${assertion.kind} ${assertion.path} ${assertion.value}`
+    );
+  }
 });
 
 test('production provenance ignores hostile Git repository overrides', () => {

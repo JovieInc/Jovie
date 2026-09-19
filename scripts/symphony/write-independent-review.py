@@ -12,9 +12,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 import importlib.util
+
+
+HERMES_DIR = str(Path(__file__).resolve().parent)
+if HERMES_DIR not in sys.path:
+    sys.path.insert(0, HERMES_DIR)
+
+from gem_gate_contract import fleet_sidecar_path  # noqa: E402
 
 
 def load_gate():
@@ -27,38 +35,44 @@ def load_gate():
     return module
 
 
-def parse_args() -> argparse.Namespace:
-    default_state = Path(
+def default_state_dir() -> Path:
+    return Path(
         os.environ.get(
             "GEM_PRIORITY_GATE_STATE_DIR",
             "/home/timwhite/gem-workspace/state/gem-priority-gate",
         )
     )
+
+
+def resolve_destination(repo: str, destination: Path | None) -> Path:
+    if destination is not None:
+        return destination
+    env = os.environ.get("JOVIE_INDEPENDENT_REVIEW_RECEIPT")
+    if env:
+        return Path(env)
+    return fleet_sidecar_path(default_state_dir(), repo, "independent-review.json")
+
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=os.environ.get("GEM_PRIORITY_GATE_REPO") or "JovieInc/Jovie")
-    parser.add_argument(
-        "--destination",
-        type=Path,
-        default=Path(
-            os.environ.get("JOVIE_INDEPENDENT_REVIEW_RECEIPT")
-            or default_state.parent / "independent-review.json"
-        ),
-    )
+    parser.add_argument("--destination", type=Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    destination = resolve_destination(args.repo, args.destination)
     gate = load_gate()
     now = gate.utc_now()
     main_signal = gate.observe_main(args.repo)
-    observed = gate.refresh_independent_review_receipt(args.destination, main_signal, now)
+    observed = gate.refresh_independent_review_receipt(destination, main_signal, now)
     result = {
-        "written": bool(observed.get("accepted") and args.destination.exists()),
+        "written": bool(observed.get("accepted") and destination.exists()),
         "reason": observed.get("writeReason") or observed.get("reason"),
         "headSha": observed.get("headSha"),
         "reviewId": observed.get("reviewId"),
-        "path": str(args.destination),
+        "path": str(destination),
     }
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["written"] else 2

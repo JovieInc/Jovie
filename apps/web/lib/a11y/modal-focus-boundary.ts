@@ -1,6 +1,7 @@
 'use client';
 
 import { type RefObject, useEffect } from 'react';
+import { restoreLeakedOverlayLocks } from '@/lib/a11y/overlay-interaction-lock';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -260,6 +261,7 @@ export function useModalFocusBoundary(
       ) {
         returnFocusTarget.focus({ preventScroll: true });
       }
+      restoreLeakedOverlayLocks();
     };
   }, [instanceKey, isOpen, lockScroll, modalRef, onDismiss, restoreFocus]);
 }

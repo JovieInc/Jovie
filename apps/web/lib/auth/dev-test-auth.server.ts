@@ -80,6 +80,21 @@ interface DevTestAuthSession extends DevTestAuthActor {
   readonly dbUserId: string;
 }
 
+export type DevTestAuthFixture = 'profiles-final-row';
+
+const PROFILES_FINAL_ROW_FIXTURE_LINKS = [
+  ['instagram', 'https://instagram.com/browse-ready-user'],
+  ['tiktok', 'https://tiktok.com/@browse-ready-user'],
+  ['youtube', 'https://youtube.com/@browse-ready-user'],
+  ['soundcloud', 'https://soundcloud.com/browse-ready-user'],
+  ['bandcamp', 'https://browse-ready-user.bandcamp.com'],
+  ['twitch', 'https://twitch.tv/browse-ready-user'],
+  ['linkedin', 'https://linkedin.com/in/browse-ready-user'],
+  ['facebook', 'https://facebook.com/browse-ready-user'],
+  ['twitter', 'https://twitter.com/browse-ready-user'],
+  ['spotify', DEFAULT_READY_CREATOR_SPOTIFY_URL],
+] as const;
+
 interface PersonaSeedConfig {
   readonly persona: DevTestAuthPersona;
   readonly email: string;
@@ -351,7 +366,8 @@ export async function ensureExistingDevTestAuthActor(
 async function ensurePersonaProfile(
   persona: DevTestAuthPersona,
   dbUserId: string,
-  config: PersonaSeedConfig
+  config: PersonaSeedConfig,
+  fixture?: DevTestAuthFixture
 ) {
   const isAdminPersona = persona === 'admin';
   const isReadyCreatorPersona = persona === 'creator-ready';
@@ -411,6 +427,21 @@ async function ensurePersonaProfile(
       sortOrder: 1,
       state: 'active',
     });
+
+    if (fixture === 'profiles-final-row' && isReadyCreatorPersona) {
+      for (const [platform, url] of PROFILES_FINAL_ROW_FIXTURE_LINKS) {
+        await ensureSocialLinkRecord(db, {
+          creatorProfileId: profileId,
+          platform,
+          platformType: 'social',
+          url,
+          displayText: `Browse Ready User on ${platform}`,
+          isActive: true,
+          sortOrder: 10,
+          state: 'active',
+        });
+      }
+    }
   }
 }
 
@@ -499,7 +530,8 @@ export async function getClientAuthBootstrap(): Promise<ClientAuthBootstrap | nu
 }
 
 export async function ensureDevTestAuthActor(
-  persona: DevTestAuthPersona
+  persona: DevTestAuthPersona,
+  options?: { readonly fixture?: DevTestAuthFixture }
 ): Promise<DevTestAuthActor> {
   const config = resolvePersonaSeedConfig(persona);
 
@@ -516,7 +548,8 @@ export async function ensureDevTestAuthActor(
   return ensureDevTestAuthActorForBetterAuthUser(
     persona,
     config,
-    betterAuthUserId
+    betterAuthUserId,
+    options
   );
 }
 
@@ -533,7 +566,8 @@ export async function ensureLiveDevTestAuthActor(
 async function ensureDevTestAuthActorForBetterAuthUser(
   persona: DevTestAuthPersona,
   config: PersonaSeedConfig,
-  betterAuthUserId: string
+  betterAuthUserId: string,
+  options?: { readonly fixture?: DevTestAuthFixture }
 ): Promise<DevTestAuthActor> {
   const { id: dbUserId, previousClerkId } = await ensureUserRecord(db, {
     clerkId: betterAuthUserId, // clerk_id column is the legacy field; now carries BA user id for dev test users
@@ -551,7 +585,7 @@ async function ensureDevTestAuthActorForBetterAuthUser(
       : {}),
   });
 
-  await ensurePersonaProfile(persona, dbUserId, config);
+  await ensurePersonaProfile(persona, dbUserId, config, options?.fixture);
   const profilePath = `/${config.username}`;
 
   try {

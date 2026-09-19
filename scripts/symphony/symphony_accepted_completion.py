@@ -309,6 +309,106 @@ def github_outcome(repository: str, pr_number: int, *, runner=subprocess.run) ->
     return pr, json.loads(rules_result.stdout)
 
 
+def _rotated_enrollment(context_path: Path, *, attestation_dir: Path,
+                        binary: Path, workflow: Path, revision: str,
+                        now: datetime) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    """Recover only the private context's rows across a verified runtime rotation.
+
+    ``proof-context.json`` is the sole enrollment authority for this v2 slice;
+    the account or executor files are the independent bindings that prove each
+    row has not been replaced or revoked. No caller-supplied identity or source
+    revision can create a row. Any malformed old runtime, scope, runner, or
+    enrollment data returns ``None`` and leaves the normal fail-closed path in
+    charge.
+    """
+    try:
+        raw = trust.private_json(context_path)
+        if not isinstance(raw, dict):
+            return None
+        raw_runtime = contract.v2_validate_runtime_identity(raw.get("runtime"))
+        if (raw_runtime is None
+            or raw_runtime["contractSha256"] != trust.digest(Path(contract.__file__))
+            or Path(raw["attestationDir"]).resolve() != attestation_dir.resolve()):
+            return None
+        old_source = Path(raw["sourceRoot"])
+        old_revision = subprocess.run(
+            ["/usr/bin/git", "-C", str(old_source), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout.strip()
+        old_binary = Path(raw["binaryPath"])
+        old_workflow = Path(raw["workflowPath"])
+        if (old_revision != raw_runtime["sourceRevision"]
+            or trust.digest(old_binary) != raw_runtime["binarySha256"]
+            or trust.digest(old_workflow) != raw_runtime["workflowSha256"]):
+            return None
+        if (raw_runtime["sourceRevision"] == revision
+            and raw_runtime["binarySha256"] == trust.digest(binary)
+            and raw_runtime["workflowSha256"] == trust.digest(workflow)):
+            return None
+        runner_keys = {"codexPath", "codexSha256"}
+        if runner_keys & raw.keys():
+            if runner_keys - raw.keys():
+                return None
+            runner = Path(raw["codexPath"])
+            if (runner.is_symlink() or not runner.is_file() or not os.access(runner, os.X_OK)
+                or raw["codexSha256"] != trust.digest(runner)):
+                return None
+        raw_accounts = raw.get("accounts")
+        if not isinstance(raw_accounts, list):
+            return None
+        restored = []
+        seats = set()
+        for row in raw_accounts:
+            normalized = trust.validate_account_row(row, now)
+            if normalized.get("identityType", "codex-account") != "codex-account":
+                continue
+            seat = (normalized["provider"], normalized["profile"])
+            if seat in seats:
+                return None
+            seats.add(seat)
+            restored.append(normalized)
+        return restored, raw
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError,
+            subprocess.SubprocessError):
+        return None
+
+
+def _current_enrollment(context_path: Path, *, attestation_dir: Path,
+                        binary: Path, workflow: Path, revision: str,
+                        now: datetime) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    """Restore seats when the runtime is unchanged but observedAt went stale."""
+    try:
+        raw = trust.private_json(context_path)
+        if not isinstance(raw, dict):
+            return None
+        raw_runtime = contract.v2_validate_runtime_identity(raw.get("runtime"))
+        if (raw_runtime is None
+            or raw_runtime["contractSha256"] != trust.digest(Path(contract.__file__))
+            or Path(raw["attestationDir"]).resolve() != attestation_dir.resolve()
+            or raw_runtime["sourceRevision"] != revision
+            or raw_runtime["binarySha256"] != trust.digest(binary)
+            or raw_runtime["workflowSha256"] != trust.digest(workflow)):
+            return None
+        raw_accounts = raw.get("accounts")
+        if not isinstance(raw_accounts, list):
+            return None
+        restored = []
+        seats = set()
+        for row in raw_accounts:
+            normalized = trust.validate_account_row(row, now)
+            if normalized.get("identityType", "codex-account") != "codex-account":
+                continue
+            seat = (normalized["provider"], normalized["profile"])
+            if seat in seats:
+                return None
+            seats.add(seat)
+            restored.append(normalized)
+        return restored, raw
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError,
+            subprocess.SubprocessError):
+        return None
+
+
 def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any]]], *,
                     source_root: Path, binary: Path, workflow: Path, attestation_dir: Path,
                     service_attestation: Path, now: datetime) -> dict[str, Any]:
@@ -334,6 +434,7 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
         or attested_runtime.get("generation") != trust.live_runtime(live_input)):
         raise ValueError("official service attestation runtime binding mismatch")
     prior = None
+    prior_raw = None
     try:
         prior = trust.load_context(now, context_path)
         if prior["attestationDir"].resolve() != attestation_dir.resolve():
@@ -342,6 +443,16 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
         prior = None
     accounts = [row for row in (prior or {}).get("accounts", [])
                 if row.get("identityType", "codex-account") == "codex-account"]
+    if prior is None:
+        restored = _rotated_enrollment(
+            context_path, attestation_dir=attestation_dir, binary=binary,
+            workflow=workflow, revision=revision, now=now,
+        ) or _current_enrollment(
+            context_path, attestation_dir=attestation_dir, binary=binary,
+            workflow=workflow, revision=revision, now=now,
+        )
+        if restored is not None:
+            accounts, prior_raw = restored
     seen = set()
     for _, receipt in receipts:
         seat = (receipt["provider"], receipt["profile"])
@@ -368,8 +479,13 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
     value = {"runtime": runtime, "sourceRoot": str(source_root.resolve()), "binaryPath": str(binary.resolve()),
              "workflowPath": str(workflow.resolve()), "observedAt": observed.isoformat(), "accounts": accounts,
              "attestationDir": str(attestation_dir.resolve())}
-    if prior and prior.get("codexPath") is not None:
-        value.update(codexPath=str(prior["codexPath"]), codexSha256=prior["codexSha256"])
+    runner_source = prior or prior_raw
+    if runner_source and runner_source.get("codexPath") is not None:
+        codex_path = Path(runner_source["codexPath"])
+        codex_sha = runner_source.get("codexSha256")
+        if (not codex_path.is_symlink() and codex_path.is_file()
+            and os.access(codex_path, os.X_OK) and codex_sha == trust.digest(codex_path)):
+            value.update(codexPath=str(codex_path), codexSha256=codex_sha)
     attestation_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(attestation_dir, 0o700)
     _write_private(context_path, value)

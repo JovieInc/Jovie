@@ -195,6 +195,7 @@ describe('rate-limiter.ts', () => {
       expect(result.reset).toBeInstanceOf(Date);
       expect(result.reset.getTime()).toBe(resetMs);
       expect(result.reason).toBeUndefined();
+      expect(result.backend).toBe('redis');
     });
 
     it('returns rate-limited result from Redis when exceeded', async () => {
@@ -211,6 +212,7 @@ describe('rate-limiter.ts', () => {
       expect(result.success).toBe(false);
       expect(result.remaining).toBe(0);
       expect(result.reason).toBe('test-limiter rate limit exceeded');
+      expect(result.backend).toBe('redis');
     });
 
     it('persists limits across new limiter instances when using Redis backend', async () => {
@@ -267,7 +269,11 @@ describe('rate-limiter.ts', () => {
           }),
         })
       );
-      expect(result).toEqual({ ...memoryResult, degraded: true });
+      expect(result).toEqual({
+        ...memoryResult,
+        degraded: true,
+        backend: 'memory',
+      });
     });
 
     it('uses memory limiter directly (flagged degraded) when Redis is not configured', async () => {
@@ -283,7 +289,11 @@ describe('rate-limiter.ts', () => {
       const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
       const result = await limiter.limit('user-1');
 
-      expect(result).toEqual({ ...memoryResult, degraded: true });
+      expect(result).toEqual({
+        ...memoryResult,
+        degraded: true,
+        backend: 'memory',
+      });
       expect(mockRedisLimiter.limit).not.toHaveBeenCalled();
     });
 
@@ -299,23 +309,25 @@ describe('rate-limiter.ts', () => {
       const limiter = new RateLimiter(baseConfig, { preferRedis: false });
       const result = await limiter.limit('user-1');
 
-      expect(result).toEqual(memoryResult);
+      expect(result).toEqual({ ...memoryResult, backend: 'memory' });
       expect(result.degraded).toBeUndefined();
     });
 
-    it('returns bounded failure when Redis is unavailable and requireRedis is true', async () => {
+    it('returns bounded failure when Redis is unavailable and config.requireRedis is true', async () => {
       mockCreateRedisRateLimiter.mockReturnValue(null);
 
-      const limiter = new RateLimiter(baseConfig, {
-        requireRedis: true,
-        warnOnFallback: false,
-      });
+      const limiter = new RateLimiter(
+        { ...baseConfig, requireRedis: true },
+        { warnOnFallback: false }
+      );
       const result = await limiter.limit('user-1');
 
       expect(result.success).toBe(false);
       expect(result.limit).toBe(baseConfig.limit);
       expect(result.remaining).toBe(0);
       expect(result.reason).toContain('temporarily unavailable');
+      expect(result.unavailable).toBe(true);
+      expect(result.backend).toBe('unavailable');
       expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
     });
 
@@ -331,7 +343,32 @@ describe('rate-limiter.ts', () => {
       expect(result.success).toBe(false);
       expect(result.remaining).toBe(0);
       expect(result.reason).toContain('temporarily unavailable');
+      expect(result.backend).toBe('unavailable');
       expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('does not use memory after a quota, timeout, or connection failure when Redis is required', async () => {
+      const failures = [
+        new Error('ERR max requests limit exceeded. Limit: 500000'),
+        Object.assign(new Error('[RateLimit:test-limiter] Redis timeout'), {
+          name: 'TimeoutError',
+        }),
+        new Error('connect ECONNREFUSED'),
+      ];
+
+      for (const error of failures) {
+        resetRedisCircuitBreaker();
+        mockRedisLimiter.limit.mockRejectedValueOnce(error);
+        const limiter = new RateLimiter(baseConfig, {
+          requireRedis: true,
+          warnOnFallback: false,
+        });
+        const result = await limiter.limit('spend-user');
+        expect(result.success).toBe(false);
+        expect(result.unavailable).toBe(true);
+        expect(result.backend).toBe('unavailable');
+        expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+      }
     });
   });
 
@@ -472,6 +509,39 @@ describe('rate-limiter.ts', () => {
         });
         await limiter.limit('anonymous-ip');
         expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps mandatory limiters fail-closed while the circuit is open, then recovers', async () => {
+      vi.useFakeTimers();
+      try {
+        mockRedisLimiter.limit.mockRejectedValueOnce(
+          new Error('ERR max requests limit exceeded. Limit: 500000')
+        );
+        const limiter = new RateLimiter(baseConfig, {
+          requireRedis: true,
+          warnOnFallback: false,
+        });
+        expect((await limiter.limit('checkout-ip')).backend).toBe(
+          'unavailable'
+        );
+        expect((await limiter.limit('checkout-ip')).backend).toBe(
+          'unavailable'
+        );
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+        expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(15 * 60_000);
+        mockRedisLimiter.limit.mockResolvedValue({
+          success: true,
+          limit: 10,
+          remaining: 9,
+          reset: Date.now() + 60_000,
+        });
+        const recovered = await limiter.limit('checkout-ip');
+        expect(recovered).toMatchObject({ success: true, backend: 'redis' });
+        expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }

@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
+  readonly calm?: boolean;
   readonly item: NavItem;
   readonly isActive: boolean;
   readonly shortcut?: KeyboardShortcut;
@@ -114,6 +115,7 @@ function NavMenuInteractiveElement({
 }
 
 export function NavMenuItem({
+  calm,
   item,
   isActive,
   shortcut,
@@ -274,6 +276,7 @@ export function NavMenuItem({
       }
     : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
+    calm,
     active: isActive,
     tone: item.tone,
     className:
@@ -285,6 +288,7 @@ export function NavMenuItem({
         <Icon
           name={item.iconName}
           className={getSidebarNavIconClassName({
+            calm,
             active: isActive,
             tone: item.tone,
           })}
@@ -294,6 +298,7 @@ export function NavMenuItem({
       ) : (
         <item.icon
           className={getSidebarNavIconClassName({
+            calm,
             active: isActive,
             tone: item.tone,
           })}

@@ -94,6 +94,7 @@ RUNTIME_NAMES = (
     "model-registry.json",
     "provider_capacity.py",
     "existing_pr_repair.py",
+    "symphony-existing-repair-resolv.conf",
     "writer-owned-pr-promote.sh",
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
@@ -1741,11 +1742,14 @@ _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 PRODUCT_FAILURE_TOMBSTONE_CONTEXT = "jovie-queue-product-failure/v1"
 
 
-def _pr_status_check_rollup(repo: str, number: int) -> list | None:
+def _pr_status_check_rollup(repo: str, number: int, *, expected_head: str | None = None) -> list | None:
     payload = _gh_json(
-        ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
+        ["gh", "pr", "view", str(number), "--repo", repo, "--json",
+         "headRefOid,statusCheckRollup" if expected_head is not None else "statusCheckRollup"]
     )
     if not isinstance(payload, dict):
+        return None
+    if expected_head is not None and payload.get("headRefOid") != expected_head:
         return None
     checks = payload.get("statusCheckRollup")
     return checks if isinstance(checks, list) else None
@@ -2207,6 +2211,26 @@ def repair_preflight_command(identifier, issue_revision):
     return 0
 
 
+def _owned_repair_pr_inventory(task, repo):
+    """Add the exact target's fresh status rows to the existing PR inventory."""
+    prs = _complete_open_prs(repo)
+    if not isinstance(prs, list):
+        return prs
+    target = task.get("existingRepair") if isinstance(task, dict) else None
+    target_pr = target.get("pr") if isinstance(target, dict) else None
+    if type(target_pr) is not int:
+        return prs
+    matching = [pr for pr in prs if isinstance(pr, dict) and pr.get("number") == target_pr]
+    if len(matching) != 1 or not re.fullmatch(r"[a-f0-9]{40}", str(matching[0].get("headRefOid"))):
+        return prs
+    checks = _pr_status_check_rollup(repo, target_pr, expected_head=matching[0]["headRefOid"])
+    if not isinstance(checks, list):
+        return prs
+    return [{**pr, "statusCheckRollup": checks}
+            if isinstance(pr, dict) and pr.get("number") == target_pr else pr
+            for pr in prs]
+
+
 def owned_repair_command():
     """Signed consumer entry. No qualified live repair adapter is installed yet."""
     try:
@@ -2216,7 +2240,7 @@ def owned_repair_command():
         task = json.loads(raw)
         result = _repair_module().execute_isolated(task, __file__,
             lambda identifier: _fetch_single_issue(identifier),
-            lambda repo: _complete_open_prs(repo))
+            lambda repo: _owned_repair_pr_inventory(task, repo))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         result = {"status": "held", "reason": str(exc)}
     print(json.dumps(result, sort_keys=True))
@@ -3068,7 +3092,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-fallback-finalize.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-existing-repair-resolv.conf", "symphony-fallback-finalize.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
@@ -3142,6 +3166,20 @@ def _valid_runtime_file(path: pathlib.Path) -> bool:
 
 
 def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
+    if name == "symphony-existing-repair-resolv.conf":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and path.read_bytes() == (
+                    b"# Controller-owned provider resolver; no host-local fallback.\n"
+                    b"nameserver 1.1.1.1\n"
+                    b"nameserver 1.0.0.1\n"
+                    b"options timeout:2 attempts:1\n"
+                )
+            )
+        except OSError:
+            return False
     if name == "model-registry.json":
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -3257,6 +3295,7 @@ def install(destination_root: str | None) -> int:
                 "existing_pr_repair.py",
                 "model-registry.json",
                 "writer-owned-pr-promotion.mjs",
+                "symphony-existing-repair-resolv.conf",
             ):
                 (release / name).write_bytes(data)
                 os.chmod(release / name, 0o644)

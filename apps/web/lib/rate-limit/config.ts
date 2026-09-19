@@ -140,6 +140,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Handle check: 30 checks per minute per IP */
@@ -168,6 +169,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Anonymous onboarding chat: 60 messages per hour per ASN (defeats residential proxy IP rotation) */
@@ -179,6 +181,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Anonymous onboarding chat: 20 total turns per session lifetime (7 days) */
@@ -190,6 +193,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -231,6 +235,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Tip checkout: 30 sessions per hour per IP - public endpoint, higher limit for shared IPs */
@@ -244,6 +249,7 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
     anonymousCostException:
       'Checkout abuse can create paid Stripe sessions; preserve rolling-window semantics.',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Merch checkout: 20 sessions per hour per IP - public physical-goods endpoint */
@@ -273,6 +279,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Admin fit-score recalculation: 5 per hour per admin - compute-intensive */
@@ -317,6 +324,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -380,6 +388,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /**
@@ -395,6 +404,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Public click: 50 requests per minute per IP */
@@ -406,6 +416,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Public visit: 50 requests per minute per IP */
@@ -417,6 +428,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /**
@@ -433,6 +445,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /**
@@ -490,6 +503,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Changelog subscribe: 1 request per 10 seconds per IP */
@@ -501,6 +515,7 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -722,6 +737,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** AI Chat weekly quota (Trial): derived from ENTITLEMENT_REGISTRY */
@@ -733,6 +749,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** AI Chat weekly quota (Pro): derived from ENTITLEMENT_REGISTRY */
@@ -744,6 +761,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** AI Chat weekly quota (Max): derived from ENTITLEMENT_REGISTRY */
@@ -755,6 +773,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -811,6 +830,7 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Account data export: 5 exports per hour per user - protects against abuse */

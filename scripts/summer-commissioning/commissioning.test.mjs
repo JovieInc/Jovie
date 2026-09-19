@@ -17,6 +17,7 @@ const {
   parseArguments,
   receiptAttestationPayload,
   registryDigest,
+  resolveTrustedAttestationKeyFingerprints,
   runCommissioning,
   runCli,
   writeReport,
@@ -444,6 +445,75 @@ test('rejects an environment other than the intended commissioning target', asyn
       ),
     /options.now must be a valid date/u
   );
+});
+
+test('empty committed fingerprint slot stays fail-closed unless env/path public key matches', async t => {
+  const repositoryRoot = await fixtureDirectory();
+  t.after(() => rm(repositoryRoot, { recursive: true, force: true }));
+  const emptyAllowlist = {
+    ...registry(),
+    trustedAttestationKeyFingerprints: [],
+  };
+  assert.throws(
+    () =>
+      runCommissioning(
+        emptyAllowlist,
+        commissioningOptions(repositoryRoot, { processEnvironment: {} })
+      ),
+    /fingerprint is not trusted/u
+  );
+  assert.deepEqual(
+    resolveTrustedAttestationKeyFingerprints([], { environment: {} }),
+    []
+  );
+  assert.deepEqual(
+    resolveTrustedAttestationKeyFingerprints([], {
+      environment: {
+        SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY: publicKeyPem,
+      },
+    }),
+    [publicKeyFingerprint]
+  );
+  const envKeyPath = join(repositoryRoot, 'probe-runner-public.pem');
+  writeFileSync(envKeyPath, publicKeyPem);
+  assert.deepEqual(
+    resolveTrustedAttestationKeyFingerprints(['a'.repeat(64)], {
+      environment: {
+        RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH: envKeyPath,
+      },
+    }),
+    ['a'.repeat(64), publicKeyFingerprint]
+  );
+  assert.throws(
+    () =>
+      resolveTrustedAttestationKeyFingerprints([], {
+        environment: {
+          SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY: 'not-a-pem',
+        },
+      }),
+    /not a valid Ed25519 SPKI key/u
+  );
+  assert.deepEqual(
+    resolveTrustedAttestationKeyFingerprints([], {
+      environment: {
+        SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH: join(
+          repositoryRoot,
+          'missing-probe-runner-public.pem'
+        ),
+        RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY: publicKeyPem,
+      },
+    }),
+    []
+  );
+  const report = runCommissioning(
+    emptyAllowlist,
+    commissioningOptions(repositoryRoot, {
+      processEnvironment: {
+        SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY: publicKeyPem,
+      },
+    })
+  );
+  assert.equal(report.attestationKeyFingerprint, publicKeyFingerprint);
 });
 
 test('noncritical red evidence does not block critical commissioning', async t => {

@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify as nodeVerify } from 'node:crypto';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -19,6 +21,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
+import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { POST } from './route';
@@ -142,6 +145,67 @@ function request(body: unknown) {
   });
 }
 
+// Exercise the actual publisher composition, using only its synthetic test inputs.
+// No host observation, credential access, or submission runs in this subprocess.
+function publisherSnapshot(
+  providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN',
+  ciAuditV2 = false
+) {
+  const fixturePath = resolve(
+    process.cwd(),
+    '../../scripts/symphony/tests/summer-publisher-admissions.test.py'
+  );
+  return JSON.parse(
+    execFileSync(
+      'python3',
+      [
+        '-c',
+        `import json, runpy, sys
+fixture = runpy.run_path(sys.argv[1])
+case = fixture['TaskAdmissionPublicationTests']()
+case.setUp()
+for row in case.audit['classes']:
+    row['blockedSince'] = fixture['FRESH_AT']
+case.reference.update(mode='isolated-cli', issueId='11111111-1111-4111-8111-111111111111',
+    ownerId='22222222-2222-4222-8222-222222222222', issueRevision=fixture['FRESH_AT'],
+    repository='JovieInc/Jovie', pr=1, head=fixture['MAIN_SHA'],
+    workspace='/fixture/owned-repair', writerUnit='fixture-repair.service')
+if sys.argv[2]:
+    provider_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('existing-pr-repair.test.py')))
+    provider_case = provider_fixture['RepairTests']()
+    clock = provider_fixture['mock'].patch.object(
+        provider_fixture['repair'].time, 'time', return_value=fixture['NOW'].timestamp())
+    clock.start()
+    try:
+        provider_case.setUp()
+        provider_case.stack.enter_context(provider_fixture['mock'].patch.object(
+            provider_fixture['repair'], '_iso_now', return_value=fixture['NOW'].isoformat()))
+        _task, payload, config = provider_case.allowance_fixture()
+        if sys.argv[2] == 'HELD':
+            config['creditUsagePercent'] = 100
+        elif sys.argv[2] == 'UNKNOWN':
+            config.pop('creditUsagePercent')
+        case.observed.update(provider_fixture['repair'].observe_grok_allowance(payload,
+            opener=lambda *_args, **_kwargs: provider_case.allowance_response(config)))
+    finally:
+        provider_case.doCleanups()
+        clock.stop()
+if sys.argv[3]:
+    ci_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('summer-ci-audit.test.py')))
+    case.fleet['signals']['ciAudit'] = ci_fixture['fixture'](
+        [ci_fixture['check'](completed_at=fixture['FRESH_AT'])], clock=lambda: fixture['NOW'])
+print(json.dumps(fixture['MODULE'].compose_snapshot(case.fleet, case.runtime,
+    fixture['NOW'], case.attestation, existing_repair=case.reference,
+    task_admissions=case.observed)))`,
+        fixturePath,
+        providerState ?? '',
+        ciAuditV2 ? 'v2' : '',
+      ],
+      { encoding: 'utf8', timeout: 5000 }
+    )
+  );
+}
+
 function fixtureProjection(
   changes: (typeof fixtures.cases)[number]['changes']
 ) {
@@ -182,6 +246,339 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it.each(['ALLOWED', 'HELD', 'UNKNOWN'] as const)(
+    'preserves the actual provider observer %s result through the signed receiver',
+    async state => {
+      const input = publisherSnapshot(state);
+      vi.setSystemTime(new Date(input.observedAt));
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect(input.signals.taskAdmissions.providerEligibility.state).toBe(
+        state
+      );
+      expect((await POST(request(input))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+      expect(delivered.signals.taskAdmissions).toEqual(
+        input.signals.taskAdmissions
+      );
+      expect(JSON.stringify(delivered)).not.toContain(
+        'test-only-provider-secret'
+      );
+      expect(
+        delivered.signals.taskAdmissions.providerObservation === null
+      ).toBe(state === 'UNKNOWN');
+    }
+  );
+
+  it('forwards actual CI measurements without granting their excluded classes', async () => {
+    const input = publisherSnapshot(undefined, true);
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect(input.signals.ciAudit.measurements).toHaveLength(1);
+    expect(input.signals.ciAudit.classes).toEqual([]);
+    expect(input.signals.ciAudit.excludedClasses).toHaveLength(6);
+    expect((await POST(request(input))).status).toBe(202);
+    expect(
+      JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).signals.ciAudit
+    ).toEqual(input.signals.ciAudit);
+    input.signals.ciAudit.measurements[0].dispatchable = true;
+    expect((await POST(request(input))).status).toBe(422);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects inconsistent CI samples before signing or delivery', async () => {
+    const input = publisherSnapshot(undefined, true);
+    const audit = ciAuditV2Fixture;
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    for (const change of [
+      { excludedClasses: [...audit.excludedClasses].reverse() },
+      { measurements: [...audit.measurements, ...audit.measurements] },
+      {
+        measurements: [
+          { ...audit.measurements[0], completedAt: '2999-01-01T00:00:00Z' },
+        ],
+      },
+      { sample: { ...audit.sample, failuresOmitted: 1 } },
+      { sample: { ...audit.sample, checkRunsObserved: 0 } },
+      { sample: { ...audit.sample, reasons: ['head-drift', 'head-drift'] } },
+      {
+        sample: {
+          ...audit.sample,
+          reasons: ['incomplete-observation', 'head-drift'],
+          complete: false,
+        },
+      },
+      { sample: { ...audit.sample, complete: false } },
+    ]) {
+      const response = await POST(
+        request({
+          ...input,
+          signals: { ...input.signals, ciAudit: { ...audit, ...change } },
+        })
+      );
+      expect(response.status).toBe(422);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('signs the actual publisher runtime and task evidence without refreshing or granting it', async () => {
+    const input = publisherSnapshot();
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect(input.signals.runner.runtimeGeneration).toBe('d'.repeat(64));
+    expect(input.signals.runner.runtimeInvocationId).toBe('c'.repeat(32));
+    expect(input.signals.taskAdmissions.providerEligibility.state).toBe(
+      'UNKNOWN'
+    );
+    expect((await POST(request(input))).status).toBe(202);
+    const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    const { producerAttestation, ...unsigned } = delivered;
+    expect(unsigned).toEqual(input);
+    const verifies = (payload: unknown) =>
+      nodeVerify(
+        null,
+        Buffer.from(
+          `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(payload)}`
+        ),
+        PRODUCER_PUBLIC_KEY,
+        Buffer.from(producerAttestation.signature, 'base64url')
+      );
+    expect(verifies(input)).toBe(true);
+    // Crossed identity or refreshed/expired evidence cannot reuse this signature.
+    for (const patch of [
+      { assignmentDigest: 'e'.repeat(64) },
+      { selectedId: 'controller-cascade-coalescing' },
+      { sourceRevision: 'e'.repeat(40) },
+      { runtimeRevision: 'e'.repeat(40) },
+      { runtimeGeneration: 'e'.repeat(64) },
+      { runtimeInvocationId: 'e'.repeat(32) },
+      {
+        downstreamHealth: {
+          ...input.signals.taskAdmissions.downstreamHealth,
+          observedAt: NOW,
+        },
+      },
+    ]) {
+      expect(
+        verifies({
+          ...input,
+          signals: {
+            ...input.signals,
+            taskAdmissions: { ...input.signals.taskAdmissions, ...patch },
+          },
+        })
+      ).toBe(false);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed publisher runtime and task fields before signing or delivery', async () => {
+    const input = publisherSnapshot();
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    for (const [key, patches] of [
+      [
+        'runner',
+        [
+          { runtimeGeneration: 'bad' },
+          { runtimeInvocationId: 'bad' },
+          { grant: true },
+        ],
+      ],
+      [
+        'taskAdmissions',
+        [
+          { schema: 'jovie.eve.summer-task-admissions/v0' },
+          { assignmentDigest: 'bad' },
+          { selectedId: '' },
+          { sourceRevision: 'main' },
+          { runtimeRevision: null },
+          { runtimeGeneration: null },
+          { runtimeInvocationId: null },
+          { providerGrant: true },
+          {
+            providerEligibility: {
+              ...input.signals.taskAdmissions.providerEligibility,
+              grant: true,
+            },
+          },
+          {
+            downstreamHealth: {
+              ...input.signals.taskAdmissions.downstreamHealth,
+              expiresAt: 'never',
+            },
+          },
+          { providerObservation: { provider: 'grok' } },
+        ],
+      ],
+    ] as const) {
+      for (const patch of patches) {
+        const response = await POST(
+          request({
+            ...input,
+            signals: {
+              ...input.signals,
+              [key]: { ...input.signals[key], ...patch },
+            },
+          })
+        );
+        expect(response.status).toBe(422);
+        expect(await response.json()).toEqual({
+          ok: false,
+          code: 'invalid_bottleneck_snapshot',
+        });
+      }
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('preserves crossed and stale task observations for receiver evaluation without upgrading UNKNOWN', async () => {
+    const input = publisherSnapshot();
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    // The canonical receiver accepts well-shaped evidence, but evaluates these
+    // mismatches/stale rows as UNKNOWN. The bridge must not refresh or grant it.
+    for (const patch of [
+      { assignmentDigest: 'e'.repeat(64) },
+      { selectedId: 'controller-cascade-coalescing' },
+      { sourceRevision: 'e'.repeat(40) },
+      { runtimeRevision: 'e'.repeat(40) },
+      { runtimeGeneration: 'e'.repeat(64) },
+      { runtimeInvocationId: 'e'.repeat(32) },
+      {
+        downstreamHealth: {
+          ...input.signals.taskAdmissions.downstreamHealth,
+          observedAt: NOW,
+          expiresAt: NOW,
+        },
+      },
+    ]) {
+      const payload = {
+        ...input,
+        signals: {
+          ...input.signals,
+          taskAdmissions: { ...input.signals.taskAdmissions, ...patch },
+        },
+      };
+      expect((await POST(request(payload))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.lastCall?.[1]?.body));
+      expect(delivered.signals).toEqual(payload.signals);
+      expect(delivered.signals.taskAdmissions.providerEligibility.state).toBe(
+        'UNKNOWN'
+      );
+    }
+    vi.setSystemTime(new Date(new Date(input.observedAt).getTime() + 900_001));
+    const stale = await POST(request(input));
+    expect(stale.status).toBe(422);
+    expect(await stale.json()).toEqual({
+      ok: false,
+      code: 'stale_bottleneck_snapshot',
+    });
+    expect(fetch).toHaveBeenCalledTimes(7);
+  });
+
+  it('accepts only the canonical non-secret provider observation shape, including exhausted quota', async () => {
+    const input = publisherSnapshot();
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const observation = {
+      providerGrantDigest: '1'.repeat(64),
+      provider: 'grok',
+      model: 'grok-4.6',
+      accountUserId: '33333333-3333-4333-8333-333333333333',
+      authPoolIdentity: '2'.repeat(64),
+      executableDigest: '3'.repeat(64),
+      routerDigest: '4'.repeat(64),
+      outputDigest: '5'.repeat(64),
+      quotaObservedAt: input.observedAt,
+      quotaSourceDigest: '6'.repeat(64),
+      includedRemainingPercent: 0,
+    };
+    const withObservation = (providerObservation: unknown) => ({
+      ...input,
+      signals: {
+        ...input.signals,
+        taskAdmissions: {
+          ...input.signals.taskAdmissions,
+          providerObservation,
+        },
+      },
+    });
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect((await POST(request(withObservation(observation)))).status).toBe(
+      202
+    );
+    expect(
+      JSON.parse(String(fetch.mock.lastCall?.[1]?.body)).signals.taskAdmissions
+        .providerObservation
+    ).toEqual(observation);
+    for (const patch of [
+      { provider: 'another-provider' },
+      { model: 'another-model' },
+      { accountUserId: 'bad' },
+      { providerGrantDigest: 'bad' },
+      { authPoolIdentity: 'bad' },
+      { executableDigest: 'bad' },
+      { routerDigest: 'bad' },
+      { outputDigest: 'bad' },
+      { quotaSourceDigest: 'bad' },
+      { quotaObservedAt: 'never' },
+      { includedRemainingPercent: -1 },
+      { includedRemainingPercent: 101 },
+      { includedRemainingPercent: 0.5 },
+      { apiKey: 'forbidden' },
+    ]) {
+      expect(
+        (await POST(request(withObservation({ ...observation, ...patch }))))
+          .status
+      ).toBe(422);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -726,6 +1123,18 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an all-zero source SHA before signing', async () => {
+    const response = await POST(
+      request({ ...validSnapshot(), sourceVersion: '0'.repeat(40) })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_bottleneck_snapshot',
+    });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
   it.each([

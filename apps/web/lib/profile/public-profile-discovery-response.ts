@@ -2,15 +2,19 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import {
-  isPublicProfileIndexable,
+  isPublicProfileDiscoveryEligible,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+  type PublicProfileDiscoveryIdentity,
 } from './public-profile-indexing-policy';
 
 export function getPublicProfileDiscoveryExclusionResponse(
-  handle: string,
+  identity: string | PublicProfileDiscoveryIdentity,
   error = 'Artist not found'
 ): NextResponse | null {
-  if (isPublicProfileIndexable(handle)) {
+  const resolved: PublicProfileDiscoveryIdentity =
+    typeof identity === 'string' ? { handle: identity } : identity;
+
+  if (isPublicProfileDiscoveryEligible(resolved)) {
     return null;
   }
 

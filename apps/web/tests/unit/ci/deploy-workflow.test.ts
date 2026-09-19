@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -110,6 +110,21 @@ const productionMarkerStatePath = resolve(
   repoRoot,
   '.github/scripts/production-marker-state.mjs'
 );
+
+// Bash runs outside V8: collect real DEBUG command hits for the repaired control
+// flow, rather than reporting Vitest's TypeScript coverage as shell coverage.
+const stagingControlCommands = new Set<string>();
+const stagingExecutedCommands = new Set<string>();
+afterAll(() => {
+  if (stagingControlCommands.size === 0) return;
+  const missing = [...stagingControlCommands].filter(
+    line => !stagingExecutedCommands.has(line)
+  );
+  expect(missing, 'Unexecuted staging convergence commands').toEqual([]);
+  console.info(
+    `Staging Bash convergence command coverage: ${stagingControlCommands.size - missing.length}/${stagingControlCommands.size} command forms`
+  );
+});
 
 function getStepBlock(workflow: string, stepName: string): string {
   const lines = workflow.split('\n');
@@ -551,10 +566,7 @@ function stagingReceiptRobotsPolicyValid(robotsBody: string): boolean {
     'Prove exact staging identity, privacy, and representative routes'
   );
   const start = step.indexOf('preview_robots_policy_valid() {');
-  const end = step.indexOf(
-    '\n\n          robots="$(curl "${curl_args[@]}"',
-    start
-  );
+  const end = step.indexOf('\n          }', start) + '\n          }'.length;
   expect(start).toBeGreaterThan(0);
   expect(end).toBeGreaterThan(start);
   const source = step
@@ -2607,8 +2619,13 @@ describe('canary health gate workflow', () => {
     ['redirect', 1, 1],
     ['unauthorized', 22, 1],
     ['transport', 28, 1],
-    ['missing-noindex', 1, 1],
-    ['public-robots', 1, 1],
+    ['missing-noindex', 1, 5],
+    ['public-robots', 1, 5],
+    ['noindex-converges', 0, 2],
+    ['robots-converges', 0, 2],
+    ['privacy-then-wrong-sha', 1, 5],
+    ['homepage-unauthorized', 22, 1],
+    ['robots-transport', 28, 1],
   ] as const)(
     'gates staging content identity: %s',
     (scenario, expectedStatus, expectedRequests) => {
@@ -2617,6 +2634,22 @@ describe('canary health gate workflow', () => {
         getJobBlock(release, 'staging-deployment-receipt'),
         'Prove exact staging identity, privacy, and representative routes'
       );
+      const script = getStepRunScript(prove);
+      const lines = script.split('\n');
+      const controlStart = lines.findIndex(
+        line => line.trim() === 'privacy_valid=false'
+      );
+      if (controlStart >= 0) {
+        for (const line of lines.slice(controlStart)) {
+          if (
+            /^\s*(privacy_valid=|homepage_headers=|robots=|echo |exit |sleep |break)/.test(
+              line
+            )
+          ) {
+            stagingControlCommands.add(line.trim());
+          }
+        }
+      }
       const root = mkdtempSync(resolve(tmpdir(), 'jovie-staging-receipt-'));
 
       try {
@@ -2702,6 +2735,7 @@ case "$url" in
     case "$RECEIPT_SCENARIO" in
       sha-converges) if [ "$attempt" -eq 1 ]; then sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; fi ;;
       environment-converges) if [ "$attempt" -eq 1 ]; then environment=production; fi ;;
+      privacy-then-wrong-sha) if [ "$attempt" -gt 1 ]; then sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; fi ;;
       sha-stays-wrong) sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;
       environment-stays-wrong) environment=production ;;
       untrusted-fields) sha='SECRET_SENTINEL'; environment='SECRET_SENTINEL' ;;
@@ -2723,11 +2757,15 @@ case "$url" in
     ;;
   */robots.txt)
     printf '%s\\n' robots >> "$RECEIPT_PRIVACY_LOG"
-    if [ "$RECEIPT_SCENARIO" = public-robots ]; then printf 'User-agent: *\\nAllow: /\\n'; else printf 'User-agent: *\\nDisallow: /\\n'; fi
+    if [ "$RECEIPT_SCENARIO" = robots-transport ]; then exit 28; fi
+    attempt="$(cat "$RECEIPT_CONTENT_COUNTER")"
+    if [ "$RECEIPT_SCENARIO" = public-robots ] || { [ "$RECEIPT_SCENARIO" = robots-converges ] && [ "$attempt" -eq 1 ]; }; then printf 'User-agent: *\\nAllow: /\\n'; else printf 'User-agent: *\\nDisallow: /\\n'; fi
     ;;
   */)
     printf '%s\\n' homepage >> "$RECEIPT_PRIVACY_LOG"
-    if [ "$RECEIPT_SCENARIO" = missing-noindex ]; then printf 'HTTP/2 200\\n\\n' > "$header_path"; else printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"; fi
+    if [ "$RECEIPT_SCENARIO" = homepage-unauthorized ]; then exit 22; fi
+    attempt="$(cat "$RECEIPT_CONTENT_COUNTER")"
+    if [ "$RECEIPT_SCENARIO" = missing-noindex ] || [ "$RECEIPT_SCENARIO" = privacy-then-wrong-sha ] || { [ "$RECEIPT_SCENARIO" = noindex-converges ] && [ "$attempt" -eq 1 ]; }; then printf 'HTTP/2 200\\n\\n' > "$header_path"; else printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"; fi
     ;;
   *)
     exit 44
@@ -2746,7 +2784,10 @@ esac
         const expectedDeploymentId = 'dpl_exact_receipt';
         const result = spawnSync(
           'bash',
-          ['-c', `set -euo pipefail\n${getStepRunScript(prove)}`],
+          [
+            '-c',
+            `set -euo pipefail\ntrap 'printf \"%s\\n\" \"$BASH_COMMAND\" >> \"$RECEIPT_TRACE\"' DEBUG\n${script}`,
+          ],
           {
             cwd: root,
             env: {
@@ -2760,6 +2801,7 @@ esac
               RECEIPT_ALIAS_COUNTER: counter,
               RECEIPT_CONTENT_COUNTER: resolve(root, 'content-count'),
               RECEIPT_SCENARIO: scenario,
+              RECEIPT_TRACE: resolve(root, 'shell-trace'),
               RECEIPT_PRIVACY_LOG: resolve(root, 'privacy-log'),
               RECEIPT_SLEEP_LOG: resolve(root, 'sleep-log'),
               RUNNER_TEMP: runnerTemp,
@@ -2773,6 +2815,11 @@ esac
           }
         );
 
+        for (const line of readFileSync(resolve(root, 'shell-trace'), 'utf8')
+          .trim()
+          .split('\n')) {
+          stagingExecutedCommands.add(line.trim());
+        }
         expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
           expectedStatus
         );
@@ -2790,7 +2837,12 @@ esac
         ).toEqual(Array(expectedRequests).fill('4'));
         if (expectedStatus === 0) {
           expect(readFileSync(resolve(root, 'privacy-log'), 'utf8')).toBe(
-            'homepage\nrobots\n'
+            'homepage\nrobots\n'.repeat(
+              scenario === 'noindex-converges' ||
+                scenario === 'robots-converges'
+                ? 2
+                : 1
+            )
           );
           expect(output).toContain(
             `commitSha=${expectedSha} environment=preview`
@@ -2803,6 +2855,16 @@ esac
             scenario === 'missing-noindex'
               ? 'missing the HTTP noindex'
               : 'robots policy is not private'
+          );
+        } else if (
+          scenario === 'privacy-then-wrong-sha' ||
+          scenario === 'homepage-unauthorized' ||
+          scenario === 'robots-transport'
+        ) {
+          expect(readFileSync(resolve(root, 'privacy-log'), 'utf8')).toBe(
+            scenario === 'homepage-unauthorized'
+              ? 'homepage\n'
+              : 'homepage\nrobots\n'
           );
         } else {
           expect(() =>

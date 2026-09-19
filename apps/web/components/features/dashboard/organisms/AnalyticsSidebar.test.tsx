@@ -51,6 +51,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityTabbedRail: ({
     children,
     entityHeader,
+    onClose,
     tabOptions,
     activeTab,
     onTabChange,
@@ -59,13 +60,18 @@ vi.mock('@/components/molecules/drawer', () => ({
   }: {
     children?: ReactNode;
     entityHeader?: ReactNode;
+    onClose?: () => void;
     tabOptions: Array<{ value: string; label: string }>;
     activeTab: string;
     onTabChange: (value: string) => void;
     tabbedCardTestId?: string;
     testId?: string;
   }) => (
-    <div data-testid={testId} data-surface-variant='flat'>
+    <div
+      data-testid={testId}
+      data-surface-variant='flat'
+      data-close-handler={onClose ? 'present' : 'none'}
+    >
       {entityHeader}
       <div data-testid={tabbedCardTestId} data-surface-variant='flat'>
         <div role='tablist' aria-label='Analytics data tabs'>
@@ -145,6 +151,10 @@ describe('AnalyticsSidebar', () => {
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
     ).toHaveLength(0);
+    expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
+      'data-close-handler',
+      'present'
+    );
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
   });

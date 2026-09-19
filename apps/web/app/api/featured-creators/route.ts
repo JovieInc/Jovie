@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-indexing-policy';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -39,7 +40,13 @@ async function getFeaturedCreators() {
       timeoutPromise,
     ]);
 
-    return data.map(a => ({
+    return filterPublicDiscoveryIdentities(
+      data.map(a => ({
+        ...a,
+        handle: a.username,
+        isPublic: true,
+      }))
+    ).map(a => ({
       id: a.id,
       handle: a.username,
       name: a.displayName || a.username,

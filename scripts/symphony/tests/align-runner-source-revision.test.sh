@@ -32,8 +32,24 @@ fi
 ALIGN_ALLOW_CHECKOUT=1 bash "${SCRIPT}" "${TIP}"
 grep -qx "JOVIE_CONFIGURATION_SOURCE_REVISION=${TIP}" "${HOME}/.config/symphony/runner-source.env"
 
+assert_private_profile() {
+  python3 - "${HOME}/.config/symphony/runner-source.env" <<'PY_CHECK'
+import os
+from pathlib import Path
+import stat
+import sys
+info = Path(sys.argv[1]).lstat()
+assert stat.S_ISREG(info.st_mode)
+assert info.st_uid == os.getuid()
+assert stat.S_IMODE(info.st_mode) == 0o600, oct(stat.S_IMODE(info.st_mode))
+PY_CHECK
+}
+assert_private_profile
+# An already-aligned legacy file must also satisfy the fleet reader's contract.
+chmod 0644 "${HOME}/.config/symphony/runner-source.env"
 out="$(ALIGN_ALLOW_CHECKOUT=1 bash "${SCRIPT}" "${TIP}")"
 [[ "${out}" == *"already aligned to ${TIP}"* ]]
+assert_private_profile
 
 bogus="${TMP}/not-git"
 mkdir -p "${bogus}"

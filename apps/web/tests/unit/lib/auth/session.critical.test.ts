@@ -249,6 +249,9 @@ describe('@critical session.ts', () => {
         'user_123'
       );
       expect(result).toBe('tx_result');
+      const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      expect(queryText).toContain("set_config('app.clerk_user_id'");
+      expect(queryText).toMatch(/true/);
     });
 
     it('fails closed when transaction-scoped set_config fails', async () => {

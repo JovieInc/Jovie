@@ -6,8 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   AUTH_TROUBLE_SIGNING_IN_LABEL,
   type AuthShellBackLink,
@@ -143,11 +141,12 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     back: backProp,
   } = props;
   const searchParams = useSearchParams();
-  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   // `useAuthSafe` can resolve a cached Better Auth session synchronously in
   // the browser while SSR has no session. Keep the first client render equal
   // to the server tree, then let the route-level entry guard own the signed-in
-  // redirect after hydration.
+  // redirect after hydration. Never unmount this shell on a session — that
+  // produced a blank black /signup card when a session appeared after browse
+  // or hydration (JOV-6450).
   const [hasHydrated, setHasHydrated] = useState(false);
   const [pendingProvider, setPendingProvider] =
     useState<PrimaryAuthOAuthProvider | null>(null);
@@ -197,11 +196,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     globalThis.addEventListener('pageshow', restoreAuthActions);
     return () => globalThis.removeEventListener('pageshow', restoreAuthActions);
   }, []);
-
-  const _redirectSignedInVisitor = useCallback(() => {
-    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
-    globalThis.location?.assign(destination);
-  }, [searchParams]);
 
   const handleProviderSelect = useCallback(
     async (provider: PrimaryAuthOAuthProvider) => {
@@ -260,10 +254,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     },
     [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
   );
-
-  if (hasHydrated && isAuthLoaded && isSignedIn) {
-    return null;
-  }
 
   const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
 
@@ -379,7 +369,7 @@ function AuthShellIdentity({
       {back ? <AuthQuietBackLink href={back.href} label={back.label} /> : null}
       <Link
         href={APP_ROUTES.HOME}
-        aria-label='Go to homepage'
+        aria-label='Go to homepage' // ui-casing-allow: matches AuthLayout logo link
         className='mb-4 inline-flex rounded-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
       >
         <BrandLogo size='chrome' tone='white' aria-hidden />

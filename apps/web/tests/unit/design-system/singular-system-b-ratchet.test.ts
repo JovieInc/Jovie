@@ -61,7 +61,7 @@ function rel(file: string): string {
 }
 
 describe('singular System B — design-system unification ratchet', () => {
-  it('keeps the marketing System B wrapper dark, scrollable, and editorial', () => {
+  it('keeps the marketing System B wrapper theme-aware, scrollable, and editorial', () => {
     const layout = readFileSync(
       resolve(WEB_ROOT, 'app/(marketing)/layout.tsx'),
       'utf8'
@@ -86,7 +86,9 @@ describe('singular System B — design-system unification ratchet', () => {
       .map(path => readFileSync(resolve(WEB_ROOT, path), 'utf8'))
       .join('\n');
 
-    expect(layout).toContain('system-b-marketing dark');
+    expect(layout).toContain('ClientProviders');
+    expect(layout).toContain('system-b-marketing overflow-x-clip');
+    expect(layout).not.toContain('system-b-marketing dark');
     expect(layout).not.toContain('linear-marketing');
     expect(globals).toMatch(
       /html:has\(\.system-b-marketing\)[\s\S]*?\{[^}]*overflow-y:\s*auto/

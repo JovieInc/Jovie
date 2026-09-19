@@ -37,7 +37,7 @@ describe('HomepageNoScriptContent', () => {
     );
   });
 
-  it('mirrors the nine certified sections in order', () => {
+  it('mirrors the locked editorial sections and outcomes in order', () => {
     const { rawMarkup, section } = renderFallback();
     const text = section?.textContent ?? '';
     expect(text).not.toContain("Proof is earned. We don't borrow it.");
@@ -62,9 +62,11 @@ describe('HomepageNoScriptContent', () => {
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
+        ...('outcomes' in item
+          ? item.outcomes.flatMap(outcome => [outcome.headline, outcome.body])
+          : []),
       ]),
       HOMEPAGE_LAUNCH_COPY.certified.close.headline,
-      HOMEPAGE_LAUNCH_COPY.certified.close.support,
     ];
     let cursor = -1;
     for (const line of ordered) {

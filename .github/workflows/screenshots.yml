@@ -18,9 +18,12 @@ on:
       - 'apps/web/components/**'
       - 'apps/web/data/artistProfilePageOrder.ts'
       - 'apps/web/data/homepageLaunchCopy.ts'
+      - 'apps/web/data/marketing/**'
       - 'apps/web/features/**'
+      - 'apps/web/lib/agent-os/visual-qa/**'
       - 'apps/web/lib/screenshots/**'
       - 'apps/web/tests/product-screenshots/**'
+      - 'apps/web/tests/visual-qa/**'
       - 'apps/web/tailwind.config.*'
       - 'apps/web/app/**/layout.tsx'
       - 'apps/web/app/globals.css'
@@ -121,8 +124,10 @@ jobs:
             --workers=4
         env:
           BASE_URL: http://localhost:3000
+          SCREENSHOT_BUILD_MODE: production
 
       - name: Upload exact marketing route captures
+        id: marketing-captures
         if: >-
           always() &&
           hashFiles('apps/web/test-results/**/marketing-route.png', 'apps/web/test-results/**/receipt.json') != ''
@@ -136,6 +141,21 @@ jobs:
           retention-days: 14
           allow-images: true
           public-images: true
+
+      - name: Certify exact marketing captures
+        if: always()
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREEN_CERT_ARTIFACT_ID: ${{ steps.marketing-captures.outputs.artifact-id }}
+          SCREEN_CERT_MARKETING_ARTIFACT: marketing-route-screenshots-${{ github.sha }}
+        run: |
+          DIFF_BASE="${{ github.event.before }}"
+          if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
+            DIFF_BASE="$(git rev-parse HEAD^)"
+          fi
+          export SCREEN_CERT_DIFF_BASE="$DIFF_BASE"
+          pnpm screen-certification-gate
 
       - name: Capture screenshot catalog
         timeout-minutes: 30

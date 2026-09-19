@@ -56,4 +56,24 @@ describe('NavMenuItem', () => {
     expect(label.className).toContain('overflow-hidden');
     expect(label.className).not.toContain('mask-image');
   });
+
+  it('forwards calm rail geometry to the shared shell chrome', () => {
+    render(
+      <NavMenuItem
+        calm
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive
+      />
+    );
+
+    const row = screen.getByRole('link', { name: 'Library' });
+    expect(row.className).toContain('h-9');
+    expect(row.className).toContain('rounded-lg');
+    expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
 });

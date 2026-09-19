@@ -213,6 +213,9 @@ if [ "$DAEMON_RELOAD" -eq 1 ]; then
       --observe-cycles "${SYMPHONY_RECONCILER_PROOF_CYCLES:-2}" \
       --poll-seconds "${SYMPHONY_RECONCILER_PROOF_POLL_SECONDS:-5}"
     echo "TIMER_CADENCE_PROVEN symphony-reconciler.timer"
+    # JOV-6460: clear a stuck fail from a huge latest.json so the timer can fire.
+    systemctl --user reset-failed gem-disk-reclaim.service || true
+    echo "RESET_FAILED gem-disk-reclaim.service"
     systemctl --user enable --now gem-disk-reclaim.timer
     echo "TIMER_ENABLED gem-disk-reclaim.timer"
     systemctl --user enable --now symphony-concurrency-controller.timer

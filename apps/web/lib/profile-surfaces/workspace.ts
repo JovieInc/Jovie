@@ -2,6 +2,7 @@ import type {
   ProfilesWorkspaceFilter,
   ProfileWorkspaceRow,
 } from '@/app/app/(shell)/profiles/data';
+import { isPresenceObservationStale } from './presence-identity';
 
 export type ConnectionStatusTone = 'success' | 'warning' | 'error' | 'neutral';
 
@@ -155,14 +156,23 @@ export function getConnectionStatus(
       nextAction: 'Review monitoring settings before resuming this page.',
     };
   }
+  if (isPresenceObservationStale(row.lastObservedAt)) {
+    return {
+      label: 'Stale',
+      tone: 'warning',
+      needsAttention: true,
+      sortPriority: 1,
+      nextAction: 'Review this page; the last check is older than two weeks.',
+    };
+  }
   if (row.rank === null) {
     return {
-      label: row.lastObservedAt ? 'Not Found' : 'Not Measured',
+      label: row.lastObservedAt ? 'Not Ranked' : 'Not Measured',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 3,
       nextAction: row.lastObservedAt
-        ? 'Review the page if it should appear in search.'
+        ? 'Missing data is not a failed check. Review the page if it should appear in search.'
         : 'No action needed until the first monitoring run completes.',
     };
   }

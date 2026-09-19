@@ -31,15 +31,15 @@ describe('MarketingPricingPlans', () => {
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup?plan=free');
     expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=pro');
+      screen.getByRole('link', { name: 'Start Free Trial' })
+    ).toHaveAttribute('href', '/signup?plan=pro');
+    expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
+      'href',
+      'mailto:support@jov.ie'
+    );
     expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=max');
+      screen.getAllByRole('link').map(link => link.getAttribute('href'))
+    ).not.toContain('/signup?plan=max');
     expect(
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=team');
@@ -47,9 +47,6 @@ describe('MarketingPricingPlans', () => {
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=enterprise');
     expect(screen.queryByRole('link', { name: 'Request Access' })).toBeNull();
-    expect(
-      screen.queryByRole('link', { name: 'Contact Sales' })
-    ).not.toBeInTheDocument();
   });
 
   it('keeps default pricing plan cards neutral instead of plan-accented', () => {

@@ -14,6 +14,9 @@ describe('root layout scripts', () => {
       "<script src='/electron-runtime-init.js' />"
     );
     expect(layoutSource).toContain("<script src='/theme-init.js' />");
+    expect(layoutSource).toContain(
+      "id='jovie-theme-route-policy' type='application/json'"
+    );
     expect(layoutSource).not.toContain('beforeInteractive');
   });
 

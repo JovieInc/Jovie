@@ -110,6 +110,18 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.showMobileTabs).toBe(false);
   });
 
+  it('labels canonical Ops as an OV shell screen', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.HUD);
+
+    const { result } = renderHook(() => useAuthRouteConfig('ov'));
+
+    expect(result.current.section).toBe('ov');
+    expect(result.current.showMobileTabs).toBe(false);
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Ops', href: APP_ROUTES.HUD },
+    ]);
+  });
+
   it('keeps customer routes in customer sections', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
 

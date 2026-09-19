@@ -152,8 +152,8 @@ describe('auth shell layout contract', () => {
 
     const brandingRender = render(
       <AuthBranding
-        title='Built For Artists.'
-        description='Manage releases, links, and audience signals from one focused workspace.'
+        title='Control how the world sees you.'
+        description='Find what the internet knows. Turn it into relationships.'
       />
     );
 

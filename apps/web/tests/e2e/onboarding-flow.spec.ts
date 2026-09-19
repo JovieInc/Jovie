@@ -34,9 +34,9 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
 
-  test('anonymous handle claim redirects to waitlist', async ({ page }) => {
+  test('anonymous handle claim redirects to signup', async ({ page }) => {
     // The homepage currently uses RedesignedHero with a "Get started" CTA
-    // that links to /waitlist. The ClaimHandleForm is behind a feature flag
+    // that links to /signup. The ClaimHandleForm is behind a feature flag
     // and may not be rendered. Check for either form.
     const handleInput = page.getByLabel(
       /choose your handle|claim your handle/i
@@ -46,7 +46,7 @@ test.describe('Onboarding Flow', () => {
       .catch(() => false);
 
     if (!isFormVisible) {
-      // No claim form on homepage — verify the "Get started" link goes to /waitlist
+      // No claim form on homepage — verify the "Get started" link goes to /signup
       const getStartedLink = page.getByRole('link', { name: /get started/i });
       const isGetStartedVisible = await getStartedLink
         .isVisible({ timeout: 5000 })

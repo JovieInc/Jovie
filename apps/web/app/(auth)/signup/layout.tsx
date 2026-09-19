@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 
 const ogTitle = `Sign up | ${APP_NAME}`;
-const description =
-  'Create your Jovie account to launch your artist profile, share smarter music links, and turn every release into momentum.';
+const description = COMPANY_IDENTITY.signupDescription;
 const imageUrl = `${BASE_URL}/og/default.png`;
 
 export const metadata: Metadata = {

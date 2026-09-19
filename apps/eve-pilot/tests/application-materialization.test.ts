@@ -38,6 +38,20 @@ describe('independent application source export', () => {
               /(?:apps\/web|@\/lib\/db)/u
             );
         }
+        const health = readFileSync(
+          join(destination, 'agent/channels/runtime-health.ts'),
+          'utf8'
+        );
+        expect(health).toContain('resolveRuntimeHealthStatus');
+        expect(health).not.toMatch(/status:\s*['"]commissioned['"]/u);
+        expect(
+          existsSync(
+            join(destination, 'agent/lib/runtime-commissioning-health.ts')
+          )
+        ).toBe(true);
+        expect(
+          readFileSync(join(destination, 'scripts/check-built-app.mjs'), 'utf8')
+        ).toContain("status: 'uncommissioned'");
         if (identity === 'summer') {
           const contractDirectory = join(
             destination,

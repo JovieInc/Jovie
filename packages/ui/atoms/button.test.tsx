@@ -248,6 +248,25 @@ describe('Button', () => {
     }
   });
 
+  it('keeps text-link actions at the canonical 28px visible / 44px hit geometry', () => {
+    for (const size of ['sm', 'marketing', 'md', 'lg'] as const) {
+      const { unmount } = render(
+        <Button variant='link' size={size}>
+          Open Library
+        </Button>
+      );
+      const linkAction = screen.getByRole('button', { name: 'Open Library' });
+
+      expect(linkAction).toHaveClass('h-auto', 'min-h-7');
+      expect(linkAction.className).toContain('before:h-full');
+      expect(linkAction.className).toContain('before:min-h-11');
+      expect(linkAction.className).toContain('before:min-w-11');
+      expect(linkAction.className).not.toContain('before:hidden');
+      expect(linkAction.className).not.toMatch(/(?:^|\s)min-h-0(?:\s|$)/);
+      unmount();
+    }
+  });
+
   it('renders every entry in the server-safe button registry', () => {
     render(
       <>
