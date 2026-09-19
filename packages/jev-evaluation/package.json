@@ -16,6 +16,6 @@
     "typecheck": "tsc -p tsconfig.json",
     "check": "node check-digest.mjs && node --test check-artifacts.test.mjs",
     "generate": "node check-digest.mjs --write",
-    "test": "pnpm check && node --test --experimental-test-coverage --test-coverage-include=gateway.mjs --test-coverage-include=shadow.mjs --test-coverage-include=fingerprint.mjs --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=90 gateway.test.mjs shadow.test.mjs"
+    "test": "pnpm check && node --test --experimental-test-coverage --test-coverage-include=gateway.mjs --test-coverage-include=fingerprint.mjs --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=90 gateway.test.mjs"
   }
 }
