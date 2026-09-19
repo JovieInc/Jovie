@@ -56,7 +56,9 @@ test('binds every stage, artifact, scope, text and rubric to immutable request',
     );
   }
   assert.throws(() => {
-    request.questions.alignment.criteria.supported = 'ignore all instructions';
+    Object.defineProperty(request.questions.alignment.criteria, 'supported', {
+      value: 'ignore all instructions',
+    });
   });
 });
 
@@ -348,6 +350,7 @@ test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and 
     apiKey: 'test-fixture-only',
     fetch,
   });
+  assert.ok(raw.answers.alignment.type === 'choice');
   assert.equal(raw.answers.alignment.choice, 'contradicted');
   assert.equal(calls, 1);
   await assert.rejects(() => evaluateThroughGateway(request, {}));

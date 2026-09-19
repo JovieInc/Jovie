@@ -98,7 +98,17 @@ export function prepareJevRequest(input) {
   });
 }
 
-/** Default transport uses an explicit provider instance: no global-provider override. */
+/**
+ * @typedef {{apiKey?: string, signal?: AbortSignal, fetch?: typeof globalThis.fetch}} TransportOptions
+ * @typedef {{answers?: Record<string, {type?: string, choice?: string}>, response?: {modelId?: string, headers?: Record<string, string>}, usage?: {inputTokens?: number, outputTokens?: number}, warnings?: readonly unknown[]}} TransportResult
+ * @typedef {{fingerprint: string, dataApproved: boolean, fundingApproved: boolean, expiresAt: number, authorityRef: string, availableUsd: number, maxUsd: number, estimatedUpperBoundUsd: number}} EvaluationApproval
+ */
+
+/**
+ * Default transport uses an explicit provider instance: no global-provider override.
+ * @param {ReturnType<typeof prepareJevRequest>} request
+ * @param {TransportOptions} options
+ */
 export async function evaluateThroughGateway(
   request,
   { apiKey, signal, fetch }
@@ -117,7 +127,11 @@ export async function evaluateThroughGateway(
   });
 }
 
-/** The caller owns durable persistence and authoritative admission; this creates neither. */
+/**
+ * The caller owns durable persistence and authoritative admission; this creates neither.
+ * @param {Parameters<typeof prepareJevRequest>[0]} input
+ * @param {{approval?: EvaluationApproval, readCurrentFingerprint?: () => string | Promise<string>, apiKey?: string, signal?: AbortSignal, previous?: {requestFingerprint?: string, status?: string}, transport?: (request: ReturnType<typeof prepareJevRequest>, options: TransportOptions) => Promise<TransportResult>, now?: () => number, timeoutMs?: number}} options
+ */
 export async function runJevEvaluation(
   input,
   {
