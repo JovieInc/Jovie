@@ -73,6 +73,7 @@ async function pushToInstantlyIfEligible(
 
   try {
     const instantlyLeadId = await pushLeadToInstantly({
+      leadId,
       email: routedLead.contactEmail,
       firstName: routedLead.displayName ?? routedLead.linktreeHandle,
       claimLink: routeResult.claimUrl,

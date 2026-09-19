@@ -355,6 +355,7 @@ export async function processOutreachBatch(
       }
 
       const instantlyLeadId = await pushLeadToInstantly({
+        leadId: lead.id,
         email: lead.contactEmail,
         firstName: lead.displayName ?? lead.linktreeHandle,
         claimLink: getAppUrl(`/claim/${lead.claimToken}`),
