@@ -155,6 +155,140 @@ async function readRenderedHeroFontEvidence(page: PlaywrightPage) {
   }
 }
 
+async function readHeroFontSpecimen(page: PlaywrightPage) {
+  return page.evaluate(() => {
+    const headline = document.querySelector<HTMLElement>(
+      '.homepage-editorial-hero__headline'
+    );
+    if (!headline) throw new Error('Homepage hero headline missing');
+    const style = getComputedStyle(headline);
+    const fontSize = Number.parseFloat(style.fontSize);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    if (!Number.isFinite(fontSize) || !Number.isFinite(lineHeight)) {
+      throw new Error('Homepage hero font metrics are not numeric');
+    }
+    const strip = document.createElement('div');
+    strip.dataset.homepageFontSpecimen = 'true';
+    strip.style.cssText =
+      'position:absolute;left:-100000px;top:0;display:flex;flex-direction:column;visibility:hidden;pointer-events:none;white-space:nowrap;';
+    const variants = [
+      { viewport: 'desktop', fontSize: 80 },
+      { viewport: 'mobile', fontSize: 40 },
+    ] as const;
+    const weights = [400, 500, 600] as const;
+    for (const variant of variants) {
+      for (const weight of weights) {
+        const sample = document.createElement('span');
+        sample.dataset.fontWeight = String(weight);
+        sample.dataset.fontViewport = variant.viewport;
+        sample.textContent = headline.textContent ?? '';
+        sample.style.fontFamily = style.fontFamily;
+        sample.style.fontSize = `${variant.fontSize}px`;
+        sample.style.fontWeight = String(weight);
+        sample.style.lineHeight = String(lineHeight / fontSize);
+        sample.style.letterSpacing = style.letterSpacing;
+        strip.append(sample);
+      }
+    }
+    document.body.append(strip);
+    try {
+      return {
+        copy: headline.textContent ?? '',
+        fontFamily: style.fontFamily,
+        lineHeightRatio: lineHeight / fontSize,
+        letterSpacing: style.letterSpacing,
+        variants: Array.from(strip.children).map(sample => {
+          const bounds = sample.getBoundingClientRect();
+          return {
+            viewport: sample.getAttribute('data-font-viewport'),
+            fontSize: Number.parseFloat(getComputedStyle(sample).fontSize),
+            fontWeight: Number.parseInt(
+              sample.getAttribute('data-font-weight') ?? '0',
+              10
+            ),
+            width: bounds.width,
+            height: bounds.height,
+          };
+        }),
+      };
+    } finally {
+      strip.remove();
+    }
+  });
+}
+
+interface HeroActionVisual {
+  readonly backgroundColor: string;
+  readonly borderColor: string;
+  readonly color: string;
+  readonly boxShadow: string;
+  readonly transform: string;
+  readonly opacity: string;
+}
+
+async function readHeroActionVisual(
+  action: import('@playwright/test').Locator
+): Promise<HeroActionVisual> {
+  return action.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+      opacity: style.opacity,
+    };
+  });
+}
+
+async function sampleHeroActionVisual(
+  page: PlaywrightPage,
+  selector: string,
+  frames = 20
+): Promise<HeroActionVisual[]> {
+  return page.evaluate(
+    async ({ selector: targetSelector, frameCount }) => {
+      const element = document.querySelector<HTMLElement>(targetSelector);
+      if (!element) throw new Error('Hero action missing for visual sampling');
+      const read = (): HeroActionVisual => {
+        const style = getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          color: style.color,
+          boxShadow: style.boxShadow,
+          transform: style.transform,
+          opacity: style.opacity,
+        };
+      };
+      const samples = [read()];
+      for (let index = 0; index < frameCount; index += 1) {
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => resolve())
+        );
+        samples.push(read());
+      }
+      return samples;
+    },
+    { selector, frameCount: frames }
+  );
+}
+
+function hasHeroActionVisualDelta(
+  baseline: HeroActionVisual,
+  sample: HeroActionVisual
+): boolean {
+  return (
+    baseline.backgroundColor !== sample.backgroundColor ||
+    baseline.borderColor !== sample.borderColor ||
+    baseline.color !== sample.color ||
+    baseline.boxShadow !== sample.boxShadow ||
+    baseline.transform !== sample.transform ||
+    baseline.opacity !== sample.opacity
+  );
+}
+
 async function measureHeroAction(action: import('@playwright/test').Locator) {
   return action.evaluate(element => {
     const face = element.getBoundingClientRect();
@@ -267,16 +401,26 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('marketing-section-hero');
     const input = hero.getByPlaceholder('Search your name');
     const action = hero.getByRole('button', { name: 'Find me', exact: true });
+    const actionSelector = '[data-testid="homepage-primary-cta"]';
     await expect(input).toBeVisible();
     await expect(action).toBeEnabled();
 
     const fontEvidence = await readRenderedHeroFontEvidence(page);
+    const fontSpecimen = await readHeroFontSpecimen(page);
     await writeFile(
       testInfo.outputPath('homepage-hero-font-evidence.json'),
       JSON.stringify(fontEvidence, null, 2)
     );
     await testInfo.attach('homepage-hero-font-evidence.json', {
       path: testInfo.outputPath('homepage-hero-font-evidence.json'),
+      contentType: 'application/json',
+    });
+    await writeFile(
+      testInfo.outputPath('homepage-hero-font-specimen.json'),
+      JSON.stringify(fontSpecimen, null, 2)
+    );
+    await testInfo.attach('homepage-hero-font-specimen.json', {
+      path: testInfo.outputPath('homepage-hero-font-specimen.json'),
       contentType: 'application/json',
     });
     expect(fontEvidence.binding.fontStatus).toBe('loaded');
@@ -288,6 +432,18 @@ test.describe('Homepage', () => {
         font => font.isCustomFont && /satoshi/i.test(font.familyName)
       )
     ).toBe(true);
+    expect(fontSpecimen.copy).toBe('Control how the world sees you.');
+    expect(fontSpecimen.variants).toHaveLength(6);
+    expect(fontSpecimen.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ viewport: 'desktop', fontSize: 80 }),
+        expect.objectContaining({ viewport: 'mobile', fontSize: 40 }),
+      ])
+    );
+    for (const specimen of fontSpecimen.variants) {
+      expect(specimen.width).toBeGreaterThan(0);
+      expect(specimen.height).toBeGreaterThan(0);
+    }
 
     const baseline = await measureHeroAction(action);
     expect(baseline.faceHeight).toBeCloseTo(28, 0);
@@ -300,41 +456,71 @@ test.describe('Homepage', () => {
     expect(baseline.top).toBeGreaterThanOrEqual(baseline.field?.top ?? 0);
     expect(baseline.bottom).toBeLessThanOrEqual(baseline.field?.bottom ?? 0);
 
-    await action.focus();
-    await expect(action).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(input).toBeFocused();
+    for (const reducedMotion of [false, true]) {
+      await page.emulateMedia({
+        reducedMotion: reducedMotion ? 'reduce' : 'no-preference',
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+      const modeHero = page.getByTestId('marketing-section-hero');
+      const modeInput = modeHero.getByPlaceholder('Search your name');
+      const modeAction = modeHero.getByRole('button', {
+        name: 'Find me',
+        exact: true,
+      });
+      await expect(modeAction).toBeEnabled();
+      const stableBox = await modeAction.boundingBox();
+      const baselineVisual = await readHeroActionVisual(modeAction);
 
-    const stableBox = await action.boundingBox();
-    await action.hover();
-    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
-      true
-    );
-    await input.hover();
-    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
-      false
-    );
-    await action.hover();
-    expect(await action.evaluate(element => element.matches(':hover'))).toBe(
-      true
-    );
-    expect(await action.boundingBox()).toEqual(stableBox);
+      await modeAction.focus();
+      await expect(modeAction).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(modeInput).toBeFocused();
 
-    const pressedBox = await action.boundingBox();
-    if (!pressedBox) throw new Error('Hero action box missing');
-    await page.mouse.move(
-      pressedBox.x + pressedBox.width / 2,
-      pressedBox.y + pressedBox.height / 2
-    );
-    await page.mouse.down();
-    expect(await action.evaluate(element => element.matches(':active'))).toBe(
-      true
-    );
-    await page.mouse.up();
-    expect(await action.evaluate(element => element.matches(':active'))).toBe(
-      false
-    );
-    expect(await action.boundingBox()).toEqual(pressedBox);
+      await modeAction.hover();
+      expect(
+        await modeAction.evaluate(element => element.matches(':hover'))
+      ).toBe(true);
+      const hoverSamples = await sampleHeroActionVisual(page, actionSelector);
+      expect(
+        hoverSamples.some(sample =>
+          hasHeroActionVisualDelta(baselineVisual, sample)
+        )
+      ).toBe(true);
+      await modeInput.hover();
+      expect(
+        await modeAction.evaluate(element => element.matches(':hover'))
+      ).toBe(false);
+      const leaveSamples = await sampleHeroActionVisual(page, actionSelector);
+      expect(leaveSamples.at(-1)).toEqual(baselineVisual);
+
+      await modeAction.hover();
+      const pressedBox = await modeAction.boundingBox();
+      if (!pressedBox) throw new Error('Hero action box missing');
+      await page.mouse.move(
+        pressedBox.x + pressedBox.width / 2,
+        pressedBox.y + pressedBox.height / 2
+      );
+      await page.mouse.down();
+      expect(
+        await modeAction.evaluate(element => element.matches(':active'))
+      ).toBe(true);
+      const pressedSamples = await sampleHeroActionVisual(page, actionSelector);
+      expect(
+        pressedSamples.some(sample =>
+          hasHeroActionVisualDelta(baselineVisual, sample)
+        )
+      ).toBe(true);
+      await page.mouse.up();
+      expect(
+        await modeAction.evaluate(element => element.matches(':active'))
+      ).toBe(false);
+      await modeInput.hover();
+      expect(await modeAction.boundingBox()).toEqual(pressedBox);
+      expect(await modeAction.boundingBox()).toEqual(stableBox);
+      const releaseSamples = await sampleHeroActionVisual(page, actionSelector);
+      expect(releaseSamples.at(-1)).toEqual(baselineVisual);
+    }
 
     await action.evaluate(element => {
       (element as HTMLElement).style.fontSize = '40px';
