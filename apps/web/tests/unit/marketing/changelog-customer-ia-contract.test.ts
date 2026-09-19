@@ -25,11 +25,11 @@ describe('customer changelog IA contract', () => {
     expect(page).toContain('CustomerChangelogArchive');
     expect(page).not.toContain('ChangelogTimeline');
 
-    expect(signup).toContain('Get the good stuff');
-    expect(signup).toContain('Occasional meaningful updates');
+    expect(signup).toContain('Get product updates');
+    expect(signup).toContain('New features and improvements from Jovie.');
     expect(signup).not.toContain('Stay in the loop');
     expect(signup).not.toContain('changelog-reveal-button');
-    expect(signup.match(/Subscribe/g)?.length).toBe(1);
+    expect(signup.match(/Subscribe/g)?.length).toBe(2);
 
     expect(archive).toContain('Load Earlier Updates');
     expect(archive).not.toContain('Show 5');
