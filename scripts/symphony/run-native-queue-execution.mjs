@@ -394,3 +394,6 @@ process.stdout.write(
     decision: result.decision,
   })}\n`
 );
+
+// Delivery is incomplete until Summer accepts the correlated execution.
+if (result.status !== 'execution-recorded') process.exitCode = 1;
