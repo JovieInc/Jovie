@@ -693,6 +693,81 @@ fleet_hold_target_url() {
   printf '%s/%s/actions/runs/%s' "$server_url" "$REPO" "$run_id"
 }
 
+# Shared identity checks apply to both a live writer and historical receipts.
+# Lifecycle checks differ: a valid receipt survives its producer ending later.
+canonical_admission_run_has_identity() {  # <run-json> <run-id>
+  jq -e --arg repo "$REPO" --argjson run_id "$2" '
+    .id == $run_id and
+    (.run_attempt | type == "number" and floor == . and . >= 1) and
+    .name == "Merge Queue Auto-Enroll" and
+    .path == ".github/workflows/merge-queue-autoenroll.yml" and
+    .html_url == ("https://github.com/" + $repo + "/actions/runs/" + ($run_id | tostring)) and
+    .repository.full_name == $repo and .head_repository.full_name == $repo and
+    (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+    (.event | IN("pull_request", "push", "repository_dispatch", "workflow_dispatch", "workflow_run")) and
+    (.head_branch | type == "string" and length > 0) and
+    (.event == "pull_request" or .head_branch == "main")
+  ' <<<"$1" >/dev/null 2>&1
+}
+
+# A numeric run ID is a link, not authority. Re-read at both mutation boundaries.
+canonical_admission_producer_is_active() {
+  local run_id="${GITHUB_RUN_ID:-}" attempt="${GITHUB_RUN_ATTEMPT:-}" run
+  if [[ ! "$run_id" =~ ^[1-9][0-9]*$ || ! "$attempt" =~ ^[1-9][0-9]*$ \
+    || "${GITHUB_SERVER_URL:-https://github.com}" != "https://github.com" ]]; then
+    echo "::error::Canonical admission requires an exact workflow run and attempt" >&2
+    return 1
+  fi
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")"; then
+    echo "::error::Canonical admission producer identity is unavailable" >&2
+    return 1
+  fi
+  if ! canonical_admission_run_has_identity "$run" "$run_id" \
+    || ! jq -e --argjson attempt "$attempt" '
+      .run_attempt == $attempt and .status == "in_progress" and .conclusion == null
+    ' <<<"$run" >/dev/null 2>&1; then
+    echo "::error::Refusing admission from an inactive or noncanonical workflow producer" >&2
+    return 1
+  fi
+}
+
+canonical_admission_run_is_complete() {  # <run-json>
+  jq -e '
+    try (
+      type == "object" and (.id | type == "number") and
+      (.run_attempt | type == "number") and has("conclusion") and
+      (.conclusion == null or (.conclusion | type == "string")) and
+      ([.name, .path, .html_url, .repository.full_name, .head_repository.full_name,
+        .head_sha, .head_branch, .event, .status] | all(.[]; type == "string")) and
+      (.created_at | fromdateiso8601 | type == "number") and
+      (.updated_at | fromdateiso8601 | type == "number")
+    ) catch false
+  ' <<<"$1" >/dev/null 2>&1
+}
+
+# Return 2 for unavailable evidence: an API outage must not evict valid members.
+canonical_admission_receipt_has_provenance() {  # <status-json> [enqueued-at]
+  local receipt="$1" run_id run
+  run_id="$(jq -r '.target_url | split("/") | last' <<<"$receipt")"
+  [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || return 1
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id")" \
+    || ! canonical_admission_run_is_complete "$run"; then
+    echo "::error::Canonical admission receipt producer evidence is unavailable" >&2
+    return 2
+  fi
+  canonical_admission_run_has_identity "$run" "$run_id" || return 1
+  jq -e --argjson receipt "$receipt" --arg enqueued_at "${2:-}" '
+    ($receipt.updated_at | fromdateiso8601) as $receipt_at |
+    (if $enqueued_at == "" then $receipt_at else ($enqueued_at | fromdateiso8601) end) as $admitted_at |
+    (.created_at | fromdateiso8601) as $created_at |
+    (.updated_at | fromdateiso8601) as $updated_at |
+    $created_at <= $admitted_at and $updated_at >= $created_at and
+    ((.status == "in_progress" and .conclusion == null) or
+      (.status == "completed" and $updated_at >= $receipt_at and
+        (.conclusion | IN("action_required", "cancelled", "failure", "neutral", "skipped", "stale", "startup_failure", "success", "timed_out"))))
+  ' <<<"$run" >/dev/null 2>&1
+}
+
 waiting_lane_allows_clean_enroll() {
   case "$DRAIN_PROMOTION_MODE" in
     normal | hold-intake | draft-only) return 0 ;;
@@ -726,8 +801,13 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
   fi
   target_url="https://github.com/$REPO/actions/runs/$run_id"
   status_url="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/statuses/$head"
-  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)" \
-    || ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
+  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)"; then
+    return 2
+  fi
+  if ! jq -e 'type == "object" and (.login | type == "string") and (.type | type == "string") and (.avatar_url | type == "string")' <<<"$app_identity" >/dev/null 2>&1; then
+    return 2
+  fi
+  if ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
       select(.login == $login and .type == "Bot") | .avatar_url
     ' <<<"$app_identity" 2>/dev/null)"; then
     return 1
@@ -740,7 +820,15 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
     return 1
   fi
   if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id" 2>/dev/null)"; then
-    return 1
+    return 2
+  fi
+  if ! jq -e 'type == "object" and (.id | type == "number") and (.name | type == "string") and (.path | type == "string")' <<<"$run" >/dev/null 2>&1; then
+    return 2
+  fi
+  if jq -e '.context == "jovie-queue-admission/v2"' <<<"$status" >/dev/null \
+    && { ! canonical_admission_run_is_complete "$run" \
+      || ! jq -e '.workflow_id | type == "number"' <<<"$run" >/dev/null; }; then
+    return 2
   fi
   jq -e \
     --arg run_id "$run_id" \
@@ -888,8 +976,10 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
   # The combined /status response omits creator even for authentic bot writes.
   # Read plural statuses so manual/main-triggered admission retains its actual
   # author instead of requiring the producer's main SHA to equal the PR SHA.
-  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)"; then
-    return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)" \
+    || ! jq -e 'type == "array" and length > 0 and all(.[]; type == "array")' <<<"$statuses" >/dev/null 2>&1; then
+    echo "::error::Canonical admission status evidence is unavailable" >&2
+    return 2
   fi
   latest="$(jq -c \
     --arg context "$QUEUE_REENTRY_CONTEXT" \
@@ -935,9 +1025,11 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
   if jq -e --arg actor "$FLEET_HOLD_APP_USER" '
     .creator.type == "Bot" and .creator.login == $actor
   ' <<<"$latest" >/dev/null; then
-    return 0
+    canonical_admission_receipt_has_provenance "$latest" "$enqueued_at"
+    return $?
   fi
-  null_creator_receipt_has_provenance "$head" "$latest"
+  null_creator_receipt_has_provenance "$head" "$latest" || return $?
+  canonical_admission_receipt_has_provenance "$latest" "$enqueued_at"
 }
 
 controller_repair_queue_receipt_is_recoverable() {  # <pr> <head>
@@ -997,6 +1089,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <en
     echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
     return 0
   fi
+  canonical_admission_producer_is_active || return 1
   if ! target_url="$(fleet_hold_target_url)"; then
     echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
     return 1
@@ -1015,6 +1108,9 @@ record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <en
   # and never reuse a receipt predating this particular admission.
   if queue_reentry_receipt_is_recoverable "$n" "$expected_head" "$target_url" "" "$enqueued_at"; then
     reuse=1
+  else
+    local receipt_result=$?
+    [[ "$receipt_result" -ne 2 ]] || return 1
   fi
   # Caller token identity does not prove who created observed membership.
   if ! node scripts/merge-queue-backend.mjs prove-admission \
@@ -1724,6 +1820,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    canonical_admission_producer_is_active || return 1
     if ! enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       if ! dequeue_strict "$n"; then
@@ -2467,6 +2564,12 @@ if [[ "${DRAIN_RECONCILE_ADMISSION_RECEIPTS:-0}" == "1" ]]; then
       "$n" "$expected_head" "" "$FLEET_POLICY_MAIN_SHA" "$enqueued_at"; then
       echo "  #$n  =fresh exact-checkpoint native admission"
       continue
+    else
+      receipt_result=$?
+      if [[ "$receipt_result" -eq 2 ]]; then
+        echo "::error::Cannot reconcile admission for #$n without producer evidence; preserving membership" >&2
+        exit 1
+      fi
     fi
     echo "  #$n  stale or missing exact-checkpoint admission; canonical dequeue"
     if ! dequeue_strict "$n" "$expected_head"; then
