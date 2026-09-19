@@ -168,6 +168,12 @@ QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
 QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-1-test'
 git -C "$SEED" push -q origin "$QUEUE_HEAD:$QUEUE_REF"
 
+# GitHub deletes the queue ref when it destroys a superseded merge group. A
+# dedicated ref models that deletion without disturbing the live-queue
+# scenarios below.
+SUPERSEDED_QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-9-superseded'
+git -C "$SEED" push -q origin "$QUEUE_HEAD:$SUPERSEDED_QUEUE_REF"
+
 # GitHub can create a merge-group child whose committer timestamp predates a
 # newly advanced queue base. TruffleHog 3.97.1's go-git traversal then walks
 # below the base into a shallow boundary and silently scans zero bytes. Keep a
@@ -538,6 +544,36 @@ status=0
 [[ $status -ne 0 ]] || fail 'a superseded pull request source ref must fail closed'
 grep -q 'current ref moved' "$TEST_ROOT/stale.output" \
   || fail 'superseded pull request source ref lacks explicit classification'
+
+# A merge group destroyed between checkout and the freshness probe has already
+# lost its queue ref (GitHub deletes refs/heads/gh-readonly-queue/* with the
+# group), leaving nothing alive to gate. The dead run must neutralize with an
+# explicit notice instead of failing closed on the vanished ref — the spurious
+# red in merge_group run 35315530383. The pull-request source ref above stays
+# fail-closed on the same probe.
+SUPERSEDED_QUEUE_DIR="$TEST_ROOT/superseded-queue"
+git init -q "$SUPERSEDED_QUEUE_DIR"
+git -C "$SUPERSEDED_QUEUE_DIR" remote add origin "file://$ORIGIN"
+git -C "$SUPERSEDED_QUEUE_DIR" fetch -q --depth=1 origin "$SUPERSEDED_QUEUE_REF"
+git -C "$SUPERSEDED_QUEUE_DIR" checkout -q --detach FETCH_HEAD
+git --git-dir="$ORIGIN" update-ref -d "$SUPERSEDED_QUEUE_REF"
+status=0
+(
+  cd "$SUPERSEDED_QUEUE_DIR"
+  "$RANGE_SCRIPT" "$BASE_SHA" "$QUEUE_HEAD" "$SUPERSEDED_QUEUE_REF" \
+    "$QUEUE_HEAD" ''
+) >"$TEST_ROOT/superseded-queue.output" 2>&1 || status=$?
+[[ $status -eq 0 ]] || fail 'a deleted merge-group queue ref must neutralize the dead run'
+grep -q '::notice::merge-group run superseded; queue ref deleted' \
+  "$TEST_ROOT/superseded-queue.output" \
+  || fail 'superseded merge-group run lacks the explicit neutral notice'
+if grep -q '::error' "$TEST_ROOT/superseded-queue.output"; then
+  fail 'superseded merge-group run must not emit an error classification'
+fi
+if git -C "$SUPERSEDED_QUEUE_DIR" show-ref --verify --quiet \
+  refs/secret-scan/exact-base; then
+  fail 'superseded merge-group run must not publish a scan base'
+fi
 
 # A matching fork-safe pull head ref cannot bless a synthetic merge whose
 # second parent is not that exact source.
