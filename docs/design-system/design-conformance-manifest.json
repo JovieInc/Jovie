@@ -32,7 +32,7 @@
     {
       "id": "atom.button",
       "state": "source-bound",
-      "revision": 10,
+      "revision": 11,
       "platforms": ["web"],
       "source": "packages/ui/atoms/button.tsx",
       "contractSource": "packages/ui/atoms/button-contract.ts",
@@ -40,7 +40,7 @@
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
-      "sourceDigest": "6560a9f588bc381555854e4599e82ca9c25bc1adeaac30b28b901056868f8688"
+      "sourceDigest": "99965bcf60343fc7598d4f6b49c2d195c8a39f956d2ba35a8bdf67efd7b5cad8"
     },
     {
       "id": "atom.input",

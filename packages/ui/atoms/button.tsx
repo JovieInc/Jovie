@@ -20,7 +20,7 @@ import { Spinner } from './spinner';
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover) active:opacity-90',
+    'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover) active:opacity-90 transition-[box-shadow,transform]',
   secondary:
     'border-0 bg-btn-secondary text-btn-secondary-foreground shadow-none hover:bg-(--color-btn-secondary-hover)',
   tertiary:

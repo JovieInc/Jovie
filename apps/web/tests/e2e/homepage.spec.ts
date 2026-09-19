@@ -224,6 +224,7 @@ interface HeroActionVisual {
   readonly boxShadow: string;
   readonly transform: string;
   readonly opacity: string;
+  readonly transitionProperty: string;
 }
 
 async function readHeroActionVisual(
@@ -238,6 +239,7 @@ async function readHeroActionVisual(
       boxShadow: style.boxShadow,
       transform: style.transform,
       opacity: style.opacity,
+      transitionProperty: style.transitionProperty,
     };
   });
 }
@@ -258,6 +260,7 @@ async function readHeroActionVisualAfterFrame(
       boxShadow: style.boxShadow,
       transform: style.transform,
       opacity: style.opacity,
+      transitionProperty: style.transitionProperty,
     };
   }, selector);
 }
@@ -486,6 +489,18 @@ test.describe('Homepage', () => {
       await expect(modeAction).toBeEnabled();
       const stableBox = await modeAction.boundingBox();
       const baselineVisual = await readHeroActionVisual(modeAction);
+      if (reducedMotion) {
+        expect(baselineVisual.transitionProperty).toBe('none');
+      } else {
+        expect(baselineVisual.transitionProperty).toContain('box-shadow');
+        expect(baselineVisual.transitionProperty).toContain('transform');
+        expect(baselineVisual.transitionProperty).not.toContain('opacity');
+        expect(baselineVisual.transitionProperty).not.toContain(
+          'background-color'
+        );
+        expect(baselineVisual.transitionProperty).not.toContain('border-color');
+        expect(baselineVisual.transitionProperty).not.toContain('color');
+      }
 
       await modeAction.focus();
       await expect(modeAction).toBeFocused();
@@ -500,6 +515,9 @@ test.describe('Homepage', () => {
         page,
         actionSelector
       );
+      expect(hasHeroActionVisualDelta(baselineVisual, hoverFirstFrame)).toBe(
+        true
+      );
       await page.waitForTimeout(220);
       const hoverSettled = await readHeroActionVisual(modeAction);
       expect(hasHeroActionVisualDelta(baselineVisual, hoverSettled)).toBe(true);
@@ -511,6 +529,7 @@ test.describe('Homepage', () => {
         page,
         actionSelector
       );
+      expect(sameHeroActionVisual(leaveFirstFrame, baselineVisual)).toBe(true);
       await page.waitForTimeout(220);
       const leaveSettled = await readHeroActionVisual(modeAction);
       expect(leaveSettled).toEqual(baselineVisual);
@@ -533,6 +552,9 @@ test.describe('Homepage', () => {
         page,
         actionSelector
       );
+      expect(
+        hasHeroActionVisualDelta(pressedHoverSettled, pressedFirstFrame)
+      ).toBe(true);
       await page.waitForTimeout(220);
       const pressedSettled = await readHeroActionVisual(modeAction);
       // Compare against settled hover so hover cannot masquerade as press
@@ -546,12 +568,16 @@ test.describe('Homepage', () => {
         await modeAction.evaluate(element => element.matches(':active'))
       ).toBe(false);
       await modeInput.hover();
-      expect(await modeAction.boundingBox()).toEqual(pressedBox);
-      expect(await modeAction.boundingBox()).toEqual(stableBox);
       const releaseFirstFrame = await readHeroActionVisualAfterFrame(
         page,
         actionSelector
       );
+      expect(sameHeroActionVisual(releaseFirstFrame, baselineVisual)).toBe(
+        true
+      );
+      await page.waitForTimeout(220);
+      expect(await modeAction.boundingBox()).toEqual(pressedBox);
+      expect(await modeAction.boundingBox()).toEqual(stableBox);
       await page.waitForTimeout(220);
       const releaseSettled = await readHeroActionVisual(modeAction);
       expect(releaseSettled).toEqual(baselineVisual);
