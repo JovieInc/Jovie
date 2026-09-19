@@ -335,6 +335,95 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     vi.restoreAllMocks();
   });
 
+  it('opens the exact counted review set and keeps unmeasured inventory separate during an outage', async () => {
+    const user = userEvent.setup();
+    const base = data.rows[0];
+    if (base?.rowType !== 'surface') throw new Error('Missing surface fixture');
+    renderWorkspace({
+      ...data,
+      providerAvailable: false,
+      rows: [
+        {
+          ...base,
+          id: 'review-a',
+          label: 'Ambiguous A',
+          platform: 'instagram',
+          qualificationStatus: 'suggested',
+          monitoringState: 'locked',
+          rank: null,
+        },
+        {
+          ...base,
+          id: 'review-b',
+          label: 'Ambiguous B',
+          platform: 'instagram',
+          qualificationStatus: 'conflicting',
+        },
+        {
+          ...base,
+          id: 'measured-later',
+          label: 'Known Page',
+          rank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+    expect(
+      screen.getByRole('button', { name: 'Review Pages (2)' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    expect(within(table).queryByText('Known Page')).not.toBeInTheDocument();
+    expect(within(table).getAllByText('Instagram')).toHaveLength(2);
+    await user.click(screen.getByText('Ambiguous A'));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    const rail = render(
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
+    );
+    expect(
+      screen.getByRole('link', { name: 'Inspect Source' })
+    ).toHaveAttribute('href', base.url);
+    expect(
+      screen.queryByRole('link', { name: 'Upgrade' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Review' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Identity confirmation is not yet available here/)
+    ).toBeInTheDocument();
+    rail.unmount();
+    await user.click(screen.getByRole('button', { name: 'All Pages' }));
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
+      4
+    );
+    expect(screen.getByText('Known Page')).toBeInTheDocument();
+    expect(screen.queryByText('Up to Date')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Identity Outcome' }));
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
+      4
+    );
+    expect(
+      within(screen.getByTestId('presence-outcomes')).getByText('3 Pages')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Search Outcome' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('retains a useful inventory destination when the review queue is empty', async () => {
+    renderWorkspace(data);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Review Pages (0)' }));
+    expect(
+      screen.getByText('No Pages Awaiting Identity Review')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'All Pages' }));
+    expect(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    ).toBeInTheDocument();
+  });
+
   it('uses the canonical empty state with a direct artist-profile action', () => {
     renderWorkspace(null);
 
@@ -397,8 +486,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(within(outcomes).getByText('Catalog')).toBeInTheDocument();
     expect(within(outcomes).getByText('Search')).toBeInTheDocument();
     expect(within(outcomes).getByText('#2')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Not Measured')).toBeInTheDocument();
-    expect(screen.getByTestId('presence-photo-strip')).toBeInTheDocument();
+    expect(within(outcomes).getByText('0 Pages')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('presence-photo-strip')
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
 
     // JOV-6170: presence outcomes group by artist goal, not raw type.
@@ -430,7 +521,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(spotifyRow as HTMLElement)
         .getAllByText('Limit Reached')
-        .some(element => element.classList.contains('sr-only'))
+        .some(element => !element.classList.contains('sr-only'))
     ).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: /^Profiles$/ }));
@@ -458,7 +549,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('renders one recommendation primitive per suggested-qualification surface', async () => {
+  it('renders one explanation per suggested identity without a duplicate recommendation', async () => {
     renderWorkspace({
       ...data,
       rows: [
@@ -490,8 +581,8 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const signalList = screen.getByTestId('presence-signal-list');
     // Suggested qualification: recommendation primitive at its own weight.
     expect(
-      within(signalList).getByTestId('presence-signal-recommendation')
-    ).toHaveTextContent('Qualify This Page');
+      within(signalList).queryByTestId('presence-signal-recommendation')
+    ).not.toBeInTheDocument();
     expect(
       within(signalList).getByTestId('presence-signal-finding')
     ).toHaveTextContent('Needs Qualification');
@@ -1009,20 +1100,15 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(
       screen.getByRole('columnheader', { name: 'Monitoring' })
-    ).toHaveClass('max-2xl:hidden');
+    ).toHaveClass('hidden', '2xl:table-cell');
     expect(screen.getByTestId('connections-workspace-toolbar')).toHaveClass(
       'min-h-10',
       'px-3',
       'py-1.5'
     );
     expect(
-      screen.getByRole('columnheader', { name: 'Status / Issue' })
-    ).toHaveTextContent('Status / Issue');
-    expect(
-      within(
-        screen.getByRole('columnheader', { name: 'Status / Issue' })
-      ).getByText('Status / Issue')
-    ).toHaveClass('sr-only');
+      screen.getByRole('columnheader', { name: 'Status' })
+    ).toHaveTextContent('Status');
     expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
   });
 
