@@ -581,7 +581,7 @@ Zod-validated environment variables. Never use `process.env` directly.
 
 For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 
-- **Node 22 + pnpm 9.15.4** -- verify before any command
+- **Node 24 + pnpm 9.15.4** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
 - **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers
