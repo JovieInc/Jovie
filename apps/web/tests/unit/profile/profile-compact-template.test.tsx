@@ -2248,4 +2248,24 @@ describe('ProfileCompactTemplate', () => {
       restoreViewport();
     });
   });
+
+  it('forwards the proof-to-claim footer onto the public layout shell', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        showClaimFooter
+        claimFooterHref='/waitlist?campaign=proof-to-claim'
+        claimFooterLabel='Request access'
+        proofClaim
+      />
+    );
+
+    const cta = screen.getByTestId('profile-claim-footer-cta');
+    expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
+    expect(cta).toHaveTextContent('Request access');
+    expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
 });

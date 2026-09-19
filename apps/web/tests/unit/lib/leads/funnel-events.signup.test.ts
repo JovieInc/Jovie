@@ -488,24 +488,35 @@ describe('signup and activation receipt durability', () => {
 
 function createPaidConversionStore(options?: {
   failFirstEventWrite?: boolean;
+  proofAttributed?: boolean;
 }) {
   const leadState = {
     id: 'lead_123',
     paidAt: null as Date | null,
     paidSubscriptionId: null as string | null,
   };
-  const recordedEvents: Array<{ eventType: string; leadId: string }> = [];
+  const recordedEvents: Array<{
+    eventType: string;
+    leadId: string;
+    campaignKey?: string | null;
+  }> = [];
   let eventWriteAttempts = 0;
 
-  mockDbSelect.mockImplementation(() =>
-    createSelectChain([
-      {
-        id: leadState.id,
-        paidAt: leadState.paidAt,
-        paidSubscriptionId: leadState.paidSubscriptionId,
-      },
-    ])
-  );
+  mockDbSelect.mockImplementation((fields: Record<string, unknown>) => {
+    if ('paidAt' in fields || 'paidSubscriptionId' in fields) {
+      return createSelectChain([
+        {
+          id: leadState.id,
+          paidAt: leadState.paidAt,
+          paidSubscriptionId: leadState.paidSubscriptionId,
+        },
+      ]);
+    }
+
+    return createSelectChain(
+      options?.proofAttributed ? [{ id: 'evt_proof_to_claim' }] : []
+    );
+  });
   mockDbUpdate.mockImplementation(() => ({
     set: vi.fn((values: { paidAt?: Date; paidSubscriptionId?: string }) => ({
       where: vi.fn().mockImplementation(async () => {
@@ -516,25 +527,32 @@ function createPaidConversionStore(options?: {
     })),
   }));
   mockDbInsert.mockImplementation(() => ({
-    values: vi.fn((row: { eventType: string; leadId: string }) => ({
-      onConflictDoNothing: vi.fn().mockImplementation(async () => {
-        eventWriteAttempts += 1;
-        if (options?.failFirstEventWrite && eventWriteAttempts === 1) {
-          throw new Error('injected event-write failure');
-        }
-        if (
-          !recordedEvents.some(
-            event =>
-              event.leadId === row.leadId && event.eventType === row.eventType
-          )
-        ) {
-          recordedEvents.push({
-            leadId: row.leadId,
-            eventType: row.eventType,
-          });
-        }
-      }),
-    })),
+    values: vi.fn(
+      (row: {
+        eventType: string;
+        leadId: string;
+        campaignKey?: string | null;
+      }) => ({
+        onConflictDoNothing: vi.fn().mockImplementation(async () => {
+          eventWriteAttempts += 1;
+          if (options?.failFirstEventWrite && eventWriteAttempts === 1) {
+            throw new Error('injected event-write failure');
+          }
+          if (
+            !recordedEvents.some(
+              event =>
+                event.leadId === row.leadId && event.eventType === row.eventType
+            )
+          ) {
+            recordedEvents.push({
+              leadId: row.leadId,
+              eventType: row.eventType,
+              campaignKey: row.campaignKey,
+            });
+          }
+        }),
+      })
+    ),
   }));
 
   return { leadState, recordedEvents };
@@ -560,9 +578,35 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     expect(leadState.paidAt).toBeInstanceOf(Date);
     expect(leadState.paidSubscriptionId).toBe('sub_happy');
     expect(recordedEvents).toEqual([
-      { leadId: 'lead_123', eventType: 'paid_converted' },
+      {
+        leadId: 'lead_123',
+        eventType: 'paid_converted',
+        campaignKey: 'premade-artist-profile',
+      },
     ]);
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('records proof-to-claim activation without rewriting paid_converted campaign', async () => {
+    const { recordedEvents } = createPaidConversionStore({
+      proofAttributed: true,
+    });
+    const { attributeLeadPaidConversionByAppUserId } = leadFunnelEventsApi;
+
+    await attributeLeadPaidConversionByAppUserId('user_123', 'sub_proof');
+
+    expect(recordedEvents).toEqual([
+      {
+        leadId: 'lead_123',
+        eventType: 'paid_converted',
+        campaignKey: 'premade-artist-profile',
+      },
+      {
+        leadId: 'lead_123',
+        eventType: 'activation',
+        campaignKey: 'proof-to-claim',
+      },
+    ]);
   });
 
   it('reconciles a missing paid_converted event after an injected write failure', async () => {
@@ -593,7 +637,11 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     expect(leadState.paidAt).toBeInstanceOf(Date);
     expect(leadState.paidSubscriptionId).toBe('sub_retry');
     expect(recordedEvents).toEqual([
-      { leadId: 'lead_123', eventType: 'paid_converted' },
+      {
+        leadId: 'lead_123',
+        eventType: 'paid_converted',
+        campaignKey: 'premade-artist-profile',
+      },
     ]);
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
   });
@@ -603,15 +651,17 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
       id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
       clerkId: 'ba:better_auth_123',
     };
-    mockDbSelect.mockImplementationOnce(() =>
-      createSelectChain([
-        {
-          id: 'lead_123',
-          paidAt: null,
-          paidSubscriptionId: null,
-        },
-      ])
-    );
+    mockDbSelect
+      .mockImplementationOnce(() =>
+        createSelectChain([
+          {
+            id: 'lead_123',
+            paidAt: null,
+            paidSubscriptionId: null,
+          },
+        ])
+      )
+      .mockImplementationOnce(() => createSelectChain([]));
     const insertValues = vi.fn(() => ({
       onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
     }));
@@ -623,7 +673,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
       'sub_better_auth'
     );
 
-    expect(mockDbSelect).toHaveBeenCalledOnce();
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockDbUpdate).toHaveBeenCalledOnce();
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -660,7 +710,8 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
             paidSubscriptionId: null,
           },
         ])
-      );
+      )
+      .mockImplementationOnce(() => createSelectChain([]));
     const insertValues = vi.fn(() => ({
       onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
     }));
@@ -672,7 +723,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
       'sub_legacy'
     );
 
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(mockDbSelect).toHaveBeenCalledTimes(3);
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         leadId: 'lead_legacy',

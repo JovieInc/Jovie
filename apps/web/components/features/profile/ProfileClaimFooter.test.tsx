@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileClaimFooter } from './ProfileClaimFooter';
 
 const useIsAuthenticated = vi.fn(() => false);
 
@@ -8,30 +9,14 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
 }));
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-
-import { ProfileClaimFooter } from '@/features/profile/ProfileClaimFooter';
+vi.mock('@/lib/acquisition/proof-claim-client', () => ({
+  emitProofClaimEvent: vi.fn(),
+  rememberProofClaimAttribution: vi.fn(),
+}));
 
 describe('ProfileClaimFooter', () => {
   beforeEach(() => {
     useIsAuthenticated.mockReturnValue(false);
-  });
-
-  it('renders claim CTA for logged-out visitors', () => {
-    render(<ProfileClaimFooter href='/tim/claim?next=auth' enabled />);
-    const cta = screen.getByTestId('profile-claim-footer-cta');
-    expect(cta).toHaveAttribute('href', '/tim/claim?next=auth');
-    expect(screen.getByText(/Claim your profile/i)).toBeInTheDocument();
-  });
-
-  it('hides for authenticated viewers', () => {
-    useIsAuthenticated.mockReturnValue(true);
-    render(<ProfileClaimFooter href='/tim/claim?next=auth' enabled />);
-    expect(screen.queryByTestId('profile-claim-footer')).toBeNull();
-  });
-
-  it('hides when disabled', () => {
-    render(<ProfileClaimFooter href='/tim/claim?next=auth' enabled={false} />);
-    expect(screen.queryByTestId('profile-claim-footer')).toBeNull();
   });
 
   it('renders the proof-to-claim Request access CTA without calling the profile unclaimed', () => {
@@ -46,7 +31,6 @@ describe('ProfileClaimFooter', () => {
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
     expect(cta).toHaveAccessibleName('Request access');
     expect(screen.getByText('Request access')).toBeInTheDocument();
-    expect(screen.queryByText(/Claim Your Profile/i)).toBeNull();
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
   });
 });

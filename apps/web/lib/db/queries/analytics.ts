@@ -1,4 +1,4 @@
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, lte } from 'drizzle-orm';
 import { computeCaptureRate } from '@/lib/analytics/metrics';
 import {
   RECENT_ACTIVITY_RANGE,
@@ -14,6 +14,7 @@ import {
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import type {
   AnalyticsRange,
@@ -449,4 +450,43 @@ export async function hasReleaseClickAnalytics(
   );
 
   return result.rows?.[0]?.has_analytics === true;
+}
+
+/**
+ * Canonical `profile_views` for a public profile handle.
+ *
+ * Formula matches CANONICAL_METRICS.profile_views in lib/analytics/metrics.ts:
+ * SUM(daily_profile_views.view_count) for the creator profile, optionally
+ * bounded by view_date. Callers outside this query file must not aggregate
+ * daily_profile_views themselves.
+ */
+export async function getCanonicalProfileViews(input: {
+  readonly handle: string;
+  readonly start?: Date;
+  readonly end?: Date;
+}): Promise<number> {
+  const conditions = [eq(creatorProfiles.username, input.handle)];
+  if (input.start) {
+    conditions.push(
+      gte(dailyProfileViews.viewDate, input.start.toISOString().slice(0, 10))
+    );
+  }
+  if (input.end) {
+    conditions.push(
+      lte(dailyProfileViews.viewDate, input.end.toISOString().slice(0, 10))
+    );
+  }
+
+  const [row] = await db
+    .select({
+      views: drizzleSql<number>`coalesce(sum(${dailyProfileViews.viewCount}), 0)`,
+    })
+    .from(dailyProfileViews)
+    .innerJoin(
+      creatorProfiles,
+      eq(dailyProfileViews.creatorProfileId, creatorProfiles.id)
+    )
+    .where(and(...conditions));
+
+  return Number(row?.views ?? 0);
 }
