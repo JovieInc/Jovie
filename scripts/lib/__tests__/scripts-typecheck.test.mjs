@@ -293,7 +293,7 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
       prefix: 'scripts-typecheck',
       tsconfig: resolve(options.directory, 'tsconfig.json'),
       updateCommand: 'pnpm run typecheck:scripts:update',
-      nodeVersion: 'v22.23.1',
+      nodeVersion: 'v24.21.0',
       exit: code => {
         exits.push(code);
       },
