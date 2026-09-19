@@ -473,6 +473,42 @@ const marketingRoutes = [
     contentSelector: 'main',
     performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
   },
+  {
+    path: APP_ROUTES.COMPARE,
+    name: 'Compare Hub',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.ALTERNATIVES,
+    name: 'Alternatives Hub',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/compare/[slug]',
+    name: 'Compare Detail',
+    kind: 'dynamic',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1, main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/alternatives/[slug]',
+    name: 'Alternatives Detail',
+    kind: 'dynamic',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1, main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
 const legalRoutes = [
