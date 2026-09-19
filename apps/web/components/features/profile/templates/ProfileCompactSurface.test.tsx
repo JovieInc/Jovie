@@ -168,6 +168,19 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
+  it('uses pearlQuiet top chrome without IconButton restyle classes', () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    renderSurface({ allowSignedInEscape: true });
+
+    const back = screen.getByRole('button', { name: 'Back' });
+    const menu = screen.getByRole('button', { name: 'Menu' });
+
+    expect(back).not.toHaveClass('profile-top-chrome-icon');
+    expect(menu).not.toHaveClass('profile-top-chrome-icon');
+    expect(back).toHaveClass('bg-transparent', 'text-primary-token/78');
+    expect(menu).toHaveClass('bg-transparent', 'text-primary-token/78');
+  });
+
   it('shows the back control on the public profile root for a signed-in session', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
     const onBack = vi.fn();
@@ -268,5 +281,24 @@ describe('ProfileCompactSurface', () => {
       'data-profile-home-mode'
     );
     expect(listenSurface).not.toHaveAttribute('data-profile-overflow-mode');
+  });
+
+  it('keeps the home hero and content regions in the responsive layout contract', () => {
+    renderSurface();
+
+    expect(screen.getByTestId('profile-cover')).toHaveClass(
+      'profile-home-fluid-hero',
+      'profile-home-fluid-hero--no-media',
+      'shrink-0'
+    );
+    expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
+      'profile-home-content-scroll',
+      'min-h-0',
+      'flex-1',
+      'flex',
+      'flex-col',
+      'overflow-y-auto',
+      'overscroll-contain'
+    );
   });
 });

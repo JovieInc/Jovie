@@ -468,17 +468,14 @@ export function ProfileCompactSurface({
     renderMode === 'preview' || !renderSemanticHeading ? 'p' : 'h1';
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
-  const topChromeButtonClassName =
-    'profile-top-chrome-icon text-white dark:text-white';
   // The 20px glyph sits inside an explicit 44×44 target. Targets participate
   // in the identity grid normally so adjacent social actions never overlap.
   const socialIconClassName =
     'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  // Composition rule: the home hero has one definite token-driven height
-  // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
-  // never shrink-wraps — the old short-viewport min-h-0/flex-none band
-  // collapse is gone. Media crops via object-cover, never squashes; the
-  // carousel below owns the remaining viewport height.
+  // Composition rule: the home media slot has one definite token-driven
+  // height (clamp(220px, 34svh, 400px)) on every viewport. The in-flow identity
+  // band follows that slot, media crops via object-cover, and the carousel owns
+  // the remaining viewport height.
   const heroHeightClassName = isHomeMode
     ? resolvedHeroImageUrl
       ? 'h-(--cover-height) shrink-0'
@@ -687,7 +684,6 @@ export function ProfileCompactSurface({
                   onClick={onBack}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
                   <ChevronLeft className='h-5 w-5' />
@@ -717,7 +713,6 @@ export function ProfileCompactSurface({
                   onClick={onOpenMenu}
                   size='lg'
                   variant='pearlQuiet'
-                  className={topChromeButtonClassName}
                   ariaLabel='Menu'
                 >
                   {/* The drawer is an overflow menu (Share / Pay / Contact), so
@@ -787,7 +782,7 @@ export function ProfileCompactSurface({
                           className='h-3.5 w-3.5 shrink-0 text-white/58'
                           aria-hidden='true'
                         />
-                        <span className='shrink-0 whitespace-nowrap'>
+                        <span className='min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere] md:truncate md:whitespace-nowrap md:wrap-normal'>
                           {locationLabel}
                         </span>
                       </>
