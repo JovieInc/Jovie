@@ -152,10 +152,7 @@ describe('artists directory catalog (JOV-6260)', () => {
       new Set(['artist', 'non-artist'])
     );
 
-    expect(profiles.map(profile => profile.username)).toEqual(
-      ['tim'],
-      new Set(['artist', 'non-artist'])
-    );
+    expect(profiles.map(profile => profile.username)).toEqual(['tim']);
   });
 
   it('drops claimed public placeholders whose display name equals the handle', () => {
