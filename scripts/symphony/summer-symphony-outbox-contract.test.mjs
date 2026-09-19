@@ -249,7 +249,14 @@ describe('Summer Symphony consumer contract foundation', () => {
                       },
                     ],
                   },
-                  parent: { id: 'parent-id', identifier: 'JOV-5853' },
+                  parent: {
+                    id: 'parent-id',
+                    identifier: 'JOV-5853',
+                    children: {
+                      nodes: [],
+                      pageInfo: { hasNextPage: false, endCursor: null },
+                    },
+                  },
                   issues: { nodes: [] },
                 },
           })
