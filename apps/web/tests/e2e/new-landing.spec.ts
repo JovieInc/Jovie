@@ -40,7 +40,7 @@ test.describe('/new landing page', () => {
     ).toHaveAttribute('href', APP_ROUTES.ARTISTS);
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
-    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
+    ).toHaveAttribute('href', APP_ROUTES.PRODUCT);
     await expect(
       headerNav.getByRole('button', { name: 'For', exact: true })
     ).toHaveCount(0);

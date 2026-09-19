@@ -307,6 +307,14 @@
   --linear-body-lg-size-lg: 17px;
 }
 
+/* Shared marketing hero backdrop. Class-owned consumption of the
+   grandfathered token so new hero surfaces (e.g. /product) render it
+   without adding new --linear-* identities (JOV-5466 namespace ratchet
+   is shrink-only; identity ratchet is per-file). */
+.marketing-hero-backdrop {
+  background: var(--linear-hero-backdrop);
+}
+
 /* ============================================
    DARK MODE OVERRIDES
    Only color tokens change — typography, spacing,

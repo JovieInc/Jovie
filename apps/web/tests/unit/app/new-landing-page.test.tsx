@@ -66,7 +66,7 @@ describe('NewLandingPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/artist-profiles'
+      '/product'
     );
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
