@@ -4,6 +4,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
+function toAbsolutePublicUrl(href: string): string {
+  if (href.startsWith('https://') || href.startsWith('http://')) {
+    return href;
+  }
+  return `${BASE_URL}${href}`;
+}
+
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
  * Copy comes from the existing launch document — this is not a redesign.
@@ -21,8 +28,8 @@ export function buildHomepageMarkdown(): string {
 
 ${hero.subhead}
 
-${hero.primaryCta.label}: ${BASE_URL}${hero.primaryCta.href}
-${hero.secondaryCta.label}: ${BASE_URL}${hero.secondaryCta.href}
+${hero.primaryCta.label}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
+${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
 
 ## ${workspace.kicker}
 

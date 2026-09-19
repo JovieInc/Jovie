@@ -8,6 +8,7 @@ import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockAttributeLeadPaidConversionByAppUserId,
   mockCaptureCriticalError,
+  mockEnqueuePaidWelcomeAfterEntitlement,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
@@ -64,6 +65,13 @@ describe('@critical SubscriptionHandler - Created', () => {
     // Should not use fallback when metadata is present
     expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();
     expect(mockLogFallback).not.toHaveBeenCalled();
+    expect(mockEnqueuePaidWelcomeAfterEntitlement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appUserId: 'app_user_test',
+        clerkUserId: 'user_abc123',
+        subscription: expect.objectContaining({ id: 'sub_created_123' }),
+      })
+    );
   });
 
   it('falls back to customer ID lookup when metadata is missing', async () => {

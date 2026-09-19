@@ -15,6 +15,7 @@
 
 import type Stripe from 'stripe';
 
+import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { activateReferral } from '@/lib/referrals/service';
@@ -143,6 +144,13 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
 
       // Secondary revenue attribution always uses the canonical app UUID.
       await tryActivateReferral(result.appUserId);
+
+      enqueuePaidWelcomeAfterEntitlement({
+        appUserId: result.appUserId,
+        clerkUserId: userId,
+        subscription,
+        plan: result.plan,
+      });
 
       // JOV-6166: paid_converted is required. Swallowing here returned 200 to
       // Stripe after JOV-6129, so retries never ran and funnel metrics stayed

@@ -38,5 +38,10 @@
     "typeRoots": ["../apps/web/node_modules/@types"]
   },
   "include": ["**/*.mjs", "**/*.mts", "**/*.ts", "**/*.cts"],
-  "exclude": ["node_modules", "__pycache__", "**/node_modules"]
+  "exclude": [
+    "node_modules",
+    "__pycache__",
+    "**/node_modules",
+    "invariants/fixtures/done-sprint-invariants"
+  ]
 }

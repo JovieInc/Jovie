@@ -409,6 +409,8 @@ test.describe('Profile Modes @smoke @critical', () => {
       { mode: 'about', path: 'about' },
       { mode: 'contact', path: 'contact' },
       { mode: 'tour', path: 'tour' },
+      { mode: 'tour', path: 'shows' },
+      { mode: 'tour', path: 'events' },
     ] as const;
 
     for (const deepLink of deepLinks) {

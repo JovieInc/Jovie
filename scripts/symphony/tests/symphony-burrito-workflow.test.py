@@ -265,6 +265,132 @@ class DispatchAdmissionTests(unittest.TestCase):
             self.assertEqual(result.returncode, code, result.stderr)
             self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
 
+    def test_admission_object_is_typed_and_mode_scoped(self):
+        # symphony-dispatch-admission/v1: flat machine keys stay first-class,
+        # per-mode sub-objects carry typed evidence, and a held admission
+        # never leaks the other mode's fields.
+        admitted = self.check(self.payload())
+        self.assertEqual(admitted["schema"], "symphony-dispatch-admission/v1")
+        self.assertEqual(admitted["reason"], "dispatch-gate-prerequisite-passed")
+        self.assertEqual(admitted["mode"], "new-work")
+        self.assertEqual(admitted["productId"], "jovie")
+        self.assertEqual(admitted["maxConcurrent"], 1)
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["newIssueLeaseAllowed"])
+        self.assertTrue(admitted["newWork"]["newImplementationAllowed"])
+        self.assertNotIn("existingRepair", admitted)
+
+        repair = self.check(self.payload(), mode="existing-pr-repair")
+        self.assertTrue(repair["allowed"])
+        self.assertEqual(repair["existingRepair"]["authority"], "single-pr-writer-exact-head")
+        self.assertIn("isolated-pr-repair", repair["existingRepair"]["activities"])
+        self.assertFalse(repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", repair)
+        # The typed repair sub-object may carry pushAllowed; the top level
+        # must not (legacy contract).
+        self.assertNotIn("pushAllowed", repair)
+
+    def test_held_admissions_carry_typed_evidence_not_other_modes_fields(self):
+        # Red closure holds BOTH modes; each response carries the closure
+        # projection and only its own mode's fields when evaluated.
+        # Issue-blocked red passes the closure verdict (per-product feed
+        # semantics) but still closes new work at the workAdmission gate.
+        red = self.payload("red")
+        held_new = self.check(red, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertEqual(held_new["newWork"]["productNewIssueLeaseAllowed"], False)
+        self.assertFalse(held_new["newWork"]["newIssueLeaseAllowed"])
+        self.assertNotIn("existingRepair", held_new)
+        # Repair admission survives the same red closure (remediation is
+        # liveness), and carries only the typed repair evidence.
+        held_repair = self.check(red, "existing-pr-repair")
+        self.assertTrue(held_repair["allowed"])
+        self.assertFalse(held_repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", held_repair)
+        self.assertNotIn("pushAllowed", held_repair)
+
+        # A systems-down closure reason passes the closure verdict (the
+        # deliberate valid_reasons contract keeps repair alive on red
+        # closure); new work still closes at the new-work gate, not at the
+        # verdict, because the fixture's workAdmission intake flags are
+        # closed for red status.
+        systems_down = self.payload("red")
+        systems_down["signals"]["closureHealth"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        systems_down["closureAdmission"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        held_new = self.check(systems_down, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertNotIn("existingRepair", held_new)
+        repair_survives = self.check(systems_down, "existing-pr-repair")
+        self.assertTrue(repair_survives["allowed"])
+
+        # A structurally invalid receipt (stale beyond the fail-closed window)
+        # holds BOTH modes at the verdict with the typed closure projection
+        # and no mode fields at all.
+        stale = self.payload()
+        stale["observedAt"] = "2020-01-01T00:00:00Z"
+        held_both = self.check(stale, "new-work")
+        self.assertFalse(held_both["allowed"])
+        self.assertEqual(held_both["reason"], "fleet-gate-receipt-stale")
+        self.assertEqual(held_both["closureHealth"]["holdReason"], "fleet-gate-receipt-stale")
+        self.assertNotIn("newWork", held_both)
+        self.assertNotIn("existingRepair", held_both)
+        held_both_repair = self.check(stale, "existing-pr-repair")
+        self.assertFalse(held_both_repair["allowed"])
+        self.assertNotIn("existingRepair", held_both_repair)
+        self.assertNotIn("newWork", held_both_repair)
+
+        # Missing file / invalid mode stay fail-closed typed skeletons.
+        self.path.unlink()
+        missing = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")
+        self.assertEqual(missing["schema"], "symphony-dispatch-admission/v1")
+        self.assertFalse(missing["allowed"])
+        self.assertEqual(missing["reason"], "dispatch-gate-invalid")
+        bad_mode = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="not-a-product")
+        self.assertFalse(bad_mode["allowed"])
+        self.assertEqual(bad_mode["reason"], "dispatch-gate-invalid")
+        self.assertEqual(bad_mode["productId"], "not-a-product")
+
+    def test_new_work_projection_matches_decision_on_omitted_product_map(self):
+        # A fleet receipt without productNewIssueLeaseAllowed admits by
+        # omission (the decision's product_ok); the typed projection must
+        # mirror that, never contradict an allowed admission with False.
+        payload = self.payload()
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True}
+        admitted = self.check(payload)
+        self.assertTrue(admitted["allowed"])
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["productNewIssueLeaseAllowed"])
+
+        # An explicit empty product map is NOT omission: the product flag
+        # reads False from the map itself.
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True,
+                                    "productNewIssueLeaseAllowed": {}}
+        closed = self.check(payload)
+        self.assertFalse(closed["allowed"])
+        self.assertEqual(closed["reason"], "new-work-admission-closed")
+        self.assertFalse(closed["newWork"]["productNewIssueLeaseAllowed"])
+
+    def test_capacity_unproven_admission_carries_typed_capacity_evidence(self):
+        payload = self.payload()
+        payload["concurrency"] = {"gem": {"maxConcurrent": 0, "evidenceAccepted": False,
+                                          "newMutationAllowed": False}}
+        unproven = self.check(payload)
+        self.assertFalse(unproven["allowed"])
+        self.assertEqual(unproven["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(unproven["capacity"],
+                         {"evidenceAccepted": False, "newMutationAllowed": False,
+                          "maxConcurrent": 0})
+        self.assertNotIn("newWork", unproven)
+        # Malformed concurrency block degrades to the same typed shape.
+        payload["concurrency"] = "garbage"
+        degraded = self.check(payload)
+        self.assertEqual(degraded["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(degraded["capacity"]["maxConcurrent"], None)
+
 
 class OfficialSymphonyContractTests(unittest.TestCase):
     def test_shutdown_drains_child_output_for_parent_and_group_signals(self):
@@ -1721,6 +1847,160 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "linear_api_status=200 issue_identifier=JOV-4195", now=now
             )
         )
+        # JOV-5822: query-class refresh 400 is not a per-issue dead-letter.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "event=issue_state_refresh_failed linear_api_status=400 "
+                "issue_identifier=JOV-4195 attempt=3 running=0",
+                now=now,
+            )
+        )
+
+    def test_issue_state_refresh_failed_storm_never_dead_letters(self):
+        helper = _load_helper()
+        lines = "".join(
+            "event=issue_state_refresh_failed linear_api_status=400 "
+            f"issue_identifier=JOV-4195 attempt={attempt} running=0\n"
+            for attempt in range(1, 6)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            result = subprocess.run(
+                _runtime_command(["run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ]),
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse((dead / "JOV-4195.json").exists())
+            self.assertNotIn("issue_dead_letter", result.stdout)
+
+    def test_linear_issue_state_refresh_avoids_project_slug_400_class(self):
+        helper = _load_helper()
+        uuid = "11111111-2222-3333-4444-555555555555"
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=[])
+        )
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=["", "  "])
+        )
+        with self.assertRaises(ValueError) as first_zero:
+            helper.build_linear_issue_state_refresh_request(
+                issue_ids=[uuid], page_size=0
+            )
+        self.assertIn("page_size must be positive", str(first_zero.exception))
+        with self.assertRaises(ValueError) as identifier:
+            helper.build_linear_issue_state_refresh_request(issue_ids=["JOV-5822"])
+        self.assertIn(
+            "linear_issue_state_refresh_identifier_not_id:JOV-5822",
+            str(identifier.exception),
+        )
+        with self.assertRaises(ValueError):
+            helper.build_linear_issue_state_refresh_request(team_key="jov")
+        payload = helper.build_linear_issue_state_refresh_request(
+            issue_ids=[uuid, uuid.upper(), ""]
+        )
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["operationName"], "SymphonyLinearTeamIssuesById")
+        self.assertIn("team: {key: {eq: $teamKey}}", payload["query"])
+        self.assertNotIn("projectSlug", payload["query"])
+        self.assertNotIn("project_slug", payload["query"])
+        self.assertEqual(payload["variables"]["teamKey"], helper.OFFICIAL_TEAM_KEY)
+        self.assertEqual(payload["variables"]["ids"], [uuid])
+        self.assertEqual(payload["variables"]["first"], 1)
+        self.assertNotIn("projectSlug", payload["variables"])
+        self.assertNotIn("projectId", payload["variables"])
+        self.assertGreater(payload["variables"]["first"], 0)
+
+        calls = []
+
+        class FakeResponse:
+            status = 200
+            headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {
+                        "data": {
+                            "issues": {
+                                "nodes": [
+                                    {
+                                        "id": uuid,
+                                        "identifier": "JOV-5822",
+                                        "state": {"name": "In Progress"},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ).encode("utf-8")
+
+        def fake_urlopen(request, timeout):
+            del timeout
+            calls.append(json.loads(request.data.decode("utf-8")))
+            return FakeResponse()
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fake_urlopen):
+            empty = helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[])
+            refreshed = helper.refresh_linear_issue_states(
+                api_key="lin_test", issue_ids=[uuid]
+            )
+
+        self.assertEqual(empty, {"kind": "skipped", "reason": "empty_running", "issues": []})
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("projectSlug", calls[0]["variables"])
+        self.assertEqual(calls[0]["variables"]["teamKey"], "JOV")
+        self.assertEqual(refreshed["kind"], "refreshed")
+        self.assertEqual(refreshed["issues"][0]["identifier"], "JOV-5822")
+        self.assertEqual(
+            helper.official_symphony_release_tag(),
+            "symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_bin_infix(),
+            "dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_release_tag("v0.0.2-jovie.2"),
+            "v0.0.2-jovie.2",
+        )
+
+        error = helper.urllib.error.HTTPError(
+            "https://api.linear.app/graphql",
+            400,
+            "Bad Request",
+            {"Content-Type": "application/json"},
+            io.BytesIO(b'{"errors":[{"extensions":{"code":"INPUT_ERROR"}}]}'),
+        )
+
+        def fail_urlopen(request, timeout):
+            del request, timeout
+            raise error
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fail_urlopen):
+            with self.assertRaises(RuntimeError) as http_400:
+                helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[uuid])
+        self.assertIn(
+            "linear_issue_state_refresh_http_status:400",
+            str(http_400.exception),
+        )
 
     def test_linear_429_storm_never_dead_letters(self):
         helper = _load_helper()
@@ -1802,7 +2082,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER)
+        self.assertIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"',
+            UPDATER,
+        )
+        self.assertIn("symphony_release_tag", UPDATER)
+        self.assertIn("symphony-build-", UPDATER)
+        self.assertNotIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER
+        )
         self.assertIn("sha256", UPDATER)
         self.assertIn("symphony-elixir.service", UPDATER)
         self.assertNotIn("enable symphony-burrito.service", UPDATER)
@@ -1826,6 +2114,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
+        self.assertIn(
+            "RELEASE_TAG symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+            dry.stdout,
+        )
+        self.assertIn(
+            "symphony-dae31f823850c9ef2dea121433e5b60f09af26fa-linux_x86_64",
+            dry.stdout,
+        )
+        self.assertNotIn("v0.0.2-jovie.2", dry.stdout)
         self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)

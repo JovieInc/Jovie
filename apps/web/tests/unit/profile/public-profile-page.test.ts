@@ -20,6 +20,7 @@ import { PublicProfileErrorState } from '@/app/[username]/_components/PublicProf
 import {
   getLegacyProfileModeRedirectHref,
   getProfileModeRedirectHref,
+  LEGACY_PROFILE_MODE_BY_SLUG,
 } from '@/app/[username]/_lib/mode-route-redirect';
 import {
   getProfileModeSubtitle,
@@ -913,26 +914,25 @@ describe('profile mode route redirects', () => {
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
 
-    expect(afterFiles.slice(0, 12)).toEqual(
-      ['listen', 'music', 'releases', 'subscribe', 'tip', 'tour'].flatMap(
-        alias => [
-          {
-            source: `/:username/${alias}`,
-            has: [
-              {
-                type: 'query',
-                key: 'source',
-                value: '^(?<profileSource>link|qr)$',
-              },
-            ],
-            destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
-          },
-          {
-            source: `/:username/${alias}`,
-            destination: `/:username/${alias}/__profile-mode-alias/resolve`,
-          },
-        ]
-      )
+    const aliasSlugs = Object.keys(LEGACY_PROFILE_MODE_BY_SLUG);
+    expect(afterFiles.slice(0, aliasSlugs.length * 2)).toEqual(
+      aliasSlugs.flatMap(alias => [
+        {
+          source: `/:username/${alias}`,
+          has: [
+            {
+              type: 'query',
+              key: 'source',
+              value: '^(?<profileSource>link|qr)$',
+            },
+          ],
+          destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
+        },
+        {
+          source: `/:username/${alias}`,
+          destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+        },
+      ])
     );
   });
 
@@ -1013,10 +1013,26 @@ describe('profile mode route redirects', () => {
     ['subscribe', 'subscribe'],
     ['tip', 'pay'],
     ['tour', 'tour'],
+    ['shows', 'tour'],
+    ['events', 'tour'],
   ] as const)('maps the missing %s slug to %s mode', (slug, mode) => {
     expect(
       getLegacyProfileModeRedirectHref('dualipa', slug, { source: 'qr' })
     ).toBe(`/dualipa?mode=${mode}&source=qr`);
+  });
+
+  it('keeps the proxy duplicate-source allowlist aligned with alias slugs', () => {
+    const proxySource = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
+    const aliasBlock = proxySource.match(
+      /const LEGACY_PROFILE_MODE_ALIASES = new Set\(\[([\s\S]*?)\]\)/
+    )?.[1];
+    expect(aliasBlock).toBeTruthy();
+    const proxyAliases = [...(aliasBlock?.matchAll(/'([^']+)'/g) ?? [])].map(
+      match => match[1]
+    );
+    expect(proxyAliases.sort()).toEqual(
+      Object.keys(LEGACY_PROFILE_MODE_BY_SLUG).sort()
+    );
   });
 
   it('leaves arbitrary content slugs to the smart-link route', () => {

@@ -1125,6 +1125,18 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('rejects an all-zero source SHA before signing', async () => {
+    const response = await POST(
+      request({ ...validSnapshot(), sourceVersion: '0'.repeat(40) })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_bottleneck_snapshot',
+    });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['stale', '2026-09-04T19:44:59.999Z'],
     ['future', '2026-09-04T20:01:00.001Z'],

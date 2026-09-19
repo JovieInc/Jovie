@@ -263,16 +263,19 @@ describe('robots.ts — production behavior', () => {
   it.each([
     ['undefined (fail-safe default)', undefined],
     ['empty string', ''],
-  ])('VERCEL_ENV=%s never emits a global Disallow: /', async (_label, vercelEnv) => {
-    const robots = await importRobots(vercelEnv);
-    const result = robots();
-    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const disallows = allDisallows(rules);
+  ])(
+    'VERCEL_ENV=%s never emits a global Disallow: /',
+    async (_label, vercelEnv) => {
+      const robots = await importRobots(vercelEnv);
+      const result = robots();
+      const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+      const disallows = allDisallows(rules);
 
-    // The bare '/' disallow blocks everything — it must never appear in
-    // any production rule for any user-agent.
-    expect(disallows).not.toContain('/');
-  });
+      // The bare '/' disallow blocks everything — it must never appear in
+      // any production rule for any user-agent.
+      expect(disallows).not.toContain('/');
+    }
+  );
 
   it('includes sitemap URL pointing to /sitemap.xml', async () => {
     const robots = await importRobots(undefined);
@@ -311,20 +314,39 @@ describe('robots.ts — production behavior', () => {
     expect(disallows).toContain('/api/');
   });
 
-  it.each(
-    REQUIRED_AI_CRAWLERS
-  )('explicitly allows AI crawler "%s" in production', async crawler => {
+  it('does not hide GSC recovery roots from recrawl', async () => {
+    const { getSitemapExcludedPublicPaths } = await import(
+      '@/lib/seo/public-url-policy'
+    );
     const robots = await importRobots(undefined);
     const result = robots();
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const agentNames = rules.flatMap(r => {
-      const ua = (r as { userAgent?: string | string[] }).userAgent;
-      return Array.isArray(ua) ? ua : ua ? [ua] : [];
-    });
-    expect(agentNames, `missing AI crawler rule: ${crawler}`).toContain(
-      crawler
-    );
+    const disallows = allDisallows(rules);
+
+    for (const path of [...getSitemapExcludedPublicPaths(), '/you']) {
+      expect(
+        disallows,
+        `robots must still allow recrawl of ${path}`
+      ).not.toContain(path);
+      expect(disallows).not.toContain(`${path}/`);
+    }
   });
+
+  it.each(REQUIRED_AI_CRAWLERS)(
+    'explicitly allows AI crawler "%s" in production',
+    async crawler => {
+      const robots = await importRobots(undefined);
+      const result = robots();
+      const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+      const agentNames = rules.flatMap(r => {
+        const ua = (r as { userAgent?: string | string[] }).userAgent;
+        return Array.isArray(ua) ? ua : ua ? [ua] : [];
+      });
+      expect(agentNames, `missing AI crawler rule: ${crawler}`).toContain(
+        crawler
+      );
+    }
+  );
 
   it('AI crawler rules allow / and /llms.txt and do not globally block all paths', async () => {
     const robots = await importRobots(undefined);
@@ -362,18 +384,21 @@ describe('robots.ts — preview/staging behavior', () => {
   it.each([
     ['preview', 'preview'],
     ['development', 'development'],
-  ])('VERCEL_ENV=%s blocks all crawlers with Disallow: /', async (_label, vercelEnv) => {
-    const robots = await importRobots(vercelEnv);
-    const result = robots();
-    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const disallows = allDisallows(rules);
+  ])(
+    'VERCEL_ENV=%s blocks all crawlers with Disallow: /',
+    async (_label, vercelEnv) => {
+      const robots = await importRobots(vercelEnv);
+      const result = robots();
+      const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+      const disallows = allDisallows(rules);
 
-    expect(rules).toHaveLength(1);
-    expect(
-      disallows,
-      `VERCEL_ENV=${vercelEnv} must block all crawlers`
-    ).toContain('/');
-  });
+      expect(rules).toHaveLength(1);
+      expect(
+        disallows,
+        `VERCEL_ENV=${vercelEnv} must block all crawlers`
+      ).toContain('/');
+    }
+  );
 
   it('VERCEL_ENV=preview emits no sitemap', async () => {
     const robots = await importRobots('preview');

@@ -2859,10 +2859,11 @@ JSON
         assert heads["1003"] not in result.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
 
+    @pytest.mark.parametrize("released_hold", [False, True])
     def test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations(
-        self, tmp_path: Path
+        self, tmp_path: Path, released_hold: bool
     ) -> None:
-        """Each native enqueued event advances one bounded missed-admission cohort."""
+        """Native events and released-hold clock wakes recover bounded exact heads."""
         heads = {
             "1001": "d" * 40,
             "1002": "e" * 40,
@@ -2882,6 +2883,9 @@ JSON
                 f"""\\
                 #!/usr/bin/env bash
                 set -euo pipefail
+                if [[ "${{1:-}}" == "-e" ]]; then
+                  exec "{real_node}" "$@"
+                fi
                 queued_json() {{
                   if grep -qx -- "$1" "{enrolled}"; then
                     printf true
@@ -2998,13 +3002,44 @@ JSON
         )
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
 
+        admission_env = f"DRAIN_ADMISSION_PR=1001 DRAIN_ADMISSION_HEAD={heads['1001']} "
+        if released_hold:
+            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            held = _run_bash(
+                _drain_command(
+                    tmp_path,
+                    backend="native",
+                    extra_env=(
+                        "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                        "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                        "DRAIN_RELEASE_WAVE_HOLD=1 "
+                        "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                        f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                        "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    ),
+                )
+            )
+            assert held.returncode == 0, f"stdout={held.stdout}\nstderr={held.stderr}"
+            assert "new native enrollment/re-entry is deferred" in held.stdout
+            assert enrolled.read_text(encoding="utf-8") == ""
+            # The later clock wake has no PR payload and no auto-merge intent.
+            # It must recover fresh eligible heads after expiry, not bypass it.
+            admission_env = (
+                "DRAIN_RELEASE_WAVE_HOLD=1 "
+                "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                "DRAIN_RELEASE_WAVE_EXPIRES_AT=2000-01-01T00:00:00Z "
+                "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+            )
+
         first = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
                 extra_env=(
-                    f"DRAIN_ADMISSION_PR=1001 DRAIN_ADMISSION_HEAD={heads['1001']} "
-                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    admission_env
+                    + "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
                     "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
                     "GITHUB_RUN_ID=78 GITHUB_SERVER_URL=https://github.com"
                 ),
@@ -3015,7 +3050,11 @@ JSON
         assert "bounded exact-head native admission" in first.stdout
         assert "exact missed admission at " + heads["1002"] in first.stdout
         assert "reached total exact admission cap (2)" in first.stdout
-        assert "exact missed admission at " + heads["1001"] not in first.stdout
+        if released_hold:
+            assert "Release-wave admission hold expired" in first.stdout
+            assert "exact missed admission at " + heads["1001"] in first.stdout
+        else:
+            assert "exact missed admission at " + heads["1001"] not in first.stdout
         assert "exact missed admission at " + heads["1003"] not in first.stdout
         assert "exact missed admission at " + heads["1004"] not in first.stdout
         assert "exact missed admission at " + heads["1005"] not in first.stdout
@@ -3732,12 +3771,19 @@ JSON
         assert "(0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
-    @pytest.mark.parametrize("closure_status", ["healthy", "grace"])
+    @pytest.mark.parametrize(
+        ("closure_status", "intake_allowed"),
+        [
+            ("healthy", True),
+            ("grace", False),
+            ("grace", True),
+            ("red", True),
+        ],
+    )
     def test_hold_intake_accepts_canonical_closure_statuses(
-        self, tmp_path: Path, closure_status: str
+        self, tmp_path: Path, closure_status: str, intake_allowed: bool
     ) -> None:
         queued_head = "8" * 40
-        intake_allowed = closure_status == "healthy"
         receipt = _production_unbound_hold_receipt(
             closure_status=closure_status,
             intake_allowed=intake_allowed,
@@ -3791,8 +3837,6 @@ JSON
         [
             ("green", True),
             ("healthy", False),
-            ("grace", True),
-            ("red", True),
         ],
     )
     def test_hold_intake_rejects_retired_or_contradictory_closure_receipts(

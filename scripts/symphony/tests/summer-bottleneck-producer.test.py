@@ -115,7 +115,8 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(signals["queue"]["eligibleCleanPrs"], 4)
         self.assertEqual(signals["release"]["productionSha"], PRODUCTION_SHA)
         self.assertEqual(signals["runner"]["queuedWork"], 2)
-        self.assertIsNone(signals["closure"]["blockedSince"])
+        self.assertEqual(signals["closure"]["blockedSince"], "2026-09-05T19:29:00Z")
+        self.assertEqual(signals["release"]["blockedSince"], "2026-09-05T19:29:00Z")
         self.assertEqual(
             signals["runner"]["capacitySource"]["sourceRevision"], MAIN_SHA
         )
@@ -141,6 +142,44 @@ class ProducerTests(unittest.TestCase):
             snapshot["signals"]["closure"]["blockedSince"],
             "2026-09-05T16:31:49Z",
         )
+
+    def test_stamps_fleet_observation_when_adverse_signals_lack_blocked_since(self):
+        fleet, runtime = sources()
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        fleet_at = "2026-09-05T19:29:00Z"
+        self.assertEqual(snapshot["signals"]["closure"]["blockedSince"], fleet_at)
+        self.assertEqual(snapshot["signals"]["release"]["blockedSince"], fleet_at)
+
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["status"] = "healthy"
+        fleet["signals"]["production"]["deployedSha"] = MAIN_SHA
+        healthy = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertIsNone(healthy["signals"]["closure"]["blockedSince"])
+        self.assertIsNone(healthy["signals"]["release"]["blockedSince"])
+
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["blockedSince"] = "2026-09-05T18:10:00Z"
+        fleet["signals"]["production"]["blockedSince"] = "2026-09-05T17:40:00Z"
+        preserved = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(
+            preserved["signals"]["closure"]["blockedSince"],
+            "2026-09-05T18:10:00Z",
+        )
+        self.assertEqual(
+            preserved["signals"]["release"]["blockedSince"],
+            "2026-09-05T17:40:00Z",
+        )
+
+    def test_compose_rejects_all_zero_main_sha_when_mirror_is_unavailable(self):
+        fleet, runtime = sources()
+        fleet["signals"]["main"]["sha"] = "0" * 40
+        with mock.patch.dict(
+            MODULE.os.environ,
+            {"JOVIE_CONFIGURATION_SOURCE_ROOT": "/no/such/jovie.mirror.git"},
+            clear=False,
+        ):
+            with self.assertRaisesRegex(ValueError, "main-sha-unavailable"):
+                MODULE.compose_snapshot(fleet, runtime, NOW)
 
     def test_semantically_unchanged_source_keeps_event_id(self):
         left = MODULE.compose_snapshot(*sources(), NOW)

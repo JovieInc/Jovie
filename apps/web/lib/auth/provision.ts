@@ -93,10 +93,13 @@ export async function provisionAppUser(
 
     // 3. Insert a new app user with the same waitlist-derived status gate.ts
     //    assigns to brand-new users (shared determineUserStatus).
-    const [waitlistGateEnabled, waitlistAccess] = await Promise.all([
-      isWaitlistGateEnabled(),
-      getWaitlistAccess(email),
-    ]);
+    // JOV-6449: waitlist rows are irrelevant when the gate is off. Reading
+    // them in parallel used to fail M2 provisioning (and the next post-auth
+    // route) on an unrelated waitlist query error.
+    const waitlistGateEnabled = await isWaitlistGateEnabled();
+    const waitlistAccess = waitlistGateEnabled
+      ? await getWaitlistAccess(email)
+      : { entryId: null, status: null };
     const approvedEntryId = isWaitlistApprovedStatus(waitlistAccess.status)
       ? (waitlistAccess.entryId ?? undefined)
       : undefined;

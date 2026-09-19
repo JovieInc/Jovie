@@ -90,8 +90,13 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
     expect(freePlan?.monthlyPriceUsd).toBe(0);
   });
 
-  it('all signup hrefs include a plan query param', () => {
+  it('self-serve signup hrefs include a plan query param; Max is contact sales', () => {
     for (const plan of CANONICAL_PLANS) {
+      if (plan.id === 'max') {
+        expect(plan.signupHref).toBe('mailto:support@jov.ie');
+        expect(plan.signupHref).not.toContain('plan=max');
+        continue;
+      }
       expect(
         plan.signupHref,
         `Plan "${plan.id}" signupHref must include ?plan= so onboarding can read intent`
@@ -168,8 +173,14 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
     }
   });
 
-  it('all signup hrefs include a plan query param', () => {
+  it('self-serve CTAs carry plan intent; Max is contact sales', () => {
     for (const plan of MARKETING_PRICING_PLANS) {
+      expect(getMarketingPlanHref(plan.id)).toBe(plan.ctaHref);
+      if (plan.id === 'max') {
+        expect(plan.ctaHref).toBe('mailto:support@jov.ie');
+        expect(plan.ctaHref).not.toContain('plan=max');
+        continue;
+      }
       expect(
         plan.ctaHref,
         `Marketing plan "${plan.id}" ctaHref must include ?plan= so onboarding can read intent`
@@ -179,7 +190,6 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
       expect(resolveCanonicalPlanId(signupUrl.searchParams.get('plan'))).toBe(
         plan.id
       );
-      expect(getMarketingPlanHref(plan.id)).toBe(plan.ctaHref);
     }
   });
 

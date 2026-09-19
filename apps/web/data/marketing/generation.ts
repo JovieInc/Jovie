@@ -4,13 +4,20 @@
  * The pipeline separates product truth, narrative, copy, section design,
  * asset generation, and review so no stage approves or silently rewrites its
  * own work. Model selection is capability-based; model names never belong in
- * a page recipe or generation request.
+ * a page recipe or generation request. Asset generation embeds Scene Palette
+ * v1 plus the approved dark-glass / flowing-accent media recipes.
  */
 
 import {
   formatJovieImageColorPolicyForPrompt,
   JOVIE_IMAGE_COLOR_POLICY,
 } from './imageColorPolicy';
+import {
+  formatMarketingMediaRecipesForPrompt,
+  JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
+  JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_RECIPE_IDS,
+} from './mediaRecipes';
 
 export const MARKETING_GENERATION_SPEC_VERSION = '1.0.0';
 
@@ -94,11 +101,29 @@ export const MARKETING_ASSET_GENERATION_COLOR_CONTRACT = {
   gateIds: ['asset-consent', 'visual-review'] as const,
 } as const;
 
+export const MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT = {
+  stage: 'asset-generation',
+  policySchema: JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
+  policyVersion: JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  approvedRecipeIds: MARKETING_MEDIA_RECIPE_IDS,
+  promptBlock: formatMarketingMediaRecipesForPrompt(),
+  gateIds: ['asset-consent', 'visual-review', 'design-system'] as const,
+} as const;
+
 export const MARKETING_VISUAL_REVIEW_COLOR_CONTRACT = {
   stage: 'adversarial-review',
   policySchema: JOVIE_IMAGE_COLOR_POLICY.schema,
   policyVersion: JOVIE_IMAGE_COLOR_POLICY.version,
   promptBlock: formatJovieImageColorPolicyForPrompt(),
+  reviewsStage: 'asset-generation',
+} as const;
+
+export const MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT = {
+  stage: 'adversarial-review',
+  policySchema: JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
+  policyVersion: JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  approvedRecipeIds: MARKETING_MEDIA_RECIPE_IDS,
+  promptBlock: formatMarketingMediaRecipesForPrompt(),
   reviewsStage: 'asset-generation',
 } as const;
 

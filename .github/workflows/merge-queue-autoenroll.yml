@@ -2,7 +2,7 @@ name: Merge Queue Auto-Enroll
 # JOV-INV-029: promotion is distinct from merge and requires exact-head handoff.
 
 # Event-driven, with ownerless recovery admitted only after exact main/head
-# validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
+# validation. Runner Heartbeat's existing remediation clock recovers missed wakes.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
@@ -37,13 +37,13 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    # Ready transitions do not restart CI. The owning agent pairs ready with
-    # native auto-merge intent; the first source CI flight remains authoritative.
+    # Ready transitions re-evaluate exact-head admission without restarting CI;
+    # the first source CI flight remains authoritative.
     # A successful native enqueue emits `enqueued`, which advances the next
     # bounded recovery cohort after the event target proves idempotently
     # already queued. A rejected noncanonical admission emits `dequeued`; that
     # exact head re-enters only through this controller and its checkpoint.
-    types: [reopened, labeled, unlabeled, enqueued, dequeued]
+    types: [ready_for_review, reopened, labeled, unlabeled, enqueued, dequeued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -671,6 +671,35 @@ jobs:
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
           fi
+          # AMBER hold-intake may carry Summer issue-blocked red with intake
+          # still allowed. Main drain historically required
+          # intake==(status==healthy) and then painted this product PR
+          # UNSTABLE. Fail-closed alignment keeps promotion held and lets
+          # CLEAN source heads enroll; the drain jq now accepts the live
+          # receipt after this hop lands.
+          if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_FLEET_GATE_B64" ]]; then
+            receipt_json="$(printf '%s' "$DRAIN_FLEET_GATE_B64" | base64 -d 2>/dev/null || true)"
+            if [[ -n "$receipt_json" ]] && jq -e '
+              .promotionMode == "hold-intake" and
+              (.closureAdmission.status | IN("grace", "red")) and
+              .closureAdmission.newIssueIntakeAllowed == true
+            ' <<<"$receipt_json" >/dev/null; then
+              receipt_json="$(jq -c '
+                .closureAdmission.newIssueIntakeAllowed = false
+                | .closureAdmission.allowed = false
+                | .closureAdmission.newImplementationAllowed = false
+                | .closureAdmission.fallbackPrGenerationAllowed = false
+                | .alreadyAdmittedCohort.newIntakeAllowed = false
+                | .alreadyAdmittedCohort.semantics = "preserve-cohort-and-stop-new-implementation-intake"
+                | if .signals.closureHealth then
+                    .signals.closureHealth.newIssueIntakeAllowed = false
+                  else . end
+              ' <<<"$receipt_json")"
+              DRAIN_FLEET_GATE_B64="$(printf '%s' "$receipt_json" | base64 -w0 2>/dev/null || printf '%s' "$receipt_json" | base64 | tr -d '\n')"
+              export DRAIN_FLEET_GATE_B64
+              echo "hold-intake issue-blocked red aligned fail-closed so CLEAN source can enroll while promotion stays held"
+            fi
+          fi
           set +e
           bash scripts/drain-pr-queue.sh
           drain_rc=$?
@@ -740,6 +769,10 @@ jobs:
             echo "delivery-control-failure dispatched for $failure #$pr_number at $head_sha (exit $drain_rc)"
             if [[ "$drain_rc" -eq 3 ]]; then
               echo "queue-noop is a controller disposition, not a product-quality failure"
+              exit 0
+            fi
+            if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && "$drain_rc" -eq 2 ]]; then
+              echo "hold-intake waiting-lane is a controller disposition, not a product-quality failure"
               exit 0
             fi
             echo "::error::dropped-controller-event fails closed (exit $drain_rc)" >&2

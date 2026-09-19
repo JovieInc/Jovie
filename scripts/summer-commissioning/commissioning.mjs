@@ -33,6 +33,7 @@ import {
   digestCanonicalJson,
   requireString,
   SAFE_GIT_SHA,
+  SAFE_SHA256,
   validateRuntimeReceipt,
 } from './receipt-trust.mjs';
 
@@ -69,6 +70,80 @@ const CANONICAL_REGISTRY_PATH = fileURLToPath(
 );
 const CANONICAL_REGISTRY_REPOSITORY_PATH =
   'scripts/summer-commissioning/registry.json';
+const ATTESTATION_PUBLIC_KEY_ENV_NAMES = [
+  'SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY',
+  'RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY',
+];
+
+function defaultReadText(path) {
+  return readFileSync(path, 'utf8');
+}
+
+function readOptionalText(environment, names, readFile) {
+  for (const name of names) {
+    const direct = environment[name]?.trim();
+    if (direct) return direct;
+    const path = environment[`${name}_PATH`]?.trim();
+    if (!path) continue;
+    try {
+      const text = readFile(path).trim();
+      if (text) return text;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function fingerprintPublicKeyPem(pem) {
+  return createHash('sha256')
+    .update(createPublicKey(pem).export({ type: 'spki', format: 'der' }))
+    .digest('hex');
+}
+
+export function resolveTrustedAttestationKeyFingerprints(
+  committedFingerprints,
+  options = {}
+) {
+  if (!Array.isArray(committedFingerprints)) {
+    throw new Error(
+      'registry.trustedAttestationKeyFingerprints must be an array'
+    );
+  }
+  const trusted = new Set(committedFingerprints);
+  const environment = options.environment ?? process.env;
+  const readFile = options.readFile ?? defaultReadText;
+  const pem = readOptionalText(
+    environment,
+    ATTESTATION_PUBLIC_KEY_ENV_NAMES,
+    readFile
+  );
+  if (!pem) return [...trusted];
+  let fingerprint;
+  try {
+    fingerprint = fingerprintPublicKeyPem(pem);
+  } catch {
+    throw new Error(
+      'env/path attestation public key is not a valid Ed25519 SPKI key'
+    );
+  }
+  if (!SAFE_SHA256.test(fingerprint)) {
+    throw new Error('env/path attestation public key fingerprint is invalid');
+  }
+  trusted.add(fingerprint);
+  return [...trusted];
+}
+
+function resolveAttestationPublicKeyPem(explicitPem, options = {}) {
+  if (typeof explicitPem === 'string' && explicitPem.trim() !== '') {
+    return explicitPem;
+  }
+  return readOptionalText(
+    options.environment ?? process.env,
+    ATTESTATION_PUBLIC_KEY_ENV_NAMES,
+    options.readFile ?? defaultReadText
+  );
+}
 
 function sanitizedGitEnvironment() {
   return Object.fromEntries(
@@ -395,19 +470,25 @@ export function runCommissioning(registryInput, options) {
     }
   }
   const currentRegistryDigest = registryDigest(registry);
-  const attestationPublicKey = options.attestationPublicKey
-    ? createPublicKey(options.attestationPublicKey)
+  const processEnvironment = options.processEnvironment ?? process.env;
+  const readFile = options.readFile ?? defaultReadText;
+  const attestationPublicKeyPem = resolveAttestationPublicKeyPem(
+    options.attestationPublicKey,
+    { environment: processEnvironment, readFile }
+  );
+  const attestationPublicKey = attestationPublicKeyPem
+    ? createPublicKey(attestationPublicKeyPem)
     : null;
   const attestationKeyFingerprint = attestationPublicKey
-    ? createHash('sha256')
-        .update(attestationPublicKey.export({ type: 'spki', format: 'der' }))
-        .digest('hex')
+    ? fingerprintPublicKeyPem(attestationPublicKeyPem)
     : null;
+  const trustedFingerprints = resolveTrustedAttestationKeyFingerprints(
+    registry.trustedAttestationKeyFingerprints,
+    { environment: processEnvironment, readFile }
+  );
   if (
     attestationKeyFingerprint &&
-    !registry.trustedAttestationKeyFingerprints.includes(
-      attestationKeyFingerprint
-    )
+    !trustedFingerprints.includes(attestationKeyFingerprint)
   ) {
     throw new Error(
       'attestation public key fingerprint is not trusted by the registry'
@@ -655,6 +736,8 @@ export async function runCli(argv, options = {}) {
       '--environment-version'
     ),
     sourceVersion: options.sourceVersion ?? registry.sourceSnapshot.sha,
+    processEnvironment: options.processEnvironment ?? process.env,
+    readFile: options.readFile ?? defaultReadText,
     attestationPublicKey: attestationPublicKeyPath
       ? readFileSync(resolve(attestationPublicKeyPath), 'utf8')
       : options.attestationPublicKey,

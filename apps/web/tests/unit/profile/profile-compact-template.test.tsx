@@ -24,15 +24,42 @@ const {
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
   mockProfilePrimaryTabPanel,
-} = vi.hoisted(() => ({
-  mockCanonicalProfileDSPs: vi.fn(() => []),
-  mockUseProfileShell: vi.fn(),
-  mockUseIsAuthenticated: vi.fn(() => false),
-  mockProfileInlineNotificationsCTA: vi.fn(),
-  mockProfileDesktopSurface: vi.fn(),
-  mockProfileUnifiedDrawer: vi.fn(),
-  mockProfilePrimaryTabPanel: vi.fn(),
-}));
+  MockProfileDesktopSurface,
+} = vi.hoisted(() => {
+  const mockProfileDesktopSurface = vi.fn();
+  function MockProfileDesktopSurface(props: {
+    readonly onReady?: () => void;
+    readonly [key: string]: unknown;
+  }) {
+    const { onReady } = props;
+    mockProfileDesktopSurface(props);
+    React.useEffect(() => {
+      onReady?.();
+    }, [onReady]);
+    return React.createElement(
+      'div',
+      { 'data-testid': 'mock-profile-desktop-surface' },
+      React.createElement(
+        'nav',
+        { 'aria-label': 'Profile Navigation' },
+        React.createElement('button', { type: 'button' }, 'Home'),
+        React.createElement('button', { type: 'button' }, 'Music'),
+        React.createElement('button', { type: 'button' }, 'Shows'),
+        React.createElement('button', { type: 'button' }, 'About')
+      )
+    );
+  }
+  return {
+    mockCanonicalProfileDSPs: vi.fn(() => []),
+    mockUseProfileShell: vi.fn(),
+    mockUseIsAuthenticated: vi.fn(() => false),
+    mockProfileInlineNotificationsCTA: vi.fn(),
+    mockProfileDesktopSurface,
+    mockProfileUnifiedDrawer: vi.fn(),
+    mockProfilePrimaryTabPanel: vi.fn(),
+    MockProfileDesktopSurface,
+  };
+});
 
 vi.mock('next/dynamic', () => ({
   default: (loader: unknown) => {
@@ -47,7 +74,7 @@ vi.mock('next/dynamic', () => ({
     }
 
     if (source.includes('ProfileDesktopSurface')) {
-      return (props: unknown) => mockProfileDesktopSurface(props);
+      return MockProfileDesktopSurface;
     }
 
     return () => null;
@@ -162,8 +189,7 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
 }));
 
 vi.mock('@/features/profile/templates/ProfileDesktopSurface', () => ({
-  ProfileDesktopSurface: (props: Record<string, unknown>) =>
-    mockProfileDesktopSurface(props),
+  ProfileDesktopSurface: MockProfileDesktopSurface,
 }));
 
 const mockArtist: Artist = {
@@ -1772,6 +1798,24 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
+  it('does not expose a loading status on the compact public profile', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
   it('switches the public profile to the desktop surface at 1180px+', async () => {
     const restoreViewport = mockViewport('desktop');
 
@@ -1860,7 +1904,9 @@ describe('ProfileCompactTemplate', () => {
     );
     expect(html).not.toContain('data-interactive-ready="true"');
     expect(html).toContain('data-testid="profile-desktop-loading"');
-    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).not.toContain('aria-busy="true"');
+    expect(html).toContain('data-testid="profile-compact-shell"');
     const view = render(
       <ProfileCompactTemplate
         mode='profile'
@@ -2155,8 +2201,21 @@ describe('ProfileCompactTemplate', () => {
         expect(
           screen.getByTestId('public-profile-layout-shell')
         ).toHaveAttribute('data-layout', 'desktop');
+        expect(
+          screen.getByTestId('public-profile-layout-shell')
+        ).toHaveAttribute('data-desktop-ready', 'true');
         expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
         expect(mockProfileDesktopSurface).toHaveBeenCalled();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(
+          screen.getByRole('navigation', { name: 'Profile Navigation' })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'Home' })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'Music' })
+        ).toBeInTheDocument();
       });
 
       restoreViewport();

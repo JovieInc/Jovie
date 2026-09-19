@@ -58,6 +58,20 @@ export const RELIABILITY_DETECTORS: readonly ReliabilityDetector[] = [
     ],
   },
   {
+    id: 'm2-revenue-path-canary',
+    sourceIssue: 'JOV-6439',
+    symptom:
+      'Signed-out claim → $199 Pro checkout → activation path regresses in production',
+    kind: 'e2e-canary',
+    artifacts: [
+      'apps/web/lib/canaries/m2-revenue-path.ts',
+      'apps/web/lib/canaries/m2-revenue-path.test.ts',
+      'apps/web/scripts/m2-revenue-path-canary.ts',
+      'apps/web/tests/unit/ci/m2-revenue-path-canary-workflow.test.ts',
+      '.github/workflows/m2-revenue-path-canary.yml',
+    ],
+  },
+  {
     id: 'bug-to-test-rule',
     sourceIssue: 'JOV-1873',
     symptom: 'Bug fix ships without a regression test or documented waiver',

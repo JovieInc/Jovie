@@ -91,10 +91,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-first front-door contract.
+    // The shared public CTA follows the waitlist-on front-door contract on /signup.
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -136,7 +136,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -168,7 +168,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 

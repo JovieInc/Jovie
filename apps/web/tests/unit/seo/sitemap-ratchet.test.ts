@@ -146,7 +146,11 @@ describe('SEO ratchet — sitemap must stay reachable and fresh (JOV-11044)', ()
 
     whereMock
       .mockResolvedValueOnce([
-        { username: 'tim', updatedAt: new Date('2026-01-01') },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-01-01'),
+        },
       ])
       .mockResolvedValueOnce([
         {

@@ -279,17 +279,15 @@ describe('Auto-Ready provenance selector', () => {
     });
   });
 
-  it.each([
-    'security',
-    'hold',
-    'gated',
-    'queue-deferred',
-  ])('never mutates a hard-held PR labeled %s', label => {
-    expect(
-      promotion({ authorLogin: 'jovie-bot[bot]', labels: [label] })
-    ).toEqual({ eligible: false, reason: 'held' });
-    expect(AUTO_READY_HOLD_LABELS).toEqual(expect.arrayContaining([label]));
-  });
+  it.each(['security', 'hold', 'gated', 'queue-deferred'])(
+    'never mutates a hard-held PR labeled %s',
+    label => {
+      expect(
+        promotion({ authorLogin: 'jovie-bot[bot]', labels: [label] })
+      ).toEqual({ eligible: false, reason: 'held' });
+      expect(AUTO_READY_HOLD_LABELS).toEqual(expect.arrayContaining([label]));
+    }
+  );
 
   it.each([
     'human-review-required',
@@ -436,10 +434,13 @@ describe('Auto-Ready App-token workflow', () => {
 
   it('keeps workflow recovery manual-only and never source-event driven', () => {
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain(
+      "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
+    );
     expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('workflow_run:');
     expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
+    expect(workflow).not.toContain('schedule:');
   });
 });

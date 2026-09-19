@@ -125,6 +125,7 @@ export {
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
+  MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
   MARKETING_CREATIVE_ROLES,
   MARKETING_GENERATION_SPEC_VERSION,
   MARKETING_GENERATION_STAGES,
@@ -133,6 +134,7 @@ export {
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
+  MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
   selectMarketingModelCandidate,
 } from './generation';
 export type {
@@ -209,6 +211,26 @@ export {
   JOVIE_IMAGE_COLOR_POLICY_VERSION,
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
+export type {
+  MarketingMediaRecipeDecision,
+  MarketingMediaRecipeFinding,
+  MarketingMediaRecipeFindingCode,
+  MarketingMediaRecipeId,
+} from './mediaRecipes';
+export {
+  auditMarketingMediaRecipeDecision,
+  DARK_GLASS_MEDIA_RECIPE,
+  FLOWING_ACCENT_MEDIA_RECIPE,
+  formatMarketingMediaRecipesForPrompt,
+  getMarketingMediaRecipe,
+  isApprovedMarketingMediaRecipeId,
+  JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
+  JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_RECIPE_FOUNDER_LOCK,
+  MARKETING_MEDIA_RECIPE_IDS,
+  MARKETING_MEDIA_RECIPES,
+  resolveMarketingMediaRecipeForExport,
+} from './mediaRecipes';
 export type {
   MarketingPageContract,
   MarketingPageContractRouteGlob,
