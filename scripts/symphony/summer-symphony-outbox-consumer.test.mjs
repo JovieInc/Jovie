@@ -45,6 +45,7 @@ import {
   validateOutcomeV3,
   validateState,
   validateTask,
+  validateTaskRecords,
   verifyOutboxRecord,
 } from './summer-symphony-outbox-consumer.mjs';
 
@@ -1978,6 +1979,342 @@ describe('existing owned repair transport', () => {
       else process.env.HOME = previousHome;
       if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
       else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
+  });
+});
+
+describe('authenticated retained task records', () => {
+  const config = {
+    keys,
+    outcomePublicKey: host.publicKey,
+    outcomePrivateKey: host.privateKey,
+    outcomeKeyId: 'host-outcome',
+    summerOrigin: 'https://summer.example',
+    vercelAutomationBypassSecret: 'test-scoped-protection',
+  };
+  function fixture(kind = 'native-queue', status = null) {
+    const id = `${kind}-starvation`;
+    const selected = {
+      ...task().selected,
+      id,
+      owner: 'Summer',
+      handle: 'symphony',
+    };
+    const taskValue = taskV2({ action: `reconcile-${id}`, selected });
+    const projection = signOutcomeV2(
+      taskValue,
+      {
+        identifier: 'JOV-6418',
+        createdAt: '2026-09-07T01:01:00Z',
+      },
+      host.privateKey,
+      'host-outcome'
+    );
+    const value = {
+      schema: 'summer.symphony-task-records/v1',
+      taskKey: taskValue.taskKey,
+      issueIdentifier: 'JOV-6418',
+      state: status ? `execution-${status}` : 'execution-missing',
+      outbox: signedOutbox(taskValue),
+      projection,
+      execution: null,
+    };
+    if (status)
+      value.execution = resign({
+        schema: 'jovie.symphony-native-queue-execution/v1',
+        taskKey: taskValue.taskKey,
+        issueIdentifier: 'JOV-6418',
+        action: taskValue.action,
+        status,
+        detail: status === 'failed' ? 'native-queue-pr-churn-eject' : 'merged',
+        completedAt: '2026-09-07T01:02:00Z',
+        claim: { state: 'In Progress', assignee: 'unassigned-machine' },
+        execution: {
+          mutationAttempted: false,
+          authority:
+            'exact-source-ci-native-queue-production-gates-remain-required',
+          pr: 17917,
+          head: 'e'.repeat(40),
+        },
+        source: { action: taskValue.action, ...taskValue.source },
+        signatureKeyId: 'host-outcome',
+      });
+    return { taskValue, value };
+  }
+  function resign(record, signer = host) {
+    const { signature: _old, ...unsigned } = record;
+    return {
+      ...unsigned,
+      signature: `ed25519=${sign(
+        null,
+        Buffer.from(`${unsigned.schema}\0${canonical(unsigned)}`),
+        signer.privateKey
+      ).toString('base64url')}`,
+    };
+  }
+  const check = (value, taskValue) =>
+    validateTaskRecords(value, taskValue, 'JOV-6418', config);
+
+  it('returns original signed native success/failure and missing records unchanged', () => {
+    for (const status of [null, 'failed', 'succeeded']) {
+      const { value, taskValue } = fixture('native-queue', status);
+      assert.equal(check(value, taskValue), value);
+      assert.equal(check(value, taskValue), value);
+    }
+    const { value, taskValue } = fixture('release-certification');
+    assert.equal(check(value, taskValue), value);
+  });
+
+  it('rejects scope, envelope, projection, host and state substitutions', () => {
+    const { value, taskValue } = fixture();
+    for (const bad of [task(), taskV2()])
+      assert.throws(() => check(value, bad));
+    for (const issue of ['JOV-5853', 'JOV-0', null]) {
+      assert.throws(() => validateTaskRecords(value, taskValue, issue, config));
+    }
+    for (const mutate of [
+      v => {
+        v.extra = true;
+      },
+      v => {
+        v.schema = 'other';
+      },
+      v => {
+        v.taskKey = 'f'.repeat(64);
+      },
+      v => {
+        v.issueIdentifier = 'JOV-6417';
+      },
+      v => {
+        v.outbox.task.createdAt = '2026-09-07T00:00:00Z';
+      },
+      v => {
+        v.outbox = signedOutbox({
+          ...taskValue,
+          createdAt: '2026-09-07T00:00:00Z',
+        });
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          signatureKeyId: 'another-host',
+        });
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          result: { issueIdentifier: 'JOV-6417' },
+        });
+      },
+      v => {
+        v.projection = resign(v.projection, foreign);
+      },
+      v => {
+        v.projection = resign({
+          ...v.projection,
+          completedAt: '2026-09-07T00:00:00Z',
+        });
+      },
+      v => {
+        v.state = 'execution-succeeded';
+      },
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed);
+      assert.throws(() => check(changed, taskValue));
+    }
+  });
+
+  it('rejects signed execution records with cross-bound or malformed evidence', () => {
+    const { value, taskValue } = fixture('native-queue', 'failed');
+    for (const mutate of [
+      r => {
+        r.extra = true;
+      },
+      r => {
+        r.schema = 'other';
+      },
+      r => {
+        r.action = 'reconcile-release-certification-starvation';
+      },
+      r => {
+        r.taskKey = 'f'.repeat(64);
+      },
+      r => {
+        r.issueIdentifier = 'JOV-6417';
+      },
+      r => {
+        r.status = 'unknown';
+      },
+      r => {
+        r.detail = '';
+      },
+      r => {
+        r.detail = 'x'.repeat(241);
+      },
+      r => {
+        r.completedAt = 'bad';
+      },
+      r => {
+        r.completedAt = '2026-09-07T00:00:00Z';
+      },
+      r => {
+        r.completedAt = '2026-09-07T01:00:30Z';
+      },
+      r => {
+        r.source.extra = true;
+      },
+      r => {
+        r.source.action = 'other';
+      },
+      r => {
+        r.source.sourceVersion = 'f'.repeat(40);
+      },
+      r => {
+        r.source.snapshotDigest = 'f'.repeat(64);
+      },
+      r => {
+        r.claim.extra = true;
+      },
+      r => {
+        r.claim.state = 'Canceled';
+      },
+      r => {
+        r.claim.assignee = '';
+      },
+      r => {
+        r.claim.assignee = 5;
+      },
+      r => {
+        r.claim.assignee = 'x'.repeat(121);
+      },
+      r => {
+        r.execution.extra = true;
+      },
+      r => {
+        r.execution.mutationAttempted = 'yes';
+      },
+      r => {
+        r.execution.authority = 'anything';
+      },
+      r => {
+        r.execution.pr = 0;
+      },
+      r => {
+        r.execution.pr = '17917';
+      },
+      r => {
+        r.execution.head = 'not-a-sha';
+      },
+      r => {
+        r.execution.authority = 'native-queue-mutation-authority-unavailable';
+      },
+      r => {
+        r.signatureKeyId = 'other-host';
+      },
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed.execution);
+      changed.execution = resign(changed.execution);
+      assert.throws(() => check(changed, taskValue));
+    }
+    assert.throws(() =>
+      check({ ...value, state: 'execution-succeeded' }, taskValue)
+    );
+    assert.throws(
+      () =>
+        check(
+          { ...value, execution: resign(value.execution, foreign) },
+          taskValue
+        ),
+      /signature-invalid/
+    );
+    assert.throws(() =>
+      check(
+        { ...value, execution: { ...value.execution, signature: 'invalid' } },
+        taskValue
+      )
+    );
+    const success = fixture('native-queue', 'succeeded');
+    success.value.execution.execution.pr = null;
+    success.value.execution = resign(success.value.execution);
+    assert.throws(() => check(success.value, success.taskValue));
+    const release = fixture('release-certification', 'failed');
+    assert.equal(check(release.value, release.taskValue), release.value);
+    release.value.execution.action = 'reconcile-native-queue-starvation';
+    release.value.execution = resign(release.value.execution);
+    assert.throws(() => check(release.value, release.taskValue));
+    const unavailable = structuredClone(value);
+    unavailable.execution.claim.assignee = null;
+    unavailable.execution.execution = {
+      mutationAttempted: false,
+      authority: 'native-queue-mutation-authority-unavailable',
+      pr: null,
+      head: null,
+    };
+    unavailable.execution = resign(unavailable.execution);
+    assert.equal(check(unavailable, taskValue), unavailable);
+  });
+
+  it('signs only exact selectors, makes bounded GETs and never writes during repeat reads', async () => {
+    const { value, taskValue } = fixture();
+    const requests = [];
+    const transport = createHttpTransport(config, async (url, options) => {
+      requests.push({ url, options });
+      return Response.json(value);
+    });
+    for (let i = 0; i < 2; i++)
+      assert.deepEqual(
+        await transport.readTaskRecords(taskValue, 'JOV-6418'),
+        value
+      );
+    assert.equal(requests.length, 2);
+    for (const { url, options } of requests) {
+      const parsed = new URL(url);
+      assert.equal(parsed.pathname, '/summer/v1/symphony/task-records');
+      assert.deepEqual(Object.fromEntries(parsed.searchParams), {
+        taskKey: taskValue.taskKey,
+        issueIdentifier: 'JOV-6418',
+        sourceVersion: taskValue.source.sourceVersion,
+        snapshotDigest: taskValue.source.snapshotDigest,
+      });
+      assert.equal(options.method ?? 'GET', 'GET');
+      assert.equal(options.body, undefined);
+      assert.equal(options.redirect, 'error');
+      assert.ok(options.signal instanceof AbortSignal);
+      assert.equal(
+        options.headers['x-vercel-protection-bypass'],
+        'test-scoped-protection'
+      );
+      const unsigned = {
+        method: 'GET',
+        target: parsed.pathname + parsed.search,
+        timestamp: options.headers['x-summer-timestamp'],
+        nonce: options.headers['x-summer-nonce'],
+        signatureKeyId: options.headers['x-summer-key-id'],
+      };
+      assert.ok(
+        verify(
+          null,
+          Buffer.from(`${READ_DOMAIN}\0${canonical(unsigned)}`),
+          host.publicKey,
+          Buffer.from(
+            options.headers['x-summer-signature'].slice(8),
+            'base64url'
+          )
+        )
+      );
+    }
+    await assert.rejects(transport.readTaskRecords(taskV2(), 'JOV-6418'));
+    assert.equal(requests.length, 2);
+    for (const status of [401, 404, 409, 422, 503]) {
+      await assert.rejects(
+        createHttpTransport(
+          config,
+          async () => new Response('', { status })
+        ).readTaskRecords(taskValue, 'JOV-6418'),
+        new RegExp(`http-${status}`)
+      );
     }
   });
 });
