@@ -1579,6 +1579,52 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 receipt["holdSleepSecondsUsed"], helper.CLOSURE_HOLD_RECHECK_SECONDS
             )
             self.assertEqual(receipt["reason"], "closure-health-green")
+            self.assertNotEqual(receipt.get("closureStatus"), "red")
+            self.assertIsNone(helper.read_active_closure_hold(hold))
+
+    def test_released_but_red_hold_autoresolves_when_gate_is_green(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload()), encoding="utf-8"
+            )
+            hold.write_text(
+                json.dumps(
+                    {
+                        "schema": helper.CLOSURE_HOLD_SCHEMA,
+                        "status": "released",
+                        "reason": "closure-health-not-green",
+                        "closureStatus": "red",
+                        "newIssueIntakeAllowed": False,
+                        "observedAt": "2026-09-05T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertIsNone(helper.read_active_closure_hold(hold))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                returncode = helper.run_official_binary(
+                    ["python3", "-c", "print('stale-hold-cleared')"],
+                    gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=closure_gate,
+                        hold_receipt_path=hold,
+                        dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                    ),
+                    closure_observe_only=True,
+                    max_gate_sleep_seconds=300,
+                )
+            self.assertEqual(returncode, 0)
+            self.assertIn("stale-hold-cleared", out.getvalue())
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["status"], "cleared")
+            self.assertEqual(receipt["closureStatus"], "healthy")
+            self.assertTrue(receipt["newIssueIntakeAllowed"])
+            self.assertFalse(receipt["active"])
+            self.assertIsNone(helper.read_active_closure_hold(hold))
 
     def test_closure_observe_only_runs_child_while_receipt_is_red(self):
         helper = _load_helper()

@@ -1451,6 +1451,15 @@ def _read_stop_line(
     )
 
 
+def _hold_autoresolve():
+    directory = pathlib.Path(__file__).resolve().parent
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
+    import hold_autoresolve
+
+    return hold_autoresolve
+
+
 def write_closure_hold_receipt(
     path: pathlib.Path,
     verdict: dict[str, Any],
@@ -1461,21 +1470,79 @@ def write_closure_hold_receipt(
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
     """Durable symphony-closure-hold/v1 receipt for one hold decision."""
+    observed = now or _now()
+    fields = _hold_autoresolve().closure_hold_write_fields(
+        verdict, status=status, now=observed
+    )
     payload = {
         "schema": CLOSURE_HOLD_SCHEMA,
         "status": status,
-        "reason": verdict.get("reason"),
-        "closureStatus": verdict.get("closureStatus"),
-        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
         "receiptPath": verdict.get("path"),
         "receiptObservedAt": verdict.get("receiptObservedAt"),
         "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
         "holdSleepSecondsUsed": sleep_seconds_used,
         "maxGateSleepSeconds": max_sleep_seconds,
-        "observedAt": _iso(now or _now()),
+        **fields,
     }
     _write_json_receipt(path, payload)
     return payload
+
+
+def read_active_closure_hold(path: pathlib.Path) -> dict[str, Any] | None:
+    """Return the hold only when it is an active red stop.
+
+    Released-but-red host JSON is inactive. Readers must use this instead of
+    copying closureStatus=red off a released receipt.
+    """
+    helper = _hold_autoresolve()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
+        return None
+    if not helper.is_active_red_hold(payload):
+        return None
+    return payload
+
+
+def autoresolve_closure_hold_if_green(
+    stop_line: ClosureStopLine,
+    *,
+    observe_only: bool = False,
+    now: dt.datetime | None = None,
+) -> dict[str, Any] | None:
+    """Clear stale released-but-red holds when the live gate is GREEN."""
+    helper = _hold_autoresolve()
+    path = stop_line.hold_receipt_path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
+        return None
+    verdict = _read_stop_line(stop_line, now=now)
+    gate_state = (
+        "GREEN"
+        if verdict.get("reason") == "closure-health-green"
+        else verdict.get("closureStatus")
+    )
+    if not helper.should_autoresolve(
+        payload, gate_state=gate_state, observe_only=observe_only
+    ) and not (
+        payload.get("status") in helper.CLEARED_HOLD_STATUSES
+        and (
+            payload.get("closureStatus") == "red"
+            or payload.get("newIssueIntakeAllowed") is False
+        )
+        and helper.gate_is_green(gate_state)
+    ):
+        return payload
+    cleared = helper.autoresolve_hold(
+        payload, gate_state=gate_state, observe_only=observe_only, now=now
+    )
+    _write_json_receipt(path, cleared)
+    return cleared
 
 
 def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
@@ -1851,6 +1918,9 @@ def run_official_binary(
         raise ValueError("missing official Symphony command after --")
     gate_sleep_used = 0
     closure_sleep_used = 0
+    autoresolve_closure_hold_if_green(
+        closure, observe_only=closure_observe_only
+    )
     while True:
         verdict = _read_stop_line(closure)
         if verdict["hold"] and not closure_observe_only:
