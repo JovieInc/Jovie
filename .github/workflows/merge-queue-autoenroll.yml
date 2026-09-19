@@ -84,6 +84,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       mode: ${{ steps.policy.outputs.promotion_mode }}
+      promotion_mode: ${{ steps.policy.outputs.promotion_mode }}
+      state: ${{ steps.policy.outputs.state }}
+      receipt_age_seconds: ${{ steps.policy.outputs.receipt_age_seconds }}
+      capacity_accepted: ${{ steps.policy.outputs.capacity_accepted }}
+      capacity_max_concurrent: ${{ steps.policy.outputs.capacity_max_concurrent }}
+      capacity_reason: ${{ steps.policy.outputs.capacity_reason }}
+      new_mutation_allowed: ${{ steps.policy.outputs.new_mutation_allowed }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
       main_sha: ${{ steps.main-head.outputs.sha }}
     steps:
@@ -661,7 +668,28 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}
           FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          FLEET_RECEIPT_AGE_SECONDS: ${{ needs.fleet-policy.outputs.receipt_age_seconds }}
+          FLEET_CAPACITY_ACCEPTED: ${{ needs.fleet-policy.outputs.capacity_accepted }}
+          FLEET_CAPACITY_MAX_CONCURRENT: ${{ needs.fleet-policy.outputs.capacity_max_concurrent }}
+          FLEET_CAPACITY_REASON: ${{ needs.fleet-policy.outputs.capacity_reason }}
+          FLEET_NEW_MUTATION_ALLOWED: ${{ needs.fleet-policy.outputs.new_mutation_allowed }}
+          FLEET_STATE: ${{ needs.fleet-policy.outputs.state }}
         run: |
+          {
+            echo "### Auto-Enroll fleet receipt"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| state | ${FLEET_STATE:-unknown} |"
+            echo "| promotion_mode | ${DRAIN_PROMOTION_MODE:-unknown} |"
+            echo "| receipt_age_seconds | ${FLEET_RECEIPT_AGE_SECONDS:-unknown} |"
+            echo "| capacity_accepted | ${FLEET_CAPACITY_ACCEPTED:-unknown} |"
+            echo "| capacity_max_concurrent | ${FLEET_CAPACITY_MAX_CONCURRENT:-unknown} |"
+            echo "| capacity_reason | ${FLEET_CAPACITY_REASON:-unknown} |"
+            echo "| new_mutation_allowed | ${FLEET_NEW_MUTATION_ALLOWED:-unknown} |"
+            echo
+            echo "Capacity bounds new agent dispatch only. Already-green promotion/enroll uses live promotionMode."
+          } >>"$GITHUB_STEP_SUMMARY"
           policy_checkout_sha="$(git rev-parse HEAD)"
           if [[ "$policy_checkout_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
             echo "::error::Main policy checkout drifted from fleet-policy evidence ($policy_checkout_sha != $FLEET_POLICY_MAIN_SHA)" >&2

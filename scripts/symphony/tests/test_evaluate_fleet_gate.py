@@ -362,6 +362,36 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
         self.assertIn("has(\"classifications\") | not", wrapper)
 
+    def test_wrapper_publishes_receipt_age_promotion_mode_and_capacity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = pathlib.Path(tmp) / "summary.md"
+            code, outputs, receipt = run_wrapper(
+                signals(), extra_env={"GITHUB_STEP_SUMMARY": str(summary)}
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(outputs["promotion_mode"], "normal")
+            self.assertEqual(outputs["mode"], "normal")
+            self.assertEqual(outputs["capacity_accepted"], "true")
+            self.assertEqual(outputs["capacity_max_concurrent"], "4")
+            self.assertRegex(outputs["receipt_age_seconds"], r"^-?\d+$")
+            self.assertTrue(summary.is_file())
+            published = summary.read_text()
+            self.assertIn("promotion_mode", published)
+            self.assertIn("receipt_age_seconds", published)
+            self.assertIn("capacity_accepted", published)
+            self.assertIn("Capacity bounds new agent dispatch only", published)
+
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        autoenroll = (
+            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+        ).read_text()
+        self.assertIn("receipt_age_seconds", action)
+        self.assertIn("capacity_accepted", action)
+        self.assertIn("receipt_age_seconds: ${{ steps.policy.outputs.receipt_age_seconds }}", autoenroll)
+        self.assertIn("### Auto-Enroll fleet receipt", autoenroll)
+        self.assertIn("FLEET_RECEIPT_AGE_SECONDS", autoenroll)
+        self.assertIn("FLEET_CAPACITY_ACCEPTED", autoenroll)
+
 
 if __name__ == "__main__":
     unittest.main()

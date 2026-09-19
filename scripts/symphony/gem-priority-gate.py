@@ -2185,6 +2185,43 @@ def should_remint_lagging_zero_concurrency(
     return _persisted_max_concurrent(persisted) == 0
 
 
+def overlay_preserved_dispatch_seats(
+    live: dict[str, Any], persisted: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep last-good seat counts without substituting persisted promotion.
+
+    Capacity bounds new agent dispatch only. A flap-class persist must not
+    print a stale Gem-local promotionMode as Auto-Enroll authority.
+    """
+    merged = json.loads(json.dumps(live))
+    persisted_gem = (persisted.get("concurrency") or {}).get("gem")
+    if not isinstance(persisted_gem, dict):
+        return merged
+    live_gem = merged.setdefault("concurrency", {}).setdefault("gem", {})
+    maximum = persisted_gem.get("maxConcurrent")
+    if (
+        isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+    ):
+        live_gem["maxConcurrent"] = maximum
+    target = persisted_gem.get("approvedCapacityTarget")
+    if isinstance(target, int) and not isinstance(target, bool) and target >= 1:
+        live_gem["approvedCapacityTarget"] = target
+    elif (
+        isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and maximum >= 1
+    ):
+        live_gem["approvedCapacityTarget"] = maximum
+    live_gem["preserveQueuedWork"] = True
+    live_gem["newMutationAllowed"] = False
+    live_gem["evidenceAccepted"] = False
+    if not live_gem.get("reason"):
+        live_gem["reason"] = "capacity-evidence-unproven-dispatch-closed"
+    return merged
+
+
 def should_preserve_approved_concurrency(
     live: dict[str, Any], persisted: dict[str, Any] | None
 ) -> bool:
@@ -2679,13 +2716,12 @@ def persist_live_receipt(
         persisted = _read_persisted_receipt(state_dir)
         remint = should_remint_lagging_zero_concurrency(receipt, persisted)
         if should_preserve_approved_concurrency(receipt, persisted):
-            warn_live_receipt_not_persisted(
-                LivePersistFenceError(
-                    f"{LIVE_PERSIST_WRITER}: kept last-good approved concurrency "
-                    "after flap-class dispatch close"
-                )
-            )
-            return persisted
+            # Keep the prior capacity target, not its old observation. The
+            # publisher consumes latest.json, so the current closed admissions
+            # must reach the same atomic write/readback path as every refresh.
+            receipt = overlay_preserved_dispatch_seats(receipt, persisted)
+            print("INFO: fleet gate publishing current flap-closed admissions "
+                  "with preserved capacity target", file=sys.stderr)
         persisted_at = (
             parse_time(persisted.get("observedAt")) if persisted is not None else None
         )
