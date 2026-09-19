@@ -5,18 +5,25 @@ import { Fragment, useState } from 'react';
 import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
-  hasPublicAnnualOffer,
 } from '@/lib/billing/offer-truth';
 import {
   type ComparisonFeature,
-  ENTITLEMENT_REGISTRY,
   PRICING_COMPARISON,
 } from '@/lib/entitlements/registry';
-import { publicEnv } from '@/lib/env-public';
 
-const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
+const PUBLIC_PRICING_FEATURE_NAMES = new Set([
+  'Public artist profile page',
+  'Contact / subscriber capture',
+]);
 
-type PlanColumn = 'free' | 'pro' | 'max';
+const PUBLIC_PRICING_COMPARISON = PRICING_COMPARISON.map(category => ({
+  ...category,
+  features: category.features.filter(feature =>
+    PUBLIC_PRICING_FEATURE_NAMES.has(feature.name)
+  ),
+})).filter(category => category.features.length > 0);
+
+type PlanColumn = 'free' | 'pro';
 
 function CellValue({
   value,
@@ -110,60 +117,33 @@ function DesktopFeatureRow({
           comingSoon={feature.comingSoon && feature.pro !== false}
         />
       </td>
-      {maxPlanEnabled ? (
-        <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
-          <CellValue value={feature.max} comingSoon={feature.comingSoon} />
-        </td>
-      ) : null}
     </tr>
   );
 }
 
 export function PricingComparisonChart() {
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
-  const annualOfferPublished = hasPublicAnnualOffer();
 
-  const free = ENTITLEMENT_REGISTRY.free;
-  const pro = ENTITLEMENT_REGISTRY.pro;
-  const max = ENTITLEMENT_REGISTRY.max;
   const freeClaim = getPublicPriceClaim('free');
   const proClaim = getPublicPriceClaim('pro');
-  const maxClaim = getPublicPriceClaim('max');
 
   const planOptions: { id: PlanColumn; name: string; price: string }[] = [
     {
       id: 'free',
-      name: free.marketing.displayName,
+      name: freeClaim.displayName,
       price: formatPublicPriceDisplay(freeClaim),
     },
     {
       id: 'pro',
-      name: pro.marketing.displayName,
+      name: proClaim.displayName,
       price: formatPublicPriceDisplay(proClaim),
     },
-    ...(maxPlanEnabled
-      ? [
-          {
-            id: 'max' as PlanColumn,
-            name: max.marketing.displayName,
-            price: formatPublicPriceDisplay(maxClaim),
-          },
-        ]
-      : []),
   ];
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
   return (
     <div className='system-b-pricing-chart'>
-      {annualOfferPublished ? (
-        <div className='system-b-pricing-billing'>
-          <span className='system-b-pricing-billing-label' data-active='true'>
-            Monthly
-          </span>
-        </div>
-      ) : null}
-
       <div className='system-b-pricing-mobile-selector'>
         <select
           aria-label='Select Plan To Compare'
@@ -192,7 +172,7 @@ export function PricingComparisonChart() {
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                 <div className='system-b-pricing-plan-name'>
-                  {free.marketing.displayName}
+                  {freeClaim.displayName}
                 </div>
                 <div className='system-b-pricing-plan-price'>
                   {formatPublicPriceDisplay(freeClaim)}
@@ -203,40 +183,21 @@ export function PricingComparisonChart() {
                 data-selected='true'
               >
                 <div className='system-b-pricing-plan-name'>
-                  {pro.marketing.displayName}
+                  {proClaim.displayName}
                 </div>
                 <div className='system-b-pricing-plan-price'>
                   {proClaim.priceLabel}
                   {proClaim.cadence ? <span>{proClaim.cadence}</span> : null}
                 </div>
               </th>
-              {maxPlanEnabled ? (
-                <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
-                  <div className='system-b-pricing-plan-label'>
-                    <span className='system-b-pricing-plan-name'>
-                      {max.marketing.displayName}
-                    </span>
-                    <span className='system-b-pricing-chart-badge'>
-                      Early Access
-                    </span>
-                  </div>
-                  <div className='system-b-pricing-plan-price'>
-                    {maxClaim.priceLabel}
-                    {maxClaim.cadence ? <span>{maxClaim.cadence}</span> : null}
-                  </div>
-                </th>
-              ) : null}
             </tr>
           </thead>
 
           <tbody>
-            {PRICING_COMPARISON.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`cat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
-                  <td
-                    colSpan={maxPlanEnabled ? 4 : 3}
-                    className='system-b-pricing-category-cell'
-                  >
+                  <td colSpan={3} className='system-b-pricing-category-cell'>
                     {category.category}
                   </td>
                 </tr>
@@ -275,7 +236,7 @@ export function PricingComparisonChart() {
           </thead>
 
           <tbody>
-            {PRICING_COMPARISON.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`mcat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={2} className='system-b-pricing-category-cell'>

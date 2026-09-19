@@ -42,11 +42,8 @@ test.describe('Pricing Page', () => {
     // Check main heading
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
-      page.getByRole('heading', { name: 'Artist profiles built to convert' })
-    ).toBeVisible();
-    await expect(
       page.getByRole('heading', {
-        name: 'Capture fans once. Bring them back automatically.',
+        name: 'Public artist profile and audience capture',
       })
     ).toBeVisible();
 
@@ -61,26 +58,21 @@ test.describe('Pricing Page', () => {
       'Pro'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Recommended'
+      'Limited access'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Start 14-day Pro trial'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Max'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Full stack'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Contact sales'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Custom'
+      'Request access'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
-    ).toHaveCount(0);
+    ).toContainText('Enterprise');
+    await expect(
+      page.getByTestId('marketing-pricing-plan-enterprise')
+    ).toContainText('Contact sales');
+    await expect(
+      page.getByTestId('marketing-pricing-plan-enterprise')
+    ).toContainText('Custom');
+    await expect(page.getByTestId('marketing-pricing-plan-max')).toHaveCount(0);
     await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
       0
     );
@@ -105,17 +97,17 @@ test.describe('Pricing Page', () => {
 
   test('has working call-to-action buttons', async ({ page }) => {
     const freeTierCta = page
-      .getByRole('link', { name: 'Claim your profile' })
+      .getByRole('link', { name: 'Claim my free profile' })
       .first();
     await expect(freeTierCta).toBeVisible();
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Start 14-day Pro trial',
+        name: 'Request access',
       })
-    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
+    ).toHaveAttribute('href', '/waitlist');
     await expect(
-      page.getByTestId('marketing-pricing-plan-max').getByRole('link', {
+      page.getByTestId('marketing-pricing-plan-enterprise').getByRole('link', {
         name: 'Contact sales',
       })
     ).toHaveAttribute('href', 'mailto:support@jov.ie');

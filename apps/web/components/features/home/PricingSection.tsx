@@ -4,48 +4,28 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import {
+  getPublicPriceClaim,
+  type PublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 
-const FREE_OUTCOMES = [
-  'Launch unlimited smart links',
-  'Build a release-ready artist profile',
-  'See core audience and click activity',
-] as const;
+const FREE_OUTCOMES = ['Public artist profile and audience capture'] as const;
 
-const PRO_OUTCOMES = [
-  'Send paid release notifications to fans',
-  'Unlock deeper audience intelligence',
-  'Run every release from one branded home',
-] as const;
+const PRO_OUTCOMES = ['Public artist profile and audience capture'] as const;
 
-const FREE_FEATURE_PREVIEW = [
-  'Unlimited smart links',
-  'Public artist profile page',
-  'Basic analytics (30 days)',
-] as const;
+const FREE_FEATURE_PREVIEW = FREE_OUTCOMES;
+const PRO_FEATURE_PREVIEW = PRO_OUTCOMES;
 
-const PRO_FEATURE_PREVIEW = [
-  'Release notifications',
-  'Advanced analytics & geographic insights',
-  'Contact export',
-] as const;
+function formatMonthlyPrice(claim: PublicPriceClaim): string {
+  return `${claim.priceLabel}/month`;
+}
 
 export function PricingSection() {
-  const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
-  const proPlan = ENTITLEMENT_REGISTRY.pro.marketing;
   const freeClaim = getPublicPriceClaim('free');
   const proClaim = getPublicPriceClaim('pro');
-  const freeIncludes = freePlan.features.filter(feature =>
-    FREE_FEATURE_PREVIEW.includes(
-      feature as (typeof FREE_FEATURE_PREVIEW)[number]
-    )
-  );
-  const proIncludes = proPlan.features.filter(feature =>
-    PRO_FEATURE_PREVIEW.includes(
-      feature as (typeof PRO_FEATURE_PREVIEW)[number]
-    )
-  );
+  const proMonthlyPrice = formatMonthlyPrice(proClaim);
+  const freeIncludes = FREE_FEATURE_PREVIEW;
+  const proIncludes = PRO_FEATURE_PREVIEW;
 
   return (
     <section
@@ -61,9 +41,8 @@ export function PricingSection() {
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Claim your profile for smart links and your artist page. Upgrade
-              when you want release notifications, deeper audience intelligence,
-              and stronger fan ownership.
+              Artist profiles are free forever. Artist Visibility Pro is{' '}
+              {proMonthlyPrice} with limited access.
             </p>
           </div>
 
@@ -80,7 +59,7 @@ export function PricingSection() {
               }}
             >
               <p className='text-sm font-medium tracking-tight text-tertiary-token'>
-                {freePlan.displayName}
+                {freeClaim.displayName}
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
@@ -93,7 +72,7 @@ export function PricingSection() {
                 ) : null}
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                Smart links, your artist profile, and the core launch surface.
+                {freeClaim.note}
               </p>
 
               <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
@@ -137,10 +116,10 @@ export function PricingSection() {
             >
               <div className='flex items-center justify-between'>
                 <p className='text-sm font-medium tracking-tight text-tertiary-token'>
-                  {proPlan.displayName}
+                  {proClaim.displayName}
                 </p>
                 <Badge variant='default' size='lg'>
-                  Limited Time
+                  {proClaim.badge}
                 </Badge>
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
@@ -154,8 +133,7 @@ export function PricingSection() {
                 ) : null}
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                Release notifications, audience intelligence, contact export,
-                and deeper fan ownership.
+                {proClaim.note}
               </p>
 
               <ul className='mt-6 flex flex-1 flex-col gap-2.25'>

@@ -11,7 +11,8 @@
  * - Stripe/billing amount → use `@/lib/config/plan-prices` (this file re-exports it)
  *
  * Hard rules:
- * - Never mention "waitlist" in any plan label, CTA, or description
+ * - Never expose "waitlist" as public copy; approved request-access CTAs may
+ *   route to the waitlist endpoint
  * - Plan IDs here must match `PlanId` in `@/lib/entitlements/registry`
  * - Public prices and CTAs must come from `@/lib/billing/offer-truth`
  */
