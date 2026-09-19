@@ -11,6 +11,7 @@ const {
   searchParamsState,
   signInSocialMock,
   sendOtpMock,
+  trackMock,
 } = vi.hoisted(() => ({
   authState: {
     isLoaded: true,
@@ -25,6 +26,7 @@ const {
   searchParamsState: { value: '' },
   signInSocialMock: vi.fn(),
   sendOtpMock: vi.fn(),
+  trackMock: vi.fn(),
 }));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -52,6 +54,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  track: trackMock,
+}));
+
 vi.mock('@/lib/auth/oauth-providers', async () => {
   const actual = await vi.importActual<
     typeof import('@/lib/auth/oauth-providers')
@@ -77,6 +83,10 @@ vi.mock('@/lib/utils/logger', () => ({
 
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  AUTH_OFFER_SHELL_EVENTS,
+  AUTH_OFFER_SHELL_VARIANT_ID,
+} from '@/lib/auth/auth-offer-optimization';
 import { clearPlanIntent, getPlanIntentRecord } from '@/lib/auth/plan-intent';
 
 describe('AuthShell — Better Auth SSO + email-code contract', () => {
@@ -92,6 +102,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     signInSocialMock.mockResolvedValue(undefined);
     sendOtpMock.mockResolvedValue({ data: {} });
     oneTapMock.mockResolvedValue(undefined);
+    trackMock.mockReset();
   });
 
   it('preserves offer and artist across provider success, cancellation and auth cross-links', async () => {
@@ -124,6 +135,24 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
       interval: 'month',
       artist: 'Tim White',
     });
+    expect(trackMock).toHaveBeenCalledWith(
+      AUTH_OFFER_SHELL_EVENTS.EXPOSURE,
+      expect.objectContaining({
+        variantIdentity: AUTH_OFFER_SHELL_VARIANT_ID,
+        plan: 'pro',
+        interval: 'month',
+        hasArtist: true,
+      })
+    );
+    expect(trackMock).toHaveBeenCalledWith(
+      AUTH_OFFER_SHELL_EVENTS.AUTH_STARTED,
+      expect.objectContaining({
+        variantIdentity: AUTH_OFFER_SHELL_VARIANT_ID,
+        plan: 'pro',
+        hasArtist: true,
+      })
+    );
+    expect(trackMock.mock.calls.flat().join(' ')).not.toMatch(/Tim White/);
   });
 
   it.each(['desktop_return', 'mobile_return'])(

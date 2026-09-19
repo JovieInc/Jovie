@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
   type AuthOfferHandoff,
+  readAuthOfferHandoff,
   resolveAuthenticatedOfferRedirect,
 } from './auth-shell-offer';
 import {
@@ -104,6 +105,33 @@ export function getAuthenticatedAuthRouteRedirect(
       isPaidSubscriber: options?.isPaidSubscriber,
     }) ?? APP_ROUTES.DASHBOARD
   );
+}
+
+export type AuthEntryPageSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
+export function getAuthEntrySearchParam(
+  params: AuthEntryPageSearchParams,
+  key: string
+): string | null {
+  const value = params[key];
+  return typeof value === 'string' ? value : null;
+}
+
+export function getAuthenticatedAuthEntryRedirectFromParams(
+  state: CanonicalUserState,
+  params: AuthEntryPageSearchParams,
+  options?: { readonly isPaidSubscriber?: boolean }
+): string {
+  const get = (key: string) => getAuthEntrySearchParam(params, key);
+  return getAuthenticatedAuthRouteRedirect(state, {
+    redirectUrl: get('redirect_url'),
+    authState: get('auth_state'),
+    offerHandoff: readAuthOfferHandoff({ get }),
+    isPaidSubscriber: options?.isPaidSubscriber,
+  });
 }
 
 type AuthEntrySearchParams = {

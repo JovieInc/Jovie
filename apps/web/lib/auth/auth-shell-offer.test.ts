@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
-import { getAuthenticatedAuthRouteRedirect } from './access-route-redirect';
+import {
+  getAuthenticatedAuthEntryRedirectFromParams,
+  getAuthenticatedAuthRouteRedirect,
+} from './access-route-redirect';
 import {
   buildAuthOfferContinueUrl,
   persistAuthOfferFromSearchParams,
@@ -111,6 +114,27 @@ describe('auth offer reconciliation', () => {
         redirectUrl: APP_ROUTES.ONBOARDING_CHECKOUT,
       })
     ).toBe(APP_ROUTES.SETTINGS_BILLING);
+    expect(
+      getAuthenticatedAuthEntryRedirectFromParams(
+        CanonicalUserState.ACTIVE,
+        {
+          plan: 'pro',
+          interval: 'monthly',
+          artist: 'Tim White',
+          redirect_url: APP_ROUTES.ONBOARDING_CHECKOUT,
+        },
+        { isPaidSubscriber: true }
+      )
+    ).toBe(APP_ROUTES.SETTINGS_BILLING);
+    expect(
+      getAuthenticatedAuthEntryRedirectFromParams(CanonicalUserState.ACTIVE, {
+        plan: 'pro',
+        interval: 'monthly',
+        artist: 'Tim White',
+      })
+    ).toBe(
+      `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&artist_name=Tim+White`
+    );
   });
 
   it('rejects invalid intervals and preserves standalone artist recovery without a paid plan', () => {

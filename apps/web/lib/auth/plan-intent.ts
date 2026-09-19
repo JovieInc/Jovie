@@ -52,6 +52,28 @@ export function parseAuthBillingInterval(
     : null;
 }
 
+interface AuthOfferParamReader {
+  get(key: string): string | null;
+}
+
+export function readAuthOfferIntervalFromParams(
+  params: AuthOfferParamReader
+): BillingInterval | null {
+  return (
+    parseAuthBillingInterval(params.get('interval')) ??
+    parseAuthBillingInterval(params.get('billing'))
+  );
+}
+
+export function readAuthOfferArtistFromParams(
+  params: AuthOfferParamReader
+): string | null {
+  return (
+    parseAuthOfferArtist(params.get('artist')) ??
+    parseAuthOfferArtist(params.get('artist_name'))
+  );
+}
+
 function cookieValue(header: string, key: string): string | null {
   const token = header
     .split(';')
@@ -181,12 +203,8 @@ export function persistOfferIntentFromSearchParams(params: {
   const plan = validatePlan(params.get('plan'));
   if (!plan) return params.get('plan') ? null : getPlanIntentRecord();
   setPlanIntent(plan, {
-    interval:
-      parseAuthBillingInterval(params.get('interval')) ??
-      parseAuthBillingInterval(params.get('billing')),
-    artist:
-      parseAuthOfferArtist(params.get('artist')) ??
-      parseAuthOfferArtist(params.get('artist_name')),
+    interval: readAuthOfferIntervalFromParams(params),
+    artist: readAuthOfferArtistFromParams(params),
   });
   return getPlanIntentRecord();
 }

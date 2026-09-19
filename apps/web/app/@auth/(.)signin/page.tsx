@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
-import { getAuthenticatedAuthRouteRedirect } from '@/lib/auth/access-route-redirect';
-import { readAuthOfferHandoff } from '@/lib/auth/auth-shell-offer';
+import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { SigninModalClient } from './SigninModalClient';
 
@@ -13,21 +12,11 @@ export default async function SigninModalPage({
 }>) {
   await connection();
   const params = await searchParams;
-  const redirectUrl =
-    typeof params.redirect_url === 'string' ? params.redirect_url : null;
-  const authState =
-    typeof params.auth_state === 'string' ? params.auth_state : null;
   const authResult = await resolveUserState({ createDbUserIfMissing: false });
 
   if (authResult.state !== CanonicalUserState.UNAUTHENTICATED) {
     redirect(
-      getAuthenticatedAuthRouteRedirect(authResult.state, {
-        redirectUrl,
-        authState,
-        offerHandoff: readAuthOfferHandoff({
-          get: key =>
-            typeof params[key] === 'string' ? (params[key] as string) : null,
-        }),
+      getAuthenticatedAuthEntryRedirectFromParams(authResult.state, params, {
         isPaidSubscriber: authResult.context?.isPro ?? false,
       })
     );

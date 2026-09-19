@@ -143,9 +143,7 @@ export function buildAuthRouteUrlWithDesktopReturn(
   searchParams: SearchParamReader
 ): string {
   const routeUrl = new URL(
-    buildAuthRouteUrl(pathname, {
-      get: key => (key === 'redirect_url' ? null : searchParams.get(key)),
-    }),
+    buildAuthRouteUrl(pathname, searchParams, { omit: ['redirect_url'] }),
     'https://jov.ie'
   );
   const desktopReturn = sanitizeDesktopReturnRoute(

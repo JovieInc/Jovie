@@ -6,6 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
+import { track } from '@/lib/analytics';
+import {
+  AUTH_OFFER_SHELL_CONTEXT,
+  AUTH_OFFER_SHELL_EVENTS,
+} from '@/lib/auth/auth-offer-optimization';
 import {
   AUTH_TROUBLE_SIGNING_IN_LABEL,
   type AuthShellBackLink,
@@ -199,6 +204,23 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     : APP_ROUTES.DASHBOARD;
   const handoff = readAuthOfferHandoff(searchParams);
   const offerSummary = resolveAuthOfferSummary({ handoff });
+  const trackOfferAuthStarted = useCallback(() => {
+    const current = readAuthOfferHandoff(searchParams);
+    if (!current) return;
+    track(AUTH_OFFER_SHELL_EVENTS.AUTH_STARTED, {
+      ...AUTH_OFFER_SHELL_CONTEXT,
+      plan: current.plan,
+      interval: current.interval,
+      hasArtist: Boolean(current.artist),
+    });
+  }, [searchParams]);
+  const handleOtpStepChange = useCallback(
+    (active: boolean) => {
+      if (active) trackOfferAuthStarted();
+      setOtpStepActive(active);
+    },
+    [trackOfferAuthStarted]
+  );
   // Return through a server auth entry for canonical access/subscriber resolution.
   // Native and explicit callback destinations retain their existing precedence.
   const offerCallback =
@@ -228,6 +250,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   useEffect(() => {
     persistAuthOfferFromSearchParams(searchParams);
     setHasHydrated(true);
+    const current = readAuthOfferHandoff(searchParams);
+    const summary = resolveAuthOfferSummary({ handoff: current });
+    if (!current || !summary) return;
+    track(AUTH_OFFER_SHELL_EVENTS.EXPOSURE, {
+      ...AUTH_OFFER_SHELL_CONTEXT,
+      plan: current.plan,
+      interval: current.interval,
+      hasArtist: Boolean(current.artist),
+    });
   }, [searchParams]);
 
   useEffect(() => {
@@ -250,6 +281,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       if (!hasHydrated || pendingProvider) return;
 
       persistAuthOfferFromSearchParams(searchParams);
+      trackOfferAuthStarted();
       const callbackURL =
         offerCallback ?? fallbackRedirectUrl ?? getCallbackUrl(mode);
       const errorCallbackURL = getErrorCallbackUrl(
@@ -311,6 +343,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       pendingProvider,
       offerCallback,
       searchParams,
+      trackOfferAuthStarted,
     ]
   );
 
@@ -349,7 +382,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           onProviderSelect={handleProviderSelect}
           redirectUrl={resolvedRedirect}
           initialEmailAddress={props.initialValues?.emailAddress}
-          onOtpStepChange={setOtpStepActive}
+          onOtpStepChange={handleOtpStepChange}
         />
       </div>
     );
@@ -389,7 +422,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         onProviderSelect={handleProviderSelect}
         redirectUrl={resolvedRedirect}
         initialEmailAddress={props.initialValues?.emailAddress}
-        onOtpStepChange={setOtpStepActive}
+        onOtpStepChange={handleOtpStepChange}
       />
     </div>
   );

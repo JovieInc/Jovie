@@ -10,8 +10,8 @@ import {
 import {
   getPlanIntentRecord,
   type PlanIntentRecord,
-  parseAuthBillingInterval,
-  parseAuthOfferArtist,
+  readAuthOfferArtistFromParams,
+  readAuthOfferIntervalFromParams,
   setPlanIntent,
   validatePlan,
 } from './plan-intent';
@@ -33,14 +33,12 @@ export function readAuthOfferHandoff(
   const plan = validatePlan(params.get('plan'));
   if (!plan) return null;
   const rawInterval = params.get('interval') ?? params.get('billing');
-  const interval = parseAuthBillingInterval(rawInterval);
+  const interval = readAuthOfferIntervalFromParams(params);
   if (rawInterval && !interval) return null;
   return {
     plan,
     interval,
-    artist:
-      parseAuthOfferArtist(params.get('artist')) ??
-      parseAuthOfferArtist(params.get('artist_name')),
+    artist: readAuthOfferArtistFromParams(params),
   };
 }
 
@@ -58,9 +56,7 @@ export function persistAuthOfferHandoff(handoff: AuthOfferHandoff): void {
 export function persistAuthOfferFromSearchParams(
   params: SearchParamReader
 ): AuthOfferHandoff | null {
-  const artist =
-    parseAuthOfferArtist(params.get('artist')) ??
-    parseAuthOfferArtist(params.get('artist_name'));
+  const artist = readAuthOfferArtistFromParams(params);
   if (artist) {
     try {
       persistSignupClaimValue(SIGNUP_ARTIST_NAME_KEY, artist);
