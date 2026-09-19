@@ -2654,6 +2654,7 @@ describe('canonical admission membership binding', () => {
         '-c',
         `${source.slice(start, end)}
 canonical_admission_producer_is_active() { return 0; }
+canonical_admission_receipt_has_provenance() { return 0; }
 fleet_hold_target_url() { echo "$TARGET"; }
 gh_retry() { printf '%s' "$STATUSES"; }
 node() { return 0; }
