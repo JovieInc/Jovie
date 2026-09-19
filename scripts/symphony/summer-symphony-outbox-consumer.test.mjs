@@ -1192,6 +1192,12 @@ describe('configuration boundaries', () => {
     );
     assert.deepEqual(await projector.project(v2Task), issue);
     assert.equal(calls.length, 3);
+    for (const call of calls.slice(0, 2)) {
+      assert.match(
+        JSON.parse(String(call.options.body)).query,
+        /children\(first: 50.*filter: \{ state: \{ type: \{ nin: \["completed", "canceled"\]/
+      );
+    }
     assert.equal(calls[0].url, 'https://api.linear.app/graphql');
     assert.equal(calls[0].options.redirect, 'error');
     assert.equal(calls[0].options.headers.authorization, 'scoped-test-key');

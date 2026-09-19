@@ -1608,7 +1608,7 @@ async function requireChildCapacity(config, parent, fetchImpl) {
       `query SummerChildren($parentIssue: String!, $after: String!) {
         parent: issue(id: $parentIssue) {
           id identifier
-          children(first: 50, after: $after) {
+          children(first: 50, after: $after, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
             nodes { identifier title state { name } }
             pageInfo { hasNextPage endCursor }
           }
@@ -1648,7 +1648,7 @@ export function createLinearProjector(config, fetchImpl = fetch) {
           }
           parent: issue(id: $parentIssue) {
             id identifier
-            children(first: 50) {
+            children(first: 50, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
               nodes { identifier title state { name } }
               pageInfo { hasNextPage endCursor }
             }
