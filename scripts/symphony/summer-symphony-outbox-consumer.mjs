@@ -90,6 +90,8 @@ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u;
 const SIGNATURE = /^ed25519=[A-Za-z0-9_-]{86}$/u;
 const MAX_PAGES = 4;
 const PAGE_LIMIT = 25;
+export const MAX_OPEN_SUMMER_CHILDREN = 3;
+export const OPEN_CHILD_BUDGET = 'linear-projection-open-child-budget-exceeded';
 const RESPONSE_BYTE_LIMIT = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -103,6 +105,8 @@ class OutboxPageLimitError extends Error {
 const ACTIONS = new Set([
   'reconcile-release-certification-starvation',
   'reconcile-native-queue-starvation',
+  'reconcile-closure-health-red',
+  'reconcile-runner-capacity-starvation',
   'remediate-selected-ci-audit-class',
 ]);
 const CI_IDS = new Set([
@@ -317,14 +321,21 @@ export function validateTask(task) {
   }
   const release = task.selected.id === 'release-certification-starvation';
   const queueStarvation = task.selected.id === 'native-queue-starvation';
+  const closureHealth = task.selected.id === 'closure-health-red';
+  const runnerCapacity = task.selected.id === 'runner-capacity-starvation';
   if (
     !isV3 &&
     ((release &&
       task.action !== 'reconcile-release-certification-starvation') ||
       (queueStarvation &&
         task.action !== 'reconcile-native-queue-starvation') ||
+      (closureHealth && task.action !== 'reconcile-closure-health-red') ||
+      (runnerCapacity &&
+        task.action !== 'reconcile-runner-capacity-starvation') ||
       (!release &&
         !queueStarvation &&
+        !closureHealth &&
+        !runnerCapacity &&
         (!CI_IDS.has(task.selected.id) ||
           task.action !== 'remediate-selected-ci-audit-class')))
   ) {
@@ -338,7 +349,11 @@ export function validateTask(task) {
       task.decisionFingerprint !== task.taskKey ||
       lifetime <= 0 ||
       lifetime > 5400000 ||
-      (!release && !queueStarvation && !CI_IDS.has(task.selected.id))
+      (!release &&
+        !queueStarvation &&
+        !closureHealth &&
+        !runnerCapacity &&
+        !CI_IDS.has(task.selected.id))
     )
       throw new Error('existing-repair-task-cross-bound');
   }
@@ -1425,7 +1440,19 @@ export async function runCycle({
     throw new Error('v2-execution-configuration-missing');
   }
   if (state.active.phase === 'discovered') {
-    const issue = await projector.project(task);
+    let issue;
+    try {
+      issue = await projector.project(task);
+    } catch (error) {
+      if (error?.message === OPEN_CHILD_BUDGET) {
+        return {
+          status: 'projection-held',
+          taskKey: task.taskKey,
+          reason: OPEN_CHILD_BUDGET,
+        };
+      }
+      throw error;
+    }
     const outcome = signOutcomeV2(task, issue, outcomePrivateKey, outcomeKeyId);
     validateOutcomeV2(outcome, task, outcomePublicKey);
     state = {
@@ -1543,6 +1570,76 @@ function validateProjectedIssue(issue, projection) {
   return issue;
 }
 
+export function countOpenSummerChildren(nodes) {
+  if (
+    !Array.isArray(nodes) ||
+    nodes.some(
+      node =>
+        typeof node?.identifier !== 'string' ||
+        typeof node?.title !== 'string' ||
+        typeof node?.state?.name !== 'string'
+    )
+  )
+    throw new Error('linear-projection-child-evidence-invalid');
+  return nodes.filter(
+    node =>
+      node.title.startsWith('[summer-task:') &&
+      !['Done', 'Canceled'].includes(node.state.name)
+  ).length;
+}
+
+async function requireChildCapacity(config, parent, fetchImpl) {
+  let connection = parent.children;
+  let openCount = 0;
+  const cursors = new Set();
+  const identifiers = new Set();
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    openCount += countOpenSummerChildren(connection?.nodes);
+    for (const node of connection.nodes) {
+      if (identifiers.has(node.identifier))
+        throw new Error('linear-projection-child-evidence-invalid');
+      identifiers.add(node.identifier);
+    }
+    if (openCount >= MAX_OPEN_SUMMER_CHILDREN)
+      throw new Error(OPEN_CHILD_BUDGET);
+    if (typeof connection.pageInfo?.hasNextPage !== 'boolean') {
+      throw new Error('linear-projection-child-evidence-invalid');
+    }
+    if (!connection.pageInfo.hasNextPage) return;
+    const cursor = connection.pageInfo.endCursor;
+    if (
+      typeof cursor !== 'string' ||
+      !cursor ||
+      cursors.has(cursor) ||
+      page + 1 === MAX_PAGES
+    ) {
+      throw new Error('linear-projection-child-evidence-incomplete');
+    }
+    cursors.add(cursor);
+    const next = await linearGraphql(
+      config,
+      `query SummerChildren($parentIssue: String!, $after: String!) {
+        parent: issue(id: $parentIssue) {
+          id identifier
+          children(first: 50, after: $after, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+            nodes { identifier title state { name } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { parentIssue: parent.identifier, after: cursor },
+      fetchImpl
+    );
+    if (
+      next.parent?.id !== parent.id ||
+      next.parent?.identifier !== parent.identifier
+    ) {
+      throw new Error('linear-projection-child-evidence-invalid');
+    }
+    connection = next.parent.children;
+  }
+}
+
 export function createLinearProjector(config, fetchImpl = fetch) {
   return {
     async project(task) {
@@ -1562,7 +1659,13 @@ export function createLinearProjector(config, fetchImpl = fetch) {
               labels(filter: { name: { eq: "symphony" } }, first: 2) { nodes { id name } }
             }
           }
-          parent: issue(id: $parentIssue) { id identifier }
+          parent: issue(id: $parentIssue) {
+            id identifier
+            children(first: 50, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+              nodes { identifier title state { name } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
           issues(filter: { team: { key: { eq: $teamKey } }, title: { eq: $title } }, first: 10) {
             nodes {
               id identifier title description createdAt
@@ -1603,6 +1706,7 @@ export function createLinearProjector(config, fetchImpl = fetch) {
       if (existing.length === 1) {
         return validateProjectedIssue(existing[0], projection);
       }
+      await requireChildCapacity(config, prepared.parent, fetchImpl);
       const created = await linearGraphql(
         config,
         `mutation SummerProjectionCreate($input: IssueCreateInput!) {

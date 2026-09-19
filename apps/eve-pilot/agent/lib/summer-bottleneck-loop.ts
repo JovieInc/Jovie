@@ -43,12 +43,16 @@ export type SummerCiImprovementClassId =
 export type SymphonyRepairAction =
   | 'reconcile-release-certification-starvation'
   | 'reconcile-native-queue-starvation'
+  | 'reconcile-closure-health-red'
+  | 'reconcile-runner-capacity-starvation'
   | 'remediate-selected-ci-audit-class';
 
 export const repairActionsByBottleneck = {
   'release-certification-starvation':
     'reconcile-release-certification-starvation',
   'native-queue-starvation': 'reconcile-native-queue-starvation',
+  'closure-health-red': 'reconcile-closure-health-red',
+  'runner-capacity-starvation': 'reconcile-runner-capacity-starvation',
 } as const satisfies Record<string, SymphonyRepairAction>;
 const REPAIR_ACTIONS_BY_BOTTLENECK: Record<string, SymphonyRepairAction> = {
   ...repairActionsByBottleneck,
@@ -298,6 +302,8 @@ export const symphonyRepairTaskSchema = z
     action: z.enum([
       'reconcile-release-certification-starvation',
       'reconcile-native-queue-starvation',
+      'reconcile-closure-health-red',
+      'reconcile-runner-capacity-starvation',
       'remediate-selected-ci-audit-class',
     ]),
     issue: z.literal('JOV-5853'),
@@ -309,6 +315,8 @@ export const symphonyRepairTaskSchema = z
         id: z.union([
           z.literal('release-certification-starvation'),
           z.literal('native-queue-starvation'),
+          z.literal('closure-health-red'),
+          z.literal('runner-capacity-starvation'),
           ciClassId,
         ]),
         sourceRevision: exactSha,
@@ -500,7 +508,10 @@ export function rankSummerBottlenecks(
           closure.openPullRequests * 80,
           closure.sourceRevision,
           closure.sourceDigest,
-          nowMs
+          nowMs,
+          true,
+          'Summer',
+          'symphony'
         )
       : null,
     queue.eligibleCleanPrs > 0 && queue.queuedPrs === 0
@@ -556,7 +567,10 @@ export function rankSummerBottlenecks(
           queuedWork * 40,
           runnerSourceRevision,
           runner.sourceDigest,
-          nowMs
+          nowMs,
+          true,
+          'Summer',
+          'symphony'
         )
       : null,
   ].filter((item): item is Candidate => item !== null);
@@ -591,7 +605,11 @@ function fingerprintFor(
       ? { repairEnvelope: 'ci-audit-source-repair-v1' }
       : selected.id === 'native-queue-starvation'
         ? { repairEnvelope: 'native-queue-admission-repair-v1' }
-        : {}),
+        : selected.id === 'closure-health-red'
+          ? { repairEnvelope: 'closure-health-repair-v1' }
+          : selected.id === 'runner-capacity-starvation'
+            ? { repairEnvelope: 'runner-capacity-repair-v1' }
+            : {}),
     signal: semanticIdentity(signal),
     sourceVersion: snapshot.sourceVersion,
   });
@@ -605,6 +623,14 @@ type RepairSelection =
   | {
       readonly id: 'native-queue-starvation';
       readonly action: 'reconcile-native-queue-starvation';
+    }
+  | {
+      readonly id: 'closure-health-red';
+      readonly action: 'reconcile-closure-health-red';
+    }
+  | {
+      readonly id: 'runner-capacity-starvation';
+      readonly action: 'reconcile-runner-capacity-starvation';
     }
   | {
       readonly id: SummerCiImprovementClassId;
@@ -628,6 +654,18 @@ function repairSelectionFor(selected: Candidate): RepairSelection | null {
     return {
       id: selected.id,
       action: 'reconcile-native-queue-starvation',
+    };
+  }
+  if (selected.id === 'closure-health-red') {
+    return {
+      id: selected.id,
+      action: 'reconcile-closure-health-red',
+    };
+  }
+  if (selected.id === 'runner-capacity-starvation') {
+    return {
+      id: selected.id,
+      action: 'reconcile-runner-capacity-starvation',
     };
   }
   return isSummerCiImprovementClassId(selected.id)

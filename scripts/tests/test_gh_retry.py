@@ -6818,3 +6818,120 @@ class TestCanonicalAdmissionProducer:
         assert f"statuses/{head}" in receipt
         assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/42" in receipt
         assert (tmp_path / "producer-reads").read_text().strip() == "2"
+
+
+@pytest.mark.parametrize(
+    ("primary_result", "compensation_ok", "queued_count", "expected_code", "expected_enrolls"),
+    [
+        ("success", True, 0, 0, ["101", "102"]),
+        ("failure", True, 0, 1, ["101", "102"]),
+        ("failure", False, 0, 1, ["101"]),
+        ("source-red", True, 0, 3, ["102"]),
+        ("success", True, 15, 0, ["101"]),
+        ("source-red", True, 16, 3, []),
+    ],
+)
+def test_exact_target_failure_isolation_recovers_independent_heads(
+    tmp_path: Path, primary_result: str, compensation_ok: bool, queued_count: int,
+    expected_code: int, expected_enrolls: list[str],
+) -> None:
+    """Use truthful target-only reads; retain failure after safe fleet recovery."""
+    heads = {"101": "b" * 40, "102": "c" * 40, "103": "d" * 40}
+    calls = tmp_path / "calls.jsonl"
+    real_node = shutil.which("node")
+    assert real_node
+    states = {
+        number: {
+            "number": int(number), "headRefOid": head,
+            "headRefName": "release/2026-09-19" if number == "102" else "codex/fixture",
+            "state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE",
+            "mergeStateStatus": "CLEAN", "baseRefName": "main",
+            "labels": {"nodes": [{"name": "hold"}] if number == "103" else []},
+            "queued": False, "isInMergeQueue": False, "mergeQueueEntry": None,
+        }
+        for number, head in heads.items()
+    }
+    for index in range(queued_count):
+        number = str(200 + index)
+        states[number] = dict(states["101"], number=int(number), queued=True, isInMergeQueue=True,
+                              mergeQueueEntry={"id": "MQE_" + number, "state": "QUEUED", "position": index + 1})
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(json.dumps({
+        "heads": heads, "states": states, "result": primary_result,
+        "compensation_ok": compensation_ok,
+    }), encoding="utf-8")
+    prefix = f'''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+fixture = json.loads(Path({str(fixture)!r}).read_text())
+args = sys.argv[1:]
+with open({str(calls)!r}, "a") as out:
+    out.write(json.dumps([Path(sys.argv[0]).name, *args]) + "\\n")
+def emit(value):
+    print(json.dumps(value))
+    sys.exit(0)
+'''
+    node = tmp_path / "node"
+    node.write_text(prefix + f'''
+command = args[1]
+if command == "preflight": sys.exit(0)
+if command == "list-state":
+    emit({{args[2]: fixture["states"][args[2]]}} if len(args) > 2 else fixture["states"])
+if command == "max-queue-depth": emit(16)
+if command == "enroll":
+    number = args[2]
+    if number == "101" and fixture["result"] == "failure": sys.exit(1)
+    state = dict(fixture["states"][number])
+    state["mergeQueueEntry"] = {{"id": "MQE_" + number, "enqueuedAt": "2026-08-15T12:00:00Z", "state": "QUEUED", "position": 1}}
+    state["isInMergeQueue"] = state["queued"] = True
+    emit({{"state": state}})
+if command == "dequeue":
+    if not fixture["compensation_ok"]: sys.exit(1)
+    emit({{"state": {{"queued": False}}}})
+if command == "prove-admission": sys.exit(0)
+if command == "prove-receipt": emit({{"ok": False, "state": {{"queued": False}}, "explanation": {{"reason": "not-queued"}}}})
+if command in ("explain-selector", "--classify-queue", "admission", "changelog-collision"):
+    os.execv({real_node!r}, [{real_node!r}, *args])
+if command == "changelog-inventory": emit({{"prs": [], "count": 0, "reason": "explicit"}})
+if command == "changelog-drain": emit({{"action": "keep", "reason": "omits-changelog"}})
+if command in ("changelog-collision", "unmergeable-reenqueue"): emit({{"action": "allow"}})
+if command == "unmergeable-eject": emit({{"action": "keep", "reason": "not-queued"}})
+raise SystemExit("unexpected node args: " + repr(args))
+''', encoding="utf-8")
+    node.chmod(0o755)
+    gh = tmp_path / "gh"
+    gh.write_text(prefix + '''
+if args[:2] == ["pr", "checks"]:
+    emit([{"name": name, "bucket": "fail" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "pass", "state": "FAILURE" if name == "PR Ready" and args[2] == "101" and fixture["result"] == "source-red" else "SUCCESS"} for name in ["PR Ready", "Migration Guard", "Fork PR Gate", "PR Size Guard"]])
+if args[:2] == ["pr", "view"]:
+    if "files" in args: emit(["CHANGELOG.md"] if args[2] == "102" else [])
+    state = dict(fixture["states"][args[2]])
+    state["labels"] = state["labels"]["nodes"]
+    emit(state)
+if args[0] == "api":
+    if "/statuses?per_page=100" in args[1]: emit([[]])
+    if "/status" in args[1] and "/commits/" in args[1]: emit({"statuses": []})
+    if any("/statuses/" in arg for arg in args): emit({})
+    sys.exit(1)
+raise SystemExit("unexpected gh args: " + repr(args))
+''', encoding="utf-8")
+    gh.chmod(0o755)
+    result = _run_bash(_drain_command(
+        tmp_path, backend="native",
+        extra_env=f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={heads['101']} DRAIN_RECONCILE_MISSED_ADMISSION=1 DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2",
+    ))
+    assert result.returncode == expected_code, result.stdout + result.stderr
+    events = [json.loads(line) for line in calls.read_text().splitlines()]
+    enrolls = [event[3] for event in events if event[0] == "node" and event[2] == "enroll"]
+    assert enrolls == expected_enrolls
+    inventories = [event[3:] for event in events if event[0] == "node" and event[2] == "list-state"]
+    assert inventories[0] == ["101"]
+    if compensation_ok:
+        assert [] in inventories, "exact-target reads cannot contain missed fleet candidates"
+        assert ("+native-queue on #102" in result.stdout) == ("102" in expected_enrolls)
+    else:
+        assert "=== RECOVER (bounded exact-head native admission) ===" not in result.stdout, "unknown mutation effects must abort recovery"
+    status_posts = [arg for event in events if event[0] == "gh" and event[1] == "api" for arg in event[2:] if "/statuses/" in arg]
+    assert any(heads["102"] in endpoint for endpoint in status_posts) == ("102" in expected_enrolls)
+    if primary_result != "success":
+        assert not any(heads["101"] in endpoint for endpoint in status_posts)

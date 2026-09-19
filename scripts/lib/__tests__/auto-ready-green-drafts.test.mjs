@@ -63,23 +63,47 @@ describe('green-source draft classifier', () => {
     });
   });
 
-  it.each(GREEN_SOURCE_PROTECTED_PRS)(
-    'never authorizes protected PR #%s',
-    number => {
-      expect(
-        classifyGreenSourceDraft(
-          draft({
-            prNumber: number,
-            labels: number === 17156 ? ['hold'] : [],
-          })
-        )
-      ).toEqual({
-        eligible: false,
-        reason: `protected-pr:${number}`,
-      });
-      expect(isProtectedGreenSourcePr(number)).toBe(true);
-    }
-  );
+  it('keeps only HOLD #17156 as a numeric exemption', () => {
+    expect(GREEN_SOURCE_PROTECTED_PRS).toEqual([17156]);
+    expect(isProtectedGreenSourcePr(17156)).toBe(true);
+    expect(isProtectedGreenSourcePr(17453)).toBe(false);
+    expect(isProtectedGreenSourcePr(17929)).toBe(false);
+    expect(
+      classifyGreenSourceDraft(
+        draft({
+          prNumber: 17156,
+          labels: ['hold'],
+        })
+      )
+    ).toEqual({
+      eligible: false,
+      reason: 'protected-pr:17156',
+    });
+  });
+
+  it('relies on hold labels for open #17929 instead of a numeric exemption', () => {
+    expect(
+      classifyGreenSourceDraft(draft({ prNumber: 17929, labels: ['hold'] }))
+    ).toEqual({
+      eligible: false,
+      reason: 'held',
+    });
+    expect(
+      classifyGreenSourceDraft(draft({ prNumber: 17929, labels: [] }))
+    ).toEqual({
+      eligible: true,
+      reason: 'green-source-clean',
+    });
+  });
+
+  it('does not treat merged #17453 as a planted protect exemption', () => {
+    expect(
+      classifyGreenSourceDraft(draft({ prNumber: 17453, labels: [] }))
+    ).toEqual({
+      eligible: true,
+      reason: 'green-source-clean',
+    });
+  });
 
   it.each([
     'hold',
@@ -199,8 +223,11 @@ describe('green-source controller contract', () => {
     expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
     expect(fleetScript).toContain('17156');
-    expect(fleetScript).toContain('17453');
-    expect(fleetScript).toContain('17929');
+    expect(fleetScript).not.toContain('17453');
+    expect(fleetScript).not.toContain('17929');
+    expect(fleetScript).toContain(
+      'PROTECTED_PRS="$(node "$CLASSIFY_LIB" protected)"'
+    );
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
       fleetScript.indexOf('gh_retry pr ready "$n" -R "$REPO" >/dev/null')
     );

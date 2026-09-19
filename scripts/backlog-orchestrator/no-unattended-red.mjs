@@ -9,6 +9,7 @@ import { once } from 'node:events';
 import { mkdir, open, readdir, readFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import { gateHumanFireEscalation } from './summer-live-state.mjs';
 import { OFFICIAL_ROUTING_RECEIPT_SCHEMA } from './symphony-routing.mjs';
 
 export const NO_UNATTENDED_RED_SCHEMA = 'jovie-no-unattended-red/v1';
@@ -288,6 +289,8 @@ function createApi() {
     return markNotProven({ ...record, headSha: live, leaseKey: leaseKeyFor({ ...record, headSha: live }) }, 'exact-head-changed-requalify', now);
   }
   function escalate(record, reason, now = new Date().toISOString(), input = {}) {
+    const gated = gateHumanFireEscalation({ record, reason, now, input });
+    if (gated.blocked) return gated.record;
     const exactReason = text(reason) || `escalated:${record.stallClass}`;
     const handoff = buildEscalationHandoff(record, { ...input, failure: exactReason, phase: 'hard-blocked' }, { now });
     return transitionRecord(record, { state: 'hard-blocked', mode: 'authority-blocker', outcome: 'escalated', terminal: true, dispatchState: 'escalated', action: 'visible-founder-review', reason: exactReason, authorityBudget: 0, observedAt: iso(now), escalation: { key: handoff.escalationKey, repository: record.repository, status: 'hard-blocked', reason: exactReason, stallClass: record.stallClass, issue: record.issue, pr: record.pr, headSha: record.headSha, attempts: record.attempt, owner: record.owner, writer: record.writer, leaseKey: record.leaseKey, handoff } }, handoff.escalationKey);
@@ -341,6 +344,22 @@ function createApi() {
     return { status: 'delegated', reason: 'bounded-delegated-diagnosis', record: transitionRecord(record, { state: 'delegated-diagnosis', mode: 'typed-remediation', action: 'bounded-delegated-diagnosis', dispatchState: 'delegated', delegationBudget: Number(record.delegationBudget || 0) - 1, delegationDepth: receipt.depth, delegation: receipt, observedAt: iso(now) }, delegationKey) };
   }
   function planFounderContact(record, input = {}, { existing = record.escalation?.founderContact || null, now = new Date().toISOString() } = {}) {
+    const gated = gateHumanFireEscalation({
+      record,
+      reason: input.exactQuestion || input.reason || record.reason,
+      now,
+      input,
+    });
+    if (gated.blocked) {
+      return {
+        status: 'blocked',
+        reason: gated.gate.alreadyInFlight
+          ? `already-in-flight:${gated.gate.alreadyInFlight.reason}`
+          : gated.gate.reason,
+        contact: null,
+        record: gated.record,
+      };
+    }
     const severity = text(input.severity);
     const handoff = record.escalation?.handoff || buildEscalationHandoff(record, input.handoff, { now });
     const contactKey = digest({ escalationKey: handoff.escalationKey, channel: FOUNDER_CONTACT_PRIMARY_CHANNEL });

@@ -253,12 +253,15 @@ export function decideNativeQueueExecution(input) {
 }
 
 export function unsignedNativeQueueExecution(input) {
+  if (!ENROLLABLE_ACTIONS.includes(input.action)) {
+    throw new Error('native-queue-action-required');
+  }
   const decision = input.decision;
   return {
     schema: EXECUTION_SCHEMA,
     taskKey: input.taskKey,
     issueIdentifier: input.issueIdentifier,
-    action: NATIVE_QUEUE_ACTION,
+    action: input.action,
     status: decision.status === 'succeeded' ? 'succeeded' : 'failed',
     detail: String(decision.detail).slice(0, 240),
     completedAt: input.completedAt,
@@ -273,9 +276,7 @@ export function unsignedNativeQueueExecution(input) {
       head: decision.head,
     },
     source: {
-      action: ENROLLABLE_ACTIONS.includes(input.action)
-        ? input.action
-        : NATIVE_QUEUE_ACTION,
+      action: input.action,
       snapshotDigest: input.source.snapshotDigest,
       sourceVersion: input.source.sourceVersion,
     },
@@ -315,9 +316,7 @@ export async function executeNativeQueueStarvation({
   if (!/^JOV-[1-9][0-9]*$/u.test(issueIdentifier ?? '')) {
     throw new Error('issue-identifier-invalid');
   }
-  const action = ENROLLABLE_ACTIONS.includes(admission?.action)
-    ? admission.action
-    : NATIVE_QUEUE_ACTION;
+  const action = admission?.action;
   const decision = decideNativeQueueExecution({
     ...admission,
     action,
@@ -418,6 +417,14 @@ export async function executeNativeQueueStarvation({
   let acknowledgement;
   try {
     acknowledgement = await writeExecution(record);
+    if (
+      acknowledgement?.schema !== 'summer.symphony-execution-ack/v1' ||
+      acknowledgement.taskKey !== taskKey ||
+      !['recorded', 'replay'].includes(acknowledgement.status) ||
+      acknowledgement.decision !== record.status
+    ) {
+      throw new Error('execution-ack-invalid-or-cross-bound');
+    }
   } catch (error) {
     acknowledgement = {
       status: 'execution-write-failed',
@@ -441,6 +448,7 @@ export async function executeNativeQueueStarvation({
     assignee: claim?.assignee ?? AUTONOMOUS_LINEAR_WORKER,
   };
   if (
+    acknowledgement.status !== 'execution-write-failed' &&
     finalDecision.status === 'succeeded' &&
     (finalDecision.mergeQueueEntryId || finalDecision.mergedAt)
   ) {
@@ -450,7 +458,10 @@ export async function executeNativeQueueStarvation({
     });
   }
   return {
-    status: 'execution-recorded',
+    status:
+      acknowledgement.status === 'execution-write-failed'
+        ? 'execution-unacknowledged'
+        : 'execution-recorded',
     taskKey,
     issueIdentifier,
     decision: finalDecision,

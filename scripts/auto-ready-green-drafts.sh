@@ -9,7 +9,8 @@
 # queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
 # Writer-owned proof recovery stays in auto-ready-agent-drafts.sh.
 #
-# Never mutates protected specials: #17156 HOLD, #17453, #17929.
+# Never mutates HOLD #17156. Tim/machine hold labels (GREEN_SOURCE_HOLD_LABELS)
+# cover other open holds — do not keep merged/closed PR numbers here.
 #
 # Env:
 #   DRY_RUN=1                 classify and print only; flip no PRs

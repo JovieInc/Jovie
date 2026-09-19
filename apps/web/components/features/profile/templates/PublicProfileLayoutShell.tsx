@@ -37,6 +37,8 @@ interface PublicProfileLayoutShellProps {
   /** Desktop spare-space growth CTA (JOV-3544). */
   readonly claimFooterHref?: string | null;
   readonly showClaimFooter?: boolean;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
   /** True when this shell renders inside another page (marketing phone
    *  preview, dashboard preview) instead of as the outer profile document.
    *  Marks the viewport so the global html/body scroll lock in globals.css
@@ -58,6 +60,8 @@ export function PublicProfileLayoutShell({
   previewExitHref,
   claimFooterHref = null,
   showClaimFooter = false,
+  claimFooterLabel,
+  proofClaim = false,
   embedded = false,
 }: Readonly<PublicProfileLayoutShellProps>) {
   // The background blur stage is 84px blurred and 28% opaque — a CSS radial
@@ -149,7 +153,12 @@ export function PublicProfileLayoutShell({
             )}
           </div>
           {showClaimFooter && claimFooterHref ? (
-            <ProfileClaimFooter href={claimFooterHref} enabled />
+            <ProfileClaimFooter
+              href={claimFooterHref}
+              enabled
+              label={claimFooterLabel}
+              proofClaim={proofClaim}
+            />
           ) : null}
         </main>
       </div>

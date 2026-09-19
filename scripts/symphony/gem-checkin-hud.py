@@ -217,7 +217,9 @@ def terminal_size(
     size = shutil.get_terminal_size((TARGET_WIDTH, TARGET_HEIGHT))
     cols = width if isinstance(width, int) and width > 0 else int(size.columns or TARGET_WIDTH)
     rows = height if isinstance(height, int) and height > 0 else int(size.lines or TARGET_HEIGHT)
-    return max(MIN_WIDTH, cols), max(MIN_HEIGHT, rows)
+    # Hotplug can leave a real console smaller than the preferred layout.
+    # Never invent cells outside that viewport; render() clips to these bounds.
+    return max(1, cols), max(1, rows)
 
 
 def terminal_width(override: int | None = None) -> int:
