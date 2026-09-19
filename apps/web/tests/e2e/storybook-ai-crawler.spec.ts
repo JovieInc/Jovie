@@ -45,7 +45,8 @@ async function openState(page: Page, storyId: string): Promise<Locator> {
     { key: STORYBOOK_THEME_STORAGE_KEY, value: 'light' }
   );
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
-    waitUntil: 'domcontentloaded',
+    // The panel-visible assertion below owns cold Vite compilation readiness.
+    waitUntil: 'commit',
     timeout: 60_000,
   });
 
@@ -87,6 +88,25 @@ async function assertNarrowLayout(page: Page, panel: Locator) {
     layout.documentScrollWidth,
     `crawler story document overflows at narrow width: ${JSON.stringify(layout)}`
   ).toBeLessThanOrEqual(layout.documentClientWidth + 1);
+
+  const monthly = await panel
+    .getByText('Reads (30 Days)', { exact: true })
+    .boundingBox();
+  const weekly = await panel
+    .getByText('This Week', { exact: true })
+    .boundingBox();
+  expect(
+    monthly,
+    'monthly metric should have measurable geometry'
+  ).not.toBeNull();
+  expect(
+    weekly,
+    'weekly metric should have measurable geometry'
+  ).not.toBeNull();
+  if (monthly && weekly) {
+    expect(Math.abs(monthly.y - weekly.y)).toBeLessThanOrEqual(1);
+    expect(weekly.x).toBeGreaterThanOrEqual(monthly.x + monthly.width);
+  }
 
   const box = await panel.boundingBox();
   expect(

@@ -136,7 +136,7 @@ describe('AiCrawlerDetailPanel', () => {
 
     render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
 
-    expect(screen.getByText('30-Day Reads')).toBeInTheDocument();
+    expect(screen.getByText('Reads (30 Days)')).toBeInTheDocument();
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
     expect(
       screen.queryByText(

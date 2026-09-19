@@ -89,8 +89,24 @@ describe('AiCrawlerDetailPanel', () => {
     ).toHaveTextContent(
       'Readiness Signal: AI crawler reads show that a service fetched a page. They do not show an AI answer mention, referral, purchase, revenue, or causal lift.'
     );
-    expect(screen.getByText('30-Day Reads')).toBeInTheDocument();
+    expect(screen.getByText('Reads (30 Days)')).toBeInTheDocument();
     expect(screen.getByText('420')).toBeInTheDocument();
+  });
+
+  it.each([
+    { name: 'populated', data: proAnalytics, isLoading: false },
+    { name: 'missing', data: undefined, isLoading: false },
+    { name: 'loading', data: undefined, isLoading: true },
+  ])('keeps both metric tiles in separate grid columns while $name', state => {
+    hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue(state);
+    render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
+
+    const monthlyTile = screen.getByText('Reads (30 Days)').parentElement;
+    const weeklyTile = screen.getByText('This Week').parentElement;
+    const grid = monthlyTile?.parentElement;
+    expect(grid).toHaveClass('grid', 'grid-cols-2');
+    expect(weeklyTile?.parentElement).toBe(grid);
+    expect(grid?.children).toHaveLength(2);
   });
 
   it('keeps missing crawler telemetry Unknown instead of displaying zero', () => {
