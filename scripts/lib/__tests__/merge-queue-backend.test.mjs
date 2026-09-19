@@ -639,6 +639,8 @@ function exactProductionMarkerEvidence({
 function executeHoldIntakePreflight({
   closureIntakeAllowed,
   cohortIntakeAllowed,
+  closureStatus,
+  closureReasons,
 }) {
   const receipt = {
     schema: 'jovie-fleet-gate/v1',
@@ -676,12 +678,13 @@ function executeHoldIntakePreflight({
     closureAdmission: {
       allowed: closureIntakeAllowed,
       authority: 'Summer',
-      status: closureIntakeAllowed ? 'healthy' : 'red',
+      status: closureStatus ?? (closureIntakeAllowed ? 'healthy' : 'red'),
       newIssueIntakeAllowed: closureIntakeAllowed,
       newImplementationAllowed: closureIntakeAllowed,
       fallbackPrGenerationAllowed: closureIntakeAllowed,
       promotionContinues: true,
       remediationContinues: true,
+      ...(closureReasons ? { reasons: closureReasons } : {}),
     },
     alreadyAdmittedCohort: {
       preserve: true,
@@ -839,6 +842,26 @@ describe('queue workflow mutation safety', () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
+  it('accepts issue-blocked red hold-intake while promotion stays held', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: true,
+      cohortIntakeAllowed: true,
+      closureStatus: 'red',
+      closureReasons: [
+        'queue-controller-red-over-10m',
+        'unclassified-open-pr-over-15m',
+      ],
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600'
+    );
+    expect(result.stderr).not.toContain(
       'Fleet receipt does not authorize promotion mode hold-intake'
     );
   });
@@ -1591,6 +1614,13 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain(
       'queue-noop is a controller disposition, not a product-quality failure'
     );
+    expect(enroll).toContain(
+      'hold-intake issue-blocked red aligned fail-closed so CLEAN source can enroll while promotion stays held'
+    );
+    expect(enroll).toContain(
+      'hold-intake waiting-lane is a controller disposition, not a product-quality failure'
+    );
+    expect(enroll).toContain("DRAIN_PROMOTION_MODE\" == \"hold-intake\"");
     expect(enroll).toContain("failure='dropped-controller-event'");
     expect(enroll).toContain("failure='queue-noop'");
     expect(enroll).toContain('[[ "$drain_rc" -eq 3 ]]');
