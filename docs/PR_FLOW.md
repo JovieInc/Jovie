@@ -111,10 +111,11 @@ Rules:
   while new implementation and deployment stay held, subject to the separate
   release-wave pause below.
   A separate active release-wave lease pauses only new native queue enrollment
-  and re-entry while a Production Controller run is queued or in progress. The
-  workflow fixes each run's deadline at 30 minutes from `created_at`. Terminal
-  completion releases that run's hold sooner; another queued or in-progress run
-  can keep the pause active against its own deadline. Repeated observations do
+  and re-entry while a Production Controller run is queued, concurrency-pending
+  (GitHub status `pending`), or in progress. The workflow fixes each run's deadline
+  at 30 minutes from `created_at`. Terminal completion releases that run's hold
+  sooner; another queued, pending, or in-progress run can keep the pause active
+  against its own deadline. Repeated observations do
   not restart a run's deadline. Already-admitted native entries remain in the
   queue, subject to ordinary safety-dequeue checks, throughout the pause.
   Unavailable or malformed controller state fails closed before enrollment.
