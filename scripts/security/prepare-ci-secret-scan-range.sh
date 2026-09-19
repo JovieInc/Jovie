@@ -157,12 +157,27 @@ elif [[ "$CURRENT_SHA" != "$HEAD_SHA" ]]; then
 fi
 
 assert_current_ref_is_current() {
-  local remote_output remote_head
+  local remote_output remote_head lookup_status=0
   remote_output="$(
     run_bounded_network_command \
       "$GIT_BIN" ls-remote --exit-code "$REMOTE" "$CURRENT_REF"
-  )" \
-    || fail "current ref is no longer available; this run was superseded"
+  )" || lookup_status=$?
+  if [[ $lookup_status -ne 0 ]]; then
+    # GitHub deletes refs/heads/gh-readonly-queue/* when it destroys a
+    # superseded merge group, while the group's already-started runs keep
+    # executing. `ls-remote --exit-code` returns 2 exactly when the transport
+    # succeeded and the ref is gone, so nothing alive remains to gate:
+    # neutralize the dead run instead of burning a red check on it
+    # (merge_group run 35315530383). Pull-request/push refs, a queue ref that
+    # moved to a different SHA, and every other lookup failure (deadline,
+    # transport) stay fail-closed.
+    if [[ $lookup_status -eq 2 ]] \
+      && [[ "$CURRENT_REF" == refs/heads/gh-readonly-queue/* ]]; then
+      echo "::notice::merge-group run superseded; queue ref deleted — nothing alive to gate"
+      exit 0
+    fi
+    fail "current ref is no longer available; this run was superseded"
+  fi
   remote_head="$(
     awk -v expected_ref="$CURRENT_REF" '$2 == expected_ref { print $1; exit }' \
       <<<"$remote_output"

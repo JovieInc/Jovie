@@ -1266,6 +1266,12 @@ jobs:
           ./scripts/security/prepare-ci-secret-scan-range.sh \
             "$BASE_SHA" "$GITHUB_SHA" "$CURRENT_REF" "$CURRENT_SHA" \
             "$CURRENT_BASE_REF"
+          # A superseded merge-group run exits 0 above without publishing scan
+          # refs: GitHub already deleted the queue ref with the dead group, so
+          # nothing alive remains to gate. Stop before the ref reads.
+          if ! git show-ref --verify --quiet refs/secret-scan/exact-base; then
+            exit 0
+          fi
           # Update Branch may leave pull_request.base.sha stale while the exact
           # event merge parent and live base ref have advanced independently.
           # The helper publishes only the proven immutable event merge base.
