@@ -336,6 +336,7 @@ describe('JOV-6051 per-run outcome verification', () => {
 
   it('rejects malformed certified screen proof before deciding an outcome', () => {
     const row = harnessCertifiedReceipt().changedScreens[0];
+    /** @type {Array<[string, Record<string, unknown>, RegExp]>} */
     const cases = [
       [
         'registration gate',

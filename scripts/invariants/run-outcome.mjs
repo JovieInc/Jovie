@@ -402,6 +402,7 @@ function decideOutcome({ claim, receipt, issues }) {
  *   receipts?: object[],
  *   persistTo?: string,
  *   previous?: object | null,
+ *   includeShadow?: boolean,
  * }} [input]
  */
 export function verifyRunOutcome({
@@ -526,6 +527,7 @@ export function readRunOutcome(filePath) {
  *   certOptions?: object,
  *   persistTo?: string,
  *   previous?: object | null,
+ *   includeShadow?: boolean,
  * }} [input]
  */
 export function verifyScreenCertRun({
