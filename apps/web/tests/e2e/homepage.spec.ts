@@ -126,7 +126,7 @@ test.describe('Homepage', () => {
     );
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/artist-profiles'
+      '/product'
     );
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',

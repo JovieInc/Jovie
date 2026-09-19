@@ -167,4 +167,30 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
   });
+
+  it('paints the landing hero backdrop through the shared token class', () => {
+    // The --linear-hero-backdrop token is consumed only through the shared
+    // .marketing-hero-backdrop class (linear-tokens.css). Landing heroes
+    // must not inline the var: new --linear-* identities are ratcheted
+    // per-file and the namespace count is shrink-only.
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='backdrop-heading'
+        title='Backdrop title'
+        body='Backdrop body'
+        media={<div>Media</div>}
+        testId='backdrop-hero'
+      />
+    );
+
+    const shell = screen.getByTestId('backdrop-hero');
+    expect(shell.querySelector('.marketing-hero-backdrop')).not.toBeNull();
+    expect(shell.querySelector('.marketing-hero-backdrop')).toHaveClass(
+      'pointer-events-none',
+      'absolute',
+      'inset-0'
+    );
+    expect(shell.innerHTML).not.toContain('--linear-hero-backdrop');
+  });
 });
