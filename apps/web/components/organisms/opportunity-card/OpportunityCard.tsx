@@ -11,7 +11,11 @@ type OpportunityCardProps = {
   readonly className?: string;
   readonly dataTestId?: string;
 } & (
-  | { readonly format: 'compact'; readonly onSelect: () => void }
+  | {
+      readonly format: 'compact';
+      readonly disabled?: boolean;
+      readonly onSelect: () => void;
+    }
   | {
       readonly format: 'editorial';
       readonly metadata: ReactNode;
@@ -29,6 +33,7 @@ export function OpportunityCard(props: OpportunityCardProps) {
         variant='ghost'
         size='sm'
         onClick={props.onSelect}
+        disabled={props.disabled}
         aria-label={props.title}
         aria-describedby={descriptionId}
         data-opportunity-format='compact'
