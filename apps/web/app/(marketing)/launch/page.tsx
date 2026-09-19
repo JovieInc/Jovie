@@ -548,15 +548,6 @@ export default function LaunchPage() {
               />
               <div>
                 <NumberedFeatureList items={PROFILE_FEATURES} />
-                <div className='system-b-launch-stat-callout'>
-                  <strong>371%</strong>
-                  <p>
-                    More clicks when a page has one CTA instead of many. Pages
-                    with a single action convert at 13.5% vs 10.5% for pages
-                    with five or more links.
-                  </p>
-                  <span>Source: WordStream, Omnisend</span>
-                </div>
               </div>
             </div>
           </MarketingContainer>

@@ -160,7 +160,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   },
   pricing: {
     headline: 'Free to start.',
-    body: 'Artist profiles are free forever. Pro adds the release tools when you need them.',
+    body: 'Artist profiles are free forever. Pro has limited access.',
     supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
     ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,

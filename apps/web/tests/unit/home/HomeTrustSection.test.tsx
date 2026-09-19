@@ -22,8 +22,8 @@ describe('HomeTrustSection', () => {
       'card'
     );
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
-    ).toBeInTheDocument();
+      screen.queryByText('Trusted by artists and teams releasing on')
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('Universal Music Group')).toBeInTheDocument();
     expect(screen.getByLabelText('AWAL')).toBeInTheDocument();
   });
@@ -55,15 +55,15 @@ describe('HomeTrustSection', () => {
     ).toHaveLength(1);
   });
 
-  it('keeps the inline strip on the canonical trust copy', () => {
+  it('keeps the inline strip free of unsupported endorsement copy', () => {
     render(<HomeTrustSection presentation='inline-strip' />);
 
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
-    ).toBeInTheDocument();
+      screen.queryByText('Trusted by artists and teams releasing on')
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('region', {
-        name: 'Trusted by artists and teams releasing on major labels',
+        name: 'Artist distribution',
       })
     ).toBeInTheDocument();
   });

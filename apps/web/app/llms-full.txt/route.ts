@@ -1,7 +1,10 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 
 /**
  * llms-full.txt — Extended AI-readable site documentation (llmstxt.org standard).
@@ -14,6 +17,9 @@ export const revalidate = false;
 export const dynamic = 'force-static';
 
 export function GET() {
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
+  const enterpriseClaim = getPublicPriceClaim('enterprise');
   const content = `# ${APP_NAME} — Full Documentation
 
 > ${APP_NAME} — ${COMPANY_IDENTITY.seoDescription} ${COMPANY_IDENTITY.support}
@@ -96,10 +102,10 @@ AI that knows your actual career data:
 
 ## Pricing
 
-- **Free tier**: Artist profile, smart links, basic analytics, 100 contacts — free forever
-- **Pro tier ($${PLAN_PRICES.pro.monthly}/mo)**: Fan notifications, unlimited contacts, CRM, export, advanced analytics, tipping, ad pixels, verified badge
-- **Max tier ($${PLAN_PRICES.max.monthly}/mo)**: Release plan generation, metadata agents, email campaigns, API access, team management, white-label
-- New accounts start with a 14-day Pro trial — no credit card required
+- **Free tier (${formatPublicPriceDisplay(freeClaim)})**: Public artist profile and audience capture — ${freeClaim.note}
+- **Artist Visibility Pro (${formatPublicPriceDisplay(proClaim)})**: Public artist profile and audience capture — ${proClaim.note}
+- **Enterprise (${formatPublicPriceDisplay(enterpriseClaim)})**: Scope by agreement. Contact sales.
+- Continuous visibility monitoring, prioritized opportunities, and agentic fixes: Planned — not included today.
 
 ## Key URLs
 
