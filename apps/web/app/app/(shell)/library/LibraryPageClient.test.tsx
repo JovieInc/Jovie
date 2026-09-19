@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { APP_ROUTES } from '@/constants/routes';
 
 const { discardDrafts, replace, search } = vi.hoisted(() => ({
   discardDrafts: vi.fn(),
@@ -38,90 +38,37 @@ vi.mock('./CreatorDocumentsWorkspace', () => ({
 
 import { LibraryPageClient } from './LibraryPageClient';
 
-const artistRule: ArtistRuleView = {
-  id: 'rule-1',
-  category: 'visual',
-  ruleKey: 'palette',
-  instruction: 'never use yellow; make blue primary',
-  strength: 'hard_constraint',
-  scope: 'artist',
-  scopeValue: null,
-  allowOverride: false,
-  status: 'active',
-  provenanceSource: 'artist',
-  confirmedAt: '2026-08-28T12:00:00.000Z',
-  createdAt: '2026-08-28T12:00:00.000Z',
-};
-
 describe('LibraryPageClient stages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     search.value = '';
   });
 
-  it('presents All / Ideas / In Progress / Out instead of a separate Ideas destination', () => {
+  it('keeps catalog chrome on a single toolbar by omitting a competing stage row', () => {
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(
-      screen.getByRole('tablist', { name: 'Library Stages' })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    expect(screen.getByTestId('library-stage-tabs')).toHaveAttribute(
-      'data-youtube-connected',
-      'false'
-    );
-    expect(screen.queryByRole('tab', { name: 'Ideas & Scripts' })).toBeNull();
-    expect(screen.queryByRole('tab', { name: 'Assets' })).toBeNull();
-    fireEvent.click(screen.getByRole('tab', { name: 'Ideas' }));
-    expect(replace).toHaveBeenCalledWith('/app/library?stage=idea', {
-      scroll: false,
-    });
+      screen.queryByRole('tablist', { name: 'Library Stages' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Artist Rules' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Import YouTube' })).toBeNull();
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
   });
 
-  it('exposes artist rule controls from the library toolbar', async () => {
-    render(
-      <LibraryPageClient
-        creatorProfileId='profile-1'
-        merchCards={[]}
-        initialArtistRules={[artistRule]}
-      />
+  it('sends artist-rule deep links to settings', () => {
+    search.value = 'rules=1';
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+
+    expect(replace).toHaveBeenCalledWith(
+      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?rules=1`
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Artist Rules' }));
-
-    expect(await screen.findByText(artistRule.instruction)).toBeInTheDocument();
-    expect(screen.getByText(/Cannot be overridden/)).toBeInTheDocument();
   });
 
   it('restores the Ideas stage from the URL, including the legacy documents section', () => {
     search.value = 'section=documents';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
-    expect(screen.getByRole('tab', { name: 'Ideas' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
-  });
-
-  it('uses roving focus and arrow keys across stage tabs', () => {
-    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
-
-    const all = screen.getByRole('tab', { name: 'All' });
-    const ideas = screen.getByRole('tab', { name: 'Ideas' });
-    expect(all).toHaveAttribute('tabindex', '0');
-    expect(ideas).toHaveAttribute('tabindex', '-1');
-
-    all.focus();
-    fireEvent.keyDown(all, { key: 'ArrowRight' });
-
-    expect(ideas).toHaveFocus();
-    expect(replace).toHaveBeenCalledWith('/app/library?stage=idea', {
-      scroll: false,
-    });
   });
 
   it('guards leaving a document editor with an unsaved draft', () => {

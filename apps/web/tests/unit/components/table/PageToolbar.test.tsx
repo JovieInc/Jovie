@@ -8,6 +8,7 @@ import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_BACK_LINK_CLASS,
   PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS,
+  PAGE_TOOLBAR_START_CLASS,
   PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
   PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   PageToolbar,
@@ -100,6 +101,20 @@ describe('PageToolbar buttons', () => {
     expect(toolbar).not.toHaveClass('border-b');
   });
 
+  it('keeps the start cluster inset so hover and focus rings are not clipped', () => {
+    const { container } = render(
+      <PageToolbar start={<span>Start</span>} end={<span>End</span>} />
+    );
+    const start = container.firstElementChild?.firstElementChild;
+
+    expect(PAGE_TOOLBAR_START_CLASS).toContain('overflow-x-auto');
+    expect(PAGE_TOOLBAR_START_CLASS).toContain('p-0.5');
+    expect(PAGE_TOOLBAR_START_CLASS).toContain('-m-0.5');
+    expect(PAGE_TOOLBAR_START_CLASS).not.toContain('overflow-y-hidden');
+    expect(start).toHaveClass('overflow-x-auto', 'p-0.5', '-m-0.5');
+    expect(start?.className).not.toContain('overflow-y-hidden');
+  });
+
   it('forwards data-testid onto the toolbar shell', () => {
     const { container } = render(
       <PageToolbar
@@ -139,6 +154,25 @@ describe('PageToolbar buttons', () => {
 
     const button = screen.getByRole('button', { name: 'Releases' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).not.toHaveAttribute('aria-selected');
+  });
+
+  it('exposes tab semantics when a toolbar control is a tab', () => {
+    render(
+      <PageToolbarTabButton
+        id='releases-tab'
+        label='Releases'
+        active
+        role='tab'
+        tabIndex={0}
+      />
+    );
+
+    const tab = screen.getByRole('tab', { name: 'Releases' });
+    expect(tab).toHaveAttribute('id', 'releases-tab');
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(tab).toHaveAttribute('aria-pressed', 'true');
+    expect(tab).toHaveAttribute('tabIndex', '0');
   });
 
   it('keeps inactive view tabs quiet and gives the active view a surface, not a ring', () => {

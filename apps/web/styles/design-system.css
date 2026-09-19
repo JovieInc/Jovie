@@ -112,6 +112,12 @@
   --app-shell-radius: 12px;
   --app-shell-radius-item: 8px;
   --app-shell-radius-menu: 8px;
+  /* Nested surfaces sit inside the shell inset: outer radius − gap. */
+  --app-shell-radius-nested: calc(
+    var(--app-shell-radius) -
+    var(--app-shell-gap)
+  );
+  --app-shell-content-inset: var(--app-shell-gap);
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);

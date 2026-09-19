@@ -106,7 +106,7 @@ export function ConnectorsClient({
       // ui-casing-allow: sentence-case description (Found === Expected)
       description='Connect Gmail and Google Calendar to automatically detect booking confirmations.'
     >
-      <SettingsPanel title='Google Account'>
+      <SettingsPanel title='Google Account' bodyClassName='px-4 sm:px-5'>
         <div className='divide-y divide-subtle'>
           <ConnectorCard
             provider='gmail'
@@ -128,22 +128,26 @@ export function ConnectorsClient({
       </SettingsPanel>
 
       {suggestedActions.length > 0 && (
-        <SettingsPanel title='Suggested Actions'>
-          <div className='space-y-3 pt-2'>
-            {suggestedActions.map(action => (
-              <SuggestedActionCard
-                key={action.id}
-                {...action}
-                // Approve/Reject handlers are wired in C-PR-3.
-              />
-            ))}
-          </div>
+        <SettingsPanel
+          title='Suggested Actions'
+          bodyClassName='space-y-3 px-4 py-3 sm:px-5'
+        >
+          {suggestedActions.map(action => (
+            <SuggestedActionCard
+              key={action.id}
+              {...action}
+              // Approve/Reject handlers are wired in C-PR-3.
+            />
+          ))}
         </SettingsPanel>
       )}
 
       {isDev && isGoogleConnected && (
-        <SettingsPanel title='Developer Tools'>
-          <div className='py-2'>
+        <SettingsPanel
+          title='Developer Tools'
+          bodyClassName='px-4 py-3 sm:px-5'
+        >
+          <div>
             <Button
               variant='outline'
               size='sm'

@@ -1,6 +1,4 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
-import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
@@ -74,7 +72,6 @@ export default async function LibraryPage({
   let creatorDocumentsLoadFailed = false;
   let youtubeVideos: PublicVideoListItem[] = [];
   let youtubeConnected = false;
-  let artistRules: ArtistRuleView[] = [];
   let relationships: LibraryRelationshipView[] = [];
   let postReleaseBundle: LibraryPostReleaseBundle =
     EMPTY_LIBRARY_POST_RELEASE_BUNDLE;
@@ -124,7 +121,6 @@ export default async function LibraryPage({
           assetShares,
           videos,
           postRelease,
-          rules,
           relationshipRows,
           youtubeAccount,
         ] = await Promise.all([
@@ -145,14 +141,6 @@ export default async function LibraryPage({
               { route: APP_ROUTES.LIBRARY }
             );
             return EMPTY_LIBRARY_POST_RELEASE_BUNDLE;
-          }),
-          listArtistRulesForProfile(profileId).catch(error => {
-            void captureError(
-              'Artist rules load failed on library page',
-              error,
-              { route: APP_ROUTES.LIBRARY }
-            );
-            return [];
           }),
           listLibraryRelationshipsForProfile(profileId).catch(error => {
             void captureError('Library relationships load failed', error, {
@@ -184,7 +172,6 @@ export default async function LibraryPage({
         assetShareByAssetId = Object.fromEntries(assetShares);
         youtubeVideos = videos;
         postReleaseBundle = postRelease;
-        artistRules = rules;
         relationships = relationshipRows;
         youtubeConnected = Boolean(youtubeAccount);
       } catch (error) {
@@ -212,7 +199,6 @@ export default async function LibraryPage({
         creatorDocuments={creatorDocuments}
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
-        initialArtistRules={artistRules}
         youtubeVideos={youtubeVideos}
         youtubeConnected={youtubeConnected}
         relationships={relationships}
