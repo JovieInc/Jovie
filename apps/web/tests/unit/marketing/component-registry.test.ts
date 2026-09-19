@@ -719,6 +719,18 @@ describe('canonical marketing component registry', () => {
     expect(source).not.toContain('inline-flex h-10');
   });
 
+  it('imports the terminal CTA container directly without cycling through its exporting barrel', () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, 'apps/web/components/site/MarketingTerminalCta.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "import { MarketingContainer } from '@/components/marketing/MarketingContainer';"
+    );
+    expect(source.includes("from '@/components/marketing';")).toBe(false);
+  });
+
   it('asserts exact source reads for shared marketing coverage-via receipts', () => {
     expect(
       fs.readFileSync(
