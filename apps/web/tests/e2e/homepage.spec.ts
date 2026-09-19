@@ -384,7 +384,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('hero action remains independently operable through native text growth and state reversal', async ({
+  test('hero action remains independently operable through 40px label enlargement and state reversal', async ({
     page,
     browserName,
   }, testInfo) => {
@@ -464,6 +464,16 @@ test.describe('Homepage', () => {
       pressedSettled: HeroActionVisual;
       releaseFirstFrame: HeroActionVisual;
       releaseSettled: HeroActionVisual;
+      rapidHover: {
+        enterFirstFrame: HeroActionVisual;
+        leaveFirstFrame: HeroActionVisual;
+        reenterFirstFrame: HeroActionVisual;
+      };
+      rapidPress: {
+        downFirstFrame: HeroActionVisual;
+        upWhileHoveringFirstFrame: HeroActionVisual;
+        afterLeaveFirstFrame: HeroActionVisual;
+      };
       hoverFirstFrameChangedFromBaseline: boolean;
       hoverSettledChangedFromBaseline: boolean;
       leaveFirstFrameChangedFromHover: boolean;
@@ -506,6 +516,74 @@ test.describe('Homepage', () => {
       await expect(modeAction).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(modeInput).toBeFocused();
+
+      // Sample rapid state reversals without settling sleeps. Each sample
+      // waits for only the next animation frame, so the target and baseline
+      // are observed while the pointer is still reversing direction.
+      await modeAction.hover();
+      const rapidHoverEnterFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(baselineVisual, rapidHoverEnterFirstFrame)
+      ).toBe(true);
+      await modeInput.hover();
+      const rapidHoverLeaveFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        sameHeroActionVisual(rapidHoverLeaveFirstFrame, baselineVisual)
+      ).toBe(true);
+      await modeAction.hover();
+      const rapidHoverReenterFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(baselineVisual, rapidHoverReenterFirstFrame)
+      ).toBe(true);
+      await modeInput.hover();
+      expect(
+        sameHeroActionVisual(
+          await readHeroActionVisualAfterFrame(page, actionSelector),
+          baselineVisual
+        )
+      ).toBe(true);
+
+      await modeAction.hover();
+      await page.waitForTimeout(220);
+      const rapidHoverBaseline = await readHeroActionVisual(modeAction);
+      const rapidPressBox = await modeAction.boundingBox();
+      if (!rapidPressBox) throw new Error('Hero action box missing');
+      await page.mouse.move(
+        rapidPressBox.x + rapidPressBox.width / 2,
+        rapidPressBox.y + rapidPressBox.height / 2
+      );
+      await page.mouse.down();
+      const rapidPressDownFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(rapidHoverBaseline, rapidPressDownFirstFrame)
+      ).toBe(true);
+      await page.mouse.up();
+      const rapidPressUpWhileHoveringFirstFrame =
+        await readHeroActionVisualAfterFrame(page, actionSelector);
+      expect(
+        sameHeroActionVisual(
+          rapidPressUpWhileHoveringFirstFrame,
+          rapidHoverBaseline
+        )
+      ).toBe(true);
+      await modeInput.hover();
+      const rapidPressAfterLeaveFirstFrame =
+        await readHeroActionVisualAfterFrame(page, actionSelector);
+      expect(
+        sameHeroActionVisual(rapidPressAfterLeaveFirstFrame, baselineVisual)
+      ).toBe(true);
 
       await modeAction.hover();
       expect(
@@ -592,6 +670,16 @@ test.describe('Homepage', () => {
         pressedSettled,
         releaseFirstFrame,
         releaseSettled,
+        rapidHover: {
+          enterFirstFrame: rapidHoverEnterFirstFrame,
+          leaveFirstFrame: rapidHoverLeaveFirstFrame,
+          reenterFirstFrame: rapidHoverReenterFirstFrame,
+        },
+        rapidPress: {
+          downFirstFrame: rapidPressDownFirstFrame,
+          upWhileHoveringFirstFrame: rapidPressUpWhileHoveringFirstFrame,
+          afterLeaveFirstFrame: rapidPressAfterLeaveFirstFrame,
+        },
         hoverFirstFrameChangedFromBaseline: hasHeroActionVisualDelta(
           baselineVisual,
           hoverFirstFrame
