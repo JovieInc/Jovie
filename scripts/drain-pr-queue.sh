@@ -1301,7 +1301,7 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 changelog_collision_decision_for_pr() {  # <num>
   local n="$1" candidate queued members='[]' files branch admission queue_state queue_snap
   candidate="$(pr_changed_paths_json "$n")"
-  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
+  branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   admission="$(PRE_LAND_CHANGELOG_JSON="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
     '{changedFiles:$changedFiles, branch:$branch}')" \
     node scripts/lib/pre-land-changelog.mjs admission)"
@@ -1825,8 +1825,11 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate unproven native enrollment for #$n" >&2
+        return 1
       fi
-      return 1
+      # Only proven compensation isolates this failure from other candidates.
+      # Unknown mutation effects remain a fatal result (1).
+      return 4
     fi
     if ! jq -e --arg expected_head "$expected_head" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '
       .state.state == "OPEN"
@@ -1844,8 +1847,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    !! native enrollment returned no exact-head positioned queue receipt for #$n" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate malformed native enrollment receipt for #$n" >&2
+        return 1
       fi
-      return 1
+      return 4
     fi
 
     # Labels do not change the head SHA, so expected-head protection alone
@@ -2898,22 +2902,33 @@ echo "=== ENROLL (mergeable + not failing → queue admission) ==="
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
+CAPACITY_SNAP="$SNAP"
+if [[ "$MERGE_QUEUE_BACKEND" == "native" && -n "$DRAIN_ADMISSION_PR" && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" \
+  && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]] && ! stop_if_budget_exhausted; then
+  # Exact-target SNAP contains one PR. Use the existing paginated fleet read
+  # for global capacity and recovery selectors, without widening maintenance.
+  if ! RECOVERY_NATIVE_STATE="$(inventory_native_queue_state)"; then
+    echo "::error::Missed-admission fleet inventory unavailable" >&2
+    exit 1
+  fi
+  CAPACITY_SNAP="$(native_state_to_snap <<<"$RECOVERY_NATIVE_STATE")"
+fi
 if [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]]; then
   # The active release lease only pauses new enrollment/re-entry. Existing
   # native members have already passed admission and remain under the normal
   # safety dequeue/reconciliation passes above.
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=0
 elif waiting_lane_allows_clean_enroll; then
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   MAX_QUEUE_DEPTH=1
   QUEUED_NOW=$([[ -n "${ISOLATED_KEEP_PR:-}" ]] && echo 1 || echo 0)
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
-  QUEUED_CONTROLLER_REPAIRS=$(echo "$SNAP" | jq \
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_CONTROLLER_REPAIRS=$(echo "$CAPACITY_SNAP" | jq \
     '[.[] | select(.q == true and .controllerRepair == true)] | length')
   if [[ "$QUEUED_CONTROLLER_REPAIRS" -eq 0 && "$QUEUED_NOW" -lt "$MAX_QUEUE_DEPTH" ]]; then
     ENROLL_SLOTS=1
@@ -2925,7 +2940,7 @@ elif [[ "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   QUEUED_NOW=0
   ENROLL_SLOTS=0
 else
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_NOW=$(echo "$CAPACITY_SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=0
 fi
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
@@ -2990,6 +3005,18 @@ while read -r pr; do
   fi
 done < <(echo "$SNAP" | jq -c '.[] | select((.headOid // "") | test("^[0-9a-f]{40}$"))')
 
+# Retain the primary failure for the workflow's durable diagnostic, while a
+# proved no-op/compensated candidate may leave capacity for independent heads.
+ADMISSION_EXIT_STATUS=0
+defer_admission_failure() {
+  local result="$1"
+  if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]]; then
+    [[ "$ADMISSION_EXIT_STATUS" -eq 1 ]] || ADMISSION_EXIT_STATUS="$result"
+  else
+    exit "$result"
+  fi
+}
+
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
@@ -3014,6 +3041,10 @@ while read -r pr; do
       continue
     fi
     echo "::error::Failed to prove enrollment for #$n" >&2
+    if [[ "$enroll_result" -eq 4 ]]; then
+      defer_admission_failure 1
+      continue
+    fi
     exit 1
   fi
 done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '.[]
@@ -3041,7 +3072,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
 # returned success and left the PR invisible until an unrelated event happened.
 # Fail with a classified machine-owned condition so Delivery Control Receipts
 # emits a durable Gem repair task; it still cannot merge or bypass any gate.
-if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" ]]; then
+if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 && "$ADMISSION_EXIT_STATUS" -eq 0 && "$RELEASE_WAVE_HOLD_ACTIVE" != "1" ]]; then
   ADMISSION_DISPOSITION="$(echo "$SNAP" | node scripts/merge-queue-backend.mjs explain-selector \
     "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD" "$DRAIN_PROMOTION_MODE" "$ENROLL_SLOTS")"
   ADMISSION_TARGET_OBSERVED="$(jq -r '.observed' <<<"$ADMISSION_DISPOSITION")"
@@ -3084,13 +3115,13 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 && "$RELEASE_WAVE_H
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
       echo "::error::queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($LAST_ENROLL_SKIP_REASON; native admission refused, hard gate preserved)" >&2
-      exit 3
+      defer_admission_failure 3
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
       echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
-      exit 3
+      defer_admission_failure 3
     else
       echo "::error::queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($ADMISSION_SELECTOR_REASON)" >&2
-      exit 3
+      defer_admission_failure 3
     fi
   fi
 fi
@@ -3108,6 +3139,7 @@ fi
 # Legacy human, taste, and no-auto labels never exclude recovery.
 if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ) ]]; then
   echo "=== RECOVER (bounded exact-head native admission) ==="
+  RECOVERY_SNAP="$CAPACITY_SNAP"
   while read -r pr; do
     stop_if_budget_exhausted && break
     if (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 )) \
@@ -3143,12 +3175,15 @@ if [[ "$RELEASE_WAVE_HOLD_ACTIVE" != "1" && ( "$DRAIN_RECONCILE_QUEUE_REENTRY" =
       ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
     else
       recovery_result=$?
-      if [[ "$recovery_result" -ne 2 ]]; then
+      if [[ "$recovery_result" -eq 4 ]]; then
+        echo "::error::Failed exact native admission recovery for #$n; compensation proved" >&2
+        defer_admission_failure 1
+      elif [[ "$recovery_result" -ne 2 ]]; then
         echo "::error::Failed exact native admission recovery for #$n" >&2
         exit 1
       fi
     fi
-  done < <(echo "$SNAP" | jq -c \
+  done < <(echo "$RECOVERY_SNAP" | jq -c \
     --arg admission_pr "$DRAIN_ADMISSION_PR" \
     --arg promotion_mode "$DRAIN_PROMOTION_MODE" \
     --arg missed "$DRAIN_RECONCILE_MISSED_ADMISSION" \
@@ -3322,3 +3357,5 @@ echo "$SNAP" | jq -r '.[]
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
+
+exit "$ADMISSION_EXIT_STATUS"
