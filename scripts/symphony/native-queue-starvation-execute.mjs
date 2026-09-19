@@ -253,12 +253,15 @@ export function decideNativeQueueExecution(input) {
 }
 
 export function unsignedNativeQueueExecution(input) {
+  if (!ENROLLABLE_ACTIONS.includes(input.action)) {
+    throw new Error('native-queue-action-required');
+  }
   const decision = input.decision;
   return {
     schema: EXECUTION_SCHEMA,
     taskKey: input.taskKey,
     issueIdentifier: input.issueIdentifier,
-    action: NATIVE_QUEUE_ACTION,
+    action: input.action,
     status: decision.status === 'succeeded' ? 'succeeded' : 'failed',
     detail: String(decision.detail).slice(0, 240),
     completedAt: input.completedAt,
@@ -273,9 +276,7 @@ export function unsignedNativeQueueExecution(input) {
       head: decision.head,
     },
     source: {
-      action: ENROLLABLE_ACTIONS.includes(input.action)
-        ? input.action
-        : NATIVE_QUEUE_ACTION,
+      action: input.action,
       snapshotDigest: input.source.snapshotDigest,
       sourceVersion: input.source.sourceVersion,
     },
@@ -315,9 +316,7 @@ export async function executeNativeQueueStarvation({
   if (!/^JOV-[1-9][0-9]*$/u.test(issueIdentifier ?? '')) {
     throw new Error('issue-identifier-invalid');
   }
-  const action = ENROLLABLE_ACTIONS.includes(admission?.action)
-    ? admission.action
-    : NATIVE_QUEUE_ACTION;
+  const action = admission?.action;
   const decision = decideNativeQueueExecution({
     ...admission,
     action,

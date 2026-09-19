@@ -7,7 +7,6 @@ import {
   assertAutonomousClaim,
   assertAutonomousTerminal,
   executeNativeQueueStarvation,
-  NATIVE_QUEUE_ACTION,
   nativeQueueEnrollPlan,
   readCapturedMergeQueueEntryId,
   selectGreenReadyPrs,
@@ -352,16 +351,17 @@ const issueIdentifier = process.argv[3];
 const sourceVersion = process.argv[4];
 const snapshotDigest = process.argv[5];
 const fleetPath = process.argv[6];
-const action = process.argv[7] || NATIVE_QUEUE_ACTION;
+const action = process.argv[7];
 if (
   !taskKey ||
   !issueIdentifier ||
   !sourceVersion ||
   !snapshotDigest ||
-  !fleetPath
+  !fleetPath ||
+  !action
 ) {
   throw new Error(
-    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> [action]'
+    'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json> <action>'
   );
 }
 

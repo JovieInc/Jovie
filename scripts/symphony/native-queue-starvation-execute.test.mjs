@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, verify } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-
 import {
   AUTONOMOUS_LINEAR_WORKER,
   appendSummerIssueBind,
@@ -26,6 +25,7 @@ import {
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
 } from './native-queue-starvation-execute.mjs';
+import { canonical } from './summer-symphony-outbox-consumer.mjs';
 
 function pair() {
   const keys = generateKeyPairSync('ed25519');
@@ -466,7 +466,7 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(result.decision.pr, 17917);
     assert.equal(result.decision.mergeQueueEntryId, CAPTURED_17917);
     assert.equal(result.record.status, 'succeeded');
-    assert.equal(result.record.action, NATIVE_QUEUE_ACTION);
+    assert.equal(result.record.action, RELEASE_CERT_ACTION);
     assert.equal(result.record.source.action, RELEASE_CERT_ACTION);
   });
 
@@ -586,6 +586,7 @@ describe('executeNativeQueueStarvation', () => {
       greenReadyPrs: [],
     });
     const unsigned = unsignedNativeQueueExecution({
+      action: NATIVE_QUEUE_ACTION,
       taskKey: TASK_KEY,
       issueIdentifier: 'JOV-6304',
       source: SOURCE,
@@ -597,6 +598,7 @@ describe('executeNativeQueueStarvation', () => {
     assert.equal(unsigned.execution.pr, null);
     const signed = signNativeQueueExecution(
       {
+        action: NATIVE_QUEUE_ACTION,
         taskKey: TASK_KEY,
         issueIdentifier: 'JOV-6304',
         source: SOURCE,
@@ -655,6 +657,7 @@ describe('native queue execution command delivery status', () => {
             SOURCE.sourceVersion,
             SOURCE.snapshotDigest,
             fleet,
+            NATIVE_QUEUE_ACTION,
           ],
           {
             encoding: 'utf8',
@@ -680,6 +683,72 @@ describe('native queue execution command delivery status', () => {
       }
     } finally {
       rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('execution action protocol', () => {
+  it('signs exactly matching native and release actions under the existing domain', () => {
+    const host = pair();
+    for (const action of [NATIVE_QUEUE_ACTION, RELEASE_CERT_ACTION]) {
+      const record = signNativeQueueExecution(
+        {
+          action,
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          source: SOURCE,
+          decision: decideNativeQueueExecution({ action, greenReadyPrs: [] }),
+          completedAt: '2026-09-19T14:00:00Z',
+          claim: { state: 'In Progress', assignee: 'unassigned-machine' },
+          signatureKeyId: 'host',
+        },
+        host.privateKey
+      );
+      assert.equal(record.action, action);
+      assert.equal(record.source.action, action);
+      assert.equal(record.schema, 'jovie.symphony-native-queue-execution/v1');
+      const { signature, ...unsigned } = record;
+      assert.ok(
+        verify(
+          null,
+          Buffer.from(`${record.schema}\0${canonical(unsigned)}`),
+          host.publicKey,
+          Buffer.from(signature.slice(8), 'base64url')
+        )
+      );
+    }
+  });
+  it('rejects missing and unsupported action before claiming or executing any work', async () => {
+    for (const action of [undefined, null, '', 'arbitrary']) {
+      assert.throws(
+        () => unsignedNativeQueueExecution({ action }),
+        /native-queue-action-required/
+      );
+      let claims = 0;
+      await assert.rejects(
+        executeNativeQueueStarvation({
+          taskKey: TASK_KEY,
+          issueIdentifier: 'JOV-6418',
+          source: SOURCE,
+          signatureKeyId: 'host',
+          privateKeyPem: pair().privateKey,
+          completeIssue: async () => {
+            throw new Error('unexpected-completion');
+          },
+          enrollPr: async () => {
+            throw new Error('unexpected-execution');
+          },
+          writeExecution: async () => {
+            throw new Error('unexpected-write');
+          },
+          admission: { action, greenReadyPrs: [] },
+          claimIssue: async () => {
+            claims++;
+          },
+        }),
+        /native-queue-action-required/
+      );
+      assert.equal(claims, 0);
     }
   });
 });
