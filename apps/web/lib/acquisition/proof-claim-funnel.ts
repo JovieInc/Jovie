@@ -118,7 +118,7 @@ function withProofClaimParams(href: string): string {
 
 export function buildProofClaimHref(waitlistEnabled: boolean): string {
   if (waitlistEnabled) {
-    const waitlist = new URL(PUBLIC_WAITLIST_URL);
+    const waitlist = new URL(PUBLIC_WAITLIST_URL, 'https://jov.ie');
     return withProofClaimParams(
       `${APP_ROUTES.WAITLIST}${waitlist.search ? waitlist.search : ''}`
     );
