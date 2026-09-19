@@ -407,7 +407,13 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.authority == "Summer" and
         (.closureAdmission.status | IN("healthy", "grace", "red")) and
         (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
-        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
+        (
+          .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy")
+          or (
+            (.closureAdmission.status | IN("grace", "red"))
+            and .closureAdmission.newIssueIntakeAllowed == true
+          )
+        ) and
         .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and

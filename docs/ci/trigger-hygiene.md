@@ -23,13 +23,14 @@ constraint; spawn noise is the cheapest capacity to buy back.
 
 3. **Fleet-wide scanners use the earliest event that changes their decision.**
    Merge-queue drain and PR conflict handling can reconcile from CI events.
-   Auto-Ready is the exception: the owning agent's final source event must pair
-   ready + native auto-merge while checks are pending, so it listens to source
-   changes. The canonical merge-queue admission controller is the sole
-   exception: it subscribes to `ready_for_review` to re-evaluate exact-head
-   admission (with the Runner Heartbeat clock as ownerless recovery), and no
-   CI flight is restarted — an unchanged head never earns a second CI flight.
-   No other workflow may listen to `ready_for_review`.
+   Auto-Ready has two wakes: writer-proof recovery stays manual, and
+   green-source undraft listens to successful `workflow_run` / `check_suite`
+   for required source checks (not `synchronize`, not cron). The canonical
+   merge-queue admission controller is the sole `ready_for_review` subscriber:
+   it re-evaluates exact-head admission after undraft (with the Runner
+   Heartbeat clock as ownerless recovery), and no CI flight is restarted — an
+   unchanged head never earns a second CI flight. No other workflow may listen
+   to `ready_for_review`.
 
 4. **Deduplicate event types that add no coverage.** Example: `issues:
    assigned` on Claude Code — the job only runs when the body/title contains
@@ -52,7 +53,7 @@ constraint; spawn noise is the cheapest capacity to buy back.
 | Workflow | Change |
 | --- | --- |
 | `github-ai-orchestrator.yml` | Guard's label check moved from in-runner script to job-level `if:` |
-| `auto-ready-agent-drafts.yml` | Historical: dropped `synchronize`; superseded by paired promotion before CI completion |
+| `auto-ready-agent-drafts.yml` | Historical: dropped `synchronize` and later became manual-only (dead since July). Restored event-driven green-source undraft on CI / required-check success; writer-proof recovery stays `workflow_dispatch` |
 | `merge-queue-autoenroll.yml` | Dropped `pull_request: synchronize` (same) |
 | `pr-conflict-handler.yml` | Dropped `pull_request: synchronize` (same; see #13347) |
 | `claude.yml` | Dropped `issues: assigned` (no coverage beyond `opened`); documented broad-trigger rationale |

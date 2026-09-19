@@ -3771,12 +3771,19 @@ JSON
         assert "(0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
-    @pytest.mark.parametrize("closure_status", ["healthy", "grace"])
+    @pytest.mark.parametrize(
+        ("closure_status", "intake_allowed"),
+        [
+            ("healthy", True),
+            ("grace", False),
+            ("grace", True),
+            ("red", True),
+        ],
+    )
     def test_hold_intake_accepts_canonical_closure_statuses(
-        self, tmp_path: Path, closure_status: str
+        self, tmp_path: Path, closure_status: str, intake_allowed: bool
     ) -> None:
         queued_head = "8" * 40
-        intake_allowed = closure_status == "healthy"
         receipt = _production_unbound_hold_receipt(
             closure_status=closure_status,
             intake_allowed=intake_allowed,
@@ -3830,8 +3837,6 @@ JSON
         [
             ("green", True),
             ("healthy", False),
-            ("grace", True),
-            ("red", True),
         ],
     )
     def test_hold_intake_rejects_retired_or_contradictory_closure_receipts(

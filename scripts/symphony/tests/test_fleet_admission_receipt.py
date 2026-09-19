@@ -336,6 +336,32 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                     row["status"] == "healthy" or bool(row.get("reasons")),
                 )
 
+    def test_hold_intake_drain_accepts_issue_blocked_red_intake(self):
+        receipt = evaluate_receipt(
+            production={"status": "green", "deployedSha": "b" * 40},
+            closureHealth={
+                **signals()["closureHealth"],
+                "status": "red",
+                "newIssueIntakeAllowed": True,
+                "reasons": [
+                    "queue-controller-red-over-10m",
+                    "unclassified-open-pr-over-15m",
+                ],
+            },
+        )
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(receipt["closureAdmission"]["status"], "red")
+        self.assertTrue(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
     def test_runtime_intake_hold_survives_projection_without_bypassing_closure(self):
         receipt = evaluate_receipt(controller={"status": "failed"})
         projected = PROJECT.project_fleet_admission_receipt(receipt)
