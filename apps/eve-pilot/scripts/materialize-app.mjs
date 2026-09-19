@@ -27,8 +27,10 @@ const summer = [
   'agent/lib/telegram-allowlist.ts',
   'agent/instructions/summer-shadow.ts',
   'agent/schedules/summer-bottleneck-heartbeat.ts',
+  'agent/schedules/summer-liveness-heartbeat.ts',
   ...[
     'summer-bottleneck-loop',
+    'summer-liveness-heartbeat',
     'summer-commercial-projection',
     'summer-commercial-readback',
     'summer-photon-offline-proof',
@@ -45,6 +47,7 @@ const summer = [
   ...[
     'summer-bottleneck-auth',
     'summer-bottleneck-heartbeat',
+    'summer-liveness-heartbeat',
     'summer-bottleneck-loop',
     'summer-commercial-integration',
     'summer-commercial-projection',

@@ -142,6 +142,7 @@ describe('Eve framework smoke', () => {
       // framework tool may remain callable, including newly added defaults.
       expect(info.tools).toEqual([]);
       expect(info.schedules).toContain('summer-bottleneck-heartbeat');
+      expect(info.schedules).toContain('summer-liveness-heartbeat');
 
       // Eve 0.47 ships additional built-in HTTP channels (the `home` landing
       // surface, `/eve/v1/health`, connection callbacks, activity/task-input
