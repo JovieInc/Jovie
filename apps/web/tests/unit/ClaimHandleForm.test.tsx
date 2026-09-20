@@ -33,7 +33,7 @@ vi.mock('@/lib/analytics', () => ({
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
-import { ClaimHandleForm } from '@/features/home/claim-handle';
+import { ClaimHandleForm } from '@/components/features/home/claim-handle/ClaimHandleForm';
 
 beforeEach(() => {
   mockPush.mockReset();
