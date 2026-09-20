@@ -13,8 +13,9 @@ import types
 
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/symphony-burrito-workflow.test.py"
+SUITES = [SUITE, ROOT / "scripts/symphony/tests/activation-ownership.test.py"]
 TARGETS = {
-    "symphony_official_runtime.py": {"run_official_binary_once", "read_dispatch_admission", "_closure_snapshot_verdict"},
+    "symphony_official_runtime.py": {"run_official_binary_once", "read_dispatch_admission", "_closure_snapshot_verdict", "_activation_read_file", "_activation_command", "_activation_snapshot", "_activation_dropin_paths", "_activation_exec_matches", "_activation_process_generation", "activation_ownership_preflight"},
 }
 
 
@@ -32,10 +33,12 @@ child_coverage = tempfile.TemporaryDirectory(prefix="symphony-runtime-coverage-"
 os.environ["SYMPHONY_RUNTIME_COVERAGE_DIR"] = child_coverage.name
 tracer = trace.Trace(count=True, trace=False)
 status = 0
-try:
-    tracer.runfunc(runpy.run_path, str(SUITE), run_name="__main__")
-except SystemExit as exc:
-    status = int(exc.code or 0)
+for suite in SUITES:
+    sys.argv = [str(suite)]
+    try:
+        tracer.runfunc(runpy.run_path, str(suite), run_name="__main__")
+    except SystemExit as exc:
+        status = max(status, int(exc.code or 0))
 counts = tracer.results().counts
 for receipt in Path(child_coverage.name).glob("*.json"):
     for file, line, count in json.loads(receipt.read_text()):
@@ -64,5 +67,5 @@ for name, selected in TARGETS.items():
     report[name] = {"percent": round(percent, 2), "executed": len(executable) - len(missing), "statements": len(executable), "missing": missing}
     if percent < 95:
         status = 1
-print(json.dumps({"selector": str(SUITE.relative_to(ROOT)), "coverage": report}, indent=2))
+print(json.dumps({"selectors": [str(suite.relative_to(ROOT)) for suite in SUITES], "coverage": report}, indent=2))
 raise SystemExit(status)
