@@ -1,5 +1,93 @@
 {
   "schema": "jovie.architecture-freshness-registry/v1",
+  "company": {
+    "schema": "jovie.company-asset-projection/v1",
+    "coverage": [
+      {
+        "type": "repository",
+        "state": "partial",
+        "reason": "Summer declaration only. Existing Gem repository policy is a separate source, not proof of current upstream Symphony eligibility.",
+        "sourceRefs": [
+          "scripts/symphony/config/gem-repo-registry.json",
+          "scripts/symphony/gem_repo_registry.py"
+        ]
+      },
+      {
+        "type": "service",
+        "state": "partial",
+        "reason": "Summer identity only; company service discovery is not complete.",
+        "sourceRefs": [
+          "JovieInc/summer-config:apps/summer/agent/runtime-identity.ts#SERVICE_IDENTITY"
+        ]
+      },
+      {
+        "type": "work",
+        "state": "partial",
+        "reason": "Foundation issue only; Linear remains work lifecycle authority.",
+        "sourceRefs": ["linear:JOV-6481", "linear:JOV-5945", "linear:JOV-5930"]
+      },
+      {
+        "type": "deployment",
+        "state": "unenumerated",
+        "reason": "Resolve current project and environment bindings through the private identity owner; no copied live deployment snapshot.",
+        "sourceRefs": [
+          "JovieInc/summer-config:apps/summer/agent/runtime-identity.ts#SERVICE_IDENTITY"
+        ]
+      },
+      {
+        "type": "infrastructure",
+        "state": "unenumerated",
+        "reason": "Provider inventory and operational dependency coverage have not been attested.",
+        "sourceRefs": [
+          "scripts/summer-commissioning/capability-access-registry.json"
+        ]
+      }
+    ],
+    "objects": [
+      {
+        "id": "repository.summer-config",
+        "type": "repository",
+        "owner": "Summer private integration owner",
+        "purpose": "Source authority for company Summer runtime identity",
+        "authority": {
+          "repository": "JovieInc/summer-config",
+          "path": "apps/summer/agent/runtime-identity.ts"
+        },
+        "dependencies": [],
+        "capabilities": [],
+        "attributes": { "slug": "JovieInc/summer-config" }
+      },
+      {
+        "id": "company.summer",
+        "type": "service",
+        "owner": "Summer product and private integration owners",
+        "purpose": "Company governor; operational acceptance requires separate durable receipts",
+        "authority": {
+          "repository": "JovieInc/summer-config",
+          "path": "apps/summer/agent/runtime-identity.ts"
+        },
+        "dependencies": ["repository.summer-config"],
+        "capabilities": ["summer-access-github-linear", "SUMMER-COMM-001"],
+        "attributes": {
+          "repositoryId": "repository.summer-config",
+          "identityPath": "apps/summer/agent/runtime-identity.ts"
+        }
+      },
+      {
+        "id": "work.jov-6481",
+        "type": "work",
+        "owner": "Summer product registry executor",
+        "purpose": "Bounded typed registry composition foundation, not full asset discovery or certification",
+        "authority": {
+          "repository": "JovieInc/Jovie",
+          "path": "scripts/summer-commissioning/architecture-freshness-registry.json"
+        },
+        "dependencies": ["company.summer"],
+        "capabilities": [],
+        "attributes": { "serviceId": "company.summer", "issue": "JOV-6481" }
+      }
+    ]
+  },
   "registryRevision": "2026-09-02.1",
   "issue": "JOV-5853",
   "owner": "Summer runtime / Eve integration",
