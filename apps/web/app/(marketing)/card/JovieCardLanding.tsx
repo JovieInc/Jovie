@@ -94,7 +94,7 @@ export function JovieCardLanding() {
         <p className='marketing-kicker'>A future in-person flow</p>
         <h2
           id='jovie-card-how-heading'
-          className='system-b-marketing-section-heading mt-5 text-primary-token'
+          className='system-b-marketing-section-heading mt-5 line-clamp-2 text-primary-token'
         >
           From hello to your profile
         </h2>
@@ -126,7 +126,7 @@ export function JovieCardLanding() {
         <div className='mx-auto w-full max-w-public-content px-6 py-20 sm:px-8 lg:px-10 lg:py-28'>
           <h2
             id='jovie-card-introduction-heading'
-            className='system-b-marketing-section-heading max-w-3xl text-primary-token'
+            className='system-b-marketing-section-heading line-clamp-2 max-w-3xl text-primary-token'
           >
             An introduction. Not a list of usernames
           </h2>
@@ -177,7 +177,7 @@ export function JovieCardLanding() {
             </p>
             <h2
               id='jovie-card-cta-heading'
-              className='system-b-marketing-section-heading mt-5 text-primary-token'
+              className='system-b-marketing-section-heading mt-5 line-clamp-2 text-primary-token'
             >
               Bring your profile into the room
             </h2>
