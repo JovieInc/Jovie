@@ -169,7 +169,7 @@ function ReleaseSectionBlock({
         </span>
         <h2
           id={headingId}
-          className='text-2xl font-semibold tracking-tighter text-primary-token sm:text-3xl'
+          className='changelog-section-title text-primary-token'
         >
           {meta.title}
         </h2>

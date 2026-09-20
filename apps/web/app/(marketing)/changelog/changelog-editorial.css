@@ -73,7 +73,7 @@
 
 .changelog-hero__support {
   /* pen Inter 22px → 18px narrow */
-  font-size: clamp(var(--text-lg), 1.6vw, var(--text-3xl));
+  font-size: clamp(var(--text-lg), 1.53vw, 1.375rem); /* lands 22px @1440 */
   max-width: 40rem;
   line-height: var(--leading-normal);
   color: var(--color-text-tertiary-token);
@@ -537,6 +537,44 @@
   margin-top: var(--space-10);
   border-top: 1px solid var(--color-border-subtle);
   padding-top: var(--space-6);
+}
+
+/* ---------------------------------------------------------- */
+/* Version detail header (iekBP)                               */
+/* ---------------------------------------------------------- */
+
+.changelog-version-identity {
+  /* pen iekBP: Fira Code 80px w650 lh 1.05 ls -2.4 → 48px narrow.
+     650 has no registered step; bold (680) is the closest. Mono family
+     resolves to the repo --font-mono stack (Fira Code is not bundled). */
+  font-size: clamp(var(--text-5xl), 5.6vw, 5rem); /* 48px → 80px @1440 */
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.changelog-release-title {
+  /* pen iekBP: Inter 32px w590 lh 1.3 ls -0.64 → subheading 28px narrow */
+  font-size: clamp(1.75rem, 3vw, 2rem); /* 28px → 32px */
+  font-weight: var(--font-weight-semibold); /* 590 */
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.changelog-section-title {
+  /* pen iekBP section titles: Inter 32px w650 lh 1.3 ls -0.64;
+     650 → bold (680) closest step; 32 → 28px narrow */
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.changelog-resources-heading {
+  /* pen iekBP: Inter 22px w650; 650 → bold (680) closest step */
+  font-size: 1.375rem; /* 22px sits between scale steps */
+  font-weight: var(--font-weight-bold);
+  line-height: 1.3;
 }
 
 /* ---------------------------------------------------------- */

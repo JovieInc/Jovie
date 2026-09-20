@@ -21,6 +21,7 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { changelogInlineText } from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
+import '../changelog-editorial.css';
 
 export const revalidate = false;
 
@@ -156,7 +157,7 @@ export default async function ChangelogReleasePage({
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
-            <h1 className='font-mono text-5xl font-semibold tracking-tighter text-primary-token sm:text-7xl'>
+            <h1 className='changelog-version-identity font-mono text-primary-token'>
               {/* ui-casing-allow: semantic version string */}v{release.version}
             </h1>
             <div className='flex flex-col items-start gap-2.5'>
@@ -174,7 +175,7 @@ export default async function ChangelogReleasePage({
           </div>
 
           {release.summary && (
-            <p className='mt-6 max-w-3xl text-balance text-2xl font-semibold leading-snug tracking-tighter text-primary-token sm:text-3xl'>
+            <p className='changelog-release-title mt-6 max-w-3xl text-balance text-primary-token'>
               {changelogInlineText(release.summary)}
             </p>
           )}
@@ -202,7 +203,7 @@ export default async function ChangelogReleasePage({
         <section aria-labelledby='release-resources' className='mt-6'>
           <h2
             id='release-resources'
-            className='text-2xl font-semibold tracking-tight text-primary-token'
+            className='changelog-resources-heading tracking-tight text-primary-token'
           >
             {/* ui-casing-allow: founder-locked pen copy (iekBP) */}
             Resources for this release

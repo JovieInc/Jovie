@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
 import { ChangelogTimeline } from './ChangelogTimeline';
+import '@/app/(marketing)/changelog/changelog-editorial.css';
 
 const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
   {
