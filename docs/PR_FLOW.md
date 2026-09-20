@@ -41,9 +41,11 @@ included in delivery receipts so a runtime can reject a mismatched contract.
 
 ## 1. Unit of work: one small PR → `main`
 
-- **Default: a small, focused PR targeting `main`.** ≤ 800 lines / 40 files
-  (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`; mechanical codemods
-  use `big-pr`). Independent changes are **sibling PRs off `main`** — parallel,
+- **Default: a small, focused PR targeting `main`.** ≤ 1500 lines / 75 files
+  (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`, verified live
+  2026-09-20 — the workflow's built-in defaults are 800/40 when the vars are
+  unset; mechanical codemods use `big-pr`). Independent changes are
+  **sibling PRs off `main`** — parallel,
   never based on each other.
 - **Dependent work → a native GitHub stacked-PR sequence.** Push each layer
   normally and open it against its immediate parent. After the parent lands,
@@ -183,13 +185,24 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ### Native build capacity (JOV-6107)
 
-**Ship now:** use two concurrent native speculative groups after this policy
-lands. The 2026-09-08 Team-plan readback and
+**Ship now:** two concurrent native speculative groups. The
+`max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
+2026-09-20 live readback shows `max_entries_to_build=2`, with the 20-minute
+budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
+1/5 with wait zero preserved. The separate pending source cohort minimum/wait
+cutover is not part of this apply and remains pending. Roll back only the
+build count to one if runner waits or speculative invalidation outweigh the
+measured throughput gain.
+
+Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
-give 60 standard hosted jobs and five macOS jobs across the organization.
+give 60 standard hosted jobs and five macOS jobs across the organization,
+while the repo's operative planning figure is the `HOSTED_RUNNER_CAPACITY=120`
+repository variable (`ci.yml` assumes ~120 concurrent hosted jobs).
 CI run 34282800645 peaked at 19 hosted jobs for one combined head; the
 22:00:25 UTC organization snapshot observed at least seven other hosted jobs.
-Two groups plus that background need 45 jobs; three would need 64. A group
+Two groups plus that background need 45 jobs; three would need 64 — feasible
+under the operative 120 figure, not under the conservative 60 readback. A group
 selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
 groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
@@ -197,12 +210,7 @@ hosted product lanes.
 Source preflight accepts integer build counts from one through the reviewed
 ceiling of two and records the actual count and any difference from the target.
 This permits source-first rollout and a one-field rollback without blocking
-normal admission. Apply only `max_entries_to_build: 1 → 2` to live ruleset
-10512119 after the source lands; preserve the live 20-minute budget, ALLGREEN,
-all required checks, empty bypass actors, min/max merge 1/5 and wait zero.
-The separate pending source cohort minimum/wait values are not part of this
-apply. Roll back only the build count to one if runner waits or speculative
-invalidation outweigh the measured throughput gain.
+normal admission.
 
 **Re-evaluate when:** a complete simultaneous-group window supplies job waits,
 peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
@@ -395,9 +403,15 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
-   events for `pull_request` and `merge_group`, then launches Cursor-direct
-   exact-head repair when the implementer lease is not live. It must not
+   `Rolling CI Dispatch` is currently `disabled_manually` (since 2026-09-02,
+   verified 2026-09-20), and its source gate accepts only `pull_request`
+   producers. While it is disabled there is no automated dispatcher: failed
+   exact-head runs, including merge-group batches, are repaired by the
+   implementer lease or by hand. Re-enabling it, and widening its gate to
+   `merge_group` producers, is a founder/fleet decision. When active, it
+   subscribes only to completed `CI` `workflow_run` events and launches
+   Cursor-direct exact-head repair when the implementer lease is not live.
+   It must not
    subscribe to generic `check_suite` or `check_run` events because its own
    completed checks can recursively re-enter the dispatcher. It does not
    check out PR code.

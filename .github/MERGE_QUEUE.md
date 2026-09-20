@@ -35,7 +35,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context | Source PR | Native `merge_group` |
 | --- | --- | --- |
-| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
+| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
 | `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
 | `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
 | `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |
@@ -63,7 +63,10 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Minimum entries to merge: `5` (typed cohort; GitHub waits for this size or the bounded timeout)
 - Minimum entries wait: `10` minutes (low-traffic timeout so a partial cohort can still land)
 - Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
-- Maximum entries building concurrently: `1` — the live ruleset builds one combined head at a time (synced 2026-09-04, JOV-5867; do not restore the superseded 2026-08-15 three-prefix canary value)
+- Maximum entries building concurrently: `2` — the live ruleset builds up to
+  two combined heads at a time (live readback 2026-09-20, JOV-6107; the 1→2
+  apply is complete; do not restore the superseded 2026-08-15 three-prefix
+  canary value)
 - Check response timeout: `20` minutes (synced to the live ruleset readback, JOV-5867)
 - Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
 - Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
@@ -122,10 +125,17 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   GitHub parked the group, not the PR. The same head is not re-enqueued.
   Tell it worked: `list-state` shows no `UNMERGEABLE` members, and the eject
   receipt's description starts with `ejected:`.
-- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch accepts
+- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch is
+  currently `disabled_manually` (since 2026-09-02, verified 2026-09-20), and
+  its source gate accepts only `pull_request` producers, so it does not fire
+  on failed `merge_group` runs today. Until it is re-enabled and its gate is
+  widened (a founder/fleet decision), a failed combined head is repaired by
+  hand: fix the failing source PR and let GitHub rebuild the group. When
+  active, Rolling CI Dispatch accepts
   completed `CI` `workflow_run` events whose producer is `merge_group`,
   resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
-  launches FX against that source branch. Tell it worked: a failed merge_group
+  launches FX against that source branch. Tell it worked (only once
+  re-enabled): a failed merge_group
   CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
   Runner-class failures (checkout, infra, flake) still launch FX and record a
   named Actions outcome (`launched` / `repaired` / `skipped_stale` /
@@ -145,8 +155,9 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
   `max_entries_to_build` drift cannot fail `enroll` after the lock already
-  matches 1. Tell it worked: a CLEAN PR's `enroll` check stays green while
-  GraphQL reads 1.
+  matches the live build count. Tell it worked: a CLEAN PR's `enroll` check
+  stays green while GraphQL reads the live value (`2` at the 2026-09-20
+  readback).
 - Front-item churn guard (JOV-5030): every native group build runs on
   `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
   CI runs identify which PR fronted each failed attempt and against which
@@ -173,7 +184,9 @@ canonical Jovie bot or repository owner are authority.
 comments cannot create release authority.
 
 `queue-deferred-release.yml` runs after PR CI, successful production-controller
-completion, and the existing five-minute fleet-receipt refresh. That upstream
+completion, and the fleet-receipt refresh dispatched by Runner Heartbeat's
+10-minute remediation clock (`runner-heartbeat.yml`, cron `*/10 * * * *`;
+there is no separate five-minute schedule). That upstream
 durability tick means a PR checked during AMBER self-heals after GREEN even when
 the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 
@@ -195,7 +208,10 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
   `queue-pressure` holds additionally re-run the canonical live queue-depth
   policy and remain held while pressure is still above its threshold.
 
-## Update Branch convergence
+## Ownerless focused recovery
+
+`ownerless-recovery-sweep.yml` is a hosted fallback independent of Gem, Symphony, and fleet health. It carries no schedule of its own: Runner Heartbeat's remediation clock dispatches it every 10 minutes (`runner-heartbeat.yml`, cron `*/10 * * * *`). On each dispatch it may promote a PR unassigned for at least one hour only when the exact head is same-repo, current with `main`, unstacked, conflict-free, focused to CI, DevEx, delivery control, or waitlist-canary files, and has passing focused checks. Incomplete patches and credential, privacy, destructive, production-promotion, or check-bypass changes fail closed. It records an attempt receipt before mutation; success requires the same head to be merged or to have a positive authoritative native queue position.
+### Update Branch convergence
 
 Update Branch can advance the branch Git ref before the PR database, timeline,
 webhook payload, and Actions event base converge. Record and inspect those
@@ -219,7 +235,7 @@ drivers or renormalization differences remain fail-closed.
 
 ## Guarded UI fast lane
 
-Small visual-only PRs may use `ui`, `fast-track-ui`, and `fast` only when the
+Small visual-only PRs may use `ui` and `fast` only when the
 repo policy classifies them as eligible and the PR includes the required visual
 and verification evidence. Auth, billing, DB/migrations, API routes,
 entitlements, data writes, security/CSP, infra, routing, package manifests, CI,

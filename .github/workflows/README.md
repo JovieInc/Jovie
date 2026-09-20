@@ -16,8 +16,11 @@ This repository uses trunk-based development with a single long-lived branch:
 ## Drain Activation Order
 
 Workflow triggers below describe YAML capability, not live GitHub enablement.
-During the all-PR drain, enable **Merge Queue Auto-Enroll** and **Auto-Ready Agent
-Drafts** first. Enable **Main CI Health Monitor** and **Main Autofix** only after
+The all-PR drain activation is complete: **Merge Queue Auto-Enroll** is active,
+while **Auto-Ready Agent Drafts** has been `disabled_manually` since
+2026-07-20 (verified 2026-09-20) — drafts are undrafted by their writer, not
+automatically; re-enabling it is a founder decision. Enable **Main CI Health
+Monitor** and **Main Autofix** only after
 the queue and production topology have produced bounded proof. GitHub AI
 Orchestrator, GitHub AI Dispatcher, and Agent Tick are retired at source because
 Linear-backed Symphony is the sole intake selector. Keep Agent Pipeline, PR
@@ -29,9 +32,13 @@ should register active on land; verify their live state before relying on
 continuous delivery. A workflow-file merge does not re-enable a workflow that
 GitHub already marks disabled. GitHub AI Orchestrator workflow ID `306926687`
 was verified `disabled_manually` at rollout preparation. Runner Health Monitor
-workflow ID `307794302` was also verified `disabled_manually` after its legacy
-repository-variable mutation failed with HTTP 403; keep it disabled until this
-observer-only definition lands and is proven, then re-enable the observer.
+workflow ID `307794302` was re-enabled after its observer-only definition
+landed and is `active` (verified 2026-09-20); it remains observer-only and
+never mutates routing variables. Several other workflow IDs still register as
+`active` in GitHub's API with no file on `main` (Vercel Preview, CodeQL
+Analysis, Neon Branches, Agent PR Verify Ready, Actions Concurrency Canary,
+Visual Approval Guard) — they are inert residue from deleted files and cannot
+run.
 
 ## Vercel Preview Deployments
 
@@ -96,7 +103,7 @@ The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatche
 - No sensitive files changed (auth, billing, migrations, CI, etc.)
 - No active machine gate or terminal-red required check
 - Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
-- Queue pressure below threshold (12 PRs already queued)
+- Queue pressure below the dynamic threshold (`MERGE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`, currently 16 PRs already queued)
 
 Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
 
@@ -164,10 +171,12 @@ after a push. It enforces the same 5 open-agent-PR capacity cap before creating
 new draft PRs; downstream verification and agent pipeline jobs decide when a
 draft is ready and whether auto-merge is eligible. For provenance-authorized
 agent PRs, manual Auto-Ready recovery can still pair the ready transition with
-native auto-merge intent. Green-source Auto-Ready undrafts a draft only after
-PR Ready + required checks are SUCCESS and mergeability is CLEAN; Auto-Enroll
-then consumes `ready_for_review`. An unchanged `ready_for_review` event never
-launches another CI flight.
+native auto-merge intent. The automated **Auto-Ready Agent Drafts** workflow is
+currently `disabled_manually` (since 2026-07-20, verified 2026-09-20); when
+active, green-source Auto-Ready undrafts a draft only after
+PR Ready + required checks are SUCCESS and mergeability is CLEAN, and
+Auto-Enroll then consumes `ready_for_review`. An unchanged `ready_for_review`
+event never launches another CI flight.
 
 <!-- ci-harness:start -->
 ## CI Agent Harness
