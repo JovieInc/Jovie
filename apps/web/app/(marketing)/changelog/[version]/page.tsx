@@ -157,7 +157,7 @@ export default async function ChangelogReleasePage({
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
-            <h1 className='changelog-version-identity font-mono text-primary-token'>
+            <h1 className='changelog-version-identity line-clamp-2 font-mono text-primary-token'>
               {/* ui-casing-allow: semantic version string */}v{release.version}
             </h1>
             <div className='flex flex-col items-start gap-2'>
@@ -203,7 +203,7 @@ export default async function ChangelogReleasePage({
         <section aria-labelledby='release-resources' className='mt-6'>
           <h2
             id='release-resources'
-            className='changelog-resources-heading tracking-tight text-primary-token'
+            className='changelog-resources-heading line-clamp-2 tracking-tight text-primary-token'
           >
             {/* ui-casing-allow: founder-locked pen copy (iekBP) */}
             Resources for this release
