@@ -1,7 +1,7 @@
 {
   "generatedBy": "JOV-6280 shadcn/no-restyle shrink-only baseline. Do not regenerate silently; only shrink maxFiles/maxMessages and remove cleaned files.",
-  "maxFiles": 239,
-  "maxMessages": 3264,
+  "maxFiles": 238,
+  "maxMessages": 3261,
   "files": {
     "app/(auth)/identity/IdentityPageClient.tsx": 9,
     "app/(marketing)/changelog/ChangelogEmailSignup.tsx": 5,
@@ -189,7 +189,6 @@
     "components/jovie/components/TeleprompterShowcaseInterstitial.tsx": 11,
     "components/marketing/artist-notifications/ArtistNotificationsHero.tsx": 1,
     "components/marketing/changelog/ChangelogTimeline.tsx": 3,
-    "components/marketing/changelog/CustomerChangelogArchive.tsx": 3,
     "components/marketing/MarketingHero.tsx": 1,
     "components/marketing/MarketingPosterHero.tsx": 4,
     "components/molecules/AppSearchField.tsx": 18,
