@@ -21,7 +21,10 @@ export const MARKETING_PEN_CONTRACT_IDS = {
     hero: 'SijpA',
     logoCloud: 'bKvfJ',
     featureGrid: 'pM23w',
-    featureSplit: 'kQ4vN',
+    // Native registry identity for section.feature-split. The reusable visual
+    // owner is tracked separately in Pen evidence and is not emitted as the
+    // source selector until source/render equivalence is independently proven.
+    featureSplit: 'Y44oSU',
     howItWorks: 'rsv9G',
     socialProof: 'RVUME',
     stats: 'fkRn8',
