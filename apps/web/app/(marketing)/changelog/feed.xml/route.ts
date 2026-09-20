@@ -1,12 +1,9 @@
-import fs from 'node:fs';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { changelogInlineText, parseChangelog } from '@/lib/changelog-parser';
-import { resolveMonorepoPath } from '@/lib/filesystem-paths';
+import { changelogInlineText } from '@/lib/changelog-parser';
+import { getChangelogReleases } from '@/lib/changelog-source';
 
 // Fully static
 export const revalidate = false;
-
-const CHANGELOG_PATH = resolveMonorepoPath('CHANGELOG.md');
 
 export function atomEntryId(version: string): string {
   return `${BASE_URL}/changelog#v${version}`;
@@ -22,12 +19,7 @@ function escapeXml(s: string): string {
 }
 
 export async function GET() {
-  let markdown = '';
-  if (fs.existsSync(CHANGELOG_PATH)) {
-    markdown = fs.readFileSync(CHANGELOG_PATH, 'utf8');
-  }
-
-  const releases = parseChangelog(markdown);
+  const releases = await getChangelogReleases();
 
   const atomEntries = releases
     .slice(0, 20)

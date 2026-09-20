@@ -1,0 +1,598 @@
+/* Changelog editorial design — changelog-scoped projection of the
+   founder-locked pen canvas (Assembly /changelog Zgs4e, hero bBTae
+   FOUNDER LOCKED 2026-09-17, archive body gpoUn + review YgxYz
+   FOUNDER LOCKED 2026-09-13/14, entry master O64tu).
+
+   Token discipline: pen hexes map to existing semantic tokens only
+   (see docs in repo-tokens map). No --linear-* references, no new
+   color roots. Geometry that the 4px token scale cannot express uses
+   calc() over --space-* so every value stays on the beat.
+
+   Sticky-date mapping note: the pen pins the date rail at viewport
+   y104 (88px pen header + 16px clearance). The repo's fixed marketing
+   header owns --public-shell-header-offset (72px), so the sticky pin
+   resolves to header offset + 16px via the existing token. */
+
+/* ---------------------------------------------------------- */
+/* Hero — release journal (bBTae)                              */
+/* ---------------------------------------------------------- */
+
+.changelog-hero {
+  position: relative;
+  overflow: hidden;
+  /* M3HZDy editorial gradient surface: canvas base + shell haze +
+     ion radial blooms, projected onto existing tokens. */
+  background:
+    radial-gradient(
+      90% 70% at 84% 42%,
+      color-mix(in oklab, var(--color-accent-blue) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      60% 60% at 66% 26%,
+      color-mix(in oklab, var(--color-accent-blue) 8%, transparent),
+      transparent 75%
+    ),
+    radial-gradient(
+      120% 120% at 50% 0%,
+      color-mix(in oklab, var(--color-text-tertiary-token) 6%, transparent),
+      transparent 60%
+    );
+}
+
+.changelog-hero__inner {
+  padding-top: calc(var(--space-20) + var(--space-2)); /* 88px */
+  padding-bottom: calc(var(--space-16) - var(--space-2)); /* 56px */
+}
+
+.changelog-hero__masthead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.changelog-hero__kicker {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs); /* pen 10px Fira Code */
+  font-weight: var(--font-weight-semibold); /* 590 */
+  letter-spacing: 0.12em; /* pen ls 1.2 @ 10px */
+  text-transform: uppercase;
+  color: var(--color-text-tertiary-token); /* pen $muted #a8b0c3 */
+}
+
+.changelog-hero__title {
+  font-family: var(--font-display);
+  /* pen 80px wide → 48px narrow (responsive contract) */
+  font-size: clamp(var(--text-5xl), 8vw, 5rem);
+  font-weight: var(--font-weight-semibold); /* 590 */
+  letter-spacing: -0.03em; /* pen ls -2.4 @ 80px */
+  line-height: 1.05;
+  color: var(--color-text-primary-token); /* pen $ink #f5f7fb */
+  text-wrap: balance;
+}
+
+.changelog-hero__support {
+  /* pen Inter 22px → 18px narrow */
+  font-size: clamp(var(--text-lg), 1.53vw, 1.375rem); /* lands 22px @1440 */
+  max-width: 40rem;
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary-token);
+}
+
+.changelog-hero__timeline {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-subtle); /* pen $atom-border */
+}
+
+.changelog-hero__timeline-entries {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-12);
+  row-gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.changelog-hero__timeline-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5); /* 10px */
+  min-height: var(--space-11); /* 44px hit target */
+  border-radius: var(--radius-sm);
+}
+
+.changelog-hero__tone-dot {
+  width: var(--space-1-5); /* 6px */
+  height: var(--space-1-5);
+  flex: none;
+  border-radius: var(--radius-pill);
+}
+
+/* Release tones by recency rank (bBTae): ion, pulse, mint. */
+.changelog-hero__tone-dot--ion {
+  background-color: var(--color-accent-blue);
+}
+.changelog-hero__tone-dot--pulse {
+  background-color: var(--color-accent-pink);
+}
+.changelog-hero__tone-dot--mint {
+  background-color: var(--color-accent-green);
+}
+
+.changelog-hero__timeline-date {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs); /* pen 9px → closest scale step 10px */
+  letter-spacing: 0.12em;
+  color: var(--color-text-tertiary-token);
+  white-space: nowrap;
+}
+
+.changelog-hero__timeline-title {
+  font-size: var(--text-xs); /* 12px */
+  color: var(--color-text-primary-token);
+}
+
+.changelog-hero__timeline-link:hover .changelog-hero__timeline-title {
+  color: var(--color-accent);
+}
+
+/* ---------------------------------------------------------- */
+/* Archive lead — 2-column row (YgxYz, supersedes gpoUn lead)  */
+/* ---------------------------------------------------------- */
+
+.changelog-lead {
+  padding-top: var(--space-16); /* 64px */
+  padding-bottom: var(--space-12); /* 48px */
+}
+
+.changelog-lead__grid {
+  display: grid;
+  gap: var(--space-12);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .changelog-lead__grid {
+    grid-template-columns: minmax(0, 1fr) 22.5rem; /* 360px subscribe column */
+  }
+}
+
+.changelog-lead__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5); /* 20px */
+}
+
+.changelog-lead__eyebrow {
+  font-size: var(--text-app); /* 13px */
+  line-height: var(--leading-normal);
+  color: var(--color-text-quaternary-token); /* pen $marketing-ink-quiet */
+}
+
+.changelog-lead__title {
+  font-family: var(--font-display);
+  /* YgxYz: Satoshi 80px w700 lh 1.05 ls -2.4 (supersedes gpoUn Inter 56) */
+  font-size: clamp(var(--text-5xl), 8vw, 5rem);
+  font-weight: var(--font-weight-bold); /* closest step to pen 700 */
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--color-text-primary-token);
+  text-wrap: balance;
+}
+
+.changelog-lead__intro {
+  font-size: var(--text-lg); /* 18px */
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary-token); /* pen $marketing-ink-secondary */
+  max-width: 36rem;
+}
+
+/* ---------------------------------------------------------- */
+/* Subscribe column (o5CeaF, 360px changelog-scoped module)    */
+/* ---------------------------------------------------------- */
+
+.changelog-subscribe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.changelog-subscribe__alternatives {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-inline: var(--space-2);
+}
+
+.changelog-subscribe__alt {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-11); /* 44px hit target, 28px-visible type */
+  font-size: var(--text-app); /* 13px */
+  color: var(--color-text-quaternary-token); /* pen tertiary ink */
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-subtle, 150ms) ease;
+}
+
+.changelog-subscribe__alt:hover {
+  color: var(--color-text-primary-token);
+}
+
+/* ---------------------------------------------------------- */
+/* Archive jump navigation (Q3JwYT)                            */
+/* ---------------------------------------------------------- */
+
+.changelog-archive-nav {
+  padding-bottom: var(--space-6);
+}
+
+.changelog-archive-nav__row {
+  display: grid;
+  gap: var(--space-6);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle); /* canonical divider */
+}
+
+@media (min-width: 1024px) {
+  .changelog-archive-nav__row {
+    grid-template-columns: 10.5rem minmax(0, 1fr); /* 168px month rail */
+    column-gap: var(--space-12);
+  }
+}
+
+.changelog-archive-nav__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.changelog-archive-nav__month {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-11);
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium); /* 510 */
+  color: var(--color-text-secondary-token);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.changelog-archive-nav__month:hover {
+  color: var(--color-text-primary-token);
+}
+
+.changelog-archive-nav__hint {
+  font-size: var(--text-xs); /* 12px */
+  color: var(--color-text-quaternary-token);
+}
+
+.changelog-archive-nav__links {
+  display: grid;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 1024px) {
+  .changelog-archive-nav__links {
+    gap: var(--space-2);
+  }
+}
+
+.changelog-archive-nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--space-11); /* 44px jump target */
+  border-radius: var(--radius-sm);
+}
+
+.changelog-archive-nav__link-date {
+  width: 7rem;
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-quaternary-token);
+  white-space: nowrap;
+}
+
+.changelog-archive-nav__link-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-app);
+  color: var(--color-text-secondary-token);
+}
+
+.changelog-archive-nav__link:hover .changelog-archive-nav__link-title {
+  color: var(--color-text-primary-token);
+}
+
+.changelog-archive-nav__link-arrow {
+  color: var(--color-text-quaternary-token);
+  flex: none;
+}
+
+/* ---------------------------------------------------------- */
+/* Entry rows (O64tu master)                                   */
+/* ---------------------------------------------------------- */
+
+.changelog-entries {
+  padding-bottom: calc(var(--space-16) + var(--space-2)); /* 72px */
+}
+
+.changelog-entry {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-8); /* 32px */
+  padding-bottom: calc(var(--space-16) + var(--space-2)); /* 72px */
+  border-top: 1px solid var(--color-border-default); /* pen $edge hairline */
+  /* Anchor jumps clear the fixed marketing header + 16px. */
+  scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-4));
+}
+
+@media (min-width: 1024px) {
+  .changelog-entry {
+    /* 168px date rail + 48px gutter = pen's 216px content offset */
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    column-gap: var(--space-12);
+  }
+}
+
+.changelog-entry__date {
+  font-size: var(--text-app); /* 13px */
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary-token); /* pen $muted */
+}
+
+@media (min-width: 1024px) {
+  .changelog-entry__date {
+    /* Sticky date rail (pCQsH): pins under the fixed header while the
+       entry body scrolls beneath it. */
+    position: sticky;
+    top: calc(var(--public-shell-header-offset) + var(--space-4));
+    align-self: start;
+  }
+}
+
+.changelog-entry__main {
+  display: grid;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .changelog-entry__main {
+    /* O64tu at 1248: fill content column + 384px image-first card */
+    grid-template-columns: minmax(0, 1fr) 24rem;
+  }
+}
+
+.changelog-entry__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6); /* 24px */
+  min-width: 0;
+}
+
+.changelog-entry__category {
+  font-size: var(--text-xs); /* 12px */
+  letter-spacing: 0.12em; /* pen ls 1.2 */
+  text-transform: uppercase;
+  color: var(--color-text-quaternary-token); /* YgxYz tertiary ink */
+}
+
+.changelog-entry__title {
+  /* YgxYz: Inter 32px w590 ls -0.64 (supersedes O64tu 40/650) */
+  font-size: clamp(1.75rem, 3vw, 2rem); /* 28px narrow → 32px wide */
+  font-weight: var(--font-weight-semibold); /* 590 */
+  letter-spacing: -0.02em; /* pen ls -0.64 @ 32px */
+  line-height: 1.1;
+  color: var(--color-text-primary-token);
+  text-wrap: balance;
+}
+
+.changelog-entry__excerpt {
+  font-size: var(--text-lg); /* 18px */
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary-token);
+}
+
+.changelog-entry__tertiary {
+  font-size: var(--text-xs);
+  color: var(--color-text-quaternary-token);
+}
+
+.changelog-entry__tertiary a {
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-subtle, 150ms) ease;
+}
+
+.changelog-entry__tertiary a:hover {
+  color: var(--color-text-primary-token);
+}
+
+/* Editorial media — gradient and type (QQ1R4) projected onto tokens.
+   One gradient atom, per-entry accent parameters; no local gradient
+   paint outside these classes. Media is decorative release art, so the
+   block is aria-hidden at the call site. */
+.changelog-entry-media {
+  width: 100%;
+  border-radius: var(--radius-xl); /* pen r16 */
+  border: 1px solid var(--color-border-subtle);
+}
+
+.changelog-entry-media--feature {
+  height: 14rem;
+}
+
+@media (min-width: 768px) {
+  .changelog-entry-media--feature {
+    height: 25rem; /* pen 400px */
+  }
+}
+
+.changelog-entry-media--card {
+  height: 13.5rem; /* pen 216px */
+}
+
+.changelog-entry-media--ion {
+  background:
+    radial-gradient(
+      100% 90% at 20% 12%,
+      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 90% at 84% 42%,
+      color-mix(in oklab, var(--color-accent-blue) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      70% 70% at 60% 85%,
+      color-mix(in oklab, var(--color-accent-blue) 28%, transparent),
+      transparent 75%
+    ),
+    var(--color-bg-surface-1);
+}
+
+.changelog-entry-media--pulse {
+  background:
+    radial-gradient(
+      100% 90% at 20% 12%,
+      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 90% at 84% 42%,
+      color-mix(in oklab, var(--color-accent-pink) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      70% 70% at 60% 85%,
+      color-mix(in oklab, var(--color-accent-pink) 28%, transparent),
+      transparent 75%
+    ),
+    var(--color-bg-surface-1);
+}
+
+.changelog-entry-media--ultra {
+  background:
+    radial-gradient(
+      100% 90% at 20% 12%,
+      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 90% at 84% 42%,
+      color-mix(in oklab, var(--color-accent-purple) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      70% 70% at 60% 85%,
+      color-mix(in oklab, var(--color-accent-purple) 28%, transparent),
+      transparent 75%
+    ),
+    var(--color-bg-surface-1);
+}
+
+/* Image-first card variant (O64tu column 3, 384px) */
+.changelog-entry__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4); /* 16px */
+  min-width: 0;
+  border-radius: var(--radius-lg);
+}
+
+.changelog-entry__card-title {
+  font-family: var(--font-display);
+  /* pen Satoshi 22px w500 ls -0.35 lh 1.2; 22px sits between scale steps */
+  font-size: 1.375rem;
+  font-weight: 500;
+  letter-spacing: -0.016em;
+  line-height: 1.2;
+  color: var(--color-text-primary-token);
+}
+
+.changelog-entry__card-meta {
+  font-size: var(--text-xs); /* 12px */
+  line-height: 1.4;
+  color: var(--color-text-quaternary-token);
+}
+
+/* ---------------------------------------------------------- */
+/* Month sections + load-earlier row                           */
+/* ---------------------------------------------------------- */
+
+.changelog-month-section {
+  scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-4));
+}
+
+.changelog-load-earlier {
+  margin-top: var(--space-10);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-6);
+}
+
+/* ---------------------------------------------------------- */
+/* Version detail header (iekBP)                               */
+/* ---------------------------------------------------------- */
+
+.changelog-version-identity {
+  /* pen iekBP: Fira Code 80px w650 lh 1.05 ls -2.4 → 48px narrow.
+     650 has no registered step; bold (680) is the closest. Mono family
+     resolves to the repo --font-mono stack (Fira Code is not bundled). */
+  font-size: clamp(var(--text-5xl), 5.6vw, 5rem); /* 48px → 80px @1440 */
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.changelog-release-title {
+  /* pen iekBP: Inter 32px w590 lh 1.3 ls -0.64 → subheading 28px narrow */
+  font-size: clamp(1.75rem, 3vw, 2rem); /* 28px → 32px */
+  font-weight: var(--font-weight-semibold); /* 590 */
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.changelog-section-title {
+  /* pen iekBP section titles: Inter 32px w650 lh 1.3 ls -0.64;
+     650 → bold (680) closest step; 32 → 28px narrow */
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.changelog-resources-heading {
+  /* pen iekBP: Inter 22px w650; 650 → bold (680) closest step */
+  font-size: 1.375rem; /* 22px sits between scale steps */
+  font-weight: var(--font-weight-bold);
+  line-height: 1.3;
+}
+
+/* ---------------------------------------------------------- */
+/* Loading skeleton geometry (synced to the layout above)      */
+/* ---------------------------------------------------------- */
+
+.changelog-skeleton-media {
+  height: 14rem;
+  border-radius: var(--radius-xl);
+}
+
+@media (min-width: 768px) {
+  .changelog-skeleton-media {
+    height: 25rem;
+  }
+}
+
+.changelog-skeleton-card-media {
+  height: 13.5rem;
+  border-radius: var(--radius-xl);
+}
