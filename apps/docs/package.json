@@ -8,11 +8,14 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "pnpm run validate:articles",
     "build": "next build",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "start": "next start",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
+    "test": "node --test lib/*.test.mjs",
+    "validate:articles": "node scripts/validate-articles.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
