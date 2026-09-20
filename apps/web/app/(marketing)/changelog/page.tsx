@@ -55,7 +55,10 @@ function ReleaseJournalHero({
       <MarketingContainer width='page' className='changelog-hero__inner'>
         <div className='changelog-hero__masthead'>
           <p className='changelog-hero__kicker'>Changelog</p>
-          <h1 id='changelog-hero-title' className='changelog-hero__title'>
+          <h1
+            id='changelog-hero-title'
+            className='changelog-hero__title line-clamp-2'
+          >
             {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
             {'What shipped.'}
           </h1>
@@ -112,7 +115,7 @@ export default async function ChangelogPage() {
               <p className='changelog-lead__eyebrow'>Changelog</p>
               <h2
                 id='changelog-archive-title'
-                className='changelog-lead__title'
+                className='changelog-lead__title line-clamp-2'
               >
                 {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial title casing */}
                 {"What's new in Jovie"}
