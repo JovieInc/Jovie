@@ -44,6 +44,20 @@ Sources: [Burrito 1.5 archive format](https://github.com/burrito-elixir/burrito/
 Do not use maintenance commands as a read-only substitute: wrapper initialization
 can create directories or install its musl runtime before maintenance dispatch.
 
+## Preservation-only upstream observation
+
+`observe_upstream_preservation` in the existing emitter verifies the independently
+reviewed `symphony-upstream-preservation-binding/v1` digest, typed loaded systemd
+properties, exact on-disk inventory, package payload, serving process ancestry and
+stable invocation before returning `symphony-upstream-preservation/v1`.
+The example binding is deliberately unapproved with null effective/workflow hashes.
+Unknown fields, missing approval, changed configuration and stale observations fail.
+It reads no environment-file contents or process environment and claims neither.
+This observer does not publish legacy health, approve admission or install anything.
+The dependent activation-workflow change consumes this separate result to preserve
+accepted upstream without reaching legacy mutators. Current configuration approval
+and runtime-owner review remain separate from this source-only fixture proof.
+
 ## Legacy publisher
 
 JOV-6163 is the runner-source prerequisite for JOV-5853. This replaces the
