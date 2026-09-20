@@ -1,8 +1,6 @@
 import '../../components/marketing/MarketingSnapRail.css';
 import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';
-import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { MarketingFooter } from '@/components/site/MarketingFooter';
-import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
@@ -13,18 +11,17 @@ export default function BrandLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='system-b-marketing dark system-b-brand-layout'>
-      <SkipToContent />
-      <MarketingHeader
-        logoSize='sm'
-        logoVariant='icon'
-        showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
-        variant='homepage'
-      />
-      <main id='main-content' className='system-b-brand-main'>
-        {children}
-      </main>
-      <MarketingFooter variant='expanded' />
-    </div>
+    <PublicPageShell
+      className='system-b-marketing dark system-b-brand-layout'
+      footerVariant='expanded'
+      logoSize='sm'
+      logoVariant='icon'
+      mainClassName='system-b-brand-main'
+      mainOffset={false}
+      showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
+      headerVariant='homepage'
+    >
+      {children}
+    </PublicPageShell>
   );
 }
