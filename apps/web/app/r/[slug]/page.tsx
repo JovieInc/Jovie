@@ -12,9 +12,12 @@
 
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { NextRequest } from 'next/server';
 import { cache } from 'react';
 import { BASE_URL, UNKNOWN_ARTIST } from '@/constants/app';
+import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -29,7 +32,13 @@ import {
 import type { ProviderKey } from '@/lib/discography/types';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import {
+  allowIfRateLimitBackendDegraded,
+  publicClickLimiter,
+} from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { detectBot } from '@/lib/utils/bot-detection';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
@@ -217,14 +226,32 @@ export default async function ReleaseSmartLinkPage({
       notFound();
     }
 
-    // Track the click (fire-and-forget, don't block redirect)
-    void trackServerEvent('smart_link_clicked', {
-      releaseId: release.id,
-      profileId,
-      provider: providerKey,
-      releaseTitle: release.title,
-      utmParams,
+    const requestHeaders = await headers();
+    const analyticsRequest = new NextRequest(`${BASE_URL}/r/${slug}`, {
+      headers: requestHeaders,
     });
+    const botDetection = detectBot(analyticsRequest, `/r/${slug}`);
+    const rateLimit = isSmartLinkCrawler(botDetection)
+      ? null
+      : allowIfRateLimitBackendDegraded(
+          await publicClickLimiter.limit(extractClientIP(requestHeaders)),
+          { route: '/r/[slug]', operation: 'smart_link_analytics' }
+        );
+
+    if (rateLimit?.success) {
+      // Persist admitted human clicks before redirect so the serverless
+      // request cannot end before analytics delivery completes.
+      await trackServerEvent('smart_link_clicked', {
+        releaseId: release.id,
+        profileId,
+        provider: providerKey,
+        releaseTitle: release.title,
+        utm_source: utmParams.utm_source,
+        utm_medium: utmParams.utm_medium,
+        utm_content: utmParams.utm_content,
+        utm_campaign_matches_release: utmParams.utm_campaign === release.slug,
+      });
+    }
 
     redirect(appendUTMParamsToUrl(targetUrl, utmParams));
   }

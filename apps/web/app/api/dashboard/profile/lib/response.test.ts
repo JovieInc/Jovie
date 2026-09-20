@@ -10,8 +10,10 @@ vi.mock('@/lib/cache/profile', () => ({
   invalidateUsernameChange,
 }));
 
-vi.mock('@/lib/analytics/runtime-aware', () => ({
-  trackServerEvent: vi.fn(() => Promise.resolve()),
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: vi.fn(() =>
+    Promise.resolve({ ok: true, eventId: 'analytics-event-id' })
+  ),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({

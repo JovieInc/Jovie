@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       );
       if (!rateLimit.success) {
         if (isNativeClient(client)) {
-          void trackAuthEvent('auth_exchange_failed', {
+          await trackAuthEvent('auth_exchange_failed', {
             client,
             intent: 'sign_in',
             result: 'failed',
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
-      void trackAuthEvent('auth_exchange_failed', {
+      await trackAuthEvent('auth_exchange_failed', {
         client,
         intent: 'sign_in',
         result: 'failed',
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     // the auth callback failed to mint one — surface as `ott_missing` so the
     // client can restart the flow with a clear message (plan design row 24).
     if (!result.ott) {
-      void trackAuthEvent('auth_exchange_failed', {
+      await trackAuthEvent('auth_exchange_failed', {
         client,
         intent: 'sign_in',
         result: 'failed',
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
       // single-use and already consumed by `verifyOneTimeToken`, so it cannot
       // be replayed after this rejection.
       if (!iosExchange.ok) {
-        void trackAuthEvent('auth_exchange_failed', {
+        await trackAuthEvent('auth_exchange_failed', {
           client,
           intent: 'sign_in',
           result: 'failed',
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
       };
     }
 
-    void trackAuthEvent('auth_exchange_succeeded', {
+    await trackAuthEvent('auth_exchange_succeeded', {
       client,
       intent: 'sign_in',
       result: 'succeeded',

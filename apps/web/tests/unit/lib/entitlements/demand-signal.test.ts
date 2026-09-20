@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockAddBreadcrumb, mockTrackEvent } = vi.hoisted(() => ({
+const { mockAddBreadcrumb, mockTrackServerEvent } = vi.hoisted(() => ({
   mockAddBreadcrumb: vi.fn(),
-  mockTrackEvent: vi.fn().mockResolvedValue(undefined),
+  mockTrackServerEvent: vi.fn().mockResolvedValue({
+    ok: true,
+    eventId: 'event-1',
+  }),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: mockAddBreadcrumb,
 }));
 
-vi.mock('@/lib/analytics/runtime-aware', () => ({
-  trackEvent: mockTrackEvent,
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 import { logEntitlementDenial } from '@/lib/entitlements/demand-signal';
@@ -20,8 +23,8 @@ describe('logEntitlementDenial', () => {
     vi.clearAllMocks();
   });
 
-  it('records demand signal as breadcrumb + analytics, never as an exception', () => {
-    logEntitlementDenial({
+  it('records demand signal as breadcrumb + analytics, never as an exception', async () => {
+    await logEntitlementDenial({
       gate: 'canAccessTasksWorkspace',
       source: 'chat-tool-locked-stub',
       toolName: 'manageTasks',
@@ -40,7 +43,7 @@ describe('logEntitlementDenial', () => {
         }),
       })
     );
-    expect(mockTrackEvent).toHaveBeenCalledWith(
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
       'entitlement_denial',
       expect.objectContaining({
         gate: 'canAccessTasksWorkspace',

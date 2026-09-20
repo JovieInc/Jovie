@@ -8,7 +8,7 @@ import {
   ProfileEditPreviewCard,
 } from '@/components/features/dashboard/organisms/ProfileEditPreviewCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
-import { isLockedToolOutput } from '@/lib/chat/locked-tools';
+import { isLockedToolOutput } from '@/lib/chat/locked-tool-output';
 import { resolveToolFailurePresentation } from '@/lib/chat/tool-errors';
 import {
   encodeToolEvents,
