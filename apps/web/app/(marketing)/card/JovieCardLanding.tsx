@@ -21,7 +21,7 @@ function JovieCardPreview() {
                 <span className='text-sm font-semibold tracking-tight text-primary-token'>
                   Jovie Card
                 </span>
-                <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-tertiary-token'>
+                <span className='rounded-full border border-subtle px-3 py-1 text-xs text-tertiary-token'>
                   Preview
                 </span>
               </div>
