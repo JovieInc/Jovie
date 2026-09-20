@@ -9,6 +9,7 @@ import {
 import {
   changelogInlineText,
   parseChangelog,
+  parseChangelogDocument,
   parseChangelogInline,
 } from '../changelog-parser';
 
@@ -191,6 +192,29 @@ describe('parseChangelog', () => {
     const releases = parseChangelog(md);
     expect(releases).toHaveLength(1);
     expect(releases[0].version).toBe('1.0.0');
+  });
+
+  it('keeps empty source headings available for a truthful freshness notice', () => {
+    const md = `# Changelog
+
+## [2.0.0] - 2026-03-20
+
+## [1.0.0] - 2026-03-17
+
+### Added
+
+- Public launch
+`;
+
+    const parsed = parseChangelogDocument(md);
+    expect(parsed.releases.map(release => release.version)).toEqual(['1.0.0']);
+    expect(parsed.sourceReleases.map(release => release.version)).toEqual([
+      '2.0.0',
+      '1.0.0',
+    ]);
+    expect(parsed.unpublishedReleases.map(release => release.version)).toEqual([
+      '2.0.0',
+    ]);
   });
 
   it('skips [Unreleased] section', () => {

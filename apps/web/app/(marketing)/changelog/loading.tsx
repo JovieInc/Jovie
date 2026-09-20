@@ -33,43 +33,44 @@ export default function ChangelogLoading() {
         </MarketingContainer>
       </section>
 
-      {/* Archive lead skeleton: copy column + subscribe column */}
-      <MarketingContainer width='page' className='changelog-lead'>
-        <div className='changelog-lead__grid'>
+      {/* Archive content skeleton: copy, sticky subscribe, and outcomes */}
+      <MarketingContainer width='page' className='changelog-content'>
+        <div className='changelog-content__grid'>
           <div className='changelog-lead__copy'>
-            <div className='h-4 w-20 skeleton rounded' />
-            <div className='h-16 w-3/4 skeleton rounded-lg' />
             <div className='h-5 w-full max-w-lg skeleton rounded' />
           </div>
-          <div className='h-48 w-full skeleton rounded-2xl' />
-        </div>
-      </MarketingContainer>
-
-      {/* Entry rows skeleton */}
-      <MarketingContainer width='page' className='changelog-entries'>
-        {[0, 1].map(index => (
-          <div key={`cl-entry-skeleton-${index}`} className='changelog-entry'>
-            <div className='changelog-entry__date'>
-              <div className='h-4 w-28 skeleton rounded' />
-            </div>
-            <div className='changelog-entry__main'>
-              <div className='changelog-entry__content'>
-                <div className='h-3 w-16 skeleton rounded' />
-                <div className='h-8 w-2/3 skeleton rounded' />
-                <div className='changelog-skeleton-media skeleton' />
-                <div className='space-y-2'>
-                  <div className='h-4 w-full skeleton rounded' />
-                  <div className='h-4 w-5/6 skeleton rounded' />
+          <aside className='changelog-subscribe-rail'>
+            <div className='h-48 w-full skeleton rounded-2xl' />
+          </aside>
+          <div className='changelog-entries'>
+            {[0, 1].map(index => (
+              <div
+                key={`cl-entry-skeleton-${index}`}
+                className='changelog-entry'
+              >
+                <div className='changelog-entry__date'>
+                  <div className='h-4 w-28 skeleton rounded' />
+                </div>
+                <div className='changelog-entry__main'>
+                  <div className='changelog-entry__content'>
+                    <div className='h-3 w-16 skeleton rounded' />
+                    <div className='h-8 w-2/3 skeleton rounded' />
+                    <div className='changelog-skeleton-media skeleton' />
+                    <div className='space-y-2'>
+                      <div className='h-4 w-full skeleton rounded' />
+                      <div className='h-4 w-5/6 skeleton rounded' />
+                    </div>
+                  </div>
+                  <div className='changelog-entry__card'>
+                    <div className='changelog-skeleton-card-media skeleton' />
+                    <div className='h-5 w-3/4 skeleton rounded' />
+                    <div className='h-3 w-1/2 skeleton rounded' />
+                  </div>
                 </div>
               </div>
-              <div className='changelog-entry__card'>
-                <div className='changelog-skeleton-card-media skeleton' />
-                <div className='h-5 w-3/4 skeleton rounded' />
-                <div className='h-3 w-1/2 skeleton rounded' />
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
+        </div>
       </MarketingContainer>
     </div>
   );

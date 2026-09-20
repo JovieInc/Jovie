@@ -1,8 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
+import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
+import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductLanding } from './ProductLanding';
+
+const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
 
 vi.mock('next/link', () => ({
   default: ({
@@ -19,7 +24,15 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mocks.push }),
+}));
+
 describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
+  beforeEach(() => {
+    mocks.push.mockReset();
+  });
+
   it('renders the locked left copy and claim-card proof', () => {
     render(<ProductLanding />);
 
@@ -40,8 +53,46 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
 
     const cta = screen.getByTestId('product-claim-cta');
     expect(cta).toHaveTextContent(PRODUCT_COPY.claimCard.cta);
-    expect(cta).toHaveAttribute('href', PRODUCT_CLAIM_HREF);
+    expect(cta).toHaveAttribute('type', 'submit');
     expect(cta).toHaveAttribute('data-primary-action', 'true');
+    expect(
+      screen.getByRole('textbox', { name: 'Choose Your Handle' })
+    ).toHaveAttribute('placeholder', 'you');
+  });
+
+  it('preserves an entered handle in the canonical claim intent', () => {
+    render(<ProductLanding />);
+
+    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    fireEvent.change(input, { target: { value: 'fresh-handle' } });
+    fireEvent.submit(screen.getByTestId('product-claim-form'));
+
+    expect(mocks.push).toHaveBeenCalledWith(
+      buildClaimProfileStartHref('fresh-handle')
+    );
+  });
+
+  it('keeps an empty claim safe and focused', () => {
+    render(<ProductLanding />);
+
+    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    fireEvent.click(screen.getByTestId('product-claim-cta'));
+
+    expect(input).toHaveFocus();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps invalid handles local instead of navigating', () => {
+    render(<ProductLanding />);
+
+    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    fireEvent.change(input, { target: { value: 'bad handle' } });
+    fireEvent.submit(screen.getByTestId('product-claim-form'));
+
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId('product-handle-status')).toHaveTextContent(
+      'Handle can only contain lowercase letters, numbers, and hyphens'
+    );
   });
 
   it('keeps the homepage hero H1 on the homepage, not /product', () => {

@@ -1,12 +1,10 @@
-import { Button } from '@jovie/ui/atoms/button';
-import Link from 'next/link';
-import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
 import {
   MarketingHero,
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
-import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
+import { PRODUCT_COPY } from '@/data/productCopy';
+import { ProductClaimHandleForm } from './ProductClaimHandleForm';
 import './ProductLanding.css';
 
 function ProductClaimCard() {
@@ -29,29 +27,12 @@ function ProductClaimCard() {
         {claimCard.outcome}
       </p>
       <p className='text-sm text-tertiary-token'>{claimCard.proof}</p>
-      <div className='homepage-name-search w-full'>
-        <InputAuraFrame treatment='editorial' className='rounded-full'>
-          <div className='homepage-name-search__field relative flex w-full items-center'>
-            <span className='product-claim-card__field-path min-w-0 flex-1 text-primary-token'>
-              <span className='text-tertiary-token'>{claimCard.domain}</span>
-              <span>{claimCard.handle}</span>
-            </span>
-            <Button
-              asChild
-              size='marketing'
-              variant='primary'
-              className='shrink-0'
-            >
-              <Link
-                href={PRODUCT_CLAIM_HREF}
-                data-testid='product-claim-cta'
-                data-primary-action='true'
-              >
-                {claimCard.cta}
-              </Link>
-            </Button>
-          </div>
-        </InputAuraFrame>
+      <div className='product-claim-card__handle-form w-full'>
+        <ProductClaimHandleForm
+          domain={claimCard.domain}
+          placeholder={claimCard.handle}
+          submitLabel={claimCard.cta}
+        />
       </div>
     </MarketingSurfaceCard>
   );
