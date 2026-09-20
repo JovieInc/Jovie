@@ -312,6 +312,55 @@ describe('parseChangelog', () => {
   });
 });
 
+describe('featured section policy', () => {
+  const FEATURED_RELEASE = `## [1.0.0] - 2026-03-20
+
+### Featured
+
+- Flagship launch story
+
+### Added
+
+- New thing
+`;
+
+  it('drops Featured from public sections by default (email-compatible)', () => {
+    const result = parseChangelog(FEATURED_RELEASE);
+    expect(result.releases[0].sections.featured).toBeUndefined();
+    expect(result.releases[0].sections.added).toEqual(['New thing']);
+    expect(result.releases[0].raw).toContain('### Featured');
+    expect(
+      getLatestRelease(FEATURED_RELEASE).sections.featured
+    ).toBeUndefined();
+  });
+
+  it('collects Featured when includeFeatured is set, matching the web parser', () => {
+    const result = parseChangelog(FEATURED_RELEASE, { includeFeatured: true });
+    expect(result.releases[0].sections.featured).toEqual([
+      'Flagship launch story',
+    ]);
+    expect(result.releases[0].sections.added).toEqual(['New thing']);
+  });
+
+  it('keeps featured bullets out of neighboring sections when opted in', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Added
+
+- New thing
+
+### Featured
+
+- Flagship launch story
+`;
+    const result = parseChangelog(md, { includeFeatured: true });
+    expect(result.releases[0].sections.added).toEqual(['New thing']);
+    expect(result.releases[0].sections.featured).toEqual([
+      'Flagship launch story',
+    ]);
+  });
+});
+
 describe('getLatestRelease', () => {
   it('returns the first release after unreleased', () => {
     const release = getLatestRelease(SAMPLE_CHANGELOG);
