@@ -143,6 +143,98 @@ test.describe('OV responsive navigation exclusivity', () => {
     'dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
+  for (const entry of ['selector', 'palette', 'shortcut'] as const) {
+    test(`workspace round trip via ${entry} remounts the authorized navigation`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await enterPersona(page, 'admin', APP_ROUTES.DASHBOARD);
+      const customerNavigation = page.getByRole('navigation', {
+        name: 'Dashboard Navigation',
+      });
+      const operatorNavigation = page.getByRole('navigation', {
+        name: 'OV Navigation',
+      });
+      await expect(customerNavigation).toBeVisible();
+      const customerBefore = await customerNavigationContract(
+        customerNavigation,
+        false
+      );
+
+      for (const destination of [
+        { label: 'OV', href: APP_ROUTES.ADMIN_CHAT },
+        { label: 'Jovie', href: APP_ROUTES.DASHBOARD },
+      ]) {
+        // An RSC fetch or changed URL alone does not prove the old server
+        // layout was discarded. Require a new main-frame document request.
+        const documentRequest = page.waitForRequest(
+          request =>
+            request.isNavigationRequest() &&
+            request.frame() === page.mainFrame() &&
+            new URL(request.url()).pathname === destination.href
+        );
+        await Promise.all([
+          documentRequest,
+          (async () => {
+            if (entry === 'selector') {
+              await page
+                .getByRole('button', { name: 'Switch Workspace' })
+                .click();
+              await page
+                .getByRole('menuitem', {
+                  name: destination.label,
+                  exact: true,
+                })
+                .click();
+            } else if (entry === 'palette') {
+              await page.keyboard.press('Control+k');
+              await page
+                .getByRole('option')
+                .filter({
+                  hasText: `Switch to ${destination.label}`,
+                })
+                .click();
+            } else {
+              // The shortcut intentionally ignores focused text inputs.
+              await page
+                .getByRole('button', { name: 'Switch Workspace' })
+                .focus();
+              await page.keyboard.press('Alt+Shift+KeyW');
+            }
+          })(),
+        ]);
+        await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
+        await expect(
+          page.getByRole('button', { name: 'Switch Workspace' })
+        ).toHaveText(destination.label);
+        if (destination.label === 'OV') {
+          await expect(operatorNavigation).toBeVisible();
+          await expect(customerNavigation).toHaveCount(0);
+          expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
+            new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
+          );
+        } else {
+          await expect(customerNavigation).toBeVisible();
+          await expect(operatorNavigation).toHaveCount(0);
+          const customerAfter = await customerNavigationContract(
+            customerNavigation,
+            false
+          );
+          // Compare the canonical navigation, not async recent-chat controls
+          // that may still be loading after a document navigation.
+          expect(customerAfter.nodes).toEqual(customerBefore.nodes);
+          expect(customerAfter.styleInvariants).toEqual(
+            customerBefore.styleInvariants
+          );
+          await expect(
+            customerNavigation.getByRole('link', { name: 'Inbox', exact: true })
+          ).toHaveAttribute('aria-current', 'page');
+        }
+      }
+    });
+  }
+
   for (const viewport of VIEWPORTS) {
     test(`${viewport.label}: OV exposes only canonical operator navigation with stable keyboard and touch geometry`, async ({
       page,

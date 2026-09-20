@@ -57,9 +57,12 @@ export function WorkspaceSelector<Id extends string>({
       <DropdownMenuContent align='start' sideOffset={4} className='w-48'>
         {workspaces.map(workspace => {
           const isCurrent = workspace.id === currentWorkspace.id;
+          // The server layout owns mode and authorization. A client transition
+          // would retain the previous workspace's mounted shell.
+          const WorkspaceLink = isCurrent ? Link : 'a';
           return (
             <DropdownMenuItem key={workspace.id} asChild>
-              <Link
+              <WorkspaceLink
                 href={workspace.href}
                 aria-current={isCurrent ? 'page' : undefined}
                 className='flex items-center gap-2'
@@ -81,7 +84,7 @@ export function WorkspaceSelector<Id extends string>({
                     aria-hidden='true'
                   />
                 ) : null}
-              </Link>
+              </WorkspaceLink>
             </DropdownMenuItem>
           );
         })}
