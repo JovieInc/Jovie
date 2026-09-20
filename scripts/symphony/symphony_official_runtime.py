@@ -103,6 +103,31 @@ REPAIR_FEED_REASONS = frozenset(
         "queue-controller-red-over-10m",
     }
 )
+# Standalone installed wrapper: mirror closure_health.issue_intake_allowed.
+# The runtime CI selector checks reason-domain parity and real producer receipts.
+CLOSURE_ISSUE_BLOCKED_REASONS = frozenset(
+    {
+        "native-queue-empty-with-eligible-over-15m",
+        "native-queue-unmergeable",
+        "unclassified-open-pr-over-15m",
+        "no-merge-progress-over-1h",
+        "duplicate-issue-lanes-unresolved",
+        "expired-held-prs",
+        "draft-stack-policy-violation",
+        "draft-stack-repair-action-unavailable",
+        "internally-repairable-prs-open",
+        "closure-actions-pending",
+        "queue-controller-red-over-10m",
+        "lifecycle-action-inventory-incomplete",
+        "closure-observation-unknown",
+    }
+)
+CLOSURE_SYSTEMS_DOWN_REASONS = frozenset(
+    {
+        "closure-health-receipt-missing-or-malformed",
+        "gate-evaluation-failed",
+    }
+)
 DEFAULT_FLEET_GATE_RECEIPT = (
     pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
 )
@@ -1122,6 +1147,26 @@ def read_closure_stop_line(
                                      purpose=purpose)
 
 
+def _closure_issue_intake_allowed(status: object, reasons: object) -> bool:
+    """Issue-blocked red keeps Jovie intake open; systems-down stays fail-closed."""
+    if not isinstance(reasons, list) or not all(
+        isinstance(reason, str) for reason in reasons
+    ):
+        return False
+    reason_set = set(reasons)
+    if reason_set & CLOSURE_SYSTEMS_DOWN_REASONS:
+        return False
+    if status == "healthy":
+        return True
+    if (
+        status in {"grace", "red"}
+        and reason_set
+        and reason_set <= CLOSURE_ISSUE_BLOCKED_REASONS
+    ):
+        return True
+    return False
+
+
 def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
     """Repair-feed reason list when a grace/red closure row is controller feed.
 
@@ -1140,7 +1185,7 @@ def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
         not isinstance(reason, str) for reason in reasons
     ):
         return None
-    if not set(reasons) <= REPAIR_FEED_REASONS:
+    if not reasons or not set(reasons) <= REPAIR_FEED_REASONS:
         return None
     return sorted(set(reasons))
 
@@ -1193,9 +1238,12 @@ def _closure_snapshot_verdict(
     tampered = (
         closure.get("schema") != CLOSURE_HEALTH_SCHEMA
         or closure.get("authority") != CLOSURE_HEALTH_AUTHORITY
+        or not isinstance(status, str)
         or status not in CLOSURE_HEALTH_STATUSES
         or not isinstance(intake, bool)
-        or intake is not (status == CLOSURE_HEALTHY_STATUS)
+        or not isinstance(closure.get("reasons"), list)
+        or any(not isinstance(reason, str) for reason in closure["reasons"])
+        or intake is not _closure_issue_intake_allowed(status, closure["reasons"])
         or closure.get("promotionContinues") is not True
         or closure.get("remediationContinues") is not True
     )
