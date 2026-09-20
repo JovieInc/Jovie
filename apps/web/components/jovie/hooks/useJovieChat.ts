@@ -297,12 +297,14 @@ function isTimelineDebugEnabled(): boolean {
 export function useJovieChat({
   profileId,
   artistContext, // NOSONAR - kept for backward compatibility
-  conversationId,
+  conversationId: requestedConversationId,
   onConversationCreate,
   username,
   pinnedOpportunity = null,
   chatMode,
 }: UseJovieChatOptions) {
+  // The operator session is not a creator conversation or a customer cache key.
+  const conversationId = chatMode === 'ov' ? null : requestedConversationId;
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
@@ -333,6 +335,14 @@ export function useJovieChat({
   const [timelineState, setTimelineState] = useState<ChatTimelineState>(() =>
     getCachedTimelineState(activeConversationId)
   );
+  const [timelineMode, setTimelineMode] = useState(chatMode);
+  useEffect(() => {
+    if (timelineMode === chatMode) return;
+    setTimelineMode(chatMode);
+    setTimelineState(createInitialChatTimelineState(conversationId ?? null));
+    setActiveConversationId(conversationId ?? null);
+    activeClientTurnIdRef.current = null;
+  }, [chatMode, conversationId, timelineMode]);
   const timelineStateRef = useRef(timelineState);
   useEffect(() => {
     timelineStateRef.current = timelineState;
@@ -374,7 +384,6 @@ export function useJovieChat({
       return nextState;
     });
   }, []);
-  const messages = selectRenderableMessages(timelineState);
 
   // Track whether we're waiting for title generation from the server.
   // Set to a timestamp when title generation is initiated, cleared when title arrives.
@@ -425,9 +434,35 @@ export function useJovieChat({
     isLoading: isLoadingConversation,
   } = useChatConversationQuery({
     conversationId: activeConversationId,
-    enabled: !!activeConversationId,
+    enabled: chatMode === 'ov' || !!activeConversationId,
+    chatMode,
     refetchInterval: titlePollIntervalMs,
   });
+  const messages = useMemo(() => {
+    if (
+      timelineMode !== chatMode ||
+      (chatMode === 'ov' && isConversationQueryError)
+    )
+      return [];
+    const rows = selectRenderableMessages(timelineState);
+    if (chatMode !== 'ov') return rows;
+    // Canonical turn order wins over tied timestamps; never invent event times.
+    // Unpersisted local rows remain in their existing order after recorded turns.
+    const order = new Map(
+      existingConversation?.messages.map((row, index) => [row.id, index])
+    );
+    return [...rows].sort(
+      (a, b) =>
+        (order.get(a.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER)
+    );
+  }, [
+    timelineMode,
+    chatMode,
+    isConversationQueryError,
+    timelineState,
+    existingConversation,
+  ]);
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
   const transport = useMemo(
@@ -437,7 +472,7 @@ export function useJovieChat({
         api: '/api/chat',
         body: {
           ...(profileId ? { profileId } : { artistContext }),
-          ...(activeConversationId
+          ...(chatMode !== 'ov' && activeConversationId
             ? { conversationId: activeConversationId }
             : {}),
           ...(pinnedOpportunity ? { pinnedOpportunity } : {}),
@@ -478,13 +513,13 @@ export function useJovieChat({
               Math.max(0, uxLatencyNowMs() - latency.startedAt)
             );
           }
-          if (serverConversationId) {
+          if (chatMode !== 'ov' && serverConversationId) {
             adoptServerConversationIdRef.current(
               serverConversationId,
               'reserved'
             );
           }
-          if (serverConversationId && clientTurnId) {
+          if (chatMode !== 'ov' && serverConversationId && clientTurnId) {
             dispatchTimelineEvent({
               type: 'message.send.acknowledged',
               conversationId: serverConversationId,
@@ -511,6 +546,8 @@ export function useJovieChat({
   // reducer as merge events; it never directly replaces rendered messages.
   const persistedTimelineMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
+    if ((existingConversation.chatMode === 'ov') !== (chatMode === 'ov'))
+      return undefined;
     return existingConversation.messages.map(
       (msg: {
         id: string;
@@ -531,7 +568,7 @@ export function useJovieChat({
         requestId: msg.requestId ?? null,
       })
     );
-  }, [existingConversation]);
+  }, [existingConversation, chatMode]);
 
   const handleChatFailure = useCallback(
     (
@@ -615,7 +652,10 @@ export function useJovieChat({
     status,
     stop: rawStop,
   } = useChat({
-    id: activeConversationId ?? 'new-chat',
+    id:
+      chatMode === 'ov'
+        ? 'summer-operator-chat'
+        : (activeConversationId ?? 'new-chat'),
     transport,
     // JOV-3525: batch streaming UI updates to ~20fps so raw token deltas don't
     // re-render the timeline on every burst; pairs with server-side
@@ -654,7 +694,7 @@ export function useJovieChat({
           now: Date.now(),
         });
       }
-      if (metadata?.conversationId) {
+      if (chatMode !== 'ov' && metadata?.conversationId) {
         adoptServerConversationId(metadata.conversationId, 'completed');
       }
 
@@ -714,6 +754,29 @@ export function useJovieChat({
   // Query data merges into the canonical timeline. It must never replace the
   // rendered list wholesale because optimistic/streaming rows may be newer.
   useEffect(() => {
+    if (chatMode !== 'ov' || timelineMode !== chatMode) return;
+    if (isLoadingConversation) {
+      dispatchTimelineEvent({
+        type: 'conversation.load.started',
+        conversationId: null,
+      });
+    } else if (persistedTimelineMessages) {
+      dispatchTimelineEvent({
+        type: 'conversation.load.succeeded',
+        conversationId: null,
+        messages: persistedTimelineMessages,
+      });
+    }
+  }, [
+    chatMode,
+    timelineMode,
+    isLoadingConversation,
+    persistedTimelineMessages,
+    dispatchTimelineEvent,
+  ]);
+
+  useEffect(() => {
+    if (chatMode === 'ov') return;
     if (!activeConversationId || !isLoadingConversation) return;
     if (loadedConversationIdsRef.current.has(activeConversationId)) return;
     dispatchTimelineEvent({
@@ -722,9 +785,15 @@ export function useJovieChat({
       requestId: activeConversationId,
       now: Date.now(),
     });
-  }, [activeConversationId, dispatchTimelineEvent, isLoadingConversation]);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    isLoadingConversation,
+    chatMode,
+  ]);
 
   useEffect(() => {
+    if (chatMode === 'ov') return;
     if (!activeConversationId || !isConversationQueryError) {
       lastConversationLoadFailureRef.current = null;
       return;
@@ -750,9 +819,11 @@ export function useJovieChat({
     dispatchTimelineEvent,
     existingConversationError,
     isConversationQueryError,
+    chatMode,
   ]);
 
   useEffect(() => {
+    if (chatMode === 'ov') return;
     if (!activeConversationId || !persistedTimelineMessages) return;
     if (existingConversation?.conversation?.id !== activeConversationId) return;
 
@@ -774,6 +845,7 @@ export function useJovieChat({
     dispatchTimelineEvent,
     existingConversation?.conversation?.id,
     persistedTimelineMessages,
+    chatMode,
   ]);
 
   useEffect(() => {
@@ -993,6 +1065,11 @@ export function useJovieChat({
       files?: FileUIPart[],
       options?: SubmitChatMessageOptions
     ): Promise<boolean> => {
+      if (
+        chatMode === 'ov' &&
+        (isLoadingConversation || isConversationQueryError)
+      )
+        return false;
       const hasFiles = files && files.length > 0;
       if (!text.trim() && !hasFiles) return false;
       const shouldInterrupt =
@@ -1099,6 +1176,9 @@ export function useJovieChat({
       sendMessage,
       stop,
       tryHandleCommand,
+      chatMode,
+      isLoadingConversation,
+      isConversationQueryError,
     ]
   );
 
@@ -1253,14 +1333,25 @@ export function useJovieChat({
     setInput,
     chipTray,
     messages,
-    chatError,
+    chatError:
+      chatMode === 'ov' && isConversationQueryError
+        ? {
+            type: 'unknown' as const,
+            message:
+              existingConversationError instanceof Error
+                ? existingConversationError.message
+                : 'Summer history is unavailable. Do not resend the original turn.',
+          }
+        : chatError,
     isLoading,
     isSubmitting,
     hasMessages,
     isLoadingConversation:
-      timelineState.phase === 'initial-loading' &&
-      !!activeConversationId &&
-      messages.length === 0,
+      chatMode === 'ov'
+        ? isLoadingConversation
+        : timelineState.phase === 'initial-loading' &&
+          !!activeConversationId &&
+          messages.length === 0,
     status,
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */
