@@ -65,6 +65,7 @@ describe('CustomerChangelogArchive', () => {
     ).toHaveAttribute('href', '/changelog/26.8.1');
     expect(screen.queryByText(/^v26\.8\.1$/)).not.toBeInTheDocument();
     expect(screen.getByText('New')).toBeVisible();
+    expect(screen.getAllByText('Product update')).toHaveLength(2);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 

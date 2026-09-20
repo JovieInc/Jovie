@@ -6,9 +6,10 @@ import { CustomerChangelogArchive } from '@/components/marketing/changelog/Custo
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { getChangelogReleases } from '@/lib/changelog-source';
+import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
   type CustomerChangelogEntry,
+  formatCustomerChangelogDate,
   groupCustomerChangelogByMonth,
   projectCustomerChangelog,
 } from '@/lib/customer-changelog';
@@ -17,7 +18,7 @@ import './changelog-editorial.css';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: "What's new in Jovie",
+  title: 'Jovie Changelog: Product Updates & New Features',
   description: `Audience and control updates in ${APP_NAME}. What got better for you — not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
@@ -60,7 +61,7 @@ function ReleaseJournalHero({
             className='changelog-hero__title line-clamp-2'
           >
             {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
-            {'What shipped.'}
+            {"What's new in Jovie"}
           </h1>
           <p className='changelog-hero__support'>
             Versioned, dated, and source-backed.
@@ -97,10 +98,33 @@ function ReleaseJournalHero({
   );
 }
 
+function ChangelogFreshnessNotice({
+  latestPublished,
+  hasUnpublishedReleases,
+}: {
+  readonly latestPublished: readonly CustomerChangelogEntry[];
+  readonly hasUnpublishedReleases: boolean;
+}) {
+  if (!hasUnpublishedReleases) return null;
+
+  const latestDate = latestPublished[0]?.date
+    ? formatCustomerChangelogDate(latestPublished[0].date)
+    : null;
+
+  return (
+    <p className='changelog-freshness' role='status'>
+      Release notes are being prepared for newer release slots.{' '}
+      {latestDate
+        ? `The latest published update is ${latestDate}.`
+        : 'The latest published update is listed below.'}
+    </p>
+  );
+}
+
 export default async function ChangelogPage() {
-  const releases = await getChangelogReleases();
+  const snapshot = await getChangelogSnapshot();
   const months = groupCustomerChangelogByMonth(
-    projectCustomerChangelog(releases)
+    projectCustomerChangelog(snapshot.releases)
   );
   const latest = months.flatMap(group => group.entries).slice(0, 3);
 
@@ -108,31 +132,31 @@ export default async function ChangelogPage() {
     <div className='min-h-screen bg-page text-primary-token'>
       <ReleaseJournalHero latest={latest} />
 
-      <section aria-labelledby='changelog-archive-title'>
-        <MarketingContainer width='page' className='changelog-lead'>
-          <div className='changelog-lead__grid'>
-            <div className='changelog-lead__copy'>
-              <p className='changelog-lead__eyebrow'>Changelog</p>
-              <h2
-                id='changelog-archive-title'
-                className='changelog-lead__title line-clamp-2'
-              >
-                {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial title casing */}
-                {"What's new in Jovie"}
-              </h2>
-              <p className='changelog-lead__intro'>
-                {
-                  'Audience and control updates that change what you can do. Not a log of every deploy.'
-                }
-              </p>
-            </div>
-            <ChangelogSubscribeColumn />
+      <MarketingContainer width='page' className='changelog-content'>
+        <div className='changelog-content__grid'>
+          <div className='changelog-lead__copy'>
+            <p id='changelog-lead-intro' className='changelog-lead__intro'>
+              {
+                'Audience and control updates that change what you can do. Not a log of every deploy.'
+              }
+            </p>
+            <ChangelogFreshnessNotice
+              latestPublished={latest}
+              hasUnpublishedReleases={snapshot.unpublishedReleases.length > 0}
+            />
           </div>
-        </MarketingContainer>
-      </section>
 
-      <MarketingContainer width='page' className='changelog-entries'>
-        <CustomerChangelogArchive months={months} />
+          <aside
+            className='changelog-subscribe-rail'
+            aria-label='Subscribe To Changelog Updates'
+          >
+            <ChangelogSubscribeColumn />
+          </aside>
+
+          <div className='changelog-entries'>
+            <CustomerChangelogArchive months={months} />
+          </div>
+        </div>
       </MarketingContainer>
 
       <MarketingFinalCTA

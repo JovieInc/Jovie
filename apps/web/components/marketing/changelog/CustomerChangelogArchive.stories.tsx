@@ -59,7 +59,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Deterministic, static reduced-motion state for the customer-outcome changelog archive (JOV-6203 Wave 1), rebuilt to the founder-locked pen entry master (sticky date rail, gradient media, image-first card) plus the YgxYz archive jump nav. Two neutral month groups bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
+          'Deterministic, static reduced-motion state for the customer-outcome changelog archive (JOV-6203 Wave 1), rebuilt to the founder-locked pen entry master (sticky date rail, compact source-backed fallback media, image-first card) plus the YgxYz archive jump nav. Two neutral month groups bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
       },
     },
   },

@@ -17,16 +17,14 @@
   letter-spacing: 0.14em;
 }
 
+.product-claim-card__handle-input::placeholder {
+  color: var(--color-text-tertiary-token);
+}
+
 .product-claim-card__path {
   font-family: var(--font-display);
   font-size: clamp(2.25rem, 4.6vw, 3.25rem);
   font-weight: 510;
   letter-spacing: -0.03em;
   line-height: 1.02;
-}
-
-.product-claim-card__field-path {
-  font-size: var(--text-lg);
-  letter-spacing: -0.005em;
-  line-height: var(--leading-tight);
 }

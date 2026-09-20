@@ -139,47 +139,32 @@
 }
 
 /* ---------------------------------------------------------- */
-/* Archive lead — 2-column row (YgxYz, supersedes gpoUn lead)  */
+/* Archive content — copy, sticky subscribe, and outcomes      */
 /* ---------------------------------------------------------- */
 
-.changelog-lead {
+.changelog-content {
   padding-top: var(--space-16); /* 64px */
   padding-bottom: var(--space-12); /* 48px */
 }
 
-.changelog-lead__grid {
+.changelog-content__grid {
   display: grid;
   gap: var(--space-12);
   align-items: start;
 }
 
 @media (min-width: 1024px) {
-  .changelog-lead__grid {
+  .changelog-content__grid {
     grid-template-columns: minmax(0, 1fr) 22.5rem; /* 360px subscribe column */
   }
 }
 
 .changelog-lead__copy {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-5); /* 20px */
-}
-
-.changelog-lead__eyebrow {
-  font-size: var(--text-app); /* 13px */
-  line-height: var(--leading-normal);
-  color: var(--color-text-quaternary-token); /* pen $marketing-ink-quiet */
-}
-
-.changelog-lead__title {
-  font-family: var(--font-display);
-  /* YgxYz: Satoshi 80px w700 lh 1.05 ls -2.4 (supersedes gpoUn Inter 56) */
-  font-size: clamp(var(--text-5xl), 8vw, 5rem);
-  font-weight: var(--font-weight-bold); /* closest step to pen 700 */
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  color: var(--color-text-primary-token);
-  text-wrap: balance;
 }
 
 .changelog-lead__intro {
@@ -187,6 +172,36 @@
   line-height: var(--leading-normal);
   color: var(--color-text-secondary-token); /* pen $marketing-ink-secondary */
   max-width: 36rem;
+}
+
+.changelog-freshness {
+  max-width: 36rem;
+  border-left: 2px solid var(--color-accent-blue);
+  padding-left: var(--space-4);
+  font-size: var(--text-app);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary-token);
+}
+
+.changelog-subscribe-rail {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+@media (min-width: 1024px) {
+  .changelog-subscribe-rail {
+    position: sticky;
+    top: calc(var(--public-shell-header-offset) + var(--space-4));
+  }
+}
+
+@media (max-width: 1023px) {
+  .changelog-subscribe-rail {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+  }
 }
 
 /* ---------------------------------------------------------- */
@@ -321,7 +336,15 @@
 /* ---------------------------------------------------------- */
 
 .changelog-entries {
+  grid-column: 1;
+  grid-row: 2;
   padding-bottom: calc(var(--space-16) + var(--space-2)); /* 72px */
+}
+
+@media (max-width: 1023px) {
+  .changelog-entries {
+    grid-row: 3;
+  }
 }
 
 .changelog-entry {
@@ -416,14 +439,22 @@
   color: var(--color-text-primary-token);
 }
 
-/* Editorial media — gradient and type (QQ1R4) projected onto tokens.
-   One gradient atom, per-entry accent parameters; no local gradient
-   paint outside these classes. Media is decorative release art, so the
-   block is aria-hidden at the call site. */
+/* Editorial media — compact semantic fallback until an approved asset is
+   attached to a customer entry. The icon, label, and title keep this region
+   useful without implying that a CSS gradient is release artwork. */
 .changelog-entry-media {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
   width: 100%;
   border-radius: var(--radius-xl); /* pen r16 */
   border: 1px solid var(--color-border-subtle);
+  border-top: 2px solid var(--changelog-entry-media-accent);
+  background-color: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+  padding: var(--space-6);
 }
 
 .changelog-entry-media--feature {
@@ -438,66 +469,46 @@
 
 .changelog-entry-media--card {
   height: 13.5rem; /* pen 216px */
+  padding: var(--space-5);
 }
 
 .changelog-entry-media--ion {
-  background:
-    radial-gradient(
-      100% 90% at 20% 12%,
-      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
-      transparent 55%
-    ),
-    radial-gradient(
-      90% 90% at 84% 42%,
-      color-mix(in oklab, var(--color-accent-blue) 55%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      70% 70% at 60% 85%,
-      color-mix(in oklab, var(--color-accent-blue) 28%, transparent),
-      transparent 75%
-    ),
-    var(--color-bg-surface-1);
+  --changelog-entry-media-accent: var(--color-accent-blue);
 }
 
 .changelog-entry-media--pulse {
-  background:
-    radial-gradient(
-      100% 90% at 20% 12%,
-      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
-      transparent 55%
-    ),
-    radial-gradient(
-      90% 90% at 84% 42%,
-      color-mix(in oklab, var(--color-accent-pink) 55%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      70% 70% at 60% 85%,
-      color-mix(in oklab, var(--color-accent-pink) 28%, transparent),
-      transparent 75%
-    ),
-    var(--color-bg-surface-1);
+  --changelog-entry-media-accent: var(--color-accent-pink);
 }
 
 .changelog-entry-media--ultra {
-  background:
-    radial-gradient(
-      100% 90% at 20% 12%,
-      color-mix(in oklab, var(--color-text-primary-token) 10%, transparent),
-      transparent 55%
-    ),
-    radial-gradient(
-      90% 90% at 84% 42%,
-      color-mix(in oklab, var(--color-accent-purple) 55%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      70% 70% at 60% 85%,
-      color-mix(in oklab, var(--color-accent-purple) 28%, transparent),
-      transparent 75%
-    ),
-    var(--color-bg-surface-1);
+  --changelog-entry-media-accent: var(--color-accent-purple);
+}
+
+.changelog-entry-media__icon {
+  color: var(--changelog-entry-media-accent);
+  flex: none;
+}
+
+.changelog-entry-media__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-quaternary-token);
+}
+
+.changelog-entry-media__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 2.4vw, 1.75rem);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--color-text-primary-token);
 }
 
 /* Image-first card variant (O64tu column 3, 384px) */

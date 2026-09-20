@@ -1,7 +1,14 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import { ArrowRight } from 'lucide-react';
+import {
+  ArrowRight,
+  CircleMinus,
+  type LucideIcon,
+  Sparkles,
+  TrendingUp,
+  Wrench,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -16,12 +23,22 @@ import {
 const INITIAL_MONTH_COUNT = 1;
 
 /**
- * Entry media gradient accent by recency rank (pen O64tu: ion, pulse,
- * ultra — the locked card triad). One gradient atom; tone is the only
- * per-entry parameter.
+ * Compact source-backed fallback artwork. Customer entries do not currently
+ * carry an approved media asset, so the archive uses an icon, a neutral
+ * product-update label, and the entry title instead of an empty visual block.
  */
 const ENTRY_MEDIA_TONES = ['ion', 'pulse', 'ultra'] as const;
 type EntryMediaTone = (typeof ENTRY_MEDIA_TONES)[number];
+
+const ENTRY_MEDIA_ICONS: Record<
+  CustomerChangelogEntry['category'],
+  LucideIcon
+> = {
+  new: Sparkles,
+  improved: TrendingUp,
+  fixed: Wrench,
+  removed: CircleMinus,
+};
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
@@ -32,17 +49,28 @@ function versionHref(version: string): string {
 }
 
 function EntryMedia({
+  entry,
   tone,
   variant,
 }: {
+  readonly entry: CustomerChangelogEntry;
   readonly tone: EntryMediaTone;
   readonly variant: 'feature' | 'card';
 }) {
+  const Icon = ENTRY_MEDIA_ICONS[entry.category];
+
   return (
     <div
       aria-hidden='true'
       className={`changelog-entry-media changelog-entry-media--${variant} changelog-entry-media--${tone}`}
-    />
+    >
+      <Icon
+        className='changelog-entry-media__icon'
+        size={variant === 'feature' ? 28 : 22}
+      />
+      <span className='changelog-entry-media__label'>Product update</span>
+      <span className='changelog-entry-media__title'>{entry.title}</span>
+    </div>
   );
 }
 
@@ -76,7 +104,7 @@ function EntryRow({
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
           </p>
           <h3 className='changelog-entry__title'>{entry.title}</h3>
-          <EntryMedia tone={tone} variant='feature' />
+          <EntryMedia entry={entry} tone={tone} variant='feature' />
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
@@ -111,7 +139,7 @@ function EntryRow({
           ) : null}
         </div>
         <div className='changelog-entry__card'>
-          <EntryMedia tone={tone} variant='card' />
+          <EntryMedia entry={entry} tone={tone} variant='card' />
           <p className='changelog-entry__card-title'>{entry.title}</p>
           <p className='changelog-entry__card-meta'>
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]} ·{' '}

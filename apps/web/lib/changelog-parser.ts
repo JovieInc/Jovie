@@ -37,6 +37,15 @@ export interface ChangelogRelease {
   sections: ChangelogSection;
 }
 
+export interface ChangelogParseResult {
+  /** Releases with at least one public, customer-facing entry. */
+  readonly releases: readonly ChangelogRelease[];
+  /** Every release heading, including empty or internal-only slots. */
+  readonly sourceReleases: readonly ChangelogRelease[];
+  /** Source headings ahead of the latest public release with no public entries. */
+  readonly unpublishedReleases: readonly ChangelogRelease[];
+}
+
 export type ChangelogInlineNode =
   | { readonly type: 'text'; readonly value: string }
   | { readonly type: 'code'; readonly value: string }
@@ -208,6 +217,16 @@ function hasPublicEntries(release: ChangelogRelease): boolean {
  * Filters out `[internal]` entries and releases with zero public entries.
  */
 export function parseChangelog(markdown: string): ChangelogRelease[] {
+  return [...parseChangelogDocument(markdown).releases];
+}
+
+/**
+ * Parse the source once while retaining the distinction between release
+ * headings and published customer outcomes. Empty headings are intentionally
+ * excluded from `releases`, but callers can use `unpublishedReleases` to make
+ * a truthful freshness disclosure without inventing entries.
+ */
+export function parseChangelogDocument(markdown: string): ChangelogParseResult {
   const lines = markdown.split('\n');
   const releases: ChangelogRelease[] = [];
   let current: ChangelogRelease | null = null;
@@ -227,7 +246,18 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     summaryConsumed = result.summaryConsumed;
   }
 
-  return releases.filter(hasPublicEntries);
+  const publicReleases = releases.filter(hasPublicEntries);
+  const firstPublicIndex = publicReleases[0]
+    ? releases.indexOf(publicReleases[0])
+    : releases.length;
+
+  return {
+    releases: publicReleases,
+    sourceReleases: releases,
+    unpublishedReleases: releases
+      .slice(0, firstPublicIndex === -1 ? releases.length : firstPublicIndex)
+      .filter(release => !hasPublicEntries(release)),
+  };
 }
 
 type LineState = {
