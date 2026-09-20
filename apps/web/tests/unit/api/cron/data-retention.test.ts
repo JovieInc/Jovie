@@ -65,6 +65,7 @@ describe('GET /api/cron/data-retention', () => {
       clickEventsDeleted: 10,
       audienceMembersDeleted: 5,
       notificationSubscriptionsDeleted: 2,
+      serverAnalyticsEventsDeleted: 6,
       pixelEventsDeleted: 3,
       stripeWebhookEventsDeleted: 1,
       webhookEventsDeleted: 0,
@@ -100,7 +101,8 @@ describe('GET /api/cron/data-retention', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.result).toBeDefined();
+    expect(data.totalDeleted).toBe(34);
+    expect(data.result.serverAnalyticsEventsDeleted).toBe(6);
   });
 
   it('returns 403 for untrusted origins before bearer auth', async () => {

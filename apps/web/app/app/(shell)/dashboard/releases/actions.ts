@@ -844,7 +844,7 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
-  void trackServerEvent('release_isrc_rescan', {
+  await trackServerEvent('release_isrc_rescan', {
     profileId: profile.id,
     releaseId: params.releaseId,
     linksFound,
@@ -949,7 +949,7 @@ export async function rescanAppleMusicLinks(): Promise<{
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
-  void trackServerEvent('apple_music_rescan', {
+  await trackServerEvent('apple_music_rescan', {
     profileId: profile.id,
     linksFound: result.releasesEnriched,
   });
@@ -1009,7 +1009,7 @@ export async function syncFromSpotify(): Promise<{
   revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
-    void trackServerEvent('releases_synced', {
+    await trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',
@@ -1449,7 +1449,7 @@ export async function connectSpotifyArtist(params: {
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (result.success) {
-      void trackServerEvent('releases_synced', {
+      await trackServerEvent('releases_synced', {
         profileId: profile.id,
         imported: result.imported,
         source: 'spotify',
@@ -1969,7 +1969,7 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
-  void trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
+  await trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2015,7 +2015,7 @@ export async function archiveLibraryRelease(
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  void trackServerEvent('release_archived', {
+  await trackServerEvent('release_archived', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2054,7 +2054,7 @@ export async function restoreRelease(params: DeleteReleaseParams): Promise<{
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  void trackServerEvent('release_restored', {
+  await trackServerEvent('release_restored', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
