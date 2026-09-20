@@ -169,7 +169,7 @@ function ReleaseSectionBlock({
         </span>
         <h2
           id={headingId}
-          className='changelog-section-title text-primary-token'
+          className='changelog-section-title line-clamp-2 text-primary-token'
         >
           {meta.title}
         </h2>
