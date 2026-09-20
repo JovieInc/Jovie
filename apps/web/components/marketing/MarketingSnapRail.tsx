@@ -241,6 +241,8 @@ export function MarketingSnapRail({
           id={railId}
           aria-label={ariaLabel}
           aria-describedby={instructions ? describedBy : undefined}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: horizontal snap regions need a keyboard entry point for native scrolling
+          tabIndex={0}
           data-testid={scrollerTestId ?? `${testId}-scroller`}
           className={cn(
             'marketing-snap-rail__scroller relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',

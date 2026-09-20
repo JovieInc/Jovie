@@ -82,6 +82,21 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
+  it('keeps the claim handle keyboard focus visible', () => {
+    render(<ProductLanding />);
+
+    expect(
+      screen.getByRole('textbox', { name: 'Choose Your Handle' })
+    ).toHaveClass(
+      'focus-visible:outline-none',
+      'focus-visible:border-focus',
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus/25',
+      'focus-visible:ring-offset-2',
+      'focus-visible:ring-offset-surface-page'
+    );
+  });
+
   it('keeps invalid handles local instead of navigating', () => {
     render(<ProductLanding />);
 

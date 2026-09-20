@@ -192,7 +192,7 @@ export function ClaimHandleForm({
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(
               'system-b-claim-handle-input',
-              'min-w-0 flex-1 bg-transparent focus-visible:outline-none',
+              'min-w-0 flex-1 bg-transparent focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               isHeroLike
                 ? 'placeholder:text-quaternary-token'
                 : 'placeholder:text-tertiary-token'

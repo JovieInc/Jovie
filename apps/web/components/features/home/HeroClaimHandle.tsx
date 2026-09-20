@@ -28,7 +28,7 @@ export function HeroClaimHandle({
             autoCapitalize='none'
             autoComplete='off'
             autoCorrect='off'
-            className='system-b-claim-handle-input min-w-0 flex-1 bg-transparent placeholder:text-quaternary-token focus-visible:outline-none'
+            className='system-b-claim-handle-input min-w-0 flex-1 bg-transparent placeholder:text-quaternary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page'
             data-size='hero'
             data-available='false'
             name='handle'
