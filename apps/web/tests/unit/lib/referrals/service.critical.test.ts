@@ -643,6 +643,59 @@ describe('@critical referrals/service.ts', () => {
   // =========================================================================
   // expireReferralOnChurn
   // =========================================================================
+  describe('reverseReferralCommission', () => {
+    it('cancels only the reversed invoice and preserves amount and payout audit fields on replay', async () => {
+      const rows = [
+        {
+          invoice: 'in_refund',
+          status: 'paid',
+          amountCents: 999,
+          paidAt: new Date('2026-09-01'),
+        },
+        {
+          invoice: 'in_other',
+          status: 'approved',
+          amountCents: 777,
+          paidAt: null,
+        },
+      ];
+      const where = vi.fn(async (condition: { a: string; b: string }) => {
+        expect(condition.a).toBe('referralCommissions.stripeInvoiceId');
+        for (const row of rows)
+          if (row.invoice === condition.b) row.status = 'cancelled';
+      });
+      const set = vi.fn().mockReturnValue({ where });
+      mockDbUpdate.mockReturnValue({ set });
+      const { reverseReferralCommission } = await import(
+        '@/lib/referrals/service'
+      );
+      await reverseReferralCommission('in_refund');
+      await reverseReferralCommission('in_refund');
+      expect(set).toHaveBeenCalledWith({ status: 'cancelled' });
+      expect(rows[0]).toEqual({
+        invoice: 'in_refund',
+        status: 'cancelled',
+        amountCents: 999,
+        paidAt: new Date('2026-09-01'),
+      });
+      expect(rows[1].status).toBe('approved');
+    });
+
+    it('propagates persistence failures so webhook processing cannot acknowledge lost reversal', async () => {
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockRejectedValue(new Error('DB unavailable')),
+        }),
+      });
+      const { reverseReferralCommission } = await import(
+        '@/lib/referrals/service'
+      );
+      await expect(reverseReferralCommission('in_refund')).rejects.toThrow(
+        'DB unavailable'
+      );
+    });
+  });
+
   describe('expireReferralOnChurn', () => {
     it('marks active/pending referrals as churned', async () => {
       const upd = updateChain({
@@ -706,6 +759,7 @@ describe('@critical referrals/service.ts', () => {
           { status: 'pending', total: 5000 },
           { status: 'approved', total: 3000 },
           { status: 'paid', total: 10000 },
+          { status: 'cancelled', total: 9000 },
         ]);
       });
 
