@@ -137,7 +137,7 @@ export default async function ChangelogReleasePage({
         />
         <MarketingHero variant='left'>
           <nav aria-label='Breadcrumb'>
-            <ol className='flex flex-wrap items-center gap-2.5 font-mono text-app'>
+            <ol className='flex flex-wrap items-center gap-2 font-mono text-app'>
               <li>
                 <Link
                   href={APP_ROUTES.CHANGELOG}
@@ -160,14 +160,14 @@ export default async function ChangelogReleasePage({
             <h1 className='changelog-version-identity font-mono text-primary-token'>
               {/* ui-casing-allow: semantic version string */}v{release.version}
             </h1>
-            <div className='flex flex-col items-start gap-2.5'>
+            <div className='flex flex-col items-start gap-2'>
               {isLatest && (
-                <span className='rounded-full bg-success-subtle px-3.5 py-1 font-mono text-app font-semibold tracking-wide text-success'>
+                <span className='rounded-full bg-success-subtle px-3 py-1 font-mono text-app font-semibold tracking-wide text-success'>
                   Current
                 </span>
               )}
               {!hasRemovals && (
-                <span className='rounded-full border border-strong px-3.5 py-1 font-mono text-app font-medium tracking-wide text-secondary-token'>
+                <span className='rounded-full border border-strong px-3 py-1 font-mono text-app font-medium tracking-wide text-secondary-token'>
                   No breaking changes
                 </span>
               )}
@@ -213,7 +213,7 @@ export default async function ChangelogReleasePage({
               <li key={resource.href}>
                 <Link
                   href={resource.href}
-                  className='group flex h-full flex-col gap-3.5 rounded-xl border border-subtle bg-surface-0 p-6 transition-colors duration-subtle hover:border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                  className='group flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-0 p-6 transition-colors duration-subtle hover:border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
                 >
                   <span className='flex items-center justify-between'>
                     <resource.icon
