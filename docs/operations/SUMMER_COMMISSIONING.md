@@ -47,6 +47,37 @@ bounded source composition. **Re-evaluate when:** owners supply current inventor
 and runtime observations. **Then:** integrate those receipts through the existing
 certification lifecycle; full JOV-5945 discovery/economic assessment remains open.
 
+## New Vercel project review policy (JOV-6483)
+
+`project-creation-policy.mjs` validates an exact project proposal against an
+affirmative adversarial review by a second, independent agent. It requires reasons
+that both an existing project and a preview are insufficient, an accepted owner,
+repository, environment, dependencies and deployment boundary. All proposal fields
+are digest-bound; changing any field invalidates the review. Reviews expire within
+15 minutes and cannot come from the requester, executor, owner or any contributor.
+Within existing authority this adds no mandatory per-project founder approval.
+It cannot waive platform, spending, data, permission or owner-acceptance controls.
+
+**Source policy only:** this module creates no project and grants no authority.
+The live creation entrypoint and its enforcement adapter remain **UNKNOWN**.
+The existing integration owner must supply authenticated server-owned resolvers:
+an immutable producer-attested review, plus current authority for the exact digest.
+Canonical actor identities (including aliases) and complete proposal authorship
+must be resolved independently, not copied from request-supplied claims. Missing,
+unverified, stale, mismatched or self-authored evidence fails closed. Injecting
+request-controlled callbacks or trusted flags would violate this boundary.
+
+The eventual existing creation adapter must revalidate the actual creation payload
+and current controls at execution, bind execution to this exact proposal, and use
+its durable idempotency mechanism. A policy result is neither execution nor runtime
+enforcement proof. No alternate catalog, signing key, grant, scheduler, credential
+change or new project is introduced here. Behavioral coverage uses the existing
+affected-test/full/control lanes with separate 95/90/100 Node coverage thresholds.
+
+**Ship now:** bounded source validator and regression gate. **Re-evaluate when:**
+the existing owner supplies the authenticated creation boundary. **Then:** connect
+and verify that boundary under its actual authority before claiming enforcement.
+
 ## Current gap map
 
 | Capability | Implementation | Readiness | Canonical path or blocker |

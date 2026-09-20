@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildCompanyRegistryTestCommand,
   buildFullSuiteCommands,
+  buildProjectCreationTestCommand,
   buildSelectedTestCommands,
   buildVerificationEnv,
   runCommandStatus,
@@ -42,6 +43,8 @@ describe('Summer commissioning affected-test lane', () => {
       'scripts/summer-commissioning/capability-access-registry.json',
       'scripts/summer-commissioning/company-registry.mjs',
       'scripts/summer-commissioning/company-registry.test.mjs',
+      'scripts/summer-commissioning/project-creation-policy.mjs',
+      'scripts/summer-commissioning/project-creation-policy.test.mjs',
       'docs/operations/SUMMER_COMMISSIONING.md',
       'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
       'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
@@ -62,6 +65,7 @@ describe('Summer commissioning affected-test lane', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.nodeTests).toEqual([
       'scripts/summer-commissioning/company-registry.test.mjs',
+      'scripts/summer-commissioning/project-creation-policy.test.mjs',
       'scripts/summer-commissioning/canonical-registry.test.mjs',
       'scripts/summer-commissioning/commissioning.test.mjs',
       'scripts/summer-commissioning/contracts.test.mjs',
@@ -102,6 +106,39 @@ describe('Summer commissioning affected-test lane', () => {
 
     expect(plan.mode).toBe('full');
   });
+
+  it.each(['project-creation-policy.mjs', 'project-creation-policy.test.mjs'])(
+    'enforces independent coverage for %s in selected and control lanes',
+    file => {
+      const plan = buildAffectedTestPlan([
+        `scripts/summer-commissioning/${file}`,
+      ]);
+      expect(plan.mode).toBe('selected');
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands[1]).toEqual(buildProjectCreationTestCommand());
+      expect(buildProjectCreationTestCommand()).toEqual([
+        'node',
+        [
+          '--test',
+          '--experimental-test-coverage',
+          '--test-coverage-include=scripts/summer-commissioning/project-creation-policy.mjs',
+          '--test-coverage-lines=95',
+          '--test-coverage-branches=90',
+          '--test-coverage-functions=100',
+          'scripts/summer-commissioning/project-creation-policy.test.mjs',
+        ],
+      ]);
+      expect(commands[2][1]).not.toContain(
+        'scripts/summer-commissioning/project-creation-policy.test.mjs'
+      );
+      expect(runner).toMatch(
+        /const projectStatus = await runCommandStatus\(\s*\.\.\.buildProjectCreationTestCommand\(\)\s*\);/
+      );
+      expect(runner).toContain(
+        'if (projectStatus !== 0) process.exit(projectStatus);'
+      );
+    }
+  );
 });
 
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
@@ -1688,6 +1725,7 @@ describe('automation-verify affected scope', () => {
   it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
     expect(commands.shift()).toEqual(buildCompanyRegistryTestCommand());
+    expect(commands.shift()).toEqual(buildProjectCreationTestCommand());
 
     expect(commands).toEqual([
       [
