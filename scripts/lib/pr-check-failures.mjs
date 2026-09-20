@@ -72,9 +72,13 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     'actionlint',
     // The pull_request-event run of fork-pr-gate cannot mint a jovie-bot token
     // (JOVIE_BOT_PRIVATE_KEY is only exposed to pull_request_target and
-    // merge_group runs, which succeed) and fails at create-github-app-token,
-    // leaving a red `Fork PR Gate Controller` check-run beside its SKIPPED
-    // twin. The controller job is an orchestration receipt: the actual gate is
+    // merge_group runs, which succeed) and historically failed at
+    // create-github-app-token for dependabot actors, leaving a red
+    // `Fork PR Gate Controller` check-run beside its SKIPPED twin. The
+    // workflow now skips the controller for dependabot on pull_request
+    // (dependabot-gate owns that lane via pull_request_target), so this
+    // advisory entry covers pre-fix heads and any future no-secret context.
+    // The controller job is an orchestration receipt: the actual gate is
     // the required `Fork PR Gate` commit status, which stays fail-closed via
     // REQUIRED_CHECK_NAMES (missing/not-successful still blocks). Advisory
     // here is therefore equivalent to "only when the required four are green"

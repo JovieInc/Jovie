@@ -125,8 +125,12 @@ jobs:
     # pull_request_target is safe here: this job only reads PR metadata/diffs
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.
+    # Dependabot is excluded from the pull_request lane: dependabot-triggered
+    # pull_request runs only see the Dependabot secret store, so the Jovie Bot
+    # App private key is empty and the token-mint step fails hard (JOV-4782).
+    # The dependabot-gate job above owns the dependabot lane instead.
     if: >-
-      (github.event_name == 'pull_request') ||
+      (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest
