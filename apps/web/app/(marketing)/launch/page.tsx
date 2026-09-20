@@ -730,7 +730,12 @@ export default function LaunchPage() {
                       );
                     })}
                   </aside>
-                  <div className='system-b-launch-audience-main'>
+                  <section
+                    className='system-b-launch-audience-main'
+                    aria-label='Audience Table'
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: horizontal audience table needs a keyboard entry point for native scrolling
+                    tabIndex={0}
+                  >
                     <div className='system-b-launch-toolbar'>
                       <h3>Audience</h3>
                       <div>
@@ -788,7 +793,7 @@ export default function LaunchPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </section>
                 </div>
               </div>
             </div>

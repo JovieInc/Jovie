@@ -87,7 +87,7 @@ export function ProductClaimHandleForm({
             aria-invalid={unavailable ? 'true' : undefined}
             aria-describedby='product-handle-status'
             className={cn(
-              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-visible:outline-none',
+              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               unavailable && 'text-destructive'
             )}
           />

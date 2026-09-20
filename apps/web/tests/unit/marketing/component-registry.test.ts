@@ -687,6 +687,14 @@ describe('canonical marketing component registry', () => {
         'export function MarketingFinalCTA'
       ),
     });
+
+    expect(centrallyReadSources.HomepageV2Route).toContain(
+      "aria-hidden='true'"
+    );
+    expect(centrallyReadSources.HomepageV2Route).toContain('inert');
+    expect(centrallyReadSources.HomepageV2Route).toContain(
+      'homepage-v2-hero__demo-scale'
+    );
   });
 
   it('keeps terminal CTA actions on the canonical Button atom', () => {
