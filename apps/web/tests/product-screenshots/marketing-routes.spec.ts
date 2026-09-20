@@ -12,6 +12,7 @@ import {
 import {
   assertNoDevOverlays,
   hideTransientUI,
+  prepareImagesForScreenshot,
   SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
   waitForSettle,
@@ -69,6 +70,7 @@ test.describe('Exact marketing route screenshots', () => {
         await hideTransientUI(page);
         await assertNoDevOverlays(page);
         await assertRegisteredQualityChecks(page, coverageEntry);
+        await prepareImagesForScreenshot(page);
 
         const screenshotPath = testInfo.outputPath('marketing-route.png');
         await page.screenshot({
