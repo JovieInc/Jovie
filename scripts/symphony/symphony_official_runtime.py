@@ -21,6 +21,8 @@ import os
 import pathlib
 import re
 import signal
+import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -2053,6 +2055,214 @@ def read_rate_limit_gate(path: pathlib.Path, now: dt.datetime | None = None) -> 
     }
 
 
+
+# Source-only activation guard. No ownership receipt or installer authority is minted.
+ACTIVATION_UNIT_FIELDS = (
+    "Id", "LoadState", "ActiveState", "SubState", "MainPID", "ControlPID",
+    "InvocationID", "ControlGroup", "NeedDaemonReload", "Transient", "SourcePath",
+    "FragmentPath", "DropInPaths",
+)
+ACTIVATION_COMMAND_PROPERTIES = (
+    "ExecStartEx", "ExecStartPreEx", "ExecStartPostEx", "ExecConditionEx",
+    "ExecReloadEx", "ExecStopEx", "ExecStopPostEx",
+)
+ACTIVATION_PROPERTY_TYPES = {
+    **{name: "a(sasasttttuii)" for name in ACTIVATION_COMMAND_PROPERTIES},
+    "Type": "s", "WorkingDirectory": "s", "Environment": "as", "EnvironmentFiles": "a(sb)",
+}
+ACTIVATION_DROPINS = frozenset({"90-symphony-safe-restart-guard.conf", "workspace-mounts.conf"})
+
+
+def _activation_read_file(path: pathlib.Path) -> bytes:
+    if path.resolve(strict=True) != path:
+        raise ValueError("indirect file")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as handle:
+        before = os.fstat(handle.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > 65_536:
+            raise ValueError("unsupported file")
+        value = handle.read(65_537)
+        after = os.fstat(handle.fileno())
+    if len(value) > 65_536 or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+    ):
+        raise ValueError("file changed")
+    return value
+
+
+def _activation_command(args: list[str]) -> str:
+    result = subprocess.run(args, capture_output=True, text=True, timeout=5, check=True)
+    if len(result.stdout) > 65_536:
+        raise ValueError("oversized observation")
+    return result.stdout
+
+
+def _activation_snapshot() -> tuple[dict[str, str], dict[str, Any]]:
+    # Only selected properties: never dump process environments or arbitrary argv.
+    raw = _activation_command(["systemctl", "--user", "show", OFFICIAL_SERVICE_NAME,
+                               "--property=" + ",".join(ACTIVATION_UNIT_FIELDS)])
+    fields = {}
+    for line in raw.splitlines():
+        key, separator, value = line.partition("=")
+        if not separator or key in fields or key not in ACTIVATION_UNIT_FIELDS:
+            raise ValueError("ambiguous unit properties")
+        fields[key] = value
+    if set(fields) != set(ACTIVATION_UNIT_FIELDS):
+        raise ValueError("missing unit properties")
+    # systemd's typed D-Bus Ex properties retain command flags and argument arrays.
+    raw = _activation_command([
+        "busctl", "--user", "--json=short", "get-property", "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1/unit/symphony_2delixir_2eservice",
+        "org.freedesktop.systemd1.Service", *ACTIVATION_PROPERTY_TYPES,
+    ])
+    rows = raw.splitlines()
+    if len(rows) != len(ACTIVATION_PROPERTY_TYPES):
+        raise ValueError("incomplete effective configuration")
+    properties = {}
+    for (name, signature), row in zip(ACTIVATION_PROPERTY_TYPES.items(), rows):
+        value = json.loads(row)
+        if not isinstance(value, dict) or set(value) != {"type", "data"} or value["type"] != signature:
+            raise ValueError("invalid effective property")
+        properties[name] = value["data"]
+    return fields, properties
+
+
+def _activation_dropin_paths(directory: pathlib.Path) -> list[str]:
+    if directory.is_symlink():
+        raise ValueError("indirect drop-in directory")
+    if not directory.exists():
+        return []
+    if directory.resolve(strict=True) != directory:
+        raise ValueError("indirect drop-in directory")
+    with os.scandir(directory) as entries:
+        return sorted(str(directory / entry.name) for entry in entries if entry.name.endswith(".conf"))
+
+
+def _activation_exec_matches(rows: Any, commands: list[list[str]]) -> bool:
+    if not isinstance(rows, list) or len(rows) != len(commands):
+        return False
+    return all(
+        isinstance(row, list) and len(row) == 10
+        and row[:3] == [command[0], command, []]
+        and all(type(value) is int for value in row[3:])
+        and all(value >= 0 for value in row[3:8])
+        for row, command in zip(rows, commands)
+    )
+
+
+def _activation_process_generation(process: pathlib.Path) -> tuple[str, int]:
+    # /proc stat field 22 is stable start time; CPU counters are deliberately excluded.
+    value = _activation_read_file(process / "stat").decode()
+    prefix, separator, tail = value.rpartition(")")
+    fields = tail.split()
+    pid = prefix.split(" ", 1)[0]
+    if not separator or pid != process.name or len(fields) < 20 or not fields[19].isdigit():
+        raise ValueError("invalid process generation")
+    return pid, int(fields[19])
+
+
+def activation_ownership_preflight(repo_root: pathlib.Path, *, home: pathlib.Path | None = None,
+                                   proc_root: pathlib.Path = pathlib.Path("/proc")) -> dict[str, Any]:
+    """Point-in-time preservation check; unsupported or changed ownership holds.
+
+    Only candidate-source-matching canonical legacy configuration is supported.
+    Older legitimate configurations also hold for explicit migration review.
+    No file, service, environment, provider alias or runtime receipt is written.
+    """
+    stage = "observation"
+    started = time.monotonic()
+    try:
+        home = (home or pathlib.Path.home()).resolve(strict=True)
+        repo_root = repo_root.resolve(strict=True)
+        fields, effective = _activation_snapshot()
+        stage = "loaded-unit"
+        unit = home / ".config/systemd/user" / OFFICIAL_SERVICE_NAME
+        if (fields["Id"] != OFFICIAL_SERVICE_NAME or fields["LoadState"] != "loaded"
+                or fields["Transient"] != "no" or fields["SourcePath"]
+                or fields["NeedDaemonReload"] != "no" or fields["FragmentPath"] != str(unit)
+                or fields["ControlPID"] != "0"):
+            raise ValueError("unsupported loaded unit")
+        active = fields["ActiveState"] == "active" and fields["SubState"] == "running"
+        inactive = fields["ActiveState"] == "inactive" and fields["SubState"] == "dead"
+        if (not (active or inactive) or not fields["MainPID"].isdigit()
+                or str(int(fields["MainPID"])) != fields["MainPID"]
+                or (active and (int(fields["MainPID"]) <= 0
+                    or not re.fullmatch(r"[a-f0-9]{32}", fields["InvocationID"])
+                    or not fields["ControlGroup"].endswith("/" + OFFICIAL_SERVICE_NAME)))
+                or (inactive and fields["MainPID"] != "0")):
+            raise ValueError("ambiguous runtime state")
+        stage = "source-configuration"
+        source_dir = repo_root / "scripts/symphony/systemd"
+        watched = {}
+        def read(path):
+            value = _activation_read_file(path)
+            watched[path] = value
+            return value
+        source_unit = read(source_dir / OFFICIAL_SERVICE_NAME)
+        if read(unit) != source_unit:
+            raise ValueError("unsupported source unit")
+        directory = unit.with_name(unit.name + ".d")
+        paths = _activation_dropin_paths(directory)
+        loaded = shlex.split(fields["DropInPaths"])
+        if len(loaded) != len(set(loaded)) or sorted(loaded) != paths:
+            raise ValueError("unloaded or foreign drop-in")
+        texts = [source_unit.decode()]
+        for name in paths:
+            path = pathlib.Path(name)
+            if path.name not in ACTIVATION_DROPINS:
+                raise ValueError("unsupported override")
+            expected = read(source_dir / (OFFICIAL_SERVICE_NAME + ".d") / path.name)
+            if read(path) != expected:
+                raise ValueError("changed override")
+            texts.append(expected.decode())
+        directives = {}
+        for text in texts:
+            for line in text.splitlines():
+                key, separator, value = line.partition("=")
+                if separator:
+                    directives.setdefault(key, []).append(value.replace("%h", str(home)))
+        argv = [shlex.split(value) for value in directives.get("ExecStart", [])]
+        stage = "effective-configuration"
+        if len(argv) != 1 or not argv[0] or argv[0][0] != str(home / ".local/bin/symphony-official-runtime"):
+            raise ValueError("unsupported candidate command")
+        for name in ACTIVATION_COMMAND_PROPERTIES:
+            commands = [shlex.split(value) for value in directives.get(name.removesuffix("Ex"), [])]
+            if not _activation_exec_matches(effective[name], commands):
+                raise ValueError("effective command disagreement")
+        environment = [part for value in directives.get("Environment", []) for part in shlex.split(value)]
+        environment_files = [[value.removeprefix("-"), value.startswith("-")]
+                             for value in directives.get("EnvironmentFile", [])]
+        observed_files = effective["EnvironmentFiles"]
+        if (effective["Type"] != "simple" or effective["WorkingDirectory"] != str(home)
+                or effective["Environment"] != environment or observed_files != environment_files
+                or not isinstance(observed_files, list)
+                or any(not isinstance(row, list) or len(row) != 2 or type(row[1]) is not bool
+                       for row in observed_files)):
+            raise ValueError("effective configuration disagreement")
+        stage = "live-process"
+        process_generation = None
+        if active:
+            process = proc_root / fields["MainPID"]
+            args = read(process / "cmdline").decode().removesuffix("\0").split("\0")
+            if (len(args) != len(argv[0]) + 1 or args[1:] != argv[0]
+                    or not re.fullmatch(r"python3(?:\.\d+)?", pathlib.Path(args[0]).name)):
+                raise ValueError("running command disagreement")
+            cgroups = read(process / "cgroup").decode().splitlines()
+            if not any(line.split(":", 2)[-1] == fields["ControlGroup"] for line in cgroups):
+                raise ValueError("running service disagreement")
+            process_generation = _activation_process_generation(process)
+        stage = "freshness"
+        if (_activation_snapshot() != (fields, effective)
+                or (active and _activation_process_generation(process) != process_generation)
+                or _activation_dropin_paths(directory) != paths
+                or any(_activation_read_file(path) != value for path, value in watched.items())
+                or time.monotonic() - started > 15):
+            raise ValueError("ownership changed or stale")
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        return {"allowed": False, "reason": "activation-ownership-held:" + stage}
+    return {"allowed": True, "reason": "canonical-managed-ownership-observed"}
+
+
 def _print_result(result: dict[str, Any], *, json_output: bool) -> None:
     if json_output:
         print(json.dumps(result, sort_keys=True))
@@ -2087,6 +2297,9 @@ def _parse_now(value: str | None) -> dt.datetime | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+
+    ownership_parser = sub.add_parser("activation-preflight")
+    ownership_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
 
     budget_parser = sub.add_parser("budget-check")
     budget_parser.add_argument("--active-issues", type=int, default=MEASURED_ACTIVE_ISSUES)
@@ -2173,6 +2386,11 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
+    if args.command == "activation-preflight":
+        result = activation_ownership_preflight(args.repo_root)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["allowed"] else CLOSURE_HOLD_EXIT_CODE
+
 
     if args.command == "budget-check":
         budget = compute_budget(
