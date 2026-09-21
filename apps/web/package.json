@@ -337,9 +337,9 @@
     "@types/react-dom": "^19.2.7",
     "@typescript-eslint/parser": "^8.70.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/browser": "4.1.10",
+    "@vitest/browser": "5.0.1",
     "@vitest/browser-playwright": "5.0.1",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "5.0.1",
     "autoprefixer": "^10.6.1",
     "axe-core": "^4.13.0",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
@@ -362,6 +362,6 @@
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vite": "8.3.0",
-    "vitest": "4.1.10"
+    "vitest": "5.0.1"
   }
 }
