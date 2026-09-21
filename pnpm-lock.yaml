@@ -588,8 +588,8 @@ importers:
         specifier: ^10.74.0
         version: 10.74.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))
       '@shadcn/lint':
-        specifier: 0.1.0
-        version: 0.1.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+        specifier: 0.1.1
+        version: 0.1.1(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
       '@storybook/addon-a11y':
         specifier: 10.6.0
         version: 10.6.0(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))
@@ -6055,8 +6055,8 @@ packages:
     peerDependencies:
       webpack: 5.105.0
 
-  '@shadcn/lint@0.1.0':
-    resolution: {integrity: sha512-UDSxO4eQa8UAclN1tChum+L336CL2uB2ZLGYiJ7r/GDrYUBOKPWWNUVoAfh2dZs4LhcwJRCn62+fKG12eAy1FQ==}
+  '@shadcn/lint@0.1.1':
+    resolution: {integrity: sha512-00FroeyOehwp18oWk6ybuGJDm5IMc7ywmEvCODIj2yjPISSzgx+fv/BB4V6nh/Wiwrw6XoRobk89d/T2Hc3QJg==}
     engines: {node: '>=20.19'}
     peerDependencies:
       eslint: '>=9.30.0'
@@ -22114,7 +22114,7 @@ snapshots:
       - rollup
       - supports-color
 
-  '@shadcn/lint@0.1.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)':
+  '@shadcn/lint@0.1.1(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)':
     dependencies:
       '@eslint/core': 0.17.0
       '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
