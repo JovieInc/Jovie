@@ -33,6 +33,7 @@ async function runTool(url: string) {
       toolCallId: 'test',
       messages: [],
       abortSignal: new AbortController().signal,
+      context: {},
     }
   );
 }
