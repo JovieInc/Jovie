@@ -151,6 +151,19 @@ describe('HeroSpotifySearch', () => {
       expect(getInput()).toHaveAttribute('role', 'combobox');
     });
 
+    it('keeps the homepage search focus indicator visible', () => {
+      renderComponent();
+
+      expect(getInput()).toHaveClass(
+        'focus-visible:outline-none',
+        'focus-visible:border-focus',
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus/25',
+        'focus-visible:ring-offset-2',
+        'focus-visible:ring-offset-surface-page'
+      );
+    });
+
     it('namespaces result option ids per instance when rendered twice', async () => {
       mockHookReturn.results = ARTISTS;
       mockHookReturn.state = 'success';
@@ -249,6 +262,51 @@ describe('HeroSpotifySearch', () => {
   });
 
   describe('search interaction', () => {
+    it.each([
+      '/',
+      '<script>',
+      'x'.repeat(101),
+      'https://open.spotify.com/artist/not-an-id',
+      'https://open.spotify.com/track/06HL4z0CvFAxyc27GXpf02',
+    ])(
+      'explains invalid input without searching or selecting stale results: %s',
+      value => {
+        mockHookReturn.results = ARTISTS;
+        mockHookReturn.state = 'success';
+        render(
+          <HeroSpotifySearch appearance='editorial' submitLabel='Find me' />
+        );
+        fireEvent.change(getInput(), { target: { value } });
+        expect(getInput()).toHaveAttribute('aria-invalid', 'true');
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Enter an artist name'
+        );
+        expect(mockSearch).not.toHaveBeenCalled();
+        expect(mockClear).toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Find me' }));
+        fireEvent.keyDown(getInput(), { key: 'ArrowDown' });
+        fireEvent.keyDown(getInput(), { key: 'Enter' });
+        expect(mockPush).not.toHaveBeenCalled();
+      }
+    );
+
+    it('recovers from invalid input when a valid name is entered', () => {
+      renderComponent();
+      fireEvent.change(getInput(), { target: { value: '/' } });
+      fireEvent.change(getInput(), { target: { value: 'Beyoncé' } });
+      expect(getInput()).not.toHaveAttribute('aria-invalid');
+      expect(mockSearch).toHaveBeenLastCalledWith('Beyoncé');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('cancels pending name search when a Spotify link replaces it', () => {
+      renderComponent();
+      fireEvent.change(getInput(), { target: { value: 'Taylor' } });
+      fireEvent.change(getInput(), { target: { value: ARTISTS[0].url } });
+      expect(mockClear).toHaveBeenCalled();
+      expect(getInput()).toHaveAttribute('aria-expanded', 'false');
+    });
+
     it('calls search when typing', async () => {
       renderComponent();
       const user = userEvent.setup();
@@ -294,7 +352,7 @@ describe('HeroSpotifySearch', () => {
       await user.type(input, 'tim white');
 
       expect(screen.getByRole('alert')).toHaveTextContent('Search failed.');
-      await user.click(screen.getByRole('button', { name: 'Try again' }));
+      await user.click(screen.getByRole('button', { name: 'Try Again' }));
 
       expect(mockSearchImmediate).toHaveBeenCalledTimes(1);
       expect(mockSearchImmediate).toHaveBeenCalledWith('tim white');

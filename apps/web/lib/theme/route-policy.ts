@@ -20,6 +20,7 @@ export const THEME_ROUTE_POLICY = {
     '/voice',
     '/instant-merch',
     '/youtube-thumbnails',
+    '/product',
     '/launch',
     '/about',
     '/support',

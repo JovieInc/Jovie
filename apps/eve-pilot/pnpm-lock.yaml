@@ -22,13 +22,13 @@ importers:
         version: 3.32.0(zod@4.3.6)
       eve:
         specifier: 0.47.7
-        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.7.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
       microsandbox:
-        specifier: 0.6.18
-        version: 0.6.18
+        specifier: 0.7.2
+        version: 0.7.2
       zod:
         specifier: 4.3.6
         version: 4.3.6
@@ -534,6 +534,9 @@ packages:
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@microsandbox/types@0.7.2':
+    resolution: {integrity: sha512-K02/NyT4VaC14fXUlC6cC3qBYHMzfkhTEibOzJMh7P99wlbA+SxungRpZqPAm4tOzmClZEoBlC8es52Y7ipUtQ==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -1054,32 +1057,32 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.6.18':
-    resolution: {integrity: sha512-C+bz9+v8JXQ6BG0FXbiTywM/dSNjIFifF3fOh5IU3JW3OiB0HcgjBiVRFWpZYk/pV6eKhZTYSkUiIWwYc3SRNA==}
+  '@superradcompany/microsandbox-darwin-arm64@0.7.2':
+    resolution: {integrity: sha512-i6XkuEaWM0IPGK9pWg4CGegxQ3pFrobLLc7C3C4ImjMdAwCUOzYCAqKQUcsuKQmIJixbWRVpIccQOJe/sYkexA==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.18':
-    resolution: {integrity: sha512-UVtFm32CExLeB0VhiLIW+mvVCkyWi6Yg+1AYWQAvfXj8ngDYEprZz/0Kksp/T8lAnV5hFIYZ2ZrPs0jAGbAR6A==}
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.2':
+    resolution: {integrity: sha512-gU15ar5FtNXfQGiKktdgJdkba5dW5+yDv7gx38sD6QrgqhSOgVsC17yvrPOD+AAdBbj6GTntlbL3ENn/rx7MKQ==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [linux]
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.6.18':
-    resolution: {integrity: sha512-b9Mu+tu1Vq407c8sr7scNOxBgGpJX/Znd4NGFQ/Dx44SS6bHU3pjUEAdso3IpEB2Cx9nrGIBtBdaRrVw1ro+6w==}
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.2':
+    resolution: {integrity: sha512-5gmMDYjyGXtx+13rWKeI0/f6x7ecDg6aMFVCupgr23IQODQLuGsbvn70LyXUrT0bOlYhle6i4uum2+AwVKTU8Q==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [linux]
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.18':
-    resolution: {integrity: sha512-QDW9JfnTHd4lbFpms3y+c5oyEdOXK1kZCNPONm6nVrdz1Wr+UVy+zMiMadzL1AJgG4rF3Tg6WT9Xa1j0ekPk6w==}
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.2':
+    resolution: {integrity: sha512-Vhn6POQS6MKuSnthhOHppt8FAS9Lb2TqPr59q/NtBk2AXC4uK5tiUwKQCA/H7E1irzE8YHhT/rvMHufHkYXo7A==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [win32]
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.6.18':
-    resolution: {integrity: sha512-PS1vBcboB4QwZjruBouRApAsqyhUk9U1c2w+hQOCzYzFMoWVsSyUanAwuswiloqyoj2SREwBG5wY8jnAJFzr2g==}
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.2':
+    resolution: {integrity: sha512-B33UPd8Tfk+Q7r1w+QmDmwO3e16x7n0wr2c+ynssJRxjoD4llLF+LBN2WeseTtEb32IuOM+nVgeFAFuyL7q4Mg==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [win32]
@@ -2152,8 +2155,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  microsandbox@0.6.18:
-    resolution: {integrity: sha512-M38LkxCk6ppz7qXuQ+bHAgahX4bWNgNdrN5OIFpm7OVV1Bqfpvbwog+zP/QvIiImNHgIleB7M8dU1Kd4jTdwvg==}
+  microsandbox@0.7.2:
+    resolution: {integrity: sha512-SKrNTnnOzhLofhDRQAXmXeO5QEkBYzK9e0o+B8WD5FkIONjGks/y/GVcupdsFzZVJXNsusMAfImSFbBzL5E0xw==}
     engines: {node: '>= 22'}
     hasBin: true
 
@@ -3492,6 +3495,8 @@ snapshots:
       - encoding
       - supports-color
 
+  '@microsandbox/types@0.7.2': {}
+
   '@mixmark-io/domino@2.2.0': {}
 
   '@mongodb-js/zstd@7.0.0':
@@ -3812,19 +3817,19 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.6.18':
+  '@superradcompany/microsandbox-darwin-arm64@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.18':
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.6.18':
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.18':
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.6.18':
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.2':
     optional: true
 
   '@tokenizer/inflate@0.4.1':
@@ -4650,7 +4655,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.7.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.58(zod@4.3.6)
       nitro: 3.0.260610-beta(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@16.6.1)(lru-cache@11.5.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
@@ -4659,7 +4664,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       braintrust: 3.32.0(zod@4.3.6)
       just-bash: 3.4.2
-      microsandbox: 0.6.18
+      microsandbox: 0.7.2
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -5152,13 +5157,15 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  microsandbox@0.6.18:
+  microsandbox@0.7.2:
+    dependencies:
+      '@microsandbox/types': 0.7.2
     optionalDependencies:
-      '@superradcompany/microsandbox-darwin-arm64': 0.6.18
-      '@superradcompany/microsandbox-linux-arm64-gnu': 0.6.18
-      '@superradcompany/microsandbox-linux-x64-gnu': 0.6.18
-      '@superradcompany/microsandbox-win32-arm64-msvc': 0.6.18
-      '@superradcompany/microsandbox-win32-x64-msvc': 0.6.18
+      '@superradcompany/microsandbox-darwin-arm64': 0.7.2
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.2
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.2
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.2
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.2
 
   mime-db@1.52.0: {}
 

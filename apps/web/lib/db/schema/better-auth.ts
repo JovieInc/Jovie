@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -9,7 +10,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 /**
- * Better Auth core + OAuth-provider tables (better-auth@1.7.0-rc.1).
+ * Better Auth core + OAuth-provider tables (better-auth@1.7.5).
  *
  * Core tables are owned by Better Auth via its Drizzle adapter
  * (`modelName` mapping: user→ba_users, session→ba_sessions,
@@ -18,8 +19,9 @@ import {
  * `users.better_auth_user_id` (nullable, unique).
  *
  * OAuth-provider tables (`oauthClient` / `oauthRefreshToken` /
- * `oauthAccessToken` / `oauthConsent`) must cover every field declared by the
- * pinned `@better-auth/oauth-provider` schema. Contract:
+ * `oauthAccessToken` / `oauthConsent` / `oauthResource` /
+ * `oauthClientResource` / `oauthClientAssertion`) must cover every field
+ * declared by the pinned `@better-auth/oauth-provider` schema. Contract:
  * `tests/unit/auth/oauth-provider-schema-contract.test.ts`.
  *
  * Field keys are camelCase to match Better Auth's default `fieldName`s — the
@@ -88,6 +90,11 @@ export const baOauthClients = pgTable(
     }),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
+    clientDiscoveryId: text('client_discovery_id'),
+    clientCredentialsScopes: jsonb('client_credentials_scopes').$type<
+      string[]
+    >(),
+    applicationType: text('application_type'),
     name: text('name'),
     uri: text('uri'),
     icon: text('icon'),
@@ -236,6 +243,59 @@ export const baOauthConsents = pgTable(
     userIdIdx: index('idx_ba_oauth_consents_user_id').on(table.userId),
   })
 );
+
+/** Protected resources registered with the OAuth provider. */
+export const baOauthResources = pgTable('ba_oauth_resources', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull().unique(),
+  name: text('name').notNull(),
+  accessTokenTtl: integer('access_token_ttl'),
+  refreshTokenTtl: integer('refresh_token_ttl'),
+  signingAlgorithm: text('signing_algorithm'),
+  signingKeyId: text('signing_key_id'),
+  allowedScopes: jsonb('allowed_scopes').$type<string[]>(),
+  customClaims: jsonb('custom_claims').$type<Record<string, unknown>>(),
+  dpopBoundAccessTokensRequired: boolean(
+    'dpop_bound_access_tokens_required'
+  ).default(false),
+  disabled: boolean('disabled').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  policyVersion: integer('policy_version').default(1),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+});
+
+/** Many-to-many grant of OAuth clients to protected resources. */
+export const baOauthClientResources = pgTable(
+  'ba_oauth_client_resources',
+  {
+    id: text('id').primaryKey(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => baOauthClients.clientId, { onDelete: 'cascade' }),
+    resourceId: text('resource_id')
+      .notNull()
+      .references(() => baOauthResources.identifier, {
+        onDelete: 'cascade',
+      }),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  table => ({
+    clientIdIdx: index('idx_ba_oauth_client_resources_client_id').on(
+      table.clientId
+    ),
+    resourceIdIdx: index('idx_ba_oauth_client_resources_resource_id').on(
+      table.resourceId
+    ),
+  })
+);
+
+/** Expiring client assertions (private_key_jwt / CIMD proofs). */
+export const baOauthClientAssertions = pgTable('ba_oauth_client_assertions', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expires_at').notNull(),
+});
 
 export const baAccounts = pgTable(
   'ba_accounts',

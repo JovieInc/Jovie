@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { toolEventToMessagePart } from '@/lib/chat/tool-events';
 import {
   buildFailedToolEvent,
@@ -7,6 +8,18 @@ import {
   buildSucceededToolEvent,
 } from '@/lib/onboarding/presence-build/tool-events';
 import { ToolPartsRenderer } from './tool-ui';
+
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { readonly children?: ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
+}));
+
+vi.mock('@/lib/chat/locked-tools', () => {
+  throw new Error(
+    'tool-ui must not import server analytics through locked-tools'
+  );
+});
 
 const LIBRARY_STEP = 'surface_library_opportunities' as const;
 
@@ -88,5 +101,43 @@ describe('ToolPartsRenderer library opportunities', () => {
     expect(
       screen.queryByRole('button', { name: 'Try again' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('ToolPartsRenderer locked tool output', () => {
+  it('renders the upgrade state through the client-safe lock contract', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'generateAlbumArt',
+            toolCallId: 'tool-locked-album-art',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              locked: true,
+              reason: 'Album art requires the Max plan.',
+              plan_required: 'Max',
+              upgrade_cta: 'Upgrade to Max to unlock album art.',
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('tool-status-row')).toHaveAttribute(
+      'data-tool-locked',
+      'true'
+    );
+    expect(screen.getByText('Album art is a Max feature')).toBeInTheDocument();
+    expect(
+      screen.getByText('Album art requires the Max plan.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Max' })
+    ).toBeInTheDocument();
   });
 });

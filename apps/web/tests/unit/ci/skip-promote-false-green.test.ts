@@ -300,9 +300,13 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
   it('screenshot bot does not add merge-queue', () => {
     const workflow = readFileSync(screenshotsWorkflowPath, 'utf8');
     const generate = getJobBlock(workflow, 'generate');
-    const publish = getStepBlock(generate, 'Create or update screenshot PR');
+    const publisher = getJobBlock(workflow, 'publish');
+    const publish = getStepBlock(publisher, 'Create or update screenshot PR');
 
     expect(generate).toContain('actions: read');
+    expect(generate).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(generate).not.toContain('Create or update screenshot PR');
+    expect(publisher).toContain('continue-on-error: true');
     expect(publish).toContain('GH_ACTIONS_TOKEN: ${{ github.token }}');
     expect(publish).toContain('runs?status=in_progress&per_page=100');
     expect(publish).toContain(

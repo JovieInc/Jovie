@@ -33,7 +33,7 @@ vi.mock('@/lib/analytics', () => ({
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
-import { ClaimHandleForm } from '@/features/home/claim-handle';
+import { ClaimHandleForm } from '@/components/features/home/claim-handle/ClaimHandleForm';
 
 beforeEach(() => {
   mockPush.mockReset();
@@ -48,6 +48,12 @@ describe('ClaimHandleForm', () => {
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
+    expect(input).toHaveClass(
+      'focus-visible:border-focus',
+      'focus-visible:outline-2',
+      'focus-visible:outline-offset-2',
+      'focus-visible:outline-(--color-focus-ring)'
+    );
 
     // No helper text shown when handle is empty (removed redundant hint)
     const helpText = screen.queryByText(/Your Jovie profile will live at/i);

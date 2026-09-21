@@ -1,5 +1,6 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
+  "companyServiceId": "company.summer",
   "registryVersion": "2026-09-18.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",

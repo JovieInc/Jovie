@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
 import { ChangelogTimeline } from './ChangelogTimeline';
+import '@/app/(marketing)/changelog/changelog-editorial.css';
 
 const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
   {
@@ -48,16 +49,17 @@ const meta = {
     docs: {
       description: {
         component:
-          'Deterministic, static reduced-motion state for Pen registry web-026-changelog (contract V1OpUm). Two neutral releases bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
+          'Deterministic, static reduced-motion state for Pen registry web-026-changelog (contract V1OpUm). Two neutral releases bound the entry count and story height; the production route owns the release header and signup, so ChangelogEmailSignup and Turnstile are intentionally absent. Sections follow the locked iekBP taxonomy: tag pill + editorial heading + hairline items with per-section status icons.',
       },
     },
   },
   decorators: [
     Story => (
-      <section className='min-h-screen bg-page py-16 text-primary-token'>
+      <section className='min-h-screen bg-base py-16 text-primary-token'>
         <MarketingContainer width='page'>
-          <div className='marketing-divider mb-10' />
-          <Story />
+          <div className='border-t border-subtle pt-14'>
+            <Story />
+          </div>
         </MarketingContainer>
       </section>
     ),
@@ -72,6 +74,11 @@ type Story = StoryObj<typeof meta>;
 
 export const Web026Changelog: Story = {
   name: 'web-026-changelog / bounded timeline',
+};
+
+export const ReleaseDetail: Story = {
+  name: 'version detail body (entry header hidden)',
+  args: { releases: [BOUNDED_RELEASES[0]], showEntryHeader: false },
 };
 
 export const Empty: Story = {

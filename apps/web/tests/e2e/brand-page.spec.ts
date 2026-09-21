@@ -40,7 +40,7 @@ test.describe('brand page', () => {
       ).toBeVisible();
       await expect(page.getByTestId('header-nav')).toHaveAttribute(
         'data-presentation',
-        'marketing-glass'
+        'homepage-embedded'
       );
       await expect(page.locator('[data-primary-action="true"]')).toHaveCount(1);
 

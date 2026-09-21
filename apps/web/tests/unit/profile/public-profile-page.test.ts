@@ -902,6 +902,27 @@ describe('profile mode route redirects', () => {
     expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
       "username.toLowerCase() === 'unfazed'"
     );
+
+    const artistPageSource = PUBLIC_PROFILE_PAGE_SOURCE.slice(
+      PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+        'export default async function ArtistPage'
+      ),
+      PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+        'export async function generateMetadata'
+      )
+    );
+    const metadataSource = PUBLIC_PROFILE_PAGE_SOURCE.slice(
+      PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+        'export async function generateMetadata'
+      )
+    );
+    for (const source of [artistPageSource, metadataSource]) {
+      expect(
+        source.indexOf("username.toLowerCase() === 'unfazed'")
+      ).toBeLessThan(
+        source.indexOf('await enforceCanonicalPublicProfileUsername(username)')
+      );
+    }
   });
 
   it('does not shadow smart-link slugs with config-level redirects', async () => {

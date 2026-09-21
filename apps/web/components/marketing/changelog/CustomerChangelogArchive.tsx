@@ -1,7 +1,14 @@
 'use client';
 
-import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
+import {
+  ArrowRight,
+  CircleMinus,
+  type LucideIcon,
+  Sparkles,
+  TrendingUp,
+  Wrench,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -9,23 +16,29 @@ import {
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
   type CustomerChangelogEntry,
   type CustomerChangelogMonthGroup,
+  formatCustomerChangelogDate,
   formatCustomerChangelogTertiary,
 } from '@/lib/customer-changelog';
 
 const INITIAL_MONTH_COUNT = 1;
 
-const CATEGORY_TONE = {
-  new: 'success',
-  improved: 'info',
-  fixed: 'warning',
-  removed: 'error',
-} as const;
+/**
+ * Compact source-backed fallback artwork. Customer entries do not currently
+ * carry an approved media asset, so the archive uses an icon, a neutral
+ * product-update label, and the entry title instead of an empty visual block.
+ */
+const ENTRY_MEDIA_TONES = ['ion', 'pulse', 'ultra'] as const;
+type EntryMediaTone = (typeof ENTRY_MEDIA_TONES)[number];
 
-const TITLE_CLASS = {
-  featured: 'text-lg font-semibold tracking-tight text-primary-token',
-  medium: 'text-base font-semibold tracking-tight text-primary-token',
-  small: 'text-sm font-medium text-primary-token',
-} as const;
+const ENTRY_MEDIA_ICONS: Record<
+  CustomerChangelogEntry['category'],
+  LucideIcon
+> = {
+  new: Sparkles,
+  improved: TrendingUp,
+  fixed: Wrench,
+  removed: CircleMinus,
+};
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
@@ -35,7 +48,39 @@ function versionHref(version: string): string {
   return `${APP_ROUTES.CHANGELOG}/${encodeURIComponent(version)}`;
 }
 
-function OutcomeCard({ entry }: { readonly entry: CustomerChangelogEntry }) {
+function EntryMedia({
+  entry,
+  tone,
+  variant,
+}: {
+  readonly entry: CustomerChangelogEntry;
+  readonly tone: EntryMediaTone;
+  readonly variant: 'feature' | 'card';
+}) {
+  const Icon = ENTRY_MEDIA_ICONS[entry.category];
+
+  return (
+    <div
+      aria-hidden='true'
+      className={`changelog-entry-media changelog-entry-media--${variant} changelog-entry-media--${tone}`}
+    >
+      <Icon
+        className='changelog-entry-media__icon'
+        size={variant === 'feature' ? 28 : 22}
+      />
+      <span className='changelog-entry-media__label'>Product update</span>
+      <span className='changelog-entry-media__title'>{entry.title}</span>
+    </div>
+  );
+}
+
+function EntryRow({
+  entry,
+  tone,
+}: {
+  readonly entry: CustomerChangelogEntry;
+  readonly tone: EntryMediaTone;
+}) {
   const tertiary = formatCustomerChangelogTertiary(
     entry.date,
     entry.technicalVersion
@@ -46,92 +91,150 @@ function OutcomeCard({ entry }: { readonly entry: CustomerChangelogEntry }) {
   return (
     <article
       id={entry.slug}
-      className='space-y-2'
+      className='changelog-entry'
       data-changelog-prominence={entry.prominence}
     >
-      <div className='flex flex-wrap items-center gap-2'>
-        <Badge
-          variant='outline'
-          size='sm'
-          tone={CATEGORY_TONE[entry.category]}
-          className='text-2xs uppercase tracking-wide'
-        >
-          {/* ui-casing-allow: tiny taxonomy badge, not IA heading */}
-          {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
-        </Badge>
-      </div>
-      <h3 className={TITLE_CLASS[entry.prominence]}>{entry.title}</h3>
-      {hasLevel2 ? (
-        <div className='space-y-2'>
-          {entry.explanation ? (
-            <p className='text-sm leading-relaxed text-secondary-token'>
-              {entry.explanation}
-            </p>
+      <p className='changelog-entry__date'>
+        {formatCustomerChangelogDate(entry.date)}
+      </p>
+      <div className='changelog-entry__main'>
+        <div className='changelog-entry__content'>
+          <p className='changelog-entry__category'>
+            {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
+            {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
+          </p>
+          <h3 className='changelog-entry__title'>{entry.title}</h3>
+          <EntryMedia entry={entry} tone={tone} variant='feature' />
+          {hasLevel2 ? (
+            <div className='space-y-2'>
+              {entry.explanation ? (
+                <p className='changelog-entry__excerpt'>{entry.explanation}</p>
+              ) : null}
+              {entry.supporting.length > 0 ? (
+                <ul className='space-y-1'>
+                  {entry.supporting.map(item => (
+                    <li
+                      key={item}
+                      className='text-sm leading-relaxed text-secondary-token'
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
-          {entry.supporting.length > 0 ? (
-            <ul className='space-y-1'>
-              {entry.supporting.map(item => (
-                <li
-                  key={item}
-                  className='text-sm leading-relaxed text-secondary-token'
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
+          <p className='changelog-entry__tertiary'>
+            <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>
+          </p>
+          {hasLevel3 ? (
+            <details className='text-xs text-tertiary-token'>
+              <summary className='cursor-pointer select-none text-tertiary-token transition-colors hover:text-secondary-token'>
+                Technical details
+              </summary>
+              <p className='mt-1.5 leading-relaxed'>
+                {entry.technical.join(' · ')}
+              </p>
+            </details>
           ) : null}
         </div>
-      ) : null}
-      <p className='text-xs text-tertiary-token'>
-        <Link
-          href={versionHref(entry.technicalVersion)}
-          className='transition-colors hover:text-primary-token'
-        >
-          {tertiary}
-        </Link>
-      </p>
-      {hasLevel3 ? (
-        <details className='text-xs text-tertiary-token'>
-          <summary className='cursor-pointer select-none text-tertiary-token transition-colors hover:text-secondary-token'>
-            Technical details
-          </summary>
-          <p className='mt-1.5 leading-relaxed'>
-            {entry.technical.join(' · ')}
+        <div className='changelog-entry__card'>
+          <EntryMedia entry={entry} tone={tone} variant='card' />
+          <p className='changelog-entry__card-title'>{entry.title}</p>
+          <p className='changelog-entry__card-meta'>
+            {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]} ·{' '}
+            {formatCustomerChangelogDate(entry.date)}
           </p>
-        </details>
-      ) : null}
+        </div>
+      </div>
     </article>
   );
 }
 
 function MonthSection({
   group,
+  toneOffset,
 }: {
   readonly group: CustomerChangelogMonthGroup;
+  readonly toneOffset: number;
 }) {
   return (
     <section
-      aria-labelledby={`changelog-month-${group.monthKey}`}
-      className='space-y-8'
+      id={`changelog-month-${group.monthKey}`}
+      aria-labelledby={`changelog-month-${group.monthKey}-heading`}
+      className='changelog-month-section'
     >
       <h2
-        id={`changelog-month-${group.monthKey}`}
-        className='truncate text-sm font-medium text-tertiary-token'
+        id={`changelog-month-${group.monthKey}-heading`}
+        className='truncate pb-6 text-sm font-medium text-tertiary-token'
       >
         {group.label}
       </h2>
-      <div className='space-y-10'>
-        {group.entries.map(entry => (
-          <OutcomeCard key={entry.slug} entry={entry} />
+      <div>
+        {group.entries.map((entry, index) => (
+          <EntryRow
+            key={entry.slug}
+            entry={entry}
+            tone={
+              ENTRY_MEDIA_TONES[(toneOffset + index) % ENTRY_MEDIA_TONES.length]
+            }
+          />
         ))}
       </div>
     </section>
   );
 }
 
+function ArchiveJumpNav({
+  months,
+}: {
+  readonly months: readonly CustomerChangelogMonthGroup[];
+}) {
+  return (
+    <nav aria-label='Changelog Archive' className='changelog-archive-nav'>
+      {months.map(group => (
+        <div key={group.monthKey} className='changelog-archive-nav__row'>
+          <div className='changelog-archive-nav__rail'>
+            <Link
+              href={`#changelog-month-${group.monthKey}`}
+              className='changelog-archive-nav__month'
+            >
+              {group.label}
+            </Link>
+            <p className='changelog-archive-nav__hint'>Jump to an update</p>
+          </div>
+          <ul className='changelog-archive-nav__links'>
+            {group.entries.map(entry => (
+              <li key={entry.slug}>
+                <Link
+                  href={`#${entry.slug}`}
+                  className='changelog-archive-nav__link'
+                >
+                  <span className='changelog-archive-nav__link-date'>
+                    {formatCustomerChangelogDate(entry.date)}
+                  </span>
+                  <span className='changelog-archive-nav__link-title'>
+                    {entry.title}
+                    <ArrowRight
+                      aria-hidden='true'
+                      size={16}
+                      className='changelog-archive-nav__link-arrow'
+                    />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 /**
- * Public `/changelog` archive: month-grouped customer outcomes.
- * Version pages keep ChangelogTimeline for technical detail.
+ * Public `/changelog` archive (pen O64tu entry rows + Q3JwYT jump nav):
+ * month-grouped customer outcomes with a sticky date rail. Version pages
+ * keep ChangelogTimeline for technical detail.
  */
 export function CustomerChangelogArchive({
   months,
@@ -141,7 +244,7 @@ export function CustomerChangelogArchive({
 
   if (months.length === 0) {
     return (
-      <div className='max-w-3xl' data-reduced-motion='static'>
+      <div data-reduced-motion='static'>
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
       </div>
     );
@@ -151,16 +254,27 @@ export function CustomerChangelogArchive({
   const visibleMonths = months.slice(0, visibleCount);
   const remainingCount = months.length - visibleCount;
 
+  const monthToneOffsets = visibleMonths.map((_, index) =>
+    visibleMonths
+      .slice(0, index)
+      .reduce((sum, group) => sum + group.entries.length, 0)
+  );
+
   return (
-    <div className='max-w-3xl' data-reduced-motion='static'>
-      <div id='changelog-outcome-list' className='space-y-14'>
-        {visibleMonths.map(group => (
-          <MonthSection key={group.monthKey} group={group} />
+    <div data-reduced-motion='static'>
+      <ArchiveJumpNav months={visibleMonths} />
+      <div id='changelog-outcome-list'>
+        {visibleMonths.map((group, index) => (
+          <MonthSection
+            key={group.monthKey}
+            group={group}
+            toneOffset={monthToneOffsets[index] ?? 0}
+          />
         ))}
       </div>
 
       {remainingCount > 0 ? (
-        <div className='mt-10 border-t border-subtle pt-6'>
+        <div className='changelog-load-earlier'>
           <Button
             type='button'
             variant='secondary'

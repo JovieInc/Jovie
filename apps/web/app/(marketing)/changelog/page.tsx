@@ -1,21 +1,24 @@
-import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
+import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
+import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { getChangelogReleases } from '@/lib/changelog-source';
+import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
+  type CustomerChangelogEntry,
+  formatCustomerChangelogDate,
   groupCustomerChangelogByMonth,
   projectCustomerChangelog,
 } from '@/lib/customer-changelog';
-import { ChangelogEmailSignup } from './ChangelogEmailSignup';
+import './changelog-editorial.css';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: "What's new in Jovie",
+  title: 'Jovie Changelog: Product Updates & New Features',
   description: `Audience and control updates in ${APP_NAME}. What got better for you — not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
@@ -26,60 +29,141 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ChangelogPage() {
-  const releases = await getChangelogReleases();
-  const months = groupCustomerChangelogByMonth(
-    projectCustomerChangelog(releases)
-  );
+/** Hero timeline tone order by recency rank (pen bBTae: ion, pulse, mint). */
+const TIMELINE_TONES = ['ion', 'pulse', 'mint'] as const;
 
-  const now = new Date();
-  const currentMonthPrefix = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  const thisMonthCount = months
-    .filter(group => group.monthKey === currentMonthPrefix)
-    .reduce((total, group) => total + group.entries.length, 0);
+function formatTimelineDate(iso: string): string {
+  if (!iso) return '';
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed
+    .toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+    .toUpperCase();
+}
 
+function ReleaseJournalHero({
+  latest,
+}: {
+  readonly latest: readonly CustomerChangelogEntry[];
+}) {
   return (
-    <section className='min-h-screen bg-page text-primary-token'>
-      <MarketingHero variant='left'>
-        <p className='text-sm font-medium text-tertiary-token'>Changelog</p>
-        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- sentence-case marketing heading */}
-        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
-          What&apos;s new in Jovie
-        </h1>
-        <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Audience and control updates that change what you can do. Not a log of
-          every deploy.
-        </p>
-        <div className='flex flex-wrap items-center gap-3'>
-          {thisMonthCount > 0 && (
-            <Badge variant='outline' className='text-xs'>
-              {thisMonthCount} Update{thisMonthCount === 1 ? '' : 's'} This
-              Month
-            </Badge>
-          )}
-          <Link
-            href={`${APP_ROUTES.CHANGELOG}/feed.xml`}
-            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
+    <section className='changelog-hero' aria-labelledby='changelog-hero-title'>
+      <MarketingContainer width='page' className='changelog-hero__inner'>
+        <div className='changelog-hero__masthead'>
+          <p className='changelog-hero__kicker'>Changelog</p>
+          <h1
+            id='changelog-hero-title'
+            className='changelog-hero__title line-clamp-2'
           >
-            RSS Feed
-          </Link>
-          <Link
-            href={`${APP_ROUTES.CHANGELOG}/feed.json`}
-            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
-          >
-            JSON Feed
-          </Link>
+            {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
+            {"What's new in Jovie"}
+          </h1>
+          <p className='changelog-hero__support'>
+            Versioned, dated, and source-backed.
+          </p>
         </div>
-      </MarketingHero>
 
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-        <div className='marketing-divider mb-10' />
-        <CustomerChangelogArchive months={months} />
-
-        <div className='mt-16 max-w-xl'>
-          <ChangelogEmailSignup />
-        </div>
+        {latest.length > 0 ? (
+          <div className='changelog-hero__timeline'>
+            <ol className='changelog-hero__timeline-entries'>
+              {latest.map((entry, index) => (
+                <li key={entry.slug}>
+                  <Link
+                    href={`#${entry.slug}`}
+                    className='changelog-hero__timeline-link'
+                  >
+                    <span
+                      aria-hidden='true'
+                      className={`changelog-hero__tone-dot changelog-hero__tone-dot--${TIMELINE_TONES[index % TIMELINE_TONES.length]}`}
+                    />
+                    <span className='changelog-hero__timeline-date'>
+                      {formatTimelineDate(entry.date)}
+                    </span>
+                    <span className='changelog-hero__timeline-title'>
+                      {entry.title}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
       </MarketingContainer>
     </section>
+  );
+}
+
+function ChangelogFreshnessNotice({
+  latestPublished,
+  hasUnpublishedReleases,
+}: {
+  readonly latestPublished: readonly CustomerChangelogEntry[];
+  readonly hasUnpublishedReleases: boolean;
+}) {
+  if (!hasUnpublishedReleases) return null;
+
+  const latestDate = latestPublished[0]?.date
+    ? formatCustomerChangelogDate(latestPublished[0].date)
+    : null;
+
+  return (
+    <p className='changelog-freshness' role='status'>
+      Release notes are being prepared for newer release slots.{' '}
+      {latestDate
+        ? `The latest published update is ${latestDate}.`
+        : 'The latest published update is listed below.'}
+    </p>
+  );
+}
+
+export default async function ChangelogPage() {
+  const snapshot = await getChangelogSnapshot();
+  const months = groupCustomerChangelogByMonth(
+    projectCustomerChangelog(snapshot.releases)
+  );
+  const latest = months.flatMap(group => group.entries).slice(0, 3);
+
+  return (
+    <div className='min-h-screen bg-page text-primary-token'>
+      <ReleaseJournalHero latest={latest} />
+
+      <MarketingContainer width='page' className='changelog-content'>
+        <div className='changelog-content__grid'>
+          <div className='changelog-lead__copy'>
+            <p id='changelog-lead-intro' className='changelog-lead__intro'>
+              {
+                'Audience and control updates that change what you can do. Not a log of every deploy.'
+              }
+            </p>
+            <ChangelogFreshnessNotice
+              latestPublished={latest}
+              hasUnpublishedReleases={snapshot.unpublishedReleases.length > 0}
+            />
+          </div>
+
+          <aside
+            className='changelog-subscribe-rail'
+            aria-label='Subscribe To Changelog Updates'
+          >
+            <ChangelogSubscribeColumn />
+          </aside>
+
+          <div className='changelog-entries'>
+            <CustomerChangelogArchive months={months} />
+          </div>
+        </div>
+      </MarketingContainer>
+
+      <MarketingFinalCTA
+        title='Take control of your presence.'
+        ctaLabel='Find your profile'
+        ctaHref='/#handle-input'
+      />
+    </div>
   );
 }

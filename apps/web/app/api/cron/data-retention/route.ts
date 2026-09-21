@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       result.clickEventsDeleted +
       result.audienceMembersDeleted +
       result.notificationSubscriptionsDeleted +
+      result.serverAnalyticsEventsDeleted +
       result.pixelEventsDeleted +
       result.stripeWebhookEventsDeleted +
       result.webhookEventsDeleted +
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
       clickEventsDeleted: result.clickEventsDeleted,
       audienceMembersDeleted: result.audienceMembersDeleted,
       notificationSubscriptionsDeleted: result.notificationSubscriptionsDeleted,
+      serverAnalyticsEventsDeleted: result.serverAnalyticsEventsDeleted,
       pixelEventsDeleted: result.pixelEventsDeleted,
       stripeWebhookEventsDeleted: result.stripeWebhookEventsDeleted,
       webhookEventsDeleted: result.webhookEventsDeleted,
@@ -78,6 +80,7 @@ export async function GET(request: Request) {
           audienceMembersDeleted: result.audienceMembersDeleted,
           notificationSubscriptionsDeleted:
             result.notificationSubscriptionsDeleted,
+          serverAnalyticsEventsDeleted: result.serverAnalyticsEventsDeleted,
           pixelEventsDeleted: result.pixelEventsDeleted,
           stripeWebhookEventsDeleted: result.stripeWebhookEventsDeleted,
           webhookEventsDeleted: result.webhookEventsDeleted,

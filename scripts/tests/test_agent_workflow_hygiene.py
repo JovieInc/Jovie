@@ -1393,11 +1393,17 @@ def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
-    job = _job_block("screenshots.yml", "generate")
+    producer_job = _job_block("screenshots.yml", "generate")
+    publisher_job = _job_block("screenshots.yml", "publish")
     capture = _step_block("screenshots.yml", "Capture screenshot catalog")
     publication = _step_block("screenshots.yml", "Create or update screenshot PR")
 
-    job_timeout = int(re.search(r"timeout-minutes: (\d+)", job).group(1))
+    producer_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", producer_job).group(1)
+    )
+    publisher_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", publisher_job).group(1)
+    )
     capture_timeout = int(
         re.search(r"timeout-minutes: (\d+)", capture).group(1)
     )
@@ -1406,7 +1412,12 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     )
 
     assert publication_timeout >= 75
-    assert job_timeout >= capture_timeout + publication_timeout + 20
+    assert producer_timeout >= capture_timeout + 20
+    assert publisher_timeout >= publication_timeout + 20
+    assert "continue-on-error: true" in publisher_job
+    assert "Create or update screenshot PR" not in producer_job
+    assert "Upload generated screenshot catalog" in producer_job
+    assert "Download generated screenshot catalog" in publisher_job
     for capture_only_variable in (
         "DATABASE_URL",
         "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",

@@ -160,3 +160,17 @@ export async function waitForImages(
     { timeout }
   );
 }
+
+/**
+ * Full-page capture must include lazy images below the initial viewport. Force
+ * those images eager only in the capture page, then require decoded pixels
+ * before taking the screenshot so request failures remain meaningful.
+ */
+export async function prepareImagesForScreenshot(page: Page) {
+  await page.locator('img[loading="lazy"]').evaluateAll(images => {
+    for (const image of images) {
+      image.loading = 'eager';
+    }
+  });
+  await waitForImages(page);
+}

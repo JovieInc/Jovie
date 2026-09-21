@@ -25,8 +25,9 @@ const CONSENT_REQUIRED_COOKIE = 'jv_cc_required';
 // Run as anonymous visitor with no stored auth or consent
 test.use({ storageState: { cookies: [], origins: [] } });
 
-async function openHomepageWithBanner(
-  page: import('@playwright/test').Page
+async function openPublicPathWithBanner(
+  page: import('@playwright/test').Page,
+  path: string
 ): Promise<void> {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
@@ -66,11 +67,17 @@ async function openHomepageWithBanner(
   );
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 
-  await page.goto('/', {
+  await page.goto(path, {
     waitUntil: 'domcontentloaded',
     timeout: SMOKE_TIMEOUTS.NAVIGATION,
   });
   await waitForHydration(page);
+}
+
+async function openHomepageWithBanner(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  await openPublicPathWithBanner(page, '/');
 }
 
 function boxesOverlap(
@@ -189,6 +196,68 @@ test.describe('Cookie banner @smoke', () => {
         banner.getByRole('button', { name, exact: true })
       )
     );
+  });
+
+  test('consent-present product CTA and footer retain hit-testing and keyboard access', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    for (const viewport of [
+      { name: 'mobile', width: 390, height: 844 },
+      { name: 'desktop', width: 1512, height: 900 },
+    ] as const) {
+      await page.setViewportSize(viewport);
+      await openPublicPathWithBanner(page, '/product');
+
+      const banner = page.getByTestId('cookie-banner');
+      await expect(banner, `${viewport.name} consent is visible`).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      const target =
+        viewport.name === 'mobile'
+          ? page.getByTestId('product-claim-cta')
+          : page
+              .getByTestId('marketing-footer')
+              .getByRole('link', { name: 'Privacy', exact: true });
+      await expect(target, `${viewport.name} target is visible`).toBeVisible();
+
+      if (viewport.name === 'desktop') {
+        await target.scrollIntoViewIfNeeded();
+      }
+
+      const targetBox = await target.boundingBox();
+      expect(targetBox, `${viewport.name} target has a bounding box`).not.toBe(
+        null
+      );
+      const hit = await page.evaluate(
+        ({ x, y }) => {
+          const element = document.elementFromPoint(x, y);
+          return {
+            testId: element?.getAttribute('data-testid'),
+            tagName: element?.tagName,
+            text: element?.textContent?.trim(),
+          };
+        },
+        {
+          x: targetBox!.x + targetBox!.width / 2,
+          y: targetBox!.y + targetBox!.height / 2,
+        }
+      );
+      expect(
+        hit.testId ===
+          (viewport.name === 'mobile' ? 'product-claim-cta' : null) ||
+          (viewport.name === 'desktop' && hit.text === 'Privacy'),
+        `${viewport.name} target center must own its pointer hit`
+      ).toBe(true);
+
+      await target.focus();
+      await expect(
+        target,
+        `${viewport.name} target is keyboard focusable`
+      ).toBeFocused();
+    }
   });
 
   for (const viewport of [

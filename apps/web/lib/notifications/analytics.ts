@@ -1,4 +1,4 @@
-import { trackServerEvent } from '@/lib/analytics/runtime-aware';
+import { trackServerEvent } from '@/lib/server-analytics';
 import type { NotificationChannel } from '@/types/notifications';
 
 type BaseEventProps = {
@@ -65,8 +65,10 @@ export const extractPayloadProps = (
  * Determine channel from payload, inferring from presence of phone if not explicit
  */
 export const inferChannel = (payload: Record<string, unknown>): string => {
-  if (typeof payload.channel === 'string') return payload.channel;
-  return typeof payload.phone === 'string' ? 'phone' : 'email';
+  if (payload.channel === 'email' || payload.channel === 'sms') {
+    return payload.channel;
+  }
+  return typeof payload.phone === 'string' ? 'sms' : 'email';
 };
 
 /**
@@ -77,12 +79,9 @@ export const trackSubscribeAttempt = async (
 ): Promise<void> => {
   const props = extractPayloadProps(payload);
   await trackServerEvent('notifications_subscribe_attempt', {
-    artist_id: props.artist_id,
-    channel: props.channel,
+    channel: inferChannel(payload),
     email_length: props.email_length,
     phone_length: props.phone_length,
-    source: props.source,
-    source_context: props.source_context,
   });
 };
 
@@ -126,10 +125,7 @@ export const trackSubscribeSuccess = async (
 export const trackUnsubscribeAttempt = async (
   payload: Record<string, unknown>
 ): Promise<void> => {
-  const props = extractPayloadProps(payload);
   await trackServerEvent('notifications_unsubscribe_attempt', {
-    artist_id: props.artist_id,
-    method: props.method,
     channel: inferChannel(payload),
   });
 };

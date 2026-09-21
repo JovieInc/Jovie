@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 import {
@@ -250,4 +252,100 @@ describe('changed test coverage', () => {
       '--coverage',
     ]);
   });
+
+  it.each([
+    [
+      'rewritten exact-head coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      'lib/example.ts',
+      true,
+      4,
+      true,
+    ],
+    [
+      'legacy exact-head coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      '',
+      true,
+      4,
+      true,
+    ],
+    [
+      'ordinary changed tests',
+      ['run', '--changed', 'abc123'],
+      '',
+      true,
+      1,
+      false,
+    ],
+    [
+      'unscoped related coverage',
+      ['related', 'lib/example.ts', '--run', '--coverage'],
+      '',
+      true,
+      2,
+      false,
+    ],
+    ['ordinary full coverage', ['run', '--coverage'], '', true, 2, false],
+    [
+      'local scoped coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      'lib/example.ts',
+      false,
+      undefined,
+      true,
+    ],
+  ])(
+    'loads real fast config for %s',
+    async (_name, args, include, ci, workers, parallel) => {
+      const repoRoot = resolve(import.meta.dirname, '../../..');
+      const require = createRequire(import.meta.url);
+      const { loadConfigFromFile } = await import(
+        pathToFileURL(
+          require.resolve('vite', {
+            paths: [resolve(repoRoot, 'apps/web')],
+          })
+        ).href
+      );
+      const previousArgv = process.argv;
+      const previousCI = process.env.CI;
+      const previousInclude = process.env.JOVIE_COVERAGE_INCLUDE;
+      try {
+        process.argv = [
+          process.execPath,
+          'vitest',
+          ...rewriteVitestArgs(args, include),
+        ];
+        process.env.CI = String(ci);
+        process.env.JOVIE_COVERAGE_INCLUDE = include;
+        const loaded = await loadConfigFromFile(
+          { command: 'serve', mode: 'test' },
+          resolve(repoRoot, 'apps/web/vitest.config.fast.mts')
+        );
+        expect(loaded).not.toBeNull();
+        expect(loaded.config.test.maxWorkers).toBe(workers);
+        expect(loaded.config.test.fileParallelism).toBe(parallel);
+        expect(loaded.config.test.coverage.provider).toBe('v8');
+        expect(loaded.config.test.coverage.include).toEqual(
+          include ? [include] : undefined
+        );
+        if (include && args.includes('--coverage')) {
+          expect(loaded.config.test.bail).toBe(1);
+          expect(loaded.config.test.coverage.reporter).toEqual([
+            'text',
+            'json',
+          ]);
+        }
+      } finally {
+        process.argv = previousArgv;
+        for (const [key, value] of [
+          ['CI', previousCI],
+          ['JOVIE_COVERAGE_INCLUDE', previousInclude],
+        ]) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+      }
+    }
+  );
 });

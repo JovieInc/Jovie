@@ -14,12 +14,12 @@ import { isStampAllowedBranch } from '../version-fanout-guard.mjs';
 export const PRE_LAND_CHANGELOG_SCHEMA = 'jovie-pre-land-changelog/v1';
 export const PRE_LAND_CHANGELOG_PATH = 'CHANGELOG.md';
 
-function changelogFiles(files) {
+function normalizeChangedFiles(files) {
   return Array.isArray(files) ? files : null;
 }
 
 export function touchesPreLandChangelog(files) {
-  const normalized = changelogFiles(files);
+  const normalized = normalizeChangedFiles(files);
   return normalized !== null && normalized.includes(PRE_LAND_CHANGELOG_PATH);
 }
 
@@ -33,7 +33,7 @@ export function evaluatePreLandChangelogAdmission({
   changedFiles,
   branch,
 } = {}) {
-  const files = changelogFiles(changedFiles);
+  const files = normalizeChangedFiles(changedFiles);
   if (files === null) {
     return {
       schema: PRE_LAND_CHANGELOG_SCHEMA,
@@ -160,32 +160,21 @@ function parseJsonEnv(name) {
 
 function main(argv = process.argv) {
   const command = argv[2];
-  if (command === 'admission') {
-    console.log(
-      JSON.stringify(
-        evaluatePreLandChangelogAdmission(
-          parseJsonEnv('PRE_LAND_CHANGELOG_JSON')
-        )
-      )
-    );
-    return;
-  }
-  if (command === 'inventory') {
-    console.log(
-      JSON.stringify(
-        buildChangelogCollisionInventory(
-          parseJsonEnv('PRE_LAND_CHANGELOG_JSON')
-        )
-      )
-    );
-    return;
-  }
-  if (command === 'drain') {
-    console.log(
-      JSON.stringify(
-        changelogCollisionDrainDecision(parseJsonEnv('PRE_LAND_CHANGELOG_JSON'))
-      )
-    );
+  if (
+    command === 'admission' ||
+    command === 'inventory' ||
+    command === 'drain'
+  ) {
+    const input = parseJsonEnv('PRE_LAND_CHANGELOG_JSON');
+    if (command === 'admission') {
+      console.log(JSON.stringify(evaluatePreLandChangelogAdmission(input)));
+      return;
+    }
+    if (command === 'inventory') {
+      console.log(JSON.stringify(buildChangelogCollisionInventory(input)));
+      return;
+    }
+    console.log(JSON.stringify(changelogCollisionDrainDecision(input)));
     return;
   }
   console.error(

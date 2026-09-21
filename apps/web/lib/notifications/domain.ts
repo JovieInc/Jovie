@@ -280,8 +280,7 @@ interface ArtistProfileResult {
  * Fetches artist profile and computes dynamic engagement status.
  */
 async function fetchArtistProfile(
-  artist_id: string,
-  source: string | undefined
+  artist_id: string
 ): Promise<ArtistProfileResult | NotificationSubscribeDomainResponse> {
   const [artistProfile] = await db
     .select({
@@ -299,9 +298,8 @@ async function fetchArtistProfile(
 
   if (!artistProfile) {
     await trackSubscribeError({
-      artist_id,
+      artist_id: null,
       error_type: 'artist_not_found',
-      source,
     });
     return buildSubscribeNotFoundError();
   }
@@ -657,10 +655,9 @@ export const subscribeToNotificationsDomain = async (
       const props = extractPayloadProps(bodyObject);
       const validationErrors = result.error.issues.map(issue => issue.message);
       await trackSubscribeError({
-        artist_id: props.artist_id,
+        artist_id: null,
         error_type: 'validation_error',
         validation_errors: validationErrors,
-        source: props.source,
         source_context: props.source_context,
       });
       return buildSubscribeValidationError(validationErrors[0]);
@@ -677,7 +674,7 @@ export const subscribeToNotificationsDomain = async (
       city,
     } = result.data;
 
-    const artistResult = await fetchArtistProfile(artist_id, source);
+    const artistResult = await fetchArtistProfile(artist_id);
     if (!isArtistProfileResult(artistResult)) {
       return artistResult;
     }
@@ -923,10 +920,7 @@ export const verifyEmailOtpDomain = async (
 
   // Subscribe-time audience upsert is best-effort; ensure a row exists after
   // confirmation so Pro creators see the fan in audience immediately.
-  const artistResult = await fetchArtistProfile(
-    parsed.data.artist_id,
-    undefined
-  );
+  const artistResult = await fetchArtistProfile(parsed.data.artist_id);
   if (isArtistProfileResult(artistResult) && artistResult.dynamicEnabled) {
     await upsertAudienceMemberBestEffort(
       parsed.data.artist_id,
@@ -1022,9 +1016,8 @@ export const unsubscribeFromNotificationsDomain = async (
     await trackUnsubscribeAttempt(bodyObject);
 
     if (!result.success) {
-      const props = extractPayloadProps(bodyObject);
       await trackUnsubscribeError({
-        artist_id: props.artist_id,
+        artist_id: null,
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
         channel: inferChannel(bodyObject),

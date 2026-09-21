@@ -88,7 +88,7 @@ export async function GET(request: Request) {
       );
     }
 
-    void trackAuthEvent('auth_callback_received', {
+    await trackAuthEvent('auth_callback_received', {
       client: stateRecord.client,
       intent: stateRecord.intent,
       result: 'received',
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
     }
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });
-    void trackAuthEvent('auth_returned_to_client', {
+    await trackAuthEvent('auth_returned_to_client', {
       client: stateRecord.client,
       intent: stateRecord.intent,
       result: 'returned',

@@ -41,16 +41,16 @@ describe('ChangelogTimeline', () => {
     expect(screen.getByText('/pitch', { selector: 'code' })).toBeVisible();
     expect(screen.getByText('/pitch').closest('strong')).toBeVisible();
     expect(screen.getByText('inline code', { selector: 'code' })).toBeVisible();
-    expect(
-      screen.getByText('New workspace:', { selector: 'strong' })
-    ).toBeVisible();
+    expect(screen.getByText('New workspace')).toBeVisible();
     expect(
       screen.getByText('release:status', { selector: 'code' })
     ).toBeVisible();
     expect(screen.getByText('New')).toBeVisible();
-    expect(screen.getByText('Improved')).toBeVisible();
-    expect(screen.getByText('Fixed')).toBeVisible();
-    expect(screen.getByText('Removed')).toBeVisible();
+    expect(screen.getByText("What's new")).toBeVisible();
+    // Tag pill + section heading both carry the taxonomy label (pen iekBP).
+    expect(screen.getAllByText('Improved')).toHaveLength(2);
+    expect(screen.getAllByText('Fixed')).toHaveLength(2);
+    expect(screen.getAllByText('Removed')).toHaveLength(2);
     expect(screen.getAllByText('Stable compact layout.')).toHaveLength(2);
     expect(container).not.toHaveTextContent('**');
     expect(container).not.toHaveTextContent('`');
@@ -60,9 +60,23 @@ describe('ChangelogTimeline', () => {
       'data-reduced-motion',
       'static'
     );
-    expect(screen.getByText('v26.8.0').closest('span')).toHaveClass(
-      'motion-reduce:transition-none'
-    );
+  });
+
+  it('hides entry chrome on the version detail route but keeps sections', () => {
+    render(<ChangelogTimeline releases={RELEASES} showEntryHeader={false} />);
+
+    expect(screen.queryByText('v26.8.0')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aug 9, 2026')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('deterministic release with', { exact: false })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('New')).toBeVisible();
+    expect(screen.getByText("What's new")).toBeVisible();
+    expect(screen.getByText('New workspace')).toBeVisible();
+    // Tag pill + section heading both carry the taxonomy label (pen iekBP).
+    expect(screen.getAllByText('Improved')).toHaveLength(2);
+    expect(screen.getAllByText('Fixed')).toHaveLength(2);
+    expect(screen.getAllByText('Removed')).toHaveLength(2);
   });
 
   it('renders the production empty state without release chrome', () => {

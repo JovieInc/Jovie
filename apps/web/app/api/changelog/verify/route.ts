@@ -4,6 +4,16 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscribers';
 
+/**
+ * Standalone HTML status card for the email verification flow.
+ *
+ * Rendered outside the Next document tree, so System B tokens cannot reach it
+ * as utilities — the inline <style> below projects the ZiaWI dark ramp by hand:
+ * canvas #030407, card surface #0f1420, ink #f5f7fb, muted ink #a8b0c3,
+ * border-default rgba(168,176,195,0.16), shadow-deep rgba(0,0,0,0.25),
+ * ion #11afff reserved for the semantic focus ring. The CTA stays a neutral
+ * high-contrast pill (light pill, dark text) per DESIGN.md.
+ */
 function htmlPage(
   title: string,
   message: string,
@@ -15,13 +25,16 @@ function htmlPage(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
   <title>${title} | ${APP_NAME}</title>
   <style>
-    body { margin: 0; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .card { max-width: 420px; background: #fff; border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    h1 { font-size: 20px; margin: 0 0 12px; color: #000; }
-    p { font-size: 15px; line-height: 1.5; color: #666; margin: 0 0 24px; }
-    a.btn { display: inline-block; padding: 12px 32px; background: #000; color: #fff; text-decoration: none; border-radius: 9999px; font-weight: 500; font-size: 14px; }
+    :root { color-scheme: dark; }
+    body { margin: 0; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #030407; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { max-width: 420px; background: #0f1420; border: 1px solid rgba(168, 176, 195, 0.16); border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+    h1 { font-size: 20px; margin: 0 0 12px; color: #f5f7fb; }
+    p { font-size: 15px; line-height: 1.5; color: #a8b0c3; margin: 0 0 24px; }
+    a.btn { display: inline-block; padding: 12px 32px; background: #f5f7fb; color: #030407; text-decoration: none; border-radius: 9999px; font-weight: 500; font-size: 14px; }
+    a.btn:focus-visible { outline: 2px solid #11afff; outline-offset: 2px; }
   </style>
 </head>
 <body>
