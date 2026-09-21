@@ -654,8 +654,34 @@ function report(findings) {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([category, count]) => category + ':' + count)
     .join(',');
+  let diagnostic = '';
+  if (process.env.PLAYWRIGHT_ARTIFACT_REPORT_PATHS === 'true') {
+    const workspace = canonicalRoot();
+    const paths = findings
+      .filter(finding => typeof finding.path === 'string')
+      .map(finding => {
+        const candidate = resolve(finding.path);
+        if (!isInside(workspace, candidate)) return null;
+        const relativePath = relative(workspace, candidate).replace(/\\/g, '/');
+        if (!relativePath || /[\r\n]/.test(relativePath)) return null;
+        const safePath = redactSecretValues(relativePath)
+          .split('/')
+          .map(segment =>
+            segment.includes('[redacted]') ||
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(segment) ||
+            /[A-Za-z0-9_-]{32,}/.test(segment)
+              ? '[sensitive]'
+              : segment
+          )
+          .join('/')
+          .slice(0, 512);
+        return `${finding.category}:${JSON.stringify(safePath)}`;
+      })
+      .filter(Boolean);
+    if (paths.length > 0) diagnostic = `; files=${paths.join(',')}`;
+  }
   console.error(
-    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${categories}`
+    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${categories}${diagnostic}`
   );
 }
 

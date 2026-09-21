@@ -54,11 +54,11 @@ const localTrace = Object.fromEntries(
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
-  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const markdownUploads = [
@@ -92,7 +92,7 @@ const producerCounts: Record<string, number> = {
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
   'production-release.yml': 3,
-  'screenshots.yml': 2,
+  'screenshots.yml': 3,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 6,
 };
@@ -854,13 +854,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(27);
+    expect(safeUploadJobs).toHaveLength(28);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(31);
+    ).toBe(33);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1980,6 +1980,58 @@ ${fixtureCheckout}
         { workspace, allowImages: true }
       )
     ).toHaveLength(1);
+    const diagnostic = spawnSync(process.execPath, [guardScript, 'fake.png'], {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: baseEnv(workspace, fixture(), {
+        PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+      }) as NodeJS.ProcessEnv,
+    });
+    expect(diagnostic.status).toBe(1);
+    expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
+      'image-policy:"fake.png"'
+    );
+    const sensitiveFile = join(workspace, 'person@example.com.png');
+    write(sensitiveFile, invalid[0]);
+    const sensitiveDiagnostic = spawnSync(
+      process.execPath,
+      [guardScript, sensitiveFile],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }) as NodeJS.ProcessEnv,
+      }
+    );
+    expect(sensitiveDiagnostic.status).toBe(1);
+    expect(
+      `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
+    ).not.toContain('person@example.com');
+    expect(
+      `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
+    ).toContain('image-policy:"[sensitive]"');
+    const outsideWorkspace = fixture();
+    const outsideFile = join(outsideWorkspace, 'outside.png');
+    write(outsideFile, invalid[0]);
+    const outsideDiagnostic = spawnSync(
+      process.execPath,
+      [guardScript, outsideFile],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }) as NodeJS.ProcessEnv,
+      }
+    );
+    expect(outsideDiagnostic.status).toBe(1);
+    expect(
+      `${outsideDiagnostic.stdout}\n${outsideDiagnostic.stderr}`
+    ).not.toContain(outsideFile);
     const comparison = fixture('.artifact-comparison-', webRoot);
     const comparisonConfig = join(comparison, 'playwright.config.ts');
     const comparisonSpec = join(comparison, 'comparison.spec.ts');

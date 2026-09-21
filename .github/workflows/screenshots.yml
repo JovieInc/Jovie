@@ -1,6 +1,10 @@
 # Auto-generate product screenshots when UI code changes on main.
 # Captures demo-route screenshots (no database needed), checks if they
 # differ from the committed versions, and opens/updates a single PR.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Immutable artifact IDs and the completed producer-job attestation exist only after Generate Screenshots finishes; the read-only downstream job verifies those bytes without receiving mutation credentials.
+# removal-trigger: Collapse this hop when GitHub can expose the immutable uploaded artifact and completed producer-job attestation to a same-job certification step.
 name: Product Screenshots
 # clock-class: skip-if-unchanged
 
@@ -15,6 +19,7 @@ on:
       - 'apps/web/app/go/**'
       - 'apps/web/app/r/**'
       - 'apps/web/app/s/**'
+      - 'apps/web/app/[[]username]/**'
       - 'apps/web/components/**'
       - 'apps/web/data/artistProfilePageOrder.ts'
       - 'apps/web/data/homepageLaunchCopy.ts'
@@ -48,6 +53,9 @@ jobs:
     permissions:
       actions: read
       contents: read
+    outputs:
+      marketing-artifact-id: ${{ steps.marketing-captures.outputs.artifact-id }}
+      profile-artifact-id: ${{ steps.profile-proof.outputs.artifact-id }}
     defaults:
       run:
         working-directory: apps/web
@@ -64,6 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -141,21 +150,60 @@ jobs:
           retention-days: 14
           allow-images: true
           public-images: true
+          diagnostic-paths: true
 
-      - name: Certify exact marketing captures
-        if: always()
+      - name: Capture public-profile screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/public-profile-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-measurements.json
+
+      - name: Bind public-profile proof to producer provenance
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
-          SCREEN_CERT_ARTIFACT_ID: ${{ steps.marketing-captures.outputs.artifact-id }}
-          SCREEN_CERT_MARKETING_ARTIFACT: marketing-route-screenshots-${{ github.sha }}
         run: |
-          DIFF_BASE="${{ github.event.before }}"
-          if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
-            DIFF_BASE="$(git rev-parse HEAD^)"
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
           fi
-          export SCREEN_CERT_DIFF_BASE="$DIFF_BASE"
-          pnpm screen-certification-gate
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.public-profile \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof \
+            --measurements=apps/web/test-results/screen-browser-proof-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload public-profile screen proof
+        id: profile-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof
+          path: |
+            apps/web/test-results/screen-browser-proof/screen-proof.json
+            apps/web/test-results/screen-browser-proof/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
 
       - name: Capture screenshot catalog
         timeout-minutes: 30
@@ -174,6 +222,7 @@ jobs:
             echo "::error::Screenshot server process group was not recorded."
             exit 1
           fi
+
           kill -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null || true
           for _attempt in $(seq 1 10); do
             if ! kill -0 -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null; then
@@ -316,3 +365,49 @@ jobs:
             fi
             echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
+
+  certify:
+    name: Certify Screenshots
+    needs: generate
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Certify exact screen captures
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREEN_CERT_ARTIFACT_ID: ${{ needs.generate.outputs.marketing-artifact-id }}
+          SCREEN_CERT_MARKETING_ARTIFACT: marketing-route-screenshots-${{ github.sha }}
+        run: |
+          mkdir -p .artifacts/screen-certification
+          DIFF_BASE="${{ github.event.before }}"
+          if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
+            DIFF_BASE="$(git rev-parse HEAD^)"
+          fi
+          export SCREEN_CERT_DIFF_BASE="$DIFF_BASE"
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.profile-artifact-id }} \
+            --screen-id=web.public-profile \
+            --receipt-out=.artifacts/screen-certification/combined.json
+
+      - name: Upload screen certification receipts
+        if: always() && hashFiles('.artifacts/screen-certification/*.json') != ''
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-certification-${{ github.sha }}
+          path: .artifacts/screen-certification/*.json
+          if-no-files-found: error
+          retention-days: 14

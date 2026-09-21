@@ -22,12 +22,14 @@ import {
   evaluateScreenProof,
   PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
+  routeArtifactRequests,
   runScreenCertification,
   runScreenCertificationFromArtifact,
   SCREEN_BROWSER_PROOF_SCHEMA,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
   SCREEN_PLATFORMS,
+  SCREEN_PROOF_ROUTES,
   SCREEN_REGISTRATION_GATE,
   SCREEN_REGISTRY,
   validateProtectedRevenueScreenRegistry,
@@ -39,6 +41,7 @@ import { emitScreenProof } from './screen-proof-emit.mjs';
 import {
   MARKETING_EVIDENCE_SCHEMA,
   marketingArtifactName,
+  PRODUCER,
   REQUIRED_MARKETING_QUALITY_CHECKS,
   resolveTrustedScreenProof,
 } from './screen-proof-resolver.mjs';
@@ -272,7 +275,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
   });
 
-  it('fails closed until a trusted browser producer adapter is integrated', () => {
+  it('rejects caller-authored proof that did not pass through the trusted resolver', () => {
     const screen = home();
     const result = runScreenCertification({
       headSha: HEAD,
@@ -377,10 +380,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
-  it('tests owned GitHub artifact transport directly while the gate remains fail closed without source continuity', () => {
+  it('certifies an exact-head screen through the owned GitHub artifact transport', () => {
     const root = mkdtempSync(join(tmpdir(), 'screen-resolver-gh-'));
     const priorPath = process.env.PATH;
     const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    const priorRunId = process.env.GITHUB_RUN_ID;
+    const priorRunAttempt = process.env.GITHUB_RUN_ATTEMPT;
     try {
       const head = spawnSync('git', ['rev-parse', 'HEAD'], {
         cwd: ROOT,
@@ -406,7 +411,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const proof = {
         ...validExternalProof(home(), head),
         environment: 'local-production-build',
-        sourcePaths: ['apps/web/app/(home)/page.tsx'],
+        sourcePaths: [...home().sources].sort(),
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${digest.digest('hex')}`,
         runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
@@ -415,6 +420,8 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         producerJobId: 99,
         viewports: ['desktop', 'mobile'].map(id => ({
           id,
+          requestedRoute: '/',
+          finalUrl: 'http://localhost:3000/',
           decision: 'pass',
           rendered: true,
           axe: { violations: 0 },
@@ -422,6 +429,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           interaction: { passed: true },
           cls: { value: 0 },
           contrast: { passed: true },
+          runtime: {
+            consoleErrors: 0,
+            pageErrors: 0,
+            failedResponses: 0,
+            failedRequests: 0,
+          },
         })),
       };
       writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
@@ -486,7 +499,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const git = join(root, 'git');
       writeFileSync(
         git,
-        `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2),r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(a[0]==='rev-parse')process.stdout.write(r.run.head_sha);else if(a[0]==='diff')process.stdout.write(r.changed);else process.exit(1);`
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2),r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(a[0]==='rev-parse')process.stdout.write(a.some(v=>v.startsWith('c'.repeat(40)))?'c'.repeat(40):r.run.head_sha);else if(a[0]==='diff')process.stdout.write(r.changed);else process.exit(1);`
       );
       writeFileSync(join(root, 'records.json'), JSON.stringify(records));
       chmodSync(gh, 0o755);
@@ -504,21 +517,48 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           context: {
             headSha: head,
             screenId: 'web.homepage',
-            sourcePaths: ['apps/web/app/(home)/page.tsx'],
+            sourcePaths: home().sources,
             viewports: home().viewports,
+            proofRoute: '/',
           },
         });
       const result = certify();
-      assert.deepEqual([result.ok, result.receipt.certified], [false, false]);
-      assert.equal(result.receipt.status, 'external-certification-unavailable');
-      assert.match(
-        result.receipt.issues.join('\n'),
-        /authoritative GitHub event source continuity/
+      assert.deepEqual([result.ok, result.receipt.certified], [true, true]);
+      assert.equal(result.receipt.status, 'certified');
+      assert.equal(
+        result.receipt.certificationScope,
+        'targeted-screen-plus-change-set'
       );
+      assert.deepEqual(result.receipt.targetedScreenIds, ['web.homepage']);
+      assert.deepEqual(result.receipt.changedScreens, [
+        {
+          id: 'web.homepage',
+          verdict: 'pass',
+          findings: [],
+          artifactDigest: proof.artifactDigest,
+          rendererRunUrl: proof.runUrl,
+        },
+      ]);
       assert.ok(
         resolveProof().proof,
         'fixture must exercise resolver acceptance'
       );
+
+      records.run.status = 'in_progress';
+      records.run.conclusion = null;
+      process.env.GITHUB_RUN_ID = '77';
+      process.env.GITHUB_RUN_ATTEMPT = '3';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      assert.ok(
+        resolveProof().proof,
+        'a downstream job in the same run may verify its completed producer job'
+      );
+      process.env.GITHUB_RUN_ATTEMPT = '4';
+      assert.equal(resolveProof().proof, null);
+      process.env.GITHUB_RUN_ATTEMPT = '3';
+      records.run.status = 'completed';
+      records.run.conclusion = 'success';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
 
       const baselineProof = structuredClone(proof);
       const baselineRecords = structuredClone(records);
@@ -571,7 +611,13 @@ describe('JOV-INV-018 screen-certification/v2', () => {
             proof.runUrl = 'https://example.test/invented-run';
           },
         ],
-        [true, () => proof.sourcePaths.push('apps/web/app/(home)/layout.tsx')],
+        [true, () => proof.sourcePaths.push('apps/web/app/waitlist/page.tsx')],
+        [
+          true,
+          () =>
+            (proof.viewports[0].finalUrl = 'http://localhost:3000/waitlist'),
+        ],
+        [true, () => (proof.viewports[0].runtime.pageErrors = 1)],
         [true, () => delete proof.viewports[0].contrast],
         [true, () => (screenshot = Buffer.alloc(0))],
       ];
@@ -579,6 +625,8 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         rejects({ archive, mutate });
       Object.assign(proof, structuredClone(baselineProof));
       records = structuredClone(baselineRecords);
+      screenshot = image;
+      rebuild();
       records.changed = [
         'M\tapps/web/app/(home)/page.tsx',
         'M\tapps/web/app/waitlist/page.tsx',
@@ -588,11 +636,139 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         artifactId: 42,
         screenId: 'web.homepage',
       });
-      assert.deepEqual([widened.ok, widened.receipt.ok], [false, false]);
+      assert.deepEqual([widened.ok, widened.receipt.certified], [false, false]);
+      assert.match(
+        widened.receipt.issues.join('\n'),
+        /missing exact-head proof for web\.waitlist/
+      );
     } finally {
       process.env.PATH = priorPath;
       if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
       else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      if (priorRunId === undefined) delete process.env.GITHUB_RUN_ID;
+      else process.env.GITHUB_RUN_ID = priorRunId;
+      if (priorRunAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT;
+      else process.env.GITHUB_RUN_ATTEMPT = priorRunAttempt;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('keeps workflow producer identity synchronized with the trusted resolver', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    assert.match(workflow, new RegExp(`name: ${PRODUCER.job}`));
+    assert.match(workflow, new RegExp(`name: ${PRODUCER.artifact}`));
+    assert.match(workflow, new RegExp(`--environment=${PRODUCER.environment}`));
+    assert.equal(SCREEN_PROOF_ROUTES['web.public-profile'], '/unfazed');
+    const profileSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-profile-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      profileSpec,
+      new RegExp(
+        `const profileRoute = '${SCREEN_PROOF_ROUTES['web.public-profile']}'`
+      )
+    );
+  });
+
+  it('routes changed screens to their matching artifacts in one certification pass', () => {
+    const homepage = home();
+    const profile = SCREEN_REGISTRY.find(
+      screen => screen.id === 'web.public-profile'
+    );
+    assert.ok(homepage);
+    assert.ok(profile);
+    assert.deepEqual(
+      routeArtifactRequests({
+        pendingScreens: [homepage],
+        requested: [{ artifactId: 42, screenId: profile.id }],
+        fallbackArtifactId: 43,
+      }),
+      [
+        { artifactId: 42, screenId: 'web.public-profile' },
+        { artifactId: 43, screenId: 'web.homepage' },
+      ]
+    );
+    assert.deepEqual(
+      routeArtifactRequests({
+        pendingScreens: [profile],
+        requested: [{ artifactId: 42, screenId: profile.id }],
+        fallbackArtifactId: 43,
+      }),
+      [{ artifactId: 42, screenId: 'web.public-profile' }]
+    );
+  });
+
+  it('fails closed for invalid controlled artifact requests through the API and CLI', () => {
+    for (const options of [
+      {
+        artifactId: 0,
+        screenId: 'web.homepage',
+        expectedScreens: ['web.homepage'],
+        expectedIssue: /controlled resolver request is invalid/,
+      },
+      {
+        artifactId: 42,
+        screenId: 'web.unknown',
+        expectedScreens: [],
+        expectedIssue: /unknown or excluded screen web\.unknown/,
+      },
+    ]) {
+      const result = runScreenCertificationFromArtifact(options);
+      assert.equal(result.ok, false);
+      assert.equal(result.receipt.certified, false);
+      assert.equal(result.receipt.status, 'blocked');
+      assert.deepEqual(
+        result.receipt.changedScreens.map(screen => screen.id),
+        options.expectedScreens
+      );
+      assert.match(result.receipt.issues.join('\n'), options.expectedIssue);
+    }
+
+    const root = mkdtempSync(join(tmpdir(), 'screen-certification-cli-'));
+    try {
+      const receiptPath = join(root, 'receipt.json');
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(ROOT, 'scripts/invariants/screen-certification.mjs'),
+          '--artifact-id=0',
+          '--screen-id=web.public-profile',
+          `--receipt-out=${receiptPath}`,
+        ],
+        { cwd: ROOT, encoding: 'utf8' }
+      );
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /controlled resolver request is invalid/);
+      const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+      assert.equal(receipt.status, 'blocked');
+      assert.equal(receipt.certified, false);
+      assert.deepEqual(
+        receipt.changedScreens.map(screen => screen.id),
+        ['web.public-profile']
+      );
+      const incompatible = spawnSync(
+        process.execPath,
+        [
+          resolve(ROOT, 'scripts/invariants/screen-certification.mjs'),
+          '--artifact-id=42',
+          '--screen-id=web.public-profile',
+          '--registration-only',
+        ],
+        { cwd: ROOT, encoding: 'utf8' }
+      );
+      assert.equal(incompatible.status, 1);
+      assert.match(
+        incompatible.stderr,
+        /targeted artifact certification is incompatible/
+      );
+    } finally {
       rmSync(root, { force: true, recursive: true });
     }
   });
@@ -1367,12 +1543,60 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         bundle: 'bundle',
         measurements,
         artifactRoot,
+        producerRunId: 123456789,
+        producerRunAttempt: 2,
+        producerJobId: 987654321,
+        environment: 'local-production-build',
       });
       assert.equal(proof.schema, SCREEN_BROWSER_PROOF_SCHEMA);
       assert.equal(proof.status, 'unverified-candidate');
       assert.equal(proof.certificationStatus, 'not-certified');
       assert.equal(proof.artifactPath, 'bundle');
       assert.match(proof.artifactDigest, /^sha256:[0-9a-f]{64}$/);
+      assert.deepEqual(
+        [
+          proof.producerRunId,
+          proof.producerRunAttempt,
+          proof.producerJobId,
+          proof.environment,
+        ],
+        [123456789, 2, 987654321, 'local-production-build']
+      );
+      assert.deepEqual(proof.sourcePaths, [...screen.sources].sort());
+      const measurementsPath = join(artifactRoot, 'measurements.json');
+      const cliProofPath = join(artifactRoot, 'cli-proof.json');
+      writeFileSync(measurementsPath, JSON.stringify(measurements));
+      const cli = spawnSync(
+        process.execPath,
+        [
+          join(ROOT, 'scripts/invariants/screen-proof-emit.mjs'),
+          `--screen=${screen.id}`,
+          `--head-sha=${HEAD}`,
+          '--run-url=https://github.com/JovieInc/Jovie/actions/runs/123456789',
+          '--bundle=bundle',
+          `--measurements=${measurementsPath}`,
+          `--out=${cliProofPath}`,
+          `--artifact-root=${artifactRoot}`,
+        ],
+        { cwd: ROOT, encoding: 'utf8' }
+      );
+      assert.equal(cli.status, 0, cli.stderr);
+      const cliProof = JSON.parse(readFileSync(cliProofPath, 'utf8'));
+      assert.equal(cliProof.environment, undefined);
+      assert.equal(cliProof.producerRunId, undefined);
+      assert.throws(
+        () =>
+          emitScreenProof({
+            screenId: screen.id,
+            headSha: HEAD,
+            runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+            bundle: 'bundle',
+            measurements,
+            artifactRoot,
+            producerRunId: 123456789,
+          }),
+        /producer provenance requires positive run, attempt, and job IDs/
+      );
       const result = runScreenCertification({
         headSha: HEAD,
         changedFiles: ['apps/web/app/(home)/page.tsx'],

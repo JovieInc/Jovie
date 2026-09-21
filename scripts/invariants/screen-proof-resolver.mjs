@@ -47,6 +47,22 @@ const paths = value =>
 const equal = (left, right) =>
   left?.length === right?.length &&
   left.every((value, index) => value === right[index]);
+const validLocalFinalUrl = (value, expectedRoute) => {
+  if (typeof value !== 'string' || typeof expectedRoute !== 'string')
+    return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1'].includes(url.hostname) &&
+      url.pathname === expectedRoute &&
+      url.search === '' &&
+      url.hash === ''
+    );
+  } catch {
+    return false;
+  }
+};
 const normalizePath = value => String(value || '').replace(/\\/g, '/');
 const sourceMatches = (path, sources) => {
   const normalized = normalizePath(path);
@@ -306,6 +322,14 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
     );
     const trustedName =
       artifact.name === PRODUCER.artifact || artifact.name === marketingName;
+    const currentRunId = Number(process.env.GITHUB_RUN_ID);
+    const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+    const completedRun = workflowRun.conclusion === 'success';
+    const downstreamCertificationRun =
+      runId === currentRunId &&
+      attempt === currentAttempt &&
+      workflowRun.status === 'in_progress' &&
+      workflowRun.conclusion == null;
     if (
       !validId(runId) ||
       !validId(attempt) ||
@@ -318,7 +342,7 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       workflowRun.head_sha?.toLowerCase() !== context.headSha.toLowerCase() ||
       workflowRun.path !== PRODUCER.workflow ||
       !['push', 'workflow_dispatch'].includes(workflowRun.event) ||
-      workflowRun.conclusion !== 'success' ||
+      (!completedRun && !downstreamCertificationRun) ||
       job?.length !== 1 ||
       !validId(job[0].id) ||
       job[0].conclusion !== 'success'
@@ -413,11 +437,19 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
         return (
           !item ||
           item.rendered !== true ||
+          (context.proofRoute &&
+            (item.requestedRoute !== context.proofRoute ||
+              !validLocalFinalUrl(item.finalUrl, context.proofRoute))) ||
           typeof item.axe?.violations !== 'number' ||
           typeof item.overflow?.maxHorizontalPx !== 'number' ||
           item.interaction?.passed !== true ||
           typeof item.cls?.value !== 'number' ||
-          item.contrast?.passed !== true
+          item.contrast?.passed !== true ||
+          (context.proofRoute &&
+            (item.runtime?.consoleErrors !== 0 ||
+              item.runtime?.pageErrors !== 0 ||
+              item.runtime?.failedResponses !== 0 ||
+              item.runtime?.failedRequests !== 0))
         );
       })
     )

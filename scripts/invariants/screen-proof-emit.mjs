@@ -14,7 +14,14 @@
  *     --run-url=https://github.com/JovieInc/Jovie/actions/runs/<id> \
  *     --bundle=<dir of rendered stills> \
  *     --measurements=<json: {capturedAt, viewports[], activeFlow, historyProof, visibleActions}> \
- *     --out=<proof json> [--artifact-root=<dir>]
+ *     --out=<proof json> [--artifact-root=<dir>] \
+ *     [--producer-run-id=<positive integer> \
+ *      --producer-run-attempt=<positive integer> \
+ *      --producer-job-id=<positive integer> \
+ *      --environment=local-production-build]
+ *
+ * Producer provenance is all-or-none. Omitting the group emits a local
+ * unverified candidate that the trusted GitHub artifact resolver cannot admit.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -46,6 +53,10 @@ export function emitScreenProof({
   bundle,
   measurements,
   artifactRoot = REPO_ROOT,
+  producerRunId,
+  producerRunAttempt,
+  producerJobId,
+  environment,
 }) {
   const screen = SCREEN_REGISTRY.find(
     entry => entry.id === screenId && !entry.excluded
@@ -58,6 +69,29 @@ export function emitScreenProof({
   }
   if (typeof runUrl !== 'string' || !/^https:\/\/[^\s]+$/i.test(runUrl)) {
     throw new Error('run url must be an https URL');
+  }
+  const producerProvenance = [
+    producerRunId,
+    producerRunAttempt,
+    producerJobId,
+    environment,
+  ];
+  const hasProducerProvenance = producerProvenance.some(
+    value => value !== undefined
+  );
+  if (
+    hasProducerProvenance &&
+    (!Number.isSafeInteger(producerRunId) ||
+      producerRunId <= 0 ||
+      !Number.isSafeInteger(producerRunAttempt) ||
+      producerRunAttempt <= 0 ||
+      !Number.isSafeInteger(producerJobId) ||
+      producerJobId <= 0 ||
+      environment !== 'local-production-build')
+  ) {
+    throw new Error(
+      'producer provenance requires positive run, attempt, and job IDs plus local-production-build'
+    );
   }
   const root = resolve(artifactRoot);
   const bundleAbs = resolve(root, bundle);
@@ -82,6 +116,12 @@ export function emitScreenProof({
     runUrl,
     artifactDigest,
     artifactPath,
+    ...(hasProducerProvenance ? { producerRunId } : {}),
+    ...(hasProducerProvenance ? { producerRunAttempt } : {}),
+    ...(hasProducerProvenance ? { producerJobId } : {}),
+    ...(hasProducerProvenance
+      ? { environment, sourcePaths: [...screen.sources].sort() }
+      : {}),
     capturedAt: measurements?.capturedAt,
     viewports: measurements?.viewports,
     activeFlow: measurements?.activeFlow,
@@ -89,7 +129,8 @@ export function emitScreenProof({
     visibleActions: measurements?.visibleActions,
   };
   // Validate shape only. The caller owns these bytes and metrics, so the output
-  // remains explicitly unverified until a producer-owned adapter exists.
+  // remains explicitly unverified until the trusted resolver admits the
+  // immutable producer artifact.
   const findings = evaluateScreenProof(proof, { screen, headSha }).filter(
     finding =>
       finding !==
@@ -128,6 +169,19 @@ if (isMain) {
     bundle: args.bundle,
     measurements,
     artifactRoot: args['artifact-root'],
+    producerRunId:
+      args['producer-run-id'] === undefined
+        ? undefined
+        : Number(args['producer-run-id']),
+    producerRunAttempt:
+      args['producer-run-attempt'] === undefined
+        ? undefined
+        : Number(args['producer-run-attempt']),
+    producerJobId:
+      args['producer-job-id'] === undefined
+        ? undefined
+        : Number(args['producer-job-id']),
+    environment: args.environment,
   });
   writeFileSync(resolve(args.out), `${JSON.stringify(proof, null, 2)}\n`);
   process.stdout.write(
