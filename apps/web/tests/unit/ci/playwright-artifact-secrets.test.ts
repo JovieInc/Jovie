@@ -866,7 +866,7 @@ describe('Playwright artifact secret boundary', () => {
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(33);
+    ).toBe(34);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1057,6 +1057,7 @@ ${fixtureCheckout}
       'utf8'
     );
     const screenshotJob = jobBlock(screenshots, 'generate');
+    const screenshotPublisherJob = jobBlock(screenshots, 'publish');
     const screenshotCapture = stepBlock(
       screenshots,
       'Capture screenshot catalog'
@@ -1068,14 +1069,30 @@ ${fixtureCheckout}
       'Verify screenshot catalog integrity and budgets'
     );
     const screenshotDiff = stepBlock(screenshots, 'Check for changes');
+    const screenshotUpload = stepBlock(
+      screenshots,
+      'Upload generated screenshot catalog'
+    );
+    const screenshotDownload = stepBlock(
+      screenshots,
+      'Download generated screenshot catalog'
+    );
+    const screenshotDownloadedIntegrity = stepBlock(
+      screenshots,
+      'Verify downloaded screenshot catalog'
+    );
     const screenshotToken = stepBlock(screenshots, 'Generate Jovie Bot token');
     const screenshotPush = stepBlock(
       screenshots,
       'Create or update screenshot PR'
     );
     expect(screenshotJob).not.toBe('');
+    expect(screenshotPublisherJob).not.toBe('');
     expect(screenshotCapture).not.toBe('');
     expect(screenshotJob).toMatch(
+      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
+    );
+    expect(screenshotPublisherJob).toMatch(
       /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
     );
     expect(screenshotJob.indexOf('actions/checkout@')).toBeLessThan(
@@ -1117,6 +1134,9 @@ ${fixtureCheckout}
       screenshotStop,
       screenshotIntegrity,
       screenshotDiff,
+      screenshotUpload,
+      screenshotDownload,
+      screenshotDownloadedIntegrity,
       screenshotToken,
       screenshotPush,
     ])
@@ -1131,10 +1151,36 @@ ${fixtureCheckout}
       screenshotJob.indexOf(screenshotDiff)
     );
     expect(screenshotJob.indexOf(screenshotDiff)).toBeLessThan(
-      screenshotJob.indexOf(screenshotToken)
+      screenshotJob.indexOf('- name: Upload generated screenshot catalog')
+    );
+    expect(screenshotJob).not.toContain('${{ secrets.');
+    expect(screenshotJob).not.toContain('Create or update screenshot PR');
+    expect(
+      screenshotPublisherJob.indexOf(
+        '- name: Download generated screenshot catalog'
+      )
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf(
+        '- name: Verify downloaded screenshot catalog'
+      )
     );
     expect(
-      screenshotJob.slice(0, screenshotJob.indexOf(screenshotToken))
+      screenshotPublisherJob.indexOf(
+        '- name: Verify downloaded screenshot catalog'
+      )
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
+    );
+    expect(
+      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf('- name: Create or update screenshot PR')
+    );
+    expect(
+      screenshotPublisherJob.slice(
+        0,
+        screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
+      )
     ).not.toContain('${{ secrets.');
     expect(
       persistentGitCredentialViolations(
