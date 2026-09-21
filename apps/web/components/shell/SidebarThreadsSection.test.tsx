@@ -322,8 +322,9 @@ describe('SidebarThreadsSection', () => {
     expect(label.className).not.toContain('-webkit-mask-image');
 
     const pill = screen.getByRole('button', { name: 'New Chat' });
-    expect(pill.className).toContain('w-fit');
-    expect(pill.className).not.toContain('w-full');
+    const pillClasses = pill.className.split(/\s+/);
+    expect(pillClasses).toContain('w-fit');
+    expect(pillClasses).not.toContain('w-full');
   });
 
   it('keeps loading and error rows on the same reserved geometry', () => {
