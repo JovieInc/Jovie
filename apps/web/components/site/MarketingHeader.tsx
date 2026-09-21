@@ -2,7 +2,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import {
   type HeaderFlyoutMenu,
@@ -129,6 +129,26 @@ export function MarketingHeader({
     : usesHomepageChrome
       ? 'homepage-embedded'
       : 'marketing-glass';
+  const growthSpaceRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const space = growthSpaceRef.current;
+    const row = space?.querySelector(
+      '.marketing-glass-header__shell'
+    )?.firstElementChild;
+    if (!space || !(row instanceof HTMLElement)) return;
+
+    // The page already reserves the normal header height. Add only intrinsic
+    // growth so enlarged text cannot put the floating bar over the hero.
+    const reserveGrowth = () => {
+      const minimum = Number.parseFloat(getComputedStyle(row).minHeight) || 0;
+      space.style.height = `${Math.max(0, row.getBoundingClientRect().height - minimum)}px`;
+    };
+    reserveGrowth();
+    const observer = new ResizeObserver(reserveGrowth);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [presentation]);
+
   const centerNavEnabled =
     FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
     (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
@@ -152,7 +172,7 @@ export function MarketingHeader({
         ? 'icon'
         : logoVariant;
 
-  return (
+  const header = (
     <HeaderNav
       penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}
       className={isArtistProfiles ? 'artist-profiles-home-header' : undefined}
@@ -175,5 +195,13 @@ export function MarketingHeader({
       navLinks={navConfig.desktopNavLinks}
       showContactLink={false}
     />
+  );
+
+  return presentation === 'marketing-glass' ? (
+    <div ref={growthSpaceRef} className='marketing-header-growth-space'>
+      {header}
+    </div>
+  ) : (
+    header
   );
 }

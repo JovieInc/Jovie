@@ -364,6 +364,50 @@ export const clickEvents = pgTable(
   })
 );
 
+/**
+ * Append-only first-party server funnel ledger.
+ *
+ * The writer accepts only the versioned event/property allowlist in
+ * `lib/server-analytics.ts`. Direct identifiers and arbitrary payloads are not
+ * stored. Pseudonymous UUID sources expire through the canonical retention
+ * job. Polymorphic source columns let operators reconcile an event with the
+ * durable profile, release, or tour-date row that produced it.
+ */
+export const serverAnalyticsEvents = pgTable(
+  'server_analytics_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contractVersion: text('contract_version').notNull(),
+    eventName: text('event_name').notNull(),
+    category: text('category').notNull(),
+    privacyClass: text('privacy_class').notNull(),
+    consentPolicy: text('consent_policy').notNull(),
+    sourceEntityType: text('source_entity_type'),
+    sourceEntityId: text('source_entity_id'),
+    properties: jsonb('properties')
+      .$type<Record<string, string | number | boolean | null>>()
+      .default({})
+      .notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    eventOccurredAtIdx: index(
+      'server_analytics_events_event_occurred_at_idx'
+    ).on(table.eventName, table.occurredAt),
+    sourceOccurredAtIdx: index(
+      'server_analytics_events_source_occurred_at_idx'
+    ).on(table.sourceEntityType, table.sourceEntityId, table.occurredAt),
+    createdAtIdx: index('server_analytics_events_created_at_idx').on(
+      table.createdAt
+    ),
+  })
+);
+
 export const dailyProfileViews = pgTable(
   'daily_profile_views',
   {
@@ -574,6 +618,12 @@ export const tips = pgTable(
 // Schema validations
 export const insertClickEventSchema = createInsertSchema(clickEvents);
 export const selectClickEventSchema = createSelectSchema(clickEvents);
+export const insertServerAnalyticsEventSchema = createInsertSchema(
+  serverAnalyticsEvents
+);
+export const selectServerAnalyticsEventSchema = createSelectSchema(
+  serverAnalyticsEvents
+);
 
 export const insertNotificationSubscriptionSchema = createInsertSchema(
   notificationSubscriptions
@@ -600,6 +650,9 @@ export type NewAudienceSourceLink = typeof audienceSourceLinks.$inferInsert;
 
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
+
+export type ServerAnalyticsEvent = typeof serverAnalyticsEvents.$inferSelect;
+export type NewServerAnalyticsEvent = typeof serverAnalyticsEvents.$inferInsert;
 
 export type DailyProfileView = typeof dailyProfileViews.$inferSelect;
 export type NewDailyProfileView = typeof dailyProfileViews.$inferInsert;

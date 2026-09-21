@@ -170,7 +170,7 @@ export function createLockedToolStub(toolName: LockableChatToolName) {
     inputSchema: schema.inputSchema,
     execute: async () => {
       const result = buildLockedToolResult(toolName);
-      logEntitlementDenial({
+      await logEntitlementDenial({
         gate: result.gate,
         source: 'chat-tool-locked-stub',
         toolName,
@@ -220,13 +220,4 @@ export function buildLockedToolPromptInfo(
   });
 }
 
-/** Type guard the chat UI uses to detect a locked tool output. */
-export function isLockedToolOutput(
-  output: Record<string, unknown> | undefined
-): output is Record<string, unknown> & {
-  locked: true;
-  reason?: string;
-  plan_required?: string;
-} {
-  return output?.locked === true;
-}
+export { isLockedToolOutput } from './locked-tool-output';

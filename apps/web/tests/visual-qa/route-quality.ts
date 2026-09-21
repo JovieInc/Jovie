@@ -5,6 +5,10 @@ import type {
   VisualQaPlaywrightRouteSource,
 } from '@/lib/agent-os/visual-qa/coverage';
 import { measureBufferedCls } from '../helpers/cls-measurement';
+import {
+  classifySameOriginRequestFailure,
+  formatRequestFailure,
+} from './aborted-image-request';
 
 export type RouteCoverageEntry = VisualQaCoverageEntry & {
   readonly source: VisualQaPlaywrightRouteSource;
@@ -17,6 +21,13 @@ export function isRouteCoverageEntry(
 }
 
 export interface BrowserErrorCollection {
+  /**
+   * Same-origin image loads cancelled with `net::ERR_ABORTED`. Full-page
+   * screenshots resize the viewport, and Chromium aborts the superseded
+   * `srcset` candidate. Decoded pixels are checked separately, so these
+   * cancellations stay observable without failing the request-failure gate.
+   */
+  readonly abortedImageRequests: string[];
   readonly consoleErrors: string[];
   readonly failedRequests: string[];
   readonly failedResponses: string[];
@@ -192,6 +203,7 @@ export function collectBrowserErrors(
   page: Page,
   enabled: boolean
 ): BrowserErrorCollection {
+  const abortedImageRequests: string[] = [];
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const failedResponses: string[] = [];
@@ -200,6 +212,7 @@ export function collectBrowserErrors(
     process.env.BASE_URL?.trim() || 'http://localhost:3100'
   ).origin;
   const failures = {
+    abortedImageRequests,
     consoleErrors,
     failedRequests,
     failedResponses,
@@ -219,11 +232,20 @@ export function collectBrowserErrors(
     }
   });
   page.on('requestfailed', request => {
-    if (request.url().startsWith(origin)) {
-      failedRequests.push(
-        `${request.url()} ${request.failure()?.errorText ?? 'unknown failure'}`
-      );
+    const url = request.url();
+    const errorText = request.failure()?.errorText;
+    const kind = classifySameOriginRequestFailure({
+      errorText,
+      resourceType: request.resourceType(),
+      sameOrigin: url.startsWith(origin),
+    });
+    if (kind === 'ignored') return;
+    const detail = formatRequestFailure(url, errorText);
+    if (kind === 'aborted-image') {
+      abortedImageRequests.push(detail);
+      return;
     }
+    failedRequests.push(detail);
   });
   return failures;
 }

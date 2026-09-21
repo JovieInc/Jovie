@@ -4,7 +4,7 @@
  * `apps/web/tests/lib/analytics/data-retention.test.ts` already covers the pure
  * helpers (`getRetentionDays`, `getRetentionCutoffDate`) with a fully-mocked
  * `@/lib/db`. This file covers `runDataRetentionCleanup` itself: the exact
- * cutoff/window each of the 16 cleanup rules uses, the WHERE direction and
+ * cutoff/window each of the 17 cleanup rules uses, the WHERE direction and
  * status/scope filters per rule, the batched-delete loop's halting condition
  * and count aggregation, and cross-rule failure behavior.
  *
@@ -33,6 +33,7 @@ import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
+  serverAnalyticsEvents,
 } from '@/lib/db/schema/analytics';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { chatAuditLog, chatMessages } from '@/lib/db/schema/chat';
@@ -142,6 +143,7 @@ describe('runDataRetentionCleanup', () => {
     > = [
       ['clickEvents', clickEvents],
       ['notificationSubscriptions', notificationSubscriptions],
+      ['serverAnalyticsEvents', serverAnalyticsEvents],
       ['pixelEvents', pixelEvents],
       ['notificationDeliveryLog', notificationDeliveryLog],
       ['emailEngagement', emailEngagement],
@@ -149,24 +151,25 @@ describe('runDataRetentionCleanup', () => {
       ['adminAuditLog', adminAuditLog],
     ];
 
-    it.each(
-      simpleCreatedAtRules
-    )('%s: deletes createdAt < default 90-day cutoff (direction + window pinned)', async (_name, table) => {
-      const { runDataRetentionCleanup } = await import(
-        '@/lib/analytics/data-retention'
-      );
-      await runDataRetentionCleanup({ dryRun: true });
+    it.each(simpleCreatedAtRules)(
+      '%s: deletes createdAt < default 90-day cutoff (direction + window pinned)',
+      async (_name, table) => {
+        const { runDataRetentionCleanup } = await import(
+          '@/lib/analytics/data-retention'
+        );
+        await runDataRetentionCleanup({ dryRun: true });
 
-      const cutoff = expectedCutoff(FIXED_NOW, DEFAULT_RETENTION_DAYS);
-      const { sql, params } = compile(findCall(table).condition);
-      const { name: tableName } = getTableConfig(table);
+        const cutoff = expectedCutoff(FIXED_NOW, DEFAULT_RETENTION_DAYS);
+        const { sql, params } = compile(findCall(table).condition);
+        const { name: tableName } = getTableConfig(table);
 
-      // Direction pinned: "<" not ">" or ">=" etc.
-      expect(sql).toContain(`"${tableName}"."created_at" <`);
-      expect(sql).not.toContain(`"${tableName}"."created_at" >`);
-      // Window pinned to the exact 90-day cutoff — a 7-day or 1-day mutant fails here.
-      expect(params).toEqual([cutoff.toISOString()]);
-    });
+        // Direction pinned: "<" not ">" or ">=" etc.
+        expect(sql).toContain(`"${tableName}"."created_at" <`);
+        expect(sql).not.toContain(`"${tableName}"."created_at" >`);
+        // Window pinned to the exact 90-day cutoff — a 7-day or 1-day mutant fails here.
+        expect(params).toEqual([cutoff.toISOString()]);
+      }
+    );
 
     it('audienceMembers: deletes lastSeenAt < cutoff AND type=anonymous AND email/phone NULL', async () => {
       const { runDataRetentionCleanup } = await import(
@@ -341,38 +344,40 @@ describe('runDataRetentionCleanup', () => {
       selectCountByTable.set(clickEvents, 101);
       selectCountByTable.set(audienceMembers, 102);
       selectCountByTable.set(notificationSubscriptions, 103);
-      selectCountByTable.set(pixelEvents, 104);
-      selectCountByTable.set(stripeWebhookEvents, 105);
-      selectCountByTable.set(webhookEvents, 106);
-      selectCountByTable.set(notificationDeliveryLog, 107);
-      selectCountByTable.set(emailEngagement, 108);
-      selectCountByTable.set(chatMessages, 109);
-      selectCountByTable.set(chatAuditLog, 110);
-      selectCountByTable.set(billingAuditLog, 111);
-      selectCountByTable.set(adminAuditLog, 112);
-      selectCountByTable.set(ingestionJobs, 113);
-      selectCountByTable.set(unsubscribeTokens, 114);
-      selectCountByTable.set(emailSendAttribution, 115);
-      selectCountByTable.set(emailSuppressions, 116);
+      selectCountByTable.set(serverAnalyticsEvents, 104);
+      selectCountByTable.set(pixelEvents, 105);
+      selectCountByTable.set(stripeWebhookEvents, 106);
+      selectCountByTable.set(webhookEvents, 107);
+      selectCountByTable.set(notificationDeliveryLog, 108);
+      selectCountByTable.set(emailEngagement, 109);
+      selectCountByTable.set(chatMessages, 110);
+      selectCountByTable.set(chatAuditLog, 111);
+      selectCountByTable.set(billingAuditLog, 112);
+      selectCountByTable.set(adminAuditLog, 113);
+      selectCountByTable.set(ingestionJobs, 114);
+      selectCountByTable.set(unsubscribeTokens, 115);
+      selectCountByTable.set(emailSendAttribution, 116);
+      selectCountByTable.set(emailSuppressions, 117);
 
       const result = await runDataRetentionCleanup({ dryRun: true });
 
       expect(result.clickEventsDeleted).toBe(101);
       expect(result.audienceMembersDeleted).toBe(102);
       expect(result.notificationSubscriptionsDeleted).toBe(103);
-      expect(result.pixelEventsDeleted).toBe(104);
-      expect(result.stripeWebhookEventsDeleted).toBe(105);
-      expect(result.webhookEventsDeleted).toBe(106);
-      expect(result.notificationDeliveryLogDeleted).toBe(107);
-      expect(result.emailEngagementDeleted).toBe(108);
-      expect(result.chatMessagesDeleted).toBe(109);
-      expect(result.chatAuditLogDeleted).toBe(110);
-      expect(result.billingAuditLogDeleted).toBe(111);
-      expect(result.adminAuditLogDeleted).toBe(112);
-      expect(result.ingestionJobsDeleted).toBe(113);
-      expect(result.unsubscribeTokensDeleted).toBe(114);
-      expect(result.emailSendAttributionDeleted).toBe(115);
-      expect(result.emailSuppressionsDeleted).toBe(116);
+      expect(result.serverAnalyticsEventsDeleted).toBe(104);
+      expect(result.pixelEventsDeleted).toBe(105);
+      expect(result.stripeWebhookEventsDeleted).toBe(106);
+      expect(result.webhookEventsDeleted).toBe(107);
+      expect(result.notificationDeliveryLogDeleted).toBe(108);
+      expect(result.emailEngagementDeleted).toBe(109);
+      expect(result.chatMessagesDeleted).toBe(110);
+      expect(result.chatAuditLogDeleted).toBe(111);
+      expect(result.billingAuditLogDeleted).toBe(112);
+      expect(result.adminAuditLogDeleted).toBe(113);
+      expect(result.ingestionJobsDeleted).toBe(114);
+      expect(result.unsubscribeTokensDeleted).toBe(115);
+      expect(result.emailSendAttributionDeleted).toBe(116);
+      expect(result.emailSuppressionsDeleted).toBe(117);
     });
   });
 
@@ -386,7 +391,7 @@ describe('runDataRetentionCleanup', () => {
       const result = await runDataRetentionCleanup({ dryRun: false });
 
       expect(result.clickEventsDeleted).toBe(42);
-      expect(mockExecute).toHaveBeenCalledTimes(16); // one call per rule, no extra iteration
+      expect(mockExecute).toHaveBeenCalledTimes(17); // one call per rule, no extra iteration
     });
 
     it('continues batching while a delete returns exactly BATCH_SIZE, and sums totals across iterations', async () => {

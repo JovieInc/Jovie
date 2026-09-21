@@ -61,7 +61,7 @@ def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
                 "newIssueIntakeAllowed": intake,
                 "promotionContinues": True,
                 "remediationContinues": True,
-                "reasons": [] if intake else ["duplicate-issue-lanes-unresolved"],
+                "reasons": [] if intake else ["unknown-stop-reason"],
             }
         },
         "closureAdmission": {
@@ -116,6 +116,114 @@ def _runtime_command(args, *, established_clock=False):
         f" pathlib.Path({directory!r}, str(os.getpid()) + '.json').write_text(json.dumps(rows))\n"
     )
     return [sys.executable, "-c", launcher, *args]
+
+
+class ClosureProducerCompatibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import runpy
+        cls.scope = runpy.run_path(str(ROOT / "scripts/symphony/tests/gem-priority-gate.test.py"))
+        cls.producer = cls.scope["MODULE"]
+        cls.helper = _load_helper()
+        cls.now = dt.datetime(2026, 9, 20, 5, 0, tzinfo=dt.timezone.utc)
+
+    def receipt(self, status, reasons):
+        import copy
+        signals = copy.deepcopy(self.scope["GREEN_SIGNALS"])
+        signals["closureHealth"].update(
+            status=status, reasons=reasons,
+            newIssueIntakeAllowed=self.producer.issue_intake_allowed(status, reasons),
+        )
+        return self.producer.evaluate(signals, self.now.isoformat())
+
+    def verdict(self, receipt, purpose="controller-activation"):
+        return self.helper._closure_snapshot_verdict(
+            receipt, pathlib.Path("/synthetic/producer-receipt.json"),
+            now=self.now, purpose=purpose,
+        )
+
+    def test_actual_producer_repair_feed_reaches_activation_without_opening_new_work(self):
+        reasons = ["expired-held-prs", "internally-repairable-prs-open", "no-merge-progress-over-1h"]
+        for status in ("red", "grace"):
+            with self.subTest(status=status):
+                receipt = self.receipt(status, reasons)
+                self.assertIs(receipt["signals"]["closureHealth"]["newIssueIntakeAllowed"], True)
+                activation = self.verdict(receipt)
+                self.assertFalse(activation["hold"], activation)
+                self.assertEqual(activation["reason"], "closure-health-repair-feed")
+                self.assertEqual(activation["repairFeedReasons"], sorted(reasons))
+                admission = self.verdict(receipt, "admission")
+                self.assertTrue(admission["hold"])
+                self.assertEqual(admission["reason"], "closure-health-not-green")
+
+    def test_standalone_copy_accepts_real_producer_feed_without_sibling_modules(self):
+        receipt = self.receipt("red", ["expired-held-prs", "internally-repairable-prs-open"])
+        with tempfile.TemporaryDirectory() as tmp:
+            wrapper = pathlib.Path(tmp) / "symphony-official-runtime"
+            wrapper.write_bytes(HELPER_PATH.read_bytes())
+            result = subprocess.run(
+                [sys.executable, "-I", "-c",
+                 "import datetime, json, pathlib, runpy, sys; "
+                 "module = runpy.run_path(sys.argv[1]); "
+                 "print(json.dumps(module['_closure_snapshot_verdict']("
+                 "json.loads(sys.stdin.read()), pathlib.Path('/synthetic/receipt'), "
+                 "now=datetime.datetime.fromisoformat(sys.argv[2]), "
+                 "purpose='controller-activation')))",
+                 str(wrapper), self.now.isoformat()],
+                cwd=tmp, input=json.dumps(receipt), text=True, capture_output=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            verdict = json.loads(result.stdout)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-repair-feed")
+
+    def test_canonical_reason_domain_and_intake_predicate_match(self):
+        from closure_health import ISSUE_BLOCKED_REASONS, SYSTEMS_DOWN_REASONS
+        self.assertEqual(self.helper.CLOSURE_ISSUE_BLOCKED_REASONS, ISSUE_BLOCKED_REASONS)
+        self.assertEqual(self.helper.CLOSURE_SYSTEMS_DOWN_REASONS, SYSTEMS_DOWN_REASONS)
+        cases = [[], None, "expired-held-prs", [None], [{}], ["unknown-reason"]]
+        cases += [[reason] for reason in ISSUE_BLOCKED_REASONS | SYSTEMS_DOWN_REASONS]
+        cases += [list(ISSUE_BLOCKED_REASONS), list(ISSUE_BLOCKED_REASONS | SYSTEMS_DOWN_REASONS)]
+        for status in ("healthy", "grace", "red", "unknown", None):
+            for reasons in cases:
+                with self.subTest(status=status, reasons=reasons):
+                    self.assertIs(
+                        self.helper._closure_issue_intake_allowed(status, reasons),
+                        self.producer.issue_intake_allowed(status, reasons),
+                    )
+
+    def test_actual_producer_healthy_and_non_feed_outcomes(self):
+        self.assertEqual(self.verdict(self.receipt("healthy", []))["reason"], "closure-health-green")
+        for reasons in (["gate-evaluation-failed"], ["closure-health-receipt-missing-or-malformed"],
+                        ["expired-held-prs", "gate-evaluation-failed"],
+                        ["unknown-reason"], ["duplicate-issue-lanes-unresolved"], []):
+            receipt = self.receipt("red", reasons)
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(reasons=reasons, purpose=purpose):
+                    verdict = self.verdict(receipt, purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+    def test_valid_feed_still_rejects_tampered_and_disagreeing_fields(self):
+        mutations = [
+            ("schema", "wrong"), ("authority", "Gem"), ("status", "unknown"),
+            ("status", []), ("newIssueIntakeAllowed", False), ("newIssueIntakeAllowed", 1),
+            ("promotionContinues", False), ("remediationContinues", False),
+            ("reasons", None), ("reasons", "expired-held-prs"), ("reasons", [{}]),
+            ("reasons", ["expired-held-prs", "gate-evaluation-failed"]),
+        ]
+        for key, value in mutations:
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(key=key, value=value, purpose=purpose):
+                    receipt = self.receipt("red", ["expired-held-prs"])
+                    receipt["signals"]["closureHealth"][key] = value
+                    verdict = self.verdict(receipt, purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+        for key, value in (("status", "healthy"), ("newIssueIntakeAllowed", False)):
+            receipt = self.receipt("red", ["expired-held-prs"])
+            receipt["closureAdmission"][key] = value
+            self.assertEqual(self.verdict(receipt)["reason"], "closure-admission-disagrees")
 
 
 class DispatchAdmissionTests(unittest.TestCase):
@@ -1185,7 +1293,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
-            payload = _fleet_gate_payload(status="red", intake=False)
+            payload = _fleet_gate_payload(status="red", intake=True)
             payload["signals"]["closureHealth"]["reasons"] = [
                 "native-queue-empty-with-eligible-over-15m",
                 "native-queue-unmergeable",
@@ -1350,7 +1458,9 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             def write_closure(status, reasons):
                 payload = _fleet_gate_payload(
-                    status=status, intake=False, observed_at=observed
+                    status=status,
+                    intake=helper._closure_issue_intake_allowed(status, reasons),
+                    observed_at=observed,
                 )
                 payload["signals"]["closureHealth"]["reasons"] = reasons
                 payload["closureAdmission"]["reasons"] = reasons
@@ -1425,7 +1535,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 with self.subTest(purpose=purpose, reasons="non-string"):
                     verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
                     self.assertTrue(verdict["hold"])
-                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+                    self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
 
             # A non-jovie product closure red with only feed reasons passes
             # activation but still holds admission.
@@ -1467,7 +1577,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             # Stale receipts hold in both purposes even with feed reasons.
             payload = _fleet_gate_payload(
-                status="red", intake=False, observed_at="2026-09-10T13:55:00Z"
+                status="red", intake=True, observed_at="2026-09-10T13:55:00Z"
             )
             payload["signals"]["closureHealth"]["reasons"] = feed
             gate.write_text(json.dumps(payload), encoding="utf-8")
@@ -1478,7 +1588,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             # Schema/authority violations hold in both purposes.
             payload = _fleet_gate_payload(
-                status="red", intake=False, observed_at="2026-09-10T14:05:00Z"
+                status="red", intake=True, observed_at="2026-09-10T14:05:00Z"
             )
             payload["signals"]["closureHealth"]["reasons"] = feed
             payload["signals"]["closureHealth"]["authority"] = "Gem"

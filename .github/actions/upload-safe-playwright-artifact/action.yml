@@ -36,6 +36,10 @@ inputs:
     description: Permit scanned Markdown for an explicitly documented report lane
     required: false
     default: 'false'
+  diagnostic-paths:
+    description: Report rejected relative paths for an explicitly public artifact lane
+    required: false
+    default: 'false'
 
 outputs:
   artifact-id:
@@ -58,6 +62,7 @@ runs:
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: ${{ inputs.allow-images }}
         PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: ${{ inputs.public-images }}
         PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: ${{ inputs.allow-markdown }}
+        PLAYWRIGHT_ARTIFACT_REPORT_PATHS: ${{ inputs.diagnostic-paths }}
         PLAYWRIGHT_ARTIFACT_PATHS: ${{ inputs.path }}
       working-directory: ${{ github.workspace }}
       run: |

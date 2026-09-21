@@ -154,6 +154,10 @@ const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
+  'scripts/summer-commissioning/architecture-freshness-registry.json',
+  'scripts/summer-commissioning/capability-access-registry.json',
+  'scripts/summer-commissioning/company-registry.mjs',
+  'scripts/summer-commissioning/company-registry.test.mjs',
   'docs/operations/SUMMER_COMMISSIONING.md',
   'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
   'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
@@ -173,6 +177,7 @@ const SUMMER_COMMISSIONING_LANE = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SUMMER_COMMISSIONING_NODE_TESTS = [
+  'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
@@ -2312,10 +2317,31 @@ async function runCommands(commands, concurrency = 1, options = {}) {
   process.exit(failureStatus);
 }
 
+export function buildCompanyRegistryTestCommand() {
+  return [
+    'node',
+    [
+      '--test',
+      '--experimental-test-coverage',
+      '--test-coverage-include=scripts/summer-commissioning/company-registry.mjs',
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
+      'scripts/summer-commissioning/company-registry.test.mjs',
+    ],
+  ];
+}
+
 export function buildSelectedTestCommands(plan, maxWorkers) {
   const commands = [];
   if ((plan.nodeTests || []).length > 0) {
-    commands.push(['node', ['--test', ...plan.nodeTests]]);
+    const companyTest =
+      'scripts/summer-commissioning/company-registry.test.mjs';
+    if (plan.nodeTests.includes(companyTest))
+      commands.push(buildCompanyRegistryTestCommand());
+    const otherTests = plan.nodeTests.filter(file => file !== companyTest);
+    if (otherTests.length > 0)
+      commands.push(['node', ['--test', ...otherTests]]);
   }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([
@@ -2377,7 +2403,7 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
 }
 
 export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
-  return Array.from({ length: shardCount }, (_, index) => [
+  const commands = Array.from({ length: shardCount }, (_, index) => [
     'pnpm',
     [
       '--filter',
@@ -2402,11 +2428,16 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
       '12000',
     ],
   ]);
+  return [buildCompanyRegistryTestCommand(), ...commands];
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
+    const companyStatus = await runCommandStatus(
+      ...buildCompanyRegistryTestCommand()
+    );
+    if (companyStatus !== 0) process.exit(companyStatus);
     await runCommand('pnpm', [
       'exec',
       'vitest',

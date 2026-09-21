@@ -20,7 +20,10 @@ describe('MarketingSnapRail', () => {
       </MarketingSnapRail>
     );
 
-    expect(screen.getByLabelText('Outcome Showcase')).toBeTruthy();
+    expect(screen.getByLabelText('Outcome Showcase')).toHaveAttribute(
+      'tabindex',
+      '0'
+    );
     expect(screen.getByTestId('artist-profile-outcomes-grid')).toBeTruthy();
     expect(
       screen.getAllByLabelText('Scroll Outcomes Left').length

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildAffectedTestPlan,
+  buildCompanyRegistryTestCommand,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
   buildVerificationEnv,
@@ -37,6 +38,10 @@ describe('verification child environment', () => {
 describe('Summer commissioning affected-test lane', () => {
   it('selects the fail-closed commissioning suite for every contract input', () => {
     const plan = buildAffectedTestPlan([
+      'scripts/summer-commissioning/architecture-freshness-registry.json',
+      'scripts/summer-commissioning/capability-access-registry.json',
+      'scripts/summer-commissioning/company-registry.mjs',
+      'scripts/summer-commissioning/company-registry.test.mjs',
       'docs/operations/SUMMER_COMMISSIONING.md',
       'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
       'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
@@ -56,6 +61,7 @@ describe('Summer commissioning affected-test lane', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.nodeTests).toEqual([
+      'scripts/summer-commissioning/company-registry.test.mjs',
       'scripts/summer-commissioning/canonical-registry.test.mjs',
       'scripts/summer-commissioning/commissioning.test.mjs',
       'scripts/summer-commissioning/contracts.test.mjs',
@@ -64,6 +70,27 @@ describe('Summer commissioning affected-test lane', () => {
     ]);
     expect(plan.scriptVitestTests).toContain(
       'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+    expect(buildSelectedTestCommands(plan, '1')[0]).toEqual(
+      buildCompanyRegistryTestCommand()
+    );
+    expect(buildCompanyRegistryTestCommand()).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/summer-commissioning/company-registry.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=90',
+        '--test-coverage-functions=100',
+        'scripts/summer-commissioning/company-registry.test.mjs',
+      ],
+    ]);
+    expect(runner).toMatch(
+      /const companyStatus = await runCommandStatus\(\s*\.\.\.buildCompanyRegistryTestCommand\(\)\s*\);/
+    );
+    expect(runner).toContain(
+      'if (companyStatus !== 0) process.exit(companyStatus);'
     );
   });
 
@@ -1660,6 +1687,7 @@ describe('automation-verify affected scope', () => {
 
   it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
+    expect(commands.shift()).toEqual(buildCompanyRegistryTestCommand());
 
     expect(commands).toEqual([
       [

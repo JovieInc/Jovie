@@ -197,7 +197,7 @@ export async function GET(request: Request) {
   );
   if (!rateLimit.success) {
     if (isAuthClient(rawClient) && isAuthIntent(rawIntent)) {
-      void trackAuthEvent('auth_wrong_surface_prevented', {
+      await trackAuthEvent('auth_wrong_surface_prevented', {
         client: rawClient,
         intent: rawIntent,
         result: 'blocked',
@@ -230,7 +230,7 @@ export async function GET(request: Request) {
     getStringParam(url, 'return_to')
   );
   if (!returnTo) {
-    void trackAuthEvent('auth_wrong_surface_prevented', {
+    await trackAuthEvent('auth_wrong_surface_prevented', {
       client: rawClient,
       intent: rawIntent,
       result: 'blocked',
@@ -280,7 +280,7 @@ export async function GET(request: Request) {
       desktopFlow,
     });
 
-    void trackAuthEvent('auth_started', {
+    await trackAuthEvent('auth_started', {
       client: rawClient,
       intent: rawIntent,
       result: 'started',
@@ -301,7 +301,7 @@ export async function GET(request: Request) {
 
     const authPage = new URL(getAuthPageForIntent(rawIntent), request.url);
     authPage.searchParams.set('auth_state', record.state);
-    void trackAuthEvent('auth_provider_opened', {
+    await trackAuthEvent('auth_provider_opened', {
       client: rawClient,
       intent: rawIntent,
       result: 'opened',

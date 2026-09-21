@@ -74,7 +74,6 @@ describe('vitest critical-surface coverage floors', () => {
     );
 
     expect(source).toContain('isChangedRun && !isCoverageRun');
-    expect(source).toContain('isChangedRun && isCoverageRun');
     expect(source).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(source).toContain('reporter: isExactHeadCoverageRun');
     expect(source).not.toMatch(

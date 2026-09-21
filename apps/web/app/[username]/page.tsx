@@ -559,11 +559,12 @@ async function ArtistPageContent({
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
-  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return <UnfazedProfileClient />;
   }
+
+  await enforceCanonicalPublicProfileUsername(username);
 
   // Resolve a missing/private profile before the page-level Suspense boundary
   // can stream its loading shell. This preserves the segment's profile-specific
@@ -594,7 +595,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
-  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return {
@@ -602,6 +602,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       robots: { index: false, follow: false },
     };
   }
+
+  await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status, creatorClerkId } = profileResult;

@@ -10,6 +10,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  truncateSync,
   writeFileSync,
 } from 'node:fs';
 import { type AddressInfo, createServer } from 'node:net';
@@ -24,12 +25,17 @@ import {
   guardPlaywrightArtifacts,
   inspectPlaywrightArtifacts,
   isCredentialBearingName,
+  MAX_ARTIFACT_AGGREGATE_BYTES,
+  MAX_ARTIFACT_FILE_BYTES,
   markdownContainsSecret,
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
+  MAX_PLAYWRIGHT_PNG_HEIGHT,
   MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
+  MAX_PLAYWRIGHT_PNG_PIXELS,
+  MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
 
@@ -54,11 +60,11 @@ const localTrace = Object.fromEntries(
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
-  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const markdownUploads = [
@@ -70,7 +76,7 @@ const markdownUploads = [
 const protectedJobs: Record<string, string[]> = {
   'agent-tick.yml': ['synthetic-monitoring'],
   'ci.yml':
-    'ci-visual-snapshot-compare ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
+    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
       ' '
     ),
   'e2e-full-matrix.yml': ['e2e-full-matrix'],
@@ -85,14 +91,14 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 15,
+  'ci.yml': 16,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
   'production-release.yml': 3,
-  'screenshots.yml': 2,
+  'screenshots.yml': 3,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 6,
 };
@@ -755,6 +761,57 @@ describe('Playwright artifact secret boundary', () => {
     );
   }, 120_000);
 
+  it.each([0, 37])(
+    'keeps Storybook base-fetch auth scoped and propagates exit %i',
+    fetchExit => {
+      const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+      const job = jobBlock(workflow, 'ci-fast-remaining');
+      const step = stepBlock(job, 'Decide structural lane');
+      expect(step).toContain('GH_TOKEN: ${{ github.token }}');
+      const command = step
+        .split('        run: |\n')[1]
+        .replaceAll('${{ github.event_name }}', 'pull_request')
+        .replaceAll('${{ github.base_ref }}', 'main');
+      const directory = fixture();
+      const calls = join(directory, 'calls');
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          `
+      git() {
+        printf '%s\\n' "$*" >> "$FETCH_CALLS"
+        if [[ "$1" == '-c' ]]; then return "$FETCH_EXIT"; fi
+        printf '%s\\n' 'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx'
+      }
+      ${command}
+      test -z "\${GH_TOKEN:-}"
+      test -z "\${AUTH_HEADER:-}"
+    `,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GH_TOKEN: 'fixture-token',
+            FETCH_EXIT: String(fetchExit),
+            FETCH_CALLS: calls,
+            GITHUB_OUTPUT: join(directory, 'output'),
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(fetchExit);
+      const invoked = readFileSync(calls, 'utf8').trim().split('\n');
+      expect(invoked[0]).toBe(
+        `-c http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from('x-access-token:fixture-token').toString('base64')} fetch origin main --no-tags`
+      );
+      expect(invoked).toHaveLength(fetchExit === 0 ? 2 : 1);
+      expect(`${result.stdout}\n${result.stderr}`).not.toContain(
+        'fixture-token'
+      );
+    }
+  );
+
   it('routes the exact upload and producer inventory through staged-only guards', () => {
     const uploads: string[] = [];
     const images: string[] = [];
@@ -803,13 +860,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(26);
+    expect(safeUploadJobs).toHaveLength(28);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(30);
+    ).toBe(34);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1000,6 +1057,7 @@ ${fixtureCheckout}
       'utf8'
     );
     const screenshotJob = jobBlock(screenshots, 'generate');
+    const screenshotPublisherJob = jobBlock(screenshots, 'publish');
     const screenshotCapture = stepBlock(
       screenshots,
       'Capture screenshot catalog'
@@ -1011,14 +1069,30 @@ ${fixtureCheckout}
       'Verify screenshot catalog integrity and budgets'
     );
     const screenshotDiff = stepBlock(screenshots, 'Check for changes');
+    const screenshotUpload = stepBlock(
+      screenshots,
+      'Upload generated screenshot catalog'
+    );
+    const screenshotDownload = stepBlock(
+      screenshots,
+      'Download generated screenshot catalog'
+    );
+    const screenshotDownloadedIntegrity = stepBlock(
+      screenshots,
+      'Verify downloaded screenshot catalog'
+    );
     const screenshotToken = stepBlock(screenshots, 'Generate Jovie Bot token');
     const screenshotPush = stepBlock(
       screenshots,
       'Create or update screenshot PR'
     );
     expect(screenshotJob).not.toBe('');
+    expect(screenshotPublisherJob).not.toBe('');
     expect(screenshotCapture).not.toBe('');
     expect(screenshotJob).toMatch(
+      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
+    );
+    expect(screenshotPublisherJob).toMatch(
       /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
     );
     expect(screenshotJob.indexOf('actions/checkout@')).toBeLessThan(
@@ -1060,6 +1134,9 @@ ${fixtureCheckout}
       screenshotStop,
       screenshotIntegrity,
       screenshotDiff,
+      screenshotUpload,
+      screenshotDownload,
+      screenshotDownloadedIntegrity,
       screenshotToken,
       screenshotPush,
     ])
@@ -1074,10 +1151,37 @@ ${fixtureCheckout}
       screenshotJob.indexOf(screenshotDiff)
     );
     expect(screenshotJob.indexOf(screenshotDiff)).toBeLessThan(
-      screenshotJob.indexOf(screenshotToken)
+      screenshotJob.indexOf('- name: Upload generated screenshot catalog')
+    );
+    expect(screenshotJob).not.toContain('${{ secrets.');
+    expect(screenshotJob).not.toContain('Create or update screenshot PR');
+    expect(
+      screenshotPublisherJob.indexOf(
+        '- name: Download generated screenshot catalog'
+      )
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf(
+        '- name: Verify downloaded screenshot catalog'
+      )
+    );
+    expect(screenshotDownload).toContain('path: apps/web');
+    expect(
+      screenshotPublisherJob.indexOf(
+        '- name: Verify downloaded screenshot catalog'
+      )
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
     );
     expect(
-      screenshotJob.slice(0, screenshotJob.indexOf(screenshotToken))
+      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
+    ).toBeLessThan(
+      screenshotPublisherJob.indexOf('- name: Create or update screenshot PR')
+    );
+    expect(
+      screenshotPublisherJob.slice(
+        0,
+        screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
+      )
     ).not.toContain('${{ secrets.');
     expect(
       persistentGitCredentialViolations(
@@ -1852,6 +1956,12 @@ ${fixtureCheckout}
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
+    // Regression for the production /changelog desktop capture that exposed
+    // the previous 400MB ceiling: 2880x58814 RGBA plus one filter byte/row.
+    expect((1 + 2880 * 4) * 58_814).toBe(677_596_094);
+    expect((1 + 2880 * 4) * 58_814).toBeLessThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
     const marketingWorkspace = fixture();
     write(
       join(marketingWorkspace, 'marketing-route.png'),
@@ -1888,6 +1998,49 @@ ${fixtureCheckout}
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(overCap)).toBe(false);
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, MAX_PLAYWRIGHT_PNG_WIDTH + 1, 1)
+      )
+    ).toBe(false);
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, 1, MAX_PLAYWRIGHT_PNG_HEIGHT + 1)
+      )
+    ).toBe(false);
+    const overPixelWidth = MAX_PLAYWRIGHT_PNG_WIDTH;
+    const overPixelHeight =
+      Math.floor(MAX_PLAYWRIGHT_PNG_PIXELS / overPixelWidth) + 1;
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, overPixelWidth, overPixelHeight)
+      )
+    ).toBe(false);
+
+    const boundedWorkspace = fixture();
+    const oversized = join(boundedWorkspace, 'oversized.json');
+    write(oversized, '');
+    truncateSync(oversized, MAX_ARTIFACT_FILE_BYTES + 1);
+    expect(() =>
+      guardPlaywrightArtifacts(
+        ['oversized.json'],
+        {},
+        { workspace: boundedWorkspace }
+      )
+    ).toThrow(/file exceeds inspection byte limit/);
+    const aggregatePaths = Array.from({ length: 9 }, (_, index) => {
+      const path = join(boundedWorkspace, `aggregate-${index}.json`);
+      write(path, '');
+      truncateSync(path, Math.floor(MAX_ARTIFACT_AGGREGATE_BYTES / 8));
+      return path;
+    });
+    expect(() =>
+      guardPlaywrightArtifacts(
+        aggregatePaths,
+        {},
+        { workspace: boundedWorkspace }
+      )
+    ).toThrow(/selection exceeds inspection byte limit/);
     const badCrc = Buffer.from(valid);
     badCrc[badCrc.length - 1] ^= 1;
     const invalid = [
@@ -1929,6 +2082,58 @@ ${fixtureCheckout}
         { workspace, allowImages: true }
       )
     ).toHaveLength(1);
+    const diagnostic = spawnSync(process.execPath, [guardScript, 'fake.png'], {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: baseEnv(workspace, fixture(), {
+        PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+      }) as NodeJS.ProcessEnv,
+    });
+    expect(diagnostic.status).toBe(1);
+    expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
+      'image-policy:"fake.png"'
+    );
+    const sensitiveFile = join(workspace, 'person@example.com.png');
+    write(sensitiveFile, invalid[0]);
+    const sensitiveDiagnostic = spawnSync(
+      process.execPath,
+      [guardScript, sensitiveFile],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }) as NodeJS.ProcessEnv,
+      }
+    );
+    expect(sensitiveDiagnostic.status).toBe(1);
+    expect(
+      `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
+    ).not.toContain('person@example.com');
+    expect(
+      `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
+    ).toContain('image-policy:"[sensitive]"');
+    const outsideWorkspace = fixture();
+    const outsideFile = join(outsideWorkspace, 'outside.png');
+    write(outsideFile, invalid[0]);
+    const outsideDiagnostic = spawnSync(
+      process.execPath,
+      [guardScript, outsideFile],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }) as NodeJS.ProcessEnv,
+      }
+    );
+    expect(outsideDiagnostic.status).toBe(1);
+    expect(
+      `${outsideDiagnostic.stdout}\n${outsideDiagnostic.stderr}`
+    ).not.toContain(outsideFile);
     const comparison = fixture('.artifact-comparison-', webRoot);
     const comparisonConfig = join(comparison, 'playwright.config.ts');
     const comparisonSpec = join(comparison, 'comparison.spec.ts');

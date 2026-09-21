@@ -136,7 +136,11 @@ function HomepageV2Hero() {
               <div className='homepage-v2-hero__phone-float'>
                 <ArtistProfilePhoneFrame>
                   <div className='relative h-full w-full overflow-hidden bg-(--color-bg-base)'>
-                    <div className='homepage-v2-hero__demo-scale pointer-events-none absolute left-0 top-0'>
+                    <div
+                      aria-hidden='true'
+                      inert
+                      className='homepage-v2-hero__demo-scale pointer-events-none absolute left-0 top-0'
+                    >
                       <DemoPublicProfileSurface />
                     </div>
                   </div>

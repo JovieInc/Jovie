@@ -9,6 +9,7 @@ import {
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AiCrawlerStat } from '@/types/ai-crawler-analytics';
@@ -21,6 +22,7 @@ const ACCENT_COLORS = [
   'var(--color-accent-orange, #ff9800)',
   'var(--color-accent-green, #2f9e44)',
 ] as const;
+const CRAWLER_READ_DISCLOSURE = getAeoMeasurementDisclosure('crawler_read');
 
 interface AiCrawlerDetailPanelProps {
   readonly isOpen: boolean;
@@ -52,10 +54,12 @@ function TrendBadge({ stat }: { readonly stat: AiCrawlerStat }) {
 
 function CrawlerRows({
   loading,
+  hasData,
   crawlers,
   blurred,
 }: {
   readonly loading: boolean;
+  readonly hasData: boolean;
   readonly crawlers: readonly AiCrawlerStat[];
   readonly blurred: boolean;
 }) {
@@ -72,6 +76,20 @@ function CrawlerRows({
           </li>
         ))}
       </ul>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <div className='flex min-h-49 flex-col items-center justify-center text-center'>
+        <Bot
+          className='mb-1.5 h-4 w-4 text-quaternary-token'
+          aria-hidden='true'
+        />
+        <p className='text-xs text-tertiary-token'>
+          AI crawler reads are Unknown until telemetry is available.
+        </p>
+      </div>
     );
   }
 
@@ -94,7 +112,7 @@ function CrawlerRows({
   return (
     <ul
       className='min-h-49 space-y-2'
-      aria-label='AI crawlers by request count'
+      aria-label='AI Crawlers By Request Count'
     >
       {crawlers.map((crawler, index) => {
         const widthPct = (crawler.requests / maxRequests) * 100;
@@ -162,37 +180,46 @@ export function AiCrawlerDetailPanel({
             <div className='space-y-3 pr-8'>
               <div className='space-y-1'>
                 <p className='text-mid font-semibold tracking-tight text-primary-token'>
-                  AI Crawler Activity
+                  AI Crawler Reads
                 </p>
-                <p className='text-xs leading-4 text-secondary-token'>
-                  Which AI services read your profile and asset pages.
+                <p
+                  className='text-xs leading-4 text-secondary-token'
+                  data-testid='ai-crawler-measurement-disclosure'
+                >
+                  {CRAWLER_READ_DISCLOSURE.layerLabel}:{' '}
+                  {CRAWLER_READ_DISCLOSURE.description}
                 </p>
               </div>
-              <DrawerSurfaceCard
-                variant='flat'
-                className='grid grid-cols-2 gap-2 p-2'
-              >
-                <StatTile
-                  label='30-Day Reads'
-                  value={
-                    isLoading ? '' : (data?.totalRequests ?? 0).toLocaleString()
-                  }
-                />
-                <StatTile
-                  label='This Week'
-                  value={
-                    isLoading
-                      ? ''
-                      : (data?.weeklyRequests ?? 0).toLocaleString()
-                  }
-                />
+              <DrawerSurfaceCard variant='flat'>
+                <div className='grid grid-cols-2 gap-2 p-2'>
+                  <StatTile
+                    label='Reads (30 Days)'
+                    value={
+                      isLoading
+                        ? ''
+                        : data
+                          ? data.totalRequests.toLocaleString()
+                          : 'Unknown'
+                    }
+                  />
+                  <StatTile
+                    label='This Week'
+                    value={
+                      isLoading
+                        ? ''
+                        : data
+                          ? data.weeklyRequests.toLocaleString()
+                          : 'Unknown'
+                    }
+                  />
+                </div>
               </DrawerSurfaceCard>
             </div>
           </div>
         </DrawerSurfaceCard>
       }
     >
-      <DrawerSurfaceCard variant='card' className='p-3'>
+      <DrawerSurfaceCard variant='card'>
         {showTeaser ? (
           <div className='mb-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3 text-center'>
             <p className='text-app text-secondary-token'>
@@ -205,6 +232,7 @@ export function AiCrawlerDetailPanel({
         ) : null}
         <CrawlerRows
           loading={isLoading}
+          hasData={data != null}
           crawlers={data?.crawlers ?? []}
           blurred={showTeaser}
         />
@@ -214,7 +242,9 @@ export function AiCrawlerDetailPanel({
           </p>
         ) : (
           <p className='mt-3 text-3xs text-tertiary-token'>
-            Refreshes daily from Cloudflare edge analytics.
+            {data
+              ? 'Refreshes daily from Cloudflare edge analytics.'
+              : 'Telemetry unavailable; crawler reads remain Unknown.'}
           </p>
         )}
       </DrawerSurfaceCard>

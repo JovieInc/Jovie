@@ -102,4 +102,13 @@ describe('launch page System B source contract', () => {
       );
     }
   });
+
+  it('makes the mobile audience overflow region keyboard focusable', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+
+    expect(source).toContain(
+      "<section\n                    className='system-b-launch-audience-main'"
+    );
+    expect(source).toContain('tabIndex={0}');
+  });
 });

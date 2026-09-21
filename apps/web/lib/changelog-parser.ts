@@ -1,8 +1,15 @@
 /**
- * Shared Changelog Parser (TypeScript)
+ * Canonical Changelog parser for the Next.js app.
  *
- * Single source of truth for parsing CHANGELOG.md in the Next.js app.
- * Used by: /changelog page (server component) and /changelog/feed.xml (route handler).
+ * Every public changelog surface reads through this module (via
+ * lib/changelog-source.ts): the /changelog pages, feed.xml, feed.json,
+ * and the sitemap.
+ *
+ * The Node.js publishing pipeline has its own parser
+ * (scripts/lib/changelog-parser.mjs) whose output shape serves the email
+ * flow. It intentionally does not recognize `### Featured` by default —
+ * the founder-approved email output drops Featured entries; see its
+ * `includeFeatured` option.
  *
  * Supports two public-facing conventions:
  * - **Summary blockquote**: A `> ...` line immediately after the version heading
@@ -28,6 +35,15 @@ export interface ChangelogRelease {
   date: string;
   summary: string;
   sections: ChangelogSection;
+}
+
+export interface ChangelogParseResult {
+  /** Releases with at least one public, customer-facing entry. */
+  readonly releases: readonly ChangelogRelease[];
+  /** Every release heading, including empty or internal-only slots. */
+  readonly sourceReleases: readonly ChangelogRelease[];
+  /** Source headings ahead of the latest public release with no public entries. */
+  readonly unpublishedReleases: readonly ChangelogRelease[];
 }
 
 export type ChangelogInlineNode =
@@ -201,6 +217,16 @@ function hasPublicEntries(release: ChangelogRelease): boolean {
  * Filters out `[internal]` entries and releases with zero public entries.
  */
 export function parseChangelog(markdown: string): ChangelogRelease[] {
+  return [...parseChangelogDocument(markdown).releases];
+}
+
+/**
+ * Parse the source once while retaining the distinction between release
+ * headings and published customer outcomes. Empty headings are intentionally
+ * excluded from `releases`, but callers can use `unpublishedReleases` to make
+ * a truthful freshness disclosure without inventing entries.
+ */
+export function parseChangelogDocument(markdown: string): ChangelogParseResult {
   const lines = markdown.split('\n');
   const releases: ChangelogRelease[] = [];
   let current: ChangelogRelease | null = null;
@@ -220,7 +246,18 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     summaryConsumed = result.summaryConsumed;
   }
 
-  return releases.filter(hasPublicEntries);
+  const publicReleases = releases.filter(hasPublicEntries);
+  const firstPublicIndex = publicReleases[0]
+    ? releases.indexOf(publicReleases[0])
+    : releases.length;
+
+  return {
+    releases: publicReleases,
+    sourceReleases: releases,
+    unpublishedReleases: releases
+      .slice(0, firstPublicIndex === -1 ? releases.length : firstPublicIndex)
+      .filter(release => !hasPublicEntries(release)),
+  };
 }
 
 type LineState = {
