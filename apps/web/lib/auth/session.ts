@@ -342,7 +342,7 @@ export async function getProfileByDbUserId(
  * Replaces the common pattern:
  * ```typescript
  * const { userId } = await getCachedAuth();
- * const [user] = await db.select().from(users).where(eq(users.clerkId, userId));
+ * const [user] = await db.select().from(users).where(eq(users.id, userId));
  * const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
  * ```
  *

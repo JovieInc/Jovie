@@ -58,7 +58,7 @@ export interface SetPlaylistEngineSettingsInput {
 
 export interface SetPlaylistSpotifyInput {
   readonly clerkUserId: string;
-  readonly updatedByClerkUserId: string;
+  readonly updatedByUserId: string;
 }
 
 export interface SpotifyExternalAccount {
@@ -182,11 +182,11 @@ export async function setPlaylistEngineSettings(
   };
 }
 
-async function getAppUserId(clerkUserId: string): Promise<string | null> {
+async function getAppUserId(userId: string): Promise<string | null> {
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, userId))
     .limit(1);
   return user?.id ?? null;
 }
@@ -337,7 +337,7 @@ export async function setPlaylistSpotifyClerkUserId(
     );
   }
 
-  const appUserId = await getAppUserId(input.updatedByClerkUserId);
+  const appUserId = await getAppUserId(input.updatedByUserId);
   const now = new Date();
 
   await db

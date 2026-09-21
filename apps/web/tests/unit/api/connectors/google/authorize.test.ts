@@ -14,6 +14,7 @@ import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-s
 const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
   dbSelectMock: vi.fn(),
+  whereArgs: [] as unknown[],
   captureErrorMock: vi.fn().mockResolvedValue(undefined),
   mockEnv: {
     GOOGLE_OAUTH_CLIENT_ID: 'test-client-id.apps.googleusercontent.com' as
@@ -50,8 +51,9 @@ vi.mock('@/lib/env-server', () => ({
 function selectReturns(rows: Array<{ id: string }>) {
   hoisted.dbSelectMock.mockReturnValue({
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(rows),
+      where: vi.fn().mockImplementation((condition: unknown) => {
+        hoisted.whereArgs.push(condition);
+        return { limit: vi.fn().mockResolvedValue(rows) };
       }),
     }),
   });
@@ -77,7 +79,8 @@ describe('GET /api/connectors/google/authorize', () => {
     hoisted.mockEnv.TRACKING_TOKEN_SECRET = 'test-oauth-state-secret';
     hoisted.mockEnv.CRON_SECRET = undefined;
     selectReturns([{ id: 'db-user-1' }]);
-    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_1' });
+    // Post-cutover, getCachedAuth().userId is the app `users.id` UUID.
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-1' });
   });
 
   it('falls back to the dev fixture seed route when GOOGLE_OAUTH_CLIENT_ID is missing (non-production)', async () => {
@@ -112,7 +115,20 @@ describe('GET /api/connectors/google/authorize', () => {
     expect(hoisted.dbSelectMock).not.toHaveBeenCalled();
   });
 
-  it('redirects with ?error=auth when the Clerk user has no DB row', async () => {
+  it('looks up the users row by users.id (app UUID), not clerk_id', async () => {
+    const { GET } = await import('@/app/api/connectors/google/authorize/route');
+    await GET(new Request('http://localhost/api/connectors/google/authorize'));
+
+    // JOV-4228: the session userId is `users.id` after the Better Auth
+    // cutover, so the lookup must key on `users.id`, never `users.clerkId`.
+    expect(hoisted.whereArgs).toHaveLength(1);
+    const serialized = JSON.stringify(hoisted.whereArgs[0]);
+    expect(serialized).toContain('users.id');
+    expect(serialized).not.toContain('clerk');
+    expect(serialized).toContain('db-user-1');
+  });
+
+  it('redirects with ?error=auth when the session user has no DB row', async () => {
     selectReturns([]);
 
     const { GET } = await import('@/app/api/connectors/google/authorize/route');
@@ -165,7 +181,7 @@ describe('GET /api/connectors/google/authorize', () => {
     );
 
     // The state must verify through the REAL signing/verification helper and
-    // carry the resolved DB user id + the requested returnTo — not the Clerk id.
+    // carry the resolved DB user id + the requested returnTo.
     const state = url.searchParams.get('state');
     expect(state).toBeTruthy();
     const decoded = verifyGoogleOAuthState(state as string);
