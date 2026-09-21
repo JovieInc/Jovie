@@ -191,7 +191,10 @@ export function useUnifiedArtistSearchQuery<TResult>(
   }
 
   return {
-    results: data ?? [],
+    // keepPreviousData keeps the last result set attached to the observer even
+    // after clear() empties debouncedQuery, so gate on the enabled condition —
+    // an idle search must never surface stale artists.
+    results: debouncedQuery.length >= minQueryLength ? (data ?? []) : [],
     state,
     error: errorMessage,
     search,
