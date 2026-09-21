@@ -1164,6 +1164,7 @@ ${fixtureCheckout}
         '- name: Verify downloaded screenshot catalog'
       )
     );
+    expect(screenshotDownload).toContain('path: apps/web');
     expect(
       screenshotPublisherJob.indexOf(
         '- name: Verify downloaded screenshot catalog'

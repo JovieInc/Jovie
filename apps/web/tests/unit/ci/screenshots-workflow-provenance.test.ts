@@ -196,6 +196,9 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(publish).toContain('needs: generate');
     expect(publish).toContain('continue-on-error: true');
     expect(publish).toContain('Download generated screenshot catalog');
+    expect(publish).toMatch(
+      /name: Download generated screenshot catalog[\s\S]*?path: apps\/web/
+    );
     expect(publish).toContain('Create or update screenshot PR');
     expect(publish).toContain('JOVIE_BOT_PRIVATE_KEY');
   });
