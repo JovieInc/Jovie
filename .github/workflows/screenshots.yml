@@ -19,7 +19,7 @@ on:
       - 'apps/web/app/go/**'
       - 'apps/web/app/r/**'
       - 'apps/web/app/s/**'
-      - 'apps/web/app/[[]username]/**'
+      - 'apps/web/app/\[username\]/**'
       - 'apps/web/components/**'
       - 'apps/web/data/artistProfilePageOrder.ts'
       - 'apps/web/data/homepageLaunchCopy.ts'
