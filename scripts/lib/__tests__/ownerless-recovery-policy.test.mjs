@@ -402,16 +402,16 @@ describe('tracker scan admission', () => {
       })
     ).rejects.toThrow('quota exhausted');
   });
-  it('admits explicit audit events as recovery demand', () => {
+  it('admits explicit audit events as recovery demand', async () => {
     // The dedicated sweep workflow was deleted; the sweeper script remains the
     // recovery policy library and treats manual/workflow_dispatch events as
     // explicit full-audit demand.
-    expect(recoveryEventDecision({ name: 'workflow_dispatch' }).reason).toBe(
-      'explicit-audit'
-    );
-    expect(recoveryEventDecision({ name: 'manual' }).reason).toBe(
-      'explicit-audit'
-    );
+    await expect(
+      recoveryEventDecision({ name: 'workflow_dispatch' })
+    ).resolves.toMatchObject({ reason: 'explicit-audit' });
+    await expect(
+      recoveryEventDecision({ name: 'manual' })
+    ).resolves.toMatchObject({ reason: 'explicit-audit' });
   });
 });
 
