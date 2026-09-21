@@ -34,21 +34,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { userId: clerkId } = await getCachedAuth();
-    if (!clerkId) {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
       return NextResponse.redirect(`${origin}/sign-in`, { status: 302 });
     }
 
-    // Resolve the internal DB user ID from Clerk ID.
+    // getCachedAuth().userId is the app `users.id` UUID post-cutover —
+    // `users.clerkId` is null on Better Auth rows.
     const [dbUser] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.clerkId, clerkId))
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (!dbUser) {
       logger.error('[connectors/google/authorize] DB user not found', {
-        clerkId,
+        userId,
       });
       return NextResponse.redirect(
         `${origin}${APP_ROUTES.SETTINGS_CONNECTORS}?error=auth`,

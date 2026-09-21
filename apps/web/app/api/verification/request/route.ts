@@ -15,11 +15,10 @@ export const runtime = 'nodejs';
 
 export async function POST() {
   try {
-    return await withDbSession(async clerkUserId => {
-      // Rate limit early (keyed on Clerk user) so repeated calls cannot spam
-      // the Slack webhook even before we hit the database.
-      const rateLimitResult =
-        await checkVerificationRequestRateLimit(clerkUserId);
+    return await withDbSession(async userId => {
+      // Rate limit early (keyed on the app user id) so repeated calls cannot
+      // spam the Slack webhook even before we hit the database.
+      const rateLimitResult = await checkVerificationRequestRateLimit(userId);
       if (!rateLimitResult.success) {
         return NextResponse.json(
           { error: rateLimitResult.reason ?? 'Rate limit exceeded' },
@@ -39,7 +38,7 @@ export async function POST() {
           isPro: users.isPro,
         })
         .from(users)
-        .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
         .limit(1);
 
       if (!user) {
