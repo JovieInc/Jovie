@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { PublicProfileFixture } from './PublicProfileFixture';
 
-vi.mock('@/app/[username]/_components/PublicClaimBanner', () => ({
-  PublicClaimBanner: ({
+vi.mock('@/features/profile/ClaimBanner', () => ({
+  ClaimBanner: ({
     displayName,
     prefetch,
   }: {
