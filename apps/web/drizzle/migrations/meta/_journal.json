@@ -708,8 +708,8 @@
       "when": 1788415600001,
       "tag": "0100_hesitant_demogoblin",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 101,
       "version": "7",
       "when": 1788415600002,
@@ -728,6 +728,13 @@
       "version": "7",
       "when": 1789871406427,
       "tag": "0103_charming_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1789973175630,
+      "tag": "0104_oauth_provider_1_7_5",
       "breakpoints": true
     }
   ]

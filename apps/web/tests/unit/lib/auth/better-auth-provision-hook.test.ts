@@ -42,9 +42,12 @@ vi.mock('@/lib/db/schema/better-auth', () => ({
   baAccounts: {},
   baJwks: {},
   baOauthAccessTokens: {},
+  baOauthClientAssertions: {},
+  baOauthClientResources: {},
   baOauthClients: {},
   baOauthConsents: {},
   baOauthRefreshTokens: {},
+  baOauthResources: {},
   baSessions: {},
   baUsers: {},
   baVerifications: {},
@@ -110,19 +113,19 @@ describe('Better Auth base URL', () => {
     expect(getOptions().baseURL).not.toBe('https://staging.jov.ie');
   });
 
-  it.each([
-    'jovie-preview-abc.vercel.app',
-    'jovie-git-auth-jovie.vercel.app',
-  ])('resolves requests on the exact allowed host %s', host => {
-    expect(
-      resolveBaseURL(
-        getOptions().baseURL,
-        '/api/auth',
-        new Request(`https://${host}/identity`),
-        false
-      )
-    ).toBe(`https://${host}/api/auth`);
-  });
+  it.each(['jovie-preview-abc.vercel.app', 'jovie-git-auth-jovie.vercel.app'])(
+    'resolves requests on the exact allowed host %s',
+    host => {
+      expect(
+        resolveBaseURL(
+          getOptions().baseURL,
+          '/api/auth',
+          new Request(`https://${host}/identity`),
+          false
+        )
+      ).toBe(`https://${host}/api/auth`);
+    }
+  );
 
   it('rejects requests on an unrelated Vercel host', () => {
     expect(() =>
