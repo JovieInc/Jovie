@@ -2023,6 +2023,39 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the profile-mode render route for changed-surface certification', () => {
+    const source = 'apps/web/app/[username]/profile-mode-render/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.profile-mode-render'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.profile-mode-render',
+      platform: 'web',
+      owner: 'profile-mode-render',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        {
+          path: 'apps/web/app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.profile-mode-render',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers the marketing shell layout for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/layout.tsx';
     const screen = SCREEN_REGISTRY.find(
