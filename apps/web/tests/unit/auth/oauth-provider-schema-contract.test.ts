@@ -5,9 +5,12 @@ import { describe, expect, it } from 'vitest';
 import {
   baJwks,
   baOauthAccessTokens,
+  baOauthClientAssertions,
+  baOauthClientResources,
   baOauthClients,
   baOauthConsents,
   baOauthRefreshTokens,
+  baOauthResources,
 } from '@/lib/db/schema/better-auth';
 
 /**
@@ -25,6 +28,9 @@ const MAPPED_OAUTH_MODELS = {
   oauthRefreshToken: baOauthRefreshTokens,
   oauthAccessToken: baOauthAccessTokens,
   oauthConsent: baOauthConsents,
+  oauthResource: baOauthResources,
+  oauthClientResource: baOauthClientResources,
+  oauthClientAssertion: baOauthClientAssertions,
 } as const;
 
 type MappedOAuthModel = keyof typeof MAPPED_OAUTH_MODELS;
@@ -54,20 +60,21 @@ function drizzleFieldNames(
 }
 
 describe('OAuth provider schema contract (JOV-4587)', () => {
-  it.each(
-    Object.keys(MAPPED_OAUTH_MODELS) as MappedOAuthModel[]
-  )('maps every %s field declared by the pinned oauth-provider', model => {
-    const required = providerFieldNames(model);
-    const mapped = drizzleFieldNames(MAPPED_OAUTH_MODELS[model]);
-    const missing = required.filter(field => !mapped.includes(field));
+  it.each(Object.keys(MAPPED_OAUTH_MODELS) as MappedOAuthModel[])(
+    'maps every %s field declared by the pinned oauth-provider',
+    model => {
+      const required = providerFieldNames(model);
+      const mapped = drizzleFieldNames(MAPPED_OAUTH_MODELS[model]);
+      const missing = required.filter(field => !mapped.includes(field));
 
-    expect(
-      missing,
-      `Drizzle table for ${model} is missing provider fields: ${missing.join(', ')}. Expand apps/web/lib/db/schema/better-auth.ts and generate a migration.`
-    ).toEqual([]);
-  });
+      expect(
+        missing,
+        `Drizzle table for ${model} is missing provider fields: ${missing.join(', ')}. Expand apps/web/lib/db/schema/better-auth.ts and generate a migration.`
+      ).toEqual([]);
+    }
+  );
 
-  it('covers the four oauth models required by token exchange', () => {
+  it('covers every oauth model declared by the pinned provider', () => {
     const plugin = oauthProvider({
       loginPage: '/identity',
       consentPage: '/identity',
@@ -76,6 +83,13 @@ describe('OAuth provider schema contract (JOV-4587)', () => {
 
     for (const model of Object.keys(MAPPED_OAUTH_MODELS)) {
       expect(providerModels).toContain(model);
+    }
+
+    for (const model of providerModels) {
+      expect(
+        Object.keys(MAPPED_OAUTH_MODELS),
+        `oauthProvider schema declares unmapped model ${model}. Map it in apps/web/lib/auth/better-auth.ts and add a Drizzle table.`
+      ).toContain(model);
     }
   });
 });
