@@ -160,6 +160,32 @@ export const RATE_LIMITERS = {
   // limits stack with hard turn caps and Haiku-force to bound the worst case.
   // ---------------------------------------------------------------------------
 
+  /**
+   * Anonymous onboarding chat, first touch only: 120 session starts per hour per IP.
+   *
+   * Charged exclusively on requests that arrive without a valid onboarding
+   * session cookie — i.e. the visitor's very first message. Those requests
+   * already cleared Turnstile, so they draw on a dedicated, more generous
+   * budget instead of the shared IP/ASN pools below. Those pools are sized for
+   * sustained traffic and are routinely exhausted by carrier-grade NAT and
+   * corporate egress, which dead-ended real first-time visitors on message #1
+   * (JOV-6114).
+   *
+   * Deliberately NOT requireRedis: this is an allowance for Turnstile-verified
+   * fresh sessions only, so it degrades to per-instance memory during a Redis
+   * outage rather than hard-failing a new visitor's first message. Subsequent
+   * turns stay fail-closed via the IP/ASN/session limiters below.
+   */
+  anonymousOnboardingChatFirstTouch: {
+    name: 'Anonymous Onboarding Chat (First Touch)',
+    limit: 120,
+    window: '1 h',
+    prefix: 'anon_onb_chat_first_touch',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+  } satisfies RateLimitConfig,
+
   /** Anonymous onboarding chat: 20 messages per hour per IP */
   anonymousOnboardingChatIp: {
     name: 'Anonymous Onboarding Chat (IP)',

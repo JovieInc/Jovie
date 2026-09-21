@@ -127,10 +127,28 @@ export const anonymousOnboardingChatSessionLimiter = createRateLimiter(
   { requireRedis: true }
 );
 
+/**
+ * First-touch allowance: applies only to a visitor's very first anonymous
+ * message (no valid session cookie yet, Turnstile already passed). Higher
+ * per-IP budget so shared egress (carrier NAT, office IPs) can't burn the
+ * tighter sustained-traffic caps before a real first-time visitor sends
+ * message #1. Not requireRedis — degrades to per-instance memory during a
+ * Redis outage instead of hard-failing a cold first touch (JOV-6114).
+ */
+export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatFirstTouch
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
   readonly asn?: string | null;
+  /**
+   * True when the request carries no valid onboarding session cookie — the
+   * visitor's first message. First-touch requests skip the shared IP/ASN
+   * pools and draw on the dedicated first-touch budget instead.
+   */
+  readonly isFirstTouch?: boolean;
 }
 
 // ============================================================================
@@ -541,6 +559,14 @@ async function checkRateLimit(
 export async function checkAnonymousChatRateLimit(
   input: AnonymousChatLimitInput
 ): Promise<RateLimitResult> {
+  if (input.isFirstTouch) {
+    return checkRateLimit(
+      anonymousOnboardingChatFirstTouchLimiter,
+      `first_touch:${input.ip}`,
+      'Too many new chats from this network right now. Try again in a moment, or sign up to skip the line.'
+    );
+  }
+
   const ipResult = await checkRateLimit(
     anonymousOnboardingChatIpLimiter,
     `ip:${input.ip}`,
@@ -1159,6 +1185,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     anonymousOnboardingChatIp: anonymousOnboardingChatIpLimiter,
     anonymousOnboardingChatAsn: anonymousOnboardingChatAsnLimiter,
     anonymousOnboardingChatSession: anonymousOnboardingChatSessionLimiter,
+    anonymousOnboardingChatFirstTouch: anonymousOnboardingChatFirstTouchLimiter,
     dashboardLinks: dashboardLinksLimiter,
     headerSearch: headerSearchLimiter,
     paymentIntent: paymentIntentLimiter,
