@@ -46,6 +46,26 @@ function parseArgs(argv) {
   return values;
 }
 
+/**
+ * @param {{
+ *   screenId: string,
+ *   headSha: string,
+ *   runUrl: string,
+ *   bundle: string,
+ *   measurements: {
+ *     capturedAt?: unknown,
+ *     viewports?: unknown,
+ *     activeFlow?: unknown,
+ *     historyProof?: unknown,
+ *     visibleActions?: unknown,
+ *   },
+ *   artifactRoot?: string,
+ *   producerRunId?: number,
+ *   producerRunAttempt?: number,
+ *   producerJobId?: number,
+ *   environment?: string,
+ * }} options
+ */
 export function emitScreenProof({
   screenId,
   headSha,
