@@ -406,9 +406,9 @@ describe('tracker scan admission', () => {
     // The dedicated sweep workflow was deleted; the sweeper script remains the
     // recovery policy library and treats manual/workflow_dispatch events as
     // explicit full-audit demand.
-    expect(
-      recoveryEventDecision({ name: 'workflow_dispatch' }).reason
-    ).toBe('explicit-audit');
+    expect(recoveryEventDecision({ name: 'workflow_dispatch' }).reason).toBe(
+      'explicit-audit'
+    );
     expect(recoveryEventDecision({ name: 'manual' }).reason).toBe(
       'explicit-audit'
     );
