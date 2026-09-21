@@ -12,12 +12,14 @@ vi.mock('next/link', () => ({
     href,
     children,
     className,
+    prefetch,
     'data-testid': testId,
     'aria-label': ariaLabel,
   }: {
     href: string;
     children: ReactNode;
     className?: string;
+    prefetch?: boolean;
     'data-testid'?: string;
     'aria-label'?: string;
   }) => (
@@ -25,6 +27,7 @@ vi.mock('next/link', () => ({
       href={href}
       className={className}
       data-testid={testId}
+      data-prefetch={String(prefetch)}
       aria-label={ariaLabel}
     >
       {children}
@@ -108,5 +111,20 @@ describe('ClaimBanner', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByTestId('claim-banner-cta')).not.toBeInTheDocument();
+  });
+
+  it('can suppress automatic route prefetch without removing the CTA', () => {
+    render(
+      <ClaimBanner
+        profileHandle='unfazed'
+        ctaHref='/unfazed/claim?next=auth'
+        prefetch={false}
+      />
+    );
+
+    expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+      'data-prefetch',
+      'false'
+    );
   });
 });
