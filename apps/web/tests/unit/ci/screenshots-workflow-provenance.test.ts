@@ -26,6 +26,17 @@ function stepIndex(workflow: string, stepName: string): number {
   return index;
 }
 
+function matchesLiteralDirectoryFilter(pattern: string, path: string): boolean {
+  const recursiveSuffix = '/**';
+  if (!pattern.endsWith(recursiveSuffix)) return false;
+
+  const escapedPrefix = pattern.slice(0, -recursiveSuffix.length);
+  if (/(^|[^\\])[*[\]!?+]/.test(escapedPrefix)) return false;
+
+  const prefix = escapedPrefix.replace(/\\([*[\]!?+])/g, '$1');
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
 describe('Product Screenshots provenance cleanliness', () => {
   it('checks out full history so the exact push base is resolvable', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -109,7 +120,28 @@ describe('Product Screenshots provenance cleanliness', () => {
     const upload = getStepBlock(workflow, 'Upload public-profile screen proof');
     const certify = getStepBlock(workflow, 'Certify exact screen captures');
 
-    expect(workflow).toContain("- 'apps/web/app/[[]username]/**'");
+    const profilePathFilter = workflow.match(
+      /^\s+- '([^']*app\/\\\[username\\\][^']*)'$/m
+    )?.[1];
+    expect(profilePathFilter).toBe('apps/web/app/\\[username\\]/**');
+    expect(
+      matchesLiteralDirectoryFilter(
+        profilePathFilter ?? '',
+        'apps/web/app/[username]/page.tsx'
+      )
+    ).toBe(true);
+    expect(
+      matchesLiteralDirectoryFilter(
+        profilePathFilter ?? '',
+        'apps/web/app/u/page.tsx'
+      )
+    ).toBe(false);
+    expect(
+      matchesLiteralDirectoryFilter(
+        profilePathFilter ?? '',
+        'apps/web/app/username/page.tsx'
+      )
+    ).toBe(false);
     expect(workflow).toContain(
       'profile-artifact-id: ${{ steps.profile-proof.outputs.artifact-id }}'
     );
