@@ -23,6 +23,13 @@ type PackResult = {
   readonly version?: string;
 };
 
+type PublicFixture = {
+  readonly body: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly status?: number;
+  readonly type: string;
+};
+
 function isPackResult(value: unknown): value is readonly PackResult[] {
   return (
     Array.isArray(value) &&
@@ -32,11 +39,55 @@ function isPackResult(value: unknown): value is readonly PackResult[] {
   );
 }
 
-const PUBLIC_FIXTURES: Readonly<
-  Record<string, { readonly body: string; readonly type: string }>
-> = {
+const PUBLIC_FIXTURES: Readonly<Record<string, PublicFixture>> = {
   '/api/v1/demo': {
     body: JSON.stringify({ artist: { username: 'demo' } }),
+    type: 'application/json',
+  },
+  '/api/v1/rich': {
+    body: JSON.stringify({
+      artist: { username: 'rich', name: 'Rich Artist' },
+      releases: [{ id: 'release-1', title: 'A Release' }],
+      events: [{ id: 'event-1', title: 'A Show' }],
+      merch: [{ id: 'merch-1', title: 'A Shirt' }],
+    }),
+    type: 'application/json',
+  },
+  '/api/v1/empty': {
+    body: JSON.stringify({
+      artist: { username: 'empty', name: 'Empty Artist' },
+      releases: [],
+      events: [],
+      merch: [],
+    }),
+    type: 'application/json',
+  },
+  '/api/v1/unknown': {
+    body: JSON.stringify({ error: 'Artist not found' }),
+    status: 404,
+    type: 'application/json',
+  },
+  '/api/v1/private': {
+    body: JSON.stringify({ error: 'Artist not found' }),
+    status: 404,
+    type: 'application/json',
+  },
+  '/api/v1/rate-limited': {
+    body: JSON.stringify({
+      error: 'Too many requests',
+      code: 'RATE_LIMITED',
+    }),
+    headers: { 'Retry-After': '30' },
+    status: 429,
+    type: 'application/json',
+  },
+  '/api/v1/dependency-failure': {
+    body: JSON.stringify({
+      error: 'Public API temporarily unavailable',
+      code: 'RATE_LIMIT_UNAVAILABLE',
+    }),
+    headers: { 'Retry-After': '30' },
+    status: 503,
     type: 'application/json',
   },
   '/demo/llms.txt': {
@@ -67,7 +118,10 @@ async function withLocalPublicApi<T>(
       response.end();
       return;
     }
-    response.writeHead(200, { 'Content-Type': fixture.type });
+    response.writeHead(fixture.status ?? 200, {
+      'Content-Type': fixture.type,
+      ...fixture.headers,
+    });
     response.end(fixture.body);
   });
 
@@ -178,6 +232,58 @@ async function assertInstalledCommand(
   if (stdout !== expectedStdout && stdout !== `${expectedStdout}\n`) {
     throw new Error(
       `Installed command ${args.join(' ')} output ${JSON.stringify(stdout)} instead of ${JSON.stringify(expectedStdout)}.`
+    );
+  }
+}
+
+async function assertInstalledFailure(
+  installedCli: string,
+  cwd: string,
+  args: readonly string[],
+  expectedStatus: number,
+  expectedRetryAfterSeconds?: number
+): Promise<void> {
+  let failure: unknown;
+  try {
+    await execFileAsync(installedCli, [...args], {
+      cwd,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch (error) {
+    failure = error;
+  }
+
+  if (!failure) {
+    throw new Error(
+      `Installed command ${args.join(' ')} unexpectedly succeeded.`
+    );
+  }
+
+  const result = failure as {
+    readonly code?: number | string;
+    readonly stderr?: string;
+    readonly stdout?: string;
+  };
+  if (result.code !== 1 || result.stderr) {
+    throw new Error(
+      `Installed command ${args.join(' ')} failed with an unexpected process result.`
+    );
+  }
+
+  const payload = JSON.parse(result.stdout ?? '') as {
+    readonly error?: {
+      readonly retryAfterSeconds?: number;
+      readonly status?: number;
+    };
+  };
+  if (
+    payload.error?.status !== expectedStatus ||
+    (expectedRetryAfterSeconds === undefined
+      ? payload.error?.retryAfterSeconds !== undefined
+      : payload.error?.retryAfterSeconds !== expectedRetryAfterSeconds)
+  ) {
+    throw new Error(
+      `Installed command ${args.join(' ')} returned an unexpected error receipt: ${result.stdout}`
     );
   }
 }
@@ -363,7 +469,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const fixtureOrigin = await withLocalPublicApi(async origin => {
+    const fixtureJourney = await withLocalPublicApi(async origin => {
       await assertInstalledCommand(
         installedCli,
         installRoot,
@@ -394,7 +500,55 @@ async function main(): Promise<void> {
         ['docs', 'llms', '--full', '--base-url', origin],
         '# full guide\n'
       );
-      return origin;
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'rich', '--json', '--base-url', origin],
+        '{"artist":{"username":"rich","name":"Rich Artist"},"releases":[{"id":"release-1","title":"A Release"}],"events":[{"id":"event-1","title":"A Show"}],"merch":[{"id":"merch-1","title":"A Shirt"}]}'
+      );
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'empty', '--json', '--base-url', origin],
+        '{"artist":{"username":"empty","name":"Empty Artist"},"releases":[],"events":[],"merch":[]}'
+      );
+      await assertInstalledFailure(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'unknown', '--json', '--base-url', origin],
+        404
+      );
+      await assertInstalledFailure(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'private', '--json', '--base-url', origin],
+        404
+      );
+      await assertInstalledFailure(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'rate-limited', '--json', '--base-url', origin],
+        429,
+        30
+      );
+      await assertInstalledFailure(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'dependency-failure', '--json', '--base-url', origin],
+        503,
+        30
+      );
+      return {
+        origin,
+        statuses: {
+          dependencyFailure: 503,
+          empty: 200,
+          private: 404,
+          rateLimited: 429,
+          rich: 200,
+          unknown: 404,
+        },
+      };
     });
 
     await runInstalledCriticalCommand(installedCli, installRoot);
@@ -411,7 +565,7 @@ async function main(): Promise<void> {
           importSmoke: 'passed',
           installSmoke: 'passed',
           commandSmoke: 'passed',
-          fixtureOrigin,
+          fixtureJourney,
           staging: 'temporary-only',
         },
         null,

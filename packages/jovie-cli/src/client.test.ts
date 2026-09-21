@@ -12,13 +12,17 @@ import {
   validateUsername,
 } from './client.js';
 
-function createFetch(body: string, status = 200) {
+function createFetch(
+  body: string,
+  status = 200,
+  headers: Record<string, string> = {}
+) {
   const calls: Array<{ input: string | URL; init?: RequestInit }> = [];
   const fetchImpl: FetchImplementation = async (input, init) => {
     calls.push({ input, init });
     return new Response(body, {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
     });
   };
   return { calls, fetchImpl };
@@ -116,6 +120,30 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       status: 404,
       responseBody: 'not found',
+    });
+  });
+
+  it('preserves retry guidance for throttled and unavailable services', async () => {
+    const throttled = createFetch('{"error":"Too many requests"}', 429, {
+      'Retry-After': '30',
+    });
+    await expect(
+      fetchArtist('demo', { fetchImpl: throttled.fetchImpl })
+    ).rejects.toMatchObject({
+      status: 429,
+      retryAfterSeconds: 30,
+    });
+
+    const unavailable = createFetch(
+      '{"error":"Public API temporarily unavailable"}',
+      503,
+      { 'Retry-After': '30' }
+    );
+    await expect(
+      fetchArtist('demo', { fetchImpl: unavailable.fetchImpl })
+    ).rejects.toMatchObject({
+      status: 503,
+      retryAfterSeconds: 30,
     });
   });
 
