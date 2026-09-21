@@ -180,10 +180,11 @@ jobs:
 
                 # One recovery per generation: an in-flight re-proof already
                 # owns this SHA (the recovery run-name carries it verbatim).
-                inflight="$(gh api \
-                  "repos/$REPOSITORY/actions/workflows/production-marker-recovery.yml/runs?per_page=30" \
-                  --jq --arg sha "$deployed_sha" \
-                  '[.workflow_runs[] | select(.status != "completed" and ((.display_title // "") | contains($sha)))] | length')"
+                recovery_runs="$(gh api \
+                  "repos/$REPOSITORY/actions/workflows/production-marker-recovery.yml/runs?per_page=30")"
+                inflight="$(jq --arg sha "$deployed_sha" \
+                  '[.workflow_runs[] | select(.status != "completed" and ((.display_title // "") | contains($sha)))] | length' \
+                  <<<"$recovery_runs")"
                 if [ "$inflight" != "0" ]; then
                   echo "Marker recovery for $deployed_sha is already in flight."
                   exit 0
