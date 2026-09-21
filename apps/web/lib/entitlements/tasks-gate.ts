@@ -27,14 +27,14 @@ export async function canGenerateReleasePlans(): Promise<boolean> {
   return entitlements.canGenerateReleasePlans;
 }
 
-function throwTasksUpgradeRequired(
+async function throwTasksUpgradeRequired(
   code: TasksUpgradeRequiredCode,
   message: string,
   gate: 'canAccessTasksWorkspace' | 'canGenerateReleasePlans'
-): never {
+): Promise<never> {
   // Demand signal for server-action callers (chat panel, mutations).
   // Chat tools already log via locked stubs / fail-soft boundary.
-  logEntitlementDenial({
+  await logEntitlementDenial({
     gate,
     source: 'server-action',
     code,
@@ -50,7 +50,7 @@ export async function requireTasksWorkspaceAccess(): Promise<void> {
     return;
   }
 
-  throwTasksUpgradeRequired(
+  await throwTasksUpgradeRequired(
     'TASKS_WORKSPACE_LOCKED',
     'Tasks requires a Pro plan.',
     'canAccessTasksWorkspace'
@@ -62,7 +62,7 @@ export async function requireReleasePlanGenerationAccess(): Promise<void> {
     return;
   }
 
-  throwTasksUpgradeRequired(
+  await throwTasksUpgradeRequired(
     'RELEASE_PLAN_LOCKED',
     'Release plans require a Pro plan.',
     'canGenerateReleasePlans'

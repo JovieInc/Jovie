@@ -16,6 +16,37 @@ The registry consumes the pending `jovie.certification/v1` contract from
 JOV-5753. It does not define another lifecycle, event bus, scheduler, or
 orchestration platform.
 
+## Typed company composition (JOV-6481, JOV-5945 foundation)
+
+`company-registry.mjs` composes the `company` section of the architecture
+registry with capability IDs and the existing commissioning registry. Stable
+`company.summer` references the private `jovie.service-identity/v1`
+`SERVICE_IDENTITY` declaration in `JovieInc/summer-config`, not a copied runtime.
+Repository, service, work, deployment and infrastructure kinds have distinct
+required attributes. Missing repositories, dangling/cyclic dependencies,
+conflicting canonical production bindings and ambiguous coverage fail closed.
+Coverage is partial or unenumerated, with an unknown total, never company-wide
+completeness. Empty deployment/infra inventory does not mean no infrastructure.
+
+**Compose:** keep existing registries, Linear work lifecycle, Gem repository
+policy (`scripts/symphony/config/gem-repo-registry.json` and its Python loader),
+and JOV-5930 `jovie.certification/v1` authority. Legacy Gem policy entries do not
+establish current official Symphony admission. No new catalog, discovery job,
+controller, persistence layer or permission grant is introduced.
+
+`validateCompanyObservation` compares a separately retrieved observation with
+an independently supplied exact artifact expectation and clock. It binds the
+joined registry digest, repository, source SHA, artifact digest, deployment ID
+and freshness (maximum 15 minutes). It does not verify signatures or issue certificates. Historical
+audit timestamps elsewhere in these files are unchanged, not renewed by a
+valid projection. No provider credentials or private source contents belong here.
+
+The existing affected-test and CI control lanes run the co-located behavioral
+tests with Node coverage (95% lines, 90% branches, 100% functions). **Ship now:**
+bounded source composition. **Re-evaluate when:** owners supply current inventory
+and runtime observations. **Then:** integrate those receipts through the existing
+certification lifecycle; full JOV-5945 discovery/economic assessment remains open.
+
 ## Current gap map
 
 | Capability | Implementation | Readiness | Canonical path or blocker |

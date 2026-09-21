@@ -53,23 +53,72 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* The shared Button owns the CTA target. A second transform here would
+   combine with Tailwind's translate and displace the clickable region. */
 .marketing-glass-header[data-presentation="marketing-glass"]
-  .marketing-glass-header__cta::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  min-width: 2.75rem;
-  height: 2.75rem;
-  content: "";
-  transform: translate(-50%, -50%);
+  .marketing-glass-header__shell
+  > div {
+  height: auto !important;
+  min-height: var(--marketing-glass-height);
 }
 
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__nav-link,
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__text-link {
+  position: relative;
   color: var(--marketing-glass-muted);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link::before,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  min-width: 2.75rem;
+  height: 100%;
+  min-height: 2.75rem;
+  content: "";
+  translate: -50% -50%;
+}
+
+/* Keep navigation centered at normal size, but reserve space for account
+   actions and wrap navigation instead of overlapping them at larger text sizes. */
+@media (min-width: 1024px) {
+  .marketing-glass-header[data-presentation="marketing-glass"]
+    .marketing-glass-header__shell
+    > div:has(> .marketing-glass-header__nav) {
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(
+        max-content,
+        1fr
+      );
+  }
+
+  .marketing-glass-header[data-presentation="marketing-glass"]
+    .marketing-glass-header__shell
+    > div:has(> .marketing-glass-header__nav)
+    > [aria-hidden="true"] {
+    display: none;
+  }
+
+  .marketing-glass-header[data-presentation="marketing-glass"]
+    .marketing-glass-header__nav {
+    position: static;
+    flex-wrap: wrap;
+    row-gap: var(--space-4);
+    justify-content: center;
+    transform: none;
+  }
+
+  .marketing-glass-header[data-presentation="marketing-glass"]
+    .marketing-glass-header__nav
+    + div {
+    justify-self: end;
+  }
 }
 
 .marketing-glass-header[data-presentation="marketing-glass"]

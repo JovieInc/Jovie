@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   exists: vi.fn(),
   parse: vi.fn(),
+  parseDocument: vi.fn(),
 }));
 vi.mock('node:fs', () => ({
   default: { readFileSync: mocks.read, existsSync: mocks.exists },
@@ -17,7 +18,10 @@ vi.mock('next/cache', () => ({
 vi.mock('../filesystem-paths', () => ({
   resolveMonorepoPath: () => '/fixture/CHANGELOG.md',
 }));
-vi.mock('../changelog-parser', () => ({ parseChangelog: mocks.parse }));
+vi.mock('../changelog-parser', () => ({
+  parseChangelog: mocks.parse,
+  parseChangelogDocument: mocks.parseDocument,
+}));
 
 beforeEach(() => {
   vi.resetModules();
@@ -45,4 +49,19 @@ it('fails closed to empty source when the source file is missing', async () => {
   expect(await getChangelogReleases()).toEqual([]);
   expect(mocks.read).not.toHaveBeenCalled();
   expect(mocks.parse).toHaveBeenCalledWith('');
+});
+
+it('returns source headings and public releases together for freshness UI', async () => {
+  mocks.read.mockReturnValue('release source');
+  const parsed = {
+    releases: [{ version: '26.8.2' }],
+    sourceReleases: [{ version: '26.9.0' }, { version: '26.8.2' }],
+    unpublishedReleases: [{ version: '26.9.0' }],
+  };
+  mocks.parseDocument.mockReturnValue(parsed);
+
+  const { getChangelogSnapshot } = await import('../changelog-source');
+
+  await expect(getChangelogSnapshot()).resolves.toEqual(parsed);
+  expect(mocks.parseDocument).toHaveBeenCalledWith('release source');
 });

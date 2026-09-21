@@ -7,7 +7,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { trackEvent } from '@/lib/analytics/runtime-aware';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { logger } from '@/lib/utils/logger';
 
 export type EntitlementDenialSource =
@@ -28,7 +28,9 @@ export interface EntitlementDenialSignal {
 /**
  * Log an expected entitlement denial as demand signal (never as a Sentry error).
  */
-export function logEntitlementDenial(signal: EntitlementDenialSignal): void {
+export async function logEntitlementDenial(
+  signal: EntitlementDenialSignal
+): Promise<void> {
   const data = {
     gate: signal.gate,
     source: signal.source,
@@ -48,9 +50,9 @@ export function logEntitlementDenial(signal: EntitlementDenialSignal): void {
     data,
   });
 
-  void trackEvent('entitlement_denial', data, signal.userId ?? undefined).catch(
-    () => {
-      // Analytics must never take down the request path.
-    }
+  await trackServerEvent(
+    'entitlement_denial',
+    data,
+    signal.userId ?? undefined
   );
 }

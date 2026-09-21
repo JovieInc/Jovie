@@ -10,10 +10,6 @@
     "apps/desktop/src/tray.ts": {
       "deflateSync": 1
     },
-    "apps/web/app/(marketing)/changelog/feed.xml/route.ts": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/app/api/health/build-info/route.ts": {
       "readFileSync": 1
     },

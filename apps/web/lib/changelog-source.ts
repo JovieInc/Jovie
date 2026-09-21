@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 import { unstable_cache } from 'next/cache';
-import { type ChangelogRelease, parseChangelog } from './changelog-parser';
+import {
+  type ChangelogParseResult,
+  type ChangelogRelease,
+  parseChangelog,
+  parseChangelogDocument,
+} from './changelog-parser';
 import { resolveMonorepoPath } from './filesystem-paths';
 
 function resolveChangelogPath(): string | null {
@@ -25,4 +30,13 @@ const getChangelogMarkdown = unstable_cache(
 // Cache source bytes, not policy decisions: safety rules must apply on every read.
 export async function getChangelogReleases(): Promise<ChangelogRelease[]> {
   return parseChangelog(await getChangelogMarkdown());
+}
+
+/**
+ * Read the same cached source bytes with publication metadata. The public
+ * release list remains filtered; the metadata lets customer surfaces explain
+ * newer empty release slots without treating them as shipped updates.
+ */
+export async function getChangelogSnapshot(): Promise<ChangelogParseResult> {
+  return parseChangelogDocument(await getChangelogMarkdown());
 }

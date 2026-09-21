@@ -28,6 +28,7 @@ import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
+  serverAnalyticsEvents,
 } from '@/lib/db/schema/analytics';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { chatAuditLog, chatMessages } from '@/lib/db/schema/chat';
@@ -75,6 +76,7 @@ export interface RetentionCleanupResult {
   clickEventsDeleted: number;
   audienceMembersDeleted: number;
   notificationSubscriptionsDeleted: number;
+  serverAnalyticsEventsDeleted: number;
   // New tables - 90 day retention
   pixelEventsDeleted: number;
   stripeWebhookEventsDeleted: number;
@@ -170,6 +172,16 @@ async function cleanupNotificationSubscriptions(
   return dryRun
     ? countRows(notificationSubscriptions, condition)
     : batchDelete(notificationSubscriptions, condition);
+}
+
+async function cleanupServerAnalyticsEvents(
+  cutoffDate: Date,
+  dryRun: boolean
+): Promise<number> {
+  const condition = lt(serverAnalyticsEvents.createdAt, cutoffDate);
+  return dryRun
+    ? countRows(serverAnalyticsEvents, condition)
+    : batchDelete(serverAnalyticsEvents, condition);
 }
 
 async function cleanupPixelEvents(
@@ -341,6 +353,7 @@ export async function runDataRetentionCleanup(options?: {
     clickEventsDeleted,
     audienceMembersDeleted,
     notificationSubscriptionsDeleted,
+    serverAnalyticsEventsDeleted,
     pixelEventsDeleted,
     stripeWebhookEventsDeleted,
     webhookEventsDeleted,
@@ -358,6 +371,7 @@ export async function runDataRetentionCleanup(options?: {
     cleanupClickEvents(cutoffDate, dryRun),
     cleanupAudienceMembers(cutoffDate, dryRun),
     cleanupNotificationSubscriptions(cutoffDate, dryRun),
+    cleanupServerAnalyticsEvents(cutoffDate, dryRun),
     cleanupPixelEvents(cutoffDate, dryRun),
     cleanupStripeWebhookEvents(cutoffDate, dryRun),
     cleanupWebhookEvents(cutoffDate, dryRun),
@@ -379,6 +393,7 @@ export async function runDataRetentionCleanup(options?: {
     clickEventsDeleted,
     audienceMembersDeleted,
     notificationSubscriptionsDeleted,
+    serverAnalyticsEventsDeleted,
     pixelEventsDeleted,
     stripeWebhookEventsDeleted,
     webhookEventsDeleted,

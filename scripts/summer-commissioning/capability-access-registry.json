@@ -1,5 +1,6 @@
 {
   "schema": "jovie.summer-capability-access-registry/v1",
+  "companyServiceId": "company.summer",
   "auditVersion": "2026-09-02.1",
   "issue": "JOV-5853",
   "auditedAt": "2026-09-02T04:11:01Z",

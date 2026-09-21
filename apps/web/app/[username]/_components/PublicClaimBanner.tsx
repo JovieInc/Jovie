@@ -11,6 +11,7 @@ interface PublicClaimBannerProps {
   readonly directClaimSupported: boolean;
   readonly claimRequiresVerification?: boolean;
   readonly isClaimed: boolean;
+  readonly prefetch?: boolean;
   readonly visitorState: ProfileVisitorState;
 }
 
@@ -93,6 +94,7 @@ export function PublicClaimBanner({
   directClaimSupported,
   claimRequiresVerification = false,
   isClaimed,
+  prefetch,
   visitorState,
 }: PublicClaimBannerProps) {
   const locationSearch = useSyncExternalStore(
@@ -120,6 +122,7 @@ export function PublicClaimBanner({
     <ClaimBanner
       profileHandle={profileHandle}
       displayName={displayName}
+      prefetch={prefetch}
       variant={claimBannerVariant ?? undefined}
       ctaHref={
         claimBannerVariant === 'unsupported'

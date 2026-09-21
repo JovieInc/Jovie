@@ -1,13 +1,42 @@
-import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { isInternalEntry } from '../changelog-filter-rules';
+import {
+  INTERNAL_PATTERNS,
+  isInternalEntry,
+  VENDOR_NAMES,
+} from '../changelog-filter-rules';
 import {
   changelogInlineText,
   parseChangelog,
+  parseChangelogDocument,
   parseChangelogInline,
 } from '../changelog-parser';
+
+// The email/stamp pipeline keeps a plain-JS mirror of the filter rules at
+// scripts/lib/changelog-filter-rules.mjs (the Next.js build must not reach
+// outside apps/web, and plain Node cannot import TS, so neither side can
+// import the other). These tests pin the two copies rule-for-rule.
+const SCRIPT_FILTER_RULES_URL = pathToFileURL(
+  resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../../../scripts/lib/changelog-filter-rules.mjs'
+  )
+).href;
+
+interface ScriptFilterRulesModule {
+  readonly VENDOR_NAMES: readonly string[];
+  readonly INTERNAL_PATTERNS: readonly RegExp[];
+  readonly isInternalEntry: (entry: string) => boolean;
+}
+
+function loadScriptFilterRules(): Promise<ScriptFilterRulesModule> {
+  return import(SCRIPT_FILTER_RULES_URL);
+}
+
+function serializePatterns(patterns: readonly RegExp[]): string[] {
+  return patterns.map(pattern => `${pattern.source}/${pattern.flags}`);
+}
 
 const BASIC_CHANGELOG = `# Changelog
 
@@ -36,7 +65,16 @@ const BASIC_CHANGELOG = `# Changelog
 `;
 
 describe('parseChangelog', () => {
-  it('keeps web and publishing safety rules equivalent in the web CI suite', () => {
+  it('keeps the scripts/.mjs filter rules identical to this copy', async () => {
+    const script = await loadScriptFilterRules();
+    expect([...script.VENDOR_NAMES]).toEqual([...VENDOR_NAMES]);
+    expect(serializePatterns(script.INTERNAL_PATTERNS)).toEqual(
+      serializePatterns(INTERNAL_PATTERNS)
+    );
+  });
+
+  it('classifies the safety corpus identically in both languages', async () => {
+    const script = await loadScriptFilterRules();
     const entries = [
       'Local waits for localhost:3100 while Chromium compiles the server.',
       'SwiftUI retries invalidAuthURL when no window is available.',
@@ -50,19 +88,6 @@ describe('parseChangelog', () => {
       'Your agent can help plan a release.',
       'The conductor can preview a turbo mix.',
     ];
-    const output = execFileSync(
-      process.execPath,
-      [
-        '--input-type=module',
-        '-e',
-        'const {isInternalEntry}=await import(process.argv[1]); process.stdout.write(JSON.stringify(JSON.parse(process.argv[2]).map(isInternalEntry)));',
-        pathToFileURL(
-          resolve(process.cwd(), '../../scripts/lib/changelog-filter-rules.mjs')
-        ).href,
-        JSON.stringify(entries),
-      ],
-      { encoding: 'utf8' }
-    );
     const expected = [
       true,
       true,
@@ -77,7 +102,7 @@ describe('parseChangelog', () => {
       false,
     ];
     expect(entries.map(isInternalEntry)).toEqual(expected);
-    expect(JSON.parse(output)).toEqual(expected);
+    expect(entries.map(script.isInternalEntry)).toEqual(expected);
   });
   it.each([
     'Local waits for localhost:3100 while Chromium compiles the server.',
@@ -167,6 +192,29 @@ describe('parseChangelog', () => {
     const releases = parseChangelog(md);
     expect(releases).toHaveLength(1);
     expect(releases[0].version).toBe('1.0.0');
+  });
+
+  it('keeps empty source headings available for a truthful freshness notice', () => {
+    const md = `# Changelog
+
+## [2.0.0] - 2026-03-20
+
+## [1.0.0] - 2026-03-17
+
+### Added
+
+- Public launch
+`;
+
+    const parsed = parseChangelogDocument(md);
+    expect(parsed.releases.map(release => release.version)).toEqual(['1.0.0']);
+    expect(parsed.sourceReleases.map(release => release.version)).toEqual([
+      '2.0.0',
+      '1.0.0',
+    ]);
+    expect(parsed.unpublishedReleases.map(release => release.version)).toEqual([
+      '2.0.0',
+    ]);
   });
 
   it('skips [Unreleased] section', () => {

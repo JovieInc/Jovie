@@ -283,12 +283,17 @@ class ActivationAuthorityTests(unittest.TestCase):
             for status, intake, reasons, observed, expected in [
                 ('healthy', True, [], now, 0),
                 # Repair-feed subsets feed the installer instead of stopping it.
-                ('red', False, ['internally-repairable-prs-open', 'no-merge-progress-over-1h'], now, 0),
-                ('grace', False, ['queue-controller-red-over-10m'], now, 0),
-                ('red', False, [], now, 0),
+                ('red', True, ['internally-repairable-prs-open', 'no-merge-progress-over-1h'], now, 0),
+                ('grace', True, ['queue-controller-red-over-10m'], now, 0),
+                ('red', False, [], now, 76),
                 # Mixed or unrelated reasons still stop activation.
-                ('red', False, ['closure-observation-unknown'], now, 76),
-                ('red', False, ['internally-repairable-prs-open', 'closure-observation-unknown'], now, 76),
+                ('red', True, ['closure-observation-unknown'], now, 76),
+                ('red', True, ['internally-repairable-prs-open', 'closure-observation-unknown'], now, 76),
+                # Typed producer disagreement and systems-down never become feed.
+                ('red', False, ['internally-repairable-prs-open'], now, 76),
+                ('grace', False, ['queue-controller-red-over-10m'], now, 76),
+                ('red', False, ['gate-evaluation-failed'], now, 76),
+                ('red', False, ['internally-repairable-prs-open', 'gate-evaluation-failed'], now, 76),
                 ('healthy', True, [], now - dt.timedelta(hours=1), 76),
                 ('healthy', True, [], now + dt.timedelta(hours=1), 76),
                 ('healthy', False, [], now, 76),
