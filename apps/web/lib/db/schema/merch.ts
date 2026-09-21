@@ -312,6 +312,11 @@ export const merchCards = pgTable(
     liveCardsIdx: index('merch_cards_live_idx')
       .on(table.creatorProfileId, table.rankScore)
       .where(drizzleSql`status = 'live'`),
+    selectedDesignOptionUnique: uniqueIndex(
+      'merch_cards_selected_design_option_unique'
+    )
+      .on(table.selectedDesignOptionId)
+      .where(drizzleSql`selected_design_option_id IS NOT NULL`),
   })
 );
 
