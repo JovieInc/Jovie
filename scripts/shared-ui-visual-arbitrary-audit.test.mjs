@@ -41,6 +41,12 @@ const GLOBALS_CSS_SOURCE = readFileSync(
   resolve(REPO_ROOT, 'apps/web/app/globals.css'),
   'utf8'
 );
+// The canonical @theme block lives in styles/tailwind-foundation.css, which
+// app/globals.css imports normally (JOV-2269 two-context split).
+const TAILWIND_FOUNDATION_CSS_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'apps/web/styles/tailwind-foundation.css'),
+  'utf8'
+);
 const DESIGN_SYSTEM_CSS_SOURCE = readFileSync(
   resolve(REPO_ROOT, 'apps/web/styles/design-system.css'),
   'utf8'
@@ -389,13 +395,16 @@ test('zero baseline sources keep their canonical token and utility contracts', (
 });
 
 test('canonical CSS authority preserves the retired values exactly', () => {
+  // The canonical @theme block moved to styles/tailwind-foundation.css
+  // (JOV-2269 two-context split); pin it there. globals.css keeps the
+  // hand-written @keyframes blocks.
   assert.match(
-    GLOBALS_CSS_SOURCE,
+    TAILWIND_FOUNDATION_CSS_SOURCE,
     /--animate-progress-indeterminate:\s*progress-indeterminate 1\.5s ease-in-out\s+infinite;/
   );
   assert.match(GLOBALS_CSS_SOURCE, /@keyframes progress-indeterminate\s*\{/);
-  assert.match(GLOBALS_CSS_SOURCE, /--z-index-sheet:\s*65;/);
-  assert.match(GLOBALS_CSS_SOURCE, /--z-index-tooltip:\s*150;/);
+  assert.match(TAILWIND_FOUNDATION_CSS_SOURCE, /--z-index-sheet:\s*65;/);
+  assert.match(TAILWIND_FOUNDATION_CSS_SOURCE, /--z-index-tooltip:\s*150;/);
   assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-4:\s*1rem;/);
   assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-8:\s*2rem;/);
   assert.match(
