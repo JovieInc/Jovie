@@ -85,6 +85,7 @@ test('emits exact-head public-profile desktop and mobile evidence', async ({
     expect(finalUrl.search).toBe('');
     expect(finalUrl.hash).toBe('');
     await waitForHydration(page);
+    await page.waitForLoadState('networkidle');
 
     const shell = page.getByTestId('public-profile-layout-shell');
     await expect(shell).toHaveAttribute('data-layout', viewport.layout);
