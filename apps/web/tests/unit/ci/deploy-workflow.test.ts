@@ -1344,9 +1344,11 @@ describe('deploy workflow Vercel env resolution', () => {
       resolve(repoRoot, 'node_modules/vercel/dist/commands/deploy/index.js'),
       'utf8'
     );
-    expect(packageJson.devDependencies.vercel).toBe('56.3.2');
-    expect(vercelEntry).toContain('else if (process.env.VERCEL_TOKEN)');
-    expect(vercelDeploy).toContain('val = process.env[key]');
+    expect(packageJson.devDependencies.vercel).toBe('59.16.0');
+    expect(vercelEntry).toContain(
+      'process.env.VERCEL_TOKEN&&(explicitToken=process.env.VERCEL_TOKEN,tokenSource="env")'
+    );
+    expect(vercelDeploy).toContain('val=process.env[key]');
     expect(vercelDeploy).toContain('Reading ${import_chalk.default.bold(');
 
     const fixtureRoot = mkdtempSync(
