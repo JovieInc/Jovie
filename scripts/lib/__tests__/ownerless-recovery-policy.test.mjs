@@ -402,22 +402,16 @@ describe('tracker scan admission', () => {
       })
     ).rejects.toThrow('quota exhausted');
   });
-  it('skips draft scans while preserving existing workflow triggers', () => {
-    const workflow = readFileSync(
-      new URL(
-        '../../../.github/workflows/ownerless-recovery-sweep.yml',
-        import.meta.url
-      ),
-      'utf8'
-    );
-    expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
-    expect(workflow).not.toContain('ready_for_review');
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('permission-merge-queues');
-    expect(workflow).not.toMatch(/permission-contents:/);
-    expect(workflow).toMatch(
-      /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
-    );
+  it('admits explicit audit events as recovery demand', async () => {
+    // The dedicated sweep workflow was deleted; the sweeper script remains the
+    // recovery policy library and treats manual/workflow_dispatch events as
+    // explicit full-audit demand.
+    await expect(
+      recoveryEventDecision({ name: 'workflow_dispatch' })
+    ).resolves.toMatchObject({ reason: 'explicit-audit' });
+    await expect(
+      recoveryEventDecision({ name: 'manual' })
+    ).resolves.toMatchObject({ reason: 'explicit-audit' });
   });
 });
 
