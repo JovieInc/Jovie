@@ -267,6 +267,25 @@ const nextConfig = {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
       },
+      // Internal render-fixture surface (lib/render-fixture-policy.ts). These
+      // pages deny in production; authorized non-production renders must still
+      // be non-indexable at the HTTP layer. Direct marker requests are already
+      // dropped by proxy.ts — this also covers environments where the proxy
+      // does not run.
+      {
+        source: '/renders/:path*',
+        headers: [
+          ...securityHeaders,
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        source: '/:username/profile-mode-render/:path*',
+        headers: [
+          ...securityHeaders,
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
       // Homepage content-negotiation: later rules win. Keep Accept on Vary
       // together with Next's RSC tokens so a prerendered HTML object cannot
       // be reused for Accept: text/markdown at the CDN. Link survives even

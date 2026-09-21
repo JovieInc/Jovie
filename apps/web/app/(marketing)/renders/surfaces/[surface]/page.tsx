@@ -3,8 +3,13 @@ import {
   isMarketingRenderRouteSurfaceId,
   MarketingRenderSurface,
 } from '@/features/home/MarketingRenderSurface';
+import {
+  isRenderFixtureEnabled,
+  RENDER_FIXTURE_METADATA,
+} from '@/lib/render-fixture-policy';
 
 export const revalidate = false;
+export const metadata = RENDER_FIXTURE_METADATA;
 
 function getSearchParam(
   value: string | string[] | undefined
@@ -19,6 +24,8 @@ export default async function MarketingSurfaceRenderPage({
   readonly params: Promise<{ surface: string }>;
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if (!isRenderFixtureEnabled()) notFound();
+
   const { surface } = await params;
   const resolvedSearchParams = await searchParams;
   const hideChrome = getSearchParam(resolvedSearchParams.chrome) !== 'true';
