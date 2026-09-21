@@ -44,6 +44,15 @@ updates:
         versions: ['10.3.2']
       - dependency-name: '@storybook/nextjs-vite'
         versions: ['10.3.2']
+      # Pinned at 0.121.12 (2026-09-21): promptfoo 0.122+/0.123+ breaks the
+      # merge_group-only `Validate Promptfoo config` gate. 0.123.1 failed the
+      # step on 7 consecutive queue runs (CI run 35645275515 and siblings)
+      # while 0.121.12 passed the same step at 20:38Z (run 35652372163).
+      # The gate stays strict; dependabot must not propose >=0.122 until the
+      # upstream import failure is diagnosed. Re-evaluate with a local
+      # `pnpm --filter @jovie/web run evals:validate` against 0.123.x.
+      - dependency-name: 'promptfoo'
+        versions: ['>=0.122']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
@@ -83,7 +92,7 @@ updates:
     assignees:
       - 'itstimwhite'
     commit-message:
-      prefix: 'docker'
+      prefix: 'ci'
       include: 'scope'
     labels:
       - 'dependencies'
