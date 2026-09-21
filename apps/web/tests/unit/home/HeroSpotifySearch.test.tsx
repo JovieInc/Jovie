@@ -518,6 +518,46 @@ describe('HeroSpotifySearch', () => {
       expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Taylor');
     });
 
+    it('routes a typed submit with no highlighted result as a free-text prompt, never results[0]', async () => {
+      // JOV-6114 regression: "Michael Jackson" used to navigate with
+      // spotify_url/artist_name of results[0] (a different artist entirely).
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Michael Jackson');
+      await user.keyboard('{Enter}');
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const url = mockPush.mock.calls[0][0] as string;
+      const params = new URLSearchParams(url.split('?')[1]);
+      expect(params.get('spotify_url')).toBeNull();
+      expect(params.get('artist_name')).toBeNull();
+      expect(params.get('starter_prompt')).toBe(
+        "hey, I'm Michael Jackson. show me my Spotify."
+      );
+    });
+
+    it('claim button submits a free-text prompt when results are empty', async () => {
+      mockHookReturn.results = [];
+      mockHookReturn.state = 'empty';
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'xyznonexistent');
+
+      const claimButton = screen.getByRole('button', {
+        name: /Claim Artist/i,
+      });
+      expect(claimButton).not.toBeDisabled();
+      await user.click(claimButton);
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const url = mockPush.mock.calls[0][0] as string;
+      const params = new URLSearchParams(url.split('?')[1]);
+      expect(params.get('spotify_url')).toBeNull();
+      expect(params.get('starter_prompt')).toBe(
+        "hey, I'm xyznonexistent. show me my Spotify."
+      );
+    });
+
     it('verified badge shown for verified artists', async () => {
       renderComponent();
       const user = userEvent.setup();

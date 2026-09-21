@@ -152,7 +152,14 @@ export function getOnboardingErrorMessage(
     case 'TURNSTILE_REQUIRED':
       return 'Complete the security check to send your message.';
     case 'RATE_LIMITED':
-      return 'Too many messages were sent. Try again in a moment.';
+      // The server's `message` names the specific cap that tripped and the
+      // next step (e.g. "sign up to keep going") — keep it instead of
+      // flattening every denial to generic copy.
+      return (
+        message.trim() || 'Too many messages were sent. Try again in a moment.'
+      );
+    case 'RATE_LIMIT_UNAVAILABLE':
+      return 'Chat is temporarily unavailable. Try again in a moment.';
     case 'AUTH_REQUIRED':
       return 'Sign in to continue this chat.';
     case 'INVALID_ONBOARDING_PAYLOAD':

@@ -39,15 +39,6 @@ describe('getOnboardingErrorMessage', () => {
       expected: 'Complete the security check to send your message.',
     },
     {
-      status: 429,
-      body: {
-        error: 'Rate limit exceeded',
-        message: 'IP limit exceeded',
-        errorCode: 'RATE_LIMITED',
-      },
-      expected: 'Too many messages were sent. Try again in a moment.',
-    },
-    {
       status: 401,
       body: {
         error: 'Unauthorized',
@@ -80,12 +71,49 @@ describe('getOnboardingErrorMessage', () => {
       },
       expected: 'Chat is temporarily unavailable. Try again in a moment.',
     },
-  ])('maps a $status API response without leaking its body', ({
-    status,
-    body,
-    expected,
-  }) => {
-    const serialized = serializeApiError(status, body);
+  ])(
+    'maps a $status API response without leaking its body',
+    ({ status, body, expected }) => {
+      const serialized = serializeApiError(status, body);
+
+      expect(
+        getOnboardingErrorMessage(
+          serialized.message,
+          serialized.errorCode,
+          serialized.type
+        )
+      ).toBe(expected);
+    }
+  );
+
+  it('surfaces the server-provided rate-limit reason verbatim (JOV-6114)', () => {
+    // The API's `message` names the specific cap and the sign-up next step;
+    // flattening it to generic copy is what dead-ended anonymous visitors.
+    const reason =
+      'Too many anonymous chat requests from this network. Please sign up to continue.';
+    const serialized = serializeApiError(429, {
+      error: 'Rate limit exceeded',
+      message: reason,
+      errorCode: 'RATE_LIMITED',
+      retryAfter: 42,
+    });
+
+    expect(serialized.type).toBe('rate_limit');
+    expect(
+      getOnboardingErrorMessage(
+        serialized.message,
+        serialized.errorCode,
+        serialized.type
+      )
+    ).toBe(reason);
+  });
+
+  it('falls back to generic copy when a rate-limit body carries no message', () => {
+    const serialized = serializeApiError(429, {
+      error: 'Rate limit exceeded',
+      errorCode: 'RATE_LIMITED',
+      retryAfter: 30,
+    });
 
     expect(
       getOnboardingErrorMessage(
@@ -93,7 +121,23 @@ describe('getOnboardingErrorMessage', () => {
         serialized.errorCode,
         serialized.type
       )
-    ).toBe(expected);
+    ).toBe('Too many requests. Please wait 30 seconds.');
+  });
+
+  it('maps a limiter-backend outage to temporarily-unavailable copy', () => {
+    const serialized = serializeApiError(503, {
+      error: 'Rate limit exceeded',
+      message: 'The rate limiter is temporarily unavailable.',
+      errorCode: 'RATE_LIMIT_UNAVAILABLE',
+    });
+
+    expect(
+      getOnboardingErrorMessage(
+        serialized.message,
+        serialized.errorCode,
+        serialized.type
+      )
+    ).toBe('Chat is temporarily unavailable. Try again in a moment.');
   });
 
   it('does not render a 401 Unauthorized transport body as a rate limit', () => {

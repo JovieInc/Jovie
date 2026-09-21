@@ -601,6 +601,91 @@ describe('limiters.ts', () => {
   });
 
   // =========================================================================
+  // checkAnonymousChatRateLimit (JOV-6114 first-touch budget)
+  // =========================================================================
+
+  describe('checkAnonymousChatRateLimit', () => {
+    it('charges a first touch against the dedicated first-touch budget only', async () => {
+      // A shared-egress IP that already burned the anonymous pools must not
+      // dead-end a brand-new visitor on message #1.
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('first_touch:')
+            ? makeAllowedResult()
+            : makeDeniedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        asn: 'AS64500',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith('first_touch:203.0.113.10');
+    });
+
+    it('checks ip, asn, then session for an established session', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-old',
+        asn: 'AS64500',
+        isFirstTouch: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'ip:203.0.113.10',
+        'asn:AS64500',
+        'session:sess-old',
+      ]);
+    });
+
+    it('denies an established session at the shared IP pool', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-old',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe(
+        'Too many anonymous chat requests from this IP. Please slow down or sign up to continue.'
+      );
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith('ip:203.0.113.10');
+    });
+
+    it('keeps the first-touch allowance off requireRedis so a Redis outage degrades instead of dead-ending', async () => {
+      const { anonymousOnboardingChatFirstTouchLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const options = (
+        anonymousOnboardingChatFirstTouchLimiter as unknown as {
+          options?: { requireRedis?: boolean };
+        }
+      ).options;
+
+      expect(options?.requireRedis).toBeFalsy();
+    });
+  });
+
+  // =========================================================================
   // checkSpotifySearchRateLimit
   // =========================================================================
 

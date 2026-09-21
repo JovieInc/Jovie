@@ -1,7 +1,10 @@
 'use client';
 
 import { RefreshCw, WifiOff } from 'lucide-react';
+import Link from 'next/link';
 import type { ChatError } from '@/components/jovie/types';
+import { APP_ROUTES } from '@/constants/routes';
+import { formatTimeRemaining } from '@/lib/utils/date-formatting';
 
 interface OnboardingMessageRecoveryRowProps {
   readonly chatError: ChatError;
@@ -17,6 +20,10 @@ export function OnboardingMessageRecoveryRow({
   isSubmitted,
 }: OnboardingMessageRecoveryRowProps) {
   const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
+  const isRateLimited = chatError.type === 'rate_limit';
+  const waitLabel = chatError.retryAfter
+    ? formatTimeRemaining(Date.now() + chatError.retryAfter * 1000)
+    : null;
 
   return (
     <div
@@ -35,6 +42,9 @@ export function OnboardingMessageRecoveryRow({
           Message paused
         </p>
         <p className='text-secondary-token'>{chatError.message}</p>
+        {waitLabel ? (
+          <p className='text-secondary-token'>Try again in {waitLabel}.</p>
+        ) : null}
         {canRetry ? (
           <button
             type='button'
@@ -45,6 +55,14 @@ export function OnboardingMessageRecoveryRow({
             <RefreshCw className='size-3.5' aria-hidden='true' />
             Retry message
           </button>
+        ) : null}
+        {isRateLimited ? (
+          <Link
+            href={APP_ROUTES.SIGNUP}
+            className='mt-1.5 inline-flex items-center text-2xs font-medium text-secondary-token underline-offset-4 transition-colors duration-fast hover:text-primary-token hover:underline focus-visible:text-primary-token focus-visible:underline focus-visible:outline-none'
+          >
+            Create a free account to keep going
+          </Link>
         ) : null}
       </div>
     </div>

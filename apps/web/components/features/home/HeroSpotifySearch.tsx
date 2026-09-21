@@ -169,6 +169,34 @@ export function HeroSpotifySearch({
     [clear, router, submitAnalytics]
   );
 
+  /**
+   * Free-text submit: route the typed name to /start as a starter prompt
+   * with no Spotify attribution. Used when the visitor submits without
+   * picking a dropdown result — we must not silently substitute Spotify's
+   * top hit for their intent (JOV-6114).
+   */
+  const handleNavigateToStartPrompt = useCallback(
+    (query: string) => {
+      if (isNavigatingRef.current) return;
+      isNavigatingRef.current = true;
+      setIsNavigating(true);
+      clear();
+      setShowResults(false);
+      setActiveIndex(-1);
+      if (submitAnalytics) {
+        track(submitAnalytics.eventName, {
+          ...submitAnalytics.properties,
+          hasArtistName: true,
+          freeText: true,
+        });
+      }
+      const params = new URLSearchParams();
+      params.set('starter_prompt', `hey, I'm ${query}. show me my Spotify.`);
+      router.push(`${APP_ROUTES.START}?${params.toString()}`);
+    },
+    [clear, router, submitAnalytics]
+  );
+
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -223,33 +251,29 @@ export function HeroSpotifySearch({
       return;
     }
 
-    if (isLoading) {
-      inputRef.current?.focus();
-      return;
-    }
-
     const activeArtist =
       activeIndex >= 0 && activeIndex < results.length
         ? results[activeIndex]
         : undefined;
-    const fallbackArtist = results[0];
-    const nextArtist = activeArtist ?? fallbackArtist;
 
-    if (nextArtist) {
-      handleArtistSelect(nextArtist);
+    if (activeArtist) {
+      handleArtistSelect(activeArtist);
       return;
     }
 
-    setShowResults(true);
-    inputRef.current?.focus();
+    // Nothing explicitly highlighted: never auto-claim results[0]. Spotify's
+    // top hit is frequently a different artist, which silently routed
+    // visitors under the wrong identity (JOV-6114). Hand the typed name to
+    // /start as free text and let onboarding resolve the artist.
+    handleNavigateToStartPrompt(query);
   }, [
     searchQuery,
     activeIndex,
     results,
     isNavigating,
-    isLoading,
     isInvalidQuery,
     handleNavigateToStart,
+    handleNavigateToStartPrompt,
     handleArtistSelect,
   ]);
 
@@ -303,7 +327,7 @@ export function HeroSpotifySearch({
           } else if (activeIndex === pasteUrlIndex) {
             handlePasteUrlClick();
           } else {
-            // No active selection → claim first result or URL
+            // No active selection → typed submit (free-text route or URL)
             handleClaimArtist();
           }
           break;
@@ -345,11 +369,11 @@ export function HeroSpotifySearch({
   // Editorial: the submit pill is the hero's one primary action, so it stays
   // visible and enabled — an empty submit just focuses the field.
   const showClaimButton = isEditorial || Boolean(trimmedQuery);
+  // A valid typed query is always submittable: without an explicit dropdown
+  // pick it routes to /start as a free-text prompt, so an empty/slow results
+  // list never dead-ends the funnel.
   const claimButtonDisabled =
-    isNavigating ||
-    (!isEditorial &&
-      ((isLoading && !isSpotifyUrl(trimmedQuery)) ||
-        (!isSpotifyUrl(trimmedQuery) && results.length === 0)));
+    isNavigating || (!isEditorial && (!trimmedQuery || isInvalidQuery));
 
   const fieldClassName = isEditorial
     ? cn(
@@ -569,7 +593,6 @@ export function HeroSpotifySearch({
                 <p role='alert' className='text-sm text-error'>
                   Search failed.
                 </p>
-                {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve the established homepage recovery copy while this focused repair only restores the input focus contract. */}
                 <Button
                   type='button'
                   size='sm'
@@ -579,7 +602,6 @@ export function HeroSpotifySearch({
                 >
                   Try Again
                 </Button>
-                {/* eslint-enable @jovie/canonical-ui-label-casing */}
               </div>
             )}
 
