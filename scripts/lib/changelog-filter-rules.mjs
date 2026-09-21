@@ -2,15 +2,18 @@
  * Changelog Auto-Filter Rules
  *
  * Safety net that catches internal entries even when developers forget
- * to add the [internal] prefix. Used by both the TypeScript parser
- * (apps/web/lib/changelog-parser.ts) and the JS email script parser
- * (scripts/lib/changelog-parser.mjs).
- *
- * Rules derived from: feedback_changelog_rules.md
+ * to add the [internal] prefix. Mirror of the TypeScript copy at
+ * apps/web/lib/changelog-filter-rules.ts — the two copies must stay
+ * rule-for-rule identical; the parity test in
+ * apps/web/lib/__tests__/changelog-parser.test.ts compares both rule lists
+ * and their classification behavior.
  */
 
-/** Vendor names that should never appear in public changelog entries. */
-const VENDOR_NAMES = [
+/**
+ * Vendor names that should never appear in public changelog entries.
+ * Exported for the cross-language parity test.
+ */
+export const VENDOR_NAMES = [
   'Clerk',
   'Statsig',
   'Sentry',
@@ -37,8 +40,11 @@ const VENDOR_PATTERNS = VENDOR_NAMES.map(
   name => new RegExp(`\\b${escapeRegex(name)}\\b`)
 );
 
-/** Infrastructure, dev tooling, admin, and business-sensitive patterns. */
-const INTERNAL_PATTERNS = [
+/**
+ * Infrastructure, dev tooling, admin, and business-sensitive patterns.
+ * Exported for the cross-language parity test.
+ */
+export const INTERNAL_PATTERNS = [
   // Local development and operator implementation are not product updates.
   /\b(?:localhost|127\.0\.0\.1|loopback|Chromium|SwiftUI|invalidAuthURL)\b/i,
   /\bhot[- ]reload\b/i,

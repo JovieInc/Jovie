@@ -12,6 +12,7 @@ export interface ClaimBannerProps {
   readonly displayName?: string;
   readonly ctaHref?: string;
   readonly ctaLabel?: string;
+  readonly prefetch?: boolean;
   readonly variant?: ClaimBannerVariant;
 }
 
@@ -46,6 +47,7 @@ export function ClaimBanner({
   displayName,
   ctaHref,
   ctaLabel,
+  prefetch,
   variant = 'organic',
 }: ClaimBannerProps) {
   const trackedImpressionKeys = useRef<Set<string>>(new Set());
@@ -90,6 +92,7 @@ export function ClaimBanner({
           {ctaHref && resolvedCtaLabel ? (
             <Link
               href={ctaHref}
+              prefetch={prefetch}
               className='inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset sm:text-sm'
               data-testid='claim-banner-cta'
               aria-label={`${resolvedCtaLabel} for ${name}`}

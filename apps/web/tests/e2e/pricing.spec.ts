@@ -73,7 +73,7 @@ test.describe('Pricing Page', () => {
       'Full stack'
     );
     await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Start Free Trial'
+      'Contact sales'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -113,9 +113,9 @@ test.describe('Pricing Page', () => {
     ).toHaveAttribute('href', '/signup?plan=pro');
     await expect(
       page.getByTestId('marketing-pricing-plan-max').getByRole('link', {
-        name: 'Start Free Trial',
+        name: 'Contact sales',
       })
-    ).toHaveAttribute('href', '/signup?plan=max');
+    ).toHaveAttribute('href', 'mailto:support@jov.ie');
     const pricingCardCtasAreCentered = await page
       .locator('.marketing-pricing-plan-card')
       .evaluateAll(cards =>

@@ -63,7 +63,17 @@ jobs:
           HELICONE_API_KEY: ${{ secrets.HELICONE_API_KEY }}
           GITHUB_HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
-          pnpm exec vitest run \
-            --config lib/eval/adversarial/vitest.config.real-eval.mts \
-            --maxWorkers 1 \
-            --maxConcurrency 1
+          # Without both gateway keys the live suites skip, and the
+          # disabled-guard test then requires the flag to be unset.
+          if [ -z "$AI_GATEWAY_API_KEY" ] || [ -z "$HELICONE_API_KEY" ]; then
+            echo "::warning::real-model eval keys missing; running disabled-guard mode"
+            JOVIE_RUN_REAL_MODEL_EVALS='' pnpm exec vitest run \
+              --config lib/eval/adversarial/vitest.config.real-eval.mts \
+              --maxWorkers 1 \
+              --maxConcurrency 1
+          else
+            pnpm exec vitest run \
+              --config lib/eval/adversarial/vitest.config.real-eval.mts \
+              --maxWorkers 1 \
+              --maxConcurrency 1
+          fi

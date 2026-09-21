@@ -52,6 +52,62 @@ describe('MarketingHeader', () => {
     });
   });
 
+  it('reserves only enlarged row growth and releases its observer on unmount', () => {
+    const observations: {
+      element: Element;
+      resize: () => void;
+      disconnect: ReturnType<typeof vi.fn>;
+    }[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        resize: () => void;
+        disconnect = vi.fn();
+        constructor(resize: () => void) {
+          this.resize = resize;
+        }
+        observe(element: Element) {
+          observations.push({
+            element,
+            resize: this.resize,
+            disconnect: this.disconnect,
+          });
+        }
+        unobserve() {}
+      }
+    );
+    try {
+      const view = render(<MarketingHeader />);
+      const space = view.container.querySelector(
+        '.marketing-header-growth-space'
+      );
+      const row = view.container.querySelector(
+        '.marketing-glass-header__shell'
+      )?.firstElementChild;
+      expect(space).not.toBeNull();
+      expect(row).toBeInstanceOf(HTMLElement);
+      if (!(row instanceof HTMLElement) || !(space instanceof HTMLElement))
+        throw new Error('Missing header geometry');
+      row.style.minHeight = '44px';
+      const bounds = vi.spyOn(row, 'getBoundingClientRect');
+      const observation = observations.find(item => item.element === row);
+      if (!observation) throw new Error('Header row must be observed');
+      bounds.mockReturnValue(new DOMRect(0, 0, 1024, 44));
+      observation.resize();
+      expect(space.style.height).toBe('0px');
+      bounds.mockReturnValue(new DOMRect(0, 0, 1024, 100));
+      observation.resize();
+      expect(space.style.height).toBe('56px');
+      bounds.mockReturnValue(new DOMRect(0, 0, 1024, 44));
+      observation.resize();
+      expect(space.style.height).toBe('0px');
+      view.unmount();
+      expect(observation.disconnect).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('fires one canonical public-shell exposure receipt', () => {
     render(<MarketingHeader />);
 
@@ -70,13 +126,13 @@ describe('MarketingHeader', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.header
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/artist-profiles'
+      '/product'
     );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
@@ -91,10 +147,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-first front-door contract.
+    // The shared public CTA follows the waitlist-on front-door contract on /signup.
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -105,7 +161,7 @@ describe('MarketingHeader', () => {
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Artists', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -136,7 +192,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 
@@ -162,13 +218,13 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
       '/artists'
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/signup'
     );
   });
 

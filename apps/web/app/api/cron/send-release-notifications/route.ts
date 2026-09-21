@@ -199,81 +199,6 @@ async function updateNotificationStatus(
     .where(eq(fanReleaseNotifications.id, notificationId));
 }
 
-async function incrementTrialNotificationCount(userId: string): Promise<void> {
-  const MAX_OPTIMISTIC_LOCK_RETRIES = 3;
-
-  for (let attempt = 0; attempt < MAX_OPTIMISTIC_LOCK_RETRIES; attempt += 1) {
-    const [currentUser] = await db
-      .select({
-        id: users.id,
-        billingVersion: users.billingVersion,
-      })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-
-    if (!currentUser) {
-      logger.warn(
-        '[send-release-notifications] Trial notification count update skipped for missing user',
-        { userId }
-      );
-      return;
-    }
-
-    const updatedRows = await db
-      .update(users)
-      .set({
-        trialNotificationsSent: drizzleSql`COALESCE(${users.trialNotificationsSent}, 0) + 1`,
-        billingVersion: drizzleSql`${users.billingVersion} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(users.id, userId),
-          eq(users.billingVersion, currentUser.billingVersion)
-        )
-      )
-      .returning({ id: users.id });
-
-    if (updatedRows.length > 0) {
-      return;
-    }
-  }
-
-  logger.warn(
-    '[send-release-notifications] Trial notification count update lost optimistic lock after retries',
-    { userId, retries: 3 }
-  );
-}
-
-async function persistTrialNotificationCount(
-  notificationId: string,
-  ownerUserId: string,
-  trialState: {
-    isTrialing: boolean;
-    trialNotificationsSent: number;
-  }
-): Promise<void> {
-  if (!trialState.isTrialing) {
-    return;
-  }
-
-  trialState.trialNotificationsSent += 1;
-
-  try {
-    await incrementTrialNotificationCount(ownerUserId);
-  } catch (error) {
-    logger.error(
-      '[send-release-notifications] Failed to persist trial notification count:',
-      error
-    );
-    await captureError('Failed to persist trial notification count', error, {
-      notificationId,
-      userId: ownerUserId,
-    });
-  }
-}
-
 function getCancellationReason(
   reason: ReleaseNotificationEligibilityReason
 ): string {
@@ -640,12 +565,9 @@ async function processNotificationWithBatchedData(ctx: {
         senderContext
       );
 
-      if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
-        await persistTrialNotificationCount(
-          notification.id,
-          creator.ownerUserId,
-          trialState
-        );
+      // The shared sender atomically reserves trial email usage before delivery.
+      if (result === 'sent' && trialState.isTrialing) {
+        trialState.trialNotificationsSent += 1;
       }
 
       return result;
@@ -663,14 +585,6 @@ async function processNotificationWithBatchedData(ctx: {
         },
         senderContext
       );
-
-      if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
-        await persistTrialNotificationCount(
-          notification.id,
-          creator.ownerUserId,
-          trialState
-        );
-      }
 
       return result;
     }

@@ -2,7 +2,7 @@ name: Merge Queue Auto-Enroll
 # JOV-INV-029: promotion is distinct from merge and requires exact-head handoff.
 
 # Event-driven, with ownerless recovery admitted only after exact main/head
-# validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
+# validation. Runner Heartbeat's existing remediation clock recovers missed wakes.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
@@ -37,13 +37,13 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    # Ready transitions do not restart CI. The owning agent pairs ready with
-    # native auto-merge intent; the first source CI flight remains authoritative.
+    # Ready transitions re-evaluate exact-head admission without restarting CI;
+    # the first source CI flight remains authoritative.
     # A successful native enqueue emits `enqueued`, which advances the next
     # bounded recovery cohort after the event target proves idempotently
     # already queued. A rejected noncanonical admission emits `dequeued`; that
     # exact head re-enters only through this controller and its checkpoint.
-    types: [reopened, labeled, unlabeled, enqueued, dequeued]
+    types: [ready_for_review, reopened, labeled, unlabeled, enqueued, dequeued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -84,6 +84,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       mode: ${{ steps.policy.outputs.promotion_mode }}
+      promotion_mode: ${{ steps.policy.outputs.promotion_mode }}
+      state: ${{ steps.policy.outputs.state }}
+      receipt_age_seconds: ${{ steps.policy.outputs.receipt_age_seconds }}
+      capacity_accepted: ${{ steps.policy.outputs.capacity_accepted }}
+      capacity_max_concurrent: ${{ steps.policy.outputs.capacity_max_concurrent }}
+      capacity_reason: ${{ steps.policy.outputs.capacity_reason }}
+      new_mutation_allowed: ${{ steps.policy.outputs.new_mutation_allowed }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
       main_sha: ${{ steps.main-head.outputs.sha }}
     steps:
@@ -661,7 +668,28 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}
           FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          FLEET_RECEIPT_AGE_SECONDS: ${{ needs.fleet-policy.outputs.receipt_age_seconds }}
+          FLEET_CAPACITY_ACCEPTED: ${{ needs.fleet-policy.outputs.capacity_accepted }}
+          FLEET_CAPACITY_MAX_CONCURRENT: ${{ needs.fleet-policy.outputs.capacity_max_concurrent }}
+          FLEET_CAPACITY_REASON: ${{ needs.fleet-policy.outputs.capacity_reason }}
+          FLEET_NEW_MUTATION_ALLOWED: ${{ needs.fleet-policy.outputs.new_mutation_allowed }}
+          FLEET_STATE: ${{ needs.fleet-policy.outputs.state }}
         run: |
+          {
+            echo "### Auto-Enroll fleet receipt"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| state | ${FLEET_STATE:-unknown} |"
+            echo "| promotion_mode | ${DRAIN_PROMOTION_MODE:-unknown} |"
+            echo "| receipt_age_seconds | ${FLEET_RECEIPT_AGE_SECONDS:-unknown} |"
+            echo "| capacity_accepted | ${FLEET_CAPACITY_ACCEPTED:-unknown} |"
+            echo "| capacity_max_concurrent | ${FLEET_CAPACITY_MAX_CONCURRENT:-unknown} |"
+            echo "| capacity_reason | ${FLEET_CAPACITY_REASON:-unknown} |"
+            echo "| new_mutation_allowed | ${FLEET_NEW_MUTATION_ALLOWED:-unknown} |"
+            echo
+            echo "Capacity bounds new agent dispatch only. Already-green promotion/enroll uses live promotionMode."
+          } >>"$GITHUB_STEP_SUMMARY"
           policy_checkout_sha="$(git rev-parse HEAD)"
           if [[ "$policy_checkout_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
             echo "::error::Main policy checkout drifted from fleet-policy evidence ($policy_checkout_sha != $FLEET_POLICY_MAIN_SHA)" >&2
@@ -670,6 +698,35 @@ jobs:
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
+          fi
+          # AMBER hold-intake may carry Summer issue-blocked red with intake
+          # still allowed. Main drain historically required
+          # intake==(status==healthy) and then painted this product PR
+          # UNSTABLE. Fail-closed alignment keeps promotion held and lets
+          # CLEAN source heads enroll; the drain jq now accepts the live
+          # receipt after this hop lands.
+          if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_FLEET_GATE_B64" ]]; then
+            receipt_json="$(printf '%s' "$DRAIN_FLEET_GATE_B64" | base64 -d 2>/dev/null || true)"
+            if [[ -n "$receipt_json" ]] && jq -e '
+              .promotionMode == "hold-intake" and
+              (.closureAdmission.status | IN("grace", "red")) and
+              .closureAdmission.newIssueIntakeAllowed == true
+            ' <<<"$receipt_json" >/dev/null; then
+              receipt_json="$(jq -c '
+                .closureAdmission.newIssueIntakeAllowed = false
+                | .closureAdmission.allowed = false
+                | .closureAdmission.newImplementationAllowed = false
+                | .closureAdmission.fallbackPrGenerationAllowed = false
+                | .alreadyAdmittedCohort.newIntakeAllowed = false
+                | .alreadyAdmittedCohort.semantics = "preserve-cohort-and-stop-new-implementation-intake"
+                | if .signals.closureHealth then
+                    .signals.closureHealth.newIssueIntakeAllowed = false
+                  else . end
+              ' <<<"$receipt_json")"
+              DRAIN_FLEET_GATE_B64="$(printf '%s' "$receipt_json" | base64 -w0 2>/dev/null || printf '%s' "$receipt_json" | base64 | tr -d '\n')"
+              export DRAIN_FLEET_GATE_B64
+              echo "hold-intake issue-blocked red aligned fail-closed so CLEAN source can enroll while promotion stays held"
+            fi
           fi
           set +e
           bash scripts/drain-pr-queue.sh
@@ -740,6 +797,10 @@ jobs:
             echo "delivery-control-failure dispatched for $failure #$pr_number at $head_sha (exit $drain_rc)"
             if [[ "$drain_rc" -eq 3 ]]; then
               echo "queue-noop is a controller disposition, not a product-quality failure"
+              exit 0
+            fi
+            if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && "$drain_rc" -eq 2 ]]; then
+              echo "hold-intake waiting-lane is a controller disposition, not a product-quality failure"
               exit 0
             fi
             echo "::error::dropped-controller-event fails closed (exit $drain_rc)" >&2

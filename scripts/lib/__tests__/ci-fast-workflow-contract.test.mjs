@@ -231,6 +231,104 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects the crawler state proof through the maintained Storybook browser path', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/CRAWLER_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.stories.tsx',
+      'apps/web/tests/e2e/storybook-ai-crawler.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Run ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'crawler-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        )
+      ).toEqual({
+        run: 'true',
+        spotify: 'false',
+        kbd: 'false',
+        crawler: 'true',
+      });
+
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'true',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([
+        'tests/e2e/storybook-ai-crawler.spec.ts',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),
@@ -308,6 +406,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'scripts-typecheck',
+      'shadcn-lint-contracts',
       'structural',
       'typecheck',
     ]);
@@ -642,6 +741,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes().map(lane => lane.id)).toEqual([
       'biome',
       'eslint-server-boundaries',
+      'shadcn-lint-contracts',
       'typecheck',
       'scripts-typecheck',
       'guardrails',
@@ -669,6 +769,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance': 'pnpm design:conformance:gate',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
+      'shadcn-lint-contracts':
+        'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
@@ -707,6 +809,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
+    expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
     expect(LANE_COMMANDS['design-conformance']).toBe(
       'pnpm design:conformance:gate'
     );
@@ -915,6 +1018,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
   });
 
+  it('runs native queue delivery regressions with coverage for executor changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain(
+      '(run-native-queue-execution|native-queue-starvation-execute(?:\\.test)?)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs'
+    );
+  });
+
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -960,7 +1076,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
       'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-      'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
       'python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py',
       'coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
       'python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py',

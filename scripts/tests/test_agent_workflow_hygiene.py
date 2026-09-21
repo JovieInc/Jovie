@@ -25,6 +25,7 @@ FULL_CHECKOUT_JOBS = (
 FLEET_CONTROLLER_JOBS = (
     ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
+    ("auto-ready-agent-drafts.yml", "green-source"),
     ("merge-queue-autoenroll.yml", "enroll"),
     ("merge-queue-autoenroll.yml", "rebase"),
     ("agent-tick.yml", "auto-ready"),
@@ -805,9 +806,22 @@ def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
         encoding="utf-8"
     )
+    assert "controller-hop-exception: jovie-controller-hop/v1" in auto_ready
+    assert "accountable-writer: Gem" in auto_ready
     assert "workflow_dispatch:" in auto_ready
-    assert "workflow_run:" not in auto_ready
+    assert "workflow_run:" in auto_ready
     assert "pull_request:" not in auto_ready
+    assert "schedule:" not in auto_ready
+    writer_proof = _job_block("auto-ready-agent-drafts.yml", "auto-ready")
+    assert (
+        "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
+        in writer_proof
+    )
+    green_source = _job_block("auto-ready-agent-drafts.yml", "green-source")
+    assert "github.event.workflow_run.event == 'pull_request'" in green_source
+    assert "github.event.workflow_run.conclusion == 'success'" in green_source
+    assert "scripts/auto-ready-green-drafts.sh" in green_source
+    assert "--auto --squash" not in green_source
 
     pipeline = _job_block("agent-pipeline.yml", "guard")
     assert "github.event.workflow_run.event == 'pull_request'" in pipeline
@@ -1379,11 +1393,17 @@ def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
-    job = _job_block("screenshots.yml", "generate")
+    producer_job = _job_block("screenshots.yml", "generate")
+    publisher_job = _job_block("screenshots.yml", "publish")
     capture = _step_block("screenshots.yml", "Capture screenshot catalog")
     publication = _step_block("screenshots.yml", "Create or update screenshot PR")
 
-    job_timeout = int(re.search(r"timeout-minutes: (\d+)", job).group(1))
+    producer_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", producer_job).group(1)
+    )
+    publisher_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", publisher_job).group(1)
+    )
     capture_timeout = int(
         re.search(r"timeout-minutes: (\d+)", capture).group(1)
     )
@@ -1392,7 +1412,12 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     )
 
     assert publication_timeout >= 75
-    assert job_timeout >= capture_timeout + publication_timeout + 20
+    assert producer_timeout >= capture_timeout + 20
+    assert publisher_timeout >= publication_timeout + 20
+    assert "continue-on-error: true" in publisher_job
+    assert "Create or update screenshot PR" not in producer_job
+    assert "Upload generated screenshot catalog" in producer_job
+    assert "Download generated screenshot catalog" in publisher_job
     for capture_only_variable in (
         "DATABASE_URL",
         "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",

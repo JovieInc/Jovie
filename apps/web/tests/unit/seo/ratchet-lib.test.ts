@@ -52,26 +52,14 @@ describe('SEO ratchet library — live robots/sitemap parsers (JOV-11044)', () =
     ).toBe(true);
   });
 
-  it('accepts live sitemap.xml with lastmod on every URL', () => {
+  it('accepts live sitemap.xml with or without lastmod', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://jov.ie/</loc><lastmod>2026-06-18</lastmod></url>
-  <url><loc>https://jov.ie/about</loc><lastmod>2026-06-18</lastmod></url>
+  <url><loc>https://jov.ie/about</loc></url>
 </urlset>`;
 
     expect(validateLiveSitemapXml(xml)).toEqual([]);
-  });
-
-  it('rejects live sitemap.xml entries missing lastmod', () => {
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://jov.ie/</loc></url>
-</urlset>`;
-
-    const issues = validateLiveSitemapXml(xml);
-    expect(
-      issues.some(issue => issue.code === 'live-sitemap-missing-lastmod')
-    ).toBe(true);
   });
 
   it('validateProductionRobots catches missing AI crawler rules', () => {

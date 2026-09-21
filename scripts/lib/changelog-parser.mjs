@@ -1,14 +1,26 @@
 /**
- * Shared Changelog Parser
+ * Changelog parser for the Node.js publishing pipeline.
  *
- * Single source of truth for parsing CHANGELOG.md across the project.
- * Used by: send-changelog-email.mjs and the /changelog page (server component).
+ * Used by: send-changelog-email.mjs (via getLatestRelease). The public web
+ * app does NOT use this module — it parses through the typed parser at
+ * apps/web/lib/changelog-parser.ts instead.
+ *
+ * Intentional divergence from the web parser: `### Featured` is not
+ * recognized by default, because the product-update email format is
+ * founder-approved and currently drops Featured entries. Pass
+ * `{ includeFeatured: true }` to collect Featured into `sections.featured`
+ * the way the web parser does. Never enable it on the email path without
+ * founder sign-off — and note the email renderer (entriesToHtml /
+ * entriesToText in send-changelog-email.mjs) only renders
+ * added/changed/fixed/removed regardless.
  */
 
 import { isInternalEntry } from './changelog-filter-rules.mjs';
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
+const FEATURED_SECTION_HEADING_RE =
+  /^### (Featured|Added|Changed|Fixed|Removed)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 /**
@@ -21,9 +33,14 @@ const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
  *   separated into `internalSections` and excluded from `sections`.
  *
  * @param {string} markdown - Raw CHANGELOG.md content
+ * @param {{ includeFeatured?: boolean }} [options] - `includeFeatured`
+ *   recognizes `### Featured` as a section (default false; see file header).
  * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
  */
-export function parseChangelog(markdown) {
+export function parseChangelog(markdown, { includeFeatured = false } = {}) {
+  const sectionHeadingRe = includeFeatured
+    ? FEATURED_SECTION_HEADING_RE
+    : SECTION_HEADING_RE;
   const lines = markdown.split('\n');
   const releases = [];
   const unreleased = {
@@ -76,7 +93,7 @@ export function parseChangelog(markdown) {
       continue;
     }
 
-    const sectionMatch = line.match(SECTION_HEADING_RE);
+    const sectionMatch = line.match(sectionHeadingRe);
     if (sectionMatch) {
       currentSection = sectionMatch[1].toLowerCase();
       if (!target.sections[currentSection]) {

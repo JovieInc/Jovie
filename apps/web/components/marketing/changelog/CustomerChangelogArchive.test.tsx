@@ -65,13 +65,15 @@ describe('CustomerChangelogArchive', () => {
     ).toHaveAttribute('href', '/changelog/26.8.1');
     expect(screen.queryByText(/^v26\.8\.1$/)).not.toBeInTheDocument();
     expect(screen.getByText('New')).toBeVisible();
+    expect(screen.getAllByText('Product update')).toHaveLength(2);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('shows one month then loads earlier updates without 1-of-N theater', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
 
-    expect(screen.getByText('August 2026')).toBeVisible();
+    // Month label appears twice by design: archive jump-nav rail + section heading.
+    expect(screen.getAllByText('August 2026').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'August 2026' })).toHaveClass(
       'truncate'
     );
@@ -86,7 +88,7 @@ describe('CustomerChangelogArchive', () => {
       screen.getByRole('button', { name: 'Load Earlier Updates' })
     );
 
-    expect(screen.getByText('July 2026')).toBeVisible();
+    expect(screen.getAllByText('July 2026').length).toBeGreaterThan(0);
     expect(
       screen.queryByRole('button', { name: 'Load Earlier Updates' })
     ).not.toBeInTheDocument();

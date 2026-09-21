@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -78,7 +78,7 @@ describe('EmailCodeAuthForm', () => {
     authState.isSignedIn = false;
   });
 
-  it('keeps signed-in initial markup deterministic, then hides after hydration', async () => {
+  it('keeps signed-in initial markup deterministic and does not blank after hydration', async () => {
     authState.isSignedIn = true;
 
     const serverMarkup = renderToStaticMarkup(
@@ -86,10 +86,46 @@ describe('EmailCodeAuthForm', () => {
     );
     expect(serverMarkup).toContain('Email');
 
-    const { container } = render(
-      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeInTheDocument();
+  });
+
+  it('does not send an OTP when a session is already present', async () => {
+    authState.isSignedIn = true;
+    const user = userEvent.setup();
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
+
+    await user.type(screen.getByLabelText('Email'), 'artist@example.com');
+    await user.click(
+      screen.getByRole('button', { name: /send sign-in code/i })
     );
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+
+    expect(mockSendVerificationOtp).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the form interactive on a failed send so recovery is possible', async () => {
+    authState.isSignedIn = false;
+    const user = userEvent.setup();
+    mockSendVerificationOtp.mockRejectedValueOnce({
+      code: 'otp_expired',
+    });
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
+
+    await user.type(screen.getByLabelText('Email'), 'artist@example.com');
+    await user.click(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    );
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeInTheDocument();
+    expect(mockSendVerificationOtp).toHaveBeenCalledTimes(1);
   });
 
   describe('send-code error mapping (readErrorCode / getSendErrorMessage)', () => {

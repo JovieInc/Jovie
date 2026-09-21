@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import {
   act,
   fireEvent,
@@ -88,12 +86,12 @@ describe('ChangelogEmailSignup', () => {
 
   it('renders one compact subscribe form without a duplicate reveal CTA', () => {
     const { container } = render(<ChangelogEmailSignup />);
-    const revealRoot = container.querySelector("[data-ui='cta-reveal']");
-    expect(revealRoot).toHaveAttribute('data-visual-state', 'expanded');
+    const revealRoot = container.querySelector("[data-pen-source='qKrDn']");
+    expect(revealRoot).toHaveAttribute('data-visual-state', 'idle');
 
-    expect(screen.getByText('Get the good stuff')).toBeVisible();
+    expect(screen.getByText('Get product updates')).toBeVisible();
     expect(
-      screen.getByText('Occasional meaningful updates — not every deploy.')
+      screen.getByText('New features and improvements from Jovie.')
     ).toBeVisible();
     expect(
       screen.queryByTestId('changelog-reveal-button')
@@ -101,14 +99,14 @@ describe('ChangelogEmailSignup', () => {
     expect(screen.getAllByRole('button', { name: 'Subscribe' })).toHaveLength(
       1
     );
-    expect(screen.getByPlaceholderText('you@example.com')).toBeVisible();
+    expect(screen.getByPlaceholderText('you@email.com')).toBeVisible();
   });
 
   it('keeps the Turnstile lifecycle stable while the parent rerenders', async () => {
     render(<ChangelogEmailSignup />);
 
     await waitFor(() => expect(turnstileMock.effectCount).toBe(1));
-    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+    fireEvent.change(screen.getByPlaceholderText('you@email.com'), {
       target: { value: 'artist@example.com' },
     });
 
@@ -117,15 +115,15 @@ describe('ChangelogEmailSignup', () => {
 
   it('does not steal focus when Turnstile requires interaction', async () => {
     const { container } = render(<ChangelogEmailSignup />);
-    const revealRoot = container.querySelector("[data-ui='cta-reveal']");
-    const input = screen.getByPlaceholderText('you@example.com');
+    const revealRoot = container.querySelector("[data-pen-source='qKrDn']");
+    const input = screen.getByPlaceholderText('you@email.com');
 
     act(() => turnstileMock.onStateChange?.({ status: 'interactive' }));
     await act(async () => {
       await new Promise(resolve => globalThis.setTimeout(resolve, 0));
     });
 
-    expect(revealRoot).toHaveAttribute('data-visual-state', 'expanded');
+    expect(revealRoot).toHaveAttribute('data-visual-state', 'idle');
     expect(input).not.toHaveFocus();
   });
 
@@ -149,12 +147,12 @@ describe('ChangelogEmailSignup', () => {
   it('keeps the shell open and shows the success state after submit', async () => {
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'ok' }),
+      json: async () => ({ state: 'confirmation_required' }),
     } as Response);
 
     render(<ChangelogEmailSignup />);
 
-    const input = screen.getByPlaceholderText('you@example.com');
+    const input = screen.getByPlaceholderText('you@email.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
 
     const form = screen.getByTestId('changelog-subscribe-form');
@@ -167,7 +165,12 @@ describe('ChangelogEmailSignup', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(screen.getByTestId('changelog-success-message')).toBeVisible();
+      expect(
+        screen.getByRole('heading', { name: 'Check your email' })
+      ).toBeVisible();
+      expect(screen.getByTestId('changelog-success-message')).toHaveTextContent(
+        'Confirm your subscription to receive Jovie changelog emails.'
+      );
     });
     await waitFor(() => expect(turnstileMock.unmountCount).toBe(1));
     expect(turnstileMock.onStateChange).toBeNull();
@@ -188,7 +191,7 @@ describe('ChangelogEmailSignup', () => {
 
     render(<ChangelogEmailSignup />);
 
-    const input = screen.getByPlaceholderText('you@example.com');
+    const input = screen.getByPlaceholderText('you@email.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
 
@@ -217,15 +220,15 @@ describe('ChangelogEmailSignup', () => {
         }
       )
     ).toBeDisabled();
-    expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute(
+    expect(screen.getByPlaceholderText('you@email.com')).toHaveAttribute(
       'aria-describedby',
-      'changelog-subscribe-status'
+      expect.stringContaining('-error')
     );
-    expect(screen.getByPlaceholderText('you@example.com')).not.toHaveAttribute(
+    expect(screen.getByPlaceholderText('you@email.com')).not.toHaveAttribute(
       'aria-invalid'
     );
 
-    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+    fireEvent.change(screen.getByPlaceholderText('you@email.com'), {
       target: { value: 'artist@example.com' },
     });
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -256,17 +259,52 @@ describe('ChangelogEmailSignup', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('reserves two mobile lines for accessible security failures', () => {
-    const globalsCss = readFileSync(
-      resolve(process.cwd(), 'app/globals.css'),
-      'utf8'
-    );
+  it('shows already subscribed without asking for an email that was not sent', async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'subscribed' }),
+    } as Response);
+    render(<ChangelogEmailSignup source='marketing:/blog' />);
+    fireEvent.change(screen.getByLabelText('Email Address'), {
+      target: { value: 'reader@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+    expect(
+      await screen.findByRole('heading', { name: 'Jovie changelog' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('This email already receives the Jovie changelog.')
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Subscribe' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Check your email to confirm your subscription.')
+    ).not.toBeInTheDocument();
+    expect(
+      JSON.parse(vi.mocked(global.fetch).mock.calls[0][1]?.body as string)
+        .source
+    ).toBe('marketing:/blog');
+  });
 
-    expect(globalsCss).toMatch(
-      /\[data-ui="cta-reveal"\] \.cta-reveal-support \{[\s\S]*?min-height: 40px;/
+  it('preserves the email on failure and rejects an unrecognized success response', async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    } as Response);
+    render(<ChangelogEmailSignup />);
+    fireEvent.change(screen.getByLabelText('Email Address'), {
+      target: { value: 'reader@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Subscription could not be confirmed'
     );
-    expect(globalsCss).toMatch(
-      /@media \(min-width: 640px\) \{[\s\S]*?\.cta-reveal-support \{[\s\S]*?min-height: 20px;/
+    expect(screen.getByLabelText('Email Address')).toHaveValue(
+      'reader@example.com'
+    );
+    expect(screen.getByRole('status')).not.toHaveTextContent(
+      'Check your email'
     );
   });
 });

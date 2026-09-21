@@ -86,7 +86,7 @@ describe('WaitlistSuccessView', () => {
       '<WaitlistSuccessView email={authResult.context.email} />'
     );
     expect(routeSource).toContain('getWaitlistRouteRedirect');
-    expect(routeSource).toContain('notFound()');
+    expect(routeSource).not.toContain('notFound()');
     expect(routeSource).not.toContain('WaitlistIntakeChat');
 
     expect(storySource).toContain('component: WaitlistSuccessView');

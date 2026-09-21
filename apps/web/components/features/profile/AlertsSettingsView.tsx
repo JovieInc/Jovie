@@ -1,36 +1,38 @@
 'use client';
 
+import { Switch } from '@jovie/ui';
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 
 const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 
 type ToggleProps = Readonly<{
+  id: string;
   checked: boolean;
   disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  ariaLabel: string;
+  ariaDescribedBy?: string;
 }>;
 
-function SettingsToggle({ checked, disabled }: ToggleProps) {
+function SettingsToggle({
+  id,
+  checked,
+  disabled,
+  onCheckedChange,
+  ariaLabel,
+  ariaDescribedBy,
+}: ToggleProps) {
   return (
-    <span
-      className={cn(
-        'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-subtle',
-        checked
-          ? 'border-white/40 bg-white dark:bg-surface-1'
-          : 'border-white/14 bg-white/[0.08]',
-        disabled && 'opacity-45'
-      )}
-      aria-hidden='true'
-    >
-      <span
-        className={cn(
-          'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
-          checked
-            ? 'translate-x-4 bg-black dark:bg-black'
-            : 'translate-x-0 bg-white dark:bg-surface-1'
-        )}
-      />
-    </span>
+    <Switch
+      id={id}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={onCheckedChange}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+    />
   );
 }
 
@@ -49,26 +51,38 @@ function AlertsSettingsRow({
   disabled,
   onClick,
 }: RowProps) {
+  const switchId = useId();
+  const descriptionId = `${switchId}-description`;
+
   return (
-    <button
-      type='button'
-      onClick={onClick}
-      disabled={disabled}
-      role='switch'
-      aria-label={label}
-      aria-checked={checked}
-      className='flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
+    <label
+      htmlFor={switchId}
+      aria-disabled={disabled || undefined}
+      className={cn(
+        'flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03]',
+        disabled && 'cursor-default hover:bg-transparent'
+      )}
     >
       <div className='min-w-0 flex-1'>
         <p className='truncate text-sm font-medium tracking-tight text-white dark:text-white'>
           {label}
         </p>
-        <p className='truncate text-2xs leading-4 text-white/50'>
+        <p
+          id={descriptionId}
+          className='truncate text-2xs leading-4 text-white/50'
+        >
           {description}
         </p>
       </div>
-      <SettingsToggle checked={checked} disabled={disabled} />
-    </button>
+      <SettingsToggle
+        id={switchId}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onClick}
+        ariaLabel={label}
+        ariaDescribedBy={descriptionId}
+      />
+    </label>
   );
 }
 

@@ -36,13 +36,15 @@ describe('support route header contract', () => {
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
-    expect(headerSource).toContain('NAV_LINK_BY_LABEL.Customers');
+    expect(headerSource).toContain('NAV_LINK_BY_LABEL.Artists');
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');
     expect(headerSource).toContain("import './MarketingHeader.css'");
     expect(headerSource).toContain("presentation === 'marketing-glass'");
     expect(headerSource).toContain("? 'sm'");
+    expect(headerSource).toContain('marketing-header-growth-space');
+    expect(headerSource).toContain('ResizeObserver');
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);
@@ -63,6 +65,7 @@ describe('support route header contract', () => {
     expect(headerSource).toContain('minimalAuth={isMinimal}');
     expect(headerSource).toContain("minimalAuthLabel='Sign in'");
     expect(headerSource).toContain('showContactLink={false}');
+    expect(headerSource).toContain('marketing-header-growth-space');
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('HOMEPAGE_LAUNCH_COPY.hero.primaryCta');
   });

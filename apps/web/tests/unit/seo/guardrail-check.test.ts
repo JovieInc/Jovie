@@ -165,15 +165,24 @@ describe('validateSitemapXml', () => {
     expect(result.errors[0]?.code).toBe('sitemap.empty');
   });
 
-  it('fails when url entries are missing lastmod', () => {
+  it('accepts url entries that omit lastmod', () => {
     const missingLastmod = SAMPLE_SITEMAP.replace(
       '<lastmod>2026-06-17T00:00:00.000Z</lastmod>',
       ''
     );
     const result = validateSitemapXml(missingLastmod);
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails when lastmod is unparseable', () => {
+    const invalidLastmod = SAMPLE_SITEMAP.replace(
+      '<lastmod>2026-06-17T00:00:00.000Z</lastmod>',
+      '<lastmod>soon</lastmod>'
+    );
+    const result = validateSitemapXml(invalidLastmod);
     expect(result.ok).toBe(false);
     expect(result.errors.map(error => error.code)).toContain(
-      'sitemap.missing-lastmod'
+      'sitemap.invalid-lastmod'
     );
   });
 

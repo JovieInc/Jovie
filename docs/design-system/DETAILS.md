@@ -1004,3 +1004,5 @@ mark intentional marketing sentence-case headlines with
 | 2026-09-10 | Ion / product focus is `#11AFFF` (lighter blue), not `#1F7BF5` | Tim KEEP ~1:26 PT. Ultra/pulse/mint/orange/red stay noir-ion lock hexes. Exactly 5 elevations; no panel. |
 | 2026-09-10 | ActionButton / product CTAs: 28px visible, 510, radius 999; mobile 44px hit wrapping the 28px pill | Tim KEEP ~1:26 PT. Not 32-in-44 and not density-32 everywhere. Homepage not rewritten. `#17156` HOLD. `#17453` untouched. |
 | 2026-09-10 | Pen node ZiaWI is the canonical color SoT (`ziawi-color-sot-v1`) | Tim add ~1:34 PT. React tokens in #17584 must match ZiaWI. Do not invent a parallel React-only color root. |
+
+| 2026-09-14 | BlogCard editorial titles: full live-text titles, no truncation or global fixed height, per-row subgrid tracks (`data-wrap="editorial-title"`) | Founder decision, PR #17852. Only BlogCard is exempt from heading bounds via the explicit marker + both required subgrid tracks; all other heading bounds remain enforced. |

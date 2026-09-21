@@ -12,6 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  resolveTrustedArtifactId,
+  resolveTrustedScreenProof,
+} from './screen-proof-resolver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
@@ -21,6 +25,12 @@ export const SCREEN_BROWSER_PROOF_SCHEMA = 'screen-browser-proof/v1';
 export const SCREEN_CERT_GATE = 'screen-certification-gate';
 export const SCREEN_REGISTRATION_GATE = 'screen-registration-gate';
 export const CLS_INTERACTION_BUDGET = 0.05;
+export const SCREEN_MARKETING_ROUTES = Object.freeze({
+  'web.homepage': '/',
+});
+export const SCREEN_PROOF_ROUTES = Object.freeze({
+  'web.public-profile': '/unfazed',
+});
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
   'ovie',
@@ -79,6 +89,7 @@ export const SCREEN_REGISTRY = Object.freeze(
     `
 web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
 web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
+web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
@@ -87,11 +98,15 @@ web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
+web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
+web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
@@ -123,7 +138,7 @@ ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swif
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-web.auth|web|auth-security|apps/web/app/(auth)/|desktop,mobile|x|Auth/security lane is out of scope
+web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/(.)signup/page.tsx|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
 ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
 ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope
@@ -133,6 +148,31 @@ ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell la
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Proof objects resolved by the producer-owned transport
+ * (`resolveTrustedScreenProof`) are marked by identity, never by a field the
+ * proof JSON itself can carry, so a caller-authored proof cannot forge the
+ * marker by copying it into a handwritten file. Callers cannot populate this
+ * set; only the resolver's success path does.
+ * @type {WeakSet<object>}
+ */
+const TRUSTED_PROOF_ORIGINS = new WeakSet();
+
+/**
+ * @param {object} proof a proof object produced by the trusted resolver
+ */
+function markProofTrusted(proof) {
+  TRUSTED_PROOF_ORIGINS.add(proof);
+}
+
+/**
+ * @param {any} proof
+ * @returns {boolean} true only for a resolver-produced proof object
+ */
+function isProofTrusted(proof) {
+  return isObject(proof) && TRUSTED_PROOF_ORIGINS.has(proof);
 }
 
 function normalizeRepoPath(value) {
@@ -431,13 +471,67 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   ) {
     findings.push('visible actions are required');
   }
-  // A local path and digest are caller-controlled. The existing Playwright
-  // transport does not yet expose a success-run resolver/decoded bundle, so
-  // external certification must fail closed until that adapter exists.
-  findings.push(
-    'trusted external browser producer integration is unavailable; supplied proof cannot certify'
-  );
+  // A local path and digest are caller-controlled, so caller-authored proof
+  // never certifies. The only path past this line is a proof object returned
+  // by the producer-owned resolver: it has already verified the trusted
+  // workflow, the successful exact-head producer job, the immutable artifact
+  // digest against GitHub's bytes, the production-build environment, the
+  // exact source paths, and every required route/viewport measurement. If
+  // that transport was not consulted for this proof object, fail closed.
+  if (!isProofTrusted(proof)) {
+    findings.push(
+      'trusted external browser producer integration is unavailable; supplied proof cannot certify'
+    );
+  }
   return findings;
+}
+
+/**
+ * Resolve one producer artifact into a trusted screen proof through the
+ * producer-owned GitHub transport, then evaluate it against the admission
+ * context. Every resolver rejection carries a specific finding; nothing here
+ * can mint a pass from caller-authored bytes.
+ *
+ * @param {{ artifactId: number, screenId: string, headSha?: string, repoRoot?: string }} request
+ * @returns {{ proof: object | null, screen: object | null, findings: string[] }}
+ */
+export function resolveTrustedProofForScreen(request) {
+  const { artifactId, screenId } = request ?? {};
+  const screen = SCREEN_REGISTRY.find(
+    entry => !entry.excluded && entry.id === screenId
+  );
+  if (!screen || typeof screenId !== 'string') {
+    return {
+      proof: null,
+      screen: null,
+      findings: [
+        `proof requested for unknown or excluded screen ${String(screenId)}`,
+      ],
+    };
+  }
+  const repoRoot = request.repoRoot ?? REPO_ROOT;
+  const headSha = resolveHeadSha(request.headSha, repoRoot);
+  const context = {
+    headSha,
+    screenId: screen.id,
+    sourcePaths: [...screen.sources],
+    viewports: [...screen.viewports],
+    marketingRoute: SCREEN_MARKETING_ROUTES[screen.id],
+    proofRoute: SCREEN_PROOF_ROUTES[screen.id],
+  };
+  const resolved = resolveTrustedScreenProof({ artifactId, context });
+  if (!resolved.proof) {
+    return {
+      proof: null,
+      screen,
+      findings: [
+        `${screen.id}: trusted producer artifact ${String(artifactId)} is not acceptable: ${(resolved.findings || []).join('; ')}`,
+      ],
+    };
+  }
+  markProofTrusted(resolved.proof);
+  const findings = evaluateScreenProof(resolved.proof, { screen, headSha });
+  return { proof: resolved.proof, screen, findings };
 }
 
 export const DELIBERATE_RED_FIXTURES = Object.freeze([
@@ -767,6 +861,7 @@ export function evaluateChangedScreens({
   headSha,
   proofs = [],
   requireExternalEvidence = false,
+  targetScreenIds = [],
 }) {
   const issues = [];
   const changedScreens = [];
@@ -781,6 +876,20 @@ export function evaluateChangedScreens({
     }
   }
   const seen = new Set();
+  const screens = [];
+  for (const screenId of targetScreenIds) {
+    const screen = registry.find(
+      entry => !entry.excluded && entry.id === screenId
+    );
+    if (!screen) {
+      issues.push(`targeted screen is not registered: ${screenId}`);
+      continue;
+    }
+    if (!seen.has(screen.id)) {
+      seen.add(screen.id);
+      screens.push(screen);
+    }
+  }
   for (const file of normalizeChanged(changedFiles)) {
     const classified = classifyScreenPath(file.path, registry);
     if (classified.kind === 'excluded') {
@@ -801,6 +910,9 @@ export function evaluateChangedScreens({
     const screen = classified.entry;
     if (seen.has(screen.id)) continue;
     seen.add(screen.id);
+    screens.push(screen);
+  }
+  for (const screen of screens) {
     const proof = supplied.get(screen.id) || null;
     if (!proof) {
       const detail = requireExternalEvidence
@@ -839,9 +951,26 @@ export function evaluateChangedScreens({
   return { issues, changedScreens, excludedChanges };
 }
 
+export function routeArtifactRequests({
+  pendingScreens,
+  requested,
+  fallbackArtifactId,
+}) {
+  const routed = [...requested];
+  const explicitlyRequested = new Set(routed.map(request => request.screenId));
+  for (const screen of pendingScreens) {
+    if (explicitlyRequested.has(screen.id)) continue;
+    routed.push({ artifactId: fallbackArtifactId, screenId: screen.id });
+  }
+  return routed;
+}
+
 export function runScreenCertification(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
   const registry = options.registry ?? SCREEN_REGISTRY;
+  const targetScreenIds = Array.isArray(options.targetScreenIds)
+    ? [...new Set(options.targetScreenIds)]
+    : [];
   const headSha = resolveHeadSha(options.headSha, repoRoot);
   const issues = [
     ...validateScreenRegistry(registry, {
@@ -874,17 +1003,82 @@ export function runScreenCertification(options = {}) {
   }
   const changedFiles =
     options.changedFiles ?? changedFilesFromGit(diffBase, repoRoot);
+  // Producer-owned artifact requests resolve first; their trusted proofs join
+  // caller-supplied proofs in the existing admission path below. Resolver
+  // rejections surface as specific issues and never as silent passes.
+  const proofs = [...(options.proofs ?? [])];
+  let requested = Array.isArray(options.proofRequests)
+    ? [...options.proofRequests]
+    : [];
+  const artifactRequest = {
+    artifactId: Number(
+      options.artifactId ?? process.env.SCREEN_CERT_ARTIFACT_ID ?? ''
+    ),
+    artifactName:
+      options.marketingArtifactName ??
+      process.env.SCREEN_CERT_MARKETING_ARTIFACT ??
+      '',
+  };
+  const pendingScreens = [];
+  const seenPending = new Set();
+  for (const file of normalizeChanged(changedFiles)) {
+    const classified = classifyScreenPath(file.path, registry);
+    if (
+      classified.kind === 'registered' &&
+      !seenPending.has(classified.entry.id)
+    ) {
+      seenPending.add(classified.entry.id);
+      pendingScreens.push(classified.entry);
+    }
+  }
+  const wantsArtifact =
+    Number.isSafeInteger(artifactRequest.artifactId) &&
+    artifactRequest.artifactId > 0
+      ? artifactRequest.artifactId
+      : artifactRequest.artifactName
+        ? resolveTrustedArtifactId({
+            artifactName: artifactRequest.artifactName,
+            headSha,
+          })
+        : null;
+  if (
+    pendingScreens.length > 0 &&
+    (artifactRequest.artifactName ||
+      (Number.isSafeInteger(artifactRequest.artifactId) &&
+        artifactRequest.artifactId > 0))
+  ) {
+    if (!wantsArtifact) {
+      issues.push('controlled GitHub artifact resolver is unavailable');
+    } else {
+      requested = routeArtifactRequests({
+        pendingScreens,
+        requested,
+        fallbackArtifactId: wantsArtifact,
+      });
+    }
+  }
+  for (const request of requested) {
+    const resolved = resolveTrustedProofForScreen({
+      ...request,
+      headSha,
+      repoRoot,
+    });
+    if (resolved.proof) proofs.push(resolved.proof);
+    else issues.push(...resolved.findings);
+  }
   const changed = evaluateChangedScreens({
     changedFiles,
     registry,
     headSha,
-    proofs: options.proofs,
+    proofs,
     requireExternalEvidence: options.registrationOnly !== true,
+    targetScreenIds,
   });
   issues.push(...changed.issues);
   const ok = issues.length === 0;
-  // The future trusted producer adapter may make external certification real.
-  // Registration-only audits and no-change runs never certify.
+  // Only proofs returned by the trusted producer adapter can make external
+  // certification real. Registration-only audits and no-change runs never
+  // certify.
   const certified =
     ok &&
     options.registrationOnly !== true &&
@@ -917,6 +1111,11 @@ export function runScreenCertification(options = {}) {
       ok,
       certified,
       registrationOnly: options.registrationOnly === true,
+      certificationScope:
+        targetScreenIds.length > 0
+          ? 'targeted-screen-plus-change-set'
+          : 'changed-screen-set',
+      targetedScreenIds: targetScreenIds,
       status,
       issues,
       changedScreens: changed.changedScreens,
@@ -931,50 +1130,29 @@ export function runScreenCertification(options = {}) {
 }
 
 /**
- * Reserved external-certification entrypoint. It accepts no verifier callback
- * and remains unavailable until the dependent authoritative source-continuity
- * adapter binds a GitHub push event to the immutable artifact.
- * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
+ * Certify one explicitly targeted registered screen from an immutable exact-head
+ * producer artifact. This entrypoint proves the current rendering and its
+ * registry source binding; it does not claim that the screen source changed in
+ * the commit being certified.
+ * The controlled resolver binds the candidate to the trusted workflow, the
+ * completed producer job, the exact main head, the registered source paths,
+ * and GitHub's artifact digest before the normal admission checks run.
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string; diffBase?: string }} options
  */
 export function runScreenCertificationFromArtifact({
   artifactId,
   screenId,
   repoRoot = REPO_ROOT,
+  diffBase,
 } = {}) {
   const headSha = resolveHeadSha(undefined, repoRoot);
-  const screen = SCREEN_REGISTRY.find(
-    entry => !entry.excluded && entry.id === screenId
-  );
-  // An immutable artifact alone cannot establish which push event introduced
-  // the registered source change. The post-run GitHub compare binding belongs
-  // to the dependent continuity slice; do not substitute local git history.
-  void artifactId;
-  const issue =
-    'artifact certification is unavailable until authoritative GitHub event source continuity is verified';
-  return {
-    ok: false,
-    schema: SCREEN_CERT_SCHEMA,
-    receipt: {
-      gate: SCREEN_CERT_GATE,
-      invariant: SCREEN_CERT_INVARIANT_ID,
-      headSha,
-      baseSha: null,
-      ok: false,
-      certified: false,
-      registrationOnly: false,
-      status: 'external-certification-unavailable',
-      issues: [issue],
-      changedScreens: screen
-        ? [{ id: screenId, verdict: 'block', findings: [issue] }]
-        : [],
-      excludedChanges: [],
-      fixtures: [],
-      sweeps: RETAINED_SWEEP_WORKFLOWS.map(item => ({
-        path: item.path,
-        retained: true,
-      })),
-    },
-  };
+  return runScreenCertification({
+    repoRoot,
+    headSha,
+    diffBase,
+    targetScreenIds: typeof screenId === 'string' && screenId ? [screenId] : [],
+    proofRequests: [{ artifactId: Number(artifactId), screenId }],
+  });
 }
 
 const isMain =
@@ -990,13 +1168,29 @@ if (isMain) {
   const artifactRoot = process.argv
     .find(arg => arg.startsWith('--artifact-root='))
     ?.slice('--artifact-root='.length);
+  const artifactId = process.argv
+    .find(arg => arg.startsWith('--artifact-id='))
+    ?.slice('--artifact-id='.length);
+  const screenId = process.argv
+    .find(arg => arg.startsWith('--screen-id='))
+    ?.slice('--screen-id='.length);
+  const marketingArtifactName = process.argv
+    .find(arg => arg.startsWith('--marketing-artifact='))
+    ?.slice('--marketing-artifact='.length);
   const receiptOut = process.argv
     .find(arg => arg.startsWith('--receipt-out='))
     ?.slice('--receipt-out='.length);
   const registrationOnly = process.argv.includes('--registration-only');
-  const activeGate = registrationOnly
-    ? SCREEN_REGISTRATION_GATE
-    : SCREEN_CERT_GATE;
+  const activeGate =
+    registrationOnly && !screenId ? SCREEN_REGISTRATION_GATE : SCREEN_CERT_GATE;
+  if (
+    screenId &&
+    (proofFile || artifactRoot || marketingArtifactName || registrationOnly)
+  ) {
+    throw new Error(
+      '--screen-id targeted artifact certification is incompatible with --proof-file, --artifact-root, --marketing-artifact, and --registration-only'
+    );
+  }
   let proofs = [];
   if (proofFile) {
     const parsed = JSON.parse(readFileSync(resolve(proofFile), 'utf8'));
@@ -1005,12 +1199,20 @@ if (isMain) {
       throw new Error('screen proof file must contain an array or { proofs }');
     }
   }
-  const result = runScreenCertification({
-    diffBase,
-    proofs,
-    registrationOnly,
-    artifactRoot,
-  });
+  const result = screenId
+    ? runScreenCertificationFromArtifact({
+        artifactId: artifactId ? Number(artifactId) : undefined,
+        screenId,
+        diffBase,
+      })
+    : runScreenCertification({
+        diffBase,
+        proofs,
+        registrationOnly,
+        artifactRoot,
+        ...(artifactId ? { artifactId: Number(artifactId) } : {}),
+        ...(marketingArtifactName ? { marketingArtifactName } : {}),
+      });
   if (receiptOut) {
     // The receipt is the immutable machine record: exact head/base, per-screen
     // verdicts with artifact digest + renderer provenance, and the certified bit.

@@ -16,6 +16,37 @@ The registry consumes the pending `jovie.certification/v1` contract from
 JOV-5753. It does not define another lifecycle, event bus, scheduler, or
 orchestration platform.
 
+## Typed company composition (JOV-6481, JOV-5945 foundation)
+
+`company-registry.mjs` composes the `company` section of the architecture
+registry with capability IDs and the existing commissioning registry. Stable
+`company.summer` references the private `jovie.service-identity/v1`
+`SERVICE_IDENTITY` declaration in `JovieInc/summer-config`, not a copied runtime.
+Repository, service, work, deployment and infrastructure kinds have distinct
+required attributes. Missing repositories, dangling/cyclic dependencies,
+conflicting canonical production bindings and ambiguous coverage fail closed.
+Coverage is partial or unenumerated, with an unknown total, never company-wide
+completeness. Empty deployment/infra inventory does not mean no infrastructure.
+
+**Compose:** keep existing registries, Linear work lifecycle, Gem repository
+policy (`scripts/symphony/config/gem-repo-registry.json` and its Python loader),
+and JOV-5930 `jovie.certification/v1` authority. Legacy Gem policy entries do not
+establish current official Symphony admission. No new catalog, discovery job,
+controller, persistence layer or permission grant is introduced.
+
+`validateCompanyObservation` compares a separately retrieved observation with
+an independently supplied exact artifact expectation and clock. It binds the
+joined registry digest, repository, source SHA, artifact digest, deployment ID
+and freshness (maximum 15 minutes). It does not verify signatures or issue certificates. Historical
+audit timestamps elsewhere in these files are unchanged, not renewed by a
+valid projection. No provider credentials or private source contents belong here.
+
+The existing affected-test and CI control lanes run the co-located behavioral
+tests with Node coverage (95% lines, 90% branches, 100% functions). **Ship now:**
+bounded source composition. **Re-evaluate when:** owners supply current inventory
+and runtime observations. **Then:** integrate those receipts through the existing
+certification lifecycle; full JOV-5945 discovery/economic assessment remains open.
+
 ## Current gap map
 
 | Capability | Implementation | Readiness | Canonical path or blocker |
@@ -25,12 +56,12 @@ orchestration platform.
 | GBrain/Supabase query | already works | degraded | Read-only Ovie tools exist; live GBrain queries timed out. |
 | Neon/application query | missing | blocked | No least-privilege Summer tool exists. |
 | Stripe/business query | missing | blocked | No read-only Summer business tool or safe fixture exists. |
-| Linear read/update | in flight | blocked | Eve Summer refuses writes; PR #16396 carries durable delivery work. |
+| Linear read/update | already works | passing | Bounded Linear create/update with founder intent and mandatory readback exists in source and unit tests; the signed production-like runtime receipt is still required. |
 | Repo/PR/deploy lookup | in flight | blocked | Shipping-state sources exist but are not in the Summer safe-tool manifest. |
 | Intent → dispatch → observed result | in flight | degraded | One exact packaged source (`b315372…`) claimed/completed a real worker job and persisted the expected reply, but its root PRs are unlanded and it predates this receipt contract. |
 | Execution failure escalation | already works | untested | State and watchdog primitives exist; Summer-owned runtime proof is absent. |
 | Soul/invariants/autonomy/version | missing | blocked | The Eve Summer pack has no certified version/digest declaration or exact-runtime receipt. The retired local profile cannot satisfy this gate. |
-| Heartbeat/no-op/reconciliation | conflicting | blocked | Scheduled turn `01a05f69-5b89-7db0-81fe-96fe21aae443` completed in 9.873s after the heartbeat was updated to require a terminal receipt, but emitted no assistant message, tool marker, or receipt. Empty completed turns fail closed. |
+| Heartbeat/no-op/reconciliation | in flight | blocked | Eve owns a 15-minute `summer-liveness-heartbeat` trigger (`jovie.eve.summer-liveness-heartbeat/v1`) that must emit a non-empty signed no-op or identification/remediation receipt. The five-minute Codex heartbeat and empty turn `01a05f69-5b89-7db0-81fe-96fe21aae443` are superseded and fail closed. Runtime deploy remains a founder gate. Backlog rerank stays event-driven only. |
 | Missed-event recovery | already works | untested | Ambiguous dispatch reconciliation exists without runtime proof. |
 | Duplicate/idempotency | already works | passing | Immutable/dedupe source contracts exist; intended-environment receipt is still required. |
 | Dependency degradation | already works | passing | Fail-closed source tests exist; intended-environment receipt is still required. |
@@ -109,8 +140,8 @@ closed.
 | Exact packaged runtime | Signed package from source `b31537204a4a8dfeaeb8c55061bd1c1cfeecc470` dogfooded through real `/app/ov/chat`; Summer claimed/completed the worker job. | Verified for that package only; it predates the canonical commissioning receipt schema. |
 | Persistence | The UI persisted `SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem — idle factory means Linear work does not land.` | Verified for that package only. |
 | Fresh production Mac | Signed `app.jov.ie` 26.8.1 (`app.asar` SHA-256 `3877b0a…`) loaded the existing authorized owner session on production web commit `8d58cb6589d2776c3ba37dc118c845de4fff7dfc`. | **Blocked before request** — installed shell lacks the Talk door and `/app/ov/chat`; HUD launcher Retry returned to Unavailable. Privacy-safe receipt: `docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json`. |
-| Recurrence | A five-minute Codex heartbeat is attached to Summer. Scheduled turn `01a05f69-5b89-7db0-81fe-96fe21aae443` completed in 9.873s but emitted no assistant message, tool marker, or terminal receipt after the heartbeat was updated to require one. | Scheduling recurrence exists, but empty completed turns do not prove Summer identification/remediation recurrence. Require a later non-empty signed scheduled receipt. |
-| Eve-native ownership | No Eve-owned scheduler/no-op/remediation receipt across restart. | **Blocked** — owner: Eve / Summer liveness. Re-evaluate only when Eve owns the schedule and emits signed terminal receipts; any ownership, cadence, state-fingerprint, cost-budget, restart, or escalation-route change invalidates proof. |
+| Recurrence | The five-minute Codex heartbeat is superseded. Eve source now declares `summer-liveness-heartbeat` at `*/15 * * * *` with a non-empty terminal receipt contract. Empty Codex turn `01a05f69-5b89-7db0-81fe-96fe21aae443` remains a fail-closed counterexample, not proof. | Source cadence exists. Exact deployed runtime receipt is still required. Founder deploy is an explicit later gate. |
+| Eve-native ownership | Eve schedule `apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts` owns the 15-minute liveness trigger in source. | **Blocked pending founder deploy** — owner: Eve / Summer liveness. Re-evaluate only after that Eve schedule emits a signed terminal no-op or identification/remediation receipt in the intended runtime; any ownership, cadence, receipt schema, restart, or escalation-route change invalidates proof. |
 
 These receipts are incorporated as evidence rather than duplicated as new
 implementation. They do not turn the canonical 16-probe gate green and do not
@@ -170,18 +201,47 @@ as UTF-8 JSON with object keys recursively sorted and array order preserved. The
 receipt producer signs those bytes with its Ed25519 private key. The verifier is
 given only the corresponding trusted public key and rejects it unless its
 fingerprint is in `trustedAttestationKeyFingerprints`. The accepted fingerprint
-is recorded in the report. An empty allowlist is intentionally fail-closed.
-`registryDigest` is SHA-256 over the same canonical serialization of
-`registry.json`. The executable valid test fixture and signature generation live
-in `scripts/summer-commissioning/commissioning.test.mjs`; production private key
-material never belongs in this repository.
+is recorded in the report. The committed registry slot stays an empty array:
+that is intentionally fail-closed and does not embed a probe-runner private key
+or a guessed public-key fingerprint. Operators load the probe-runner **public**
+key from the same env/path names as Eve
+`runtime-commissioning-health`:
 
-For the heartbeat probe specifically, a scheduler reporting a completed turn is
-not evidence of liveness when the turn emitted no assistant message, tool
-marker, or terminal receipt. The passing runtime receipt must immutably identify
-a later scheduled turn with a non-empty no-op or remediation result and explicit
-Eve scheduler ownership. A receipt generated by an observer for an empty turn,
-or by the existing Codex heartbeat without Eve ownership, fails closed.
+- `SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY` or
+  `SUMMER_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH`
+- `RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY` or
+  `RUNTIME_COMMISSIONING_ATTESTATION_PUBLIC_KEY_PATH`
+
+The harness derives the SHA-256 SPKI fingerprint from that PEM at mint time and
+unions it with the committed allowlist. `--attestation-public-key` still wins
+when both are present. A missing env/path key leaves the allowlist empty, so an
+unlisted CLI key is rejected. Production private key material never belongs in
+this repository. `registryDigest` is SHA-256 over the same canonical
+serialization of `registry.json`. The executable valid test fixture and
+signature generation live in
+`scripts/summer-commissioning/commissioning.test.mjs`.
+
+## Heartbeat is not backlog rerank
+
+The Eve-owned 15-minute liveness heartbeat detects silent or failing event
+delivery. It emits either a signed healthy no-op or a non-empty
+identification/remediation receipt. Empty completed turns fail closed.
+
+Backlog rerank stays **event-driven only**. Allowed triggers remain land, CI,
+signal, founder, GSC, and intake. The liveness heartbeat must not reshuffle,
+continuously rerank, or invoke the backlog orchestrator. Missed-event recovery
+stays on the separate `summer-bottleneck-heartbeat` path and is not a ranking
+loop.
+
+## Heartbeat probe contract
+
+A scheduler reporting a completed turn is not evidence of liveness when the
+turn emitted no assistant message, tool marker, or terminal receipt. The
+passing runtime receipt must immutably identify a later Eve-owned 15-minute
+scheduled tick with a non-empty no-op or remediation result. A receipt
+generated by an observer for an empty turn, or by the superseded five-minute
+Codex heartbeat (including turn `01a05f69-5b89-7db0-81fe-96fe21aae443`),
+fails closed.
 
 Run the source-plus-receipt gate with an exact production-like version:
 

@@ -25,11 +25,16 @@ dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
 const isCoverageRun = process.argv.includes('--coverage');
-const isExactHeadCoverageRun = isChangedRun && isCoverageRun;
 const coverageInclude = (process.env.JOVIE_COVERAGE_INCLUDE ?? '')
   .split('\n')
   .map(entry => entry.trim())
   .filter(Boolean);
+// The wrapper rewrites planned --changed coverage to `related`, removing
+// --changed. Preserve exact-head parallelism and bounded reporters in both forms.
+const isExactHeadCoverageRun =
+  isCoverageRun &&
+  (isChangedRun ||
+    (process.argv.includes('related') && coverageInclude.length > 0));
 
 // Vitest 4: the junit reporter's per-reporter outputFile OVERRIDES the CLI
 // --outputFile flag, so sharded CI runs (the workflow passes a shard-specific
@@ -220,6 +225,7 @@ export default defineConfig({
               lines: 100,
             },
             'lib/ovie/summer-admissions.ts': { branches: 95, lines: 100 },
+            'lib/ovie/summer-ci-audit.ts': { branches: 100, lines: 100 },
             'lib/ovie/summer-task-admissions.ts': { branches: 100, lines: 100 },
             'lib/ovie/summer-product-paths.ts': { branches: 100, lines: 100 },
             'lib/ovie/summer-shadow-client.ts': { branches: 100, lines: 100 },

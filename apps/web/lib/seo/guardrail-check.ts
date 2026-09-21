@@ -34,7 +34,7 @@ const AI_CRAWLER_REMEDIATION =
   'Keep REQUIRED_AI_CRAWLERS in apps/web/app/robots.ts and mirror the list in tests/app/robots.test.ts.';
 
 const SITEMAP_XML_REMEDIATION =
-  'Ensure apps/web/app/sitemap.ts returns non-empty MetadataRoute.Sitemap entries with lastModified on every URL.';
+  'Ensure apps/web/app/sitemap.ts returns non-empty MetadataRoute.Sitemap entries. Use real content-revision dates for lastModified, or omit the field when unknown.';
 
 function failure(
   code: string,
@@ -203,7 +203,8 @@ export function validateRobotsTxt(content: string): SeoGuardrailResult {
 }
 
 /**
- * Validate a sitemap.xml body: well-formed urlset, non-empty, lastmod on every URL.
+ * Validate a sitemap.xml body: well-formed urlset, non-empty loc entries.
+ * lastmod is optional and must be a real content revision when present.
  */
 export function validateSitemapXml(content: string): SeoGuardrailResult {
   const errors: SeoGuardrailFinding[] = [];
@@ -254,11 +255,12 @@ export function validateSitemapXml(content: string): SeoGuardrailResult {
         )
       );
     }
-    if (!/<lastmod>[^<]+<\/lastmod>/i.test(block)) {
+    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/i)?.[1];
+    if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
       errors.push(
         failure(
-          'sitemap.missing-lastmod',
-          `sitemap.xml entry ${index + 1} is missing <lastmod>.`,
+          'sitemap.invalid-lastmod',
+          `sitemap.xml entry ${index + 1} has an unparseable <lastmod>.`,
           SITEMAP_XML_REMEDIATION
         )
       );

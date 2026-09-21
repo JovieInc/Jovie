@@ -3,6 +3,7 @@ import {
   canCreatorSendNotifications,
   getBatchCreatorEntitlements,
   getCreatorEntitlements,
+  getCreatorOwnerUserId,
   getCreatorPlanEntitlements,
 } from '@/lib/entitlements/creator-plan';
 import { getEntitlements } from '@/lib/entitlements/registry';
@@ -357,5 +358,30 @@ describe('paid fan send provenance', () => {
       (await getBatchCreatorEntitlements(['artist'])).get('artist')
         ?.entitlements.booleans.canSendNotifications
     ).toBe(false);
+  });
+});
+
+describe('getCreatorOwnerUserId', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it.each([
+    [{ claimedUserId: 'claimed', legacyUserId: 'legacy' }, 'claimed'],
+    [{ claimedUserId: null, legacyUserId: 'legacy' }, 'legacy'],
+    [{ claimedUserId: null, legacyUserId: null }, null],
+  ])(
+    'uses claimed ownership before legacy ownership',
+    async (row, expected) => {
+      installQueryResult([row]);
+      expect(await getCreatorOwnerUserId('artist')).toBe(expected);
+      expect(orderByMock).toHaveBeenCalledOnce();
+    }
+  );
+  it('returns null for a missing creator', async () => {
+    installQueryResult([]);
+    expect(await getCreatorOwnerUserId('missing')).toBeNull();
+  });
+  it('propagates lookup failure to prevent unreserved sends', async () => {
+    installQueryResult([]);
+    limitMock.mockRejectedValueOnce(new Error('offline'));
+    await expect(getCreatorOwnerUserId('artist')).rejects.toThrow('offline');
   });
 });

@@ -7,6 +7,8 @@
  *
  * Pure logic — no DB access. Storage is caller's responsibility.
  * Asset-scoped observations live in `./asset-visibility` (JOV-5607).
+ * Measurement layers (readiness / observed visibility / business outcome)
+ * live in `./visibility-measurement` (JOV-6243).
  */
 
 import { computeRatePercent } from '@/lib/analytics/metrics';
@@ -51,6 +53,60 @@ export interface CitationStats {
     readonly citedCount: number;
     readonly shareOfCitation: number;
   }>;
+}
+
+/** Stable contract identity for the three-layer measurement disclosure. */
+export const AEO_MEASUREMENT_CONTRACT_VERSION =
+  'aeo-measurement-layers:v1' as const;
+
+export const AEO_MEASUREMENT_LAYERS = [
+  'readiness',
+  'observed_visibility',
+  'business_outcomes',
+] as const;
+
+export type AeoMeasurementLayer = (typeof AEO_MEASUREMENT_LAYERS)[number];
+export type AeoMeasurementMetric = 'crawler_read' | 'citation';
+
+export interface AeoMeasurementDisclosure {
+  readonly metric: AeoMeasurementMetric;
+  readonly layer: AeoMeasurementLayer;
+  readonly layerLabel: string;
+  readonly label: string;
+  readonly description: string;
+}
+
+const AEO_MEASUREMENT_DISCLOSURES: Readonly<
+  Record<AeoMeasurementMetric, AeoMeasurementDisclosure>
+> = {
+  crawler_read: {
+    metric: 'crawler_read',
+    layer: 'readiness',
+    layerLabel: 'Readiness Signal',
+    label: 'AI Crawler Reads',
+    description:
+      'AI crawler reads show that a service fetched a page. They do not show an AI answer mention, referral, purchase, revenue, or causal lift.',
+  },
+  citation: {
+    metric: 'citation',
+    layer: 'observed_visibility',
+    layerLabel: 'Observed Visibility',
+    label: 'Citations',
+    description:
+      'Observed visibility is sampled AI-answer evidence. It does not measure referrals, purchases, revenue, or causal lift.',
+  },
+};
+
+/**
+ * Return the canonical layer label and disclosure for a metric.
+ *
+ * Crawler reads intentionally map to a readiness signal: a fetch is evidence
+ * of machine access, not evidence of an answer mention or a commercial result.
+ */
+export function getAeoMeasurementDisclosure(
+  metric: AeoMeasurementMetric
+): AeoMeasurementDisclosure {
+  return AEO_MEASUREMENT_DISCLOSURES[metric];
 }
 
 /** Canonical question templates for an artist */

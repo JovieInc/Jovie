@@ -24,10 +24,10 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_GO_LIVE_SECTION: true,
   SHOW_HOMEPAGE_FAQ: true,
   // Prelaunch waitlist gate. When true, public-front-door CTAs render as
-  // "Get started" and land on /waitlist. When false, they revert to
-  // "Claim your free profile". The server-side waitlist gate
+  // "Get started" and land on /signup. When false, they revert to
+  // "Claim your free profile" on /start. The server-side waitlist gate
   // (`isWaitlistGateEnabled`) still owns post-auth routing. Flip to false
-  // to open the doors.
+  // to open the doors. /waitlist remains the pending-receipt route.
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,

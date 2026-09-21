@@ -303,6 +303,65 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
         self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
 
+    def test_issue_blocked_red_intake_projects_instead_of_contradicting(self):
+        # cf7a9579 (#17903) keeps new-issue intake open on issue-blocked
+        # closure red. The projector previously asserted intake is
+        # (status == "healthy") everywhere, so every such receipt failed with
+        # "closureAdmission status contradicts intake" and took the live
+        # Resolve fleet promotion policy check red on every PR (#17929).
+        receipt = evaluate_receipt(
+            closureHealth={
+                **signals()["closureHealth"],
+                "status": "red",
+                "newIssueIntakeAllowed": True,
+                "reasons": ["expired-held-prs", "internally-repairable-prs-open"],
+            }
+        )
+        self.assertEqual(
+            receipt["closureAdmission"]["newIssueIntakeAllowed"], True
+        )
+        self.assertEqual(receipt["closureAdmission"]["status"], "red")
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(
+            projected["closureAdmission"]["newIssueIntakeAllowed"], True
+        )
+        self.assertEqual(projected["closureAdmission"]["status"], "red")
+        self.assertTrue(projected["closureAdmission"]["allowed"])
+        # Product rows inherit the same issue-blocked red semantics.
+        products = projected["closureAdmission"].get("products")
+        if isinstance(products, dict):
+            for row in products.values():
+                self.assertEqual(
+                    row["newIssueIntakeAllowed"],
+                    row["status"] == "healthy" or bool(row.get("reasons")),
+                )
+
+    def test_hold_intake_drain_accepts_issue_blocked_red_intake(self):
+        receipt = evaluate_receipt(
+            production={"status": "green", "deployedSha": "b" * 40},
+            closureHealth={
+                **signals()["closureHealth"],
+                "status": "red",
+                "newIssueIntakeAllowed": True,
+                "reasons": [
+                    "queue-controller-red-over-10m",
+                    "unclassified-open-pr-over-15m",
+                ],
+            },
+        )
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(receipt["closureAdmission"]["status"], "red")
+        self.assertTrue(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
     def test_runtime_intake_hold_survives_projection_without_bypassing_closure(self):
         receipt = evaluate_receipt(controller={"status": "failed"})
         projected = PROJECT.project_fleet_admission_receipt(receipt)
@@ -414,11 +473,14 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         )
 
         forged = json.loads(json.dumps(receipt))
+        # Systems-down red keeps intake closed; issue-blocked red (the #17903
+        # intake semantics) would make intake=False itself contradictory and
+        # trip the closureAdmission contract before controller repair runs.
         forged_closure = {
             **forged["signals"]["closureHealth"],
             "status": "red",
             "newIssueIntakeAllowed": False,
-            "reasons": ["closure-observation-unknown"],
+            "reasons": ["closure-health-receipt-missing-or-malformed"],
         }
         forged["signals"]["closureHealth"] = forged_closure
         forged["closureAdmission"] = {
@@ -428,7 +490,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             "newImplementationAllowed": False,
             "fallbackPrGenerationAllowed": False,
             "status": "red",
-            "reasons": ["closure-observation-unknown"],
+            "reasons": ["closure-health-receipt-missing-or-malformed"],
         }
         with self.assertRaisesRegex(
             PROJECT.AdmissionProjectionError,

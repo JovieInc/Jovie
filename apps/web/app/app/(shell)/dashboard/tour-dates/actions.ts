@@ -300,7 +300,7 @@ export async function saveBandsintownApiKey(params: {
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    void trackServerEvent('bandsintown_api_key_saved', {
+    await trackServerEvent('bandsintown_api_key_saved', {
       profileId: profile.id,
     });
 
@@ -350,7 +350,7 @@ export async function removeBandsintownApiKey(): Promise<{
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    void trackServerEvent('bandsintown_api_key_removed', {
+    await trackServerEvent('bandsintown_api_key_removed', {
       profileId: profile.id,
     });
 
@@ -417,7 +417,7 @@ export async function connectBandsintownArtist(params: {
   const events = await fetchBandsintownEvents(params.artistName, apiKey);
   const synced = await upsertBandsintownEvents(profile.id, events);
 
-  void trackServerEvent('tour_dates_synced', {
+  await trackServerEvent('tour_dates_synced', {
     profileId: profile.id,
     synced,
     source: 'bandsintown',
@@ -487,7 +487,7 @@ export async function syncFromBandsintown(): Promise<{
   );
   const synced = await upsertBandsintownEvents(profile.id, events);
 
-  void trackServerEvent('tour_dates_synced', {
+  await trackServerEvent('tour_dates_synced', {
     profileId: profile.id,
     synced,
     source: 'bandsintown',
@@ -561,7 +561,7 @@ export async function createTourDate(params: {
     })
     .returning();
 
-  void trackServerEvent('tour_date_created', {
+  await trackServerEvent('tour_date_created', {
     profileId: profile.id,
     tourDateId: created.id,
     source: 'manual',
@@ -682,7 +682,7 @@ export async function deleteTourDate(
     throw new TypeError('Tour date not found');
   }
 
-  void trackServerEvent('tour_date_deleted', {
+  await trackServerEvent('tour_date_deleted', {
     profileId: profile.id,
     tourDateId: id,
   });

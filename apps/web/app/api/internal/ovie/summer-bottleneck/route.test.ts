@@ -21,6 +21,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
+import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { POST } from './route';
@@ -146,7 +147,10 @@ function request(body: unknown) {
 
 // Exercise the actual publisher composition, using only its synthetic test inputs.
 // No host observation, credential access, or submission runs in this subprocess.
-function publisherSnapshot() {
+function publisherSnapshot(
+  providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN',
+  ciAuditV2 = false
+) {
   const fixturePath = resolve(
     process.cwd(),
     '../../scripts/symphony/tests/summer-publisher-admissions.test.py'
@@ -166,10 +170,36 @@ case.reference.update(mode='isolated-cli', issueId='11111111-1111-4111-8111-1111
     ownerId='22222222-2222-4222-8222-222222222222', issueRevision=fixture['FRESH_AT'],
     repository='JovieInc/Jovie', pr=1, head=fixture['MAIN_SHA'],
     workspace='/fixture/owned-repair', writerUnit='fixture-repair.service')
+if sys.argv[2]:
+    provider_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('existing-pr-repair.test.py')))
+    provider_case = provider_fixture['RepairTests']()
+    clock = provider_fixture['mock'].patch.object(
+        provider_fixture['repair'].time, 'time', return_value=fixture['NOW'].timestamp())
+    clock.start()
+    try:
+        provider_case.setUp()
+        provider_case.stack.enter_context(provider_fixture['mock'].patch.object(
+            provider_fixture['repair'], '_iso_now', return_value=fixture['NOW'].isoformat()))
+        _task, payload, config = provider_case.allowance_fixture()
+        if sys.argv[2] == 'HELD':
+            config['creditUsagePercent'] = 100
+        elif sys.argv[2] == 'UNKNOWN':
+            config.pop('creditUsagePercent')
+        case.observed.update(provider_fixture['repair'].observe_grok_allowance(payload,
+            opener=lambda *_args, **_kwargs: provider_case.allowance_response(config)))
+    finally:
+        provider_case.doCleanups()
+        clock.stop()
+if sys.argv[3]:
+    ci_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('summer-ci-audit.test.py')))
+    case.fleet['signals']['ciAudit'] = ci_fixture['fixture'](
+        [ci_fixture['check'](completed_at=fixture['FRESH_AT'])], clock=lambda: fixture['NOW'])
 print(json.dumps(fixture['MODULE'].compose_snapshot(case.fleet, case.runtime,
     fixture['NOW'], case.attestation, existing_repair=case.reference,
     task_admissions=case.observed)))`,
         fixturePath,
+        providerState ?? '',
+        ciAuditV2 ? 'v2' : '',
       ],
       { encoding: 'utf8', timeout: 5000 }
     )
@@ -216,6 +246,101 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it.each(['ALLOWED', 'HELD', 'UNKNOWN'] as const)(
+    'preserves the actual provider observer %s result through the signed receiver',
+    async state => {
+      const input = publisherSnapshot(state);
+      vi.setSystemTime(new Date(input.observedAt));
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect(input.signals.taskAdmissions.providerEligibility.state).toBe(
+        state
+      );
+      expect((await POST(request(input))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+      expect(delivered.signals.taskAdmissions).toEqual(
+        input.signals.taskAdmissions
+      );
+      expect(JSON.stringify(delivered)).not.toContain(
+        'test-only-provider-secret'
+      );
+      expect(
+        delivered.signals.taskAdmissions.providerObservation === null
+      ).toBe(state === 'UNKNOWN');
+    }
+  );
+
+  it('forwards actual CI measurements without granting their excluded classes', async () => {
+    const input = publisherSnapshot(undefined, true);
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect(input.signals.ciAudit.measurements).toHaveLength(1);
+    expect(input.signals.ciAudit.classes).toEqual([]);
+    expect(input.signals.ciAudit.excludedClasses).toHaveLength(6);
+    expect((await POST(request(input))).status).toBe(202);
+    expect(
+      JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).signals.ciAudit
+    ).toEqual(input.signals.ciAudit);
+    input.signals.ciAudit.measurements[0].dispatchable = true;
+    expect((await POST(request(input))).status).toBe(422);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects inconsistent CI samples before signing or delivery', async () => {
+    const input = publisherSnapshot(undefined, true);
+    const audit = ciAuditV2Fixture;
+    vi.setSystemTime(new Date(input.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    for (const change of [
+      { excludedClasses: [...audit.excludedClasses].reverse() },
+      { measurements: [...audit.measurements, ...audit.measurements] },
+      {
+        measurements: [
+          { ...audit.measurements[0], completedAt: '2999-01-01T00:00:00Z' },
+        ],
+      },
+      { sample: { ...audit.sample, failuresOmitted: 1 } },
+      { sample: { ...audit.sample, checkRunsObserved: 0 } },
+      { sample: { ...audit.sample, reasons: ['head-drift', 'head-drift'] } },
+      {
+        sample: {
+          ...audit.sample,
+          reasons: ['incomplete-observation', 'head-drift'],
+          complete: false,
+        },
+      },
+      { sample: { ...audit.sample, complete: false } },
+    ]) {
+      const response = await POST(
+        request({
+          ...input,
+          signals: { ...input.signals, ciAudit: { ...audit, ...change } },
+        })
+      );
+      expect(response.status).toBe(422);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
   it('signs the actual publisher runtime and task evidence without refreshing or granting it', async () => {
@@ -998,6 +1123,18 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an all-zero source SHA before signing', async () => {
+    const response = await POST(
+      request({ ...validSnapshot(), sourceVersion: '0'.repeat(40) })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_bottleneck_snapshot',
+    });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
   it.each([

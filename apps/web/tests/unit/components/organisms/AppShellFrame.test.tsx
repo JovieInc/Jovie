@@ -42,6 +42,7 @@ describe('AppShellFrame', () => {
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();
+    expect(screen.getByTestId('overlay-interaction-guard')).toBeInTheDocument();
     // Header renders exactly once inside main (no duplicate-render hack).
     const headers = screen.getAllByText('Header');
     expect(headers).toHaveLength(1);

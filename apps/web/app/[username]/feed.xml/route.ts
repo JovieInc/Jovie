@@ -35,7 +35,7 @@ export async function GET(
   if (!profile || !profile.isPublic) {
     return new NextResponse('Not found', { status: 404 });
   }
-  if (!isPublicProfileIndexable(profile.username)) {
+  if (!isPublicProfileIndexable(profile.username, profile.displayName)) {
     return new NextResponse('Not found', {
       status: 404,
       headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,

@@ -12,11 +12,16 @@ import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfi
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
+import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import {
+  isProofProfileHandle,
+  resolveProofClaimCta,
+} from '@/lib/acquisition/proof-claim-funnel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,
@@ -301,6 +306,8 @@ async function ArtistPageContent({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
   const isClaimed = creatorClerkId !== null;
+  const isProofProfile = isProofProfileHandle(artist.handle);
+  const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
   // Structured-credit profiles still expose a claim path when an exact
@@ -510,8 +517,14 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!isClaimed && directClaimSupported}
-        claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
+        showClaimFooter={(!isClaimed && directClaimSupported) || isProofProfile}
+        claimFooterHref={
+          isProofProfile
+            ? proofClaim.href
+            : `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+        }
+        claimFooterLabel={isProofProfile ? proofClaim.label : undefined}
+        proofClaim={isProofProfile}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
@@ -523,11 +536,19 @@ async function ArtistPageContent({
       <ProfileAeoContent
         content={aeoContent}
         claimHref={
-          !isClaimed && directClaimSupported
+          !isProofProfile && !isClaimed && directClaimSupported
             ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
             : undefined
         }
       />
+      {isProofProfile ? (
+        <ProfileAeoProofClaimCard
+          artistName={aeoContent.artistName}
+          href={proofClaim.href}
+          label={proofClaim.label}
+          note={proofClaim.note}
+        />
+      ) : null}
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
@@ -538,11 +559,12 @@ async function ArtistPageContent({
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
-  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return <UnfazedProfileClient />;
   }
+
+  await enforceCanonicalPublicProfileUsername(username);
 
   // Resolve a missing/private profile before the page-level Suspense boundary
   // can stream its loading shell. This preserves the segment's profile-specific
@@ -573,7 +595,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
-  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return {
@@ -581,6 +602,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       robots: { index: false, follow: false },
     };
   }
+
+  await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status, creatorClerkId } = profileResult;

@@ -1933,7 +1933,7 @@ import json
 import pathlib
 import sys
 sys.path.insert(0, sys.argv[1])
-from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir, validate_gate_result
+from gem_gate_contract import GateContractError, drain_state_dir, fleet_sidecar_path, gate_state_dir, validate_gate_result
 
 receipt = {
     "schema": "jovie-fleet-gate/v1",
@@ -1971,6 +1971,11 @@ assert gate_state_dir(pathlib.Path("/tmp/gem"), "other/repo").parent == pathlib.
 assert gate_state_dir(pathlib.Path("/tmp/gem"), "foo/bar-baz") != gate_state_dir(pathlib.Path("/tmp/gem"), "foo-bar/baz")
 assert drain_state_dir(pathlib.Path("/tmp/gem"), "JovieInc/Jovie") == pathlib.Path("/tmp/gem/state/gem-pr-drain")
 assert drain_state_dir(pathlib.Path("/tmp/gem"), "other/repo") != pathlib.Path("/tmp/gem/state/gem-pr-drain")
+jovie_state = pathlib.Path("/tmp/gem/state/gem-priority-gate")
+assert fleet_sidecar_path(jovie_state, "JovieInc/Jovie", "queue-snapshot.json") == pathlib.Path("/tmp/gem/state/queue-snapshot.json")
+assert fleet_sidecar_path(jovie_state, "JovieInc/LogYourBody", "queue-snapshot.json") != pathlib.Path("/tmp/gem/state/queue-snapshot.json")
+assert fleet_sidecar_path(jovie_state, "JovieInc/LogYourBody", "queue-snapshot.json").parent == pathlib.Path("/tmp/gem/state")
+assert fleet_sidecar_path(jovie_state, "foo/bar-baz", "queue-snapshot.json") != fleet_sidecar_path(jovie_state, "foo-bar/baz", "queue-snapshot.json")
 contradictory = dict(receipt, state="RED")
 try:
     validate_gate_result(0, json.dumps(contradictory), "fleet")

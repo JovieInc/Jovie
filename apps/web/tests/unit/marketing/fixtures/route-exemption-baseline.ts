@@ -8,6 +8,8 @@
 export const SANCTIONED_EXEMPTION_BASELINE = [
   '(marketing)/developers/page.tsx',
   '(marketing)/api-versioning/page.tsx',
+  '(marketing)/compare/page.tsx',
+  '(marketing)/alternatives/page.tsx',
   'waitlist/invite/page.tsx',
   '(marketing)/ai/page.tsx',
   '(marketing)/blog/[slug]/page.tsx',

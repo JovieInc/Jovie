@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +27,56 @@ describe('Switch', () => {
       expect(switchElement.className).toContain('h-4');
       expect(switchElement.className).toContain('w-7');
       expect(switchElement.className).toContain('rounded-full');
+    });
+
+    it('supports an owner-defined thumb presentation', () => {
+      render(
+        <Switch
+          aria-label='Theme toggle'
+          thumbClassName='h-5 w-5'
+          thumbChildren={<span data-testid='thumb-icon' aria-hidden='true' />}
+        />
+      );
+
+      expect(
+        screen.getByRole('switch', { name: 'Theme toggle' })
+      ).toBeVisible();
+      expect(screen.getByTestId('thumb-icon')).toBeInTheDocument();
+    });
+
+    it('lets owner variants supply their own checked thumb translation', () => {
+      render(
+        <Switch aria-label='Owner-positioned toggle' thumbTranslation='owner' />
+      );
+
+      const thumb = screen.getByRole('switch').firstChild;
+      expect(thumb?.className || '').not.toContain(
+        'data-[state=checked]:translate-x-3'
+      );
+    });
+
+    it('lets owner variants supply complete checked and unchecked paints', () => {
+      render(
+        <Switch
+          aria-label='Owner-painted toggle'
+          stateStyling='owner'
+          thumbClassName='bg-surface-1'
+        />
+      );
+
+      const switchElement = screen.getByRole('switch');
+      const thumb = switchElement.firstChild;
+
+      expect(switchElement.className).not.toContain(
+        'data-[state=checked]:bg-btn-primary'
+      );
+      expect(switchElement.className).not.toContain(
+        'data-[state=unchecked]:bg-surface-2'
+      );
+      expect(thumb?.className || '').not.toContain(
+        'data-[state=unchecked]:bg-btn-primary'
+      );
+      expect(thumb?.className || '').toContain('bg-surface-1');
     });
   });
 
@@ -109,7 +160,7 @@ describe('Switch', () => {
         'data-[state=unchecked]:bg-surface-2'
       );
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:ring-subtle'
+        'data-[state=unchecked]:border-subtle'
       );
     });
 
@@ -194,6 +245,9 @@ describe('Switch', () => {
       const thumb = switchElement.firstChild;
       expect(thumb?.className || '').toContain(
         'data-[state=checked]:translate-x-3'
+      );
+      expect(thumb?.className || '').toContain(
+        'rtl:data-[state=checked]:-translate-x-3'
       );
       expect(thumb?.className || '').toContain('transition-transform');
       expect(thumb?.className || '').not.toContain('transition-[margin]');
@@ -282,21 +336,34 @@ describe('Switch', () => {
         'true'
       );
     });
+
+    it('preserves aria-invalid state', () => {
+      render(
+        <Switch
+          aria-label='Invalid toggle'
+          aria-invalid='true'
+          data-testid='switch'
+        />
+      );
+      const switchElement = screen.getByTestId('switch');
+      expect(switchElement).toHaveAttribute('aria-invalid', 'true');
+      expect(switchElement.className).toContain('aria-invalid:!border-error');
+    });
   });
 
   describe('Keyboard Navigation', () => {
-    it('toggles on space key', () => {
+    it('toggles on space key', async () => {
       const onCheckedChange = vi.fn();
       render(<Switch aria-label='Toggle' onCheckedChange={onCheckedChange} />);
       const switchElement = screen.getByRole('switch');
+      const user = userEvent.setup();
 
       switchElement.focus();
       expect(switchElement).toHaveFocus();
 
-      // Radix UI handles keyboard events internally and triggers onClick
-      // fireEvent.keyDown/keyUp doesn't trigger the handler in tests, so we test click
-      fireEvent.click(switchElement);
+      await user.keyboard(' ');
       expect(onCheckedChange).toHaveBeenCalledWith(true);
+      expect(switchElement).toHaveAttribute('aria-checked', 'true');
     });
 
     it('is focusable', () => {

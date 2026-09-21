@@ -22,6 +22,7 @@ export type {
   ProcessSubscriptionResult,
 } from './base-handler';
 export { BaseSubscriptionHandler } from './base-handler';
+export { ChargeHandler, chargeHandler } from './handlers/charge-handler';
 // Handler instances (for testing and introspection)
 export {
   CheckoutSessionHandler,
@@ -50,9 +51,13 @@ export type {
 export { isSupportedEventType } from './types';
 // Utilities - Common functions for webhook processing
 export {
+  extractStripeObjectId,
+  extractSubscriptionIdFromInvoice,
   getCustomerId,
   getStripeObjectId,
   getUserIdFromStripeCustomer,
   invalidateBillingCache,
+  isFullyRefundedCharge,
+  isLatestSubscriptionInvoice,
   stripeTimestampToDate,
 } from './utils';

@@ -113,7 +113,7 @@ async function updateEventModerationStatus({
     return { ok: false, reason: 'not_found' };
   }
 
-  void trackServerEvent(trackingEvent, {
+  await trackServerEvent(trackingEvent, {
     profileId: authed.profileId,
     eventId: id,
   });
@@ -182,7 +182,7 @@ async function updateBulkEventModerationStatus({
     return { ok: false, reason: 'not_found' };
   }
 
-  void trackServerEvent(trackingEvent, {
+  await trackServerEvent(trackingEvent, {
     profileId: authed.profileId,
     requested: ids.length,
     updated,

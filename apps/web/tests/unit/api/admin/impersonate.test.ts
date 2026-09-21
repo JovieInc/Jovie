@@ -46,6 +46,13 @@ vi.mock('@/lib/rate-limit', () => ({
   adminImpersonateLimiter: mockAdminImpersonateLimiter,
   createRateLimitHeaders: mockCreateRateLimitHeaders,
   getClientIP: mockGetClientIP,
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'This action is temporarily unavailable. Please try again later.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 
 const routeModulePromise = import('@/app/api/admin/impersonate/route');
@@ -231,6 +238,29 @@ describe('Admin Impersonate API', () => {
       expect(data.error).toBe(
         'Too many impersonation attempts. Please try again later.'
       );
+    });
+
+    it('returns 503 when the durable limiter is unavailable', async () => {
+      mockRequireAdmin.mockResolvedValue(null);
+      mockAuth.mockResolvedValue({ userId: 'admin-123' });
+      mockAdminImpersonateLimiter.limit.mockResolvedValue({
+        success: false,
+        limit: 5,
+        remaining: 0,
+        reset: new Date(),
+        unavailable: true,
+        backend: 'unavailable',
+      });
+      const { POST } = await routeModulePromise;
+      const response = await POST(
+        new Request('http://localhost/api/admin/impersonate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetClerkId: 'target-123' }),
+        })
+      );
+      expect(response.status).toBe(503);
+      expect(mockStartImpersonation).not.toHaveBeenCalled();
     });
 
     it('returns 400 when impersonation fails', async () => {

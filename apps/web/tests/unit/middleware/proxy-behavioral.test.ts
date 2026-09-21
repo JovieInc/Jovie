@@ -407,6 +407,27 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBe(404);
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
     });
+
+    it('returns 410 for root /music and /shows only', async () => {
+      for (const pathname of ['/music', '/shows']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status, pathname).toBe(410);
+        expect(res.headers.get('x-robots-tag')).toBe('noindex');
+        expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+      }
+    });
+
+    it('leaves /product and /you claimable so Drive can ship the marketing route', async () => {
+      for (const pathname of ['/product', '/you']) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status, pathname).not.toBe(410);
+        expect(res.status, pathname).not.toBe(308);
+      }
+    });
   });
 
   // ==========================================================================

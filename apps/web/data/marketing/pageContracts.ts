@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
 
 export interface MarketingPageContract {
   readonly routeGlob: string;
@@ -18,7 +19,7 @@ const START_CTA = {
 } as const;
 
 const CLAIM_PROFILE_CTA = {
-  href: 'https://jov.ie/waitlist',
+  href: APP_ROUTES.SIGNUP,
   label: 'Claim your profile',
 } as const;
 
@@ -110,6 +111,17 @@ export const MARKETING_PAGE_CONTRACTS = {
     proof: 'paste-channel before/after preview, workflow, and safeguards',
     successEvent: 'visitor pastes a channel and sees three thumbnails',
     primaryCta: START_CTA,
+  },
+  '(marketing)/product/page.tsx': {
+    routeGlob: '(marketing)/product/page.tsx',
+    url: APP_ROUTES.PRODUCT,
+    job: 'claim the public page that shows up when people search for you',
+    proof: 'unclaimed jov.ie/you claim card with inset Claim action',
+    successEvent: 'visitor claims the public page from the product hero',
+    primaryCta: {
+      href: PRODUCT_CLAIM_HREF,
+      label: PRODUCT_COPY.claimCard.cta,
+    },
   },
   '(marketing)/launch/page.tsx': {
     routeGlob: '(marketing)/launch/page.tsx',

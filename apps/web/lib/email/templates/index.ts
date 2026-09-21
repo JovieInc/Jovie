@@ -34,6 +34,16 @@ export {
   getFounderWelcomeSubject,
   getFounderWelcomeText,
 } from './founder-welcome';
+export type { PaidWelcomeTemplateData } from './paid-welcome';
+export {
+  buildPaidWelcomeActivationUrl,
+  buildPaidWelcomeBillingUrl,
+  buildPaidWelcomeSupportUrl,
+  getPaidWelcomeEmail,
+  getPaidWelcomeHtml,
+  getPaidWelcomeSubject,
+  getPaidWelcomeText,
+} from './paid-welcome';
 export type { ProductUpdateTemplateData } from './product-update';
 export {
   getProductUpdateEmail,

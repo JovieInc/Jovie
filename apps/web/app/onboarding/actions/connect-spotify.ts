@@ -451,7 +451,7 @@ export async function connectOnboardingSpotifyArtist(
       return;
     }
 
-    void trackServerEvent('releases_synced', {
+    await trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',

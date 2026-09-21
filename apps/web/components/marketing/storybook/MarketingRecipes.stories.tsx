@@ -419,7 +419,7 @@ export const seo: Story = {
           <MarketingHero
             headingId='seo-hero-heading'
             headline='About Jovie'
-            subtitle='Jovie is a release platform for independent musicians — smart links, artist profiles, audience intelligence, and release automation.'
+            subtitle='Jovie is one product for presence, relationships, and growth — for artists, founders, authors, creators, and independent experts.'
             primaryCta={{ label: 'Get started', href: APP_ROUTES.SIGNUP }}
             logos={false}
             align='left'

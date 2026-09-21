@@ -51,6 +51,28 @@ SYSTEMS_DOWN_REASONS = frozenset(
         "gate-evaluation-failed",
     }
 )
+
+
+def issue_intake_allowed(status: object, reasons: object) -> bool:
+    """Issue-blocked red keeps Jovie intake open; systems-down stays fail-closed."""
+    if not isinstance(reasons, list) or not all(
+        isinstance(reason, str) for reason in reasons
+    ):
+        return False
+    reason_set = set(reasons)
+    if reason_set & SYSTEMS_DOWN_REASONS:
+        return False
+    if status == "healthy":
+        return True
+    if (
+        status in {"grace", "red"}
+        and reason_set
+        and reason_set <= ISSUE_BLOCKED_REASONS
+    ):
+        return True
+    return False
+
+
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
@@ -2598,13 +2620,17 @@ def evaluate_closure_health(
         "status": status,
         "authority": AUTHORITY,
         "observedAt": isoformat(now),
-        "newIssueIntakeAllowed": status == "healthy",
+        "newIssueIntakeAllowed": issue_intake_allowed(status, reasons),
         "promotionContinues": True,
         "remediationContinues": True,
         "blockedActivities": (
-            ["new-issue-lease", "new-implementation", "fallback-pr-generation"]
-            if status != "healthy"
-            else []
+            []
+            if issue_intake_allowed(status, reasons)
+            else [
+                "new-issue-lease",
+                "new-implementation",
+                "fallback-pr-generation",
+            ]
         ),
         "reasons": sorted(set(reasons)),
         "episodes": episodes,

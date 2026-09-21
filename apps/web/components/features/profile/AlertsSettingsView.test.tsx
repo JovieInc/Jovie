@@ -57,4 +57,25 @@ describe('AlertsSettingsView', () => {
       )
     ).toBeVisible();
   });
+
+  it('pairs each canonical switch with its row description for announced labels', () => {
+    render(
+      <AlertsSettingsView {...viewProps} isSubscribed onTogglePref={vi.fn()} />
+    );
+
+    for (const name of ['New Music', 'Events', 'Merch', 'General']) {
+      const row = screen.getByRole('switch', { name });
+      const describedBy = row.getAttribute('aria-describedby');
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy as string)).toHaveTextContent(
+        name === 'New Music'
+          ? 'Singles, albums, and videos.'
+          : name === 'Events'
+            ? 'Tour dates and ticket updates.'
+            : name === 'Merch'
+              ? 'Drops, restocks, and low-stock updates.'
+              : 'Occasional artist updates.'
+      );
+    }
+  });
 });

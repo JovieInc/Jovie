@@ -151,6 +151,19 @@ describe('HeroSpotifySearch', () => {
       expect(getInput()).toHaveAttribute('role', 'combobox');
     });
 
+    it('keeps the homepage search focus indicator visible', () => {
+      renderComponent();
+
+      expect(getInput()).toHaveClass(
+        'focus-visible:outline-none',
+        'focus-visible:border-focus',
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus/25',
+        'focus-visible:ring-offset-2',
+        'focus-visible:ring-offset-surface-page'
+      );
+    });
+
     it('namespaces result option ids per instance when rendered twice', async () => {
       mockHookReturn.results = ARTISTS;
       mockHookReturn.state = 'success';

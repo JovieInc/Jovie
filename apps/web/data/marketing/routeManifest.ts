@@ -467,6 +467,28 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/youtube-thumbnails',
   },
   {
+    glob: '(marketing)/product/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/product/ProductLanding.tsx',
+      'hero'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
+      notes:
+        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/product',
+    healthCheck: {
+      path: '/product',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(
@@ -617,6 +639,54 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/cli',
     healthCheck: {
       path: '/cli',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/compare/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 compare hub',
+      notes:
+        'Hub index listing comparison slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'compare hub index listing comparison slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/compare',
+    healthCheck: {
+      path: '/compare',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/alternatives/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-1650 alternatives hub',
+      notes:
+        'Hub index listing alternative slugs. Uses the marketing shell but is a prose index rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'alternatives hub index listing alternative slugs; not recipe-composable',
+      linearId: 'JOV-1650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/17985',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/alternatives',
+    healthCheck: {
+      path: '/alternatives',
       expected: 'page',
     },
   },

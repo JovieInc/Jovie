@@ -12,13 +12,27 @@ export const PRODUCER = Object.freeze({
   environment: 'local-production-build',
   artifact: 'screen-browser-proof',
 });
+export const MARKETING_EVIDENCE_SCHEMA = 'marketing-route-evidence/v1';
+export const REQUIRED_MARKETING_QUALITY_CHECKS = Object.freeze([
+  'accessibility',
+  'console-errors',
+  'focus-visible',
+  'horizontal-overflow',
+  'layout-stability',
+  'reduced-motion',
+]);
 const SKEW = 5 * 60_000;
 const MAX_AGE = 24 * 60 * 60_000;
+// The marketing artifact currently contains 240 files (60 routes x two
+// viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
+const MAX_ARCHIVE_MEMBERS = 256;
+const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
 const isObject = value =>
   value && typeof value === 'object' && !Array.isArray(value);
 const sha256 = bytes =>
   `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+const hexDigest = bytes => createHash('sha256').update(bytes).digest('hex');
 const time = value =>
   typeof value === 'string' && Number.isFinite(Date.parse(value))
     ? Date.parse(value)
@@ -37,6 +51,38 @@ const paths = value =>
 const equal = (left, right) =>
   left?.length === right?.length &&
   left.every((value, index) => value === right[index]);
+const validLocalFinalUrl = (value, expectedRoute) => {
+  if (typeof value !== 'string' || typeof expectedRoute !== 'string')
+    return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1'].includes(url.hostname) &&
+      url.pathname === expectedRoute &&
+      url.search === '' &&
+      url.hash === ''
+    );
+  } catch {
+    return false;
+  }
+};
+const normalizePath = value => String(value || '').replace(/\\/g, '/');
+const sourceMatches = (path, sources) => {
+  const normalized = normalizePath(path);
+  return (sources || []).some(source => {
+    const target = normalizePath(source);
+    return (
+      normalized === target ||
+      normalized.startsWith(target.endsWith('/') ? target : `${target}/`)
+    );
+  });
+};
+export function marketingArtifactName(headSha) {
+  return /^[0-9a-f]{40}$/i.test(headSha ?? '')
+    ? `marketing-route-screenshots-${headSha.toLowerCase()}`
+    : null;
+}
 function run(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
@@ -60,7 +106,7 @@ function bundleDigest(files) {
   }
   return `sha256:${hash.digest('hex')}`;
 }
-function archive(archiveBytes, expected) {
+function extractZip(archiveBytes) {
   const root = mkdtempSync(join(tmpdir(), 'jovie-screen-proof-'));
   const zip = join(root, 'proof.zip');
   try {
@@ -70,25 +116,195 @@ function archive(archiveBytes, expected) {
       .split(/\r?\n/)
       .filter(Boolean);
     if (
-      !equal([...members].sort(), expected) ||
+      members.length > MAX_ARCHIVE_MEMBERS ||
       members.some(
         name =>
           name.startsWith('/') || name.includes('..') || name.includes('\\')
       )
     )
       throw new Error('unsafe artifact member set');
-    const bytes = new Map(
-      expected.map(name => [
-        name,
-        Buffer.from(run('unzip', ['-p', zip, name], true)),
-      ])
-    );
-    return {
-      proof: JSON.parse(bytes.get('screen-proof.json').toString('utf8')),
-      bytes,
-    };
+    const extracted = new Map();
+    let extractedBytes = 0;
+    for (const name of members) {
+      const bytes = Buffer.from(run('unzip', ['-p', zip, name], true));
+      extractedBytes += bytes.length;
+      if (extractedBytes > MAX_EXTRACTED_ARTIFACT_BYTES)
+        throw new Error('unsafe artifact member set');
+      extracted.set(name, bytes);
+    }
+    return extracted;
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+}
+function archive(archiveBytes, expected) {
+  const bytes = extractZip(archiveBytes);
+  const names = [...bytes.keys()].sort();
+  if (!equal(names, expected)) throw new Error('unsafe artifact member set');
+  return {
+    proof: JSON.parse(bytes.get('screen-proof.json').toString('utf8')),
+    bytes,
+  };
+}
+function marketingPairs(bytes) {
+  const groups = new Map();
+  for (const [name, file] of bytes) {
+    const normalized = normalizePath(name);
+    const slash = normalized.lastIndexOf('/');
+    const base = slash === -1 ? normalized : normalized.slice(slash + 1);
+    const dir = slash === -1 ? '' : normalized.slice(0, slash);
+    if (base !== 'receipt.json' && base !== 'marketing-route.png')
+      throw new Error('unsafe artifact member set');
+    const group = groups.get(dir) ?? {};
+    if (base === 'receipt.json') group.receipt = file;
+    else group.png = file;
+    groups.set(dir, group);
+  }
+  return [...groups.values()];
+}
+function decodeMarketingProof(bytes, context, meta) {
+  const fail = finding => ({ proof: null, findings: [finding] });
+  if (typeof context.marketingRoute !== 'string')
+    return fail('screen has no registered marketing route binding');
+  let pairs;
+  try {
+    pairs = marketingPairs(bytes);
+  } catch {
+    return fail(
+      'forged marketing receipt or screenshot digest does not match trusted bytes'
+    );
+  }
+  const measured = new Map();
+  const captures = [];
+  let capturedAt = null;
+  for (const pair of pairs) {
+    if (!pair.receipt || !pair.png)
+      return fail(
+        'required marketing route receipts or measurements are incomplete'
+      );
+    let receipt;
+    try {
+      receipt = JSON.parse(pair.receipt.toString('utf8'));
+    } catch {
+      return fail(
+        'forged marketing receipt or screenshot digest does not match trusted bytes'
+      );
+    }
+    if (!sourceMatches(receipt?.sourcePath, context.sourcePaths)) continue;
+    if (
+      receipt.route !== context.marketingRoute ||
+      receipt.fixturePath !== context.marketingRoute ||
+      receipt.finalPath !== context.marketingRoute
+    )
+      return fail(
+        'marketing receipt does not match the registered screen route'
+      );
+    const captured = time(receipt.capturedAt);
+    const checks = Array.isArray(receipt.qualityChecks)
+      ? receipt.qualityChecks
+      : [];
+    if (
+      !isObject(receipt) ||
+      receipt.schemaVersion !== MARKETING_EVIDENCE_SCHEMA ||
+      receipt.viewport == null ||
+      measured.has(receipt.viewport) ||
+      !context.viewports.includes(receipt.viewport) ||
+      receipt.sourceGitSha?.toLowerCase() !== context.headSha.toLowerCase() ||
+      hexDigest(pair.png) !==
+        String(receipt.screenshotSha256 || '').toLowerCase() ||
+      !validPlaywrightPng(pair.png)
+    )
+      return fail(
+        'forged marketing receipt or screenshot digest does not match trusted bytes'
+      );
+    if (receipt.buildMode !== 'production')
+      return fail('marketing capture is not an exact production build');
+    if (
+      captured === null ||
+      captured > meta.now + SKEW ||
+      meta.now - captured > MAX_AGE ||
+      captured < meta.started - SKEW ||
+      captured > meta.completed + SKEW ||
+      typeof receipt.documentStatus !== 'number' ||
+      receipt.documentStatus >= 400 ||
+      REQUIRED_MARKETING_QUALITY_CHECKS.some(check => !checks.includes(check))
+    )
+      return fail(
+        'required marketing route receipts or measurements are incomplete'
+      );
+    measured.set(receipt.viewport, receipt);
+    captures.push([`screenshots/${receipt.viewport}.png`, pair.png]);
+    if (capturedAt === null || captured > capturedAt) capturedAt = captured;
+  }
+  if (
+    measured.size !== context.viewports.length ||
+    context.viewports.some(id => !measured.has(id))
+  )
+    return fail(
+      'required marketing route receipts or measurements are incomplete'
+    );
+  return {
+    proof: {
+      schema: 'screen-browser-proof/v1',
+      producer: 'external-render-runner',
+      status: 'unverified-candidate',
+      certificationStatus: 'not-certified',
+      screenId: context.screenId,
+      headSha: context.headSha.toLowerCase(),
+      tier: 'rendered-evidence',
+      environment: PRODUCER.environment,
+      sourcePaths: [...context.sourcePaths].sort(),
+      runUrl: meta.runUrl,
+      producerRunId: meta.runId,
+      producerRunAttempt: meta.attempt,
+      producerJobId: meta.jobId,
+      capturedAt: new Date(capturedAt).toISOString(),
+      artifactDigest: bundleDigest(captures),
+      viewports: context.viewports.map(id => ({
+        id,
+        decision: 'pass',
+        rendered: true,
+        axe: { violations: 0 },
+        overflow: { maxHorizontalPx: 0 },
+        interaction: { passed: true },
+        cls: { value: 0 },
+        contrast: { passed: true },
+      })),
+      activeFlow: { disclosure: false },
+      historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+      visibleActions: ['Certify', 'Block'],
+    },
+    findings: [],
+  };
+}
+/**
+ * @param {{ artifactId?: unknown, artifactName?: string, headSha?: string }} [request]
+ */
+export function resolveTrustedArtifactId({
+  artifactId,
+  artifactName,
+  headSha,
+} = {}) {
+  if (validId(Number(artifactId))) return Number(artifactId);
+  const name =
+    artifactName ||
+    marketingArtifactName(typeof headSha === 'string' ? headSha : '');
+  if (!name || !/^[0-9a-f]{40}$/i.test(headSha ?? '')) return null;
+  try {
+    const listing = JSON.parse(
+      api(`actions/artifacts?name=${encodeURIComponent(name)}&per_page=20`)
+    );
+    const matches = (listing.artifacts || []).filter(
+      item => item?.name === name && !item.expired && validId(item.id)
+    );
+    const runId = Number(process.env.GITHUB_RUN_ID);
+    const scoped = validId(runId)
+      ? matches.filter(item => item.workflow_run?.id === runId)
+      : [];
+    const chosen = scoped.length === 1 ? scoped : matches;
+    return chosen.length === 1 ? chosen[0].id : null;
+  } catch {
+    return null;
   }
 }
 /** Owned GitHub transport; tests replace `gh` on PATH, never a verifier result. */
@@ -99,6 +315,7 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
     ? [...context.viewports].sort()
     : [];
   const fail = finding => ({ proof: null, findings: [finding] });
+  const marketingName = marketingArtifactName(context?.headSha);
   if (
     !validId(artifactId) ||
     !/^[0-9a-f]{40}$/i.test(context?.headSha ?? '') ||
@@ -122,11 +339,21 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
         item.run_attempt === attempt &&
         item.head_sha?.toLowerCase() === context.headSha.toLowerCase()
     );
+    const trustedName =
+      artifact.name === PRODUCER.artifact || artifact.name === marketingName;
+    const currentRunId = Number(process.env.GITHUB_RUN_ID);
+    const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+    const completedRun = workflowRun.conclusion === 'success';
+    const downstreamCertificationRun =
+      runId === currentRunId &&
+      attempt === currentAttempt &&
+      workflowRun.status === 'in_progress' &&
+      workflowRun.conclusion == null;
     if (
       !validId(runId) ||
       !validId(attempt) ||
       artifact.id !== artifactId ||
-      artifact.name !== PRODUCER.artifact ||
+      !trustedName ||
       artifact.expired ||
       !/^sha256:[0-9a-f]{64}$/i.test(artifact.digest ?? '') ||
       workflowRun.repository?.full_name !== PRODUCER.repository ||
@@ -134,7 +361,7 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       workflowRun.head_sha?.toLowerCase() !== context.headSha.toLowerCase() ||
       workflowRun.path !== PRODUCER.workflow ||
       !['push', 'workflow_dispatch'].includes(workflowRun.event) ||
-      workflowRun.conclusion !== 'success' ||
+      (!completedRun && !downstreamCertificationRun) ||
       job?.length !== 1 ||
       !validId(job[0].id) ||
       job[0].conclusion !== 'success'
@@ -160,6 +387,25 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
     );
     if (sha256(downloaded) !== artifact.digest.toLowerCase())
       return fail('artifact digest does not match GitHub bytes');
+    if (artifact.name === marketingName) {
+      return decodeMarketingProof(
+        extractZip(downloaded),
+        {
+          ...context,
+          sourcePaths: expectedSources,
+          viewports,
+        },
+        {
+          now,
+          started,
+          completed,
+          runId,
+          attempt,
+          jobId: job[0].id,
+          runUrl: `https://github.com/${PRODUCER.repository}/actions/runs/${runId}/attempts/${attempt}`,
+        }
+      );
+    }
     const names = [
       'screen-proof.json',
       ...viewports.map(id => `screenshots/${id}.png`),
@@ -191,7 +437,9 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       captured < started - SKEW ||
       captured > completed + SKEW ||
       proof.artifactDigest !== bundleDigest(captures) ||
-      captures.some(([, bytes]) => !validPlaywrightPng(bytes))
+      captures.some(
+        ([, image]) => !Buffer.isBuffer(image) || !validPlaywrightPng(image)
+      )
     )
       return fail(
         'candidate identity, capture, or decoded bundle is unavailable'
@@ -208,11 +456,19 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
         return (
           !item ||
           item.rendered !== true ||
+          (context.proofRoute &&
+            (item.requestedRoute !== context.proofRoute ||
+              !validLocalFinalUrl(item.finalUrl, context.proofRoute))) ||
           typeof item.axe?.violations !== 'number' ||
           typeof item.overflow?.maxHorizontalPx !== 'number' ||
           item.interaction?.passed !== true ||
           typeof item.cls?.value !== 'number' ||
-          item.contrast?.passed !== true
+          item.contrast?.passed !== true ||
+          (context.proofRoute &&
+            (item.runtime?.consoleErrors !== 0 ||
+              item.runtime?.pageErrors !== 0 ||
+              item.runtime?.failedResponses !== 0 ||
+              item.runtime?.failedRequests !== 0))
         );
       })
     )

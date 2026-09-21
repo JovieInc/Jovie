@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -106,11 +109,15 @@ describe('changed test coverage', () => {
       isCoverageSourcePath('apps/web/components/atoms/example.stories.tsx')
     ).toBe(false);
     expect(isCoverageSourcePath('scripts/lib/example.mjs')).toBe(false);
+    expect(isCoverageSourcePath('apps/web/scripts/vitest-wrapper.mjs')).toBe(
+      false
+    );
     expect(
       evaluateChangedLineCoverage({
         changedLines: new Map([
           ['apps/web/vitest.config.fast.mts', new Set([1])],
           ['scripts/lib/example.mjs', new Set([1])],
+          ['apps/web/scripts/vitest-wrapper.mjs', new Set([1])],
         ]),
         coverage: {},
       })
@@ -145,6 +152,28 @@ describe('changed test coverage', () => {
       'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"'
     );
     expect(coverage).toContain('has_web_coverage_changes');
+    const webPkg = JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, '../../../apps/web/package.json'),
+        'utf8'
+      )
+    );
+    // pnpm forwards a leading "--" into test:coverage; vitest then treats
+    // --changed as a filter and Exact-head runs the full tree (~1267 files).
+    expect(webPkg.scripts['test:coverage']).toContain('vitest-wrapper.mjs');
+    expect(webPkg.scripts['test:coverage']).toContain('--coverage');
+    expect(webPkg.scripts['test:coverage']).not.toBe('vitest run --coverage');
+    const wrapper = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../apps/web/scripts/vitest-wrapper.mjs'
+      ),
+      'utf8'
+    );
+    expect(wrapper).toContain("rawArgs[0] === '--'");
+    expect(wrapper).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(wrapper).toContain("args[index] === '--changed'");
+    expect(wrapper).toContain("'related'");
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
     expect(coverage).toContain(
       'pnpm --filter @jovie/web test:coverage --changed'
@@ -202,4 +231,121 @@ describe('changed test coverage', () => {
     expect(mergeReady).toContain('Exact-head Coverage:$COVERAGE_RESULT');
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
   });
+
+  it('maps Exact-head --changed onto planned related files only', () => {
+    expect(
+      rewriteVitestArgs(
+        ['run', '--coverage', '--changed', 'abc123', '--bail', '1'],
+        'constants/plans.ts\ndata/marketingPricingPlans.ts'
+      )
+    ).toEqual([
+      'related',
+      'constants/plans.ts',
+      'data/marketingPricingPlans.ts',
+      '--run',
+      '--coverage',
+      '--bail',
+      '1',
+    ]);
+    expect(rewriteVitestArgs(['--', 'run', '--coverage'], '')).toEqual([
+      'run',
+      '--coverage',
+    ]);
+  });
+
+  it.each([
+    [
+      'rewritten exact-head coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      'lib/example.ts',
+      true,
+      4,
+      true,
+    ],
+    [
+      'legacy exact-head coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      '',
+      true,
+      4,
+      true,
+    ],
+    [
+      'ordinary changed tests',
+      ['run', '--changed', 'abc123'],
+      '',
+      true,
+      1,
+      false,
+    ],
+    [
+      'unscoped related coverage',
+      ['related', 'lib/example.ts', '--run', '--coverage'],
+      '',
+      true,
+      2,
+      false,
+    ],
+    ['ordinary full coverage', ['run', '--coverage'], '', true, 2, false],
+    [
+      'local scoped coverage',
+      ['run', '--coverage', '--changed', 'abc123'],
+      'lib/example.ts',
+      false,
+      undefined,
+      true,
+    ],
+  ])(
+    'loads real fast config for %s',
+    async (_name, args, include, ci, workers, parallel) => {
+      const repoRoot = resolve(import.meta.dirname, '../../..');
+      const require = createRequire(import.meta.url);
+      const { loadConfigFromFile } = await import(
+        pathToFileURL(
+          require.resolve('vite', {
+            paths: [resolve(repoRoot, 'apps/web')],
+          })
+        ).href
+      );
+      const previousArgv = process.argv;
+      const previousCI = process.env.CI;
+      const previousInclude = process.env.JOVIE_COVERAGE_INCLUDE;
+      try {
+        process.argv = [
+          process.execPath,
+          'vitest',
+          ...rewriteVitestArgs(args, include),
+        ];
+        process.env.CI = String(ci);
+        process.env.JOVIE_COVERAGE_INCLUDE = include;
+        const loaded = await loadConfigFromFile(
+          { command: 'serve', mode: 'test' },
+          resolve(repoRoot, 'apps/web/vitest.config.fast.mts')
+        );
+        expect(loaded).not.toBeNull();
+        expect(loaded.config.test.maxWorkers).toBe(workers);
+        expect(loaded.config.test.fileParallelism).toBe(parallel);
+        expect(loaded.config.test.coverage.provider).toBe('v8');
+        expect(loaded.config.test.coverage.include).toEqual(
+          include ? [include] : undefined
+        );
+        if (include && args.includes('--coverage')) {
+          expect(loaded.config.test.bail).toBe(1);
+          expect(loaded.config.test.coverage.reporter).toEqual([
+            'text',
+            'json',
+          ]);
+        }
+      } finally {
+        process.argv = previousArgv;
+        for (const [key, value] of [
+          ['CI', previousCI],
+          ['JOVIE_COVERAGE_INCLUDE', previousInclude],
+        ]) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+      }
+    }
+  );
 });

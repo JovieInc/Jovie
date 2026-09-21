@@ -1,6 +1,7 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
-  "registryVersion": "2026-09-02.1",
+  "companyServiceId": "company.summer",
+  "registryVersion": "2026-09-18.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
@@ -245,8 +246,8 @@
         "apps/web/lib/ovie/linear-coordination.ts",
         "apps/web/lib/ovie/mcp/tools.ts"
       ],
-      "implementationState": "implemented",
-      "status": "certified_local",
+      "implementationState": "already_works",
+      "status": "passing",
       "critical": true,
       "evidence": [
         {
@@ -281,7 +282,7 @@
         "version": "1.1.0",
         "fixture": "linear-explicit-update-reversible-fixture/v1",
         "expectedState": "durable_linear_readback_observed",
-        "requiresRuntimeReceipt": false,
+        "requiresRuntimeReceipt": true,
         "sourceAssertions": [
           {
             "kind": "file_contains",
@@ -512,50 +513,76 @@
       "id": "SUMMER-COMM-011",
       "capability": "Cheap heartbeat, liveness, and no-op reconciliation",
       "canonicalPath": [
-        "low-cadence heartbeat -> state fingerprint -> no-op or targeted reconciliation -> observable receipt",
-        "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
+        "eve-owned 15m liveness heartbeat -> signed non-empty no-op or identification/remediation receipt",
+        "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+        "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts"
       ],
-      "implementationState": "conflicting",
+      "implementationState": "in_flight",
       "status": "blocked",
       "critical": true,
       "evidence": [
         {
           "kind": "source",
-          "ref": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
-          "summary": "A watchdog exists, but no canonical Summer heartbeat/no-op receipt contract is present."
+          "ref": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+          "summary": "Eve owns the 15-minute summer-liveness-heartbeat trigger. It emits jovie.eve.summer-liveness-heartbeat/v1 and does not invoke backlog rerank."
         },
         {
           "kind": "runtime",
           "ref": "codex-turn:01a05f69-5b89-7db0-81fe-96fe21aae443",
-          "summary": "After the five-minute heartbeat was updated to require a non-empty terminal receipt, this scheduled turn completed in 9.873 seconds with no assistant message, tool marker, or receipt. Scheduling recurrence exists, but the completed empty turn fails closed as Summer identification/remediation evidence."
+          "summary": "The superseded five-minute Codex heartbeat completed in 9.873 seconds with no assistant message, tool marker, or receipt. Empty completed turns fail closed and do not count as Summer liveness evidence."
         },
         {
           "kind": "blocker",
           "ref": "JOV-5853:eve-native-continuous-loop",
-          "summary": "The continuous bottleneck-remediation loop remains blocked until a later scheduled turn emits a non-empty signed terminal no-op/remediation receipt and Eve owns that schedule across restart; the existing Codex heartbeat and its completed empty turn cannot satisfy either boundary."
+          "summary": "Source owns the Eve 15-minute receipt contract. Founder deploy of that schedule in the intended runtime remains required before commissioning; the Codex empty turn cannot satisfy the gate."
         }
       ],
-      "lastVerified": "2026-09-01T23:56:56Z",
-      "invalidationCondition": "Re-evaluate only after a later scheduled turn emits a non-empty signed no-op/remediation receipt and Eve natively owns that five-minute schedule across restart; invalidate on an empty completed turn, cadence, state fingerprint, cost budget, scheduler ownership, or escalation-route changes.",
+      "lastVerified": "2026-09-19T02:11:00Z",
+      "invalidationCondition": "Re-evaluate only after the Eve-owned 15-minute summer-liveness-heartbeat emits a non-empty signed no-op or identification/remediation receipt in the intended runtime; invalidate on an empty completed turn, cadence change, backlog-rerank from this heartbeat, scheduler ownership change, or receipt-schema change.",
       "ownerRemediation": {
         "owner": "Eve / Summer liveness",
         "refs": ["JOV-5852", "JOV-5853"]
       },
       "probe": {
         "id": "summer.liveness.heartbeat-noop",
-        "version": "1.1.0",
-        "fixture": "scheduled-heartbeat-nonempty-receipt-across-restart/v2",
+        "version": "1.2.0",
+        "fixture": "eve-owned-15m-nonempty-receipt/v3",
         "expectedState": "eve_owned_non_empty_terminal_noop_or_remediation_receipt",
         "requiresRuntimeReceipt": true,
         "sourceAssertions": [
           {
             "kind": "file_exists",
-            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts"
           },
           {
             "kind": "file_contains",
-            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
-            "value": "jovie.summer-heartbeat/v1"
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+            "value": "SUMMER_LIVENESS_HEARTBEAT_CADENCE"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "jovie.eve.summer-liveness-heartbeat/v1"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "event-driven-only"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "*/15 * * * *"
+          },
+          {
+            "kind": "file_not_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-liveness-heartbeat.ts",
+            "value": "rankSummerBottlenecks"
+          },
+          {
+            "kind": "file_not_contains",
+            "path": "apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts",
+            "value": "rankSummerBottlenecks"
           }
         ]
       }

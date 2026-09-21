@@ -4,7 +4,12 @@ import type { YouTubeThumbnailSet } from '@/lib/db/schema/youtube-library';
 import { serverFetch } from '@/lib/http/server-fetch';
 import { parseYouTubeDuration } from '@/lib/youtube/metadata';
 import type {
+  YouTubeSnippetWriter,
+  YouTubeVideoSnippetRecord,
+} from '@/lib/youtube-library/link-apply';
+import type {
   YouTubeChannelVideo,
+  YouTubeImportSkip,
   YouTubeLibraryProvider,
   YouTubeMetricWindow,
   YouTubeVideoMetrics,
@@ -41,13 +46,18 @@ interface PlaylistItemsResponse extends PageInfo {
 }
 
 interface VideosResponse {
+  readonly etag?: string;
   readonly items?: readonly {
     readonly id: string;
+    readonly etag?: string;
     readonly snippet?: {
       readonly channelId?: string;
       readonly title?: string;
       readonly description?: string;
       readonly publishedAt?: string;
+      readonly categoryId?: string;
+      readonly tags?: readonly string[];
+      readonly defaultLanguage?: string;
       readonly thumbnails?: YouTubeThumbnailSet;
     };
     readonly contentDetails?: { readonly duration?: string };
@@ -68,10 +78,12 @@ export interface OwnedYouTubeChannel {
 
 export class YouTubeProviderError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  readonly reason: string | null;
+  constructor(message: string, status: number, reason?: string | null) {
     super(message);
     this.name = 'YouTubeProviderError';
     this.status = status;
+    this.reason = reason ?? null;
   }
 }
 
@@ -79,17 +91,30 @@ async function authorizedJson<T>(
   url: URL,
   accessToken: string,
   fetcher: ProviderFetch,
-  context: string
+  context: string,
+  init?: { readonly method?: string; readonly body?: string }
 ): Promise<T> {
   const response = await fetcher(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    method: init?.method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: init?.body,
     timeoutMs: 15_000,
     context,
   });
   if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      readonly error?: {
+        readonly status?: string;
+        readonly errors?: readonly { readonly reason?: string }[];
+      };
+    } | null;
     throw new YouTubeProviderError(
       `${context} failed with status ${response.status}`,
-      response.status
+      response.status,
+      payload?.error?.errors?.[0]?.reason ?? payload?.error?.status ?? null
     );
   }
   return (await response.json()) as T;
@@ -270,6 +295,80 @@ export function createYouTubeLibraryProvider(input: {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
   return {
+    async listChannelVideosPage(channelId, pageInput) {
+      const channels = await listOwnedYouTubeChannels({
+        accessToken: input.accessToken,
+        fetcher,
+      });
+      const channel = channels.find(item => item.id === channelId);
+      if (!channel) {
+        throw new YouTubeProviderError(
+          'The authorized account does not own the selected YouTube channel',
+          403,
+          'channelMismatch'
+        );
+      }
+      const url = new URL(`${YOUTUBE_DATA_API}/playlistItems`);
+      url.searchParams.set('part', 'contentDetails');
+      url.searchParams.set('playlistId', channel.uploadsPlaylistId);
+      url.searchParams.set('maxResults', '50');
+      if (pageInput?.pageToken) {
+        url.searchParams.set('pageToken', pageInput.pageToken);
+      }
+      const playlist = await authorizedJson<PlaylistItemsResponse>(
+        url,
+        input.accessToken,
+        fetcher,
+        'YouTube uploads page'
+      );
+      const skipped: YouTubeImportSkip[] = [];
+      const ids: string[] = [];
+      for (const item of playlist.items ?? []) {
+        const videoId = item.contentDetails?.videoId?.trim();
+        if (videoId) ids.push(videoId);
+        else skipped.push({ videoId: null, reason: 'missing_id' });
+      }
+      const videos: YouTubeChannelVideo[] = [];
+      const found = new Set<string>();
+      if (ids.length > 0) {
+        const details = new URL(`${YOUTUBE_DATA_API}/videos`);
+        details.searchParams.set('part', 'snippet,contentDetails,status');
+        details.searchParams.set('id', ids.join(','));
+        const data = await authorizedJson<VideosResponse>(
+          details,
+          input.accessToken,
+          fetcher,
+          'YouTube video details'
+        );
+        for (const item of data.items ?? []) {
+          const video = toChannelVideo(item, channelId);
+          const videoId = item.id?.trim() || null;
+          if (!video) {
+            skipped.push({
+              videoId,
+              reason: 'wrong_channel',
+            });
+            if (videoId) found.add(videoId);
+            continue;
+          }
+          found.add(video.videoId);
+          videos.push(video);
+        }
+      }
+      for (const videoId of ids) {
+        if (!found.has(videoId))
+          skipped.push({ videoId, reason: 'missing_id' });
+      }
+      return {
+        channelId: channel.id,
+        channelTitle: channel.title,
+        uploadsPlaylistId: channel.uploadsPlaylistId,
+        videos,
+        nextPageToken: playlist.nextPageToken ?? null,
+        skipped,
+      };
+    },
+
     async listChannelVideos(channelId) {
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,
@@ -331,6 +430,85 @@ export function createYouTubeLibraryProvider(input: {
         }
       }
       return output;
+    },
+  };
+}
+
+type VideoRow = NonNullable<VideosResponse['items']>[number];
+
+function toSnippetRecord(item: VideoRow): YouTubeVideoSnippetRecord | null {
+  if (!item.id || !item.snippet?.title) return null;
+  return {
+    id: item.id,
+    etag: item.etag ?? null,
+    snippet: {
+      title: item.snippet.title.trim() || 'Untitled video',
+      description: item.snippet.description ?? '',
+      categoryId: item.snippet.categoryId ?? null,
+      tags: item.snippet.tags,
+      defaultLanguage: item.snippet.defaultLanguage,
+      channelId: item.snippet.channelId,
+    },
+  };
+}
+
+export function createYouTubeSnippetWriter(input: {
+  readonly accessToken: string;
+  readonly fetcher?: ProviderFetch;
+}): YouTubeSnippetWriter {
+  const fetcher = input.fetcher ?? serverFetch;
+  const videoUrl = (id?: string) => {
+    const url = new URL(`${YOUTUBE_DATA_API}/videos`);
+    url.searchParams.set('part', 'snippet');
+    if (id) url.searchParams.set('id', id);
+    return url;
+  };
+  return {
+    async getVideo(videoId) {
+      const data = await authorizedJson<VideosResponse>(
+        videoUrl(videoId),
+        input.accessToken,
+        fetcher,
+        'YouTube video snippet'
+      );
+      return data.items?.[0] ? toSnippetRecord(data.items[0]) : null;
+    },
+    async updateVideo(update) {
+      const snippet = {
+        title: update.snippet.title,
+        description: update.snippet.description,
+        ...(update.snippet.categoryId
+          ? { categoryId: update.snippet.categoryId }
+          : {}),
+        ...(update.snippet.tags ? { tags: update.snippet.tags } : {}),
+        ...(update.snippet.defaultLanguage
+          ? { defaultLanguage: update.snippet.defaultLanguage }
+          : {}),
+      };
+      const data = await authorizedJson<VideosResponse & VideoRow>(
+        videoUrl(),
+        input.accessToken,
+        fetcher,
+        'YouTube video update',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            id: update.videoId,
+            snippet,
+            ...(update.etag ? { etag: update.etag } : {}),
+          }),
+        }
+      );
+      const item = data.items?.[0] ?? (data.id ? data : null);
+      const record = item ? toSnippetRecord(item) : null;
+      if (!record) {
+        throw new YouTubeProviderError(
+          'YouTube video update returned no snippet',
+          502,
+          'ambiguousProviderResult'
+        );
+      }
+      return record;
     },
   };
 }

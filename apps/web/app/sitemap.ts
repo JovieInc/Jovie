@@ -6,11 +6,11 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   discogRecordings,
   discogReleases,
@@ -20,9 +20,17 @@ import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getPublishedEngineeringStories } from '@/lib/engineering-publication';
 import { env } from '@/lib/env-server';
-import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
+import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import {
+  getExactPublishedMarketingPaths,
+  isEditorialSitemapPath,
+  latestContentRevision,
+  SITEMAP_PUBLISHED_LEGAL_PATHS,
+  SITEMAP_PUBLISHED_MACHINE_PATHS,
+  toContentRevisionDate,
+} from '@/lib/seo/sitemap-publication';
 
 export const revalidate = 3600;
 
@@ -34,6 +42,7 @@ type SitemapCatalog = {
     isClaimed: boolean | null;
     displayName: string | null;
     settings: unknown;
+    ownerEmail: string | null;
   }>;
   releases: Array<{
     username: string;
@@ -53,10 +62,17 @@ type SitemapCatalog = {
   }>;
 };
 
+const EMPTY_CATALOG: SitemapCatalog = {
+  profiles: [],
+  releases: [],
+  tracks: [],
+  playlists: [],
+};
+
 const getSitemapCatalog = unstable_cache(
   async (): Promise<SitemapCatalog> => {
     if (!env.DATABASE_URL) {
-      return { profiles: [], releases: [], tracks: [], playlists: [] };
+      return EMPTY_CATALOG;
     }
 
     try {
@@ -69,8 +85,10 @@ const getSitemapCatalog = unstable_cache(
             isClaimed: creatorProfiles.isClaimed,
             displayName: creatorProfiles.displayName,
             settings: creatorProfiles.settings,
+            ownerEmail: users.email,
           })
           .from(creatorProfiles)
+          .leftJoin(users, eq(users.id, creatorProfiles.userId))
           .where(eq(creatorProfiles.isPublic, true)),
 
         db
@@ -136,29 +154,57 @@ const getSitemapCatalog = unstable_cache(
           ),
       ]);
 
+      const discoverableProfiles = filterPublicDiscoveryIdentities(
+        profiles.map(profile => ({
+          ...profile,
+          handle: profile.username,
+          isPublic: true,
+        }))
+      );
+      const eligibleUsernames = new Set(
+        discoverableProfiles.map(profile =>
+          profile.username.trim().toLowerCase()
+        )
+      );
+
       return {
-        profiles: profiles.filter(
+        profiles: discoverableProfiles.filter(
           profile =>
-            isPublicProfileIndexable(profile.username, profile.displayName) &&
-            (profile.isClaimed === true ||
-              !isUnclaimedStructuredCreditProfile(profile.settings))
+            profile.isClaimed === true ||
+            !isUnclaimedStructuredCreditProfile(profile.settings)
         ),
         releases: releases.filter(release =>
-          isPublicProfileIndexable(release.username)
+          eligibleUsernames.has(release.username.trim().toLowerCase())
         ),
         tracks: tracks.filter(track =>
-          isPublicProfileIndexable(track.username)
+          eligibleUsernames.has(track.username.trim().toLowerCase())
         ),
         playlists,
       };
     } catch (error) {
       Sentry.captureException(error);
-      return { profiles: [], releases: [], tracks: [], playlists: [] };
+      return EMPTY_CATALOG;
     }
   },
-  ['sitemap-catalog-v4'],
+  ['sitemap-catalog-v5'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
+
+function absoluteUrl(path: string): string {
+  return path === '/' ? BASE_URL : `${BASE_URL}${path}`;
+}
+
+function sitemapEntry(
+  path: string,
+  lastModified?: Date,
+  images?: readonly string[]
+): MetadataRoute.Sitemap[number] {
+  return {
+    url: absoluteUrl(path),
+    ...(lastModified ? { lastModified } : {}),
+    ...(images && images.length > 0 ? { images: [...images] } : {}),
+  };
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [catalog, blogPosts, changelogReleases, engineeringStories] =
@@ -169,262 +215,158 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       getPublishedEngineeringStories(),
     ]);
 
-  const now = new Date();
+  const blogLastModified = latestContentRevision(
+    ...blogPosts.map(post => post.updatedDate ?? post.date)
+  );
+  const changelogLastModified = latestContentRevision(
+    ...changelogReleases.map(release =>
+      release.date ? `${release.date}T00:00:00Z` : undefined
+    )
+  );
+  const engineeringLastModified = latestContentRevision(
+    ...engineeringStories.map(story =>
+      story.source ? `${story.source.date}T00:00:00Z` : undefined
+    )
+  );
 
-  const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: BASE_URL,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 1,
-    },
-    {
-      url: `${BASE_URL}/about`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      url: `${BASE_URL}${APP_ROUTES.CLI}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      url: PUBLIC_ARTIST_API_POLICY_URL,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    // These public, root-level machine-readable resources are linked from the
-    // developer guide and are intentionally distinct from the noindex /api/*
-    // surface.
-    {
-      url: `${BASE_URL}/openapi.json`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${BASE_URL}/llms.txt`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${BASE_URL}/llms-full.txt`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/blog`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-    {
-      url: `${BASE_URL}/pricing`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-    {
-      url: `${BASE_URL}${APP_ROUTES.YOUTUBE_THUMBNAILS}`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${BASE_URL}/support`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}${APP_ROUTES.PAY}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/changelog`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}${APP_ROUTES.ENGINEERING}`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.5,
-    },
+  const marketingPages: MetadataRoute.Sitemap = [];
+  for (const path of getExactPublishedMarketingPaths()) {
+    if (isEditorialSitemapPath(path)) continue;
+    marketingPages.push(sitemapEntry(path));
+  }
+
+  for (const path of SITEMAP_PUBLISHED_LEGAL_PATHS) {
+    marketingPages.push(sitemapEntry(path));
+  }
+
+  for (const path of SITEMAP_PUBLISHED_MACHINE_PATHS) {
+    marketingPages.push(sitemapEntry(path));
+  }
+
+  for (const slug of getComparisonSlugs()) {
+    marketingPages.push(sitemapEntry(`${APP_ROUTES.COMPARE}/${slug}`));
+  }
+
+  for (const slug of getAlternativeSlugs()) {
+    marketingPages.push(sitemapEntry(`${APP_ROUTES.ALTERNATIVES}/${slug}`));
+  }
+
+  const editorialPages: MetadataRoute.Sitemap = [
+    sitemapEntry('/blog', blogLastModified),
+    sitemapEntry('/changelog', changelogLastModified),
+    sitemapEntry(APP_ROUTES.ENGINEERING, engineeringLastModified),
+  ];
+
+  editorialPages.push(
+    ...blogPosts.map(post =>
+      sitemapEntry(
+        `/blog/${post.slug}`,
+        toContentRevisionDate(post.updatedDate ?? post.date)
+      )
+    )
+  );
+
+  const blogAuthors = [
+    ...new Set(
+      blogPosts
+        .map(post => post.authorUsername)
+        .filter((u): u is string => u != null)
+    ),
+  ];
+  for (const username of blogAuthors) {
+    const authorPosts = blogPosts.filter(
+      post => post.authorUsername === username
+    );
+    editorialPages.push(
+      sitemapEntry(
+        `/blog/authors/${username}`,
+        latestContentRevision(
+          ...authorPosts.map(post => post.updatedDate ?? post.date)
+        )
+      )
+    );
+  }
+
+  const blogCategories = [
+    ...new Set(
+      blogPosts.map(post => post.category).filter((c): c is string => c != null)
+    ),
+  ];
+  for (const category of blogCategories) {
+    const categoryPosts = blogPosts.filter(post => post.category === category);
+    editorialPages.push(
+      sitemapEntry(
+        `/blog/category/${slugifyCategory(category)}`,
+        latestContentRevision(
+          ...categoryPosts.map(post => post.updatedDate ?? post.date)
+        )
+      )
+    );
+  }
+
+  editorialPages.push(
+    ...changelogReleases.map(release =>
+      sitemapEntry(
+        `/changelog/${encodeURIComponent(release.version)}`,
+        toContentRevisionDate(
+          release.date ? `${release.date}T00:00:00Z` : undefined
+        )
+      )
+    )
+  );
+
+  editorialPages.push(
     ...engineeringStories.flatMap(story =>
       story.source
         ? [
-            {
-              url: `${BASE_URL}${APP_ROUTES.ENGINEERING}/${story.slug}`,
-              lastModified: new Date(`${story.source.date}T00:00:00Z`),
-              changeFrequency: 'monthly' as const,
-              priority: 0.4,
-            },
+            sitemapEntry(
+              `${APP_ROUTES.ENGINEERING}/${story.slug}`,
+              toContentRevisionDate(`${story.source.date}T00:00:00Z`)
+            ),
           ]
         : []
-    ),
-    {
-      url: `${BASE_URL}/legal/privacy`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-    {
-      url: `${BASE_URL}/legal/terms`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-  ];
-
-  const blogPages: MetadataRoute.Sitemap = blogPosts.map(post => ({
-    url: `${BASE_URL}/blog/${post.slug}`,
-    lastModified: new Date(post.updatedDate ?? post.date),
-    changeFrequency: 'monthly',
-    priority: 0.7,
-  }));
-
-  const changelogPages: MetadataRoute.Sitemap = changelogReleases.map(
-    release => ({
-      url: `${BASE_URL}/changelog/${encodeURIComponent(release.version)}`,
-      lastModified: release.date ? new Date(`${release.date}T00:00:00Z`) : now,
-      changeFrequency: 'monthly',
-      priority: 0.4,
-    })
+    )
   );
 
-  // Blog author pages
-  const blogAuthors = [
-    ...new Set(
-      blogPosts.map(p => p.authorUsername).filter((u): u is string => u != null)
-    ),
-  ];
-  const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => {
-    const authorPosts = blogPosts.filter(p => p.authorUsername === username);
-    const latestDate =
-      authorPosts.length > 0
-        ? new Date(
-            Math.max(
-              ...authorPosts.map(p =>
-                new Date(p.updatedDate ?? p.date).getTime()
-              )
-            )
-          )
-        : now;
-    return {
-      url: `${BASE_URL}/blog/authors/${username}`,
-      lastModified: latestDate,
-      changeFrequency: 'monthly' as const,
-      priority: 0.6,
-    };
-  });
-
-  // Blog category pages
-  const blogCategories = [
-    ...new Set(
-      blogPosts.map(p => p.category).filter((c): c is string => c != null)
-    ),
-  ];
-  const blogCategoryPages: MetadataRoute.Sitemap = blogCategories.map(
-    category => {
-      const catPosts = blogPosts.filter(p => p.category === category);
-      const latestDate =
-        catPosts.length > 0
-          ? new Date(
-              Math.max(
-                ...catPosts.map(p =>
-                  new Date(p.updatedDate ?? p.date).getTime()
-                )
-              )
-            )
-          : now;
-      return {
-        url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
-        lastModified: latestDate,
-        changeFrequency: 'monthly' as const,
-        priority: 0.6,
-      };
-    }
+  const profilePages: MetadataRoute.Sitemap = catalog.profiles.map(profile =>
+    sitemapEntry(
+      `/${profile.username}`,
+      toContentRevisionDate(profile.updatedAt),
+      profile.avatarUrl ? [profile.avatarUrl] : undefined
+    )
   );
 
-  const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
-    slug => ({
-      url: `${BASE_URL}/compare/${slug}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    })
+  const releasePages: MetadataRoute.Sitemap = catalog.releases.map(release =>
+    sitemapEntry(
+      `/${release.username}/${release.slug}`,
+      toContentRevisionDate(release.updatedAt),
+      release.artworkUrl ? [release.artworkUrl] : undefined
+    )
   );
-
-  const alternativePages: MetadataRoute.Sitemap = getAlternativeSlugs().map(
-    slug => ({
-      url: `${BASE_URL}/alternatives/${slug}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    })
-  );
-
-  const profilePages: MetadataRoute.Sitemap = catalog.profiles.map(profile => ({
-    url: `${BASE_URL}/${profile.username}`,
-    lastModified: profile.updatedAt ?? now,
-    changeFrequency: 'weekly',
-    priority: 0.8,
-    ...(profile.avatarUrl ? { images: [profile.avatarUrl] } : {}),
-  }));
-
-  const releasePages: MetadataRoute.Sitemap = catalog.releases.map(release => ({
-    url: `${BASE_URL}/${release.username}/${release.slug}`,
-    lastModified: release.updatedAt ?? now,
-    changeFrequency: 'monthly',
-    priority: 0.7,
-    ...(release.artworkUrl ? { images: [release.artworkUrl] } : {}),
-  }));
 
   const releaseUrls = new Set(releasePages.map(release => release.url));
   const trackPages: MetadataRoute.Sitemap = catalog.tracks
     .filter(
-      track => !releaseUrls.has(`${BASE_URL}/${track.username}/${track.slug}`)
+      track => !releaseUrls.has(absoluteUrl(`/${track.username}/${track.slug}`))
     )
-    .map(track => ({
-      url: `${BASE_URL}/${track.username}/${track.slug}`,
-      lastModified: track.updatedAt ?? now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    }));
+    .map(track =>
+      sitemapEntry(
+        `/${track.username}/${track.slug}`,
+        toContentRevisionDate(track.updatedAt)
+      )
+    );
 
-  const playlistPages: MetadataRoute.Sitemap = catalog.playlists.map(
-    playlist => ({
-      url: `${BASE_URL}/playlists/${playlist.slug}`,
-      lastModified: playlist.updatedAt ?? now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-      ...(playlist.coverImageUrl ? { images: [playlist.coverImageUrl] } : {}),
-    })
+  const playlistPages: MetadataRoute.Sitemap = catalog.playlists.map(playlist =>
+    sitemapEntry(
+      `/playlists/${playlist.slug}`,
+      toContentRevisionDate(playlist.updatedAt),
+      playlist.coverImageUrl ? [playlist.coverImageUrl] : undefined
+    )
   );
 
   return [
-    ...staticPages,
-    ...changelogPages,
-    ...blogPages,
-    ...blogAuthorPages,
-    ...blogCategoryPages,
-    ...comparisonPages,
-    ...alternativePages,
+    ...marketingPages,
+    ...editorialPages,
     ...profilePages,
     ...releasePages,
     ...trackPages,

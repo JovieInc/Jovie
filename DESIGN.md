@@ -210,9 +210,14 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 ### Sidebar (App Shell)
 
+Founder lock 2026-09-12, Pen `OqZTF`: 280px customer rail; combined search/inbox/
+new-chat bar; Library, Contacts, Presence (`canonicalSidebarNavigation`); 36px
+nav/history rows; Today/Earlier history; bottom-anchored account footer. Mobile
+keeps its composition. Homepage `t1x8T` remains locked.
+
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 244px | 244px |
+| Width | 280px | 280px |
 | Background RGB | `247 248 248` | `6 8 13` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |

@@ -105,7 +105,7 @@ export class RateLimiter {
     this.config = config;
     this.options = {
       preferRedis: options.preferRedis ?? true,
-      requireRedis: options.requireRedis ?? false,
+      requireRedis: options.requireRedis ?? config.requireRedis ?? false,
       warnOnFallback: options.warnOnFallback ?? env.NODE_ENV === 'production',
       logger:
         options.logger ??
@@ -126,10 +126,12 @@ export class RateLimiter {
     // Warn loudly if falling back to in-memory in production — rate limits
     // stored in memory reset on every Vercel deploy and don't share state
     // across instances, making them effectively useless in production.
+    // Mandatory limiters never take that path; do not claim they do.
     if (
       this.options.preferRedis &&
       !this.redisLimiter &&
-      this.options.warnOnFallback
+      this.options.warnOnFallback &&
+      !this.options.requireRedis
     ) {
       const message = `[RateLimit:${config.name}] Redis unavailable, using in-memory fallback — rate limits will reset on deploy`;
       console.error(message);
@@ -178,21 +180,27 @@ export class RateLimiter {
           reason: result.success
             ? undefined
             : `${this.config.name} rate limit exceeded`,
+          backend: 'redis',
         };
       } catch (error) {
-        // Log error and fall back to memory — this means rate limits for this
-        // request are enforced in-memory only and won't persist across deploys.
         // Open the circuit so subsequent requests skip the Redis timeout
-        // entirely while the backend is known-degraded.
+        // entirely while the backend is known-degraded. Mandatory limiters
+        // fail closed below; advisory limiters may use per-instance memory.
         const failureKind = classifyRedisFailure(error);
         openRedisCircuit(error);
         countRedisMetric('redis.rate_limit_failure', 1, {
           failure_kind: failureKind,
           limiter: this.config.prefix,
         });
-        const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
-        console.error(message);
-        this.options.logger(message);
+        if (!this.options.requireRedis) {
+          const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
+          console.error(message);
+          this.options.logger(message);
+        } else {
+          this.options.logger(
+            `[RateLimit:${this.config.name}] Redis error, failing closed: ${error}`
+          );
+        }
       }
     }
 
@@ -204,6 +212,7 @@ export class RateLimiter {
         reset: new Date(Date.now() + parseWindowToMs(this.config.window)),
         reason: `${this.config.name} rate limiter is temporarily unavailable`,
         unavailable: true,
+        backend: 'unavailable',
       };
     }
 
@@ -213,9 +222,9 @@ export class RateLimiter {
     // (mobile CGNAT) during a Redis outage.
     const memoryResult = await this.memoryLimiter.limit(identifier);
     if (this.options.preferRedis) {
-      return { ...memoryResult, degraded: true };
+      return { ...memoryResult, degraded: true, backend: 'memory' };
     }
-    return memoryResult;
+    return { ...memoryResult, backend: 'memory' };
   }
 
   /**

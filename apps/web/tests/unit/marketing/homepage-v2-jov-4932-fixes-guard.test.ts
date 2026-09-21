@@ -56,6 +56,20 @@ describe('JOV-4932 /new defect contracts', () => {
     );
   });
 
+  it('keeps the scaled profile demo inert and out of the host page interaction tree', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/homepage-v2/HomepageV2Route.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("aria-hidden='true'");
+    expect(source).toContain('inert');
+    expect(source).toContain('homepage-v2-hero__demo-scale');
+  });
+
   it('contributes zero running or pending animations under reduced motion', () => {
     const css = readFileSync(resolve(process.cwd(), homepageV2CssPath), 'utf8');
 

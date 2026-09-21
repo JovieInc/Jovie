@@ -115,7 +115,8 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(signals["queue"]["eligibleCleanPrs"], 4)
         self.assertEqual(signals["release"]["productionSha"], PRODUCTION_SHA)
         self.assertEqual(signals["runner"]["queuedWork"], 2)
-        self.assertIsNone(signals["closure"]["blockedSince"])
+        self.assertEqual(signals["closure"]["blockedSince"], "2026-09-05T19:29:00Z")
+        self.assertEqual(signals["release"]["blockedSince"], "2026-09-05T19:29:00Z")
         self.assertEqual(
             signals["runner"]["capacitySource"]["sourceRevision"], MAIN_SHA
         )
@@ -123,6 +124,62 @@ class ProducerTests(unittest.TestCase):
             signals["runner"]["workSource"]["sourceRevision"], RUNTIME_SHA
         )
         self.assertEqual(len(signals["ciAudit"]["classes"]), 6)
+
+    def test_composes_when_queue_native_queue_count_is_null(self):
+        fleet, runtime = sources()
+        fleet["signals"]["queue"]["nativeQueueCount"] = None
+        fleet["signals"]["closureHealth"]["nativeQueueCount"] = 0
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(snapshot["signals"]["queue"]["queuedPrs"], 0)
+        self.assertEqual(snapshot["signals"]["closure"]["openPullRequests"], 49)
+
+    def test_copies_latest_merge_as_closure_blocked_since_when_merge_progress_stalled(self):
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["reasons"] = ["no-merge-progress-over-1h"]
+        fleet["signals"]["closureHealth"]["latestMergeAt"] = "2026-09-05T16:31:49Z"
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(
+            snapshot["signals"]["closure"]["blockedSince"],
+            "2026-09-05T16:31:49Z",
+        )
+
+    def test_stamps_fleet_observation_when_adverse_signals_lack_blocked_since(self):
+        fleet, runtime = sources()
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        fleet_at = "2026-09-05T19:29:00Z"
+        self.assertEqual(snapshot["signals"]["closure"]["blockedSince"], fleet_at)
+        self.assertEqual(snapshot["signals"]["release"]["blockedSince"], fleet_at)
+
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["status"] = "healthy"
+        fleet["signals"]["production"]["deployedSha"] = MAIN_SHA
+        healthy = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertIsNone(healthy["signals"]["closure"]["blockedSince"])
+        self.assertIsNone(healthy["signals"]["release"]["blockedSince"])
+
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["blockedSince"] = "2026-09-05T18:10:00Z"
+        fleet["signals"]["production"]["blockedSince"] = "2026-09-05T17:40:00Z"
+        preserved = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(
+            preserved["signals"]["closure"]["blockedSince"],
+            "2026-09-05T18:10:00Z",
+        )
+        self.assertEqual(
+            preserved["signals"]["release"]["blockedSince"],
+            "2026-09-05T17:40:00Z",
+        )
+
+    def test_compose_rejects_all_zero_main_sha_when_mirror_is_unavailable(self):
+        fleet, runtime = sources()
+        fleet["signals"]["main"]["sha"] = "0" * 40
+        with mock.patch.dict(
+            MODULE.os.environ,
+            {"JOVIE_CONFIGURATION_SOURCE_ROOT": "/no/such/jovie.mirror.git"},
+            clear=False,
+        ):
+            with self.assertRaisesRegex(ValueError, "main-sha-unavailable"):
+                MODULE.compose_snapshot(fleet, runtime, NOW)
 
     def test_semantically_unchanged_source_keeps_event_id(self):
         left = MODULE.compose_snapshot(*sources(), NOW)
@@ -275,6 +332,7 @@ class ProducerTests(unittest.TestCase):
             independent_review_receipt=None,
         )
         observations = {
+            "observe_ci_audit": None,
             "observe_main": {"status": "green", "sha": MAIN_SHA},
             "observe_production": {
                 "status": "green",
@@ -321,7 +379,7 @@ class ProducerTests(unittest.TestCase):
             self.addCleanup(patch.stop)
 
         observed = GATE.observe_signals(args, NOW)
-        self.assertNotIn("ciAudit", observed)
+        self.assertIsNone(observed["ciAudit"])
         receipt = GATE.evaluate(observed, GATE.isoformat(NOW))
         runtime = {
             "generated_at": at,
@@ -498,6 +556,77 @@ class ProducerTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "response exceeds"):
                     MODULE.read_sources(None)
+
+
+    def test_resolve_main_sha_falls_back_to_refs_heads_main_not_zeros(self):
+        with tempfile.TemporaryDirectory() as directory:
+            git_dir = pathlib.Path(directory) / "mirror.git"
+            subprocess = __import__("subprocess")
+            subprocess.check_call(
+                ["git", "init", "--bare", str(git_dir)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            work = pathlib.Path(directory) / "work"
+            work.mkdir()
+            subprocess.check_call(
+                ["git", "clone", str(git_dir), str(work)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                ["git", "-C", str(work), "checkout", "-b", "main"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            (work / "README").write_text("x\n")
+            subprocess.check_call(
+                ["git", "-C", str(work), "add", "README"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                [
+                    "git",
+                    "-C",
+                    str(work),
+                    "-c",
+                    "user.email=ci@example.com",
+                    "-c",
+                    "user.name=ci",
+                    "commit",
+                    "-m",
+                    "init",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.check_call(
+                ["git", "-C", str(work), "push", "origin", "HEAD:refs/heads/main"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            expected = subprocess.check_output(
+                ["git", "--git-dir", str(git_dir), "rev-parse", "refs/heads/main"],
+                text=True,
+            ).strip()
+            with mock.patch.dict(
+                MODULE.os.environ,
+                {"JOVIE_CONFIGURATION_SOURCE_ROOT": str(git_dir)},
+                clear=False,
+            ):
+                self.assertEqual(
+                    MODULE.resolve_main_sha({"sha": "0" * 40}), expected
+                )
+                self.assertEqual(MODULE.resolve_main_sha({}), expected)
+            with mock.patch.dict(
+                MODULE.os.environ,
+                {"JOVIE_CONFIGURATION_SOURCE_ROOT": str(pathlib.Path(directory) / "missing.git")},
+                clear=False,
+            ):
+                with self.assertRaisesRegex(ValueError, "main-sha-unavailable"):
+                    MODULE.resolve_main_sha({"sha": "0" * 40})
+        self.assertEqual(MODULE.resolve_main_sha({"sha": MAIN_SHA}), MAIN_SHA)
 
 
 if __name__ == "__main__":

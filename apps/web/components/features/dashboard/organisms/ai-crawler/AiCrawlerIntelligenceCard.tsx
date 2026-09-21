@@ -9,6 +9,7 @@ import {
   KIND_PRESETS,
   statusDotVar,
 } from '@/components/organisms/entity-card/kind-presets';
+import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
 import { track } from '@/lib/analytics';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ interface AiCrawlerIntelligenceCardProps {
 
 const ROW_CLASS =
   'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2';
+const CRAWLER_READ_DISCLOSURE = getAeoMeasurementDisclosure('crawler_read');
 
 function RowSkeleton({ className }: { readonly className?: string }) {
   return (
@@ -104,13 +106,14 @@ export function AiCrawlerIntelligenceCard({
         />
       )}
       <span className='shrink-0 text-sm font-semibold text-primary-token'>
-        AI Visibility
+        {CRAWLER_READ_DISCLOSURE.label}
       </span>
       <span className='min-w-0 flex-1 truncate text-left text-2xs text-tertiary-token'>
         {showTeaser
-          ? 'See which AI services read your pages'
+          ? 'Observed machine reads only · no referral or revenue attribution'
           : `${model.title} · ${model.meta}`}
       </span>
+      <span className='sr-only'>{CRAWLER_READ_DISCLOSURE.description}</span>
       {model.status ? (
         <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-wide text-secondary-token'>
           <span
@@ -151,7 +154,7 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI Visibility Details'
+      aria-label='View AI crawler read details'
     >
       {rowContent}
       <ChevronRight

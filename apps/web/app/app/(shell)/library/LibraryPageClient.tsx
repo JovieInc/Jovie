@@ -134,21 +134,45 @@ export function LibraryPageClient({
 
     startYouTubeImport(async () => {
       try {
-        const response = await fetch('/api/youtube-library/sync', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ creatorProfileId }),
-        });
-        const result = (await response.json()) as {
-          total?: number;
+        const postPage = () =>
+          fetch('/api/youtube-library/sync', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ creatorProfileId, mode: 'page' }),
+          });
+        let response = await postPage();
+        let result = (await response.json()) as {
+          state?: string;
+          resumable?: boolean;
+          counts?: { imported?: number; discovered?: number; skipped?: number };
           error?: string;
+          lastErrorUserMessage?: string;
         };
-        if (!response.ok) throw new Error(result.error ?? 'Sync failed');
-        toast.success(`Synced ${result.total ?? 0} YouTube videos`);
+        if (!response.ok) throw new Error(result.error ?? 'Import failed');
+        while (result.resumable && result.state === 'partial') {
+          response = await postPage();
+          result = (await response.json()) as typeof result;
+          if (!response.ok) throw new Error(result.error ?? 'Import failed');
+        }
+        const imported = result.counts?.imported ?? 0;
+        const discovered = result.counts?.discovered ?? 0;
+        if (result.state === 'quota-limited') {
+          toast.error(
+            `YouTube quota limited after ${imported} of ${discovered} videos. Resume import later.`
+          );
+        } else if (result.state === 'error') {
+          toast.error(
+            result.lastErrorUserMessage ??
+              result.error ??
+              'YouTube import failed'
+          );
+        } else {
+          toast.success(`Imported ${imported} of ${discovered} YouTube videos`);
+        }
         router.refresh();
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : 'YouTube sync failed'
+          error instanceof Error ? error.message : 'YouTube import failed'
         );
       }
     });
@@ -196,11 +220,7 @@ export function LibraryPageClient({
             onClick={handleYouTubeImport}
             className='shrink-0'
           >
-            {isImportingYouTube
-              ? 'Syncing…'
-              : youtubeConnected
-                ? 'Sync YouTube'
-                : 'Import YouTube'}
+            {isImportingYouTube ? 'Importing…' : 'Import YouTube'}
           </Button>
         </div>
       </div>

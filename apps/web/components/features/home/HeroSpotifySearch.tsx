@@ -448,7 +448,7 @@ export function HeroSpotifySearch({
             autoCorrect='off'
             autoComplete='off'
             className={cn(
-              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
+              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               isEditorial ? 'homepage-name-search__input' : 'text-sm'
             )}
             role='combobox'
@@ -569,6 +569,7 @@ export function HeroSpotifySearch({
                 <p role='alert' className='text-sm text-error'>
                   Search failed.
                 </p>
+                {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve the established homepage recovery copy while this focused repair only restores the input focus contract. */}
                 <Button
                   type='button'
                   size='sm'
@@ -578,6 +579,7 @@ export function HeroSpotifySearch({
                 >
                   Try Again
                 </Button>
+                {/* eslint-enable @jovie/canonical-ui-label-casing */}
               </div>
             )}
 

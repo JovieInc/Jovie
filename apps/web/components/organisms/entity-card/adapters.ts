@@ -1,3 +1,7 @@
+import {
+  buildAiVisibilityMeasurement,
+  requireMeasuredAiVisibilityMetric,
+} from '@/lib/aeo/visibility-measurement';
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
@@ -489,9 +493,27 @@ export function aiCrawlerAnalyticsToEntityCard(
   options: Readonly<{ onOpenDetail?: () => void }> = {}
 ): EntityCardModel {
   const preset = KIND_PRESETS.ai;
+  const measurement = buildAiVisibilityMeasurement({
+    observed: {
+      crawlerReads: analytics.totalRequests,
+      weeklyCrawlerReads: analytics.weeklyRequests,
+    },
+  });
+  const reads = requireMeasuredAiVisibilityMetric(
+    measurement,
+    'crawler_reads',
+    'observed_visibility'
+  );
+  const weekly = requireMeasuredAiVisibilityMetric(
+    measurement,
+    'weekly_crawler_reads',
+    'observed_visibility'
+  );
+  const readCount = typeof reads.value === 'number' ? reads.value : 0;
+  const weeklyCount = typeof weekly.value === 'number' ? weekly.value : 0;
   const topCrawler = analytics.crawlers[0]?.name;
   const detail =
-    analytics.totalRequests > 0
+    readCount > 0
       ? analytics.crawlers.length > 1
         ? `${analytics.crawlers.length} services tracked`
         : (topCrawler ?? 'Last 30 days')
@@ -502,14 +524,14 @@ export function aiCrawlerAnalyticsToEntityCard(
     kind: 'ai',
     accent: preset.accent,
     eyebrow: preset.eyebrow,
-    title: `${analytics.totalRequests.toLocaleString()} reads`,
+    title: `${readCount.toLocaleString()} reads`,
     meta: detail,
     secondaryMeta:
-      analytics.weeklyRequests > 0
-        ? `${analytics.weeklyRequests.toLocaleString()} this week`
+      weeklyCount > 0
+        ? `${weeklyCount.toLocaleString()} this week`
         : 'Last 30 days',
     status:
-      analytics.totalRequests > 0
+      readCount > 0
         ? { label: 'Active', tone: 'live' }
         : { label: 'Collecting', tone: 'neutral' },
     cta: analytics.isTeaser

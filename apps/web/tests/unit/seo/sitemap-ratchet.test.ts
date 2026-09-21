@@ -28,9 +28,19 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
 const innerJoinMock = vi.fn(() => ({
   innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
   where: whereMock,
 }));
-const fromMock = vi.fn(() => ({ where: whereMock, innerJoin: innerJoinMock }));
+const leftJoinMock = vi.fn(() => ({
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+  where: whereMock,
+}));
+const fromMock = vi.fn(() => ({
+  where: whereMock,
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+}));
 const selectMock = vi.fn(() => ({ from: fromMock }));
 
 vi.mock('@/lib/db', () => ({
@@ -80,14 +90,25 @@ vi.mock('@/lib/db/schema/playlists', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: {
+    id: 'id',
+    email: 'email',
+  },
+}));
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     username: 'username',
     usernameNormalized: 'usernameNormalized',
     updatedAt: 'updatedAt',
     avatarUrl: 'avatarUrl',
+    isClaimed: 'isClaimed',
     isPublic: 'isPublic',
+    displayName: 'displayName',
+    settings: 'settings',
     id: 'id',
+    userId: 'userId',
   },
 }));
 
@@ -107,7 +128,7 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 describe('SEO ratchet — sitemap must stay reachable and fresh (JOV-11044)', () => {
-  it('returns non-empty sitemap entries with lastModified on every URL', async () => {
+  it('returns non-empty canonical sitemap entries without inventing lastmod', async () => {
     getBlogPosts.mockResolvedValue([
       {
         slug: 'hello-world',
@@ -125,7 +146,11 @@ describe('SEO ratchet — sitemap must stay reachable and fresh (JOV-11044)', ()
 
     whereMock
       .mockResolvedValueOnce([
-        { username: 'tim', updatedAt: new Date('2026-01-01') },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-01-01'),
+        },
       ])
       .mockResolvedValueOnce([
         {
@@ -150,6 +175,10 @@ describe('SEO ratchet — sitemap must stay reachable and fresh (JOV-11044)', ()
 
     expect(issues, issues.map(issue => issue.message).join('\n')).toEqual([]);
     expect(entries.length).toBeGreaterThan(0);
-    expect(entries.every(entry => entry.lastModified)).toBe(true);
+    expect(entries.map(entry => entry.url)).toContain('https://jov.ie/tim');
+    const unchanged = entries.find(
+      entry => entry.url === 'https://jov.ie/about'
+    );
+    expect(unchanged?.lastModified).toBeUndefined();
   });
 });

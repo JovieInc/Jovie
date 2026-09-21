@@ -6,6 +6,7 @@ import { env } from '@/lib/env';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
 import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
+import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
 import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
@@ -20,12 +21,16 @@ const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
+const ZERO_SHA = '0'.repeat(40);
 const DIGEST = /^[0-9a-f]{64}$/u;
 const JOVIE_PRODUCTION_OIDC_SUBJECT =
   'owner:jovie:project:jovie:environment:production';
 const JOVIE_VERCEL_OIDC_ISSUER = 'https://oidc.vercel.com/jovie';
 const timestamp = z.string().datetime({ offset: true });
-const exactSha = z.string().regex(SHA);
+const exactSha = z
+  .string()
+  .regex(SHA)
+  .refine(value => value !== ZERO_SHA, 'source SHA must not be all zeros');
 const safeCount = z.number().int().nonnegative().safe();
 
 const summerCiImprovementClassIds = [
@@ -59,7 +64,7 @@ const runnerAuthority = z
   })
   .strict();
 
-const ciAuditSchema = z
+const ciAuditV1Schema = z
   .object({
     schema: z.literal('jovie-ci-bottleneck-audit/v1'),
     ...sourceFields,
@@ -92,6 +97,11 @@ const ciAuditSchema = z
       });
     }
   });
+
+const ciAuditSchema = z.union([
+  ciAuditV1Schema,
+  createSummerCiAuditV2Schema(summerCiImprovementClassIds),
+]);
 
 // References an existing host grant; signing this snapshot does not grant execution.
 const existingRepairSchema = z

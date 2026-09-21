@@ -16,12 +16,14 @@ import hashlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
 from summer_admissions import admission_projection
+from summer_ci_audit import SCHEMA as CI_AUDIT_V2, validate_projection as validate_ci_audit_v2
 from summer_existing_repair import (
     load_existing_repair_reference,
     load_existing_repair_task_admissions,
@@ -109,10 +111,36 @@ def optional_blocked_since(
     return parsed.isoformat().replace("+00:00", "Z")
 
 
+def adverse_blocked_since(
+    existing: object,
+    *,
+    adverse: bool,
+    observed_at: str,
+    label: str,
+    now: datetime,
+) -> str | None:
+    """Copy a measured clock; if the signal is adverse and none exists, use observe time."""
+    if existing is not None:
+        return optional_blocked_since(existing, label, now)
+    if not adverse:
+        return None
+    return optional_blocked_since(observed_at, label, now)
+
+
 def count(value: object, label: str) -> int:
+    if isinstance(value, list):
+        value = len(value)
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(f"{label} is not a nonnegative integer")
     return value
+
+
+def first_count(*values: object, label: str) -> int:
+    for value in values:
+        if value is None:
+            continue
+        return count(value, label)
+    raise ValueError(f"{label} is not a nonnegative integer")
 
 
 def exact_sha(value: object, label: str) -> str:
@@ -120,9 +148,33 @@ def exact_sha(value: object, label: str) -> str:
         not isinstance(value, str)
         or len(value) != 40
         or any(character not in SHA for character in value)
+        or set(value) == {"0"}
     ):
         raise ValueError(f"{label} is not an exact SHA")
     return value
+
+
+def resolve_main_sha(main: object) -> str:
+    """Fail closed on zeros; fall back to the Jovie mirror tip, never publish 0{40}."""
+    sha = main.get("sha") if isinstance(main, dict) else None
+    try:
+        return exact_sha(sha, "main SHA")
+    except ValueError:
+        pass
+    git_dir = os.environ.get(
+        "JOVIE_CONFIGURATION_SOURCE_ROOT", "/srv/git/mirrors/Jovie.git"
+    )
+    for ref in ("refs/heads/main", "origin/main", "HEAD"):
+        try:
+            out = subprocess.check_output(
+                ["git", "--git-dir", git_dir, "rev-parse", ref],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            return exact_sha(out, "main SHA")
+        except (OSError, subprocess.CalledProcessError, ValueError):
+            continue
+    raise ValueError("main-sha-unavailable")
 
 
 def exact_digest(value: object, label: str) -> str:
@@ -154,6 +206,8 @@ def audit_projection(
     if value is None:
         return None
     audit = record(value, "CI audit")
+    if audit.get("schema") == CI_AUDIT_V2:
+        return validate_ci_audit_v2(audit, source_version, now, MAX_SOURCE_AGE_SECONDS)
     if audit.get("schema") != "jovie-ci-bottleneck-audit/v1":
         raise ValueError("CI audit schema is invalid")
     observed_at = require_fresh(audit.get("observedAt"), "CI audit", now)
@@ -316,7 +370,7 @@ def compose_snapshot(
     runtime_revision = attested_runtime_revision(
         signals, runtime, now, attestation
     )
-    main_sha = exact_sha(main.get("sha"), "main SHA")
+    main_sha = resolve_main_sha(main)
     production_sha_raw = production.get("deployedSha")
     production_sha = (
         exact_sha(production_sha_raw, "production SHA")
@@ -326,11 +380,13 @@ def compose_snapshot(
     closure_status = closure.get("status")
     if closure_status not in {"healthy", "grace", "red"}:
         raise ValueError("closure status is invalid")
-    open_prs = count(closure.get("openPrs"), "open PR count")
-    eligible = count(queue.get("greenReadyPrs"), "eligible clean PR count")
-    queued = count(
-        queue.get("nativeQueueCount", closure.get("nativeQueueCount")),
-        "queued PR count",
+    open_prs = first_count(closure.get("openPrs"), label="open PR count")
+    eligible = first_count(queue.get("greenReadyPrs"), label="eligible clean PR count")
+    queued = first_count(
+        queue.get("nativeQueueCount"),
+        closure.get("nativeQueueCount"),
+        0,
+        label="queued PR count",
     )
     capacity = record(lease.get("capacity"), "lease capacity")
     available = count(capacity.get("available"), "available capacity")
@@ -441,8 +497,17 @@ def compose_snapshot(
                     source_value=closure_value,
                 ),
                 "status": closure_status,
-                "blockedSince": optional_blocked_since(
-                    closure.get("blockedSince"), "closure authority", now
+                "blockedSince": adverse_blocked_since(
+                    closure.get("blockedSince")
+                    or (
+                        closure.get("latestMergeAt")
+                        if "no-merge-progress-over-1h" in (closure.get("reasons") or [])
+                        else None
+                    ),
+                    adverse=closure_status in {"red", "grace"},
+                    observed_at=fleet_at,
+                    label="closure authority",
+                    now=now,
                 ),
                 "openPullRequests": open_prs,
             },
@@ -455,7 +520,14 @@ def compose_snapshot(
                     source_value=queue_value,
                 ),
                 "blockedSince": optional_blocked_since(
-                    queue.get("blockedSince"), "queue authority", now
+                    queue.get("blockedSince")
+                    or (
+                        queue.get("observedAt")
+                        if int(queue.get("greenReadyPrs") or 0) > 0
+                        else None
+                    ),
+                    "queue authority",
+                    now,
                 ),
                 "eligibleCleanPrs": eligible,
                 "queuedPrs": queued,
@@ -468,8 +540,12 @@ def compose_snapshot(
                     source_revision=main_sha,
                     source_value=release_value,
                 ),
-                "blockedSince": optional_blocked_since(
-                    production.get("blockedSince"), "production authority", now
+                "blockedSince": adverse_blocked_since(
+                    production.get("blockedSince"),
+                    adverse=main_sha != production_sha,
+                    observed_at=fleet_at,
+                    label="production authority",
+                    now=now,
                 ),
                 "mainSha": main_sha,
                 "productionSha": production_sha,

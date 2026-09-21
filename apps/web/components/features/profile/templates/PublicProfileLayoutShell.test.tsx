@@ -1,6 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => false,
+}));
+
+vi.mock('@/lib/acquisition/proof-claim-client', () => ({
+  emitProofClaimEvent: vi.fn(),
+  rememberProofClaimAttribution: vi.fn(),
+}));
 
 const commonProps = {
   artistName: 'Unfazed',
@@ -15,6 +24,28 @@ const commonProps = {
 describe('PublicProfileLayoutShell', () => {
   it('owns exactly the desktop surface in desktop layout', () => {
     render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={true}
+        desktopSurfaceReady
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+      'data-layout',
+      'desktop'
+    );
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+      'data-desktop-ready',
+      'true'
+    );
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('compact-content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('keeps compact content available to assistive tech until the desktop surface is ready', () => {
+    render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={true} />
     );
 
@@ -22,8 +53,9 @@ describe('PublicProfileLayoutShell', () => {
       'data-layout',
       'desktop'
     );
+    expect(screen.getByTestId('compact-content')).toBeInTheDocument();
     expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('compact-content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('owns exactly the compact surface below the desktop boundary', () => {
@@ -37,6 +69,11 @@ describe('PublicProfileLayoutShell', () => {
     );
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
     expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('labels an embedded compact surface as a preview with an exit', () => {
@@ -56,5 +93,23 @@ describe('PublicProfileLayoutShell', () => {
       'href',
       '/unfazed'
     );
+  });
+
+  it('forwards the proof-to-claim footer without calling the profile unclaimed', () => {
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={true}
+        showClaimFooter
+        claimFooterHref='/waitlist?campaign=proof-to-claim'
+        claimFooterLabel='Request access'
+        proofClaim
+      />
+    );
+
+    const cta = screen.getByTestId('profile-claim-footer-cta');
+    expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
+    expect(cta).toHaveTextContent('Request access');
+    expect(screen.queryByText(/unclaimed/i)).toBeNull();
   });
 });

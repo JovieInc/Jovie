@@ -18,6 +18,12 @@ export const AVATAR_SIZE_MAP = {
     dot: 'h-3 w-3',
     dotOffset: '-bottom-0.5 -right-0.5',
   },
+  sidebar: {
+    px: 28,
+    text: 'text-2xs',
+    dot: 'h-3 w-3',
+    dotOffset: '-bottom-0.5 -right-0.5',
+  },
   lg: {
     px: 32,
     text: 'text-app',

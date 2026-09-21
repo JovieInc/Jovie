@@ -20,8 +20,10 @@ const { mockLimit, mockGetStatus, mockWouldBeRateLimited } = vi.hoisted(() => ({
 vi.mock('@/lib/rate-limit/rate-limiter', () => {
   class FakeRateLimiter {
     config: RateLimitConfig;
-    constructor(config: RateLimitConfig) {
+    options: unknown;
+    constructor(config: RateLimitConfig, options?: unknown) {
       this.config = config;
+      this.options = options;
     }
     limit = mockLimit;
     getStatus = mockGetStatus;
@@ -33,7 +35,8 @@ vi.mock('@/lib/rate-limit/rate-limiter', () => {
   }
   return {
     RateLimiter: FakeRateLimiter,
-    createRateLimiter: (config: RateLimitConfig) => new FakeRateLimiter(config),
+    createRateLimiter: (config: RateLimitConfig, options?: unknown) =>
+      new FakeRateLimiter(config, options),
   };
 });
 
@@ -472,6 +475,25 @@ describe('plan-aware-limiter.ts', () => {
 
       expect(result.success).toBe(true);
       expect(result.reason).toBeUndefined();
+    });
+
+    it('does not rewrite an unavailable backend as quota exhaustion', async () => {
+      mockLimit.mockResolvedValue(
+        makeDeniedResult({
+          unavailable: true,
+          reason:
+            'AI Chat Weekly (Pro) rate limiter is temporarily unavailable',
+        })
+      );
+      const { createPlanAwareRateLimiter } = await import(
+        '@/lib/rate-limit/plan-aware-limiter'
+      );
+      const limiter = createPlanAwareRateLimiter({
+        configs: { free: freeConfig, pro: proConfig },
+        errorMessage: () => 'You have reached your weekly AI message limit.',
+      });
+      const result = await limiter.limit('user-1', 'pro');
+      expect(result.reason).toContain('temporarily unavailable');
     });
   });
 

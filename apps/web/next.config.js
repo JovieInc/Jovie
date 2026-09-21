@@ -452,6 +452,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/directory',
+        destination: '/artists',
+        permanent: true,
+      },
+      {
         source: '/engagement-engine',
         destination: '/artist-notifications',
         permanent: true,
@@ -495,6 +500,8 @@ const nextConfig = {
       'subscribe',
       'tip',
       'tour',
+      'shows',
+      'events',
     ].flatMap(alias => [
       {
         source: `/:username/${alias}`,

@@ -49,6 +49,8 @@ try {
     signal: AbortSignal.timeout(5000),
   });
   assert.equal(response.status, 200);
+  // Isolated built output has no signed commissioning receipt. Health must
+  // stay uncommissioned; a string-swap to commissioned fails this proof.
   assert.deepEqual(await response.json(), {
     identity,
     status: 'uncommissioned',

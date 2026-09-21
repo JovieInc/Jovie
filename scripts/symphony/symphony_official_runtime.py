@@ -21,6 +21,8 @@ import os
 import pathlib
 import re
 import signal
+import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -71,6 +73,14 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+# Typed dispatch admission (dispatch-preflight output). The flat keys
+# (allowed/reason/mode/productId/maxConcurrent) remain the machine contract
+# consumed by the fallback pickup check (symphony-codex-exhausted); the
+# versioned envelope and per-mode sub-objects are additive so new consumers
+# can bind typed fields without stringly single-key coupling.
+DISPATCH_ADMISSION_SCHEMA = "symphony-dispatch-admission/v1"
+DISPATCH_ADMISSION_MODES = ("new-work", "existing-pr-repair")
+DISPATCH_ADMISSION_PRODUCTS = ("jovie", "ovie", "logyourbody")
 # Closure stop-line purposes. "admission" (default) is the new-issue stop-line:
 # every non-healthy closure holds new work. "controller-activation" is the
 # startup check for installing the repair controller itself: a grace/red
@@ -91,6 +101,31 @@ REPAIR_FEED_REASONS = frozenset(
         "internally-repairable-prs-open",
         "no-merge-progress-over-1h",
         "queue-controller-red-over-10m",
+    }
+)
+# Standalone installed wrapper: mirror closure_health.issue_intake_allowed.
+# The runtime CI selector checks reason-domain parity and real producer receipts.
+CLOSURE_ISSUE_BLOCKED_REASONS = frozenset(
+    {
+        "native-queue-empty-with-eligible-over-15m",
+        "native-queue-unmergeable",
+        "unclassified-open-pr-over-15m",
+        "no-merge-progress-over-1h",
+        "duplicate-issue-lanes-unresolved",
+        "expired-held-prs",
+        "draft-stack-policy-violation",
+        "draft-stack-repair-action-unavailable",
+        "internally-repairable-prs-open",
+        "closure-actions-pending",
+        "queue-controller-red-over-10m",
+        "lifecycle-action-inventory-incomplete",
+        "closure-observation-unknown",
+    }
+)
+CLOSURE_SYSTEMS_DOWN_REASONS = frozenset(
+    {
+        "closure-health-receipt-missing-or-malformed",
+        "gate-evaluation-failed",
     }
 )
 DEFAULT_FLEET_GATE_RECEIPT = (
@@ -140,6 +175,29 @@ query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $f
     pageInfo {
       hasNextPage
       endCursor
+    }
+  }
+}
+"""
+# Official burrito pin: JovieInc/symphony#10 team-scoped Linear intake.
+# v0.0.2-jovie.2 still required $projectSlug: String! on ID refresh (JOV-5822).
+OFFICIAL_SYMPHONY_GIT_SHA = "dae31f823850c9ef2dea121433e5b60f09af26fa"
+OFFICIAL_SYMPHONY_RELEASE_TAG = f"symphony-build-{OFFICIAL_SYMPHONY_GIT_SHA}"
+LINEAR_ISSUE_ID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+# Mirrors JovieInc/symphony SymphonyLinearTeamIssuesById. Never send projectSlug
+# or first:0 — both are Linear HTTP 400 INPUT_ERROR on the official team WORKFLOW.
+LINEAR_ISSUE_STATE_REFRESH_QUERY = """
+query SymphonyLinearTeamIssuesById($ids: [ID!]!, $teamKey: String!, $first: Int!) {
+  issues(filter: {id: {in: $ids}, team: {key: {eq: $teamKey}}}, first: $first) {
+    nodes {
+      id
+      identifier
+      state {
+        name
+      }
     }
   }
 }
@@ -480,6 +538,175 @@ def fetch_linear_eligible_issue_count(
         pages += 1
         if pages >= LINEAR_COUNT_MAX_PAGES:
             raise RuntimeError("linear_eligible_count_page_limit_exceeded")
+
+
+def official_symphony_release_tag(version: str | None = None) -> str:
+    """Map a burrito version override to the GitHub release tag."""
+    value = (version or OFFICIAL_SYMPHONY_GIT_SHA).strip()
+    if value.startswith("symphony-build-"):
+        return value
+    if value.startswith("v"):
+        return value
+    if re.fullmatch(r"[0-9a-f]{40}", value):
+        return f"symphony-build-{value}"
+    return value
+
+
+def official_symphony_bin_infix(version: str | None = None) -> str:
+    """Binary infix is the git SHA for symphony-build tags."""
+    value = (version or OFFICIAL_SYMPHONY_GIT_SHA).strip()
+    prefix = "symphony-build-"
+    if value.startswith(prefix):
+        return value[len(prefix) :]
+    return value
+
+
+def normalize_linear_issue_ids(issue_ids: list[str] | tuple[str, ...]) -> list[str]:
+    """Accept Linear UUIDs only. Identifiers as [ID!] are HTTP 400."""
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in issue_ids:
+        if not isinstance(raw, str):
+            raise ValueError("linear_issue_state_refresh_invalid_id")
+        value = raw.strip()
+        if not value:
+            continue
+        if ISSUE_IDENTIFIER_PATTERN.fullmatch(value):
+            raise ValueError(f"linear_issue_state_refresh_identifier_not_id:{value}")
+        if not LINEAR_ISSUE_ID_PATTERN.fullmatch(value):
+            raise ValueError(f"linear_issue_state_refresh_invalid_id:{value}")
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(value)
+    return normalized
+
+
+def build_linear_issue_state_refresh_request(
+    *,
+    team_key: str = OFFICIAL_TEAM_KEY,
+    issue_ids: list[str] | tuple[str, ...] = (),
+    page_size: int = LINEAR_PAGE_SIZE,
+) -> dict[str, Any] | None:
+    """Build a team-scoped ID-refresh payload, or None when running=0.
+
+    Empty IDs must not POST: Linear rejects ``first: 0`` and ``ids: []``
+    on ``[ID!]!`` as HTTP 400. Project slug is never a variable — official
+    WORKFLOW is team-keyed and ``projectSlug: null`` is INPUT_ERROR.
+    """
+    if not TEAM_KEY_PATTERN.fullmatch(team_key):
+        raise ValueError(f"team_key must match {TEAM_KEY_PATTERN.pattern}")
+    if page_size <= 0:
+        raise ValueError("page_size must be positive")
+    ids = normalize_linear_issue_ids(issue_ids)
+    if not ids:
+        return None
+    first = min(page_size, len(ids))
+    return {
+        "query": LINEAR_ISSUE_STATE_REFRESH_QUERY,
+        "operationName": "SymphonyLinearTeamIssuesById",
+        "variables": {
+            "ids": ids[:first],
+            "teamKey": team_key,
+            "first": first,
+        },
+    }
+
+
+def refresh_linear_issue_states(
+    *,
+    api_key: str,
+    issue_ids: list[str] | tuple[str, ...] = (),
+    team_key: str = OFFICIAL_TEAM_KEY,
+    api_url: str = LINEAR_API_URL,
+    page_size: int = LINEAR_PAGE_SIZE,
+) -> dict[str, Any]:
+    """Refresh Linear issue states without the v0.0.2-jovie.2 400 path."""
+    payload = build_linear_issue_state_refresh_request(
+        team_key=team_key,
+        issue_ids=issue_ids,
+        page_size=page_size,
+    )
+    if payload is None:
+        return {
+            "kind": "skipped",
+            "reason": "empty_running",
+            "issues": [],
+        }
+
+    request = urllib.request.Request(
+        api_url,
+        data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+        headers={
+            "Authorization": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": "jovie-symphony-elixir-issue-state-refresh/1",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = int(getattr(response, "status", 200))
+            headers = {key.lower(): value for key, value in response.headers.items()}
+            body = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        headers = {key.lower(): value for key, value in exc.headers.items()}
+        classification = classify_linear_response(
+            status=exc.code,
+            headers=headers,
+            body=body,
+        )
+        if classification["kind"] == "rate_limited":
+            raise RuntimeError(
+                "linear_issue_state_refresh_rate_limited:"
+                f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+                f"resetAt={classification['resetAt']}"
+            ) from exc
+        raise RuntimeError(f"linear_issue_state_refresh_http_status:{exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"linear_issue_state_refresh_request_failed:{exc.reason}") from exc
+
+    classification = classify_linear_response(status=status, headers=headers, body=body)
+    if classification["kind"] == "rate_limited":
+        raise RuntimeError(
+            "linear_issue_state_refresh_rate_limited:"
+            f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+            f"resetAt={classification['resetAt']}"
+        )
+    if status < 200 or status >= 300:
+        raise RuntimeError(f"linear_issue_state_refresh_http_status:{status}")
+    try:
+        decoded = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("linear_issue_state_refresh_invalid_json") from exc
+    if _graphql_ratelimited(body):
+        raise RuntimeError("linear_issue_state_refresh_rate_limited")
+    errors = decoded.get("errors") if isinstance(decoded, dict) else None
+    if errors:
+        raise RuntimeError("linear_issue_state_refresh_graphql_errors")
+    issues = decoded.get("data", {}).get("issues") if isinstance(decoded, dict) else None
+    nodes = issues.get("nodes") if isinstance(issues, dict) else None
+    if not isinstance(nodes, list):
+        raise RuntimeError("linear_issue_state_refresh_missing_team_issues")
+    refreshed: list[dict[str, str]] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        issue_id = node.get("id")
+        identifier = node.get("identifier")
+        state = node.get("state")
+        state_name = state.get("name") if isinstance(state, dict) else None
+        if (
+            isinstance(issue_id, str)
+            and isinstance(identifier, str)
+            and isinstance(state_name, str)
+        ):
+            refreshed.append(
+                {"id": issue_id, "identifier": identifier, "state": state_name}
+            )
+    return {"kind": "refreshed", "reason": None, "issues": refreshed}
 
 
 def resolve_linear_eligible_issue_count(
@@ -920,6 +1147,26 @@ def read_closure_stop_line(
                                      purpose=purpose)
 
 
+def _closure_issue_intake_allowed(status: object, reasons: object) -> bool:
+    """Issue-blocked red keeps Jovie intake open; systems-down stays fail-closed."""
+    if not isinstance(reasons, list) or not all(
+        isinstance(reason, str) for reason in reasons
+    ):
+        return False
+    reason_set = set(reasons)
+    if reason_set & CLOSURE_SYSTEMS_DOWN_REASONS:
+        return False
+    if status == "healthy":
+        return True
+    if (
+        status in {"grace", "red"}
+        and reason_set
+        and reason_set <= CLOSURE_ISSUE_BLOCKED_REASONS
+    ):
+        return True
+    return False
+
+
 def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
     """Repair-feed reason list when a grace/red closure row is controller feed.
 
@@ -938,7 +1185,7 @@ def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
         not isinstance(reason, str) for reason in reasons
     ):
         return None
-    if not set(reasons) <= REPAIR_FEED_REASONS:
+    if not reasons or not set(reasons) <= REPAIR_FEED_REASONS:
         return None
     return sorted(set(reasons))
 
@@ -991,9 +1238,12 @@ def _closure_snapshot_verdict(
     tampered = (
         closure.get("schema") != CLOSURE_HEALTH_SCHEMA
         or closure.get("authority") != CLOSURE_HEALTH_AUTHORITY
+        or not isinstance(status, str)
         or status not in CLOSURE_HEALTH_STATUSES
         or not isinstance(intake, bool)
-        or intake is not (status == CLOSURE_HEALTHY_STATUS)
+        or not isinstance(closure.get("reasons"), list)
+        or any(not isinstance(reason, str) for reason in closure["reasons"])
+        or intake is not _closure_issue_intake_allowed(status, closure["reasons"])
         or closure.get("promotionContinues") is not True
         or closure.get("remediationContinues") is not True
     )
@@ -1081,12 +1331,18 @@ def read_dispatch_admission(
 
     The controller must separately verify tracker/repository identity, exact
     repair assignment and writer lease, and recheck before its one-use claim.
+
+    Returns a typed symphony-dispatch-admission/v1 object. The flat keys
+    (allowed/reason/mode/productId/maxConcurrent, optional observedAt) are the
+    legacy machine contract and stay first-class; the per-mode sub-objects
+    (newWork/existingRepair) carry the mode-specific evidence so consumers can
+    bind typed fields instead of re-deriving them from the fleet receipt.
+    A held admission never leaks the other mode's fields.
     """
-    result = {"allowed": False, "reason": "dispatch-gate-invalid", "maxConcurrent": 0,
-              "mode": mode, "productId": product_id}
+    result = _new_dispatch_admission(mode, product_id)
     if (not isinstance(mode, str) or not isinstance(product_id, str)
-            or mode not in {"new-work", "existing-pr-repair"}
-            or product_id not in {"jovie", "ovie", "logyourbody"}):
+            or mode not in DISPATCH_ADMISSION_MODES
+            or product_id not in DISPATCH_ADMISSION_PRODUCTS):
         return result
     try:
         # One read: closure and capacity must never come from different versions.
@@ -1097,6 +1353,7 @@ def read_dispatch_admission(
     result["reason"] = verdict["reason"]
     valid_reasons = {"closure-health-green", "closure-health-product-independent", "closure-health-not-green"}
     if verdict["reason"] not in valid_reasons:
+        result["closureHealth"] = _admission_closure_projection(verdict)
         return result
     result["observedAt"] = verdict["receiptObservedAt"]
     concurrency = payload.get("concurrency")
@@ -1107,6 +1364,7 @@ def read_dispatch_admission(
             or gem.get("evidenceAccepted") is not True or gem.get("newMutationAllowed") is not True
             or type(maximum) is not int or maximum <= 0):
         result["reason"] = "dispatch-capacity-unproven"
+        result["capacity"] = _admission_capacity_projection(gem)
         return result
     if mode == "new-work":
         work = payload.get("workAdmission")
@@ -1119,7 +1377,11 @@ def read_dispatch_admission(
                 or work.get("newIssueLeaseAllowed") is not True
                 or work.get("newImplementationAllowed") is not True or not product_ok):
             result["reason"] = "new-work-admission-closed"
+            result["newWork"] = _admission_new_work_projection(
+                work, products, product_id
+            )
             return result
+        result["newWork"] = _admission_new_work_projection(work, products, product_id)
     else:
         repair = payload.get("remediationAdmission")
         activities = repair.get("activities") if isinstance(repair, dict) else None
@@ -1132,9 +1394,98 @@ def read_dispatch_admission(
                 or type(repair.get("pushAllowed")) is not bool
                 or type(repair_max) is not int or repair_max != maximum):
             result["reason"] = "existing-pr-remediation-closed"
+            result["existingRepair"] = _admission_repair_projection(repair)
             return result
+        result["existingRepair"] = _admission_repair_projection(repair)
     result.update(allowed=True, reason="dispatch-gate-prerequisite-passed", maxConcurrent=maximum)
     return result
+
+
+def _new_dispatch_admission(mode: object, product_id: object) -> dict[str, Any]:
+    """Fail-closed typed skeleton for an unevaluable admission."""
+    return {
+        "schema": DISPATCH_ADMISSION_SCHEMA,
+        "allowed": False,
+        "reason": "dispatch-gate-invalid",
+        "maxConcurrent": 0,
+        "mode": mode,
+        "productId": product_id,
+    }
+
+
+def _admission_closure_projection(verdict: dict[str, Any]) -> dict[str, Any]:
+    """Typed closure evidence snapshot for a held admission."""
+    return {
+        "closureStatus": verdict.get("closureStatus"),
+        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
+        "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
+        "holdReason": verdict.get("reason"),
+    }
+
+
+def _admission_capacity_projection(gem: object) -> dict[str, Any]:
+    """Typed capacity evidence snapshot for an unproven admission."""
+    if not isinstance(gem, dict):
+        return {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": None}
+    return {
+        "evidenceAccepted": gem.get("evidenceAccepted") is True,
+        "newMutationAllowed": gem.get("newMutationAllowed") is True,
+        "maxConcurrent": gem.get("maxConcurrent") if type(gem.get("maxConcurrent")) is int else None,
+    }
+
+
+def _admission_new_work_projection(
+    work: object, products: object, product_id: str
+) -> dict[str, Any]:
+    """Typed new-work evidence; absent workAdmission degrades to all-closed.
+
+    The product flag mirrors the decision's missing-map semantics exactly: a
+    fleet receipt with no productNewIssueLeaseAllowed map projects the
+    product's own intake as allowed-by-omission (the decision's product_ok
+    treats the missing map as OK), never a contradicting False.
+    """
+    if not isinstance(work, dict):
+        return {
+            "allowed": False,
+            "newIssueLeaseAllowed": False,
+            "newImplementationAllowed": False,
+            "productNewIssueLeaseAllowed": False,
+        }
+    if isinstance(products, dict):
+        product_flag = products.get(product_id) is True
+    elif "productNewIssueLeaseAllowed" not in work:
+        # Omitted map: the decision admits by omission; project the same.
+        product_flag = work.get("newIssueLeaseAllowed") is True
+    else:
+        product_flag = False
+    return {
+        "allowed": work.get("allowed") is True,
+        "newIssueLeaseAllowed": work.get("newIssueLeaseAllowed") is True,
+        "newImplementationAllowed": work.get("newImplementationAllowed") is True,
+        "productNewIssueLeaseAllowed": product_flag,
+    }
+
+
+def _admission_repair_projection(repair: object) -> dict[str, Any]:
+    """Typed existing-repair evidence; absent admission degrades to closed."""
+    if not isinstance(repair, dict):
+        return {
+            "allowed": False,
+            "localAllowed": False,
+            "pushAllowed": False,
+            "authority": None,
+            "activities": [],
+        }
+    activities = repair.get("activities")
+    return {
+        "allowed": repair.get("allowed") is True,
+        "localAllowed": repair.get("localAllowed") is True,
+        "pushAllowed": repair.get("pushAllowed") is True,
+        "authority": repair.get("authority") if isinstance(repair.get("authority"), str) else None,
+        "activities": [
+            activity for activity in (activities or []) if isinstance(activity, str)
+        ] if isinstance(activities, list) else [],
+    }
 
 
 def _read_stop_line(
@@ -1150,6 +1501,15 @@ def _read_stop_line(
     )
 
 
+def _hold_autoresolve():
+    directory = pathlib.Path(__file__).resolve().parent
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
+    import hold_autoresolve
+
+    return hold_autoresolve
+
+
 def write_closure_hold_receipt(
     path: pathlib.Path,
     verdict: dict[str, Any],
@@ -1160,21 +1520,79 @@ def write_closure_hold_receipt(
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
     """Durable symphony-closure-hold/v1 receipt for one hold decision."""
+    observed = now or _now()
+    fields = _hold_autoresolve().closure_hold_write_fields(
+        verdict, status=status, now=observed
+    )
     payload = {
         "schema": CLOSURE_HOLD_SCHEMA,
         "status": status,
-        "reason": verdict.get("reason"),
-        "closureStatus": verdict.get("closureStatus"),
-        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
         "receiptPath": verdict.get("path"),
         "receiptObservedAt": verdict.get("receiptObservedAt"),
         "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
         "holdSleepSecondsUsed": sleep_seconds_used,
         "maxGateSleepSeconds": max_sleep_seconds,
-        "observedAt": _iso(now or _now()),
+        **fields,
     }
     _write_json_receipt(path, payload)
     return payload
+
+
+def read_active_closure_hold(path: pathlib.Path) -> dict[str, Any] | None:
+    """Return the hold only when it is an active red stop.
+
+    Released-but-red host JSON is inactive. Readers must use this instead of
+    copying closureStatus=red off a released receipt.
+    """
+    helper = _hold_autoresolve()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
+        return None
+    if not helper.is_active_red_hold(payload):
+        return None
+    return payload
+
+
+def autoresolve_closure_hold_if_green(
+    stop_line: ClosureStopLine,
+    *,
+    observe_only: bool = False,
+    now: dt.datetime | None = None,
+) -> dict[str, Any] | None:
+    """Clear stale released-but-red holds when the live gate is GREEN."""
+    helper = _hold_autoresolve()
+    path = stop_line.hold_receipt_path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
+        return None
+    verdict = _read_stop_line(stop_line, now=now)
+    gate_state = (
+        "GREEN"
+        if verdict.get("reason") == "closure-health-green"
+        else verdict.get("closureStatus")
+    )
+    if not helper.should_autoresolve(
+        payload, gate_state=gate_state, observe_only=observe_only
+    ) and not (
+        payload.get("status") in helper.CLEARED_HOLD_STATUSES
+        and (
+            payload.get("closureStatus") == "red"
+            or payload.get("newIssueIntakeAllowed") is False
+        )
+        and helper.gate_is_green(gate_state)
+    ):
+        return payload
+    cleared = helper.autoresolve_hold(
+        payload, gate_state=gate_state, observe_only=observe_only, now=now
+    )
+    _write_json_receipt(path, cleared)
+    return cleared
 
 
 def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
@@ -1321,7 +1739,12 @@ def classify_linear_issue_error_log_line(
     Only a ``linear_api_status`` 4xx (never 429, never a RATELIMITED body, which
     the rate-limit gate owns) attributed to exactly one issue identifier may
     dead-letter. Ambiguous or unattributable lines fail closed to no action.
+    ``issue_state_refresh_failed`` is a query-class error (empty running set,
+    projectSlug on a team WORKFLOW, identifier-as-ID) — not a per-issue
+    permanent 400. Dead-lettering it blocks Symphony self-heal (JOV-5822).
     """
+    if "issue_state_refresh_failed" in line:
+        return None
     status_match = LINEAR_API_STATUS_PATTERN.search(line)
     if status_match is None:
         return None
@@ -1545,6 +1968,9 @@ def run_official_binary(
         raise ValueError("missing official Symphony command after --")
     gate_sleep_used = 0
     closure_sleep_used = 0
+    autoresolve_closure_hold_if_green(
+        closure, observe_only=closure_observe_only
+    )
     while True:
         verdict = _read_stop_line(closure)
         if verdict["hold"] and not closure_observe_only:
@@ -1677,6 +2103,214 @@ def read_rate_limit_gate(path: pathlib.Path, now: dt.datetime | None = None) -> 
     }
 
 
+
+# Source-only activation guard. No ownership receipt or installer authority is minted.
+ACTIVATION_UNIT_FIELDS = (
+    "Id", "LoadState", "ActiveState", "SubState", "MainPID", "ControlPID",
+    "InvocationID", "ControlGroup", "NeedDaemonReload", "Transient", "SourcePath",
+    "FragmentPath", "DropInPaths",
+)
+ACTIVATION_COMMAND_PROPERTIES = (
+    "ExecStartEx", "ExecStartPreEx", "ExecStartPostEx", "ExecConditionEx",
+    "ExecReloadEx", "ExecStopEx", "ExecStopPostEx",
+)
+ACTIVATION_PROPERTY_TYPES = {
+    **{name: "a(sasasttttuii)" for name in ACTIVATION_COMMAND_PROPERTIES},
+    "Type": "s", "WorkingDirectory": "s", "Environment": "as", "EnvironmentFiles": "a(sb)",
+}
+ACTIVATION_DROPINS = frozenset({"90-symphony-safe-restart-guard.conf", "workspace-mounts.conf"})
+
+
+def _activation_read_file(path: pathlib.Path) -> bytes:
+    if path.resolve(strict=True) != path:
+        raise ValueError("indirect file")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as handle:
+        before = os.fstat(handle.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > 65_536:
+            raise ValueError("unsupported file")
+        value = handle.read(65_537)
+        after = os.fstat(handle.fileno())
+    if len(value) > 65_536 or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+    ):
+        raise ValueError("file changed")
+    return value
+
+
+def _activation_command(args: list[str]) -> str:
+    result = subprocess.run(args, capture_output=True, text=True, timeout=5, check=True)
+    if len(result.stdout) > 65_536:
+        raise ValueError("oversized observation")
+    return result.stdout
+
+
+def _activation_snapshot() -> tuple[dict[str, str], dict[str, Any]]:
+    # Only selected properties: never dump process environments or arbitrary argv.
+    raw = _activation_command(["systemctl", "--user", "show", OFFICIAL_SERVICE_NAME,
+                               "--property=" + ",".join(ACTIVATION_UNIT_FIELDS)])
+    fields = {}
+    for line in raw.splitlines():
+        key, separator, value = line.partition("=")
+        if not separator or key in fields or key not in ACTIVATION_UNIT_FIELDS:
+            raise ValueError("ambiguous unit properties")
+        fields[key] = value
+    if set(fields) != set(ACTIVATION_UNIT_FIELDS):
+        raise ValueError("missing unit properties")
+    # systemd's typed D-Bus Ex properties retain command flags and argument arrays.
+    raw = _activation_command([
+        "busctl", "--user", "--json=short", "get-property", "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1/unit/symphony_2delixir_2eservice",
+        "org.freedesktop.systemd1.Service", *ACTIVATION_PROPERTY_TYPES,
+    ])
+    rows = raw.splitlines()
+    if len(rows) != len(ACTIVATION_PROPERTY_TYPES):
+        raise ValueError("incomplete effective configuration")
+    properties = {}
+    for (name, signature), row in zip(ACTIVATION_PROPERTY_TYPES.items(), rows):
+        value = json.loads(row)
+        if not isinstance(value, dict) or set(value) != {"type", "data"} or value["type"] != signature:
+            raise ValueError("invalid effective property")
+        properties[name] = value["data"]
+    return fields, properties
+
+
+def _activation_dropin_paths(directory: pathlib.Path) -> list[str]:
+    if directory.is_symlink():
+        raise ValueError("indirect drop-in directory")
+    if not directory.exists():
+        return []
+    if directory.resolve(strict=True) != directory:
+        raise ValueError("indirect drop-in directory")
+    with os.scandir(directory) as entries:
+        return sorted(str(directory / entry.name) for entry in entries if entry.name.endswith(".conf"))
+
+
+def _activation_exec_matches(rows: Any, commands: list[list[str]]) -> bool:
+    if not isinstance(rows, list) or len(rows) != len(commands):
+        return False
+    return all(
+        isinstance(row, list) and len(row) == 10
+        and row[:3] == [command[0], command, []]
+        and all(type(value) is int for value in row[3:])
+        and all(value >= 0 for value in row[3:8])
+        for row, command in zip(rows, commands)
+    )
+
+
+def _activation_process_generation(process: pathlib.Path) -> tuple[str, int]:
+    # /proc stat field 22 is stable start time; CPU counters are deliberately excluded.
+    value = _activation_read_file(process / "stat").decode()
+    prefix, separator, tail = value.rpartition(")")
+    fields = tail.split()
+    pid = prefix.split(" ", 1)[0]
+    if not separator or pid != process.name or len(fields) < 20 or not fields[19].isdigit():
+        raise ValueError("invalid process generation")
+    return pid, int(fields[19])
+
+
+def activation_ownership_preflight(repo_root: pathlib.Path, *, home: pathlib.Path | None = None,
+                                   proc_root: pathlib.Path = pathlib.Path("/proc")) -> dict[str, Any]:
+    """Point-in-time preservation check; unsupported or changed ownership holds.
+
+    Only candidate-source-matching canonical legacy configuration is supported.
+    Older legitimate configurations also hold for explicit migration review.
+    No file, service, environment, provider alias or runtime receipt is written.
+    """
+    stage = "observation"
+    started = time.monotonic()
+    try:
+        home = (home or pathlib.Path.home()).resolve(strict=True)
+        repo_root = repo_root.resolve(strict=True)
+        fields, effective = _activation_snapshot()
+        stage = "loaded-unit"
+        unit = home / ".config/systemd/user" / OFFICIAL_SERVICE_NAME
+        if (fields["Id"] != OFFICIAL_SERVICE_NAME or fields["LoadState"] != "loaded"
+                or fields["Transient"] != "no" or fields["SourcePath"]
+                or fields["NeedDaemonReload"] != "no" or fields["FragmentPath"] != str(unit)
+                or fields["ControlPID"] != "0"):
+            raise ValueError("unsupported loaded unit")
+        active = fields["ActiveState"] == "active" and fields["SubState"] == "running"
+        inactive = fields["ActiveState"] == "inactive" and fields["SubState"] == "dead"
+        if (not (active or inactive) or not fields["MainPID"].isdigit()
+                or str(int(fields["MainPID"])) != fields["MainPID"]
+                or (active and (int(fields["MainPID"]) <= 0
+                    or not re.fullmatch(r"[a-f0-9]{32}", fields["InvocationID"])
+                    or not fields["ControlGroup"].endswith("/" + OFFICIAL_SERVICE_NAME)))
+                or (inactive and fields["MainPID"] != "0")):
+            raise ValueError("ambiguous runtime state")
+        stage = "source-configuration"
+        source_dir = repo_root / "scripts/symphony/systemd"
+        watched = {}
+        def read(path):
+            value = _activation_read_file(path)
+            watched[path] = value
+            return value
+        source_unit = read(source_dir / OFFICIAL_SERVICE_NAME)
+        if read(unit) != source_unit:
+            raise ValueError("unsupported source unit")
+        directory = unit.with_name(unit.name + ".d")
+        paths = _activation_dropin_paths(directory)
+        loaded = shlex.split(fields["DropInPaths"])
+        if len(loaded) != len(set(loaded)) or sorted(loaded) != paths:
+            raise ValueError("unloaded or foreign drop-in")
+        texts = [source_unit.decode()]
+        for name in paths:
+            path = pathlib.Path(name)
+            if path.name not in ACTIVATION_DROPINS:
+                raise ValueError("unsupported override")
+            expected = read(source_dir / (OFFICIAL_SERVICE_NAME + ".d") / path.name)
+            if read(path) != expected:
+                raise ValueError("changed override")
+            texts.append(expected.decode())
+        directives = {}
+        for text in texts:
+            for line in text.splitlines():
+                key, separator, value = line.partition("=")
+                if separator:
+                    directives.setdefault(key, []).append(value.replace("%h", str(home)))
+        argv = [shlex.split(value) for value in directives.get("ExecStart", [])]
+        stage = "effective-configuration"
+        if len(argv) != 1 or not argv[0] or argv[0][0] != str(home / ".local/bin/symphony-official-runtime"):
+            raise ValueError("unsupported candidate command")
+        for name in ACTIVATION_COMMAND_PROPERTIES:
+            commands = [shlex.split(value) for value in directives.get(name.removesuffix("Ex"), [])]
+            if not _activation_exec_matches(effective[name], commands):
+                raise ValueError("effective command disagreement")
+        environment = [part for value in directives.get("Environment", []) for part in shlex.split(value)]
+        environment_files = [[value.removeprefix("-"), value.startswith("-")]
+                             for value in directives.get("EnvironmentFile", [])]
+        observed_files = effective["EnvironmentFiles"]
+        if (effective["Type"] != "simple" or effective["WorkingDirectory"] != str(home)
+                or effective["Environment"] != environment or observed_files != environment_files
+                or not isinstance(observed_files, list)
+                or any(not isinstance(row, list) or len(row) != 2 or type(row[1]) is not bool
+                       for row in observed_files)):
+            raise ValueError("effective configuration disagreement")
+        stage = "live-process"
+        process_generation = None
+        if active:
+            process = proc_root / fields["MainPID"]
+            args = read(process / "cmdline").decode().removesuffix("\0").split("\0")
+            if (len(args) != len(argv[0]) + 1 or args[1:] != argv[0]
+                    or not re.fullmatch(r"python3(?:\.\d+)?", pathlib.Path(args[0]).name)):
+                raise ValueError("running command disagreement")
+            cgroups = read(process / "cgroup").decode().splitlines()
+            if not any(line.split(":", 2)[-1] == fields["ControlGroup"] for line in cgroups):
+                raise ValueError("running service disagreement")
+            process_generation = _activation_process_generation(process)
+        stage = "freshness"
+        if (_activation_snapshot() != (fields, effective)
+                or (active and _activation_process_generation(process) != process_generation)
+                or _activation_dropin_paths(directory) != paths
+                or any(_activation_read_file(path) != value for path, value in watched.items())
+                or time.monotonic() - started > 15):
+            raise ValueError("ownership changed or stale")
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        return {"allowed": False, "reason": "activation-ownership-held:" + stage}
+    return {"allowed": True, "reason": "canonical-managed-ownership-observed"}
+
+
 def _print_result(result: dict[str, Any], *, json_output: bool) -> None:
     if json_output:
         print(json.dumps(result, sort_keys=True))
@@ -1711,6 +2345,9 @@ def _parse_now(value: str | None) -> dt.datetime | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+
+    ownership_parser = sub.add_parser("activation-preflight")
+    ownership_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
 
     budget_parser = sub.add_parser("budget-check")
     budget_parser.add_argument("--active-issues", type=int, default=MEASURED_ACTIVE_ISSUES)
@@ -1797,6 +2434,11 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
+    if args.command == "activation-preflight":
+        result = activation_ownership_preflight(args.repo_root)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["allowed"] else CLOSURE_HOLD_EXIT_CODE
+
 
     if args.command == "budget-check":
         budget = compute_budget(

@@ -45,6 +45,10 @@
 @source not "../**/*.test.*";
 @source not "../**/*.spec.*";
 @source not "../**/*.stories.*";
+/* DashboardThemeToggle is rendered by the app shell and has a small
+   route-owned utility set. Re-include only this file so its state paints are
+   present without scanning the dashboard tree into public CSS. */
+@source "../components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -149,6 +153,12 @@ html[data-desktop-runtime="electron"]
     [data-electron-no-drag="true"],
     [data-radix-popper-content-wrapper]
   ) {
+  -webkit-app-region: no-drag;
+}
+
+/* JOV-6340: route canvas/composer are never a window-drag region. */
+html[data-desktop-runtime="electron"] [data-app-shell-scroll],
+html[data-desktop-runtime="electron"] [data-testid="chat-composer-surface"] {
   -webkit-app-region: no-drag;
 }
 

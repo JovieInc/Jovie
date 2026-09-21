@@ -56,6 +56,12 @@ export const APP_FLAG_DEFAULTS = {
    * and stream tool artifacts in the welcome chat (JOV-3988). Kill-switchable.
    */
   ONBOARDING_WOW_TASK_QUEUE: true,
+  /**
+   * Paid-subscription fulfillment confirmation email (JOV-6445).
+   * Default OFF. Approvals-policy-v1: Tim must publish this flag on
+   * and approve the first live send before any customer receives it.
+   */
+  PAID_WELCOME_EMAIL: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -83,6 +89,7 @@ export const APP_FLAG_KEYS = {
   PROFILES_WORKSPACE: 'profiles_workspace',
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
   ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
+  PAID_WELCOME_EMAIL: 'paid_welcome_email',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -105,6 +112,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   PROFILES_WORKSPACE: 'code:PROFILES_WORKSPACE',
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
   ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
+  PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -153,6 +161,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Google-first artist search-presence monitoring runner',
   ONBOARDING_WOW_TASK_QUEUE:
     'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
+  PAID_WELCOME_EMAIL:
+    'Send one idempotent paid-welcome email after verified subscription entitlement. Default off — Tim publishes prod override and approves the first live send (JOV-6445).',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -173,4 +183,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
+  'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
 ]);

@@ -180,6 +180,8 @@ jobs:
           # Preserve the managed provider generation boundary. The next installer
           # owns the exact workflow/service-unit overlay, and the explicit installs
           # below own the adaptive controller; provider-only is not the whole activation.
+          # Refuse unsupported effective ownership before any runtime mutation.
+          python3 -B scripts/symphony/symphony_official_runtime.py activation-preflight --repo-root "$GITHUB_WORKSPACE"
           bash scripts/symphony/symphony-elixir-safe-restart --prepare-stop-guard
           bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
           bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
@@ -198,6 +200,7 @@ jobs:
           systemctl --user daemon-reload
           systemctl --user enable --now symphony-concurrency-controller.timer
           systemctl --user start symphony-concurrency-controller.service
+          systemctl --user reset-failed gem-disk-reclaim.service || true
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
         if: steps.marker.outputs.superseded != 'true'

@@ -93,6 +93,31 @@ describe('MarketingHero source-backed default story', () => {
     ).toHaveClass('marketing-h1-max-two-lines');
   });
 
+  it('uses the canonical growing action contract for a landing secondary CTA', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='landing-actions-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        secondaryCtaLabel='See pricing'
+        secondaryCtaHref='/pricing'
+      />
+    );
+
+    const secondary = screen.getByRole('link', { name: 'See pricing' });
+    expect(secondary).toHaveAttribute('href', '/pricing');
+    expect(secondary).toHaveAttribute('data-variant', 'ghost');
+    expect(secondary).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11'
+    );
+    expect(secondary).not.toHaveClass('h-10');
+  });
+
   it('routes route-owned presentation through the unstyled shell without hero chrome', () => {
     render(
       <MarketingHero
@@ -141,5 +166,31 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('relative', 'w-full');
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
+  });
+
+  it('paints the landing hero backdrop through the shared token class', () => {
+    // The --linear-hero-backdrop token is consumed only through the shared
+    // .marketing-hero-backdrop class (linear-tokens.css). Landing heroes
+    // must not inline the var: new --linear-* identities are ratcheted
+    // per-file and the namespace count is shrink-only.
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='backdrop-heading'
+        title='Backdrop title'
+        body='Backdrop body'
+        media={<div>Media</div>}
+        testId='backdrop-hero'
+      />
+    );
+
+    const shell = screen.getByTestId('backdrop-hero');
+    expect(shell.querySelector('.marketing-hero-backdrop')).not.toBeNull();
+    expect(shell.querySelector('.marketing-hero-backdrop')).toHaveClass(
+      'pointer-events-none',
+      'absolute',
+      'inset-0'
+    );
+    expect(shell.innerHTML).not.toContain('--linear-hero-backdrop');
   });
 });

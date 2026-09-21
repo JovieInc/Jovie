@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  collectSitemapInventoryViolations,
+  type SitemapManifestRoute,
+} from '@/lib/seo/sitemap-publication';
 
 vi.mock('next/cache', () => ({
   unstable_cache: (callback: () => Promise<unknown>) => callback,
@@ -31,9 +35,19 @@ const queryMock = vi.fn();
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
 const innerJoinMock = vi.fn(() => ({
   innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
   where: whereMock,
 }));
-const fromMock = vi.fn(() => ({ where: whereMock, innerJoin: innerJoinMock }));
+const leftJoinMock = vi.fn(() => ({
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+  where: whereMock,
+}));
+const fromMock = vi.fn(() => ({
+  where: whereMock,
+  innerJoin: innerJoinMock,
+  leftJoin: leftJoinMock,
+}));
 const selectMock = vi.fn(() => ({ from: fromMock }));
 
 vi.mock('@/lib/db', () => ({
@@ -83,6 +97,13 @@ vi.mock('@/lib/db/schema/playlists', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: {
+    id: 'id',
+    email: 'email',
+  },
+}));
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     username: 'username',
@@ -94,6 +115,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     displayName: 'displayName',
     settings: 'settings',
     id: 'id',
+    userId: 'userId',
   },
 }));
 
@@ -195,6 +217,11 @@ describe('sitemap', () => {
         'https://jov.ie/engineering',
         'https://jov.ie/legal/privacy',
         'https://jov.ie/legal/terms',
+        'https://jov.ie/legal/cookies',
+        'https://jov.ie/legal/dmca',
+        'https://jov.ie/artist-profiles',
+        'https://jov.ie/product',
+        'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',
         'https://jov.ie/tim/album',
         'https://jov.ie/tim/single',
@@ -218,15 +245,30 @@ describe('sitemap', () => {
       'https://jov.ie/engineering/preview',
       'https://jov.ie/engineering/preview/verified-changelog',
       'https://jov.ie/engineering/verified-changelog',
+      'https://jov.ie/new',
+      'https://jov.ie/artist-profile',
+      'https://jov.ie/voice',
+      'https://jov.ie/waitlist',
+      'https://jov.ie/ai',
+      'https://jov.ie/renders',
+      'https://jov.ie/solutions',
+      'https://jov.ie/music',
+      'https://jov.ie/shows',
+      'https://jov.ie/you',
+      'https://jov.ie/privacy',
+      'https://jov.ie/terms',
     ]) {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }
 
+    const inventoryViolations = collectSitemapInventoryViolations(entries, {
+      generatedAt: new Date('2026-09-16T20:30:02.784Z'),
+    });
+    expect(inventoryViolations).toEqual([]);
     for (const entry of entries) {
-      expect(
-        entry.lastModified,
-        `${entry.url} must include lastModified for sitemap <lastmod>`
-      ).toBeDefined();
+      if (entry.lastModified) {
+        expect(entry.lastModified).toBeInstanceOf(Date);
+      }
     }
 
     expect(entries.length).toBeGreaterThan(0);
@@ -234,13 +276,13 @@ describe('sitemap', () => {
     expect(queryMock).toHaveBeenCalled();
   });
 
-  it('every sitemap entry has a lastModified date (SEO ratchet #11044)', async () => {
+  it('uses catalog revision dates and omits lastmod when the revision is unknown', async () => {
     getBlogPosts.mockResolvedValue([]);
     whereMock
       .mockResolvedValueOnce([
         {
           username: 'artist',
-          displayName: 'Artist',
+          displayName: 'Artist Name',
           updatedAt: new Date('2026-01-01'),
         },
       ])
@@ -250,15 +292,12 @@ describe('sitemap', () => {
 
     const { default: sitemap } = await import('../../app/sitemap');
     const entries = await sitemap();
+    const artist = entries.find(entry => entry.url === 'https://jov.ie/artist');
+    const about = entries.find(entry => entry.url === 'https://jov.ie/about');
 
     expect(entries.length).toBeGreaterThan(0);
-    for (const entry of entries) {
-      expect(
-        entry.lastModified,
-        `sitemap entry "${entry.url}" is missing lastModified`
-      ).toBeDefined();
-      expect(entry.lastModified).toBeInstanceOf(Date);
-    }
+    expect(artist?.lastModified).toEqual(new Date('2026-01-01'));
+    expect(about?.lastModified).toBeUndefined();
   });
 
   it('excludes automatic unclaimed structured-credit profiles', async () => {
@@ -483,6 +522,53 @@ describe('sitemap', () => {
     expect(urls).toContain('https://jov.ie/tmoc-artist');
   });
 
+  it('excludes a realistic test account and its URLs without a handle denylist', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'jordanmiles',
+          displayName: 'Jordan Miles',
+          updatedAt: new Date('2026-09-13'),
+          isClaimed: true,
+          settings: {},
+          ownerEmail: 'e2e+jordan@example.com',
+        },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-09-13'),
+          isClaimed: true,
+          settings: {},
+          ownerEmail: 'tim@timwhite.audio',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'jordanmiles',
+          slug: 'realistic-release',
+          updatedAt: new Date('2026-09-13'),
+          artworkUrl: null,
+        },
+        {
+          username: 'tim',
+          slug: 'never-say-a-word',
+          updatedAt: new Date('2026-09-13'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).not.toContain('https://jov.ie/jordanmiles');
+    expect(urls).not.toContain('https://jov.ie/jordanmiles/realistic-release');
+    expect(urls).toContain('https://jov.ie/tim');
+    expect(urls).toContain('https://jov.ie/tim/never-say-a-word');
+  });
+
   it('is non-empty (at minimum static marketing pages are included)', async () => {
     getBlogPosts.mockResolvedValue([]);
     whereMock
@@ -498,7 +584,7 @@ describe('sitemap', () => {
     expect(entries.map(e => e.url)).toContain('https://jov.ie');
   });
 
-  it('returns a non-empty sitemap where every entry has lastModified', async () => {
+  it('returns a non-empty canonical sitemap and omits unknown lastmod', async () => {
     getBlogPosts.mockResolvedValue([]);
     whereMock.mockResolvedValue([]);
 
@@ -508,7 +594,71 @@ describe('sitemap', () => {
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
       expect(entry.url).toMatch(/^https:\/\/jov\.ie/);
-      expect(entry.lastModified).toBeInstanceOf(Date);
+      if (entry.lastModified) {
+        expect(entry.lastModified).toBeInstanceOf(Date);
+      }
     }
+  });
+
+  it('does not resurrect unpublished or QA identities when the catalog is unavailable', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock.mockRejectedValue(new Error('database unavailable'));
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).toContain('https://jov.ie/artist-profiles');
+    expect(urls).not.toContain('https://jov.ie/unpublished-band');
+    expect(urls).not.toContain('https://jov.ie/tmoc0g1x9dwmk71');
+    expect(urls.some(url => /\/tmoc[0-9a-z]{10,}/.test(url))).toBe(false);
+  });
+});
+
+describe('sitemap publication inventory fixtures (JOV-6263)', () => {
+  const generatedAt = new Date('2026-09-16T20:30:02.784Z');
+  const manifest: SitemapManifestRoute[] = [
+    { url: '/youtube-thumbnails', status: 'active', recipeId: 'feature' },
+    { url: '/artist-profiles', status: 'active', recipeId: 'artist-lp' },
+  ];
+  const hubs = [
+    { url: 'https://jov.ie/artist-profiles' },
+    { url: 'https://jov.ie/youtube-thumbnails' },
+  ];
+
+  it('flags an omitted commercial page, QA identity, and request-time lastmod', () => {
+    expect(
+      collectSitemapInventoryViolations(hubs.slice(0, 1), { manifest })
+    ).toContain('omitted commercial page: /youtube-thumbnails');
+    expect(
+      collectSitemapInventoryViolations(
+        [...hubs, { url: 'https://jov.ie/tmoc0g1x9dwmk71' }],
+        { manifest }
+      )
+    ).toContain('QA identity included: /tmoc0g1x9dwmk71');
+    expect(
+      collectSitemapInventoryViolations(
+        [{ ...hubs[0], lastModified: generatedAt }, hubs[1]],
+        { generatedAt, manifest }
+      )
+    ).toContain('request-time lastmod on unchanged page: /artist-profiles');
+  });
+
+  it('flags gone and alias public roots if they leak into the sitemap', () => {
+    expect(
+      collectSitemapInventoryViolations(
+        [
+          { url: 'https://jov.ie/artist-profiles' },
+          { url: 'https://jov.ie/youtube-thumbnails' },
+          { url: 'https://jov.ie/music' },
+          { url: 'https://jov.ie/privacy' },
+        ],
+        { manifest }
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'non-indexable public url: /music',
+        'non-indexable public url: /privacy',
+      ])
+    );
   });
 });

@@ -41,7 +41,7 @@ export function withFailSoftToolExecute(
       const normalizedFailure = normalizeToolFailureOutput(toolName, result);
 
       if (normalizedFailure?.errorCode === TOOL_ERROR_CODES.PLAN_UNAVAILABLE) {
-        return toLockedUpgradeResult(toolName, normalizedFailure.error, {
+        return await toLockedUpgradeResult(toolName, normalizedFailure.error, {
           source: 'chat-tool-throw',
         });
       }
@@ -51,7 +51,7 @@ export function withFailSoftToolExecute(
       if (isEntitlementDenialError(error)) {
         const message =
           error instanceof Error ? error.message : 'Requires a Pro plan.';
-        return toLockedUpgradeResult(toolName, message, {
+        return await toLockedUpgradeResult(toolName, message, {
           source: 'chat-tool-throw',
           code:
             error instanceof Error
@@ -63,7 +63,7 @@ export function withFailSoftToolExecute(
       const failure = classifyThrownToolError(toolName, error);
 
       if (failure.errorCode === TOOL_ERROR_CODES.PLAN_UNAVAILABLE) {
-        return toLockedUpgradeResult(toolName, failure.error, {
+        return await toLockedUpgradeResult(toolName, failure.error, {
           source: 'chat-tool-throw',
         });
       }
@@ -80,7 +80,7 @@ export function withFailSoftToolExecute(
   };
 }
 
-function toLockedUpgradeResult(
+async function toLockedUpgradeResult(
   toolName: string,
   message: string,
   meta: {
@@ -97,7 +97,7 @@ function toLockedUpgradeResult(
     message,
   });
 
-  logEntitlementDenial({
+  await logEntitlementDenial({
     gate: locked.gate,
     source: meta.source,
     toolName,

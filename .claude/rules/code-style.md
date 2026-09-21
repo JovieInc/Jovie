@@ -87,7 +87,7 @@ The `file-protection-check.sh` hook blocks hardcoded dashboard route literals.
 
 **Server-only modules CANNOT be imported in `'use client'` files:**
 - `@/lib/db/*` — Database access
-- `@clerk/nextjs/server` — Server-side auth
+- `@/lib/auth/better-auth`, `@/lib/auth/cached` — Server-side auth
 - `stripe`, `resend` — API clients with secrets
 - `drizzle-orm` — ORM queries
 - `*.server.ts` files
@@ -118,8 +118,8 @@ Remove the import or remove "use client" if this should be a server component.
 | Entitlements (registry) | `import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry'` | Duplicating plan matrices in components |
 | UI Icons | `import { IconName } from 'lucide-react'` | Emoji, FontAwesome, heroicons, custom SVGs |
 | Social/Brand Icons | `import { SocialIcon } from '@/components/atoms/SocialIcon'` | Lucide for social platforms, direct `simple-icons` |
-| Auth (client) | `import { useUser, useAuth } from '@clerk/nextjs'` | `@clerk/nextjs/server` in client files |
-| Auth (server) | `import { auth, currentUser } from '@clerk/nextjs/server'` | Server imports in `'use client'` files |
+| Auth (client) | `import { useJovieAuth, useUserSafe } from '@/hooks/useJovieAuth'` | Server auth modules in client files |
+| Auth (server) | `import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached'` | Server imports in `'use client'` files |
 | Error tracking | `import { captureError } from '@/lib/error-tracking'` | `console.error()` (hook-blocked in production code) |
 | Logger | `import { logger } from '@/lib/utils/logger'` | `console.log()` (hook-blocked in production code) |
 | Cache presets | `import { STABLE_CACHE } from '@/lib/queries/cache-strategies'` | Inline `staleTime`/`gcTime` values without presets |
@@ -227,7 +227,7 @@ useQuery({
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
 | `use-client-directive` | React hooks (`useState`, `useEffect`, etc.) in files without `'use client'` | Add `'use client'` at top of file |
-| `server-only-imports` | `@/lib/db`, `@clerk/nextjs/server`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
+| `server-only-imports` | `@/lib/db`, `@/lib/auth/better-auth`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
 | `icon-usage` | Emoji in JSX, non-Lucide UI icons, direct `simple-icons` imports | Use `lucide-react` for UI icons; `SocialIcon` component for social/brand icons |
 | `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use sequential operations or `db.insert().values([...])` batch |
 | `no-handler-initialization` | `new Stripe()`, `new Pool()`, `new Resend()`, `new Client()` inside `GET`/`POST`/`PUT`/`DELETE` handlers | Move to module-level singleton: `const stripe = getStripe()` at file top |
@@ -255,7 +255,7 @@ useQuery({
 Location: `apps/web/app/api/{domain}/{action}/route.ts`
 
 ```typescript
-import { auth } from '@clerk/nextjs/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
@@ -266,7 +266,7 @@ const payloadSchema = z.object({ /* ... */ });
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -293,7 +293,7 @@ Location: `apps/web/app/{route}/actions.ts` or `apps/web/lib/actions/{domain}.ts
 ```typescript
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';

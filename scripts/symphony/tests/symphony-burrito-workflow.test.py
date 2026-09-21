@@ -61,7 +61,7 @@ def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
                 "newIssueIntakeAllowed": intake,
                 "promotionContinues": True,
                 "remediationContinues": True,
-                "reasons": [] if intake else ["duplicate-issue-lanes-unresolved"],
+                "reasons": [] if intake else ["unknown-stop-reason"],
             }
         },
         "closureAdmission": {
@@ -116,6 +116,114 @@ def _runtime_command(args, *, established_clock=False):
         f" pathlib.Path({directory!r}, str(os.getpid()) + '.json').write_text(json.dumps(rows))\n"
     )
     return [sys.executable, "-c", launcher, *args]
+
+
+class ClosureProducerCompatibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import runpy
+        cls.scope = runpy.run_path(str(ROOT / "scripts/symphony/tests/gem-priority-gate.test.py"))
+        cls.producer = cls.scope["MODULE"]
+        cls.helper = _load_helper()
+        cls.now = dt.datetime(2026, 9, 20, 5, 0, tzinfo=dt.timezone.utc)
+
+    def receipt(self, status, reasons):
+        import copy
+        signals = copy.deepcopy(self.scope["GREEN_SIGNALS"])
+        signals["closureHealth"].update(
+            status=status, reasons=reasons,
+            newIssueIntakeAllowed=self.producer.issue_intake_allowed(status, reasons),
+        )
+        return self.producer.evaluate(signals, self.now.isoformat())
+
+    def verdict(self, receipt, purpose="controller-activation"):
+        return self.helper._closure_snapshot_verdict(
+            receipt, pathlib.Path("/synthetic/producer-receipt.json"),
+            now=self.now, purpose=purpose,
+        )
+
+    def test_actual_producer_repair_feed_reaches_activation_without_opening_new_work(self):
+        reasons = ["expired-held-prs", "internally-repairable-prs-open", "no-merge-progress-over-1h"]
+        for status in ("red", "grace"):
+            with self.subTest(status=status):
+                receipt = self.receipt(status, reasons)
+                self.assertIs(receipt["signals"]["closureHealth"]["newIssueIntakeAllowed"], True)
+                activation = self.verdict(receipt)
+                self.assertFalse(activation["hold"], activation)
+                self.assertEqual(activation["reason"], "closure-health-repair-feed")
+                self.assertEqual(activation["repairFeedReasons"], sorted(reasons))
+                admission = self.verdict(receipt, "admission")
+                self.assertTrue(admission["hold"])
+                self.assertEqual(admission["reason"], "closure-health-not-green")
+
+    def test_standalone_copy_accepts_real_producer_feed_without_sibling_modules(self):
+        receipt = self.receipt("red", ["expired-held-prs", "internally-repairable-prs-open"])
+        with tempfile.TemporaryDirectory() as tmp:
+            wrapper = pathlib.Path(tmp) / "symphony-official-runtime"
+            wrapper.write_bytes(HELPER_PATH.read_bytes())
+            result = subprocess.run(
+                [sys.executable, "-I", "-c",
+                 "import datetime, json, pathlib, runpy, sys; "
+                 "module = runpy.run_path(sys.argv[1]); "
+                 "print(json.dumps(module['_closure_snapshot_verdict']("
+                 "json.loads(sys.stdin.read()), pathlib.Path('/synthetic/receipt'), "
+                 "now=datetime.datetime.fromisoformat(sys.argv[2]), "
+                 "purpose='controller-activation')))",
+                 str(wrapper), self.now.isoformat()],
+                cwd=tmp, input=json.dumps(receipt), text=True, capture_output=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            verdict = json.loads(result.stdout)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-repair-feed")
+
+    def test_canonical_reason_domain_and_intake_predicate_match(self):
+        from closure_health import ISSUE_BLOCKED_REASONS, SYSTEMS_DOWN_REASONS
+        self.assertEqual(self.helper.CLOSURE_ISSUE_BLOCKED_REASONS, ISSUE_BLOCKED_REASONS)
+        self.assertEqual(self.helper.CLOSURE_SYSTEMS_DOWN_REASONS, SYSTEMS_DOWN_REASONS)
+        cases = [[], None, "expired-held-prs", [None], [{}], ["unknown-reason"]]
+        cases += [[reason] for reason in ISSUE_BLOCKED_REASONS | SYSTEMS_DOWN_REASONS]
+        cases += [list(ISSUE_BLOCKED_REASONS), list(ISSUE_BLOCKED_REASONS | SYSTEMS_DOWN_REASONS)]
+        for status in ("healthy", "grace", "red", "unknown", None):
+            for reasons in cases:
+                with self.subTest(status=status, reasons=reasons):
+                    self.assertIs(
+                        self.helper._closure_issue_intake_allowed(status, reasons),
+                        self.producer.issue_intake_allowed(status, reasons),
+                    )
+
+    def test_actual_producer_healthy_and_non_feed_outcomes(self):
+        self.assertEqual(self.verdict(self.receipt("healthy", []))["reason"], "closure-health-green")
+        for reasons in (["gate-evaluation-failed"], ["closure-health-receipt-missing-or-malformed"],
+                        ["expired-held-prs", "gate-evaluation-failed"],
+                        ["unknown-reason"], ["duplicate-issue-lanes-unresolved"], []):
+            receipt = self.receipt("red", reasons)
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(reasons=reasons, purpose=purpose):
+                    verdict = self.verdict(receipt, purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+    def test_valid_feed_still_rejects_tampered_and_disagreeing_fields(self):
+        mutations = [
+            ("schema", "wrong"), ("authority", "Gem"), ("status", "unknown"),
+            ("status", []), ("newIssueIntakeAllowed", False), ("newIssueIntakeAllowed", 1),
+            ("promotionContinues", False), ("remediationContinues", False),
+            ("reasons", None), ("reasons", "expired-held-prs"), ("reasons", [{}]),
+            ("reasons", ["expired-held-prs", "gate-evaluation-failed"]),
+        ]
+        for key, value in mutations:
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(key=key, value=value, purpose=purpose):
+                    receipt = self.receipt("red", ["expired-held-prs"])
+                    receipt["signals"]["closureHealth"][key] = value
+                    verdict = self.verdict(receipt, purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+        for key, value in (("status", "healthy"), ("newIssueIntakeAllowed", False)):
+            receipt = self.receipt("red", ["expired-held-prs"])
+            receipt["closureAdmission"][key] = value
+            self.assertEqual(self.verdict(receipt)["reason"], "closure-admission-disagrees")
 
 
 class DispatchAdmissionTests(unittest.TestCase):
@@ -264,6 +372,132 @@ class DispatchAdmissionTests(unittest.TestCase):
             result = subprocess.run(command, text=True, capture_output=True, timeout=5)
             self.assertEqual(result.returncode, code, result.stderr)
             self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
+
+    def test_admission_object_is_typed_and_mode_scoped(self):
+        # symphony-dispatch-admission/v1: flat machine keys stay first-class,
+        # per-mode sub-objects carry typed evidence, and a held admission
+        # never leaks the other mode's fields.
+        admitted = self.check(self.payload())
+        self.assertEqual(admitted["schema"], "symphony-dispatch-admission/v1")
+        self.assertEqual(admitted["reason"], "dispatch-gate-prerequisite-passed")
+        self.assertEqual(admitted["mode"], "new-work")
+        self.assertEqual(admitted["productId"], "jovie")
+        self.assertEqual(admitted["maxConcurrent"], 1)
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["newIssueLeaseAllowed"])
+        self.assertTrue(admitted["newWork"]["newImplementationAllowed"])
+        self.assertNotIn("existingRepair", admitted)
+
+        repair = self.check(self.payload(), mode="existing-pr-repair")
+        self.assertTrue(repair["allowed"])
+        self.assertEqual(repair["existingRepair"]["authority"], "single-pr-writer-exact-head")
+        self.assertIn("isolated-pr-repair", repair["existingRepair"]["activities"])
+        self.assertFalse(repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", repair)
+        # The typed repair sub-object may carry pushAllowed; the top level
+        # must not (legacy contract).
+        self.assertNotIn("pushAllowed", repair)
+
+    def test_held_admissions_carry_typed_evidence_not_other_modes_fields(self):
+        # Red closure holds BOTH modes; each response carries the closure
+        # projection and only its own mode's fields when evaluated.
+        # Issue-blocked red passes the closure verdict (per-product feed
+        # semantics) but still closes new work at the workAdmission gate.
+        red = self.payload("red")
+        held_new = self.check(red, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertEqual(held_new["newWork"]["productNewIssueLeaseAllowed"], False)
+        self.assertFalse(held_new["newWork"]["newIssueLeaseAllowed"])
+        self.assertNotIn("existingRepair", held_new)
+        # Repair admission survives the same red closure (remediation is
+        # liveness), and carries only the typed repair evidence.
+        held_repair = self.check(red, "existing-pr-repair")
+        self.assertTrue(held_repair["allowed"])
+        self.assertFalse(held_repair["existingRepair"]["pushAllowed"])
+        self.assertNotIn("newWork", held_repair)
+        self.assertNotIn("pushAllowed", held_repair)
+
+        # A systems-down closure reason passes the closure verdict (the
+        # deliberate valid_reasons contract keeps repair alive on red
+        # closure); new work still closes at the new-work gate, not at the
+        # verdict, because the fixture's workAdmission intake flags are
+        # closed for red status.
+        systems_down = self.payload("red")
+        systems_down["signals"]["closureHealth"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        systems_down["closureAdmission"]["reasons"] = ["closure-health-receipt-missing-or-malformed"]
+        held_new = self.check(systems_down, "new-work")
+        self.assertFalse(held_new["allowed"])
+        self.assertEqual(held_new["reason"], "new-work-admission-closed")
+        self.assertNotIn("existingRepair", held_new)
+        repair_survives = self.check(systems_down, "existing-pr-repair")
+        self.assertTrue(repair_survives["allowed"])
+
+        # A structurally invalid receipt (stale beyond the fail-closed window)
+        # holds BOTH modes at the verdict with the typed closure projection
+        # and no mode fields at all.
+        stale = self.payload()
+        stale["observedAt"] = "2020-01-01T00:00:00Z"
+        held_both = self.check(stale, "new-work")
+        self.assertFalse(held_both["allowed"])
+        self.assertEqual(held_both["reason"], "fleet-gate-receipt-stale")
+        self.assertEqual(held_both["closureHealth"]["holdReason"], "fleet-gate-receipt-stale")
+        self.assertNotIn("newWork", held_both)
+        self.assertNotIn("existingRepair", held_both)
+        held_both_repair = self.check(stale, "existing-pr-repair")
+        self.assertFalse(held_both_repair["allowed"])
+        self.assertNotIn("existingRepair", held_both_repair)
+        self.assertNotIn("newWork", held_both_repair)
+
+        # Missing file / invalid mode stay fail-closed typed skeletons.
+        self.path.unlink()
+        missing = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")
+        self.assertEqual(missing["schema"], "symphony-dispatch-admission/v1")
+        self.assertFalse(missing["allowed"])
+        self.assertEqual(missing["reason"], "dispatch-gate-invalid")
+        bad_mode = self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="not-a-product")
+        self.assertFalse(bad_mode["allowed"])
+        self.assertEqual(bad_mode["reason"], "dispatch-gate-invalid")
+        self.assertEqual(bad_mode["productId"], "not-a-product")
+
+    def test_new_work_projection_matches_decision_on_omitted_product_map(self):
+        # A fleet receipt without productNewIssueLeaseAllowed admits by
+        # omission (the decision's product_ok); the typed projection must
+        # mirror that, never contradict an allowed admission with False.
+        payload = self.payload()
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True}
+        admitted = self.check(payload)
+        self.assertTrue(admitted["allowed"])
+        self.assertTrue(admitted["newWork"]["allowed"])
+        self.assertTrue(admitted["newWork"]["productNewIssueLeaseAllowed"])
+
+        # An explicit empty product map is NOT omission: the product flag
+        # reads False from the map itself.
+        payload["workAdmission"] = {"allowed": True, "newIssueLeaseAllowed": True,
+                                    "newImplementationAllowed": True,
+                                    "productNewIssueLeaseAllowed": {}}
+        closed = self.check(payload)
+        self.assertFalse(closed["allowed"])
+        self.assertEqual(closed["reason"], "new-work-admission-closed")
+        self.assertFalse(closed["newWork"]["productNewIssueLeaseAllowed"])
+
+    def test_capacity_unproven_admission_carries_typed_capacity_evidence(self):
+        payload = self.payload()
+        payload["concurrency"] = {"gem": {"maxConcurrent": 0, "evidenceAccepted": False,
+                                          "newMutationAllowed": False}}
+        unproven = self.check(payload)
+        self.assertFalse(unproven["allowed"])
+        self.assertEqual(unproven["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(unproven["capacity"],
+                         {"evidenceAccepted": False, "newMutationAllowed": False,
+                          "maxConcurrent": 0})
+        self.assertNotIn("newWork", unproven)
+        # Malformed concurrency block degrades to the same typed shape.
+        payload["concurrency"] = "garbage"
+        degraded = self.check(payload)
+        self.assertEqual(degraded["reason"], "dispatch-capacity-unproven")
+        self.assertEqual(degraded["capacity"]["maxConcurrent"], None)
 
 
 class OfficialSymphonyContractTests(unittest.TestCase):
@@ -1059,7 +1293,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
-            payload = _fleet_gate_payload(status="red", intake=False)
+            payload = _fleet_gate_payload(status="red", intake=True)
             payload["signals"]["closureHealth"]["reasons"] = [
                 "native-queue-empty-with-eligible-over-15m",
                 "native-queue-unmergeable",
@@ -1224,7 +1458,9 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             def write_closure(status, reasons):
                 payload = _fleet_gate_payload(
-                    status=status, intake=False, observed_at=observed
+                    status=status,
+                    intake=helper._closure_issue_intake_allowed(status, reasons),
+                    observed_at=observed,
                 )
                 payload["signals"]["closureHealth"]["reasons"] = reasons
                 payload["closureAdmission"]["reasons"] = reasons
@@ -1299,7 +1535,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 with self.subTest(purpose=purpose, reasons="non-string"):
                     verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
                     self.assertTrue(verdict["hold"])
-                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+                    self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
 
             # A non-jovie product closure red with only feed reasons passes
             # activation but still holds admission.
@@ -1341,7 +1577,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             # Stale receipts hold in both purposes even with feed reasons.
             payload = _fleet_gate_payload(
-                status="red", intake=False, observed_at="2026-09-10T13:55:00Z"
+                status="red", intake=True, observed_at="2026-09-10T13:55:00Z"
             )
             payload["signals"]["closureHealth"]["reasons"] = feed
             gate.write_text(json.dumps(payload), encoding="utf-8")
@@ -1352,7 +1588,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             # Schema/authority violations hold in both purposes.
             payload = _fleet_gate_payload(
-                status="red", intake=False, observed_at="2026-09-10T14:05:00Z"
+                status="red", intake=True, observed_at="2026-09-10T14:05:00Z"
             )
             payload["signals"]["closureHealth"]["reasons"] = feed
             payload["signals"]["closureHealth"]["authority"] = "Gem"
@@ -1453,6 +1689,52 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 receipt["holdSleepSecondsUsed"], helper.CLOSURE_HOLD_RECHECK_SECONDS
             )
             self.assertEqual(receipt["reason"], "closure-health-green")
+            self.assertNotEqual(receipt.get("closureStatus"), "red")
+            self.assertIsNone(helper.read_active_closure_hold(hold))
+
+    def test_released_but_red_hold_autoresolves_when_gate_is_green(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload()), encoding="utf-8"
+            )
+            hold.write_text(
+                json.dumps(
+                    {
+                        "schema": helper.CLOSURE_HOLD_SCHEMA,
+                        "status": "released",
+                        "reason": "closure-health-not-green",
+                        "closureStatus": "red",
+                        "newIssueIntakeAllowed": False,
+                        "observedAt": "2026-09-05T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertIsNone(helper.read_active_closure_hold(hold))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                returncode = helper.run_official_binary(
+                    ["python3", "-c", "print('stale-hold-cleared')"],
+                    gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=closure_gate,
+                        hold_receipt_path=hold,
+                        dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                    ),
+                    closure_observe_only=True,
+                    max_gate_sleep_seconds=300,
+                )
+            self.assertEqual(returncode, 0)
+            self.assertIn("stale-hold-cleared", out.getvalue())
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["status"], "cleared")
+            self.assertEqual(receipt["closureStatus"], "healthy")
+            self.assertTrue(receipt["newIssueIntakeAllowed"])
+            self.assertFalse(receipt["active"])
+            self.assertIsNone(helper.read_active_closure_hold(hold))
 
     def test_closure_observe_only_runs_child_while_receipt_is_red(self):
         helper = _load_helper()
@@ -1721,6 +2003,160 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "linear_api_status=200 issue_identifier=JOV-4195", now=now
             )
         )
+        # JOV-5822: query-class refresh 400 is not a per-issue dead-letter.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "event=issue_state_refresh_failed linear_api_status=400 "
+                "issue_identifier=JOV-4195 attempt=3 running=0",
+                now=now,
+            )
+        )
+
+    def test_issue_state_refresh_failed_storm_never_dead_letters(self):
+        helper = _load_helper()
+        lines = "".join(
+            "event=issue_state_refresh_failed linear_api_status=400 "
+            f"issue_identifier=JOV-4195 attempt={attempt} running=0\n"
+            for attempt in range(1, 6)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            result = subprocess.run(
+                _runtime_command(["run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ]),
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse((dead / "JOV-4195.json").exists())
+            self.assertNotIn("issue_dead_letter", result.stdout)
+
+    def test_linear_issue_state_refresh_avoids_project_slug_400_class(self):
+        helper = _load_helper()
+        uuid = "11111111-2222-3333-4444-555555555555"
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=[])
+        )
+        self.assertIsNone(
+            helper.build_linear_issue_state_refresh_request(issue_ids=["", "  "])
+        )
+        with self.assertRaises(ValueError) as first_zero:
+            helper.build_linear_issue_state_refresh_request(
+                issue_ids=[uuid], page_size=0
+            )
+        self.assertIn("page_size must be positive", str(first_zero.exception))
+        with self.assertRaises(ValueError) as identifier:
+            helper.build_linear_issue_state_refresh_request(issue_ids=["JOV-5822"])
+        self.assertIn(
+            "linear_issue_state_refresh_identifier_not_id:JOV-5822",
+            str(identifier.exception),
+        )
+        with self.assertRaises(ValueError):
+            helper.build_linear_issue_state_refresh_request(team_key="jov")
+        payload = helper.build_linear_issue_state_refresh_request(
+            issue_ids=[uuid, uuid.upper(), ""]
+        )
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["operationName"], "SymphonyLinearTeamIssuesById")
+        self.assertIn("team: {key: {eq: $teamKey}}", payload["query"])
+        self.assertNotIn("projectSlug", payload["query"])
+        self.assertNotIn("project_slug", payload["query"])
+        self.assertEqual(payload["variables"]["teamKey"], helper.OFFICIAL_TEAM_KEY)
+        self.assertEqual(payload["variables"]["ids"], [uuid])
+        self.assertEqual(payload["variables"]["first"], 1)
+        self.assertNotIn("projectSlug", payload["variables"])
+        self.assertNotIn("projectId", payload["variables"])
+        self.assertGreater(payload["variables"]["first"], 0)
+
+        calls = []
+
+        class FakeResponse:
+            status = 200
+            headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {
+                        "data": {
+                            "issues": {
+                                "nodes": [
+                                    {
+                                        "id": uuid,
+                                        "identifier": "JOV-5822",
+                                        "state": {"name": "In Progress"},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ).encode("utf-8")
+
+        def fake_urlopen(request, timeout):
+            del timeout
+            calls.append(json.loads(request.data.decode("utf-8")))
+            return FakeResponse()
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fake_urlopen):
+            empty = helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[])
+            refreshed = helper.refresh_linear_issue_states(
+                api_key="lin_test", issue_ids=[uuid]
+            )
+
+        self.assertEqual(empty, {"kind": "skipped", "reason": "empty_running", "issues": []})
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("projectSlug", calls[0]["variables"])
+        self.assertEqual(calls[0]["variables"]["teamKey"], "JOV")
+        self.assertEqual(refreshed["kind"], "refreshed")
+        self.assertEqual(refreshed["issues"][0]["identifier"], "JOV-5822")
+        self.assertEqual(
+            helper.official_symphony_release_tag(),
+            "symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_bin_infix(),
+            "dae31f823850c9ef2dea121433e5b60f09af26fa",
+        )
+        self.assertEqual(
+            helper.official_symphony_release_tag("v0.0.2-jovie.2"),
+            "v0.0.2-jovie.2",
+        )
+
+        error = helper.urllib.error.HTTPError(
+            "https://api.linear.app/graphql",
+            400,
+            "Bad Request",
+            {"Content-Type": "application/json"},
+            io.BytesIO(b'{"errors":[{"extensions":{"code":"INPUT_ERROR"}}]}'),
+        )
+
+        def fail_urlopen(request, timeout):
+            del request, timeout
+            raise error
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fail_urlopen):
+            with self.assertRaises(RuntimeError) as http_400:
+                helper.refresh_linear_issue_states(api_key="lin_test", issue_ids=[uuid])
+        self.assertIn(
+            "linear_issue_state_refresh_http_status:400",
+            str(http_400.exception),
+        )
 
     def test_linear_429_storm_never_dead_letters(self):
         helper = _load_helper()
@@ -1802,7 +2238,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER)
+        self.assertIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-dae31f823850c9ef2dea121433e5b60f09af26fa}"',
+            UPDATER,
+        )
+        self.assertIn("symphony_release_tag", UPDATER)
+        self.assertIn("symphony-build-", UPDATER)
+        self.assertNotIn(
+            'SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER
+        )
         self.assertIn("sha256", UPDATER)
         self.assertIn("symphony-elixir.service", UPDATER)
         self.assertNotIn("enable symphony-burrito.service", UPDATER)
@@ -1826,6 +2270,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
+        self.assertIn(
+            "RELEASE_TAG symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa",
+            dry.stdout,
+        )
+        self.assertIn(
+            "symphony-dae31f823850c9ef2dea121433e5b60f09af26fa-linux_x86_64",
+            dry.stdout,
+        )
+        self.assertNotIn("v0.0.2-jovie.2", dry.stdout)
         self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)
