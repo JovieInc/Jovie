@@ -2,7 +2,6 @@ import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import {
   evaluateAcceptanceEvidence,
   evaluateRelationalGrid,
-  evaluateSharedSearchGeometry,
 } from '../../../../scripts/component-rendered-invariant-policy.mjs';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
@@ -1092,40 +1091,14 @@ test.describe('Homepage', () => {
     const heroSearch = await measureSearch(
       '[data-testid="homepage-editorial-hero-search"]'
     );
-    const closeSearch = await measureSearch(
-      '[data-testid="homepage-close-search"]'
-    );
+    // K4ar1 closing owns one focus-only action; the hero field is the sole
+    // search surface, so a duplicated close-search node must stay absent.
+    expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
     expect(heroSearch).not.toBeNull();
-    expect(closeSearch).not.toBeNull();
     expect(heroSearch?.treatment).toBe('editorial');
-    expect(closeSearch?.treatment).toBe('editorial');
     expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(closeSearch?.actionHeight).toBeCloseTo(28, 0);
     expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
     expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetBottom ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetRight ?? 0, 0);
-    expect(heroSearch?.fieldHeight).toBeCloseTo(
-      closeSearch?.fieldHeight ?? 0,
-      0
-    );
-    expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
-    expect(
-      evaluateSharedSearchGeometry({
-        hero: {
-          treatment: heroSearch?.treatment,
-          fieldHeight: heroSearch?.fieldHeight,
-          fieldBackground: heroSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-        close: {
-          treatment: closeSearch?.treatment,
-          fieldHeight: closeSearch?.fieldHeight,
-          fieldBackground: closeSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-      }).ok
-    ).toBe(true);
 
     const input = page
       .getByTestId('homepage-editorial-hero-search')
