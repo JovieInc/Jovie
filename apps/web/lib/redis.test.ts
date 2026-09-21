@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockRequest } = vi.hoisted(() => ({
+const { mockRequest, mockConstructor, mockEnv } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
+  mockConstructor: vi.fn(),
+  mockEnv: {
+    NODE_ENV: 'test' as string,
+    UPSTASH_REDIS_REST_URL: 'https://example.upstash.io' as string | undefined,
+    UPSTASH_REDIS_REST_TOKEN: 'token' as string | undefined,
+  },
 }));
 
 vi.mock('@upstash/redis', () => ({
   Redis: class MockRedis {
     request = mockRequest;
+    constructor(...args: unknown[]) {
+      mockConstructor(...args);
+    }
   },
 }));
 
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    NODE_ENV: 'test',
-    UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
-    UPSTASH_REDIS_REST_TOKEN: 'token',
-  },
+  env: mockEnv,
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -34,6 +39,91 @@ import {
   resetRedisStateForTests,
 } from './redis';
 
+function resetEnv(): void {
+  mockEnv.NODE_ENV = 'test';
+  mockEnv.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
+  mockEnv.UPSTASH_REDIS_REST_TOKEN = 'token';
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetRedisStateForTests();
+  resetEnv();
+  mockRequest.mockResolvedValue('OK');
+});
+
+describe('Upstash URL validation', () => {
+  const invalidUrls = [
+    undefined,
+    '',
+    '   ',
+    'not-a-url',
+    'http://example.upstash.io',
+    'rediss://default:pass@example.upstash.io:6379',
+    'redis://localhost:6379',
+    'https://',
+    'https:// bad host',
+  ];
+
+  it.each(invalidUrls)(
+    'returns null without constructing a client for %j',
+    url => {
+      mockEnv.UPSTASH_REDIS_REST_URL = url;
+      expect(getRedis()).toBeNull();
+      expect(mockConstructor).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns null when the token is missing or blank', () => {
+    mockEnv.UPSTASH_REDIS_REST_TOKEN = '   ';
+    expect(getRedis()).toBeNull();
+    expect(mockConstructor).not.toHaveBeenCalled();
+  });
+
+  it('accepts a whitespace-padded absolute https URL', () => {
+    mockEnv.UPSTASH_REDIS_REST_URL = '  https://example.upstash.io  ';
+    expect(getRedis()).not.toBeNull();
+    expect(mockConstructor).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://example.upstash.io' })
+    );
+  });
+
+  it('returns null instead of throwing when the constructor throws', () => {
+    mockConstructor.mockImplementationOnce(() => {
+      throw new Error(
+        'UrlError: Upstash Redis client was passed an invalid URL'
+      );
+    });
+    expect(getRedis()).toBeNull();
+  });
+
+  it('retries after the cooldown once config becomes valid', () => {
+    vi.useFakeTimers();
+    try {
+      mockEnv.UPSTASH_REDIS_REST_URL = 'not-a-url';
+      expect(getRedis()).toBeNull();
+
+      mockEnv.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
+      // Cooldown suppresses immediate retries
+      expect(getRedis()).toBeNull();
+      vi.advanceTimersByTime(31_000);
+      expect(getRedis()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('module evaluation', () => {
+  it('never throws at import time when the URL is invalid', async () => {
+    mockEnv.UPSTASH_REDIS_REST_URL = 'not-a-url';
+    vi.resetModules();
+    const mod = await import('./redis');
+    expect(mod.redis).toBeNull();
+    expect(mod.getRedis()).toBeNull();
+  });
+});
+
 function redisCommandClient(options?: { bypassQuotaCircuit?: boolean }): {
   request: () => Promise<unknown>;
 } {
@@ -43,12 +133,6 @@ function redisCommandClient(options?: { bypassQuotaCircuit?: boolean }): {
 }
 
 describe('Redis quota circuit', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetRedisStateForTests();
-    mockRequest.mockResolvedValue('OK');
-  });
-
   it('returns a client while the quota circuit is closed', () => {
     expect(getRedis()).not.toBeNull();
     expect(isRedisQuotaCircuitOpen()).toBe(false);
