@@ -176,4 +176,30 @@ describe('Product Screenshots provenance cleanliness', () => {
       "if: always() && hashFiles('.artifacts/screen-certification/*.json') != ''"
     );
   });
+
+  it('keeps trusted proof production independent from catalog publication', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const generateStart = workflow.indexOf('\n  generate:');
+    const publishStart = workflow.indexOf('\n  publish:');
+    const certifyStart = workflow.indexOf('\n  certify:');
+    const generate = workflow.slice(generateStart, publishStart);
+    const publish = workflow.slice(publishStart, certifyStart);
+
+    expect(generateStart).toBeGreaterThanOrEqual(0);
+    expect(publishStart).toBeGreaterThan(generateStart);
+    expect(certifyStart).toBeGreaterThan(publishStart);
+    expect(generate).toContain('name: Generate Screenshots');
+    expect(generate).toContain('Upload generated screenshot catalog');
+    expect(generate).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(generate).not.toContain('Create or update screenshot PR');
+    expect(publish).toContain('name: Publish Screenshot Catalog');
+    expect(publish).toContain('needs: generate');
+    expect(publish).toContain('continue-on-error: true');
+    expect(publish).toContain('Download generated screenshot catalog');
+    expect(publish).toMatch(
+      /name: Download generated screenshot catalog[\s\S]*?path: apps\/web/
+    );
+    expect(publish).toContain('Create or update screenshot PR');
+    expect(publish).toContain('JOVIE_BOT_PRIVATE_KEY');
+  });
 });

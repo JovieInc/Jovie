@@ -47,8 +47,9 @@ jobs:
   generate:
     name: Generate Screenshots
     runs-on: ubuntu-latest
-    # The catalog currently takes ~17 minutes and the generated branch must
-    # still pass the repository's normal pre-push gate before publication.
+    # The catalog currently takes ~17 minutes. Publication runs in a separate,
+    # non-authoritative job so its repository gate cannot taint an otherwise
+    # successful exact-head proof producer.
     timeout-minutes: 150
     permissions:
       actions: read
@@ -56,6 +57,7 @@ jobs:
     outputs:
       marketing-artifact-id: ${{ steps.marketing-captures.outputs.artifact-id }}
       profile-artifact-id: ${{ steps.profile-proof.outputs.artifact-id }}
+      catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
         working-directory: apps/web
@@ -253,16 +255,60 @@ jobs:
             git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           fi
 
+      - name: Upload generated screenshot catalog
+        if: steps.diff.outputs.changed == 'true'
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screenshot-catalog-${{ github.sha }}
+          path: |
+            apps/web/public/product-screenshots/
+            apps/web/screenshot-catalog/current/
+          if-no-files-found: error
+          retention-days: 3
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+  publish:
+    name: Publish Screenshot Catalog
+    needs: generate
+    if: ${{ needs.generate.result == 'success' && needs.generate.outputs.catalog-changed == 'true' }}
+    # Publishing generated assets is deliberately non-authoritative. The
+    # repository's normal commit/push gates still block unsafe publication,
+    # while a publication failure cannot retroactively invalidate the trusted
+    # exact-head browser artifacts produced by `generate`.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download generated screenshot catalog
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: screenshot-catalog-${{ github.sha }}
+          path: apps/web
+
+      - name: Verify downloaded screenshot catalog
+        working-directory: apps/web
+        run: pnpm exec tsx scripts/check-screenshot-catalog.ts
+
       - name: Generate Jovie Bot token
         id: app-token
-        if: steps.diff.outputs.changed == 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Create or update screenshot PR
-        if: steps.diff.outputs.changed == 'true'
         timeout-minutes: 90
         working-directory: .
         env:
