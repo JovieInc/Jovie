@@ -7,16 +7,18 @@ import { crc32, inflateSync } from 'node:zlib';
 
 /**
  * Decoded pixel-buffer ceiling. 2x desktop (2880-wide) full-page marketing
- * captures exceed 100MB around 5_786 CSS px. This bound covers 2x×1440
- * full-page pages up to ~23k CSS px:
- * `(1 + 2880 * 3) * 46_290 ≈ 400_000_000`.
+ * captures exceed 100MB around 5_786 CSS px. The current longest certified
+ * route is /changelog at 58_814 device pixels high and 677_596_094 decoded
+ * RGBA bytes. This bound covers 2x×1440 full-page pages up to ~32.5k CSS px:
+ * `(1 + 2880 * 4) * 65_098 ≈ 750_000_000`.
  *
- * Ship now: 400MB so Generate Screenshots can upload exact marketing-route
- * captures. Re-evaluate when a 2x desktop full-page route exceeds ~23k CSS px.
+ * Ship now: 750MB so Generate Screenshots can upload the exact /changelog
+ * capture with measured headroom. Re-evaluate when a 2x desktop full-page
+ * route exceeds ~32.5k CSS px.
  * Then: raise this bound or paginate/clip the capture — do not skip CRC or
  * pixel verification.
  */
-export const MAX_PLAYWRIGHT_PNG_PIXEL_BYTES = 400_000_000;
+export const MAX_PLAYWRIGHT_PNG_PIXEL_BYTES = 750_000_000;
 
 /** @param {Buffer} bytes */
 export function validPlaywrightPng(bytes) {

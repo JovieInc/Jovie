@@ -1903,6 +1903,12 @@ ${fixtureCheckout}
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
+    // Regression for the production /changelog desktop capture that exposed
+    // the previous 400MB ceiling: 2880x58814 RGBA plus one filter byte/row.
+    expect((1 + 2880 * 4) * 58_814).toBe(677_596_094);
+    expect((1 + 2880 * 4) * 58_814).toBeLessThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
     const marketingWorkspace = fixture();
     write(
       join(marketingWorkspace, 'marketing-route.png'),
