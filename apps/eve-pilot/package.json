@@ -30,7 +30,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
+    "@types/node": "26.5.1",
     "@vitest/coverage-v8": "5.0.1",
     "typescript": "6.0.3",
     "vercel": "59.16.0",
