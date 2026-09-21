@@ -25,6 +25,9 @@ export const SCREEN_BROWSER_PROOF_SCHEMA = 'screen-browser-proof/v1';
 export const SCREEN_CERT_GATE = 'screen-certification-gate';
 export const SCREEN_REGISTRATION_GATE = 'screen-registration-gate';
 export const CLS_INTERACTION_BUDGET = 0.05;
+export const SCREEN_MARKETING_ROUTES = Object.freeze({
+  'web.homepage': '/',
+});
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
 });
@@ -513,6 +516,7 @@ export function resolveTrustedProofForScreen(request) {
     screenId: screen.id,
     sourcePaths: [...screen.sources],
     viewports: [...screen.viewports],
+    marketingRoute: SCREEN_MARKETING_ROUTES[screen.id],
     proofRoute: SCREEN_PROOF_ROUTES[screen.id],
   };
   const resolved = resolveTrustedScreenProof({ artifactId, context });

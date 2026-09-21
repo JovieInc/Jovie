@@ -71,6 +71,10 @@ const REDACTED = new Set([
   'unknown',
 ]);
 const DEFAULT_PATHS = ['apps/web/{playwright-report,test-results}'];
+// Bound compressed/structured input before readFileSync retains it. The PNG
+// decoder separately bounds decoded pixels, dimensions, and row traversal.
+export const MAX_ARTIFACT_FILE_BYTES = 64 * 1024 * 1024;
+export const MAX_ARTIFACT_AGGREGATE_BYTES = 512 * 1024 * 1024;
 
 const isInside = (root, path) => {
   const child = relative(root, path);
@@ -141,11 +145,27 @@ const statKey = stat =>
 
 function readRecords(paths, rootPath, allowEmptyPaths = false) {
   const root = canonicalRoot(rootPath);
-  return resolveArtifactFiles(paths, root, allowEmptyPaths).map(path => {
+  const files = resolveArtifactFiles(paths, root, allowEmptyPaths);
+  let selectedBytes = 0;
+  for (const path of files) {
+    const stat = checkedStat(path, root);
+    if (stat.size > MAX_ARTIFACT_FILE_BYTES)
+      throw new Error('artifact file exceeds inspection byte limit');
+    selectedBytes += stat.size;
+    if (selectedBytes > MAX_ARTIFACT_AGGREGATE_BYTES)
+      throw new Error('artifact selection exceeds inspection byte limit');
+  }
+  let readBytes = 0n;
+  return files.map(path => {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
       const before = fstatSync(fd, { bigint: true });
       if (!before.isFile()) throw new Error('artifact changed type');
+      if (before.size > BigInt(MAX_ARTIFACT_FILE_BYTES))
+        throw new Error('artifact file exceeds inspection byte limit');
+      readBytes += before.size;
+      if (readBytes > BigInt(MAX_ARTIFACT_AGGREGATE_BYTES))
+        throw new Error('artifact selection exceeds inspection byte limit');
       const bytes = readFileSync(fd);
       const after = fstatSync(fd, { bigint: true });
       if (

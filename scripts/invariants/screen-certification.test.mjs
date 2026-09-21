@@ -28,6 +28,7 @@ import {
   SCREEN_BROWSER_PROOF_SCHEMA,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
+  SCREEN_MARKETING_ROUTES,
   SCREEN_PLATFORMS,
   SCREEN_PROOF_ROUTES,
   SCREEN_REGISTRATION_GATE,
@@ -661,6 +662,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(workflow, new RegExp(`name: ${PRODUCER.job}`));
     assert.match(workflow, new RegExp(`name: ${PRODUCER.artifact}`));
     assert.match(workflow, new RegExp(`--environment=${PRODUCER.environment}`));
+    assert.equal(SCREEN_MARKETING_ROUTES['web.homepage'], '/');
     assert.equal(SCREEN_PROOF_ROUTES['web.public-profile'], '/unfazed');
     const profileSpec = readFileSync(
       join(
@@ -720,7 +722,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         expectedIssue: /unknown or excluded screen web\.unknown/,
       },
     ]) {
-      const result = runScreenCertificationFromArtifact(options);
+      const result = runScreenCertificationFromArtifact({
+        ...options,
+        // Targeted-screen behavior is the subject of this test. Pin an empty
+        // diff so unrelated branch commits cannot add more changed screens.
+        diffBase: 'HEAD',
+      });
       assert.equal(result.ok, false);
       assert.equal(result.receipt.certified, false);
       assert.equal(result.receipt.status, 'blocked');
@@ -740,6 +747,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           resolve(ROOT, 'scripts/invariants/screen-certification.mjs'),
           '--artifact-id=0',
           '--screen-id=web.public-profile',
+          '--diff-base=HEAD',
           `--receipt-out=${receiptPath}`,
         ],
         { cwd: ROOT, encoding: 'utf8' }
@@ -1310,6 +1318,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
             'apps/web/app/(home)/layout.tsx',
           ],
           viewports: home().viewports,
+          marketingRoute: '/',
         },
       });
       assert.equal(resolved.proof?.certificationStatus, 'not-certified');
@@ -1491,6 +1500,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         issues(),
         /required marketing route receipts or measurements are incomplete/
       );
+
+      for (const field of ['route', 'fixturePath', 'finalPath']) {
+        const wrongRouteZip = writeBundle({
+          desktop: receiptFor('desktop', { [field]: '/product' }),
+          mobile: receiptFor('mobile'),
+        });
+        makeRecords({ artifact: { digest: sha256(wrongRouteZip) } });
+        assert.match(issues(), /does not match the registered screen route/);
+      }
 
       const priorPathOnly = process.env.PATH;
       process.env.PATH = priorPathOnly

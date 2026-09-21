@@ -23,6 +23,10 @@ export const REQUIRED_MARKETING_QUALITY_CHECKS = Object.freeze([
 ]);
 const SKEW = 5 * 60_000;
 const MAX_AGE = 24 * 60 * 60_000;
+// The marketing artifact currently contains 240 files (60 routes x two
+// viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
+const MAX_ARCHIVE_MEMBERS = 256;
+const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
 const isObject = value =>
   value && typeof value === 'object' && !Array.isArray(value);
@@ -112,18 +116,23 @@ function extractZip(archiveBytes) {
       .split(/\r?\n/)
       .filter(Boolean);
     if (
+      members.length > MAX_ARCHIVE_MEMBERS ||
       members.some(
         name =>
           name.startsWith('/') || name.includes('..') || name.includes('\\')
       )
     )
       throw new Error('unsafe artifact member set');
-    return new Map(
-      members.map(name => [
-        name,
-        Buffer.from(run('unzip', ['-p', zip, name], true)),
-      ])
-    );
+    const extracted = new Map();
+    let extractedBytes = 0;
+    for (const name of members) {
+      const bytes = Buffer.from(run('unzip', ['-p', zip, name], true));
+      extractedBytes += bytes.length;
+      if (extractedBytes > MAX_EXTRACTED_ARTIFACT_BYTES)
+        throw new Error('unsafe artifact member set');
+      extracted.set(name, bytes);
+    }
+    return extracted;
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -155,6 +164,8 @@ function marketingPairs(bytes) {
 }
 function decodeMarketingProof(bytes, context, meta) {
   const fail = finding => ({ proof: null, findings: [finding] });
+  if (typeof context.marketingRoute !== 'string')
+    return fail('screen has no registered marketing route binding');
   let pairs;
   try {
     pairs = marketingPairs(bytes);
@@ -180,6 +191,14 @@ function decodeMarketingProof(bytes, context, meta) {
       );
     }
     if (!sourceMatches(receipt?.sourcePath, context.sourcePaths)) continue;
+    if (
+      receipt.route !== context.marketingRoute ||
+      receipt.fixturePath !== context.marketingRoute ||
+      receipt.finalPath !== context.marketingRoute
+    )
+      return fail(
+        'marketing receipt does not match the registered screen route'
+      );
     const captured = time(receipt.capturedAt);
     const checks = Array.isArray(receipt.qualityChecks)
       ? receipt.qualityChecks

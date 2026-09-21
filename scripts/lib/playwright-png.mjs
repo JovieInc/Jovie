@@ -19,6 +19,11 @@ import { crc32, inflateSync } from 'node:zlib';
  * pixel verification.
  */
 export const MAX_PLAYWRIGHT_PNG_PIXEL_BYTES = 750_000_000;
+// Independent geometry ceilings reject pathological one-pixel-wide/tall PNGs
+// before inflation and keep validation work bounded to real browser captures.
+export const MAX_PLAYWRIGHT_PNG_WIDTH = 8_192;
+export const MAX_PLAYWRIGHT_PNG_HEIGHT = 100_000;
+export const MAX_PLAYWRIGHT_PNG_PIXELS = 200_000_000;
 
 /** @param {Buffer} bytes */
 export function validPlaywrightPng(bytes) {
@@ -71,6 +76,9 @@ export function validPlaywrightPng(bytes) {
     const expected = rowLength * height;
     if (
       state !== 3 ||
+      width > MAX_PLAYWRIGHT_PNG_WIDTH ||
+      height > MAX_PLAYWRIGHT_PNG_HEIGHT ||
+      width * height > MAX_PLAYWRIGHT_PNG_PIXELS ||
       !Number.isSafeInteger(expected) ||
       expected > MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     )
@@ -85,13 +93,15 @@ export function validPlaywrightPng(bytes) {
           })
         )
       );
-    return (
-      engine.bytesWritten === compressedBytes.length &&
-      pixels.length === expected &&
-      Array.from({ length: height }, (_, row) => pixels[row * rowLength]).every(
-        filter => filter <= 4
-      )
-    );
+    if (
+      engine.bytesWritten !== compressedBytes.length ||
+      pixels.length !== expected
+    )
+      return false;
+    for (let row = 0; row < height; row += 1) {
+      if (pixels[row * rowLength] > 4) return false;
+    }
+    return true;
   } catch {
     return false;
   }

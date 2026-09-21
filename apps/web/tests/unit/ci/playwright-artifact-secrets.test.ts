@@ -10,6 +10,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  truncateSync,
   writeFileSync,
 } from 'node:fs';
 import { type AddressInfo, createServer } from 'node:net';
@@ -24,12 +25,17 @@ import {
   guardPlaywrightArtifacts,
   inspectPlaywrightArtifacts,
   isCredentialBearingName,
+  MAX_ARTIFACT_AGGREGATE_BYTES,
+  MAX_ARTIFACT_FILE_BYTES,
   markdownContainsSecret,
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
+  MAX_PLAYWRIGHT_PNG_HEIGHT,
   MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
+  MAX_PLAYWRIGHT_PNG_PIXELS,
+  MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
 
@@ -1945,6 +1951,49 @@ ${fixtureCheckout}
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(overCap)).toBe(false);
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, MAX_PLAYWRIGHT_PNG_WIDTH + 1, 1)
+      )
+    ).toBe(false);
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, 1, MAX_PLAYWRIGHT_PNG_HEIGHT + 1)
+      )
+    ).toBe(false);
+    const overPixelWidth = MAX_PLAYWRIGHT_PNG_WIDTH;
+    const overPixelHeight =
+      Math.floor(MAX_PLAYWRIGHT_PNG_PIXELS / overPixelWidth) + 1;
+    expect(
+      validPlaywrightPng(
+        png([], deflateSync(pngRows), 2, overPixelWidth, overPixelHeight)
+      )
+    ).toBe(false);
+
+    const boundedWorkspace = fixture();
+    const oversized = join(boundedWorkspace, 'oversized.json');
+    write(oversized, '');
+    truncateSync(oversized, MAX_ARTIFACT_FILE_BYTES + 1);
+    expect(() =>
+      guardPlaywrightArtifacts(
+        ['oversized.json'],
+        {},
+        { workspace: boundedWorkspace }
+      )
+    ).toThrow(/file exceeds inspection byte limit/);
+    const aggregatePaths = Array.from({ length: 9 }, (_, index) => {
+      const path = join(boundedWorkspace, `aggregate-${index}.json`);
+      write(path, '');
+      truncateSync(path, Math.floor(MAX_ARTIFACT_AGGREGATE_BYTES / 8));
+      return path;
+    });
+    expect(() =>
+      guardPlaywrightArtifacts(
+        aggregatePaths,
+        {},
+        { workspace: boundedWorkspace }
+      )
+    ).toThrow(/selection exceeds inspection byte limit/);
     const badCrc = Buffer.from(valid);
     badCrc[badCrc.length - 1] ^= 1;
     const invalid = [
