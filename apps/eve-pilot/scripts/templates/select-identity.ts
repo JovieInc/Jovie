@@ -7,6 +7,7 @@ export type EvePilotCapability =
   | 'privileged-gbrain-write'
   | 'symphony-heal'
   | 'symphony-bounded-dispatch'
+  | 'linear-coordination-write'
   | 'gbrain-read'
   | 'ingest-ack';
 export class EvePilotCapabilityDeniedError extends Error {}
@@ -20,6 +21,9 @@ export function bindEvePilotIdentity(id: EvePilotIdentityId) {
     canPrivilegedWriteGbrain: false,
     canHealSymphony: false,
     canDispatchBoundedSymphonyRepair: id === 'summer',
+    // Summer may open Linear issues with explicit founder intent plus
+    // provenance and a verified readback (identities/summer/instructions.md).
+    canLinearCoordinationWrite: id === 'summer',
     canReadGbrain: false,
     canIngestAck: false,
   } as const;
@@ -27,7 +31,11 @@ export function bindEvePilotIdentity(id: EvePilotIdentityId) {
     pack,
     instructions: IDENTITY_INSTRUCTIONS,
     require(capability: EvePilotCapability) {
-      if (capability !== 'symphony-bounded-dispatch' || id !== 'summer')
+      const allowed =
+        (capability === 'symphony-bounded-dispatch' ||
+          capability === 'linear-coordination-write') &&
+        id === 'summer';
+      if (!allowed)
         throw new EvePilotCapabilityDeniedError(`${id} denied ${capability}`);
     },
   };
