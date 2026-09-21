@@ -4,8 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { PublicProfileFixture } from './PublicProfileFixture';
 
 vi.mock('@/app/[username]/_components/PublicClaimBanner', () => ({
-  PublicClaimBanner: ({ displayName }: { displayName: string }) => (
-    <div data-testid='public-claim-banner'>{displayName}</div>
+  PublicClaimBanner: ({
+    displayName,
+    prefetch,
+  }: {
+    displayName: string;
+    prefetch?: boolean;
+  }) => (
+    <div data-testid='public-claim-banner' data-prefetch={String(prefetch)}>
+      {displayName}
+    </div>
   ),
 }));
 
@@ -39,6 +47,10 @@ describe('PublicProfileFixture', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('public-claim-banner')).toHaveTextContent(
       'Unfazed'
+    );
+    expect(screen.getByTestId('public-claim-banner')).toHaveAttribute(
+      'data-prefetch',
+      'false'
     );
   });
 

@@ -58,6 +58,7 @@ export function PublicProfileFixture({
           displayName={artist.name}
           directClaimSupported
           claimRequiresVerification
+          prefetch={false}
           isClaimed={state === 'claimed' || state === 'owner'}
           visitorState={
             state === 'owner'

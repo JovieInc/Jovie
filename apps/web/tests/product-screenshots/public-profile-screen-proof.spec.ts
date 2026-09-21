@@ -139,10 +139,10 @@ test('emits exact-head public-profile desktop and mobile evidence', async ({
     expect(browserMetrics.brokenImages).toEqual([]);
     expect(browserMetrics.horizontalOverflow).toBeLessThanOrEqual(1);
     expect(browserMetrics.cls).toBeLessThanOrEqual(0.05);
-    expect(browserErrors.consoleErrors).toEqual([]);
-    expect(browserErrors.pageErrors).toEqual([]);
     expect(browserErrors.failedResponses).toEqual([]);
     expect(browserErrors.failedRequests).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
 
     await page.screenshot({
       path: path.join(outputRoot, 'screenshots', `${viewport.id}.png`),
