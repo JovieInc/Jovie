@@ -35,9 +35,12 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     );
   });
 
-  it('keeps Calendar in the mobile More menu, not on the desktop rail', () => {
-    expect(mobileMoreHrefs).toContain(APP_ROUTES.CALENDAR);
-    expect(desktopVisibleHrefs).not.toContain(APP_ROUTES.CALENDAR);
+  it.each([
+    ['Calendar', APP_ROUTES.CALENDAR],
+    ['Tasks', APP_ROUTES.TASKS],
+  ])('keeps %s in the mobile More menu, not on the desktop rail', (_, href) => {
+    expect(mobileMoreHrefs).toContain(href);
+    expect(desktopVisibleHrefs).not.toContain(href);
   });
 
   it('measures desktop-visible Library via the real rail link', () => {
@@ -87,6 +90,23 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     ) as PerfRouteDefinition;
 
     expect(route.path).toBe(APP_ROUTES.CALENDAR);
+    expect(route.measureMode).toBe(measurement.measureMode);
+    expect(route.warmupStrategy).toBe(measurement.warmupStrategy);
+    expect(route.readySelectors.navTrigger).toBeUndefined();
+    expect(route.warmNavigationStartPath).toBeUndefined();
+  });
+
+  it('keeps the shipped creator-tasks-warm route on the Tasks measurement contract', () => {
+    const measurement = resolveResponsiveWarmNavMeasurement({
+      destinationHref: APP_ROUTES.TASKS,
+      desktopVisibleHrefs,
+      mobileMoreHrefs,
+    });
+    const route = getEndUserPerfRouteById(
+      'creator-tasks-warm'
+    ) as PerfRouteDefinition;
+
+    expect(route.path).toBe(APP_ROUTES.TASKS);
     expect(route.measureMode).toBe(measurement.measureMode);
     expect(route.warmupStrategy).toBe(measurement.warmupStrategy);
     expect(route.readySelectors.navTrigger).toBeUndefined();

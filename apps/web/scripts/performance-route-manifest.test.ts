@@ -82,8 +82,7 @@ describe('performance route manifest', () => {
           route =>
             route.measureMode === 'warm-navigation' &&
             route.navigationItemId &&
-            route.navigationItemId !== 'profile' &&
-            route.navigationItemId !== 'tasks'
+            route.navigationItemId !== 'profile'
         )
         .map(route => [route.navigationItemId, route])
     );
@@ -92,6 +91,7 @@ describe('performance route manifest', () => {
       desktopVisibleNavigation.map(item => item.id).sort()
     );
     expect(warmRoutesByNavigationItem.has('calendar')).toBe(false);
+    expect(warmRoutesByNavigationItem.has('tasks')).toBe(false);
 
     for (const item of desktopVisibleNavigation) {
       const route = warmRoutesByNavigationItem.get(item.id);

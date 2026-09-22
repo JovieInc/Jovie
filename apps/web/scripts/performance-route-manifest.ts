@@ -1651,24 +1651,25 @@ const CREATOR_SHELL_ROUTES = [
     surface: 'creator-app',
     path: APP_ROUTES.TASKS,
     navigationItemId: 'tasks',
-    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
-    warmupStrategy: 'authenticated-shell',
-    measureMode: 'warm-navigation',
+    // Tasks is mobile More only (OqZTF desktop rail is Library/Contacts/
+    // Presence). Keep the legacy route id, but measure it through the same
+    // documented route-load contract as the canonical Tasks route.
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="tasks-workspace"]',
         '[data-testid="tasks-upgrade-interstitial"]',
         '[data-testid="release-plan-upgrade-interstitial"]',
       ],
-      navTrigger: [
-        `a[href="${APP_ROUTES.TASKS}"]`,
-        `a[href^="${APP_ROUTES.TASKS}?"]`,
-      ],
     },
     timings: [
-      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
       { metric: 'skeleton-to-content', budget: 1000 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
