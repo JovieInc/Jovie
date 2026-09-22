@@ -1,20 +1,20 @@
 {
   "$comment": "Trusted main inventory; conservative spacing enforcement is active. Lower ceilings when drift is removed, never raise them. Strict inventory remains report-only. Preserve approved component styling.",
   "$provenance": {
-    "sourceSha": "75034f8539e0b039fb2ec8ff33c0102598d86198",
+    "sourceSha": "635874734cc92240f182ff70342e0deda3bfda4e",
     "detectorSha256": "f3366e5b40737f5233787c55efe00459b9d98fab40ee4c2d826bd9f7cea62b87"
   },
   "conservative": {
     "armed": true,
-    "count": 739,
+    "count": 735,
     "perFamily": {
       "marketing": 113,
-      "web-shell": 296,
+      "web-shell": 292,
       "web-other": 319,
       "packages/ui": 11
     },
     "perUtility": {
-      "gap-2.5": 92,
+      "gap-2.5": 91,
       "gap-3.5": 15,
       "gap-x-2.5": 1,
       "mb-2.5": 9,
@@ -23,7 +23,7 @@
       "mx-2.5": 1,
       "my-2.5": 1,
       "p-2.5": 34,
-      "p-3.5": 32,
+      "p-3.5": 31,
       "pb-2.5": 13,
       "pb-3.5": 1,
       "pl-2.5": 2,
@@ -31,7 +31,7 @@
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 9,
-      "px-2.5": 246,
+      "px-2.5": 244,
       "px-3.5": 47,
       "py-2.5": 131,
       "py-3.5": 34,
