@@ -62,7 +62,12 @@ const MEASURE_KEYS_FALLBACK = [
   'security_hotspots',
 ];
 
-const RETRYABLE_KINDS = new Set(['rate_limited', 'server', 'network', 'timeout']);
+const RETRYABLE_KINDS = new Set([
+  'rate_limited',
+  'server',
+  'network',
+  'timeout',
+]);
 
 export class SonarFetchError extends Error {
   constructor(kind, message, { status, url } = {}) {
@@ -170,9 +175,7 @@ export async function fetchJson(
       const retryAfterMs = parseRetryAfterMs(
         response.headers?.get?.('retry-after')
       );
-      await sleep(
-        Math.max(backoffMs(attempt, baseDelayMs), retryAfterMs)
-      );
+      await sleep(Math.max(backoffMs(attempt, baseDelayMs), retryAfterMs));
       continue;
     }
 
@@ -272,7 +275,12 @@ function monthWindow(month) {
 }
 
 async function fetchFacetBuckets(ctx, params, facet) {
-  const json = await fetchIssueSearch(ctx, { ...params, ps: 1, p: 1, facets: facet });
+  const json = await fetchIssueSearch(ctx, {
+    ...params,
+    ps: 1,
+    p: 1,
+    facets: facet,
+  });
   const entry = Array.isArray(json.facets)
     ? json.facets.find(item => item?.property === facet)
     : undefined;
@@ -282,7 +290,10 @@ async function fetchFacetBuckets(ctx, params, facet) {
     issuesSearchUrl(ctx.baseUrl, { ...params, facets: facet })
   );
   return entry.values
-    .map(value => ({ val: String(value?.val ?? ''), count: Number(value?.count ?? 0) }))
+    .map(value => ({
+      val: String(value?.val ?? ''),
+      count: Number(value?.count ?? 0),
+    }))
     .filter(value => value.val && value.count > 0);
 }
 
@@ -291,7 +302,13 @@ async function fetchFacetBuckets(ctx, params, facet) {
  * `createdAt` month buckets (then `rules` inside an over-cap month) when the
  * 10k result cap would otherwise truncate the inventory.
  */
-async function collectIssues(ctx, params, incompleteness, depth = 0, label = 'all') {
+async function collectIssues(
+  ctx,
+  params,
+  incompleteness,
+  depth = 0,
+  label = 'all'
+) {
   const first = await collectIssuePages(ctx, params);
   if (!first.capped) {
     return { records: first.issues, reportedTotal: first.apiTotal };
@@ -366,7 +383,9 @@ async function fetchHotspots(ctx, incompleteness) {
     incompleteness.push({
       partition: 'hotspots:TO_REVIEW',
       reason:
-        hotspots.length >= RESULT_CAP ? 'result_cap_exceeded' : 'empty_page_before_api_total',
+        hotspots.length >= RESULT_CAP
+          ? 'result_cap_exceeded'
+          : 'empty_page_before_api_total',
       apiTotal,
       fetched: hotspots.length,
     });
@@ -378,7 +397,9 @@ async function latestAnalysis(ctx) {
   const url = `${ctx.baseUrl}/api/project_analyses/search?${new URLSearchParams({ project: ctx.projectKey, branch: ctx.branch, ps: '1' }).toString()}`;
   try {
     const json = await fetchJson(url, ctx);
-    const analysis = Array.isArray(json?.analyses) ? json.analyses[0] : undefined;
+    const analysis = Array.isArray(json?.analyses)
+      ? json.analyses[0]
+      : undefined;
     if (!analysis?.key) return null;
     return {
       key: analysis.key,
@@ -607,7 +628,9 @@ export async function collectInventory({
     bundle = await collectAll(ctx);
     const after = await latestAnalysis(ctx);
     boundAnalysis = after ?? before;
-    const drifted = Boolean(before?.key && after?.key && before.key !== after.key);
+    const drifted = Boolean(
+      before?.key && after?.key && before.key !== after.key
+    );
     if (!drifted) {
       break;
     }
@@ -640,8 +663,7 @@ export async function collectInventory({
       apiTotal: openReportedTotal,
       fetchedUnique: open.records.length,
       matches:
-        openReportedTotal === null ||
-        open.records.length >= openReportedTotal,
+        openReportedTotal === null || open.records.length >= openReportedTotal,
     },
     accepted: {
       apiTotal: acceptedReportedTotal,
@@ -674,7 +696,11 @@ export async function collectInventory({
   }
 
   const measureMismatches = [];
-  const measureMap = { BUG: 'bugs', VULNERABILITY: 'vulnerabilities', CODE_SMELL: 'code_smells' };
+  const measureMap = {
+    BUG: 'bugs',
+    VULNERABILITY: 'vulnerabilities',
+    CODE_SMELL: 'code_smells',
+  };
   if (measures.status === 'ok') {
     const byType = countBy(open.records, 'type');
     for (const [type, metric] of Object.entries(measureMap)) {
@@ -705,6 +731,16 @@ export async function collectInventory({
   const status = incompleteness.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
   const usesImpacts = open.records.some(issue => Array.isArray(issue?.impacts));
 
+  const sha = observedSha(ctx);
+  const stale = Boolean(
+    boundAnalysis?.revision && sha && boundAnalysis.revision !== sha
+  );
+  if (stale) {
+    warnings.push(
+      `bound analysis revision ${boundAnalysis.revision} lags observed commit ${sha} — findings may not reflect current ${branch}`
+    );
+  }
+
   const inventory = {
     schema: 'jovie-sonar-inventory/v1',
     status,
@@ -713,7 +749,12 @@ export async function collectInventory({
     durationMs: Date.now() - startedAt,
     projectKey,
     branch,
-    observedSha: observedSha(ctx),
+    observedSha: sha,
+    staleness: {
+      analysisRevision: boundAnalysis?.revision ?? null,
+      observedSha: sha,
+      stale,
+    },
     sonarMode: usesImpacts ? 'mqr' : 'standard',
     analysis: boundAnalysis,
     counts: {
@@ -753,58 +794,62 @@ export async function collectInventory({
   };
 }
 
-function printSummary(result) {
+function printSummary(result, logger = console) {
   const { counts } = result.inventory;
-  console.log(`✅ Fetched ${counts.open.fetched} unique open issues`);
+  logger.log(`✅ Fetched ${counts.open.fetched} unique open issues`);
   if (result.inventory.observedSha) {
-    console.log(`   Observed commit: ${result.inventory.observedSha}`);
+    logger.log(`   Observed commit: ${result.inventory.observedSha}`);
   }
   if (result.inventory.analysis) {
-    console.log(
+    logger.log(
       `   Bound to analysis ${result.inventory.analysis.key} (${result.inventory.analysis.date ?? 'no date'})`
     );
   }
 
   const group = (by, label) => {
-    console.log(`\n📊 Issues by ${label}:`);
-    for (const [name, count] of Object.entries(by).sort((a, b) => b[1] - a[1])) {
-      console.log(`   ${name}: ${count}`);
+    logger.log(`\n📊 Issues by ${label}:`);
+    for (const [name, count] of Object.entries(by).sort(
+      (a, b) => b[1] - a[1]
+    )) {
+      logger.log(`   ${name}: ${count}`);
     }
   };
   group(counts.open.bySeverity, 'severity');
   group(counts.open.byType, 'type');
 
-  console.log('\n📊 Top 10 rules:');
+  logger.log('\n📊 Top 10 rules:');
   const byRule = countBy(result.issues, 'rule');
   for (const [rule, count] of Object.entries(byRule)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)) {
-    console.log(`   ${rule}: ${count}`);
+    logger.log(`   ${rule}: ${count}`);
   }
 
-  console.log(
+  logger.log(
     `\n   New-code issues: ${counts.newCode.apiTotal ?? 'unavailable'}`
   );
-  console.log(
+  logger.log(
     `   Accepted / false-positive: ${counts.acceptedFalsePositive.fetched}`
   );
-  console.log(
+  logger.log(
     `   Security hotspots to review: ${counts.hotspotsToReview.fetched}`
   );
-  console.log(`   Status: ${result.inventory.status}, atomic: ${result.inventory.atomic}`);
+  logger.log(
+    `   Status: ${result.inventory.status}, atomic: ${result.inventory.atomic}`
+  );
 
   if (result.inventory.incompleteness.length > 0) {
-    console.log('\n⚠️  INCOMPLETE partitions:');
+    logger.log('\n⚠️  INCOMPLETE partitions:');
     for (const entry of result.inventory.incompleteness) {
-      console.log(
+      logger.log(
         `   ${entry.partition}: ${entry.reason} (${entry.fetched}/${entry.apiTotal} fetched)`
       );
     }
   }
   if (result.inventory.warnings.length > 0) {
-    console.log('\n⚠️  Warnings:');
+    logger.log('\n⚠️  Warnings:');
     for (const warning of result.inventory.warnings) {
-      console.log(`   ${warning}`);
+      logger.log(`   ${warning}`);
     }
   }
 }
@@ -821,25 +866,39 @@ function repoRoot(cwd) {
   }
 }
 
-export async function main(env = process.env) {
+export async function main(
+  env = process.env,
+  {
+    fetchImpl,
+    sleep = defaultSleep,
+    exit = code => process.exit(code),
+    cwd = process.cwd(),
+    logger = console,
+  } = {}
+) {
   const token = env.SONAR_TOKEN?.trim();
   if (!token) {
-    console.error(
+    logger.error(
       '❌ SONAR_TOKEN is not set — export it in the environment (never on the command line) before running this script.'
     );
-    process.exit(1);
+    return exit(1);
   }
 
-  console.log('🔍 Fetching SonarCloud issues...');
+  logger.log('🔍 Fetching SonarCloud issues...');
   try {
     const result = await collectInventory({
       baseUrl: env.SONAR_BASE_URL || DEFAULT_BASE_URL,
       projectKey: env.SONAR_PROJECT_KEY || DEFAULT_PROJECT_KEY,
       branch: env.SONAR_BRANCH || DEFAULT_BRANCH,
       token,
+      fetchImpl,
+      sleep,
+      cwd,
+      env,
+      logger,
     });
 
-    const root = repoRoot(process.cwd());
+    const root = repoRoot(cwd);
     const issuesPath = writeIssueOutputAtomic(
       ISSUES_FILE,
       JSON.stringify(result.issues, null, 2),
@@ -851,16 +910,20 @@ export async function main(env = process.env) {
       { root }
     );
 
-    printSummary(result);
-    console.log(`\n💾 Saved issues to: ${issuesPath}`);
-    console.log(`💾 Saved inventory to: ${inventoryPath}`);
+    printSummary(result, logger);
+    logger.log(`\n💾 Saved issues to: ${issuesPath}`);
+    logger.log(`💾 Saved inventory to: ${inventoryPath}`);
 
-    process.exit(result.status === 'COMPLETE' && result.atomic ? 0 : 2);
+    return exit(result.status === 'COMPLETE' && result.atomic ? 0 : 2);
   } catch (error) {
     const kind = error instanceof SonarFetchError ? error.kind : 'unknown';
-    console.error(`\n❌ SonarCloud collection failed [${kind}]: ${error?.message ?? error}`);
-    console.error('   No inventory written; last-known evidence left untouched.');
-    process.exit(1);
+    logger.error(
+      `\n❌ SonarCloud collection failed [${kind}]: ${error?.message ?? error}`
+    );
+    logger.error(
+      '   No inventory written; last-known evidence left untouched.'
+    );
+    return exit(1);
   }
 }
 
