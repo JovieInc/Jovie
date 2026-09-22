@@ -45,6 +45,7 @@ import { StaticListenInterface } from '@/features/profile/StaticListenInterface'
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { formatEventDateParts } from '@/lib/events/date';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import {
@@ -136,6 +137,7 @@ interface ProfileDesktopSurfaceProps {
   /** Fired once the desktop surface has mounted so the layout shell can
    *  retire the compact a11y tree (JOV-6434). */
   readonly onReady?: () => void;
+  readonly onOpenReleaseCredits?: () => void;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -158,20 +160,21 @@ function toDateValue(value: Date | string | null | undefined) {
   return Number.isNaN(next.getTime()) ? null : next;
 }
 
-function formatMonth(date: string | Date | null | undefined) {
-  const resolved = toDateValue(date);
-  if (!resolved) return 'Soon';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-  }).format(resolved);
+function formatMonth(
+  date: string | Date | null | undefined,
+  timezone: string | null
+) {
+  return formatEventDateParts({ startDate: date, timezone })?.month ?? 'Soon';
 }
 
-function formatDay(date: string | Date | null | undefined) {
-  const resolved = toDateValue(date);
-  if (!resolved) return '—';
-  return new Intl.DateTimeFormat('en-US', {
-    day: '2-digit',
-  }).format(resolved);
+function formatDay(
+  date: string | Date | null | undefined,
+  timezone: string | null
+) {
+  return (
+    formatEventDateParts({ startDate: date, timezone })?.day.padStart(2, '0') ??
+    '—'
+  );
 }
 
 function formatReleaseMeta(
@@ -282,6 +285,7 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
   onReady,
+  onOpenReleaseCredits,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => {
@@ -569,10 +573,10 @@ export function ProfileDesktopSurface({
                   >
                     <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
                       <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                        {formatMonth(tourDate.startDate)}
+                        {formatMonth(tourDate.startDate, tourDate.timezone)}
                       </div>
                       <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                        {formatDay(tourDate.startDate)}
+                        {formatDay(tourDate.startDate, tourDate.timezone)}
                       </div>
                     </div>
                     <div className='min-w-0'>
@@ -696,6 +700,7 @@ export function ProfileDesktopSurface({
                 {isSubscribed ? 'Manage' : 'Get updates'}
               </span>
             </button>
+
             {showArtistEmailRow ? (
               <>
                 <div className='h-px bg-white/8' />
@@ -881,10 +886,10 @@ export function ProfileDesktopSurface({
               >
                 <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
                   <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                    {formatMonth(tourDate.startDate)}
+                    {formatMonth(tourDate.startDate, tourDate.timezone)}
                   </div>
                   <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                    {formatDay(tourDate.startDate)}
+                    {formatDay(tourDate.startDate, tourDate.timezone)}
                   </div>
                 </div>
                 <div className='min-w-0'>
@@ -945,6 +950,16 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-top-chrome'
         >
           <div className='flex min-w-0 items-center gap-2'>
+            {onOpenReleaseCredits ? (
+              <button
+                type='button'
+                data-testid='profile-release-credits'
+                onClick={onOpenReleaseCredits}
+                className='inline-flex min-h-11 items-center rounded-full border border-white/16 bg-white px-4 text-sm font-semibold text-black dark:bg-white dark:text-black'
+              >
+                Release credits
+              </button>
+            ) : null}
             {showBackChevron && onBack ? (
               <CircleIconButton
                 onClick={onBack}
