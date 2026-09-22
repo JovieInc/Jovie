@@ -114,8 +114,15 @@ final class DogfoodExplorationUITests: XCTestCase {
               .matching(NSPredicate(format: "label == %@", "Manage Account"))
               .firstMatch
           },
-          elementExistsCheck("logout-row", timeout: 4) { app in
-            app.buttons["Log Out"]
+          { app in
+            // The Log Out row renders below the fold; List rows only
+            // materialize in the accessibility tree once scrolled into view.
+            app.swipeUp()
+            return DogfoodCheck(
+              name: "logout-row",
+              passed: app.buttons["Log Out"].waitForExistence(timeout: 4),
+              detail: nil
+            )
           },
           elementExistsCheck("version-row") { $0.staticTexts["Version"] },
         ]

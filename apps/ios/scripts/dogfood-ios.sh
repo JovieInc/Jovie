@@ -105,10 +105,10 @@ STARTED_AT="$STARTED_AT" \
 FINISHED_AT="$FINISHED_AT" \
 DURATION_SECONDS="$((END_EPOCH - START_EPOCH))" \
 ONLY_TESTING="$ONLY_TESTING" \
-RUBYOPT= ruby -rjson -e '
+LC_ALL=en_US.UTF-8 RUBYOPT= ruby -EUTF-8:UTF-8 -rjson -e '
   def read_jsonl(path)
     return [] unless File.exist?(path)
-    File.readlines(path).filter_map do |line|
+    File.readlines(path).map do |line|
       line = line.strip
       next if line.empty?
       begin
@@ -116,7 +116,7 @@ RUBYOPT= ruby -rjson -e '
       rescue JSON::ParserError
         nil
       end
-    end
+    end.compact
   end
 
   output_dir = ENV.fetch("OUTPUT_DIR")
