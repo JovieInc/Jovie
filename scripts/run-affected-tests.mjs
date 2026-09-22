@@ -158,6 +158,8 @@ const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
   'scripts/summer-commissioning/capability-access-registry.json',
   'scripts/summer-commissioning/company-registry.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',
+  'scripts/summer-commissioning/project-creation-policy.mjs',
+  'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'docs/operations/SUMMER_COMMISSIONING.md',
   'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
   'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
@@ -178,6 +180,7 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
+  'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
@@ -2332,6 +2335,21 @@ export function buildCompanyRegistryTestCommand() {
   ];
 }
 
+export function buildProjectCreationTestCommand() {
+  return [
+    'node',
+    [
+      '--test',
+      '--experimental-test-coverage',
+      '--test-coverage-include=scripts/summer-commissioning/project-creation-policy.mjs',
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
+      'scripts/summer-commissioning/project-creation-policy.test.mjs',
+    ],
+  ];
+}
+
 export function buildSelectedTestCommands(plan, maxWorkers) {
   const commands = [];
   if ((plan.nodeTests || []).length > 0) {
@@ -2339,7 +2357,13 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
       'scripts/summer-commissioning/company-registry.test.mjs';
     if (plan.nodeTests.includes(companyTest))
       commands.push(buildCompanyRegistryTestCommand());
-    const otherTests = plan.nodeTests.filter(file => file !== companyTest);
+    const projectTest =
+      'scripts/summer-commissioning/project-creation-policy.test.mjs';
+    if (plan.nodeTests.includes(projectTest))
+      commands.push(buildProjectCreationTestCommand());
+    const otherTests = plan.nodeTests.filter(
+      file => file !== companyTest && file !== projectTest
+    );
     if (otherTests.length > 0)
       commands.push(['node', ['--test', ...otherTests]]);
   }
@@ -2428,7 +2452,11 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
       '12000',
     ],
   ]);
-  return [buildCompanyRegistryTestCommand(), ...commands];
+  return [
+    buildCompanyRegistryTestCommand(),
+    buildProjectCreationTestCommand(),
+    ...commands,
+  ];
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -2438,6 +2466,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ...buildCompanyRegistryTestCommand()
     );
     if (companyStatus !== 0) process.exit(companyStatus);
+    const projectStatus = await runCommandStatus(
+      ...buildProjectCreationTestCommand()
+    );
+    if (projectStatus !== 0) process.exit(projectStatus);
     await runCommand('pnpm', [
       'exec',
       'vitest',
