@@ -473,8 +473,8 @@ importers:
         specifier: ^3.10.2
         version: 3.10.2
       langfuse:
-        specifier: ^3.38.20
-        version: 3.38.20
+        specifier: ^3.39.2
+        version: 3.39.2
       lucide-react:
         specifier: ^1.47.0
         version: 1.47.0(react@19.2.8)
@@ -12333,12 +12333,12 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  langfuse-core@3.38.20:
-    resolution: {integrity: sha512-zBKVmQN/1oT5VWZUBYlWzvokIlkC/6mnpgr/2atMyTeAm+jR3ia7w2iJMjlrF5/oG8ukO1s8+LDRCzJpF1QeEA==}
+  langfuse-core@3.39.2:
+    resolution: {integrity: sha512-+NkjTBF6mX3Z1muFhevxdZPksh7ZF2XvW0LoeCzNgmLrwpLml6g9mZQQEO1GXTbtd5kqB2PmZnkTCziZVOpOBA==}
     engines: {node: '>=18'}
 
-  langfuse@3.38.20:
-    resolution: {integrity: sha512-MAmBAASSzJtmK1O9HQegA1mFsQhT8Yf+OJRGvE7FXkyv3g/eiBE0glLD0Ohg3pkxhoPdggM5SejK7ue9ctlaMA==}
+  langfuse@3.39.2:
+    resolution: {integrity: sha512-GEn2EFkLUkaf19wewu5TuMFoiiY5AZwhuWl7jvtXrf4JASa54c5ObTGTCG71XGIjNw3PhomD/xD4ZRi6JX8EcQ==}
     engines: {node: '>=18'}
 
   language-subtag-registry@0.3.23:
@@ -15775,8 +15775,8 @@ packages:
   tldts-core@7.4.10:
     resolution: {integrity: sha512-KnQjp53ZekKgm/r3l+u8kJGGzYgrWdP8+Mql7a4vijh2WE0IrZWspQj/TpTxDho/YxO+AnOZnIjQcCD+q6iJsw==}
 
-  tldts-core@7.4.13:
-    resolution: {integrity: sha512-mbYsrih5FRtGxs3Usvl/PqwJsNpp+jsmrdFviiK02teHDG0/HebBG/pqCylje3kzgXYzuLoHJF/0mz9W53t8Xg==}
+  tldts-core@7.4.14:
+    resolution: {integrity: sha512-KYkjfJHnIC5t+Gy7hPrMHgJmWc/N9FfmS+fggRPSlpFckidpB9HD6OzPsSTkfDH+MpZgcu2tJPGgLfHl979N1Q==}
 
   tldts-icann@6.1.86:
     resolution: {integrity: sha512-NFxmRT2lAEMcCOBgeZ0NuM0zsK/xgmNajnY6n4S1mwAKocft2s2ise1O3nQxrH3c+uY6hgHUV9GGNVp7tUE4Sg==}
@@ -15788,8 +15788,8 @@ packages:
     resolution: {integrity: sha512-WMi/OQ2axVTf/ykqCQgXiIct+mSQDFdH2fkwhPwgEwvJ1kSzZRiinb0zF2Xb8u4+OqPChmyI6MEu4EezNJz+FQ==}
     hasBin: true
 
-  tldts@7.4.13:
-    resolution: {integrity: sha512-iHtaIWWIbMDkCeJdTBzZFGgbluE5J+oHlb2g7+oAz1S1gpuVpabRZdQyd471Vl8UUkcz2vXSL8xZH2kyCe8tfA==}
+  tldts@7.4.14:
+    resolution: {integrity: sha512-EahQoi+Q5oqmG3yxRHx+bwn36OaLbtw6jnTFcGjc8fcmktzTgk45xRnzAx8Ch87PFEiqRhoc3FWBmY+LBrvEGQ==}
     hasBin: true
 
   tmp-promise@3.0.3:
@@ -29857,13 +29857,13 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  langfuse-core@3.38.20:
+  langfuse-core@3.39.2:
     dependencies:
       mustache: 4.2.0
 
-  langfuse@3.38.20:
+  langfuse@3.39.2:
     dependencies:
-      langfuse-core: 3.38.20
+      langfuse-core: 3.39.2
 
   language-subtag-registry@0.3.23: {}
 
@@ -32566,7 +32566,7 @@ snapshots:
       google-auth-library: 10.6.2
       hono: 4.12.31
       ibm-cloud-sdk-core: 5.4.20
-      langfuse: 3.38.20
+      langfuse: 3.39.2
       natural: 8.1.1(@opentelemetry/api@1.9.1)(gcp-metadata@8.1.2)(socks@2.8.10)
       node-sql-parser: 5.4.0
       pdf-parse: 2.4.5
@@ -34611,7 +34611,7 @@ snapshots:
 
   tldts-core@7.4.10: {}
 
-  tldts-core@7.4.13:
+  tldts-core@7.4.14:
     optional: true
 
   tldts-icann@6.1.86:
@@ -34626,9 +34626,9 @@ snapshots:
     dependencies:
       tldts-core: 6.1.86
 
-  tldts@7.4.13:
+  tldts@7.4.14:
     dependencies:
-      tldts-core: 7.4.13
+      tldts-core: 7.4.14
     optional: true
 
   tmp-promise@3.0.3:
@@ -34667,7 +34667,7 @@ snapshots:
 
   tough-cookie@6.0.2:
     dependencies:
-      tldts: 7.4.13
+      tldts: 7.4.14
     optional: true
 
   tr46@0.0.3: {}
