@@ -478,5 +478,14 @@ exit 0
                 self.assertFalse((root / 'gem-workspace/state/gem-service-attestation.json').exists())
 
 
+def load_tests(loader, tests, pattern):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("upstream_preservation_tests", Path(__file__).with_name("upstream-preservation.test.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    tests.addTests(loader.loadTestsFromModule(module))
+    return tests
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,152 @@ BOUNDED_OVERRIDES = {
 }
 OBSERVATION_ERRORS = (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError)
 RETRY_DELAYS = (5, 15)
+UPSTREAM_RELEASE = {
+    "repository": "openai/symphony", "releaseTag": "v0.0.3",
+    "sourceRevision": "1c0fb6c8e8ef9031a2c861e62af5f9e66cee39cb",
+    "packageSha256": "ea35a04a54a6d37c0cafe3f195da871e47614a8c05765b90dbb4cac32e1435ee",
+}
+
+
+def upstream_effective_digest(properties: dict) -> str:
+    """Hash selected typed D-Bus values; do not interpret systemd unit syntax.
+
+    Command execution timestamps are generation-dependent and excluded. Argument
+    arrays, flags, ordered environment-file paths and unique environment values
+    remain bound. Environment-file contents and process environment are not read.
+    """
+    import symphony_official_runtime as runtime
+    if set(properties) != set(runtime.ACTIVATION_PROPERTY_TYPES):
+        raise ValueError("incomplete effective properties")
+    normalized = {}
+    for name in runtime.ACTIVATION_COMMAND_PROPERTIES:
+        rows = properties[name]
+        if not isinstance(rows, list):
+            raise ValueError("invalid command list")
+        commands = []
+        for row in rows:
+            if (not isinstance(row, list) or len(row) != 10 or not isinstance(row[1], list)
+                    or not row[1] or any(not isinstance(arg, str) or "\0" in arg for arg in row[1])
+                    or not Path(row[1][0]).is_absolute()):
+                raise ValueError("invalid command")
+            commands.append(row[1])
+        if not runtime._activation_exec_matches(rows, commands):
+            raise ValueError("unsupported command flags or metadata")
+        normalized[name] = [row[:3] for row in rows]
+    environment = properties["Environment"]
+    if (not isinstance(environment, list) or any(not isinstance(item, str) or "\0" in item
+            or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", item, re.DOTALL) for item in environment)
+            or len({item.split("=", 1)[0] for item in environment}) != len(environment)):
+        raise ValueError("ambiguous environment")
+    files = properties["EnvironmentFiles"]
+    if (not isinstance(files, list) or any(not isinstance(row, list) or len(row) != 2
+            or not isinstance(row[0], str) or not Path(row[0]).is_absolute() or "\0" in row[0]
+            or type(row[1]) is not bool for row in files)
+            or properties["Type"] != "simple" or not isinstance(properties["WorkingDirectory"], str)
+            or not Path(properties["WorkingDirectory"]).is_absolute()):
+        raise ValueError("invalid effective configuration")
+    normalized.update(Type=properties["Type"], WorkingDirectory=properties["WorkingDirectory"],
+                      Environment=sorted(environment), EnvironmentFiles=files)
+    return digest(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode())
+
+
+def observe_upstream_preservation(binding_path: Path, approved_digest: str, *,
+                                  home: Path | None = None, proc_root: Path = Path("/proc")) -> dict:
+    """Observe separately approved upstream identity without legacy health or writes.
+
+    The caller supplies an independently reviewed configuration binding digest.
+    Neither this function nor workflow observations can approve or refresh it.
+    """
+    import symphony_official_runtime as runtime
+    import verify_upstream_burrito_payload as payload
+    started = time.monotonic()
+    home = (home or Path.home()).resolve(strict=True)
+    watched = {}
+    def read(path):
+        value = runtime._activation_read_file(path)
+        watched[path] = value
+        return value
+    if not isinstance(approved_digest, str) or not DIGEST.fullmatch(approved_digest):
+        raise ValueError("configuration approval missing")
+    raw = read(binding_path)
+    if digest(raw) != approved_digest:
+        raise ValueError("configuration binding changed")
+    binding = json.loads(raw)
+    if (not isinstance(binding, dict) or binding.get("schema") != "symphony-upstream-preservation-binding/v1"
+            or set(binding) != {"schema", "purpose", "service", "release", "configurationApproved",
+                "unitPath", "dropInDirectory", "unitSha256", "dropIns", "effectiveConfigurationSha256",
+                "packagePath", "extractedRoot", "executablePath", "workflowPath", "workflowSha256"}
+            or binding.get("purpose") != "preservation-only" or binding.get("service") != SERVICE
+            or binding.get("release") != UPSTREAM_RELEASE or binding.get("configurationApproved") is not True):
+        raise ValueError("unapproved upstream binding")
+    unit = home / ".config/systemd/user" / SERVICE
+    directory = unit.with_name(unit.name + ".d")
+    if binding.get("unitPath") != str(unit) or binding.get("dropInDirectory") != str(directory):
+        raise ValueError("mixed configuration paths")
+    fields, effective = runtime._activation_snapshot()
+    if (fields["Id"] != SERVICE or fields["LoadState"] != "loaded" or fields["ActiveState"] != "active"
+            or fields["SubState"] != "running" or fields["ControlPID"] != "0"
+            or not re.fullmatch(r"[1-9][0-9]*", fields["MainPID"])
+            or not re.fullmatch(r"[a-f0-9]{32}", fields["InvocationID"])
+            or not fields["ControlGroup"].endswith("/" + SERVICE) or fields["Transient"] != "no"
+            or fields["SourcePath"] or fields["NeedDaemonReload"] != "no" or fields["FragmentPath"] != str(unit)):
+        raise ValueError("upstream service unavailable or stale")
+    dropins = binding.get("dropIns")
+    if (not isinstance(dropins, dict) or not dropins or "zz-upstream-cutover.conf" not in dropins
+            or any(not isinstance(name, str) or Path(name).name != name or not name.endswith(".conf")
+                   or not isinstance(value, str) or not DIGEST.fullmatch(value) for name, value in dropins.items())):
+        raise ValueError("invalid approved inventory")
+    paths = runtime._activation_dropin_paths(directory)
+    loaded = shlex.split(fields["DropInPaths"])
+    if paths != sorted(str(directory / name) for name in dropins) or sorted(loaded) != paths or len(set(loaded)) != len(loaded):
+        raise ValueError("unloaded or extra configuration")
+    if digest(read(unit)) != binding.get("unitSha256"):
+        raise ValueError("unit differs from approval")
+    for name, expected in dropins.items():
+        if digest(read(directory / name)) != expected:
+            raise ValueError("override differs from approval")
+    if upstream_effective_digest(effective) != binding.get("effectiveConfigurationSha256"):
+        raise ValueError("loaded configuration differs from approval")
+    package, root, executable, workflow = (Path(binding[key]) for key in
+        ("packagePath", "extractedRoot", "executablePath", "workflowPath"))
+    if any(not path.is_absolute() or path.resolve(strict=True) != path for path in (package, root, executable, workflow)):
+        raise ValueError("indirect upstream artifact")
+    if not executable.is_relative_to(root) or executable.name != "beam.smp":
+        raise ValueError("unbound upstream executable")
+    if digest(read(workflow)) != binding.get("workflowSha256"):
+        raise ValueError("workflow differs from approval")
+    starts = effective["ExecStartEx"]
+    if len(starts) != 1 or starts[0][0] != str(package) or starts[0][1][-1] != str(workflow):
+        raise ValueError("upstream start command disagreement")
+    proof = payload.verify(package, UPSTREAM_RELEASE["packageSha256"], root)
+    process = proc_root / fields["MainPID"]
+    generation = runtime._activation_process_generation(process)
+    live_input = {"binaryPath": str(executable), "workflowPath": str(workflow)}
+    live_generation = trust.live_runtime(live_input)
+    with urllib.request.urlopen("http://127.0.0.1:4041/api/v1/state", timeout=5) as response:
+        state = json.loads(response.read(1_048_577))
+    observed = datetime.now(timezone.utc)
+    if not isinstance(state, dict) or not isinstance(state.get("generated_at"), str):
+        raise ValueError("invalid upstream state")
+    state_at = datetime.fromisoformat(state["generated_at"].replace("Z", "+00:00"))
+    if (state_at.tzinfo is None or not -60 <= (observed - state_at).total_seconds() <= 600
+            or any(not isinstance(state.get(key), list) for key in ("running", "retrying", "blocked"))):
+        raise ValueError("upstream state unavailable or stale")
+    if (runtime._activation_snapshot() != (fields, effective)
+            or runtime._activation_process_generation(process) != generation
+            or trust.live_runtime(live_input) != live_generation
+            or payload.verify(package, UPSTREAM_RELEASE["packageSha256"], root) != proof
+            or runtime._activation_dropin_paths(directory) != paths
+            or any(runtime._activation_read_file(path) != value for path, value in watched.items())
+            or time.monotonic() - started > 30):
+        raise ValueError("upstream identity changed during observation")
+    return {"schema": "symphony-upstream-preservation/v1", "mode": "upstream-preserved",
+            "observedAt": observed.isoformat(), "service": SERVICE, "sourceRevision": UPSTREAM_RELEASE["sourceRevision"],
+            "packageSha256": proof["packageSha256"], "payloadManifestSha256": proof["payloadManifestSha256"],
+            "configurationBindingSha256": approved_digest, "workflowSha256": binding["workflowSha256"],
+            "invocationId": fields["InvocationID"], "runtimeGeneration": live_generation,
+            "activation": "not-activated", "admission": "unverified",
+            "environmentFileContents": "unverified", "processEnvironment": "unverified"}
 
 
 def failure_reason(error: Exception) -> str:
