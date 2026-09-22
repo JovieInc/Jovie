@@ -4,6 +4,10 @@ import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import {
+  filterNavigationPageMap,
+  loadArticleRegistry,
+} from '@/lib/article-registry.mjs';
 
 export const metadata: Metadata = {
   title: {
@@ -19,6 +23,12 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
+  const articleRegistry = loadArticleRegistry();
+  const primaryRoutes = articleRegistry.consumers.navigation.map(
+    (article: { route: string }) => article.route
+  );
+  const pageMap = filterNavigationPageMap(await getPageMap(), primaryRoutes);
+
   return (
     <html lang='en' dir='ltr' suppressHydrationWarning>
       <Head
@@ -42,7 +52,7 @@ export default async function RootLayout({
               }
             />
           }
-          pageMap={await getPageMap()}
+          pageMap={pageMap}
           docsRepositoryBase='https://github.com/ArtistFirst/Jovie/tree/main/apps/docs'
           editLink='Edit this page on GitHub'
           footer={

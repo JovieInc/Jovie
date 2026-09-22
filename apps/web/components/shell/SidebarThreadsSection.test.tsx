@@ -304,6 +304,29 @@ describe('SidebarThreadsSection', () => {
     expect(onNewThread).toHaveBeenCalledTimes(1);
   });
 
+  // JOV-6181: the empty-state New Chat create pill hugs its label in an
+  // auto-sized track — a terminal fade here sheared the trailing "t" with
+  // rail space free. This is the one spot the label still renders as text.
+  it('keeps the New Chat empty-state pill label off the terminal fade', () => {
+    render(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        onNewThread={vi.fn()}
+        collapsed={false}
+      />
+    );
+
+    const label = screen.getByText('New Chat');
+    expect(label.className).not.toContain('mask-image');
+    expect(label.className).not.toContain('-webkit-mask-image');
+
+    const pill = screen.getByRole('button', { name: 'New Chat' });
+    const pillClasses = pill.className.split(/\s+/);
+    expect(pillClasses).toContain('w-fit');
+    expect(pillClasses).not.toContain('w-full');
+  });
+
   it('keeps loading and error rows on the same reserved geometry', () => {
     const onRetry = vi.fn();
     const { container, rerender } = render(

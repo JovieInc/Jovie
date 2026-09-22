@@ -54,6 +54,19 @@ const OUTCOME_TAB_KINDS: Readonly<
   catalog: ['authority'],
 };
 
+/** Identity work is independent of search availability and monitoring limits. */
+export function selectPresenceReviewRows(
+  rows: readonly ProfileWorkspaceRow[]
+): ProfileWorkspaceRow[] {
+  return rows.filter(
+    row =>
+      !row.id.startsWith('preview:') &&
+      row.rowType === 'surface' &&
+      (row.qualificationStatus === 'suggested' ||
+        row.qualificationStatus === 'conflicting')
+  );
+}
+
 export function filterProfileWorkspaceRows(
   rows: readonly ProfileWorkspaceRow[],
   filter: ProfilesWorkspaceFilter
@@ -68,7 +81,8 @@ export function filterProfileWorkspaceRows(
 }
 
 export function getConnectionStatus(
-  row: ProfileWorkspaceRow
+  row: ProfileWorkspaceRow,
+  providerAvailable = true
 ): ConnectionStatus {
   if (row.rowType === 'connector') {
     if (row.status === 'connected' || row.status === 'syncing') {
@@ -117,7 +131,7 @@ export function getConnectionStatus(
       needsAttention: true,
       sortPriority: 0,
       nextAction:
-        'Resolve the identity conflict before monitoring this result.',
+        'Inspect the source to check this identity conflict. Identity confirmation is not yet available here.',
     };
   }
   if (row.qualificationStatus === 'suggested') {
@@ -126,7 +140,8 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
-      nextAction: 'Confirm whether this profile belongs to the artist.',
+      nextAction:
+        'Inspect the source to check whether it belongs to the artist. Identity confirmation is not yet available here.',
     };
   }
   if (row.monitoringState === 'locked') {
@@ -136,6 +151,16 @@ export function getConnectionStatus(
       needsAttention: true,
       sortPriority: 1,
       nextAction: 'Upgrade the monitoring limit to track this page.',
+    };
+  }
+  if (!providerAvailable) {
+    return {
+      label: 'Search Unavailable',
+      tone: 'neutral',
+      needsAttention: false,
+      sortPriority: 3,
+      nextAction:
+        'Search checks are unavailable. You can still inspect the source page.',
     };
   }
   if (row.monitoringState === 'unavailable') {
@@ -198,12 +223,17 @@ export function getConnectionPrimaryAction(
     return 'open';
   }
 
+  // Identity must be resolved before a monitoring limit can be actionable.
+  if (
+    row.qualificationStatus === 'conflicting' ||
+    row.qualificationStatus === 'suggested'
+  ) {
+    return 'review';
+  }
   if (row.monitoringState === 'locked') return 'upgrade';
   if (
     row.monitoringState === 'unavailable' ||
-    row.monitoringState === 'paused' ||
-    row.qualificationStatus === 'conflicting' ||
-    row.qualificationStatus === 'suggested'
+    row.monitoringState === 'paused'
   ) {
     return 'review';
   }
@@ -310,9 +340,10 @@ export interface PresenceSignal {
  * Ordered for scan reading: blockers first, quiet state last.
  */
 export function getPresenceSignals(
-  row: ProfileWorkspaceRow
+  row: ProfileWorkspaceRow,
+  providerAvailable = true
 ): readonly PresenceSignal[] {
-  const status = getConnectionStatus(row);
+  const status = getConnectionStatus(row, providerAvailable);
   const signals: PresenceSignal[] = [];
 
   if (status.needsAttention && status.tone === 'error') {
@@ -354,16 +385,6 @@ export function getPresenceSignals(
       label: status.label,
       detail: status.nextAction,
       sortOrder: 3,
-    });
-  }
-
-  if (row.rowType === 'surface' && row.qualificationStatus === 'suggested') {
-    signals.push({
-      kind: 'recommendation',
-      tone: 'neutral',
-      label: 'Qualify This Page',
-      detail: 'Confirm whether this page belongs to the artist.',
-      sortOrder: 2,
     });
   }
 

@@ -50,6 +50,7 @@ export {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
   anonymousOnboardingChatAsnLimiter,
+  anonymousOnboardingChatFirstTouchLimiter,
   anonymousOnboardingChatIpLimiter,
   anonymousOnboardingChatSessionLimiter,
   apiLimiter,

@@ -90,6 +90,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Product',
     links: [
       { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
       { href: APP_ROUTES.PAY, label: 'Pay' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },

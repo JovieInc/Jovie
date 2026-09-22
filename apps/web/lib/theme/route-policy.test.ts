@@ -12,6 +12,7 @@ describe('theme route policy', () => {
   it.each([
     '/',
     '/about',
+    '/card',
     '/blog/entry',
     '/changelog/v2',
     '/engineering/preview/story',

@@ -13,7 +13,6 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { dspCatalogScans } from '@/lib/db/schema/dsp-catalog-scan';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -69,9 +68,8 @@ async function validateConfirmRequest(
   const { profileId } = parsed.data;
 
   const [profile] = await db
-    .select({ id: creatorProfiles.id, clerkId: users.clerkId })
+    .select({ id: creatorProfiles.id, userId: creatorProfiles.userId })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
@@ -84,7 +82,7 @@ async function validateConfirmRequest(
     };
   }
 
-  if (profile.clerkId !== userId) {
+  if (profile.userId !== userId) {
     return {
       error: NextResponse.json(
         {

@@ -43,7 +43,10 @@ import {
   getProfilePacAssignment,
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
-import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
+import {
+  buildProfileAeoContent,
+  buildProfileAeoFaqStructuredData,
+} from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
   type EntityMentionContext,
@@ -452,18 +455,7 @@ async function ArtistPageContent({
       {/* FAQPage JSON-LD — feeds AI citation engines and Google FAQ rich results */}
       {aeoContent.faqs.length > 0 && (
         <script type='application/ld+json'>
-          {safeJsonLdStringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: aeoContent.faqs.map(item => ({
-              '@type': 'Question',
-              name: item.question,
-              acceptedAnswer: {
-                '@type': 'Answer',
-                text: item.answer,
-              },
-            })),
-          })}
+          {safeJsonLdStringify(buildProfileAeoFaqStructuredData(aeoContent))}
         </script>
       )}
 

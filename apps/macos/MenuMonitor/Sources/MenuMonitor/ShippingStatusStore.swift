@@ -130,24 +130,30 @@ final class ShippingStatusStore: ObservableObject {
           userInfo: [NSLocalizedDescriptionKey: "Invalid kanban JSON"]
         )
       }
-      var inProgress = 0
-      var ready = 0
-      var blocked = 0
-      for row in rows {
-        let status = ((row["status"] as? String) ?? "").lowercased()
-        switch status {
-        case "in_progress", "in-progress", "running", "shipping":
-          inProgress += 1
-        case "ready", "todo", "queued":
-          ready += 1
-        case "blocked":
-          blocked += 1
-        default:
-          break
-        }
-      }
-      return Counts(inProgress: inProgress, ready: ready, blocked: blocked)
+      return counts(fromRows: rows)
     }.value
+  }
+
+  /// Buckets kanban rows by their `status` field. Unknown or missing statuses
+  /// are ignored; matching is case-insensitive on the raw status string.
+  nonisolated static func counts(fromRows rows: [[String: Any]]) -> Counts {
+    var inProgress = 0
+    var ready = 0
+    var blocked = 0
+    for row in rows {
+      let status = ((row["status"] as? String) ?? "").lowercased()
+      switch status {
+      case "in_progress", "in-progress", "running", "shipping":
+        inProgress += 1
+      case "ready", "todo", "queued":
+        ready += 1
+      case "blocked":
+        blocked += 1
+      default:
+        break
+      }
+    }
+    return Counts(inProgress: inProgress, ready: ready, blocked: blocked)
   }
 
   /// Historical implementation retained for diagnostics only.

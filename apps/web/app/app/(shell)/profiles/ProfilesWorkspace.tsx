@@ -75,9 +75,15 @@ import {
   getConnectionStatus,
   getPresenceSignals,
   type PresenceSignal,
+  selectPresenceReviewRows,
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
-import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
+import {
+  FetchError,
+  fetchWithTimeout,
+  queryKeys,
+  STANDARD_CACHE,
+} from '@/lib/queries';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
@@ -97,13 +103,15 @@ import {
   PresenceOutcomeStrip as PresenceOutcomeBoard,
   presenceFilterForGroup,
 } from './PresenceOutcomes';
+import styles from './profiles-workspace.module.css';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
-type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested';
+type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested' | 'review';
 const FILTERS: ReadonlyArray<{
   readonly id: ProfilesWorkspaceView;
   readonly label: string;
 }> = [
+  { id: 'review', label: 'Review Pages' },
   { id: 'all', label: 'All Pages' },
   { id: 'identity', label: 'Identity' },
   { id: 'profiles', label: 'Profiles' },
@@ -485,8 +493,11 @@ function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   );
 }
 
-function StatusCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
-  const status = getConnectionStatus(row);
+function StatusCell({
+  row,
+  providerAvailable,
+}: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
+  const status = getConnectionStatus(row, providerAvailable);
   const StatusIcon =
     status.tone === 'success'
       ? CircleCheck
@@ -499,14 +510,14 @@ function StatusCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
     <SimpleTooltip content={status.label}>
       <span
         className={cn(
-          'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary-token',
+          'inline-flex min-h-7 items-center gap-1.5 text-xs text-tertiary-token',
           status.tone === 'success' && 'text-success',
           status.tone === 'warning' && 'text-warning',
           status.tone === 'error' && 'text-error'
         )}
       >
-        <StatusIcon className='h-3.5 w-3.5' aria-hidden />
-        <span className='sr-only'>{status.label}</span>
+        <StatusIcon className='h-3.5 w-3.5 shrink-0' aria-hidden />
+        <span className='min-w-0 whitespace-normal'>{status.label}</span>
       </span>
     </SimpleTooltip>
   );
@@ -573,6 +584,7 @@ function ConnectionRail({
     <EntitySidebarShell
       isOpen={row !== null}
       ariaLabel='Presence details'
+      onClose={onClose}
       contextMenuItems={contextMenuItems}
       scrollStrategy='shell'
       workspaceSurface='raised'
@@ -602,7 +614,9 @@ function ConnectionRail({
               )
             }
             title={getPresenceEntityName(row, data.artist.name)}
-            subtitle={getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+            subtitle={[getPresencePlatformLabel(row), getPresenceHandle(row)]
+              .filter(Boolean)
+              .join(' · ')}
             meta={
               <ShareableLinkRow
                 url={
@@ -642,7 +656,7 @@ function ConnectionRail({
               {
                 id: 'status',
                 label: 'Status',
-                value: getConnectionStatus(row).label,
+                value: getConnectionStatus(row, data?.providerAvailable).label,
                 hint: MONITORING_LABELS[row.monitoringState],
               },
               {
@@ -669,12 +683,18 @@ function ConnectionRail({
               />
             </div>
           </DrawerSection>
-          <PresenceSignalSection row={row} />
+          <PresenceSignalSection
+            row={row}
+            providerAvailable={data.providerAvailable}
+          />
           <DrawerSection sectionKind='details'>
             <div
               className={cn(
                 'grid gap-2 px-1',
-                primaryAction === 'open' ? 'grid-cols-1' : 'grid-cols-2'
+                primaryAction === 'open' ||
+                  (primaryAction === 'review' && row.rowType === 'surface')
+                  ? 'grid-cols-1'
+                  : 'grid-cols-2'
               )}
             >
               <Button asChild variant='secondary' size='sm'>
@@ -683,10 +703,14 @@ function ConnectionRail({
                   target={row.url.startsWith('http') ? '_blank' : undefined}
                   rel={row.url.startsWith('http') ? 'noreferrer' : undefined}
                 >
-                  <ExternalLink className='h-3.5 w-3.5' /> Open
+                  <ExternalLink className='h-3.5 w-3.5' />{' '}
+                  {primaryAction === 'review' && row.rowType === 'surface'
+                    ? 'Inspect Source'
+                    : 'Open'}
                 </Link>
               </Button>
-              {primaryAction !== 'open' ? (
+              {primaryAction !== 'open' &&
+              !(primaryAction === 'review' && row.rowType === 'surface') ? (
                 <Button asChild size='sm'>
                   <Link
                     href={
@@ -782,8 +806,9 @@ function CanonicalSourceDrills({ identity }: Readonly<{ identity: string }>) {
  */
 function PresenceSignalSection({
   row,
-}: Readonly<{ row: ProfileWorkspaceRow }>) {
-  const signals = getPresenceSignals(row);
+  providerAvailable,
+}: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
+  const signals = getPresenceSignals(row, providerAvailable);
   return (
     <DrawerSection title='Signals' sectionKind='status'>
       <ul className='space-y-2' data-testid='presence-signal-list'>
@@ -999,7 +1024,7 @@ function SuggestedConnectionsReview({
       {isError && groups.length === 0 ? (
         <SuggestedConnectionsState
           heading="Couldn't Load Suggestions"
-          description='Saved suggestions are still available. Try again.'
+          description='Suggestions could not be retrieved. Try again.'
           onRetry={onRetry}
           testId='suggested-connections-error-state'
         />
@@ -1060,7 +1085,9 @@ function SuggestedConnectionsReview({
 export function ProfilesWorkspace({
   data,
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceView>('all');
+  const [filter, setFilter] = useState<ProfilesWorkspaceView>(() =>
+    selectPresenceReviewRows(data?.rows ?? []).length > 0 ? 'review' : 'all'
+  );
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
@@ -1087,6 +1114,9 @@ export function ProfilesWorkspace({
     queryFn: ({ signal }) =>
       fetchConnectionSuggestions(profileId ?? '', signal),
     enabled: Boolean(profileId),
+    retry: (failureCount, error) =>
+      failureCount < 2 &&
+      (!(error instanceof FetchError) || error.isRetryable()),
   });
   const connectionSuggestions = useMemo(
     () => connectionSuggestionsQuery.data ?? [],
@@ -1255,7 +1285,9 @@ export function ProfilesWorkspace({
       ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
       : [...persistedAcceptedRows, ...(data?.rows ?? [])];
     return sortProfileWorkspaceRows(
-      filterProfileWorkspaceRows(sourceRows, filter)
+      filter === 'review'
+        ? selectPresenceReviewRows(sourceRows)
+        : filterProfileWorkspaceRows(sourceRows, filter)
     );
   }, [data?.rows, filter, pendingRow, persistedAcceptedRows]);
   const handleAddConnection = useCallback(() => {
@@ -1270,7 +1302,8 @@ export function ProfilesWorkspace({
           ariaLabel='Add Profile Or Site'
           onClick={handleAddConnection}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Profile Or Site'
+          label='Add Page'
+          hideLabelOnMobile
         />
       </DashboardHeaderActionGroup>
     ),
@@ -1292,6 +1325,10 @@ export function ProfilesWorkspace({
         },
         onPrimaryAction: connection => {
           const action = getConnectionPrimaryAction(connection);
+          if (action === 'review' && connection.rowType === 'surface') {
+            setSelected(connection);
+            return;
+          }
           router.push(
             action === 'upgrade'
               ? APP_ROUTES.SETTINGS_BILLING
@@ -1308,8 +1345,8 @@ export function ProfilesWorkspace({
     () => [
       columnHelper.accessor('label', {
         header: 'Profile / Page',
-        size: 220,
-        minSize: 160,
+        size: 150,
+        minSize: 100,
         meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
@@ -1339,14 +1376,27 @@ export function ProfilesWorkspace({
                   />
                 ) : (
                   <div
-                    className='truncate text-xs text-tertiary-token max-sm:hidden'
+                    data-testid='presence-page-identity'
+                    className='truncate text-xs text-tertiary-token'
                     title={
                       getPresenceHandle(row) ?? getPresencePlatformLabel(row)
                     }
                   >
-                    {getPresenceHandle(row) ?? getPresencePlatformLabel(row)}
+                    <span>{getPresencePlatformLabel(row)}</span>
+                    {getPresenceHandle(row) ? (
+                      <>
+                        {' '}
+                        · <span>{getPresenceHandle(row)}</span>
+                      </>
+                    ) : null}
                   </div>
                 )}
+                <div className={styles.mobileStatus}>
+                  <StatusCell
+                    row={row}
+                    providerAvailable={data?.providerAvailable ?? false}
+                  />
+                </div>
               </div>
             </div>
           );
@@ -1356,16 +1406,24 @@ export function ProfilesWorkspace({
         id: 'type',
         header: () => <span className='sr-only'>Type</span>,
         size: 48,
-        meta: { className: 'px-3' },
+        meta: { className: 'hidden' },
         cell: context => <TypeCell row={context.row.original} />,
       }),
-      columnHelper.accessor(row => getConnectionStatus(row).label, {
-        id: 'status',
-        header: () => <span className='sr-only'>Status / Issue</span>,
-        size: 48,
-        meta: { className: 'px-3' },
-        cell: context => <StatusCell row={context.row.original} />,
-      }),
+      columnHelper.accessor(
+        row => getConnectionStatus(row, data?.providerAvailable).label,
+        {
+          id: 'status',
+          header: 'Status',
+          size: 120,
+          meta: { className: cn('px-2', styles.statusColumn) },
+          cell: context => (
+            <StatusCell
+              row={context.row.original}
+              providerAvailable={data?.providerAvailable ?? false}
+            />
+          ),
+        }
+      ),
       columnHelper.display({
         id: 'rank',
         header: 'Search Rank',
@@ -1412,7 +1470,7 @@ export function ProfilesWorkspace({
         id: 'monitoring',
         header: 'Monitoring',
         size: 124,
-        meta: { className: 'max-2xl:hidden' },
+        meta: { className: 'hidden 2xl:table-cell' },
         cell: context => <MonitoringCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -1446,7 +1504,12 @@ export function ProfilesWorkspace({
         },
       }),
     ],
-    [data?.artist.name, getContextMenuItems, selected?.id]
+    [
+      data?.artist.name,
+      data?.providerAvailable,
+      getContextMenuItems,
+      selected?.id,
+    ]
   );
 
   useRegisterRightPanel(
@@ -1529,7 +1592,12 @@ export function ProfilesWorkspace({
           start={FILTERS.map(option => (
             <PageToolbarTabButton
               key={option.id}
-              label={option.label}
+              className={styles.filter}
+              label={
+                option.id === 'review'
+                  ? `Review Pages (${selectPresenceReviewRows(data.rows).length})`
+                  : option.label
+              }
               active={filter === option.id}
               onClick={() => {
                 setFilter(option.id);
@@ -1542,13 +1610,9 @@ export function ProfilesWorkspace({
     >
       <PresenceOutcomeBoard
         data={data}
-        rows={rows}
         onSelectGroup={group => {
           setFilter(presenceFilterForGroup(group));
           setSelected(null);
-        }}
-        onSelectRow={row => {
-          if (!row.id.startsWith('preview:')) setSelected(row);
         }}
       />
       {filter === 'suggested' ? (
@@ -1581,7 +1645,8 @@ export function ProfilesWorkspace({
           getContextMenuItems={getContextMenuItems}
           rowHeight={56}
           containerClassName='min-h-0 flex-1'
-          minWidth='390px'
+          minWidth='0'
+          className={styles.table}
           isRowSelected={row =>
             !row.id.startsWith('preview:') && selected?.id === row.id
           }
@@ -1593,8 +1658,16 @@ export function ProfilesWorkspace({
           }
           emptyState={
             <TableEmptyState
-              heading='No Presence in This Category'
-              description='Try another filter.'
+              heading={
+                filter === 'review'
+                  ? 'No Pages Awaiting Identity Review'
+                  : 'No Presence in This Category'
+              }
+              description={
+                filter === 'review'
+                  ? 'Your pages remain available in All Pages. Monitoring coverage is separate.'
+                  : 'Try another filter.'
+              }
             />
           }
         />

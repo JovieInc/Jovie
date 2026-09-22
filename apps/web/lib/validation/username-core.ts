@@ -44,6 +44,7 @@ export const RESERVED_USERNAMES = [
   'clerk',
   'mail',
   'changelog',
+  'card',
   'engineering',
   'engagement-engine',
   'artist-profiles',

@@ -15,6 +15,7 @@ import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
+  BILLING_PROVENANCE_COVERAGE_PATHS,
   CERTIFICATION_KERNEL_COMMAND,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
@@ -22,6 +23,7 @@ import {
   LANE_GROUPS,
   MARKETING_CERTIFICATION_COMMAND,
   RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
+  selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -831,6 +833,12 @@ describe('ci-fast bounded parallel workflow', () => {
       'tests/unit/lib/stripe/customer-sync.queries.test.ts'
     );
     expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'lib/stripe/test-price-contract.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      '--coverage.include=lib/stripe/test-price-contract.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
       '--coverage.thresholds.perFile=true'
     );
     expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
@@ -864,6 +872,23 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignExceptionRegistry\(\)[\s\S]*LANE_COMMANDS\['design-exception-registry'\]/
     );
+  });
+
+  it('runs billing provenance coverage when the Artist Visibility price contract changes', () => {
+    expect(BILLING_PROVENANCE_COVERAGE_PATHS).toEqual(
+      expect.arrayContaining([
+        'apps/web/lib/stripe/test-price-contract.ts',
+        'apps/web/lib/stripe/test-price-contract.test.ts',
+      ])
+    );
+
+    const commands = selectBillingCoverageCommands({
+      event: 'pull_request',
+      provenanceFiles: ['apps/web/lib/stripe/test-price-contract.ts'],
+      fanSendFiles: [],
+    });
+
+    expect(commands).toEqual([BILLING_PROVENANCE_COVERAGE_COMMAND]);
   });
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {

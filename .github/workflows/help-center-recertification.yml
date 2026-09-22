@@ -1,0 +1,40 @@
+name: Help Center Recertification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/docs/**'
+      - 'apps/web/**'
+      - 'docs/FEATURE_REGISTRY.md'
+      - 'scripts/help-center-recertification.mjs'
+
+permissions: {}
+
+concurrency:
+  group: help-center-recertification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  affected-articles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact product change
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Open deterministic documentation-review issues
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/help-center-recertification.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --sync-linear

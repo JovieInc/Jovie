@@ -357,6 +357,7 @@ function classifyMarkerEntry(entry, context) {
       kind: 'interrupted',
       attempt,
       controllerRun,
+      deploymentId: entry.payload.deploymentId,
       markerContext,
       attemptJobs: entry.attemptJobs,
     };
@@ -430,10 +431,25 @@ export function classifyProductionMarkerEvidence(evidence) {
     const primaryCandidates = classified.filter(
       entry => entry.attempt === 1 || entry.normalRerun || entry.recovered
     );
-    if (primaryCandidates.length > 1 && !converged) {
+    // A recovered marker naming the interrupted primary's exact producer
+    // attempt and the same exact deployment replaces that receipt: the
+    // bounded recovery re-proved the identical canonical binding rather than
+    // competing for primary authority. Any other pairing is a duplicate.
+    const interruptedPrimary = primaryCandidates.find(
+      entry => entry.kind === 'interrupted'
+    );
+    const replacedInterrupted =
+      classified.length === 2 &&
+      recovered?.kind === 'verified' &&
+      interruptedPrimary !== undefined &&
+      recovered.sourceRun === interruptedPrimary.controllerRun &&
+      recovered.sourceAttempt === interruptedPrimary.attempt &&
+      INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
+      recovered.deploymentId === interruptedPrimary.deploymentId;
+    if (primaryCandidates.length > 1 && !converged && !replacedInterrupted) {
       return manual('duplicate_primary_marker');
     }
-    const primary = primaryCandidates[0];
+    const primary = replacedInterrupted ? recovered : primaryCandidates[0];
     const recovery = classified.find(
       entry => entry.attempt === 2 && !entry.recovered && !entry.normalRerun
     );
@@ -590,6 +606,7 @@ export function classifyProductionMarkerEvidence(evidence) {
         reason: 'current_recovery_attempt_requires_lease',
         controllerRun,
         controllerAttempt: 1,
+        deploymentId: primary.deploymentId,
       };
     }
     if (latestAttempt === 1 && evidence.latestRun.status === 'completed') {
@@ -598,6 +615,7 @@ export function classifyProductionMarkerEvidence(evidence) {
         reason: 'one_interrupted_marker_safe_to_rerun',
         controllerRun,
         controllerAttempt: 1,
+        deploymentId: primary.deploymentId,
       };
     }
     if (latestAttempt === 2 && ACTIVE_STATUSES.has(evidence.latestRun.status)) {

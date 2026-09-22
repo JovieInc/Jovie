@@ -1701,12 +1701,39 @@ ${selectedGateScript}`,
       expect(jobCondition).toContain(requirement);
     }
     expect(jobCondition).toContain("github.actor != 'dependabot[bot]'");
+    expect(jobCondition).toContain(
+      "github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'"
+    );
     expect(jobCondition).not.toContain('copilot-swe-agent');
     expect(FORK_GATE_WORKFLOW).toContain('types: [submitted, dismissed]');
     expect(controller).toContain('gh api --paginate --slurp');
     expect(controller).toContain('.state == "DISMISSED"');
     expect(controller).toContain('.commit_id == $head_sha');
     expect(controller).toContain('.author_association == "COLLABORATOR"');
+  });
+
+  it('routes dependabot PRs only through the pull_request_target lane (JOV-4782)', () => {
+    // Dependabot-triggered pull_request runs only see the Dependabot secret
+    // store, so the fork-gate controller's create-github-app-token step fails
+    // hard there. The controller must skip dependabot on both PR-flavored
+    // events; dependabot-gate owns the required Fork PR Gate status for
+    // dependabot via pull_request_target, where the App secrets exist.
+    const controller = getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate');
+    const jobCondition = controller.match(
+      /^    if: >-\n([\s\S]*?)^    runs-on:/m
+    )?.[1];
+    expect(jobCondition).toBeTruthy();
+    expect(
+      jobCondition.match(/github\.actor != 'dependabot\[bot\]'/g)
+    ).toHaveLength(2);
+    expect(controller).toContain('actions/create-github-app-token');
+
+    const dependabotGate = getJobBlock(FORK_GATE_WORKFLOW, 'dependabot-gate');
+    expect(dependabotGate).toContain(
+      "github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'"
+    );
+    expect(dependabotGate).toContain('actions/create-github-app-token');
+    expect(dependabotGate).toContain('-f context="Fork PR Gate"');
   });
 
   it.each([

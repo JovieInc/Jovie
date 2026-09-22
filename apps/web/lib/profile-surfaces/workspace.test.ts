@@ -8,6 +8,7 @@ import {
   filterProfileWorkspaceRows,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  selectPresenceReviewRows,
   sortProfileWorkspaceRows,
   summarizeProfileWorkspaceRows,
 } from './workspace';
@@ -52,6 +53,47 @@ function connector(
 }
 
 describe('connections workspace helpers', () => {
+  it('does not claim healthy monitoring during an unavailable search provider', () => {
+    expect(getConnectionStatus(surface(), false)).toMatchObject({
+      label: 'Search Unavailable',
+      tone: 'neutral',
+      needsAttention: false,
+    });
+    expect(
+      getConnectionStatus(surface({ qualificationStatus: 'suggested' }), false)
+        .label
+    ).toBe('Needs Qualification');
+    expect(getConnectionStatus(connector(), false).label).toBe('Active');
+  });
+
+  it('selects only persisted identity work, independent of monitoring and provider state', () => {
+    const rows = [
+      ...(['active', 'paused', 'locked', 'unavailable'] as const).flatMap(
+        monitoringState => [
+          surface({
+            id: `suggested-${monitoringState}`,
+            qualificationStatus: 'suggested',
+            monitoringState,
+          }),
+          surface({ id: `qualified-${monitoringState}`, monitoringState }),
+        ]
+      ),
+      surface({ id: 'conflict', qualificationStatus: 'conflicting' }),
+      surface({ id: 'rejected', qualificationStatus: 'rejected' }),
+      surface({ id: 'preview:unsaved', qualificationStatus: 'suggested' }),
+      connector({ status: 'needs_reauth' }),
+    ];
+    expect(selectPresenceReviewRows(rows).map(row => row.id)).toEqual([
+      'suggested-active',
+      'suggested-paused',
+      'suggested-locked',
+      'suggested-unavailable',
+      'conflict',
+    ]);
+    expect(selectPresenceReviewRows([])).toEqual([]);
+    expect(selectPresenceReviewRows([surface(), connector()])).toEqual([]);
+  });
+
   it('groups Presence filters by artist outcome (JOV-6170)', () => {
     const rows = [
       surface({
@@ -143,6 +185,24 @@ describe('connections workspace helpers', () => {
       getConnectionPrimaryAction(surface({ monitoringState: 'locked' }))
     ).toBe('upgrade');
   });
+
+  it.each(['suggested', 'conflicting'] as const)(
+    'requires identity review before an upgrade for a locked %s page (JOV-6343)',
+    qualificationStatus => {
+      const row = surface({ qualificationStatus, monitoringState: 'locked' });
+
+      expect(getConnectionPrimaryAction(row)).toBe('review');
+      expect(getConnectionStatus(row).label).toBe(
+        qualificationStatus === 'suggested'
+          ? 'Needs Qualification'
+          : 'Needs Review'
+      );
+      expect(row.monitoringState).toBe('locked');
+      expect(
+        getConnectionPrimaryAction({ ...row, qualificationStatus: 'qualified' })
+      ).toBe('upgrade');
+    }
+  );
 
   it('keeps duplicate connection labels as distinct URL-backed rows', () => {
     const first = surface({

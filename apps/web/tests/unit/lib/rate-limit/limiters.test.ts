@@ -86,6 +86,30 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 h',
       prefix: 'onboarding',
     },
+    anonymousOnboardingChatIp: {
+      name: 'Anonymous Onboarding Chat (IP)',
+      limit: 20,
+      window: '1 h',
+      prefix: 'anon_onb_chat_ip',
+    },
+    anonymousOnboardingChatAsn: {
+      name: 'Anonymous Onboarding Chat (ASN)',
+      limit: 60,
+      window: '1 h',
+      prefix: 'anon_onb_chat_asn',
+    },
+    anonymousOnboardingChatSession: {
+      name: 'Anonymous Onboarding Chat (Session)',
+      limit: 20,
+      window: '7 d',
+      prefix: 'anon_onb_chat_session',
+    },
+    anonymousOnboardingChatFirstTouch: {
+      name: 'Anonymous Onboarding Chat (First Touch)',
+      limit: 20,
+      window: '1 h',
+      prefix: 'anon_onb_chat_first_touch',
+    },
     handleCheck: {
       name: 'Handle Check',
       limit: 30,
@@ -597,6 +621,145 @@ describe('limiters.ts', () => {
       expect(result.success).toBe(true);
       expect(mockLimit).toHaveBeenCalledTimes(1);
       expect(mockLimit).toHaveBeenCalledWith('user:user-1');
+    });
+  });
+
+  // =========================================================================
+  // checkAnonymousChatRateLimit (JOV-6114 first-touch budget)
+  // =========================================================================
+
+  describe('checkAnonymousChatRateLimit', () => {
+    it('charges a first touch against the first-touch budget, then the new session bucket', async () => {
+      // A shared-egress IP that already burned the shared IP/ASN pools must
+      // not dead-end a brand-new visitor on message #1: the first touch
+      // charges the dedicated first_touch pool, then the fresh session's
+      // lifetime bucket. Only the shared ip:/asn: pools stay burned.
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('ip:') || key.startsWith('asn:')
+            ? makeDeniedResult()
+            : makeAllowedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        asn: 'AS64500',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(true);
+      // First-touch pool + the fresh session's lifetime bucket (cookie-reset
+      // bypass fix: the session counter must survive cookie rotation). The
+      // shared ip:/asn: pools are never consulted on a first touch.
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'first_touch:203.0.113.10',
+        'session:sess-new',
+      ]);
+    });
+
+    it('denies a first touch whose fresh session bucket is exhausted', async () => {
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('session:')
+            ? makeDeniedResult({
+                reason:
+                  'You have hit the conversation limit for this session. Sign up to keep going.',
+              })
+            : makeAllowedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe(
+        'You have hit the conversation limit for this session. Sign up to keep going.'
+      );
+    });
+
+    it('checks ip, asn, then session for an established session', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-old',
+        asn: 'AS64500',
+        isFirstTouch: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'ip:203.0.113.10',
+        'asn:AS64500',
+        'session:sess-old',
+      ]);
+    });
+
+    it('denies an established session at the shared IP pool', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-old',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe(
+        'Too many anonymous chat requests from this IP. Please slow down or sign up to continue.'
+      );
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith('ip:203.0.113.10');
+    });
+
+    it('keeps the first-touch allowance off requireRedis so a Redis outage degrades instead of dead-ending', async () => {
+      const { anonymousOnboardingChatFirstTouchLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const options = (
+        anonymousOnboardingChatFirstTouchLimiter as unknown as {
+          options?: { requireRedis?: boolean };
+        }
+      ).options;
+
+      expect(options?.requireRedis).toBeFalsy();
+    });
+
+    it('caps the first-touch budget at the sustained per-IP hourly rate so cookie resets cannot buy extra throughput', async () => {
+      const { anonymousOnboardingChatFirstTouchLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const config = anonymousOnboardingChatFirstTouchLimiter.getConfig() as {
+        limit: number;
+        window: string;
+      };
+      const { anonymousOnboardingChatIpLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const ipConfig = anonymousOnboardingChatIpLimiter.getConfig() as {
+        limit: number;
+        window: string;
+      };
+
+      expect(config.window).toBe(ipConfig.window);
+      expect(config.limit).toBeLessThanOrEqual(ipConfig.limit);
     });
   });
 

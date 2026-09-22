@@ -44,7 +44,7 @@ function actionErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-async function requireAdminClerkUserId(): Promise<string> {
+async function requireAdminUserId(): Promise<string> {
   const { userId } = await getCachedAuth();
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
@@ -52,24 +52,24 @@ async function requireAdminClerkUserId(): Promise<string> {
   return userId;
 }
 
-async function getAppUserId(clerkUserId: string): Promise<string | null> {
+async function getAppUserId(userId: string): Promise<string | null> {
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, userId))
     .limit(1);
   return user?.id ?? null;
 }
 
 async function writeAuditLog(
-  clerkUserId: string,
+  userId: string,
   action: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
-  const appUserId = await getAppUserId(clerkUserId);
+  const appUserId = await getAppUserId(userId);
   if (!appUserId) {
     captureError('[Admin Audit] User mapping not found', null, {
-      clerkUserId,
+      userId,
       action,
       metadata,
     });
@@ -85,12 +85,12 @@ async function writeAuditLog(
 
 export async function setCurrentAdminAsPlaylistSpotifyPublisher(): Promise<ActionState> {
   try {
-    const clerkUserId = await requireAdminClerkUserId();
+    const userId = await requireAdminUserId();
     await setPlaylistSpotifyClerkUserId({
-      clerkUserId,
-      updatedByClerkUserId: clerkUserId,
+      clerkUserId: userId,
+      updatedByUserId: userId,
     });
-    await writeAuditLog(clerkUserId, 'playlist_spotify_publisher_updated', {
+    await writeAuditLog(userId, 'playlist_spotify_publisher_updated', {
       source: 'current_admin',
     });
     revalidatePath(APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS);
@@ -110,14 +110,10 @@ export async function updatePlaylistEngineSettings(input: {
   readonly intervalUnit: string;
 }): Promise<ActionState> {
   try {
-    const clerkUserId = await requireAdminClerkUserId();
+    const userId = await requireAdminUserId();
     const parsed = engineSettingsSchema.parse(input);
     await setPlaylistEngineSettings(parsed);
-    await writeAuditLog(
-      clerkUserId,
-      'playlist_engine_settings_updated',
-      parsed
-    );
+    await writeAuditLog(userId, 'playlist_engine_settings_updated', parsed);
     revalidatePath(APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS);
     return { success: true, message: 'Playlist engine settings saved.' };
   } catch (error) {
@@ -137,7 +133,7 @@ export async function updatePlaylistEngineSettings(input: {
 
 export async function generateTestPlaylist(): Promise<ActionState> {
   try {
-    const clerkUserId = await requireAdminClerkUserId();
+    const userId = await requireAdminUserId();
     const spotifyStatus = await getPlaylistSpotifyStatus();
     if (!spotifyStatus.healthy) {
       return {
@@ -160,7 +156,7 @@ export async function generateTestPlaylist(): Promise<ActionState> {
       };
     }
 
-    await writeAuditLog(clerkUserId, 'playlist_test_generated', {
+    await writeAuditLog(userId, 'playlist_test_generated', {
       playlistId: result.playlistId,
       title: result.title,
       trackCount: result.trackCount,

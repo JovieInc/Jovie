@@ -17,6 +17,7 @@ const ALLOWED_OUTPUT_FILES = new Set([
   'batches-latest.json',
   'sentry-issues-latest.json',
   'sonar-issues-latest.json',
+  'sonar-issues-inventory.json',
 ]);
 
 function assertRegularDirectory(path, label) {

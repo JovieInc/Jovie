@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { Music, SquarePen } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { chatNavItem } from './config';
 import { NavMenuItem } from './NavMenuItem';
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
@@ -54,6 +55,19 @@ describe('NavMenuItem', () => {
     expect(label.className).toContain('w-full');
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).toContain('overflow-hidden');
+    expect(label.className).not.toContain('mask-image');
+  });
+
+  // JOV-6181: same assertion, but through the real shipped config object so a
+  // config regression (tone dropped, renamed label) cannot silently re-expose
+  // the fade on the row the production rail hands to NavMenuItem.
+  it('keeps the configured chatNavItem label unmasked', () => {
+    expect(chatNavItem.name).toBe('New Chat');
+    expect(chatNavItem.tone).toBe('primary');
+
+    render(<NavMenuItem item={chatNavItem} isActive={false} />);
+
+    const label = screen.getByText('New Chat');
     expect(label.className).not.toContain('mask-image');
   });
 

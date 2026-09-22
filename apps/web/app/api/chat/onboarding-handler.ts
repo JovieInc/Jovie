@@ -45,6 +45,7 @@ import {
 import {
   checkAnonymousChatRateLimit,
   createRateLimitHeaders,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
 import {
@@ -73,7 +74,8 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
  *  3. Resolve client IP (via trusted proxy header helper) + ASN.
  *  4. Verify Cloudflare Turnstile token on the first message of a fresh
  *     session. Fail-closed when unconfigured in non-dev envs.
- *  5. Apply IP + ASN + session-lifetime rate limits.
+ *  5. Rate limit: fresh sessions draw on the dedicated first-touch budget;
+ *     established sessions hit IP + ASN + session-lifetime limits.
  *  6. Validate the UIMessage payload (length caps).
  *  7. Dispatch `executeChatTurn` with `mode='onboarding'`, the onboarding
  *     tool palette, and the Stanley-style system prompt. Stream the
@@ -381,17 +383,38 @@ export async function tryHandleAnonymousOnboardingChat(
   const skipAnonymousChatRateLimit =
     env.E2E_TEST_MODE === '1' && env.VERCEL_ENV !== 'production';
   if (!skipAnonymousChatRateLimit) {
-    const rate = await checkAnonymousChatRateLimit({ ip, sessionId, asn });
+    // `!existingSessionId` means this request minted a fresh session: the
+    // visitor's first message. It already cleared Turnstile, so it draws on
+    // the dedicated first-touch budget instead of the shared IP/ASN pools
+    // that carrier NATs and corporate egress routinely exhaust (JOV-6114).
+    const rate = await checkAnonymousChatRateLimit({
+      ip,
+      sessionId,
+      asn,
+      isFirstTouch: !existingSessionId,
+    });
     if (!rate.success) {
+      // `retryAfter` is only meaningful when the limit is actually exhausted.
+      // When the check FAILED (Redis outage → rate.unavailable), the reset
+      // timestamp is a synthetic guess and telling the UI to wait for it sent
+      // a misleadingly long countdown (PR #18095 review).
+      const includeRetryAfter = rate.unavailable !== true;
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((rate.reset.getTime() - Date.now()) / 1000)
+      );
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
           message: rate.reason,
-          errorCode: 'RATE_LIMITED',
+          errorCode: rate.unavailable
+            ? 'RATE_LIMIT_UNAVAILABLE'
+            : 'RATE_LIMITED',
+          ...(includeRetryAfter ? { retryAfter: retryAfterSeconds } : {}),
           requestId,
         },
         {
-          status: 429,
+          status: rateLimitDenialStatus(rate),
           headers: {
             ...corsHeaders,
             ...createRateLimitHeaders(rate),

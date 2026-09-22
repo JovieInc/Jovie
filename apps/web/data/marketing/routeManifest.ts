@@ -489,6 +489,52 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/card/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingHero.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+        'how-it-works',
+        '3-step-strip'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+        'faq',
+        'objection-handler'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source:
+        'JOV-6237 source implementation and route-health contract 2026-09-19',
+      notes:
+        'Coming-soon feature page using canonical marketing sections, an explicitly illustrative card preview, and the approved public-profile screenshot registry. Exact mounted identities are exercised by marketing-route-health.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/card',
+    healthCheck: {
+      path: '/card',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(

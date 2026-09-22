@@ -102,7 +102,7 @@ Existing enforcement remains authoritative:
 | Linear ownership and terminal issue state | [`.claude/rules/linear.md`](../.claude/rules/linear.md), `.github/workflows/linear-sync-on-merge.yml` |
 | PR writer proof and exact-head promotion | `JOV-INV-022`, `scripts/lib/writer-owned-pr-promotion.mjs`, `.github/workflows/merge-queue-autoenroll.yml` |
 | PR, CI, queue, deploy, provider, lease, and controller stalls | `JOV-INV-017`, `scripts/backlog-orchestrator/no-unattended-red.mjs`, `.github/workflows/delivery-control-receipts.yml` |
-| Canonical fleet state and missed-event repair | `.github/workflows/fleet-gate-refresh.yml`, `.github/workflows/ownerless-recovery-sweep.yml` |
+| Canonical fleet state and missed-event repair | `.github/workflows/fleet-gate-refresh.yml` |
 
 No enforcement path may count its own activity as progress or use a handoff receipt as destination proof.
 
@@ -132,5 +132,6 @@ Tim does not open Linear in the morning. Tim does not enroll PRs.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-09-21 | Deleted the ownerless-recovery-sweep workflow (chronic infra red on the jovie-fixed runner; ownerless-recovery role folded into the event-driven production controller). | Tim White |
 | 2026-09-04 | Made commitment closure explicit: destination-bound proof, accountable blockers, reconcile-before-duplicate, and independent missed-event recovery. | Tim White |
 | 2026-08-17 | Created. Constraint-packet fleet. Web-first sellability. Admission ≠ filing. Scoreboard: both accounts $0, $0 MRR; $935/mo known tool floor; gifted credits; $25k SAFE spent. | Tim White |

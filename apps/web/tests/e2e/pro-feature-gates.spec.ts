@@ -129,9 +129,9 @@ test.describe('Pro Feature Gate Verification', () => {
       waitUntil: 'domcontentloaded',
       timeout: 30_000,
     });
-    await expect(
-      page.getByText(/Standard Subscription Active|Pro|Active/i)
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Pro Plan' })).toBeVisible({
+      timeout: 10_000,
+    });
     console.log('[pro-gates] Billing page confirms active subscription');
 
     // STEP 7: Cleanup — restore free tier

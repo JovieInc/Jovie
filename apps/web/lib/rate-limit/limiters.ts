@@ -127,10 +127,33 @@ export const anonymousOnboardingChatSessionLimiter = createRateLimiter(
   { requireRedis: true }
 );
 
+/**
+ * First-touch allowance: applies only to a visitor's very first anonymous
+ * message (no valid session cookie yet, Turnstile already passed). It uses a
+ * dedicated per-IP pool so shared egress (carrier NAT, office IPs) can't burn
+ * the shared session-lifetime budget before a real first-time visitor sends
+ * message #1. The budget is capped at the sustained per-IP hourly rate: a
+ * reset or absent cookie must never buy more hourly throughput than the
+ * sustained limits allow (cookie-reset bypass, PR #18095 review). Not
+ * requireRedis — degrades to per-instance memory during a Redis outage
+ * instead of hard-failing a cold first touch (JOV-6114).
+ */
+export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatFirstTouch
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
   readonly asn?: string | null;
+  /**
+   * True when the request carries no valid onboarding session cookie — the
+   * visitor's first message. First-touch requests skip the shared IP/ASN
+   * pools (first-touch allowance, JOV-6114) but still draw on the dedicated
+   * first-touch pool AND the session-lifetime bucket, so resetting the cookie
+   * can never escape sustained chat limits (PR #18095 review).
+   */
+  readonly isFirstTouch?: boolean;
 }
 
 // ============================================================================
@@ -532,15 +555,42 @@ async function checkRateLimit(
 }
 
 /**
- * Check all three anonymous-onboarding-chat rate limits (JOV-2132).
+ * Check all anonymous-onboarding-chat rate limits (JOV-2132).
  * Returns the first failure or success if all pass.
  *
  * IP and session caps always apply; ASN cap only applies when an ASN was
  * resolvable from the request (Vercel/Cloudflare both provide this header).
+ *
+ * A first touch (no valid session cookie) draws on the dedicated first-touch
+ * pool instead of the shared IP/ASN pools (JOV-6114), but STILL charges the
+ * session-lifetime bucket for the freshly minted session id. Without that,
+ * discarding the cookie would route every request back through the
+ * first-touch path and escape the IP, ASN, and session limits entirely
+ * (cookie-reset bypass, PR #18095 review). The session bucket is fresh on a
+ * first touch, so a denial there can only mean a failed backend — checkRateLimit
+ * already converts that into a fail-closed-but-advisory result shape, and the
+ * handler treats it as 503 RATE_LIMIT_UNAVAILABLE rather than a fake 429.
  */
 export async function checkAnonymousChatRateLimit(
   input: AnonymousChatLimitInput
 ): Promise<RateLimitResult> {
+  if (input.isFirstTouch) {
+    const firstTouchResult = await checkRateLimit(
+      anonymousOnboardingChatFirstTouchLimiter,
+      `first_touch:${input.ip}`,
+      'Too many new chats from this network right now. Try again in a moment, or sign up to skip the line.'
+    );
+    if (!firstTouchResult.success) return firstTouchResult;
+
+    // Charge the brand-new session's lifetime bucket so cookie rotation
+    // cannot reset the conversation counter.
+    return checkRateLimit(
+      anonymousOnboardingChatSessionLimiter,
+      `session:${input.sessionId}`,
+      'You have hit the conversation limit for this session. Sign up to keep going.'
+    );
+  }
+
   const ipResult = await checkRateLimit(
     anonymousOnboardingChatIpLimiter,
     `ip:${input.ip}`,
@@ -1159,6 +1209,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     anonymousOnboardingChatIp: anonymousOnboardingChatIpLimiter,
     anonymousOnboardingChatAsn: anonymousOnboardingChatAsnLimiter,
     anonymousOnboardingChatSession: anonymousOnboardingChatSessionLimiter,
+    anonymousOnboardingChatFirstTouch: anonymousOnboardingChatFirstTouchLimiter,
     dashboardLinks: dashboardLinksLimiter,
     headerSearch: headerSearchLimiter,
     paymentIntent: paymentIntentLimiter,

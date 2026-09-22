@@ -98,6 +98,7 @@ web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
+web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
 web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile
@@ -138,7 +139,7 @@ ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swif
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/(.)signup/page.tsx|desktop,mobile|x|Auth/security lane is out of scope
+web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
 ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
 ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope

@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       isPro,
       billingUpdatedAt: new Date(),
     })
-    .where(eq(users.clerkId, userId));
+    .where(eq(users.id, userId));
 
   return NextResponse.json({ success: true, plan, isPro });
 }

@@ -76,15 +76,24 @@ vi.mock('@/lib/auth/secondary-storage', () => ({
 
 await import('@/lib/auth/better-auth');
 
+// The module-load betterAuth() call is captured eagerly: vitest 5 enables
+// clearMocks by default, which empties call history before each test.
+// Tests that mockClear + resetModules + re-import populate mock.calls again
+// inside the test, so helpers prefer the latest call when one exists.
+const capturedOptions = mocks.betterAuth.mock.calls.at(0)?.[0];
+
+function latestOptions() {
+  return mocks.betterAuth.mock.calls.at(-1)?.[0] ?? capturedOptions;
+}
+
 function getUserCreatedHook() {
-  const options = mocks.betterAuth.mock.calls[0]?.[0];
-  const hook = options?.databaseHooks?.user?.create?.after;
+  const hook = latestOptions()?.databaseHooks?.user?.create?.after;
   expect(hook).toBeTypeOf('function');
   return hook!;
 }
 
 function getOptions() {
-  const options = mocks.betterAuth.mock.calls[0]?.[0];
+  const options = latestOptions();
   expect(options).toBeDefined();
   return options!;
 }

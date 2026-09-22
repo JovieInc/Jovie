@@ -42,6 +42,8 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/rate-limit', () => ({
   checkAnonymousChatRateLimit: hoisted.checkAnonymousChatRateLimitMock,
   createRateLimitHeaders: () => ({}),
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
 }));
 
 vi.mock('@/lib/turnstile/verify', () => ({
@@ -880,6 +882,119 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(body.errorCode).toBe('RATE_LIMITED');
       expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
       expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('first-touch budget (JOV-6114)', () => {
+    function mockChatTurnOk() {
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('ok', { status: 200, headers }),
+        },
+        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+    }
+
+    it('marks a request with no session cookie as first touch', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      mockChatTurnOk();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      await tryHandleAnonymousOnboardingChat(req, 'req-ft-1');
+
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ isFirstTouch: true })
+      );
+    });
+
+    it('marks a request with a valid session cookie as an established session', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      mockChatTurnOk();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const existingSessionId = '00112233-4455-6677-8899-aabbccddeeff';
+      const req = makeRequest(
+        { mode: 'onboarding', messages: [userMessage('hi again')] },
+        `jovie_onboarding_session=valid-session.${existingSessionId}`
+      );
+      await tryHandleAnonymousOnboardingChat(req, 'req-ft-2');
+
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isFirstTouch: false,
+          sessionId: existingSessionId,
+        })
+      );
+    });
+
+    it('returns 503 + RATE_LIMIT_UNAVAILABLE when the limiter backend is down (not a fake 429)', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+        success: false,
+        limit: 0,
+        remaining: 0,
+        reset: new Date(Date.now() + 30_000),
+        reason: 'The rate limiter is temporarily unavailable.',
+        unavailable: true,
+      });
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(req, 'req-ft-3');
+
+      expect(result?.status).toBe(503);
+      const body = await result?.json();
+      expect(body.errorCode).toBe('RATE_LIMIT_UNAVAILABLE');
+      // A backend outage has no real reset time — retryAfter must be omitted
+      // so the UI never shows a misleading countdown (PR #18095 review).
+      expect(body.retryAfter).toBeUndefined();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+
+    it('includes retryAfter seconds in the denial body', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+        success: false,
+        limit: 10,
+        remaining: 0,
+        reset: new Date(Date.now() + 60_000),
+        reason: 'Too many anonymous chat requests from this IP',
+      });
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(req, 'req-ft-4');
+
+      expect(result?.status).toBe(429);
+      const body = await result?.json();
+      expect(body.errorCode).toBe('RATE_LIMITED');
+      expect(body.retryAfter).toBeGreaterThan(0);
+      expect(body.retryAfter).toBeLessThanOrEqual(61);
     });
   });
 });

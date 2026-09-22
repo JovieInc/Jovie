@@ -19,6 +19,29 @@ import {
 
 type Status = 'idle' | 'submitting' | 'success' | 'subscribed' | 'error';
 
+export interface ChangelogEmailSignupCopy {
+  readonly idleHeading: string;
+  readonly idleDescription: string;
+  readonly buttonLabel: string;
+  readonly consent: string;
+  readonly successHeading: string;
+  readonly successDescription: string;
+  readonly subscribedHeading: string;
+  readonly subscribedDescription: string;
+}
+
+const DEFAULT_COPY: ChangelogEmailSignupCopy = {
+  idleHeading: 'Get product updates',
+  idleDescription: 'New features and improvements from Jovie.',
+  buttonLabel: 'Subscribe',
+  consent: 'Subscribe to Jovie changelog emails. Unsubscribe anytime.',
+  successHeading: 'Check your email',
+  successDescription:
+    'Confirm your subscription to receive Jovie changelog emails.',
+  subscribedHeading: 'Jovie changelog',
+  subscribedDescription: 'This email already receives the Jovie changelog.',
+};
+
 const TURNSTILE_FAILURE_STATUSES = new Set([
   'error',
   'expired',
@@ -29,17 +52,22 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
 
 export function ChangelogEmailSignup({
   source = 'changelog_page',
+  initialEmail = '',
+  copy = DEFAULT_COPY,
 }: {
   readonly source?: string;
+  readonly initialEmail?: string;
+  readonly copy?: ChangelogEmailSignupCopy;
 }) {
   const formId = useId();
   const statusRef = useRef<HTMLDivElement>(null);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const turnstileFailureActiveRef = useRef(false);
+  const emailEditedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
@@ -48,14 +76,14 @@ export function ChangelogEmailSignup({
   const settled = status === 'success' || status === 'subscribed';
   const heading = settled
     ? status === 'subscribed'
-      ? 'Jovie changelog'
-      : 'Check your email'
-    : 'Get product updates';
+      ? copy.subscribedHeading
+      : copy.successHeading
+    : copy.idleHeading;
   const description = settled
     ? status === 'subscribed'
-      ? 'This email already receives the Jovie changelog.'
-      : 'Confirm your subscription to receive Jovie changelog emails.'
-    : 'New features and improvements from Jovie.';
+      ? copy.subscribedDescription
+      : copy.successDescription
+    : copy.idleDescription;
   const successMessage = `${heading}. ${description}`;
 
   useEffect(() => {
@@ -63,6 +91,12 @@ export function ChangelogEmailSignup({
     else if (status === 'error' && !turnstileFailed)
       inputRef.current?.focus({ preventScroll: true });
   }, [settled, status, turnstileFailed]);
+
+  useEffect(() => {
+    if (initialEmail && !emailEditedRef.current) {
+      setEmail(initialEmail);
+    }
+  }, [initialEmail]);
 
   const handleTurnstileStateChange = useCallback(
     (state: InvisibleTurnstileState) => {
@@ -167,7 +201,7 @@ export function ChangelogEmailSignup({
       </h2>
       <p className='mt-4 grid text-base text-secondary-token'>
         <span className='invisible col-start-1 row-start-1' aria-hidden='true'>
-          Confirm your subscription to receive Jovie changelog emails.
+          {copy.successDescription}
         </span>
         <span className='col-start-1 row-start-1'>{description}</span>
       </p>
@@ -197,6 +231,7 @@ export function ChangelogEmailSignup({
             placeholder='you@email.com'
             value={email}
             onChange={e => {
+              emailEditedRef.current = true;
               setEmail(e.target.value);
               if (status === 'error' && !turnstileFailed) {
                 setStatus('idle');
@@ -226,7 +261,7 @@ export function ChangelogEmailSignup({
                 status === 'error' ? `${formId}-error` : undefined
               }
             >
-              Subscribe
+              {copy.buttonLabel}
             </Button>
           </div>
           {settled ? null : (
@@ -253,7 +288,7 @@ export function ChangelogEmailSignup({
         </div>
       </div>
       <p id={`${formId}-consent`} className='mt-4 text-xs text-tertiary-token'>
-        Subscribe to Jovie changelog emails. Unsubscribe anytime.
+        {copy.consent}
       </p>
       <p
         id={`${formId}-error`}
