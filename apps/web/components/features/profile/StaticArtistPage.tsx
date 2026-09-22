@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ProfileMode } from '@/features/profile/contracts';
+import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
@@ -95,6 +96,7 @@ export function StaticArtistPage({
   showClaimFooter = false,
   claimFooterHref = null,
 }: StaticArtistPageProps) {
+  assertLiveProfileRoute();
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
