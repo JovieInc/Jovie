@@ -1,45 +1,14 @@
 #!/usr/bin/env bash
 
-set -e
+# Thin entry point. The collector lives in fetch-sonar-issues.mjs so it is
+# unit-testable with a mocked HTTP layer (JOV-6245): real pagination driven by
+# the API's paging metadata, supported partitioning at the 10k-result cap,
+# branch pinning + analysis binding, classified failures with bounded retry,
+# and fail-closed INCOMPLETE/non-atomic reporting.
+#
+# Env: SONAR_TOKEN (required), SONAR_PROJECT_KEY, SONAR_BRANCH, SONAR_BASE_URL.
+# Exit: 0 complete+atomic, 1 failed (nothing written), 2 written but flagged.
 
-OUTPUT_DIR="apps/web/.issues"
-LATEST_FILE="$OUTPUT_DIR/sonar-issues-latest.json"
+set -euo pipefail
 
-echo "🔍 Fetching SonarCloud issues..."
-
-# Fetch all issues (handling pagination)
-ALL_ISSUES="[]"
-PAGE=1
-TOTAL_PAGES=3  # 1158 / 500 = 3 pages
-
-while [ $PAGE -le $TOTAL_PAGES ]; do
-  echo "   Fetching page $PAGE..."
-
-  RESPONSE=$(curl -s "https://sonarcloud.io/api/issues/search?componentKeys=JovieInc_Jovie&resolved=false&ps=500&p=$PAGE&s=SEVERITY&asc=false" \
-    -H "Authorization: Bearer $SONAR_TOKEN")
-
-  PAGE_ISSUES=$(echo "$RESPONSE" | jq '.issues')
-  ALL_ISSUES=$(echo "$ALL_ISSUES" | jq ". + $PAGE_ISSUES")
-
-  PAGE=$((PAGE + 1))
-done
-
-echo "✅ Fetched $(echo "$ALL_ISSUES" | jq 'length') issues"
-
-# Replace the stable snapshot atomically. The helper owns temp-file cleanup.
-echo "$ALL_ISSUES" | jq '.' | \
-  node apps/web/scripts/atomic-issue-output.mjs sonar-issues-latest.json >/dev/null
-echo "💾 Saved to: $LATEST_FILE"
-
-# Print summary by severity
-echo ""
-echo "📊 Issues by severity:"
-echo "$ALL_ISSUES" | jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.count) | reverse | .[] | "   \(.severity): \(.count)"'
-
-echo ""
-echo "📊 Issues by type:"
-echo "$ALL_ISSUES" | jq -r 'group_by(.type) | map({type: .[0].type, count: length}) | sort_by(.count) | reverse | .[] | "   \(.type): \(.count)"'
-
-echo ""
-echo "📊 Top 10 rules:"
-echo "$ALL_ISSUES" | jq -r 'group_by(.rule) | map({rule: .[0].rule, count: length}) | sort_by(.count) | reverse | .[0:10] | .[] | "   \(.rule): \(.count)"'
+exec node "$(dirname "$0")/fetch-sonar-issues.mjs" "$@"
