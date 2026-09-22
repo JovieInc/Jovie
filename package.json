@@ -80,7 +80,9 @@
       "srvx": "0.11.13",
       "@playwright/test": "1.63.0",
       "playwright": "1.60.0",
-      "playwright-core": "1.60.0"
+      "playwright-core": "1.60.0",
+      "@apidevtools/json-schema-ref-parser>js-yaml": "^5.2.2",
+      "promptfoo>js-yaml": "^5.2.2"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
