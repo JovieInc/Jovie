@@ -104,13 +104,14 @@ describe('applyVipBoost', () => {
 
     // VIP should be first
     expect(boosted[0].id).toBe('vip-id');
-    // Other Tim White should be filtered out
-    expect(boosted.find(r => r.id === 'a1')).toBeUndefined();
+    // Same name does not make a different provider ID the same artist.
+    expect(boosted.find(r => r.id === 'a1')).toBeDefined();
+    expect(boosted.map(r => r.id)).toEqual(['vip-id', 'a1', 'a3']);
     // Peter White should remain
     expect(boosted.find(r => r.id === 'a3')).toBeDefined();
   });
 
-  it('synthesizes VIP result when not in results and filters same-name', async () => {
+  it('synthesizes VIP result while preserving distinct same-name artists', async () => {
     mockGetFeatured.mockResolvedValue({
       'tim white': {
         spotifyId: 'vip-id',
@@ -133,12 +134,12 @@ describe('applyVipBoost', () => {
     expect(boosted[0].id).toBe('vip-id');
     expect(boosted[0].name).toBe('Tim White');
     expect(boosted[0].followers).toBe(9900);
-    // Other Tim Whites filtered
-    expect(boosted.find(r => r.id === 'a1')).toBeUndefined();
-    expect(boosted.find(r => r.id === 'a2')).toBeUndefined();
+    // Distinct same-name artists remain selectable.
+    expect(boosted.find(r => r.id === 'a1')).toBeDefined();
+    expect(boosted.find(r => r.id === 'a2')).toBeDefined();
     // Peter White remains
     expect(boosted.find(r => r.id === 'a3')).toBeDefined();
-    expect(boosted).toHaveLength(2);
+    expect(boosted).toHaveLength(4);
   });
 
   it('keeps non-matching names when VIP match found', async () => {
@@ -209,6 +210,48 @@ describe('applyVipBoost', () => {
     expect(boosted).toHaveLength(1);
     expect(boosted[0]?.id).toBe('vip-id');
     expect(boosted[0]?.name).toBe('__proto__');
+  });
+
+  it('deduplicates provider IDs without hiding same-name candidates or mutating results', async () => {
+    mockGetFeatured.mockResolvedValue({
+      echo: {
+        spotifyId: 'vip-id',
+        name: 'Echo',
+        imageUrl: null,
+        followers: 10,
+        popularity: 5,
+      },
+    });
+    const results = [
+      makeResult({ id: 'vip-id', name: 'Echo' }),
+      makeResult({ id: 'a1', name: ' ECHO ', isClaimed: true }),
+      makeResult({ id: 'a1', name: 'Alternate label' }),
+      makeResult({ id: 'vip-id', name: 'Echo' }),
+    ];
+    const before = structuredClone(results);
+    const boosted = await applyVipBoost(results, 'echo', 5);
+    expect(boosted.map(r => r.id)).toEqual(['vip-id', 'a1']);
+    expect(boosted[1]).toEqual(results[1]);
+    expect(results).toEqual(before);
+  });
+
+  it('keeps same-name alternatives within the existing synthetic-result limit', async () => {
+    mockGetFeatured.mockResolvedValue({
+      echo: {
+        spotifyId: 'vip-id',
+        name: 'Echo',
+        imageUrl: null,
+        followers: 10,
+        popularity: 5,
+      },
+    });
+    const results = [
+      makeResult({ id: 'a1', name: 'Echo' }),
+      makeResult({ id: 'a2', name: 'Echo' }),
+      makeResult({ id: 'a3', name: 'Other' }),
+    ];
+    const boosted = await applyVipBoost(results, 'echo', 2);
+    expect(boosted.map(r => r.id)).toEqual(['vip-id', 'a1']);
   });
 
   it('VIP at top with no same-name collisions returns unchanged order', async () => {
