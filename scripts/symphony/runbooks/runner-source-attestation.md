@@ -1,5 +1,65 @@
 # Repair the existing runner-source publisher
 
+## Official upstream cutover (JOV-6484)
+
+The legacy profiles below do not attest an official `openai/symphony` Burrito
+release. Do not refresh their old inputs or relabel a governor receipt to describe
+the upstream process. Preserve JOV-6163's historical acceptance separately.
+
+`verify_upstream_burrito_payload.py` supplies a read-only prerequisite. It verifies
+an operator-selected release package SHA-256 before decoding its embedded
+Burrito 1.5 Linux x86_64 XZ/FOILZ payload, then compares every embedded regular file
+and mode with the extracted tree. Missing, extra, changed or symlinked files fail.
+Only Burrito's bounded, nonexecutable `_metadata.json` is excluded when it is not
+part of the archive. Nothing is executed or extracted, and no receipt is written
+by the helper. Its JSON explicitly leaves runtime identity and admission unverified.
+
+Resolve the package digest and source commit independently from the official
+release asset and peeled tag. Never select a digest merely because it matches an
+installed file. For an already verified package and extracted root:
+
+```bash
+python3 scripts/symphony/verify_upstream_burrito_payload.py \
+  --package "$APPROVED_PACKAGE" --sha256 "$APPROVED_PACKAGE_SHA256" \
+  --extracted-root "$OBSERVED_EXTRACTED_ROOT"
+```
+
+Limits: 64 MiB package, 256 MiB decoded payload, 128 MiB XZ decoder memory,
+20,000 regular files. The official v0.0.3 archive requires more than 64 MiB decoder
+memory because its dictionary itself is 64 MiB. Verification reads files without
+altering them; it is not an atomic filesystem snapshot or protection from a
+compromised OS principal. A successful comparison alone cannot publish an
+attestation. JOV-6484 still requires the serving socket/ancestry/cgroup, process
+generation, approved workflow/unit/drop-in configuration, reobservation and
+consumer tests before runtime-owner activation and two fresh timer observations.
+The existing 600-second freshness limit and all independent admission gates remain.
+
+Decision: extend the existing proof boundary using standard-library XZ decoding
+and Burrito's documented archive layout. This small static reader fills the
+package-to-extracted-files gap; it does not introduce a runtime or timer. Revisit
+when upstream supplies a maintained file-manifest verification interface.
+Sources: [Burrito 1.5 archive format](https://github.com/burrito-elixir/burrito/blob/v1.5.0/src/archiver.zig),
+[wrapper](https://github.com/burrito-elixir/burrito/blob/v1.5.0/src/wrapper.zig),
+[official Symphony release](https://github.com/openai/symphony/releases/tag/v0.0.3).
+Do not use maintenance commands as a read-only substitute: wrapper initialization
+can create directories or install its musl runtime before maintenance dispatch.
+
+## Preservation-only upstream observation
+
+`observe_upstream_preservation` in the existing emitter verifies the independently
+reviewed `symphony-upstream-preservation-binding/v1` digest, typed loaded systemd
+properties, exact on-disk inventory, package payload, serving process ancestry and
+stable invocation before returning `symphony-upstream-preservation/v1`.
+The example binding is deliberately unapproved with null effective/workflow hashes.
+Unknown fields, missing approval, changed configuration and stale observations fail.
+It reads no environment-file contents or process environment and claims neither.
+This observer does not publish legacy health, approve admission or install anything.
+The dependent activation-workflow change consumes this separate result to preserve
+accepted upstream without reaching legacy mutators. Current configuration approval
+and runtime-owner review remain separate from this source-only fixture proof.
+
+## Legacy publisher
+
 JOV-6163 is the runner-source prerequisite for JOV-5853. This replaces the
 implementation behind the existing `gem-service-attestation.timer`; it does not
 introduce a timer, controller, enrollment grant, or execution path. Summer cannot
