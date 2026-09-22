@@ -242,6 +242,7 @@ describe('live public profile lock', () => {
     expect(
       await screen.findByRole('button', { name: 'Custom Amount' })
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     cleanup();
     render(<CookieBannerSection testOnlyPathname='/timwhite' />);
@@ -290,10 +291,11 @@ describe('live public profile lock', () => {
       expect(screen.getAllByText('Shows').length).toBeGreaterThan(0);
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
-    const desktopCredits = screen.getAllByText('Release credits')[0];
-    fireEvent.click(desktopCredits.closest('button') ?? desktopCredits);
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(screen.getAllByText('Credits').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Credits' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
 
     const pageSource = readFileSync(
       path.resolve(process.cwd(), 'app/[username]/page.tsx'),

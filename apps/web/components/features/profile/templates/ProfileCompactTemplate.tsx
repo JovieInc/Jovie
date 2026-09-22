@@ -972,51 +972,49 @@ export function ProfileCompactTemplate({
         }
         desktopBanner={isDesktopLayout ? profileBanner : null}
         desktopSurface={
-          <>
-            {visibleReleaseCredits.length > 0 ? (
-              <button type='button' onClick={() => setCreditsOpen(true)}>
-                Release credits
-              </button>
-            ) : null}
-            <ProfileDesktopSurface
-              presentation='modal'
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              allowFanCapture={allowFanCapture}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              viewerCountryCode={viewerCountryCode}
-              releases={releases}
-              catalogLoadFailed={catalogLoadFailed}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onAlertsModalClose={() => setRequestedMode('profile')}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              onBack={handleBack}
-              profileHref={profileHref}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-            />
-          </>
+          <ProfileDesktopSurface
+            presentation='modal'
+            artist={artist}
+            socialLinks={socialLinks}
+            contacts={contacts}
+            showPayButton={showPayButton}
+            latestRelease={latestRelease}
+            profileSettings={profileSettings}
+            alertOptInVariant={resolvedAlertOptInVariant}
+            allowFanCapture={allowFanCapture}
+            genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
+            photoDownloadSizes={photoDownloadSizes}
+            tourDates={tourDates}
+            viewerCountryCode={viewerCountryCode}
+            releases={releases}
+            catalogLoadFailed={catalogLoadFailed}
+            drawerOpen={drawerOpen}
+            drawerView={drawerView}
+            activeMode={requestedMode}
+            onModeSelect={nextMode => {
+              clearCloseResetTimer();
+              setRequestedMode(nextMode);
+            }}
+            onAlertsModalClose={() => setRequestedMode('profile')}
+            onDrawerOpenChange={handleDrawerOpenChange}
+            onDrawerViewChange={handleDrawerViewChange}
+            onOpenMenu={() => openDrawerMode('menu')}
+            onPlayClick={handlePlayClick}
+            onBack={handleBack}
+            profileHref={profileHref}
+            isSubscribed={isSubscribed}
+            contentPrefs={contentPrefs}
+            onTogglePref={handleTogglePref}
+            onUnsubscribe={handleUnsubscribe}
+            isUnsubscribing={unsubMutation.isPending}
+            onOpenReleaseCredits={
+              visibleReleaseCredits.length > 0
+                ? () => setCreditsOpen(true)
+                : undefined
+            }
+          />
         }
       />
     </ProfileNotificationsContext.Provider>
