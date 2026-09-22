@@ -167,7 +167,7 @@
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging",
+      "nextLocalCommand": "pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging",
       "remediation": "Repair the path-selected Electron or MenuMonitor test/package regression on the exact combined head; unrelated Web and iOS lanes remain skipped."
     },
     {
