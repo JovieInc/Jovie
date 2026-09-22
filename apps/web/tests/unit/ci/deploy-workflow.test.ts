@@ -3607,6 +3607,12 @@ describe('CI E2E smoke workflow', () => {
       'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}'
     );
     expect(goldenPathStep).toContain(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv'
+    );
+    expect(goldenPathStep).not.toContain(
       'STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}'
     );
     expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(

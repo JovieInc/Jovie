@@ -44,7 +44,7 @@ export const CERTIFICATION_KERNEL_COMMAND =
 export const ACQUISITION_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
 export const BILLING_PROVENANCE_COVERAGE_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
@@ -289,12 +289,14 @@ function changedFiles(patterns) {
     .filter(Boolean);
 }
 
-const BILLING_PROVENANCE_COVERAGE_PATHS = [
+export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
   'apps/web/lib/entitlements/**',
   'apps/web/lib/stripe/customer-sync/**',
+  'apps/web/lib/stripe/test-price-contract.ts',
+  'apps/web/lib/stripe/test-price-contract.test.ts',
   'apps/web/tests/unit/lib/entitlements/**',
   'apps/web/tests/unit/lib/stripe/customer-sync.billing-info.test.ts',
-];
+]);
 
 const FAN_SEND_SAFETY_COVERAGE_PATHS = [
   'apps/web/app/api/cron/send-release-notifications/**',
@@ -305,16 +307,11 @@ const FAN_SEND_SAFETY_COVERAGE_PATHS = [
   'apps/web/tests/unit/lib/entitlements-state-transitions.test.ts',
 ];
 
-export function runBillingCoverage() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  const provenanceFiles =
-    event === 'workflow_dispatch'
-      ? null
-      : changedFiles(BILLING_PROVENANCE_COVERAGE_PATHS);
-  const fanSendFiles =
-    event === 'workflow_dispatch'
-      ? null
-      : changedFiles(FAN_SEND_SAFETY_COVERAGE_PATHS);
+export function selectBillingCoverageCommands({
+  event,
+  provenanceFiles,
+  fanSendFiles,
+}) {
   const commands = [];
 
   // An unreadable diff fails closed and runs both focused suites. On a normal
@@ -333,6 +330,25 @@ export function runBillingCoverage() {
   ) {
     commands.push(FAN_SEND_SAFETY_COVERAGE_COMMAND);
   }
+
+  return commands;
+}
+
+export function runBillingCoverage() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const provenanceFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(BILLING_PROVENANCE_COVERAGE_PATHS);
+  const fanSendFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(FAN_SEND_SAFETY_COVERAGE_PATHS);
+  const commands = selectBillingCoverageCommands({
+    event,
+    provenanceFiles,
+    fanSendFiles,
+  });
 
   if (commands.length === 0) {
     return {
