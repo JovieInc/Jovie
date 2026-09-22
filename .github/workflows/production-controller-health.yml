@@ -1,5 +1,9 @@
 name: Production Controller Health
 # clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Deployed-base marker healing dispatches only the bounded marker-recovery re-proof inside the production-mutation FIFO; it never redeploys, aliases, promotes, or rolls back.
+# revisit-trigger: Remove when the Production Controller heals interrupted deployed markers in-band instead of via a dispatched recovery run.
 
 on:
   # Production Controller completion is the primary reconciliation signal.
@@ -121,6 +125,105 @@ jobs:
             .state == "active"
           ' >/dev/null <<<"$controller_workflow_json" || incident invalid_controller_workflow
           controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
+
+          # Deployed-base marker audit. An interrupted verified marker on the
+          # canonical deployed SHA classifies recovery_available, which is
+          # never admissible as a release base — every later exact-main
+          # controller fails authorize until the marker is re-proven. The
+          # generation's own controller rerun cannot heal it once main has
+          # moved on (coalescing yields the lease to the newer generation),
+          # so the bounded marker-recovery workflow is the only remaining
+          # proof path for a still-deployed but superseded generation.
+          deployed_sha=""
+          if deployed_build_info="$(curl --fail --silent --show-error \
+            --connect-timeout 5 --max-time 15 \
+            "https://jov.ie/api/health/build-info" 2>/dev/null)"; then
+            deployed_sha="$(jq -r '.commitSha // empty' <<<"$deployed_build_info" 2>/dev/null || true)"
+          fi
+          if [[ ! "$deployed_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::warning::Canonical build-info did not expose an exact deployed SHA; deployed-base marker audit skipped."
+            deployed_sha=""
+          fi
+          if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$current_sha" ]; then
+            deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
+              --sha "$deployed_sha" \
+              --repo "$REPOSITORY" \
+              --controller-workflow-id "$controller_workflow_id")"
+            jq -e '
+              type == "object" and
+              (.state | IN("none", "pending", "recovery_available", "verified", "manual")) and
+              (.reason | type == "string" and length > 0)
+            ' >/dev/null <<<"$deployed_marker_json" ||
+              incident malformed_deployed_marker_classification
+            deployed_marker_state="$(jq -r '.state' <<<"$deployed_marker_json")"
+            deployed_marker_reason="$(jq -r '.reason' <<<"$deployed_marker_json")"
+            case "$deployed_marker_state" in
+              verified|none)
+                ;;
+              pending)
+                echo "Deployed generation $deployed_sha has an in-flight marker attempt; nothing to heal."
+                exit 0
+                ;;
+              manual)
+                incident "deployed_$deployed_marker_reason"
+                ;;
+              recovery_available)
+                [ "$deployed_marker_reason" = "one_interrupted_marker_safe_to_rerun" ] ||
+                  incident contradictory_deployed_recovery_authority
+                deployed_run="$(jq -r '.controllerRun // 0' <<<"$deployed_marker_json")"
+                deployed_attempt="$(jq -r '.controllerAttempt // 0' <<<"$deployed_marker_json")"
+                deployed_deployment_id="$(jq -r '.deploymentId // ""' <<<"$deployed_marker_json")"
+                [[ "$deployed_run" =~ ^[1-9][0-9]*$ ]] &&
+                  [[ "$deployed_attempt" =~ ^[1-9][0-9]*$ ]] &&
+                  [[ "$deployed_deployment_id" =~ ^dpl_[A-Za-z0-9]+$ ]] ||
+                  incident malformed_deployed_recovery_evidence
+
+                # One recovery per generation: an in-flight re-proof already
+                # owns this SHA (the recovery run-name carries it verbatim).
+                recovery_runs="$(gh api \
+                  "repos/$REPOSITORY/actions/workflows/production-marker-recovery.yml/runs?per_page=30")"
+                inflight="$(jq --arg sha "$deployed_sha" \
+                  '[.workflow_runs[] | select(.status != "completed" and ((.display_title // "") | contains($sha)))] | length' \
+                  <<<"$recovery_runs")"
+                if [ "$inflight" != "0" ]; then
+                  echo "Marker recovery for $deployed_sha is already in flight."
+                  exit 0
+                fi
+
+                # TOCTOU: re-prove the live bind and the classification at the
+                # dispatch boundary; a moved deployment or a changed marker
+                # state makes the heal neutral.
+                boundary_build_info="$(curl --fail --silent --show-error \
+                  --connect-timeout 5 --max-time 15 \
+                  "https://jov.ie/api/health/build-info")" || {
+                  echo "Canonical build-info became unreadable at the dispatch boundary; recovery dispatch is neutral."
+                  exit 0
+                }
+                boundary_sha="$(jq -r '.commitSha // empty' <<<"$boundary_build_info")"
+                if [ "$boundary_sha" != "$deployed_sha" ]; then
+                  echo "Deployed SHA moved to $boundary_sha during evaluation; recovery dispatch is neutral."
+                  exit 0
+                fi
+                boundary_marker="$(node .github/scripts/production-marker-state.mjs \
+                  --sha "$deployed_sha" \
+                  --repo "$REPOSITORY" \
+                  --controller-workflow-id "$controller_workflow_id")"
+                if [ "$(jq -r '.state // empty' <<<"$boundary_marker")" != "recovery_available" ]; then
+                  echo "Deployed marker state changed during evaluation; recovery dispatch is neutral."
+                  exit 0
+                fi
+                gh workflow run production-marker-recovery.yml \
+                  -f sha="$deployed_sha" \
+                  -f deployment_id="$deployed_deployment_id" \
+                  -f controller_run="$deployed_run" \
+                  -f controller_attempt="$deployed_attempt"
+                echo "run_url=https://github.com/$REPOSITORY/actions" >> "$GITHUB_OUTPUT"
+                echo "recovery_reason=deployed_marker_recovery_dispatched" >> "$GITHUB_OUTPUT"
+                echo "Dispatched bounded marker recovery for deployed generation $deployed_sha."
+                exit 0
+                ;;
+            esac
+          fi
 
           marker_state_json="$(node .github/scripts/production-marker-state.mjs \
             --sha "$current_sha" \

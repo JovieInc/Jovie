@@ -116,6 +116,58 @@ describe('OnboardingMessageRecoveryRow', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('counts down to a fixed deadline instead of restarting the wait on every render', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const chatError = makeChatError({
+        type: 'rate_limit',
+        message: 'Too many anonymous chat requests from this IP.',
+        retryAfter: 90,
+      });
+      const { rerender } = render(
+        <OnboardingMessageRecoveryRow
+          chatError={chatError}
+          handleRetry={noop}
+          isBusy={false}
+          isSubmitted={false}
+        />
+      );
+
+      // Deadline captured at first render: 90s out → "2 minutes" (ceil).
+      expect(screen.getByText('Try again in 2 minutes.')).toBeInTheDocument();
+
+      // 30 seconds pass and the parent re-renders (e.g. a streaming tick).
+      vi.setSystemTime(new Date('2026-01-01T00:00:30Z'));
+      rerender(
+        <OnboardingMessageRecoveryRow
+          chatError={chatError}
+          handleRetry={noop}
+          isBusy={false}
+          isSubmitted={false}
+        />
+      );
+
+      // The wait label must reflect the elapsed time (60s left → 1 minute),
+      // NOT restart from the full duration.
+      expect(screen.getByText('Try again in 1 minute.')).toBeInTheDocument();
+
+      // After the deadline passes, the label reports "now".
+      vi.setSystemTime(new Date('2026-01-01T00:01:31Z'));
+      rerender(
+        <OnboardingMessageRecoveryRow
+          chatError={chatError}
+          handleRetry={noop}
+          isBusy={false}
+          isSubmitted={false}
+        />
+      );
+      expect(screen.getByText('Try again in now.')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('omits the signup link for non-rate-limit errors', () => {
     render(
       <OnboardingMessageRecoveryRow

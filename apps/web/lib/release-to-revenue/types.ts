@@ -75,6 +75,13 @@ export interface ReleaseDistributionDrafts {
 export interface ReleaseToRevenueStoreListing {
   /** Merch cards published as the release store listing for this autopilot run. */
   readonly merchCardIds: readonly string[];
+  /**
+   * `connect-not-ready` when the selling step was gated off because the
+   * creator's Stripe Connect account cannot accept charges yet (missing
+   * account, charges/payouts/details not all enabled, or an unresolvable
+   * stale readiness cache).
+   */
+  readonly status?: 'connect-not-ready';
 }
 
 export interface ReleaseToRevenueRunStepOutputs {

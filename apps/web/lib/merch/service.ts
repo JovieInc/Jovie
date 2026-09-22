@@ -911,6 +911,35 @@ export async function getMerchProductOptions(params: {
 }
 
 /**
+ * The unique partial index `merch_cards_selected_design_option_unique`
+ * guarantees at most one card per design option; this is the canonical lookup
+ * for both the pre-check fast path and the post-conflict retry path.
+ */
+async function getCardForSelectedDesignOption(
+  optionId: string
+): Promise<MerchCard | null> {
+  const [card] = await db
+    .select()
+    .from(merchCards)
+    .where(eq(merchCards.selectedDesignOptionId, optionId))
+    .limit(1);
+  return card ?? null;
+}
+
+function assertSelectedProductMatchesCard(
+  card: MerchCard | null,
+  catalogProductId: number | null | undefined
+): void {
+  if (
+    card &&
+    catalogProductId &&
+    card.printful.catalogProductId !== catalogProductId
+  ) {
+    throw new Error('A product is already selected for this merch design');
+  }
+}
+
+/**
  * Refresh merch card economics from Printful when still on jovie_default so
  * publish / checkout sellability can pass (JOV-3393).
  */
@@ -970,6 +999,32 @@ async function hydrateMerchCardPrintfulEconomics(
   return updated ?? card;
 }
 
+/**
+ * Bring an existing canonical card up to date for the selected option:
+ * hydrate stale economics and absorb a truthful Printful mockup produced
+ * after the card was created.
+ */
+async function refreshMerchCardForSelectedOption(
+  card: MerchCard,
+  selected: MerchDesignOption
+): Promise<MerchCard> {
+  const hydrated = await hydrateMerchCardPrintfulEconomics(card);
+  const printfulMockupUrl = selected.mockupUrls.find(isPrintfulMockupUrl);
+  if (printfulMockupUrl && !hydrated.mockupUrls.includes(printfulMockupUrl)) {
+    const [updatedCard] = await db
+      .update(merchCards)
+      .set({
+        primaryImageUrl: printfulMockupUrl,
+        mockupUrls: selected.mockupUrls,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchCards.id, hydrated.id))
+      .returning();
+    return updatedCard ?? hydrated;
+  }
+  return hydrated;
+}
+
 export async function selectMerchDesign(params: {
   readonly generationId: string;
   readonly clerkUserId: string;
@@ -1011,19 +1066,8 @@ export async function selectMerchDesign(params: {
       contentReviewBlockers[0] ?? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
     );
   }
-  const existing = await db
-    .select()
-    .from(merchCards)
-    .where(eq(merchCards.selectedDesignOptionId, rawSelected.id))
-    .limit(1);
-  const existingCard = existing[0] ?? null;
-  if (
-    existingCard &&
-    params.catalogProductId &&
-    existingCard.printful.catalogProductId !== params.catalogProductId
-  ) {
-    throw new Error('A product is already selected for this merch design');
-  }
+  const existingCard = await getCardForSelectedDesignOption(rawSelected.id);
+  assertSelectedProductMatchesCard(existingCard, params.catalogProductId);
 
   const selected = params.catalogProductId
     ? await applyCatalogProductToOption(rawSelected, params.catalogProductId)
@@ -1034,21 +1078,7 @@ export async function selectMerchDesign(params: {
 
   let card = existingCard;
   if (card) {
-    card = await hydrateMerchCardPrintfulEconomics(card);
-
-    const printfulMockupUrl = selected.mockupUrls.find(isPrintfulMockupUrl);
-    if (printfulMockupUrl && !card.mockupUrls.includes(printfulMockupUrl)) {
-      const [updatedCard] = await db
-        .update(merchCards)
-        .set({
-          primaryImageUrl: printfulMockupUrl,
-          mockupUrls: selected.mockupUrls,
-          updatedAt: new Date(),
-        })
-        .where(eq(merchCards.id, card.id))
-        .returning();
-      card = updatedCard ?? card;
-    }
+    card = await refreshMerchCardForSelectedOption(card, selected);
   }
 
   if (!card) {
@@ -1106,12 +1136,28 @@ export async function selectMerchDesign(params: {
         learning,
         publishedAt: shouldPublish ? new Date() : null,
       })
+      // merch_cards_selected_design_option_unique makes the claim atomic:
+      // a concurrent winner's committed row turns this insert into a no-op
+      // instead of a duplicate card.
+      .onConflictDoNothing()
       .returning();
-    card = inserted;
-    if (params.catalogProductId) {
-      attachPrintfulMockupsAsync([selected]);
+    if (inserted) {
+      card = inserted;
+      if (params.catalogProductId) {
+        attachPrintfulMockupsAsync([selected]);
+      }
+    } else {
+      // Lost the race: the winner's card is the canonical card for this
+      // design option. Reuse it exactly like a sequential retry.
+      const winner = await getCardForSelectedDesignOption(selected.id);
+      if (!winner) {
+        throw new Error('Merch design selection conflicted; retry it');
+      }
+      assertSelectedProductMatchesCard(winner, params.catalogProductId);
+      card = await refreshMerchCardForSelectedOption(winner, selected);
     }
-  } else if (shouldPublish && card.status !== 'live') {
+  }
+  if (shouldPublish && card.status !== 'live') {
     validateMerchCardForPublishing(card, selected.qualityReview);
     [card] = await db
       .update(merchCards)

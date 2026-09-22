@@ -146,11 +146,25 @@ jobs:
             exit 1
           fi
 
-          # Recovery never overwrites durable truth: no live verified marker
-          # for this exact generation may already exist. An expired marker
-          # holds no downloadable bytes and fails classification as
-          # expired_marker; counting it here would deadlock the generation,
-          # so only non-expired artifacts block recovery.
+          # Recovery never overwrites durable truth: only a live verified
+          # marker for this exact generation blocks recovery. An expired
+          # marker holds no downloadable bytes yet still fails classification
+          # as expired_marker, which would deadlock a live interrupted
+          # marker; delete expired same-name stubs first, then classify —
+          # an interrupted marker is exactly the receipt this workflow
+          # exists to re-prove.
+          for marker_name in \
+            "production-generation-verified-$EXPECTED_SHA" \
+            "production-generation-verified-recovery-$EXPECTED_SHA"; do
+            expired_ids="$(gh api \
+              "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
+              --jq '[.artifacts[] | select(.expired == true) | .id] | .[]')"
+            for artifact_id in $expired_ids; do
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$artifact_id" >/dev/null
+              echo "::notice::Deleted expired marker artifact $artifact_id ($marker_name) before admission."
+            done
+          done
+          existing_markers=0
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
@@ -158,6 +172,31 @@ jobs:
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
+              existing_markers=1
+              break
+            fi
+          done
+          if [ "$existing_markers" != "0" ]; then
+            controller_workflow_id="$(gh api \
+              "repos/$REPO/actions/workflows/production-controller.yml" \
+              --jq '.id')"
+            [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Could not resolve the Production Controller workflow identity."
+              exit 1
+            }
+            existing_state_json="$(node \
+              .github/scripts/production-marker-state.mjs \
+              --sha "$EXPECTED_SHA" \
+              --repo "$REPO" \
+              --controller-workflow-id "$controller_workflow_id")"
+            existing_state="$(jq -r '.state // empty' <<<"$existing_state_json")"
+            existing_reason="$(jq -r '.reason // empty' <<<"$existing_state_json")"
+            if [ "$existing_state" = "recovery_available" ] &&
+              [ "$existing_reason" = "one_interrupted_marker_safe_to_rerun" ] &&
+              [ "$(jq -r '.controllerRun // 0' <<<"$existing_state_json")" = "$SOURCE_CONTROLLER_RUN" ] &&
+              [ "$(jq -r '.controllerAttempt // 0' <<<"$existing_state_json")" = "$SOURCE_CONTROLLER_ATTEMPT" ]; then
+              echo "::notice::Verified marker for $EXPECTED_SHA was interrupted after write-through on controller attempt $SOURCE_CONTROLLER_RUN/$SOURCE_CONTROLLER_ATTEMPT; re-proving it against canonical production."
+            else
               if [ "$REQUEST_MODE" = "workflow_run" ]; then
                 echo "fleet_refresh_required=true" >> "$GITHUB_OUTPUT"
                 echo "::notice::Verified marker already exists for $EXPECTED_SHA; event recovery is neutral."
@@ -166,7 +205,7 @@ jobs:
               echo "::error::A verified marker already exists for $EXPECTED_SHA; recovery is not permitted."
               exit 1
             fi
-          done
+          fi
           echo "recovery_required=true" >> "$GITHUB_OUTPUT"
           echo "fleet_refresh_required=true" >> "$GITHUB_OUTPUT"
 
@@ -300,7 +339,10 @@ jobs:
           # Re-read durable truth at the write boundary. The original
           # controller upload may become visible while the bounded probes run;
           # never create a duplicate marker name in that race. Only live
-          # (non-expired) markers count as durable truth.
+          # (non-expired) markers count, and only a verified one makes this
+          # upload neutral — the interrupted marker admitted for re-proof must
+          # still be bound to this exact source attempt before we write.
+          existing_markers=0
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
@@ -308,15 +350,45 @@ jobs:
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
+              existing_markers=1
+              break
+            fi
+          done
+          if [ "$existing_markers" != "0" ]; then
+            controller_workflow_id="$(gh api \
+              "repos/$REPO/actions/workflows/production-controller.yml" \
+              --jq '.id')"
+            [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Could not resolve the Production Controller workflow identity."
+              exit 1
+            }
+            boundary_state_json="$(node \
+              .github/scripts/production-marker-state.mjs \
+              --sha "$EXPECTED_SHA" \
+              --repo "$REPO" \
+              --controller-workflow-id "$controller_workflow_id")"
+            boundary_state="$(jq -r '.state // empty' <<<"$boundary_state_json")"
+            if [ "$boundary_state" = "verified" ]; then
               echo "::notice::Verified marker became durable during recovery; upload is neutral."
               exit 0
             fi
-          done
-          # The classifier refuses duplicate marker names, and expired
-          # artifacts remain listed until GitHub deletes them. Remove expired
-          # same-name stubs so the recovered marker is the only artifact of
-          # its name. Expired artifacts have no downloadable bytes, so this
-          # destroys no evidence.
+            if [ "$boundary_state" != "recovery_available" ] ||
+              [ "$(jq -r '.reason // empty' <<<"$boundary_state_json")" != "one_interrupted_marker_safe_to_rerun" ] ||
+              [ "$(jq -r '.controllerRun // 0' <<<"$boundary_state_json")" != "$SOURCE_CONTROLLER_RUN" ] ||
+              [ "$(jq -r '.controllerAttempt // 0' <<<"$boundary_state_json")" != "$SOURCE_CONTROLLER_ATTEMPT" ]; then
+              echo "::error::Marker evidence for $EXPECTED_SHA changed during recovery ($boundary_state); refusing to write."
+              exit 1
+            fi
+            echo "::notice::Replacing the interrupted verified marker for $EXPECTED_SHA with re-proven recovery bytes."
+          fi
+          # Expired artifacts stay listed until GitHub deletes them, and the
+          # classifier bounds each marker name at two live receipts. Remove
+          # expired same-name stubs so the recovered marker plus the
+          # interrupted primary it replaces never exceed that bound. The
+          # interrupted marker stays untouched — it is evidence, bound to the
+          # recovered marker by exact source run and deployment. Expired
+          # artifacts have no downloadable bytes, so this destroys no
+          # evidence.
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do

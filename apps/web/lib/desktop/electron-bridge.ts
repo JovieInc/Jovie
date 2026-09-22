@@ -231,6 +231,15 @@ function parseDesktopBuildIdentity(
   return record as unknown as DesktopBuildIdentity;
 }
 
+/**
+ * A cold relaunch runs the identity invoke while the window is mid-handoff —
+ * the splash → hosted swap and auth-handoff churn can drop or misattribute a
+ * single in-flight call. Bounded retries keep a transient failure from latching
+ * the badge on "Unknown" until the next full reload; a persistently untrusted
+ * or unparsable reply still settles undefined.
+ */
+const BUILD_IDENTITY_RETRY_DELAYS_MS = [250, 1_000, 4_000] as const;
+
 export function useDesktopBuildIdentity(): DesktopBuildIdentity | undefined {
   const api = getRawElectronAPI();
   const bridgeAvailable = typeof api?.getBuildIdentity === 'function';
@@ -240,22 +249,36 @@ export function useDesktopBuildIdentity(): DesktopBuildIdentity | undefined {
   }>();
 
   useEffect(() => {
-    if (!bridgeAvailable || !api?.getBuildIdentity) {
+    const getBuildIdentity = api?.getBuildIdentity;
+    if (!bridgeAvailable || !getBuildIdentity) {
       return;
     }
     let cancelled = false;
-    void api
-      .getBuildIdentity()
-      .then(value => {
-        if (!cancelled) {
-          setResolved({ api, identity: parseDesktopBuildIdentity(value) });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setResolved({ api, identity: undefined });
-      });
+    let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const settle = (identity: DesktopBuildIdentity | undefined): void => {
+      if (cancelled) return;
+      if (
+        identity === undefined &&
+        attempt < BUILD_IDENTITY_RETRY_DELAYS_MS.length
+      ) {
+        retryTimer = setTimeout(run, BUILD_IDENTITY_RETRY_DELAYS_MS[attempt]);
+        attempt += 1;
+        return;
+      }
+      setResolved({ api, identity });
+    };
+    const run = (): void => {
+      void getBuildIdentity()
+        .then(value => settle(parseDesktopBuildIdentity(value)))
+        .catch(() => settle(undefined));
+    };
+    run();
+
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
     };
   }, [api, bridgeAvailable]);
 

@@ -26,8 +26,25 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
-  OnboardingShell: ({ sessionLabel }: { readonly sessionLabel: string }) => (
-    <div data-session-label={sessionLabel} data-testid='onboarding-shell' />
+  OnboardingShell: ({
+    sessionLabel,
+    starterHandoff,
+  }: {
+    readonly sessionLabel: string;
+    readonly starterHandoff?: {
+      readonly kind: string;
+      readonly prompt: string;
+      readonly artistName?: string;
+      readonly spotifyUrl?: string;
+    } | null;
+  }) => (
+    <div
+      data-session-label={sessionLabel}
+      data-starter-handoff={
+        starterHandoff ? JSON.stringify(starterHandoff) : ''
+      }
+      data-testid='onboarding-shell'
+    />
   ),
 }));
 
@@ -162,6 +179,48 @@ describe('/start page', () => {
 
     expect(screen.getByTestId('onboarding-shell')).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('hands an anonymous spotify_artist handoff to the onboarding shell (JOV-6034)', async () => {
+    // The hero's search-select handoff lands on /start pre-auth; the funnel
+    // must accept the params and forward the resolved handoff to the chat.
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+    render(
+      await StartPage({
+        searchParams: Promise.resolve({
+          spotify_url: 'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02',
+          artist_name: 'Taylor Swift',
+          starter_prompt: "hey, I'm Taylor Swift. show me my Spotify.",
+        }),
+      })
+    );
+
+    const shell = screen.getByTestId('onboarding-shell');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(JSON.parse(shell.dataset.starterHandoff ?? '')).toEqual({
+      kind: 'spotify_artist',
+      prompt: "hey, I'm Taylor Swift. show me my Spotify.",
+      spotifyUrl: 'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Taylor Swift',
+    });
+  });
+
+  it('hands a free-text prompt handoff to the onboarding shell', async () => {
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+    render(
+      await StartPage({
+        searchParams: Promise.resolve({
+          starter_prompt: "hey, I'm Michael Jackson. show me my Spotify.",
+        }),
+      })
+    );
+
+    const shell = screen.getByTestId('onboarding-shell');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(JSON.parse(shell.dataset.starterHandoff ?? '')).toEqual({
+      kind: 'prompt',
+      prompt: "hey, I'm Michael Jackson. show me my Spotify.",
+    });
   });
 
   it.each([

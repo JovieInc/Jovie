@@ -1284,7 +1284,7 @@ class TestNullCreatorQueueReceiptProvenance:
         assert f"description=checkpoint=source-qualified;main={'a' * 40};pr=1001" in posted
         assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
 
-    def test_wrong_workflow_receipt_is_automatically_replaced_by_canonical_admission(self, tmp_path: Path) -> None:
+    def test_wrong_workflow_receipt_is_replaced_by_canonical_admission_without_dequeue(self, tmp_path: Path) -> None:
         head = "a" * 40
         prior = _null_creator_status(
             head=head, context="jovie-queue-admission/v2", state="success",
@@ -1302,15 +1302,16 @@ class TestNullCreatorQueueReceiptProvenance:
         )
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=1",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=1",
         ))
         assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
-        assert logs["dequeue"].read_text().splitlines() == ["dequeue"]
-        assert logs["enroll"].read_text().splitlines() == ["1001"]
-        assert "stale or missing exact-checkpoint admission" in result.stdout
+        # JOV-6444 churn fix: an invalid receipt is never dequeue evidence. The
+        # queued member stays queued; recovery only re-stamps when enrollment fires.
+        assert logs["dequeue"].read_text().splitlines() == []
+        assert logs["enroll"].read_text().splitlines() == []
+        assert "canonical dequeue" not in result.stdout
         posted = logs["post"].read_text()
-        assert "context=jovie-queue-admission/v2" in posted
-        assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
+        assert "context=jovie-queue-admission/v2" not in posted
 
     def test_reentry_rejects_a_receipt_written_by_another_bot(
         self, tmp_path: Path
@@ -6406,7 +6407,7 @@ class TestNativeAdmissionReceiptReconciliation:
     def _write_fixture(
         tmp_path: Path,
         *,
-        receipt_main: str,
+        receipt_main: str | None,
         checkpoint: str = "verified",
         receipt_creator: str | None = "jovie-bot[bot]",
         older_receipt_creator: str | None = None,
@@ -6415,6 +6416,7 @@ class TestNativeAdmissionReceiptReconciliation:
         dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
     ) -> tuple[str, Path]:
         head = "c" * 40
+        receipt_main = receipt_main or head
         dequeue_log = tmp_path / "dequeued"
         dequeue_log.write_text("", encoding="utf-8")
         node_calls = tmp_path / "node-calls"
@@ -6458,7 +6460,7 @@ class TestNativeAdmissionReceiptReconciliation:
             else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"{receipt_creator}"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
         )
         plural_statuses = json.loads(status_json)["statuses"]
-        if receipt_creator is None:
+        if plural_statuses and receipt_creator is None:
             plural_statuses[0]["creator"] = None
             plural_statuses[0]["avatar_url"] = _TRUSTED_BOT_AVATAR
             plural_statuses[0]["url"] = f"https://api.github.com/repos/JovieInc/Jovie/statuses/{head}"
@@ -6515,25 +6517,32 @@ class TestNativeAdmissionReceiptReconciliation:
         return head, dequeue_log
 
     @pytest.mark.parametrize(
-        ("receipt_main", "receipt_at", "expected_dequeue"),
+        ("receipt_main", "receipt_at", "receipt_creator"),
         [
-            ("a" * 40, "2026-09-07T12:00:02Z", False),
-            ("a" * 40, "2026-09-07T11:59:59Z", True),
-            ("b" * 40, "2026-09-07T12:00:02Z", False),
-            ("a" * 40, None, True),
+            ("a" * 40, "2026-09-07T12:00:02Z", "jovie-bot[bot]"),
+            ("a" * 40, "2026-09-07T11:59:59Z", "jovie-bot[bot]"),
+            ("b" * 40, "2026-09-07T12:00:02Z", "jovie-bot[bot]"),
+            ("a" * 40, None, "jovie-bot[bot]"),
+            ("a" * 40, "2026-09-07T12:00:02Z", "untrusted-bot[bot]"),
+            (None, None, None),
         ],
     )
-    def test_reconciles_only_fresh_current_checkpoint_receipts(
+    def test_queued_members_are_never_dequeued_for_missing_or_stale_receipts(
         self,
         tmp_path: Path,
-        receipt_main: str,
+        receipt_main: str | None,
         receipt_at: str | None,
-        expected_dequeue: bool,
+        receipt_creator: str | None,
     ) -> None:
+        """JOV-6444 churn fix: the drain must not dequeue a queued member
+        because its admission receipt is stale, unprovable, or absent.
+        GitHub's queue membership stands; only the safety dequeue passes
+        (hard gates, UNMERGEABLE, conflicts) evict members."""
         _, dequeue_log = self._write_fixture(
             tmp_path,
-            receipt_main=receipt_main,
+            receipt_main=receipt_main or "a" * 40,
             receipt_at=receipt_at,
+            receipt_creator=receipt_creator,
         )
 
         result = _run_bash(
@@ -6549,12 +6558,36 @@ class TestNativeAdmissionReceiptReconciliation:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        dequeued = dequeue_log.read_text(encoding="utf-8").splitlines()
-        assert dequeued == (["1001"] if expected_dequeue else [])
-        if expected_dequeue:
-            assert "stale or missing exact-checkpoint admission" in result.stdout
-        else:
-            assert "=fresh exact-checkpoint native admission" in result.stdout
+        assert dequeue_log.read_text(encoding="utf-8") == ""
+        assert "canonical dequeue" not in result.stdout
+        assert "unproven native admission" not in result.stderr
+
+    def test_dequeue_never_fires_on_admission_receipt_evidence(self, tmp_path: Path) -> None:
+        """Pin the removal: no drain pass may consume admission-receipt
+        evidence as dequeue authority, even when the flag is set."""
+        drain = _DRAIN_SCRIPT.read_text(encoding="utf-8")
+        assert "DRAIN_RECONCILE_ADMISSION_RECEIPTS" not in drain
+        assert "canonical dequeue" not in drain
+        assert "unproven native admission" not in drain
+        _, dequeue_log = self._write_fixture(
+            tmp_path,
+            receipt_main="a" * 40,
+            receipt_at="2026-09-07T12:00:02Z",
+        )
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=normal "
+                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=0"
+                ),
+            )
+        )
+        # The removed pass must stay inert even if the env var is still set.
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert dequeue_log.read_text(encoding="utf-8") == ""
 
     @pytest.mark.parametrize("checkpoint", ["source-qualified", "verified", "controller-repair"])
     def test_typed_receipt_survives_main_advance_during_unrelated_deployment(
@@ -6566,19 +6599,18 @@ class TestNativeAdmissionReceiptReconciliation:
         )
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0 DRAIN_PRODUCTION_CHECKPOINT_STATE=none",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0 DRAIN_PRODUCTION_CHECKPOINT_STATE=none",
         ))
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert dequeue_log.read_text(encoding="utf-8") == ""
-        assert "=fresh exact-checkpoint native admission" in result.stdout
 
     @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", "untrusted-bot[bot]"])
-    def test_plural_status_preserves_manual_admission_only_for_canonical_actor(
+    def test_plural_status_preserves_membership_regardless_of_receipt_author(
         self, tmp_path: Path, receipt_creator: str
     ) -> None:
-        # Production's combined endpoint omits creator. The paginated plural
-        # endpoint proves the author even when a manual run executes on main
-        # and admits a different PR head; unknown authors still fail closed.
+        # Receipt authorship is enrollment evidence, never dequeue authority:
+        # an unprovable or foreign-authored receipt must not evict a queued
+        # member (JOV-6444 churn fix).
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="a" * 40,
             receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
@@ -6589,12 +6621,10 @@ class TestNativeAdmissionReceiptReconciliation:
         )
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert dequeue_log.read_text(encoding="utf-8").splitlines() == (
-            [] if receipt_creator == "jovie-bot[bot]" else ["1001"]
-        )
+        assert dequeue_log.read_text(encoding="utf-8") == ""
 
     @pytest.mark.parametrize("overrides", [
         {"name": "Queue-Deferred Release", "path": ".github/workflows/queue-deferred-release.yml"},
@@ -6606,21 +6636,20 @@ class TestNativeAdmissionReceiptReconciliation:
         {"repository": {"full_name": "other/repository"}},
         {"event": "schedule"},
     ])
-    def test_reconciler_removes_bot_receipt_with_untrusted_producer(self, tmp_path: Path, overrides: dict) -> None:
+    def test_untrusted_receipt_producer_preserves_membership(self, tmp_path: Path, overrides: dict) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="a" * 40, receipt_at="2026-09-07T12:00:02Z",
         )
         (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
         assert result.returncode == 0, result.stderr
-        assert dequeue_log.read_text().splitlines() == ["1001"]
-        assert "stale or missing exact-checkpoint admission" in result.stdout
+        assert dequeue_log.read_text() == ""
 
     @pytest.mark.parametrize("conclusion", ["success", "cancelled", "failure"])
-    def test_reconciler_preserves_canonical_receipt_before_producer_ended(self, tmp_path: Path, conclusion: str) -> None:
+    def test_membership_survives_producer_completion_state(self, tmp_path: Path, conclusion: str) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="b" * 40, receipt_at="2026-09-07T12:00:02Z",
         )
@@ -6629,11 +6658,10 @@ class TestNativeAdmissionReceiptReconciliation:
         }))
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
         assert result.returncode == 0, result.stderr
         assert dequeue_log.read_text() == ""
-        assert "=fresh exact-checkpoint native admission" in result.stdout
 
     @pytest.mark.parametrize("failure_marker", ["producer-api-failure", "producer-malformed", "statuses-api-failure", "statuses-malformed"])
     def test_reconciler_preserves_membership_when_producer_evidence_is_unavailable(self, tmp_path: Path, failure_marker: str) -> None:
@@ -6643,10 +6671,11 @@ class TestNativeAdmissionReceiptReconciliation:
         (tmp_path / failure_marker).touch()
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
-        assert result.returncode != 0
-        assert "preserving membership" in result.stderr
+        # JOV-6444 churn fix: receipt-evidence outages no longer abort the drain
+        # or evict the member; membership is preserved unconditionally.
+        assert result.returncode == 0, result.stderr
         assert dequeue_log.read_text() == ""
         assert "enroll" not in (tmp_path / "node-calls").read_text().splitlines()
 
@@ -6661,10 +6690,9 @@ class TestNativeAdmissionReceiptReconciliation:
             (tmp_path / failure_marker).touch()
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
-        assert result.returncode != 0
-        assert "preserving membership" in result.stderr
+        assert result.returncode == 0, result.stderr
         assert dequeue_log.read_text() == ""
 
     @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", None])
@@ -6681,15 +6709,12 @@ class TestNativeAdmissionReceiptReconciliation:
         (tmp_path / "producer-overrides.json").write_text(json.dumps(overrides))
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
-            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_MISSED_ADMISSION=0",
         ))
-        assert result.returncode != 0
-        assert "preserving membership" in result.stderr
+        assert result.returncode == 0, result.stderr
         assert dequeue_log.read_text() == ""
 
-    def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
-        self, tmp_path: Path
-    ) -> None:
+    def test_stale_receipt_never_triggers_dequeue_or_enroll(self, tmp_path: Path) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path,
             receipt_main="a" * 40,
@@ -6706,21 +6731,20 @@ class TestNativeAdmissionReceiptReconciliation:
                 backend="native",
                 extra_env=(
                     "DRAIN_PROMOTION_MODE=normal "
-                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 "
                     "DRAIN_RECONCILE_MISSED_ADMISSION=0"
                 ),
             )
         )
 
-        assert result.returncode != 0
-        assert dequeue_log.read_text(encoding="utf-8").splitlines() == ["1001"]
-        assert "stale dequeue suppressed" in result.stdout
-        assert "Failed to remove unproven native admission" in result.stderr
+        # JOV-6444 churn fix: a stale receipt is not dequeue evidence. The
+        # drain neither evicts the member nor re-enrolls it behind its back.
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert dequeue_log.read_text(encoding="utf-8") == ""
         node_commands = (tmp_path / "node-calls").read_text(encoding="utf-8").splitlines()
         assert "enroll" not in node_commands
         assert "record-reentry" not in node_commands
 
-    def test_missing_enqueue_timestamp_stops_before_mutation(self, tmp_path: Path) -> None:
+    def test_missing_enqueue_timestamp_preserves_queued_membership(self, tmp_path: Path) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path,
             receipt_main="a" * 40,
@@ -6732,15 +6756,13 @@ class TestNativeAdmissionReceiptReconciliation:
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=(
-                    "DRAIN_PROMOTION_MODE=normal "
-                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1"
-                ),
+                extra_env="DRAIN_PROMOTION_MODE=normal",
             )
         )
 
-        assert result.returncode == 1
-        assert "no authoritative enqueue timestamp" in result.stderr
+        # JOV-6444 churn fix: a missing enqueue timestamp is an observation gap,
+        # never an eviction trigger. No admission mutation fires.
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert dequeue_log.read_text(encoding="utf-8") == ""
 
 

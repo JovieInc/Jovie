@@ -3407,6 +3407,81 @@ PY
         self.assertIn("Do not add the queue-deferred label", text)
         self.assertIn("Native merge-queue autoenroll is the hold", text)
 
+    def test_grok_ship_one_stale_release_promotes_from_issue_workspace(self):
+        """JOV-5992: releases predating packaged promotion helpers resolved
+        SOURCE_ROOT to the install state dir; the helpers live in the exact
+        issue workspace checkout instead."""
+        created = self.root / "pr-created"
+        prompt_capture = self.root / "grok-prompt.txt"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo "[]";;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'if [ "$1" = clone ]; then\n'
+            '  mkdir -p "$5/.git" "$5/scripts/lib"\n'
+            '  cp "$REAL_SCRIPTS/writer-owned-pr-promote.sh" "$5/scripts/"\n'
+            '  cp "$REAL_SCRIPTS/lib/writer-owned-pr-promotion.mjs" "$5/scripts/lib/"\n'
+            '  cp "$REAL_SCRIPTS/lib/upsert-pr-comment.sh" "$5/scripts/lib/"\n'
+            'fi\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") [ ! -f "$GROK_CREATED" ]'
+            ' && printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n"'
+            ' || printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'printf "%s\\n" "$@" > "$GROK_PROMPT"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        runtime = self.install_runtime()
+        release = (runtime / ".symphony-codex-auth-fallback/current").resolve()
+        for name in (
+            "writer-owned-pr-promote.sh",
+            "writer-owned-pr-promotion.mjs",
+            "upsert-pr-comment.sh",
+        ):
+            (release / name).unlink()
+        result = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_PROMPT=prompt_capture,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                REAL_SCRIPTS=ROOT / "scripts",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        workspace = self.root / "workspaces/JOV/JOV-7"
+        prompt = prompt_capture.read_text()
+        self.assertIn(f"{workspace}/scripts/writer-owned-pr-promote.sh", prompt)
+        self.assertNotIn(".symphony-codex-auth-fallback/scripts", prompt)
+        # The promotion decision runs `node $PROMOTION_LIB`; promotion=complete
+        # proves the lib resolved inside the workspace too.
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("promotion=complete", log)
+        completion = json.loads(
+            (self.root / "fallback-receipts/completions" / f"JOV-7-{'b' * 40}.json").read_text()
+        )
+        self.assertEqual(completion["schema"], "symphony-fallback-result/v1")
+        self.assertEqual(completion["headSha"], "b" * 40)
+
     def test_grok_ship_one_skips_existing_grok_prefix_pr(self):
         self.command(
             "gh",

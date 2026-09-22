@@ -145,6 +145,11 @@ const {
         path: string | undefined,
         values: readonly string[]
       ) => void;
+      readonly assertBrowserCookieOriginBoundaryImpl?: (
+        browser: unknown,
+        targetUrl: URL,
+        cookies: readonly unknown[]
+      ) => Promise<void>;
     }
   ) => Promise<void>;
   readonly primeLighthouseVercelBypass: (
@@ -307,6 +312,116 @@ describe('origin-bound Vercel protection bypass', () => {
         { name: '__unknown_dynamic_cookie', value: '1' },
       ])
     ).toEqual(['audience-cookie-value', '1']);
+  });
+
+  it('writes a zero-state receipt when staging alias bypass returns only public metadata cookies', async () => {
+    const aliasOrigin = 'https://staging.jov.ie';
+    const aliasBuildInfoUrl = `${aliasOrigin}/api/health/build-info`;
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 307,
+          url: aliasBuildInfoUrl,
+          location: aliasBuildInfoUrl,
+          setCookies: [
+            'jv_country=US; Path=/; Secure; HttpOnly; SameSite=Lax',
+            'jv_cc_required=1; Path=/; Secure; HttpOnly; SameSite=Lax',
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 200,
+          url: aliasBuildInfoUrl,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            buildId: 'staging-candidate',
+            commitSha: EXPECTED_SHA,
+            environment: 'preview',
+          }),
+        })
+      );
+    const { browser } = browserFixture();
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-alias-receipt-'));
+    const receiptPath = join(directory, 'sensitive-values');
+    try {
+      await primeLighthouseVercelAliasBypass(
+        browser,
+        { url: aliasOrigin },
+        {
+          fetchImpl,
+          bypassSecret: 'sentinel-secret',
+          expectedCommitSha: EXPECTED_SHA,
+          expectedAliasOrigin: aliasOrigin,
+          expectedEnvironment: 'preview',
+          sensitiveValuesPath: receiptPath,
+          assertBrowserCookieOriginBoundaryImpl: vi
+            .fn()
+            .mockResolvedValue(undefined),
+        }
+      );
+      expect(readFileSync(receiptPath, 'utf8')).toBe(
+        `${ZERO_DYNAMIC_SECRET_RECEIPT}\n`
+      );
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+
+  it('still records unknown short alias cookies so the guard fails closed', async () => {
+    const aliasOrigin = 'https://staging.jov.ie';
+    const aliasBuildInfoUrl = `${aliasOrigin}/api/health/build-info`;
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 307,
+          url: aliasBuildInfoUrl,
+          location: aliasBuildInfoUrl,
+          setCookies: [
+            'jv_country=US; Path=/; Secure; HttpOnly; SameSite=Lax',
+            'jv_cc_required=1; Path=/; Secure; HttpOnly; SameSite=Lax',
+            'x_track=ab; Path=/; Secure; HttpOnly; SameSite=Lax',
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 200,
+          url: aliasBuildInfoUrl,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            buildId: 'staging-candidate',
+            commitSha: EXPECTED_SHA,
+            environment: 'preview',
+          }),
+        })
+      );
+    const { browser } = browserFixture();
+    const recordSensitiveValuesImpl = vi.fn();
+
+    await primeLighthouseVercelAliasBypass(
+      browser,
+      { url: aliasOrigin },
+      {
+        fetchImpl,
+        bypassSecret: 'sentinel-secret',
+        expectedCommitSha: EXPECTED_SHA,
+        expectedAliasOrigin: aliasOrigin,
+        expectedEnvironment: 'preview',
+        sensitiveValuesPath: '/runner-temp/lighthouse-sensitive-values',
+        recordSensitiveValuesImpl,
+        assertBrowserCookieOriginBoundaryImpl: vi
+          .fn()
+          .mockResolvedValue(undefined),
+      }
+    );
+
+    expect(recordSensitiveValuesImpl).toHaveBeenCalledWith(
+      '/runner-temp/lighthouse-sensitive-values',
+      ['ab']
+    );
   });
 
   it('never attaches the bypass credential to canonical production', () => {
@@ -1471,45 +1586,43 @@ describe('origin-bound Vercel protection bypass', () => {
       body: '',
       error: 'Signup returned HTTP 204',
     },
-  ])('rejects a $label in the shared semantic public-surface verifier', async ({
-    failingPath,
-    status,
-    body,
-    error,
-  }) => {
-    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
-    const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
-      const url = new URL(rawUrl);
-      const isFailure = url.pathname === failingPath;
-      const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
-      const responseBody = isFailure
-        ? body
-        : isHealth
-          ? HEALTHY_DEPLOY_PAYLOAD
-          : html;
-      return {
-        status: isFailure ? status : 200,
-        url: url.href,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type'
-              ? isHealth
-                ? 'application/json'
-                : 'text/html; charset=utf-8'
-              : null,
-        },
-        text: vi.fn().mockResolvedValue(responseBody),
-      };
-    });
+  ])(
+    'rejects a $label in the shared semantic public-surface verifier',
+    async ({ failingPath, status, body, error }) => {
+      const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+      const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
+        const url = new URL(rawUrl);
+        const isFailure = url.pathname === failingPath;
+        const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
+        const responseBody = isFailure
+          ? body
+          : isHealth
+            ? HEALTHY_DEPLOY_PAYLOAD
+            : html;
+        return {
+          status: isFailure ? status : 200,
+          url: url.href,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type'
+                ? isHealth
+                  ? 'application/json'
+                  : 'text/html; charset=utf-8'
+                : null,
+          },
+          text: vi.fn().mockResolvedValue(responseBody),
+        };
+      });
 
-    await expect(
-      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
-        cookieHeader: '__vercel_live_token=opaque-cookie',
-        fetchImpl,
-        attempts: 1,
-      })
-    ).rejects.toThrow(error);
-  });
+      await expect(
+        verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+          cookieHeader: '__vercel_live_token=opaque-cookie',
+          fetchImpl,
+          attempts: 1,
+        })
+      ).rejects.toThrow(error);
+    }
+  );
 
   it('accepts a healthy profile whose inline flight payload serializes the not-found boundary', async () => {
     // Next.js embeds the route's not-found template inside the RSC flight

@@ -1181,8 +1181,15 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
-    expect(enroll).toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS:');
     expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
+    // Dequeue-on-unproven-receipt reconciliation was removed (JOV-6444 churn):
+    // the drain must never consume admission-receipt evidence as dequeue
+    // authority. The legacy DRAIN_RECONCILE_ADMISSION_RECEIPTS env may still be
+    // wired in the workflow until a workflows-authorized writer removes it; the
+    // drain treats it as inert.
+    expect(drain).not.toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS');
+    expect(drain).not.toContain('canonical dequeue');
+    expect(drain).not.toContain('unproven native admission');
     expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
     expect(enroll).toContain(
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
@@ -1270,7 +1277,6 @@ describe('queue workflow mutation safety', () => {
     );
     for (const name of [
       'DRAIN_RECONCILE_QUEUE_REENTRY',
-      'DRAIN_RECONCILE_ADMISSION_RECEIPTS',
       'DRAIN_RECONCILE_MISSED_ADMISSION',
     ]) {
       const expression = workflow

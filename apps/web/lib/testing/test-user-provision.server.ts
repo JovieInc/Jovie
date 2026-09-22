@@ -752,14 +752,21 @@ export async function invalidateTestUserCaches(
     }
   }
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 
   if (!url || !token) {
     return;
   }
 
-  const redis = new Redis({ url, token });
+  let redis: Redis;
+  try {
+    redis = new Redis({ url, token });
+  } catch {
+    // Upstash throws on non-https/malformed URLs; admin cache invalidation is
+    // best-effort, so unparseable config is treated as "not configured".
+    return;
+  }
 
   for (const clerkId of clerkIds) {
     await redis.del(`admin:role:${clerkId}`);
