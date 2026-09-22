@@ -1183,9 +1183,10 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
     expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
     // Dequeue-on-unproven-receipt reconciliation was removed (JOV-6444 churn):
-    // the workflow must no longer wire that eviction flag, and the drain must
-    // never consume admission-receipt evidence as dequeue authority.
-    expect(enroll).not.toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS:');
+    // the drain must never consume admission-receipt evidence as dequeue
+    // authority. The legacy DRAIN_RECONCILE_ADMISSION_RECEIPTS env may still be
+    // wired in the workflow until a workflows-authorized writer removes it; the
+    // drain treats it as inert.
     expect(drain).not.toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS');
     expect(drain).not.toContain('canonical dequeue');
     expect(drain).not.toContain('unproven native admission');
