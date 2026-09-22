@@ -274,7 +274,7 @@
     "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/*.test.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@biomejs/biome": "^2.5.14",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
