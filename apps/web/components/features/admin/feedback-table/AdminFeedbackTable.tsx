@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -15,12 +14,12 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   rowState,
-  TableEmptyState,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
@@ -30,6 +29,7 @@ import {
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useDismissFeedbackMutation } from '@/lib/queries';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import {
   buildFeedbackActions,
   feedbackActionsToContextMenuItems,
@@ -227,36 +227,38 @@ function AdminFeedbackDetailPanel({
       emptyMessage='Select a feedback row to view details.'
       entityHeader={
         selected ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
-            <EntityHeaderCard
-              eyebrow='Feedback'
-              title={getFeedbackUserLabel(selected.user)}
-              subtitle={selected.user.email ?? 'No email available'}
-              meta={
-                <div className='space-y-1 text-xs leading-4 text-secondary-token'>
-                  <p>
-                    Source: {selected.source} ·{' '}
-                    {new Date(selected.createdAtIso).toLocaleString()}
-                  </p>
-                  <p className='text-tertiary-token'>
-                    {selected.status === 'dismissed'
-                      ? formatDismissedLabel(selected.dismissedAtIso)
-                      : 'Marked as pending'}
-                  </p>
-                </div>
-              }
-              actions={
-                <DrawerCardActionBar
-                  primaryActions={[]}
-                  overflowActions={selectedActions}
-                  onClose={onClose}
-                  overflowTriggerPlacement='card-top-right'
-                  overflowTriggerIcon='vertical'
-                  className='border-0 bg-transparent px-0 py-0'
-                />
-              }
-              bodyClassName='pr-9'
-            />
+          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+            <div className='p-3.5'>
+              <EntityHeaderCard
+                eyebrow='Feedback'
+                title={getFeedbackUserLabel(selected.user)}
+                subtitle={selected.user.email ?? 'No email available'}
+                meta={
+                  <div className='space-y-1 text-xs leading-4 text-secondary-token'>
+                    <p>
+                      Source: {selected.source} ·{' '}
+                      {new Date(selected.createdAtIso).toLocaleString()}
+                    </p>
+                    <p className='text-tertiary-token'>
+                      {selected.status === 'dismissed'
+                        ? formatDismissedLabel(selected.dismissedAtIso)
+                        : 'Marked as pending'}
+                    </p>
+                  </div>
+                }
+                actions={
+                  <DrawerCardActionBar
+                    primaryActions={[]}
+                    overflowActions={selectedActions}
+                    onClose={onClose}
+                    overflowTriggerPlacement='card-top-right'
+                    overflowTriggerIcon='vertical'
+                    className='border-0 bg-transparent px-0 py-0'
+                  />
+                }
+                bodyClassName='pr-9'
+              />
+            </div>
           </DrawerSurfaceCard>
         ) : undefined
       }
@@ -470,20 +472,22 @@ export function AdminFeedbackTable({
             onFocusedRowChange={handleFocusedRowChange}
             getContextMenuItems={getContextMenuItems}
             emptyState={
-              <TableEmptyState
-                icon={
-                  <MessageSquareText className='h-5 w-5' aria-hidden='true' />
-                }
-                heading={
-                  loadError ? 'Feedback unavailable' : 'No feedback found'
-                }
-                description={
-                  loadError
-                    ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
-                    : 'New feedback will appear here once users submit it.'
-                }
-                className='min-h-55 rounded-none border-x-0 border-b-0 shadow-none'
-              />
+              <div className='flex min-h-55 flex-1 flex-col items-center justify-center border-t border-subtle bg-surface-0 px-4 py-6 text-center'>
+                <EmptyState
+                  icon={
+                    <MessageSquareText className='h-5 w-5' aria-hidden='true' />
+                  }
+                  heading={
+                    loadError ? 'Feedback unavailable' : 'No feedback found'
+                  }
+                  description={
+                    loadError
+                      ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
+                      : 'New feedback will appear here once users submit it.'
+                  }
+                  className='py-4'
+                />
+              </div>
             }
           />
         )}

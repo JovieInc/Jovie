@@ -1,11 +1,12 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  type ColumnDef,
   createColumnHelper,
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+} from '@/lib/tanstack-table';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 
 type Row = { id: string; title: string; count: number };
@@ -21,7 +22,7 @@ function Harness({
   initialSort?: { id: string; desc: boolean }[];
   semanticOnlyActions?: boolean;
 }) {
-  const columns = [
+  const columns: ColumnDef<Row, any>[] = [
     columnHelper.accessor('title', {
       header: 'Title',
       enableSorting: true,

@@ -4,7 +4,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
+} from '@/lib/tanstack-table';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 
 type Row = { id: string; title: string; count: number };

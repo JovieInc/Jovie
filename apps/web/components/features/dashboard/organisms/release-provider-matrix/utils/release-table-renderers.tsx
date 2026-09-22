@@ -1,6 +1,5 @@
 'use client';
 
-import type { CellContext } from '@tanstack/react-table';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -23,6 +22,7 @@ import {
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import type { CellContext } from '@/lib/tanstack-table';
 
 export function createReleaseCellRenderer(
   artistName: string | null | undefined,
@@ -31,7 +31,7 @@ export function createReleaseCellRenderer(
 ) {
   return function ReleaseCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     if (designV1) {
       return (
         <div className='flex min-w-0 items-center gap-2.5'>
@@ -70,7 +70,7 @@ export function createExpandableReleaseCellRenderer(
 ) {
   return function ExpandableReleaseCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     const release = row.original;
     const expanded = isExpanded(release.id);
     const loading = isLoading(release.id);

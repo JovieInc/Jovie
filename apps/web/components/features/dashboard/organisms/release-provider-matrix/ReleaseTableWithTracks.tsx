@@ -1,12 +1,12 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
 import { MobileReleaseListLazy } from './MobileReleaseListLazy';
@@ -269,12 +269,13 @@ export function ReleaseTableWithTracks({
   if (isMobile) {
     if (releases.length === 0) {
       return (
-        <TableEmptyState
-          icon={<Icon name='Disc3' className='h-6 w-6' />}
-          heading='No releases found'
-          description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='system-b-release-table-empty-state mx-4 my-3'
-        />
+        <div className='system-b-release-table-empty-state mx-4 my-3 flex flex-col'>
+          <TableEmptyState
+            icon={<Icon name='Disc3' className='h-6 w-6' />}
+            heading='No releases found'
+            description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
+          />
+        </div>
       );
     }
 
@@ -328,12 +329,13 @@ export function ReleaseTableWithTracks({
       renderExpandedContent={renderExpandedContent}
       getExpandableRowId={getExpandableRowId}
       emptyState={
-        <TableEmptyState
-          icon={<Icon name='Disc3' className='h-6 w-6' />}
-          heading='No releases found'
-          description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='system-b-release-table-empty-state m-3'
-        />
+        <div className='system-b-release-table-empty-state m-3 flex flex-col'>
+          <TableEmptyState
+            icon={<Icon name='Disc3' className='h-6 w-6' />}
+            heading='No releases found'
+            description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
+          />
+        </div>
       }
     />
   );

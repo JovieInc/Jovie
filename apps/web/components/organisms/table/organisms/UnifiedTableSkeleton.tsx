@@ -1,9 +1,9 @@
 'use client';
 
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, RowData } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
 
-export interface UnifiedTableSkeletonProps<TData> {
+export interface UnifiedTableSkeletonProps<TData extends RowData> {
   /**
    * Column definitions (TanStack Table format).
    *
@@ -86,7 +86,7 @@ export interface UnifiedTableSkeletonProps<TData> {
  * <UnifiedTable columns={ACTIVITY_COLUMNS} data={items} />
  * ```
  */
-export function UnifiedTableSkeleton<TData>({
+export function UnifiedTableSkeleton<TData extends RowData>({
   columns,
   skeletonRows = 20,
   skeletonColumnConfig,

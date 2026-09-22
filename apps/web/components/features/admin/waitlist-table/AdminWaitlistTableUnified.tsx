@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from '@/components/feedback';
@@ -12,6 +11,7 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
@@ -79,7 +79,9 @@ export function AdminWaitlistTableUnified({
 
   // Row selection state for TanStack Table
   const rowSelection = useMemo(() => {
-    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+    return Object.fromEntries(
+      Array.from(selectedIds).map(id => [id, true as const])
+    );
   }, [selectedIds]);
 
   // Refs for selection state to avoid column recreation on every selection change

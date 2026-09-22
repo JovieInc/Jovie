@@ -3,13 +3,13 @@
 // @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
 
 import { Button, Input, Switch } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { OutreachStatusBadge } from './OutreachStatusBadge';
 

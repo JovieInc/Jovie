@@ -13,7 +13,6 @@ import {
   Button,
   Textarea,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,6 +51,7 @@ import {
 import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
   type BuildAdminUserActionsCallbacks,
@@ -172,6 +172,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { setTableMeta } = useTableMeta();
   const { setHeaderActions } = useSetHeaderActions();
   const usersRef = useRef(users);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   usersRef.current = users;
 
   const handleRowClick = useCallback((user: AdminUserRow) => {
@@ -227,13 +228,17 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // TanStack Table row selection state
   const rowSelection = useMemo(() => {
-    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+    return Object.fromEntries(
+      Array.from(selectedIds).map(id => [id, true as const])
+    );
   }, [selectedIds]);
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   // Ban dialog state
@@ -439,11 +444,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Create memoized cell renderers using refs to avoid column recreation on selection change
   const SelectHeader = useMemo(
+    // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
     () => createSelectHeaderRenderer(headerCheckboxStateRef, toggleSelectAll),
     [toggleSelectAll]
   );
 
   const SelectCell = useMemo(
+    // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
     () => createSelectCellRenderer(selectedIdsRef, toggleSelect),
     [toggleSelect]
   );

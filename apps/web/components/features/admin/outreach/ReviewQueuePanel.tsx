@@ -3,11 +3,6 @@
 // @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
 
 import { Badge, Spinner as LoadingSpinner } from '@jovie/ui';
-import {
-  type CellContext,
-  type ColumnDef,
-  createColumnHelper,
-} from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -17,6 +12,11 @@ import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@/lib/tanstack-table';
 
 interface ReviewLead {
   id: string;
@@ -66,7 +66,6 @@ function ReviewLeadActions({ id, isSkipping, onSkip }: ReviewLeadActionsProps) {
         onSkip(id).catch(() => {});
       }}
       disabled={isSkipping}
-      className='h-8 px-3 text-xs'
     >
       {isSkipping ? (
         <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
@@ -154,11 +153,7 @@ function createReviewQueueColumns(
             ([key, value]) =>
               value &&
               SIGNAL_CONFIG[key] && (
-                <Badge
-                  key={key}
-                  variant={SIGNAL_CONFIG[key].variant}
-                  className='text-2xs'
-                >
+                <Badge key={key} variant={SIGNAL_CONFIG[key].variant}>
                   {SIGNAL_CONFIG[key].label}
                 </Badge>
               )

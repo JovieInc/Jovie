@@ -1,7 +1,7 @@
 'use client';
 
 import { Checkbox } from '@jovie/ui';
-import type { Row, Table } from '@tanstack/react-table';
+import type { Row, RowData, Table } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
@@ -22,7 +22,9 @@ export interface TableCheckboxCellLegacyProps {
 }
 
 // TanStack Table props (recommended)
-export interface TableCheckboxCellTanStackProps<TData = unknown> {
+export interface TableCheckboxCellTanStackProps<
+  TData extends RowData = RowData,
+> {
   readonly table?: Table<TData>;
   readonly row?: Row<TData>;
   readonly rowNumber?: number;
@@ -32,11 +34,11 @@ export interface TableCheckboxCellTanStackProps<TData = unknown> {
   readonly onToggleSelectAll?: () => void;
 }
 
-export type TableCheckboxCellProps<TData = unknown> =
+export type TableCheckboxCellProps<TData extends RowData = RowData> =
   | TableCheckboxCellLegacyProps
   | TableCheckboxCellTanStackProps<TData>;
 
-function isLegacyProps<TData = unknown>(
+function isLegacyProps<TData extends RowData = RowData>(
   props: TableCheckboxCellProps<TData>
 ): props is TableCheckboxCellLegacyProps {
   return 'checked' in props && 'onChange' in props;
@@ -220,7 +222,7 @@ function LegacyCheckboxCell({
  *   ),
  * })
  */
-export function TableCheckboxCell<TData = unknown>(
+export function TableCheckboxCell<TData extends RowData = RowData>(
   props: TableCheckboxCellProps<TData>
 ) {
   // Legacy mode
