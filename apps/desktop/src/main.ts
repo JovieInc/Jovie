@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   clipboard,
   desktopCapturer,
+  type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
@@ -69,6 +70,7 @@ import {
   getHudBuildFingerprint,
   isHudRoutePath,
 } from './hud-build-reload';
+import { resolveIpcSenderUrl } from './ipc-sender';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
@@ -436,8 +438,19 @@ async function openExternalUrl(
   }
 }
 
-function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
-  return event.senderFrame?.url ?? event.sender.getURL();
+function getIpcSenderUrl(event: IpcMainEvent | IpcMainInvokeEvent): string {
+  const senderFrame = event.senderFrame;
+  return resolveIpcSenderUrl(
+    senderFrame == null
+      ? null
+      : {
+          url: senderFrame.url,
+          detached: senderFrame.detached,
+          // parent is null only for the webContents' root frame.
+          isMainFrame: senderFrame.parent === null,
+        },
+    event.sender.getURL()
+  );
 }
 
 function isTrustedIpcSender(event: IpcMainInvokeEvent): boolean {
@@ -2500,7 +2513,7 @@ ipcMain.handle(
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
 ipcMain.on(APP_BOOTED_CHANNEL, event => {
-  const parsed = parseUrl(event.senderFrame?.url ?? event.sender.getURL());
+  const parsed = parseUrl(getIpcSenderUrl(event));
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
   if (process.platform === 'darwin' && !summerRuntimeBridge) {

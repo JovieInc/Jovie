@@ -217,6 +217,7 @@ apps/desktop/src/*
 !apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/build-identity.ts
 !apps/desktop/src/bounded-process.ts
+!apps/desktop/src/ipc-sender.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs

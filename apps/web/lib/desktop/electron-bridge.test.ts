@@ -14,8 +14,13 @@
  * regression cannot return.
  */
 
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { __testing, isDesktopEnvironment } from './electron-bridge';
+import {
+  __testing,
+  isDesktopEnvironment,
+  useDesktopBuildIdentity,
+} from './electron-bridge';
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: vi.fn().mockResolvedValue(undefined),
@@ -526,5 +531,82 @@ describe('electron-bridge — defensive guards', () => {
       expect(typeof unsub).toBe('function');
       expect(() => unsub()).not.toThrow();
     });
+  });
+});
+
+/**
+ * JOV-5996: the identity handoff is a single invoke that runs while a cold
+ * relaunch is mid-way through the splash → hosted swap; a transiently dropped
+ * or rejected invoke must not latch the titlebar on "Unknown". Bounded retries
+ * let the trusted reply land while a persistently untrusted reply still
+ * settles to undefined.
+ */
+describe('useDesktopBuildIdentity — build-identity handoff', () => {
+  const verifiedIdentity = {
+    channel: 'production',
+    version: '26.9.1',
+    sourceRevision: 'a'.repeat(40),
+    builtAt: '2026-09-09T00:00:00.000Z',
+    provenance: 'verified' as const,
+  };
+
+  it('resolves the verified identity from a trusted invoke', async () => {
+    setElectronAPI({
+      getBuildIdentity: vi.fn().mockResolvedValue(verifiedIdentity),
+    });
+    const { result } = renderHook(() => useDesktopBuildIdentity());
+    await waitFor(() => expect(result.current).toEqual(verifiedIdentity));
+  });
+
+  it('recovers when the first invoke is dropped mid-handoff', async () => {
+    vi.useFakeTimers();
+    try {
+      const getBuildIdentity = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('frame was detached'))
+        .mockResolvedValue(verifiedIdentity);
+      setElectronAPI({ getBuildIdentity });
+      const { result } = renderHook(() => useDesktopBuildIdentity());
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current).toBeUndefined();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      expect(result.current).toEqual(verifiedIdentity);
+      expect(getBuildIdentity).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles to undefined after bounded retries when the reply stays untrusted', async () => {
+    vi.useFakeTimers();
+    try {
+      const getBuildIdentity = vi.fn().mockResolvedValue(null);
+      setElectronAPI({ getBuildIdentity });
+      const { result } = renderHook(() => useDesktopBuildIdentity());
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      expect(result.current).toBeUndefined();
+      // Initial call + bounded retries — then it gives up.
+      expect(getBuildIdentity).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stays undefined when the bridge lacks getBuildIdentity (stale binary)', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    const { result } = renderHook(() => useDesktopBuildIdentity());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current).toBeUndefined();
   });
 });
