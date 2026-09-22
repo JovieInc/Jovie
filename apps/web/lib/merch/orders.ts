@@ -26,6 +26,10 @@ import {
   resolveReleaseWorkflowRunIdForMerchCard,
 } from '@/lib/release-to-revenue/gmv-attribution';
 import { stripe } from '@/lib/stripe/client';
+import {
+  getStripeConnectReadiness,
+  isStripeConnectChargesReady,
+} from '@/lib/stripe/connect-readiness';
 import { logger } from '@/lib/utils/logger';
 import {
   isPriorMerchSaleStatus,
@@ -211,6 +215,15 @@ export async function createMerchCheckoutSession(
     throw new Error('Merch item is not available');
   }
   assertMerchCardCheckoutSellable(row.card);
+
+  // Fail closed: never open a checkout session unless the creator's Stripe
+  // Connect account can accept charges right now.
+  const connectReadiness = row.profile.stripeAccountId
+    ? await getStripeConnectReadiness(row.profile.stripeAccountId)
+    : null;
+  if (!isStripeConnectChargesReady(connectReadiness)) {
+    throw new Error('connect-not-ready');
+  }
 
   const variantId = resolveVariantId(
     row.card.printful.variantMap,

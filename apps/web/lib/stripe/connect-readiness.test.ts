@@ -49,9 +49,11 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: hoisted.captureWarning,
 }));
 
-const { getStripeConnectReadiness, STRIPE_CONNECT_CACHE_TTL_MS } = await import(
-  './connect-readiness'
-);
+const {
+  getStripeConnectReadiness,
+  isStripeConnectChargesReady,
+  STRIPE_CONNECT_CACHE_TTL_MS,
+} = await import('./connect-readiness');
 
 const FRESH_ROW = {
   id: 'profile_1',
@@ -161,5 +163,47 @@ describe('getStripeConnectReadiness', () => {
     expect(result?.payoutsEnabled).toBe(true); // pre-failure cached value
     expect(hoisted.captureWarning).toHaveBeenCalledTimes(1);
     expect(hoisted.dbUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('isStripeConnectChargesReady', () => {
+  const ready = {
+    stripeAccountId: 'acct_1',
+    chargesEnabled: true,
+    payoutsEnabled: true,
+    detailsSubmitted: true,
+    onboardingComplete: true,
+    payoutEmail: null,
+    lastSyncedAt: new Date(),
+    source: 'stripe' as const,
+  };
+
+  it('returns false when readiness is null (no linked account/profile)', () => {
+    expect(isStripeConnectChargesReady(null)).toBe(false);
+  });
+
+  it.each(['cache', 'stripe'] as const)(
+    'returns true when all flags are enabled from a %s source',
+    source => {
+      expect(isStripeConnectChargesReady({ ...ready, source })).toBe(true);
+    }
+  );
+
+  it.each(['chargesEnabled', 'payoutsEnabled', 'detailsSubmitted'] as const)(
+    'returns false when %s is false',
+    flag => {
+      expect(isStripeConnectChargesReady({ ...ready, [flag]: false })).toBe(
+        false
+      );
+    }
+  );
+
+  it('fails closed on cache-stale-stripe-failed even when stale flags look enabled', () => {
+    expect(
+      isStripeConnectChargesReady({
+        ...ready,
+        source: 'cache-stale-stripe-failed',
+      })
+    ).toBe(false);
   });
 });

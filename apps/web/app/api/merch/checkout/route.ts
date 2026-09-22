@@ -80,6 +80,12 @@ export async function POST(request: Request) {
         { status: 409, headers: NO_STORE_HEADERS }
       );
     }
+    if (error instanceof Error && error.message.includes('connect-not-ready')) {
+      return NextResponse.json(
+        { error: 'This creator is not ready to accept payments yet.' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
       { status: 500, headers: NO_STORE_HEADERS }

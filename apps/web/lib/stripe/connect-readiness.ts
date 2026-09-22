@@ -63,6 +63,25 @@ function rowToReadiness(
 }
 
 /**
+ * Fail-closed policy for charge-taking surfaces (merch checkout, the
+ * release-to-revenue selling step). Ready only when the account reports
+ * charges + payouts enabled and onboarding details submitted from a trusted
+ * source — a `cache-stale-stripe-failed` result means the flags could not be
+ * re-verified, so it fails closed even if the stale flags looked enabled.
+ */
+export function isStripeConnectChargesReady(
+  readiness: StripeConnectReadiness | null
+): boolean {
+  return (
+    readiness !== null &&
+    readiness.source !== 'cache-stale-stripe-failed' &&
+    readiness.chargesEnabled &&
+    readiness.payoutsEnabled &&
+    readiness.detailsSubmitted
+  );
+}
+
+/**
  * Read Stripe Connect readiness from the DB cache. Falls back to Stripe and
  * writes through when the cache is empty or older than `ttlMs`.
  *
