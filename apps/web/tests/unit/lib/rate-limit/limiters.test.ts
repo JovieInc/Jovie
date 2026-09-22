@@ -86,6 +86,30 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 h',
       prefix: 'onboarding',
     },
+    anonymousOnboardingChatIp: {
+      name: 'Anonymous Onboarding Chat (IP)',
+      limit: 20,
+      window: '1 h',
+      prefix: 'anon_onb_chat_ip',
+    },
+    anonymousOnboardingChatAsn: {
+      name: 'Anonymous Onboarding Chat (ASN)',
+      limit: 60,
+      window: '1 h',
+      prefix: 'anon_onb_chat_asn',
+    },
+    anonymousOnboardingChatSession: {
+      name: 'Anonymous Onboarding Chat (Session)',
+      limit: 20,
+      window: '7 d',
+      prefix: 'anon_onb_chat_session',
+    },
+    anonymousOnboardingChatFirstTouch: {
+      name: 'Anonymous Onboarding Chat (First Touch)',
+      limit: 20,
+      window: '1 h',
+      prefix: 'anon_onb_chat_first_touch',
+    },
     handleCheck: {
       name: 'Handle Check',
       limit: 30,
@@ -606,13 +630,15 @@ describe('limiters.ts', () => {
 
   describe('checkAnonymousChatRateLimit', () => {
     it('charges a first touch against the first-touch budget, then the new session bucket', async () => {
-      // A shared-egress IP that already burned the anonymous pools must not
-      // dead-end a brand-new visitor on message #1.
+      // A shared-egress IP that already burned the shared IP/ASN pools must
+      // not dead-end a brand-new visitor on message #1: the first touch
+      // charges the dedicated first_touch pool, then the fresh session's
+      // lifetime bucket. Only the shared ip:/asn: pools stay burned.
       mockLimit.mockImplementation((key: string) =>
         Promise.resolve(
-          key.startsWith('first_touch:')
-            ? makeAllowedResult()
-            : makeDeniedResult()
+          key.startsWith('ip:') || key.startsWith('asn:')
+            ? makeDeniedResult()
+            : makeAllowedResult()
         )
       );
 
@@ -628,7 +654,8 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(true);
       // First-touch pool + the fresh session's lifetime bucket (cookie-reset
-      // bypass fix: the session counter must survive cookie rotation).
+      // bypass fix: the session counter must survive cookie rotation). The
+      // shared ip:/asn: pools are never consulted on a first touch.
       expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
         'first_touch:203.0.113.10',
         'session:sess-new',
