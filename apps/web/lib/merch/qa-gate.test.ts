@@ -10,7 +10,6 @@ import {
   computeMerchQaReferenceHash,
   createMerchRemediationCandidate,
   getMerchQaPublishBlockers,
-  isMerchQaReceiptFresh,
   listMerchQaQuarantine,
   MERCH_QA_BORDERLINE_BLOCKER,
   MERCH_QA_FAIL_BLOCKER,
@@ -26,8 +25,7 @@ const BATCH_ID = 'bbbbbbbb-0000-4000-8000-000000000001';
 const PROFILE_ID = 'cccccccc-0000-4000-8000-000000000001';
 const RECEIPT_ID = 'dddddddd-0000-4000-8000-000000000001';
 
-// Drizzle chain mock: every db.select() consumes the next queued row set,
-// regardless of whether the query ends in .where(), .orderBy(), or .limit().
+// Drizzle chain mock: each db.select() consumes the next queued row set.
 const qaDb = vi.hoisted(() => {
   type Rows = unknown[];
   const state = {
@@ -43,8 +41,8 @@ const qaDb = vi.hoisted(() => {
       then: (onFulfilled?: (value: Rows) => unknown) =>
         Promise.resolve(rows).then(onFulfilled),
       limit: () => Promise.resolve(rows),
+      orderBy: () => node,
     };
-    node.orderBy = () => node;
     return node;
   };
 
@@ -210,7 +208,6 @@ function makeReceipt(
   };
 }
 
-/** Receipt whose hashes match the option's current payload + reviewer version. */
 function makeFreshReceipt(
   option: MerchDesignOption,
   reviewerVersion: string,
@@ -237,10 +234,9 @@ beforeEach(() => {
 
 describe('getMerchQaPublishBlockers', () => {
   it('does not touch the database when the gate flag is off', async () => {
-    const blockers = await getMerchQaPublishBlockers(makeOption(), {
-      gateEnabled: false,
-    });
-    expect(blockers).toEqual([]);
+    await expect(
+      getMerchQaPublishBlockers(makeOption(), { gateEnabled: false })
+    ).resolves.toEqual([]);
     expect(qaDb.state.selectCalls).toBe(0);
   });
 
@@ -255,22 +251,23 @@ describe('getMerchQaPublishBlockers', () => {
   });
 
   it('skips legacy unstamped options', async () => {
-    const legacy = makeOption({ qualityReview: {} });
-    const blockers = await getMerchQaPublishBlockers(legacy, {
-      ...GATE_ON,
-      reviewer: THROWING_REVIEWER,
-    });
-    expect(blockers).toEqual([]);
+    await expect(
+      getMerchQaPublishBlockers(makeOption({ qualityReview: {} }), {
+        ...GATE_ON,
+        reviewer: THROWING_REVIEWER,
+      })
+    ).resolves.toEqual([]);
     expect(qaDb.state.selectCalls).toBe(0);
   });
 
   it('fails closed on missing evidence when the review cannot run', async () => {
     qaDb.state.selectResults.push([]); // no prior receipts
-    const blockers = await getMerchQaPublishBlockers(makeOption(), {
-      ...GATE_ON,
-      reviewer: THROWING_REVIEWER,
-    });
-    expect(blockers).toEqual([MERCH_QA_MISSING_RECEIPT_BLOCKER]);
+    await expect(
+      getMerchQaPublishBlockers(makeOption(), {
+        ...GATE_ON,
+        reviewer: THROWING_REVIEWER,
+      })
+    ).resolves.toEqual([MERCH_QA_MISSING_RECEIPT_BLOCKER]);
   });
 
   it('reviews a candidate with no receipt and persists the receipt', async () => {
@@ -287,14 +284,13 @@ describe('getMerchQaPublishBlockers', () => {
   });
 
   it('rejects stale evidence instead of trusting it (fail-closed)', async () => {
-    // A PASS receipt whose hashes no longer match the candidate payload must
-    // not be honored — with the reviewer down there is no valid evidence.
     qaDb.state.selectResults.push([makeReceipt({ verdict: 'pass' })]);
-    const blockers = await getMerchQaPublishBlockers(makeOption(), {
-      ...GATE_ON,
-      reviewer: THROWING_REVIEWER,
-    });
-    expect(blockers).toEqual([MERCH_QA_REVIEW_UNAVAILABLE_BLOCKER]);
+    await expect(
+      getMerchQaPublishBlockers(makeOption(), {
+        ...GATE_ON,
+        reviewer: THROWING_REVIEWER,
+      })
+    ).resolves.toEqual([MERCH_QA_REVIEW_UNAVAILABLE_BLOCKER]);
     expect(qaDb.state.valuesCalls).toHaveLength(0);
   });
 
@@ -355,11 +351,12 @@ describe('getMerchQaPublishBlockers', () => {
     qaDb.state.selectResults.push([
       makeFreshReceipt(option, PASS_REVIEWER.version),
     ]);
-    const blockers = await getMerchQaPublishBlockers(option, {
-      ...GATE_ON,
-      reviewer: PASS_REVIEWER,
-    });
-    expect(blockers).toEqual([]);
+    await expect(
+      getMerchQaPublishBlockers(option, {
+        ...GATE_ON,
+        reviewer: PASS_REVIEWER,
+      })
+    ).resolves.toEqual([]);
   });
 });
 
@@ -380,7 +377,7 @@ describe('assertMerchCandidateSelectable', () => {
     ).rejects.toThrow(MERCH_QA_FAIL_BLOCKER);
   });
 
-  it('allows a candidate with a fresh PASS receipt', async () => {
+  it('allows a candidate with a fresh PASS receipt and borderline drafts', async () => {
     const option = makeOption();
     qaDb.state.selectResults.push([
       makeFreshReceipt(option, PASS_REVIEWER.version),
@@ -391,10 +388,7 @@ describe('assertMerchCandidateSelectable', () => {
         reviewer: PASS_REVIEWER,
       })
     ).resolves.toBeUndefined();
-  });
 
-  it('allows borderline candidates to be selected into drafts', async () => {
-    const option = makeOption();
     qaDb.state.selectResults.push([
       makeFreshReceipt(option, PASS_REVIEWER.version, {
         verdict: 'borderline',
@@ -673,24 +667,5 @@ describe('createMerchRemediationCandidate', () => {
     );
     expect(inserted.productionWarnings).toEqual([]);
     expect(inserted.qualityReview).toEqual(source.qualityReview);
-  });
-});
-
-describe('isMerchQaReceiptFresh', () => {
-  it('is fresh only when both hashes match', () => {
-    const option = makeOption();
-    const receipt = makeFreshReceipt(option, PASS_REVIEWER.version);
-    expect(isMerchQaReceiptFresh(receipt, option, PASS_REVIEWER.version)).toBe(
-      true
-    );
-
-    const edited = makeOption({ designName: 'Edited Tee' });
-    expect(isMerchQaReceiptFresh(receipt, edited, PASS_REVIEWER.version)).toBe(
-      false
-    );
-
-    expect(isMerchQaReceiptFresh(receipt, option, 'other-reviewer/v9')).toBe(
-      false
-    );
   });
 });

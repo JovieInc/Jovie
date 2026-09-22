@@ -18,18 +18,12 @@ import {
 import { readOptionMockupStatus } from './generation-contract';
 
 /**
- * Pre-publish visual QA gate (JOV-4739, slice 1).
- *
- * Every canonical-pipeline merch candidate gets a persisted, immutable
- * QA-review receipt (merch_candidate_qa_reviews). The publish path re-checks
- * the LATEST receipt and fails closed when evidence is missing or stale —
- * the receipt's inputHash must match the candidate's current payload and its
- * referenceHash must match the contract/reviewer versions in force.
- *
- * The visual review itself is a typed seam: `MerchVisualReviewer` is injected
- * so a real reviewer lands later without touching the gate. The bundled stub
- * returns `borderline`, which routes the candidate to the quarantine queue
- * for human review.
+ * Pre-publish visual QA gate (JOV-4739, slice 1). Every canonical-pipeline
+ * merch candidate gets a persisted, immutable QA-review receipt
+ * (merch_candidate_qa_reviews); publish re-checks the LATEST receipt and
+ * fails closed on missing or stale evidence (inputHash over the current
+ * payload + referenceHash over the contract/reviewer versions in force).
+ * `MerchVisualReviewer` is the typed seam a real reviewer lands in later.
  */
 
 export const MERCH_QA_GATE_VERSION = 'merch-qa-gate/v1';
@@ -68,11 +62,8 @@ const QUARANTINE_DISPOSITIONS: readonly MerchQaDisposition[] = [
   'escalated',
 ];
 
-// ---------------------------------------------------------------------------
-// Reviewer seam — a real visual reviewer implements this interface and is
-// injected via MerchQaDeps.reviewer. The stub ships the gate fail-closed:
-// every reviewed candidate lands in quarantine for human review.
-// ---------------------------------------------------------------------------
+// Reviewer seam — real visual reviewer implements this interface and is
+// injected via MerchQaDeps.reviewer. The stub ships the gate fail-closed.
 
 export interface MerchVisualQaInput {
   readonly optionId: string;
@@ -123,11 +114,8 @@ export interface MerchQaDeps {
   readonly remediationInstruction?: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Evidence hashing — deterministic over the reviewed payload + the policy
-// versions the review ran under, so any candidate edit or reviewer upgrade
-// invalidates prior receipts.
-// ---------------------------------------------------------------------------
+// Evidence hashing is deterministic over the reviewed payload + the policy
+// versions in force, so a candidate edit or reviewer upgrade invalidates it.
 
 function stableStringify(value: unknown): string {
   if (Array.isArray(value)) {
@@ -217,11 +205,8 @@ export function isMerchQaReceiptFresh(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Gate scope — same convention as the content review (JOV-4740): only
-// canonical-pipeline candidates carrying the generation-contract stamp are
-// gated; pre-contract legacy rows keep historical behavior.
-// ---------------------------------------------------------------------------
+// Gate scope mirrors the content-review convention (JOV-4740): only
+// canonical-pipeline candidates are gated; legacy rows keep prior behavior.
 
 export function requiresMerchQaReview(
   option: Pick<MerchDesignOption, 'qualityReview'>
@@ -241,11 +226,8 @@ export async function isMerchQaGateEnabled(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Review orchestration — deterministic checks + the visual reviewer seam,
-// persisted as an immutable receipt. Prior receipts flip to 'superseded' and
-// non-passing candidates move to the quarantined option status.
-// ---------------------------------------------------------------------------
+// Review orchestration: deterministic checks + the reviewer seam, persisted
+// as an immutable receipt; prior receipts flip to 'superseded'.
 
 function dispositionForVerdict(verdict: MerchQaVerdict): MerchQaDisposition {
   if (verdict === 'fail') return 'quarantined';
@@ -493,9 +475,7 @@ export async function assertMerchQaPublishableForCard(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Quarantine queue + targeted remediation.
-// ---------------------------------------------------------------------------
 
 export interface MerchQuarantinedCandidate {
   readonly option: MerchDesignOption;
