@@ -1,10 +1,16 @@
+import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { HOMEPAGE_PROFILE_SHOWCASE_STATES } from '@/features/home/homepage-profile-preview-fixture';
 import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
+import {
+  isRenderFixtureEnabled,
+  RENDER_FIXTURE_METADATA,
+} from '@/lib/render-fixture-policy';
 import { MarketingStateRenderClient } from './MarketingStateRenderClient';
 
 export const revalidate = false;
 export const dynamicParams = false;
+export const metadata = RENDER_FIXTURE_METADATA;
 
 const VALID_STATES = Object.keys(
   HOMEPAGE_PROFILE_SHOWCASE_STATES
@@ -19,6 +25,8 @@ export default async function MarketingRenderPage({
 }: {
   readonly params: Promise<{ state: string }>;
 }) {
+  if (!isRenderFixtureEnabled()) notFound();
+
   const { state } = await params;
   const stateId = state as ProfileShowcaseStateId;
 

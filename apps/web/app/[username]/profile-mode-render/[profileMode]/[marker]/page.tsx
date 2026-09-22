@@ -4,8 +4,10 @@ import ArtistPage, {
 } from '@/app/[username]/page';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { getProfileMode } from '@/features/profile/registry';
-
-const PRIVATE_PROFILE_MODE_MARKER = '__profile-mode-alias';
+import {
+  PROFILE_MODE_ALIAS_MARKER,
+  RENDER_FIXTURE_METADATA,
+} from '@/lib/render-fixture-policy';
 
 // Query modes are bounded by next.config.js but discovered on demand. Keep each
 // private destination on the same one-hour ISR cadence as the canonical page.
@@ -27,7 +29,7 @@ function resolvePrivateProfileMode(
   value: string,
   marker: string
 ): ProfileMode | null {
-  if (marker !== PRIVATE_PROFILE_MODE_MARKER) return null;
+  if (marker !== PROFILE_MODE_ALIAS_MARKER) return null;
 
   const mode = getProfileMode(value);
   if (mode === 'profile') return null;
@@ -57,7 +59,13 @@ export async function generateMetadata({
   const { username, profileMode, marker } = await params;
   if (!resolvePrivateProfileMode(profileMode, marker)) notFound();
 
-  return generatePublicProfileMetadata({
+  const profileMetadata = await generatePublicProfileMetadata({
     params: Promise.resolve({ username }),
   });
+  return {
+    ...profileMetadata,
+    // Internal render destination — never indexable even when reachable via
+    // the bounded `?mode=` rewrite.
+    robots: RENDER_FIXTURE_METADATA.robots,
+  };
 }

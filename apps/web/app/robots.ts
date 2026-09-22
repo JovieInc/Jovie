@@ -32,6 +32,7 @@ const DISALLOW_PATHS = [
   '/out/',
   '/investors/',
   '/engineering/preview/',
+  '/renders/',
   '/*?ref=*',
   '/*&ref=*',
   '/*?utm_*',
