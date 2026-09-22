@@ -19,11 +19,15 @@ function createOutput() {
   return { output, read: () => value };
 }
 
-function createFetch(body: string, status = 200) {
+function createFetch(
+  body: string,
+  status = 200,
+  headers: Record<string, string> = {}
+) {
   const urls: string[] = [];
   const fetchImpl: FetchImplementation = async input => {
     urls.push(String(input));
-    return new Response(body, { status });
+    return new Response(body, { status, headers });
   };
   return { fetchImpl, urls };
 }
@@ -149,6 +153,33 @@ describe('jovie CLI', () => {
         message: 'GET https://jov.ie/api/v1/demo returned HTTP 404',
         responseBody: 'missing',
         status: 404,
+      },
+    });
+    expect(stderr.read()).toBe('');
+  });
+
+  it.each([
+    [429, '{"error":"Too many requests"}'],
+    [503, '{"error":"Public API temporarily unavailable"}'],
+  ])('returns retry guidance for HTTP %s failures', async (status, body) => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+    const fetch = createFetch(body, status, { 'Retry-After': '30' });
+
+    await expect(
+      runCli(['artist', 'get', 'demo', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(stdout.read())).toMatchObject({
+      error: {
+        code: 'REQUEST_FAILED',
+        responseBody: body,
+        retryAfterSeconds: 30,
+        status,
       },
     });
     expect(stderr.read()).toBe('');

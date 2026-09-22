@@ -29,7 +29,8 @@ export class JovieRequestError extends Error {
     message: string,
     readonly url: string,
     readonly status?: number,
-    readonly responseBody?: string
+    readonly responseBody?: string,
+    readonly retryAfterSeconds?: number
   ) {
     super(message);
     this.name = 'JovieRequestError';
@@ -82,6 +83,22 @@ function getFetch(options: ResourceOptions): FetchImplementation {
   return options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
 }
 
+function parseRetryAfterSeconds(
+  value: string | null,
+  nowMs = Date.now()
+): number | undefined {
+  if (!value) return undefined;
+
+  if (/^\d+$/.test(value.trim())) {
+    const seconds = Number(value);
+    return Number.isSafeInteger(seconds) ? seconds : undefined;
+  }
+
+  const retryAtMs = Date.parse(value);
+  if (!Number.isFinite(retryAtMs)) return undefined;
+  return Math.max(0, Math.ceil((retryAtMs - nowMs) / 1000));
+}
+
 async function request(
   pathname: string,
   accept: string,
@@ -110,7 +127,8 @@ async function request(
       `GET ${url} returned HTTP ${response.status}`,
       url,
       response.status,
-      body.slice(0, 1_000)
+      body.slice(0, 1_000),
+      parseRetryAfterSeconds(response.headers.get('retry-after'))
     );
   }
 

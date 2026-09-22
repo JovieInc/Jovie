@@ -115,6 +115,9 @@ function errorPayload(error: unknown): Record<string, unknown> {
       message: error.message,
       ...(error.status === undefined ? {} : { status: error.status }),
       ...(error.responseBody ? { responseBody: error.responseBody } : {}),
+      ...(error.retryAfterSeconds === undefined
+        ? {}
+        : { retryAfterSeconds: error.retryAfterSeconds }),
     };
   }
 
