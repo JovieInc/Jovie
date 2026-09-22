@@ -20,6 +20,8 @@ const {
   mockCaptureCriticalError,
   mockLogFallback,
   mockExpireReferralOnChurn,
+  mockReverseReferralCommission,
+  mockSendSlackMessage,
   mockLoggerWarn,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
@@ -33,6 +35,8 @@ const {
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
   mockExpireReferralOnChurn: vi.fn(),
+  mockReverseReferralCommission: vi.fn(),
+  mockSendSlackMessage: vi.fn(),
   mockLoggerWarn: vi.fn(),
 }));
 
@@ -88,6 +92,11 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/referrals/service', () => ({
   expireReferralOnChurn: mockExpireReferralOnChurn,
+  reverseReferralCommission: mockReverseReferralCommission,
+}));
+
+vi.mock('@/lib/notifications/providers/slack', () => ({
+  sendSlackMessage: mockSendSlackMessage,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -197,6 +206,8 @@ describe('@critical ChargeHandler', () => {
     });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
     mockExpireReferralOnChurn.mockResolvedValue(undefined);
+    mockReverseReferralCommission.mockResolvedValue(undefined);
+    mockSendSlackMessage.mockResolvedValue({ status: 'sent' });
     mockStripeSubscriptionsCancel.mockResolvedValue({
       id: 'sub_123',
       status: 'canceled',
@@ -219,6 +230,109 @@ describe('@critical ChargeHandler', () => {
       expect(isSupportedEventType('charge.refunded')).toBe(true);
       expect(isSupportedEventType('charge.dispute.created')).toBe(true);
       expect(chargeHandler.eventTypes).toEqual(handler.eventTypes);
+    });
+  });
+
+  describe('commission reversal and alerts', () => {
+    it.each(['refund', 'dispute'])(
+      'reverses the exact invoice and alerts for a %s',
+      async kind => {
+        const context =
+          kind === 'refund'
+            ? refundContext(refundedCharge())
+            : disputeContext();
+        await handler.handle(context);
+        expect(mockReverseReferralCommission).toHaveBeenCalledWith('in_latest');
+        expect(mockSendSlackMessage).toHaveBeenCalledWith({
+          text: expect.stringContaining(context.stripeEventId),
+        });
+        const text = mockSendSlackMessage.mock.calls[0][0].text;
+        expect(text).toContain(context.event.type);
+        expect(text).toContain('ch_123');
+        expect(text).toContain('manual recovery');
+        expect(mockSendSlackMessage.mock.invocationCallOrder[0]).toBeLessThan(
+          mockReverseReferralCommission.mock.invocationCallOrder[0]
+        );
+      }
+    );
+
+    it('cancels historical invoice commission while preserving current entitlement', async () => {
+      mockStripeInvoicesRetrieve.mockResolvedValue(
+        subscriptionInvoice('in_old')
+      );
+      const result = await handler.handle(
+        refundContext(refundedCharge({ invoice: 'in_old' }))
+      );
+      expect(result.reason).toBe('historical_invoice_refund');
+      expect(mockReverseReferralCommission).toHaveBeenCalledWith('in_old');
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+    });
+
+    it('retries failed commission writes even when a newer billing event now exists', async () => {
+      mockReverseReferralCommission.mockRejectedValueOnce(
+        new Error('commission DB unavailable')
+      );
+      const context = refundContext(refundedCharge());
+      await expect(handler.handle(context)).rejects.toThrow(
+        'commission DB unavailable'
+      );
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        skipped: true,
+        reason: 'stale',
+      });
+      await handler.handle(context);
+      expect(mockReverseReferralCommission).toHaveBeenCalledTimes(2);
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+    });
+
+    it('alerts even when subscription retrieval fails', async () => {
+      mockStripeSubscriptionsRetrieve.mockRejectedValueOnce(
+        new Error('Stripe unavailable')
+      );
+      await expect(handler.handle(disputeContext())).rejects.toThrow(
+        'Stripe unavailable'
+      );
+      expect(mockSendSlackMessage).toHaveBeenCalledOnce();
+    });
+
+    it.each(['error', 'skipped'])(
+      'continues financial correction when Slack returns %s',
+      async status => {
+        mockSendSlackMessage.mockResolvedValue({ status });
+        expect(await handler.handle(disputeContext())).toEqual({
+          success: true,
+        });
+        expect(mockReverseReferralCommission).toHaveBeenCalledWith('in_latest');
+        expect(mockStripeSubscriptionsCancel).toHaveBeenCalledWith('sub_123');
+        expect(mockLoggerWarn).toHaveBeenCalledWith(
+          'Charge reversal Slack alert was not sent',
+          expect.objectContaining({ status })
+        );
+      }
+    );
+
+    it('continues financial correction if the notification provider throws', async () => {
+      mockSendSlackMessage.mockRejectedValueOnce(
+        new Error('Slack unavailable')
+      );
+      expect(await handler.handle(disputeContext())).toEqual({ success: true });
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Charge reversal Slack alert failed',
+        expect.any(Object)
+      );
+    });
+
+    it('does not reverse commissions or alert for partial refunds or non-subscription charges', async () => {
+      await handler.handle(
+        refundContext(refundedCharge({ refunded: false, amount_refunded: 100 }))
+      );
+      mockStripeInvoicesRetrieve.mockResolvedValueOnce({ id: 'in_one_time' });
+      await handler.handle(refundContext(refundedCharge()));
+      expect(mockReverseReferralCommission).not.toHaveBeenCalled();
+      expect(mockSendSlackMessage).not.toHaveBeenCalled();
     });
   });
 

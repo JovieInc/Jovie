@@ -20,7 +20,11 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { expireReferralOnChurn } from '@/lib/referrals/service';
+import { sendSlackMessage } from '@/lib/notifications/providers/slack';
+import {
+  expireReferralOnChurn,
+  reverseReferralCommission,
+} from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import type { BillingAuditEventType } from '@/lib/stripe/customer-sync/types';
@@ -88,7 +92,8 @@ export class ChargeHandler implements WebhookHandler {
 
   /**
    * Full refund of the current subscription invoice revokes Pro.
-   * Partial refunds and historical-invoice goodwill refunds are skipped.
+   * Partial refunds are skipped. Historical refunds cancel commissions but
+   * preserve the current subscription entitlement.
    */
   private async handleRefunded(
     charge: Stripe.Charge,
@@ -185,6 +190,22 @@ export class ChargeHandler implements WebhookHandler {
       };
     }
 
+    // Notify before downstream API/DB work so a failed revoke still raises an
+    // alert. Route-level event deduplication suppresses completed deliveries;
+    // retries may repeat the alert with the same event ID.
+    await this.notifyChargeReversal({
+      stripeEventId,
+      stripeEventName,
+      chargeId: charge.id,
+      invoiceId: invoice.id,
+      subscriptionId,
+    });
+
+    // Commission reversal is invoice-scoped, independent of entitlement event
+    // ordering. Historical refunds and retries after a newer billing event must
+    // still remove the commission from payable earnings.
+    await reverseReferralCommission(invoice.id);
+
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
     if (
@@ -272,6 +293,36 @@ export class ChargeHandler implements WebhookHandler {
     return {
       success: true,
     };
+  }
+
+  private async notifyChargeReversal(details: {
+    stripeEventId: string;
+    stripeEventName: string;
+    chargeId: string;
+    invoiceId: string;
+    subscriptionId: string;
+  }): Promise<void> {
+    const text = [
+      `Subscription payment reversal received: ${details.stripeEventName}`,
+      `Event: ${details.stripeEventId}`,
+      `Charge: ${details.chargeId}; invoice: ${details.invoiceId}; subscription: ${details.subscriptionId}`,
+      'Commission cancellation and entitlement processing pending. Review any previous referral payouts for manual recovery.',
+    ].join('\n');
+
+    try {
+      const result = await sendSlackMessage({ text });
+      if (result.status !== 'sent') {
+        logger.warn('Charge reversal Slack alert was not sent', {
+          stripeEventId: details.stripeEventId,
+          status: result.status,
+        });
+      }
+    } catch {
+      // An optional notification must never prevent financial corrections.
+      logger.warn('Charge reversal Slack alert failed', {
+        stripeEventId: details.stripeEventId,
+      });
+    }
   }
 
   private async resolveCharge(
