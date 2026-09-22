@@ -33,7 +33,8 @@ describe('SpotifyConnectDialog System B style guard', () => {
       offenders,
       `SpotifyConnectDialog leaked ${offenders.join(', ')}`
     ).toEqual([]);
-    expect(source).toContain('system-b-spotify-connect-card');
+    expect(source).toContain("data-spotify-connect='card'");
+    expect(source).toContain("data-spotify-connect='status-card'");
     expect(source).toContain('system-b-spotify-connect-input-shell');
     expect(source).toContain('system-b-spotify-connect-trailing');
     expect(source).toContain('system-b-spotify-connect-dropdown');
@@ -44,7 +45,7 @@ describe('SpotifyConnectDialog System B style guard', () => {
   it('keeps dialog primitives token-backed', () => {
     const source = readWebFile('styles/system-b-app.css');
     const spotifyConnectCss = source.match(
-      /:where\(\.system-b-spotify-connect-card\)[\s\S]*?(?=\.system-b-release-provider-banner)/
+      /:where\(\.system-b-spotify-connect-card[\s\S]*?(?=\.system-b-release-provider-banner)/
     )?.[0];
 
     expect(spotifyConnectCss).toBeDefined();

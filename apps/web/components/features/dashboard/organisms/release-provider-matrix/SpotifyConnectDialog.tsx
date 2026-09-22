@@ -41,10 +41,7 @@ function SearchDropdownState({
       role={tone === 'error' ? 'alert' : undefined}
       aria-atomic='true'
     >
-      <DrawerSurfaceCard
-        variant='card'
-        className='system-b-spotify-connect-status-card px-2.5'
-      >
+      <DrawerSurfaceCard variant='card' data-spotify-connect='status-card'>
         <p
           className={cn(
             'system-b-spotify-connect-status-copy text-xs',
@@ -70,7 +67,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='system-b-spotify-connect-status-card gap-2.5 px-2.5'
+          data-spotify-connect='status-card'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -164,10 +161,7 @@ function SearchInputTrailing({
           tone='primary'
           disabled={claimButtonDisabled}
           onClick={onClaimArtist}
-          className={cn(
-            'h-8 w-full shrink-0 justify-center px-3 text-app',
-            claimButtonDisabled && 'text-btn-primary-foreground/60'
-          )}
+          className='w-full shrink-0 justify-center'
         >
           {(isLoading || isPending) && (
             <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
@@ -465,10 +459,7 @@ export function SpotifyConnectDialog({
       </DialogDescription>
 
       <DialogBody className='space-y-3'>
-        <DrawerSurfaceCard
-          variant='card'
-          className='system-b-spotify-connect-card p-3.5'
-        >
+        <DrawerSurfaceCard variant='card' data-spotify-connect='card'>
           <div className='mb-2.5'>
             <p className='text-2xs font-caption leading-none text-tertiary-token'>
               Artist search
