@@ -27,11 +27,13 @@ open .build/release/MenuMonitor   # or copy to /Applications
 Run from the repository root:
 
 ```bash
-swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
-swift build --package-path apps/macos/MenuMonitor -c release
+pnpm run macos:test    # swift test --package-path apps/macos/MenuMonitor
+pnpm run macos:build   # swift build --package-path apps/macos/MenuMonitor -c release
 ```
 
-The same commands run on path-selected merge-group heads before admission.
+The merge-group Mac lane runs the same suite with coverage enabled
+(`swift test --package-path apps/macos/MenuMonitor --enable-code-coverage`)
+plus the release build on path-selected heads before admission.
 
 ## Run at login (optional)
 

@@ -109,6 +109,8 @@
     "ios:runtime-performance": "bash apps/ios/scripts/measure-runtime-performance.sh",
     "ios:memory": "bash apps/ios/scripts/capture-memory-baseline.sh",
     "ios:memory:contract": "node --test apps/ios/scripts/capture-memory-baseline.test.mjs",
+    "macos:test": "swift test --package-path apps/macos/MenuMonitor",
+    "macos:build": "swift build --package-path apps/macos/MenuMonitor -c release",
     "desktop:memory": "pnpm --filter @jovie/desktop run memory",
     "test:auth:ios": "bash apps/ios/scripts/test-auth-callback.sh",
     "test:auth:web": "pnpm --filter @jovie/web exec vitest run tests/unit/lib/readiness/signed-in-auth.test.ts && doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec playwright test tests/e2e/signed-in-auth-verify.spec.ts --project=chromium --reporter=line",
