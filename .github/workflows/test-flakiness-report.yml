@@ -5,21 +5,46 @@ on:
   schedule:
     # Daily flakiness snapshot at 08:00 UTC; weekly deep report on Mondays.
     - cron: '0 8 * * *'
+  workflow_run:
+    # Re-upload merge-queue JUnit results to Codecov from this privileged
+    # context (ci.yml merge_group steps may not consume secrets).
+    workflows: ["CI"]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
-  group: test-flakiness-report
-  cancel-in-progress: true
+  # Separate lanes per event: merge_group completions are frequent and must
+  # not cancel the scheduled analysis (or vice versa).
+  group: test-flakiness-report-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_run' }}
 
 permissions:
-  contents: read
+  contents: write
   actions: read
+  issues: write
+  pull-requests: write
+
+# Flake-detection signals:
+#   - Same test fails then passes on retry within one run (JUnit flakyFailure
+#     elements emitted by vitest/Playwright retries).
+#   - Same failure signature across shards/runs collapses into ONE clustered
+#     incident (signature = sha256 of normalized test id + normalized error).
+#   - merge_group JUnit artifacts are scanned too, so queue-only flakes
+#     (green on the PR head, red in the queue) are captured.
+#   - A signature with >=3 occurrences in a rolling 24h window becomes a
+#     quarantine candidate -> schemaVersion-1 entry in
+#     apps/web/tests/quarantine.json plus one tracking issue per signature
+#     (deduped by the flake-sig:<hash> marker).
+# Un-quarantine: a signature absent from clusters for 7 consecutive days (or
+# 50 consecutive clean report windows) is removed, with a comment on its
+# tracking issue. Entries for deleted test files are pruned.
 
 jobs:
   analyze-flakiness:
     name: Analyze Test Flakiness
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -37,17 +62,146 @@ jobs:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
         run: node .github/scripts/check-flaky-ratchet.js
 
+      - name: File or upvote one issue per flaky signature
+        id: file-issues
+        if: always() && hashFiles('flakiness-clusters.json') != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        with:
+          script: |
+            const fs = require('fs');
+            const clustersDoc = JSON.parse(fs.readFileSync('flakiness-clusters.json', 'utf8'));
+            const { owner, repo } = context.repo;
+            const issueMap = {};
+
+            async function findIssue(sig) {
+              const { data } = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${owner}/${repo} is:issue "flake-sig:${sig}"`,
+                per_page: 5,
+              });
+              return (data.items || []).find(i => i.state === 'open') || (data.items || [])[0] || null;
+            }
+
+            async function createLinearIssue(cluster) {
+              if (!process.env.LINEAR_API_KEY) return null;
+              try {
+                const res = await fetch('https://api.linear.app/graphql', {
+                  method: 'POST',
+                  headers: {
+                    Authorization: process.env.LINEAR_API_KEY,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    query: 'mutation($title:String!,$description:String!){issueCreate(input:{title:$title,description:$description}){success issue{url identifier}}}',
+                    variables: {
+                      title: `Flaky test signature ${cluster.signature}: ${cluster.testId}`.slice(0, 200),
+                      description: [
+                        `flake-sig:${cluster.signature}`,
+                        `Test: ${cluster.testId}`,
+                        `File: ${cluster.file}`,
+                        `Occurrences: ${cluster.occurrences24h} in 24h / ${cluster.occurrences} total`,
+                        `Merge-group-only: ${cluster.mergeGroupOnly ? 'yes' : 'no'}`,
+                        `First seen: ${cluster.firstSeenAt}`,
+                        `Example runs: ${(cluster.runUrls || []).join(', ')}`,
+                        '',
+                        'Error excerpt:',
+                        cluster.errorExcerpt || '',
+                      ].join('\n'),
+                    },
+                  }),
+                });
+                const json = await res.json();
+                const issue = json && json.data && json.data.issueCreate && json.data.issueCreate.issue;
+                return issue ? `${issue.url} (${issue.identifier})` : null;
+              } catch (e) {
+                console.log(`Linear filing failed for ${cluster.signature}: ${e.message}`);
+                return null;
+              }
+            }
+
+            for (const cluster of (clustersDoc.clusters || [])) {
+              if (!cluster.quarantineCandidate) continue;
+              const existing = await findIssue(cluster.signature);
+              if (existing && existing.state === 'open') {
+                issueMap[cluster.signature] = existing.html_url;
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: existing.number,
+                  body: `Recurrence: signature \`${cluster.signature}\` seen ${cluster.occurrences24h} time(s) in the last 24h (${cluster.occurrences} total). Latest runs: ${(cluster.runUrls || []).slice(0, 3).join(', ')}`,
+                });
+                console.log(`Upvoted issue #${existing.number} for ${cluster.signature}`);
+                continue;
+              }
+              const linearUrl = await createLinearIssue(cluster);
+              const body = [
+                `<!-- flake-sig:${cluster.signature} -->`,
+                `**Test**: \`${cluster.testId}\``,
+                `**File**: \`${cluster.file}\``,
+                `**Signature**: \`${cluster.signature}\``,
+                `**First seen**: ${cluster.firstSeenAt}`,
+                `**Flake count/window**: ${cluster.occurrences24h} in 24h, ${cluster.occurrences} total`,
+                `**Merge-group-only**: ${cluster.mergeGroupOnly ? 'yes' : 'no'}`,
+                linearUrl ? `**Linear**: ${linearUrl}` : null,
+                `**Example failing runs**: ${(cluster.runUrls || []).join(', ')}`,
+                '',
+                'Error excerpt:',
+                '```',
+                (cluster.errorExcerpt || '').slice(0, 1000),
+                '```',
+                '',
+                'Auto-filed by test-flakiness-report. This signature may be quarantined in `apps/web/tests/quarantine.json`; quarantined tests still run but do not block merge.',
+              ].filter(l => l !== null).join('\n');
+              const { data: issue } = await github.rest.issues.create({
+                owner, repo,
+                title: `Flaky test signature ${cluster.signature}: ${cluster.testId}`.slice(0, 200),
+                body,
+                labels: ['test-flakiness', 'automated'],
+              });
+              issueMap[cluster.signature] = linearUrl || issue.html_url;
+              console.log(`Filed issue #${issue.number} for ${cluster.signature}`);
+            }
+
+            fs.writeFileSync('flake-issues.json', JSON.stringify(issueMap, null, 2));
+
+      - name: Update quarantine ledger
+        id: quarantine
+        if: always() && hashFiles('flakiness-clusters.json') != ''
+        run: node .github/scripts/update-quarantine.js
+
+      - name: Open or update quarantine PR
+        if: always() && steps.quarantine.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "jovie-flakiness-bot"
+          git config user.email "bot@jovieinc.com"
+          BRANCH="bot/flake-quarantine"
+          git checkout -B "$BRANCH"
+          git add apps/web/tests/quarantine.json
+          git commit -m "chore(ci): update test quarantine ledger" || exit 0
+          git push -f origin "$BRANCH"
+          EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$EXISTING" ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore(ci): auto-update test quarantine ledger" \
+              --body "Automated by test-flakiness-report. Quarantines signatures with >=3 failures in 24h, un-quarantines tests stable for 7 days / 50 clean windows, prunes entries for deleted files. See flakiness-report artifacts for evidence." \
+              --label automated --label test-flakiness || true
+          fi
+
       - name: Upload flakiness report
         if: always() && hashFiles('flakiness-report.md') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: flakiness-report.md
+          path: |
+            flakiness-report.md
+            flakiness-clusters.json
+            quarantine-changes.json
           retention-days: 90
 
       - name: Find or create tracking issue
         id: find-issue
-        if: ${{ github.event_name == '__retired_linear_only__' }}
+        if: always() && hashFiles('flakiness-report.md') != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -56,18 +210,19 @@ jobs:
               repo: context.repo.repo,
               state: 'open',
               labels: 'test-flakiness',
-              per_page: 1
+              per_page: 20
             });
 
-            if (issues.length > 0) {
-              core.setOutput('issue_number', issues[0].number);
+            const aggregate = issues.find(i => i.title.startsWith('Test Flakiness Detected'));
+            if (aggregate) {
+              core.setOutput('issue_number', aggregate.number);
               core.setOutput('issue_exists', 'true');
             } else {
               core.setOutput('issue_exists', 'false');
             }
 
       - name: Create or update tracking issue
-        if: ${{ github.event_name == '__retired_linear_only__' }}
+        if: always() && hashFiles('flakiness-report.md') != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
@@ -86,7 +241,7 @@ jobs:
             const ratchetNote = ratchetFailed
               ? '\n\n> ⚠️ **Ratchet exceeded**: new untracked flaky tests detected above the committed floor. Fix or quarantine before the floor may be lowered.'
               : '';
-            const body = `${report}${ratchetNote}\n\n---\n\nThis issue is automatically updated by the [Test Flakiness Report workflow](${workflowUrl}).`;
+            const body = `${report}${ratchetNote}\n\n---\n\nThis issue is automatically updated by the [Test Flakiness Report workflow](${workflowUrl}). Quarantine ledger changes are proposed on the \`bot/flake-quarantine\` branch PR; per-signature issues carry a \`flake-sig:<hash>\` marker for dedupe.`;
 
             if (flakyCount === 0) {
               if (issueExists) {
@@ -121,70 +276,23 @@ jobs:
               console.log(`Created new tracking issue #${newIssue.number}`);
             }
 
-      - name: Auto-file deflake issues for high-severity tests
-        if: ${{ github.event_name == '__retired_linear_only__' }}
+      - name: Comment un-quarantine results on tracking issues
+        if: always() && steps.quarantine.outputs.unquarantined != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          QUARANTINE_CANDIDATES: ${{ steps.analyze.outputs.quarantine_candidates || '[]' }}
         with:
           script: |
-            const raw = process.env.QUARANTINE_CANDIDATES || '[]';
-            let candidates;
-            try {
-              candidates = JSON.parse(raw);
-            } catch {
-              console.warn('Could not parse quarantine_candidates:', raw);
-              return;
-            }
-            if (!Array.isArray(candidates) || candidates.length === 0) return;
-
-            for (const candidate of candidates) {
-              const deflakeTitle = `[deflake] ${candidate.name} — ${candidate.failureRate}% failure rate`;
-
-              // Check for existing open deflake issue for this test
-              const { data: existing } = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open',
-                labels: 'deflake',
-                per_page: 100,
-              });
-
-              const alreadyTracked = existing.some(
-                issue => issue.title.includes(candidate.name)
-              );
-              if (alreadyTracked) {
-                console.log(`Deflake issue already open for: ${candidate.name}`);
-                continue;
+            const fs = require('fs');
+            const changes = JSON.parse(fs.readFileSync('quarantine-changes.json', 'utf8'));
+            const { owner, repo } = context.repo;
+            for (const item of (changes.unquarantined || [])) {
+              const match = item.issueUrl && String(item.issueUrl).match(/\/issues\/(\d+)/);
+              if (match) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: Number(match[1]),
+                  body: `Auto un-quarantined — stable for 7 days. Entry for \`${item.file}\` removed from quarantine.`,
+                });
+                console.log(`Commented un-quarantine on issue #${match[1]}`);
               }
-
-              const workflowUrl = `${context.payload.repository.html_url}/actions/workflows/test-flakiness-report.yml`;
-              const body = [
-                `## Flaky test detected`,
-                ``,
-                `**Test:** \`${candidate.name}\``,
-                `**Failure rate:** ${candidate.failureRate}%`,
-                `**Flakiness score:** ${candidate.flakinessScore}`,
-                ``,
-                `### Actions required`,
-                ``,
-                `1. **Investigate** — review recent CI logs for this test to identify the root cause (timing, race condition, environment dependency).`,
-                `2. **Quarantine** — add the test to \`apps/web/tests/quarantine.json\` so it runs in the non-blocking lane while being fixed. Use the existing ledger schema with a \`fixIssueUrl\` pointing to this issue.`,
-                `3. **Lower the ratchet** — once the test is fixed and removed from quarantine, the ratchet automatically adjusts to the tracked-flake count.`,
-                `4. **Close this issue** when the test is stable across ≥10 CI runs.`,
-                ``,
-                `---`,
-                `*Auto-filed by [Test Flakiness Report](${workflowUrl}) on ${new Date().toISOString().split('T')[0]}.*`,
-              ].join('\n');
-
-              const { data: issue } = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: deflakeTitle,
-                body,
-                labels: ['deflake', 'test-flakiness', 'automated'],
-              });
-              console.log(`Created deflake issue #${issue.number}: ${deflakeTitle}`);
             }
 
       - name: Summarize report
@@ -193,6 +301,8 @@ jobs:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
           RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || '0' }}
           HIGH_SEVERITY: ${{ steps.analyze.outputs.high_severity || '0' }}
+          CLUSTER_COUNT: ${{ steps.analyze.outputs.cluster_count || '0' }}
+          SIG_CANDIDATES: ${{ steps.analyze.outputs.signature_quarantine_candidates || '0' }}
           RATCHET_STATUS: ${{ steps.ratchet.outcome }}
         run: |
           {
@@ -201,5 +311,48 @@ jobs:
             echo "- Flaky tests: $FLAKY_COUNT"
             echo "- High severity: $HIGH_SEVERITY"
             echo "- Retry rate: $RETRY_RATE%"
+            echo "- Failure signature clusters: $CLUSTER_COUNT"
+            echo "- Signature quarantine candidates (>=3 in 24h): $SIG_CANDIDATES"
             echo "- Ratchet: $RATCHET_STATUS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  merge-group-codecov-test-results:
+    name: Merge-group Codecov test results
+    # ci.yml cannot upload to Codecov on merge_group (queue steps may not
+    # consume secrets — enforced by merge-group-workflow-contract tests).
+    # This privileged workflow_run context re-uploads the JUnit artifacts the
+    # queue already produces, gated to failure-containing runs so the queue
+    # gets the same result visibility as PR/main runs without spending token
+    # quota on green ones.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'merge_group' &&
+      github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download merge-group JUnit artifacts
+        id: download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p merge-group-junit
+          gh run download "$RUN_ID" --repo "${{ github.repository }}" \
+            -p 'unit-test-report-*' -D merge-group-junit || true
+          find merge-group-junit -name '*.xml' | head -20
+          XML_COUNT=$(find merge-group-junit -name '*.xml' | wc -l | tr -d ' ')
+          echo "junit files: $XML_COUNT"
+          echo "xml_count=$XML_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload merge-group results to Codecov
+        if: steps.download.outputs.xml_count != '0'
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: merge-group-junit
+          flags: unittests,merge-group
+          override_commit: ${{ github.event.workflow_run.head_sha }}
+          override_branch: ${{ github.event.workflow_run.head_branch }}
+          fail_ci_if_error: false
+          verbose: true

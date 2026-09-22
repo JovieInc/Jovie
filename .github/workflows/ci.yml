@@ -4051,6 +4051,31 @@ jobs:
         id: quarantine
         run: node .github/scripts/quarantine-ledger.mjs emit-github-output
 
+      # Quarantine integrity: a quarantined test must still exist and run.
+      # Never silently skip — a missing listed file fails loudly so the ledger
+      # gets pruned instead of hiding a stale entry.
+      - name: Quarantine integrity check
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        run: |
+          MISSING=0
+          for f in ${{ steps.quarantine.outputs.unit_files }}; do
+            if [ ! -f "apps/web/$f" ]; then
+              echo "::error::Quarantined test file missing: apps/web/$f — remove it from apps/web/tests/quarantine.json"
+              MISSING=1
+            fi
+          done
+          exit $MISSING
+
+      - name: Annotate quarantined unit tests
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        run: |
+          FILE="apps/web/tests/quarantine.json"
+          for f in ${{ steps.quarantine.outputs.unit_files }}; do
+            ISSUE=$(jq -r --arg f "$f" '[.entries[] | select(.path == $f) | .fixIssueUrl][0] // "untracked"' "$FILE" 2>/dev/null || echo "untracked")
+            SIG=$(jq -r --arg f "$f" '[.entries[] | select(.path == $f) | .signatureHash][0] // "manual"' "$FILE" 2>/dev/null || echo "manual")
+            echo "::warning file=apps/web/$f::Quarantined test (signature $SIG) — failure does not block merge. See $ISSUE"
+          done
+
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
@@ -4091,7 +4116,7 @@ jobs:
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
-        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} --outputFile=test-report.quarantined.junit.xml ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
         # This suite is not sharded; running it in every web-test shard was
@@ -4113,8 +4138,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # JUnit reports on every run (not just failures) feed the signature
+      # clustering in test-flakiness-report — including merge_group runs and
+      # fail-then-pass-on-retry flakes that never fail the job.
+      - name: Upload JUnit reports for flakiness analysis
+        if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-report-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.junit.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
+        # Merge-group JUnit is re-uploaded to Codecov by test-flakiness-report's
+        # workflow_run job (merge-group-codecov-test-results), which runs in a
+        # privileged context and gates on failed runs only.
         if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
@@ -4123,6 +4163,74 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
           verbose: true
+
+  ci-dep-parity:
+    name: Dependency Parity
+    # Records a resolved-dependency digest (pnpm-lock.yaml sha + extracted
+    # name->versions map) on PR runs as an artifact. On merge_group, diffs the
+    # merge-group digest against the digests of the PR heads being merged and
+    # fails naming the differing packages — the detector for the
+    # lockfile-identical-but-resolved-differently class (js-yaml v5/v4).
+    # No install required: the lockfile IS the resolved-version contract.
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') ||
+      github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compute dependency digest
+        run: node .github/scripts/dep-parity.js write
+
+      - name: Upload PR-head digest
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dep-digest-${{ github.event.pull_request.head.sha }}
+          path: dep-digest.json
+          retention-days: 14
+
+      - name: Compare merge-group digest against PR-head digests
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          cp dep-digest.json dep-digest.mg.json
+          echo "Merge group head_ref: $HEAD_REF"
+
+          # head_ref format: refs/heads/gh-readonly-queue/main/pr-<N>-<sha>
+          PR_NUMBERS=$(echo "$HEAD_REF" | grep -oE 'pr-[0-9]+' | sed 's/pr-//' | sort -u)
+          if [ -z "$PR_NUMBERS" ]; then
+            echo "::warning::No PR numbers in merge-group head_ref; skipping parity comparison"
+            exit 0
+          fi
+
+          FAILED=0
+          for PR in $PR_NUMBERS; do
+            echo "--- PR #$PR ---"
+            PR_SHA=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.head.sha')
+            echo "PR head sha: $PR_SHA"
+
+            RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?event=pull_request&head_sha=$PR_SHA&status=completed&per_page=1" --jq '.workflow_runs[0].id // empty')
+            if [ -z "$RUN_ID" ]; then
+              echo "::warning::No completed PR CI run for $PR_SHA; skipping parity for PR #$PR"
+              continue
+            fi
+
+            if ! gh run download "$RUN_ID" --repo "${{ github.repository }}" -n "dep-digest-$PR_SHA" -D "pr-digest-$PR" 2>/dev/null; then
+              echo "::warning::No dep-digest artifact on run $RUN_ID (pre-dates this job?); skipping"
+              continue
+            fi
+
+            if ! node .github/scripts/dep-parity.js diff "pr-digest-$PR/dep-digest.json" dep-digest.mg.json; then
+              FAILED=1
+            fi
+          done
+
+          exit $FAILED
 
   ci-exact-head-coverage:
     name: Exact-head Coverage
