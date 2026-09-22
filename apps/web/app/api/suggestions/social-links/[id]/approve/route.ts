@@ -15,7 +15,6 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { socialLinkSuggestions } from '@/lib/db/schema/dsp-enrichment';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -54,13 +53,12 @@ export async function POST(
 
     // Verify ownership
     const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
+      .select({ id: creatorProfiles.id, userId: creatorProfiles.userId })
       .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
 
-    if (!profile || profile.clerkId !== userId) {
+    if (!profile || profile.userId !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

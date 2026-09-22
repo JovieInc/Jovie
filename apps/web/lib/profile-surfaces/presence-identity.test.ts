@@ -176,9 +176,9 @@ describe('presence identity', () => {
       'catalog',
       'search',
     ]);
-    expect(summaries[0]?.value).toBe('Published');
-    expect(summaries[1]?.value).toBe('1 Need Attention');
-    expect(summaries[2]?.value).toBe('Not Measured');
+    expect(summaries[0]?.value).toBe('1 Page');
+    expect(summaries[1]?.value).toBe('1 Page');
+    expect(summaries[2]?.value).toBe('0 Pages');
     expect(summaries[3]?.value).toBe('#2');
   });
 });

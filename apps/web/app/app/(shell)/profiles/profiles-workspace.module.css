@@ -1,0 +1,28 @@
+/* This route is excluded from the public Tailwind source scan. Keep its table
+   geometry local rather than relying on an ungenerated utility. */
+.table {
+  table-layout: fixed;
+}
+
+.filter {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.mobileStatus {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .statusColumn {
+    display: none;
+  }
+
+  .mobileStatus {
+    display: block;
+  }
+
+  .mobileStatus > span {
+    min-height: 0;
+  }
+}

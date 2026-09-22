@@ -31,7 +31,6 @@ import { NextResponse } from 'next/server';
 
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { discogReleases } from '@/lib/db/schema/content';
 import {
@@ -107,14 +106,13 @@ export async function GET(request: Request) {
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
-        clerkId: users.clerkId,
+        userId: creatorProfiles.userId,
         avatarUrl: creatorProfiles.avatarUrl,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
         settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
 
@@ -125,7 +123,7 @@ export async function GET(request: Request) {
       );
     }
 
-    if (profile.clerkId !== userId) {
+    if (profile.userId !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

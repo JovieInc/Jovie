@@ -56,7 +56,7 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
     const rows = Array.from(container.querySelectorAll('tbody tr'));
     const finalRow = rows.at(-1);
     const secondaryLine = finalRow?.querySelector<HTMLElement>(
-      'td:first-child [title^="http"]'
+      'td:first-child [data-testid="presence-page-identity"]'
     );
     if (!finalRow || !secondaryLine) {
       throw new Error(
@@ -130,6 +130,7 @@ test('keeps the final profile row and destination line visible in a constrained 
 
   const workspace = page.getByTestId('profiles-workspace');
   await expect(workspace).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
   const table = workspace.getByRole('table');
   await expect(table).toBeVisible({ timeout: 30_000 });
   await expect(table.locator('tbody tr').first()).toBeVisible({
@@ -151,6 +152,7 @@ test('keeps the final profile row and destination line visible in a constrained 
     timeout: 30_000,
   });
 
+  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
   const shortMetrics = await readFinalRowMetrics(table);
   logMetrics('short', shortMetrics);
   expect(shortMetrics.scrollHeight).toBeGreaterThan(shortMetrics.clientHeight);
@@ -174,4 +176,66 @@ test('keeps the final profile row and destination line visible in a constrained 
   const tallMetrics = await readFinalRowMetrics(table);
   logMetrics('tall', tallMetrics);
   expectFinalRowWithinClippingAncestors(tallMetrics);
+});
+
+test('keeps page identity and review status readable at narrow widths', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await setTestAuthBypassSession(page, 'creator-ready');
+  const suggestionsResponse = page.waitForResponse(
+    response => new URL(response.url()).pathname === '/api/suggestions'
+  );
+  await page.goto(
+    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`
+  );
+  await page.waitForURL(/\/app\/profiles(?:$|\?)/);
+  const response = await suggestionsResponse;
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    success: true,
+    suggestions: expect.any(Array),
+  });
+  await page.getByRole('button', { name: 'Suggested', exact: true }).click();
+  await expect(page.getByTestId('suggested-connections-review')).toBeVisible();
+  await expect(
+    page.getByTestId('suggested-connections-error-state')
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
+  const workspace = page.getByTestId('profiles-workspace');
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const table = workspace.getByRole('table');
+    const firstRow = table.locator('tbody tr').first();
+    await expect(firstRow.getByTestId('presence-page-identity')).toBeVisible();
+    await page.screenshot({
+      path: test.info().outputPath(`presence-before-${width}.png`),
+      fullPage: true,
+    });
+    const bounds = await table.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeLessThanOrEqual(width);
+    if (width < 640) {
+      await expect(
+        table.getByRole('columnheader', { name: 'Status', exact: true })
+      ).toBeHidden();
+      const identityBounds = await firstRow.locator('td').first().boundingBox();
+      expect(identityBounds!.width).toBeGreaterThan(200);
+    }
+    await firstRow.focus();
+    await firstRow.press('Enter');
+    if (width < 640) {
+      await expect(
+        page.getByRole('dialog', { name: 'Presence details' })
+      ).toBeVisible();
+    } else {
+      await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+    }
+    await page.screenshot({
+      path: test.info().outputPath(`presence-${width}.png`),
+      fullPage: true,
+    });
+    await page.keyboard.press('Escape');
+    await expect(table).toBeVisible();
+  }
 });
