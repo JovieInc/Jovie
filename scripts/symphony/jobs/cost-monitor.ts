@@ -30,6 +30,8 @@ const NON_WATCHDOG_SERVICES = [
   'co.jovie.hermes.cron-daily-briefing',
   'co.jovie.hermes.cron-deterministic-tracker',
   'co.jovie.hermes.cron-free-model-health',
+  'co.jovie.hermes.cron-agent-ingest',
+  'co.jovie.hermes.cron-agent-label',
   'co.jovie.hermes.voice-memo-watcher',
   'co.jovie.hermes.agentcookie-receiver',
   'co.jovie.hermes.agentcookie-sync',
