@@ -123,7 +123,7 @@ function stableStringify(value: unknown): string {
   }
   if (value && typeof value === 'object') {
     return `{${Object.keys(value as Record<string, unknown>)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .map(
         key =>
           `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`
@@ -163,15 +163,21 @@ export function computeMerchQaInputHash(option: MerchQaHashSubject): string {
       productType: option.productType,
       colorway: option.colorway,
       technique: option.technique,
-      placements: [...option.placements].sort(),
-      availableSizes: [...option.availableSizes].sort(),
+      placements: [...option.placements].sort((a, b) => a.localeCompare(b)),
+      availableSizes: [...option.availableSizes].sort((a, b) =>
+        a.localeCompare(b)
+      ),
       printfulCatalogProductId: option.printfulCatalogProductId,
       printfulCatalogVariantIds: [...option.printfulCatalogVariantIds].sort(
         (a, b) => a - b
       ),
-      mockupUrls: [...option.mockupUrls].sort(),
-      printFileUrls: [...option.printFileUrls].sort(),
-      productionWarnings: [...option.productionWarnings].sort(),
+      mockupUrls: [...option.mockupUrls].sort((a, b) => a.localeCompare(b)),
+      printFileUrls: [...option.printFileUrls].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+      productionWarnings: [...option.productionWarnings].sort((a, b) =>
+        a.localeCompare(b)
+      ),
       mockupStatus: readOptionMockupStatus(option.qualityReview),
       contentReview,
     })
@@ -326,10 +332,7 @@ export async function runMerchCandidateQa(
   confidence = Math.min(confidence, visual.confidence);
   remediationInstruction =
     visual.remediationInstruction ?? remediationInstruction;
-  details.visual = {
-    reviewerVersion: reviewer.version,
-    ...(visual.details ?? {}),
-  };
+  details.visual = { reviewerVersion: reviewer.version, ...visual.details };
 
   const priorReceipts = await db
     .select({ id: merchCandidateQaReviews.id })

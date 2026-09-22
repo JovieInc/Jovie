@@ -1989,7 +1989,7 @@ export async function remediateMerchCandidate(params: {
       )
     )
     .limit(1);
-  if (!option || option.status !== 'quarantined') {
+  if (option?.status !== 'quarantined') {
     throw new Error('Only quarantined merch candidates can be remediated');
   }
   return createMerchRemediationCandidate({
