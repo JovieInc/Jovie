@@ -20,10 +20,13 @@ type RedisCommandClient = Redis & {
 
 function isValidUpstashRestUrl(url: string | undefined | null): url is string {
   if (!url) return false;
-  const trimmed = url.trim();
   // Upstash REST client requires https. Invalid placeholders / empty / rediss://
   // must fail soft — never throw during Next page data collection / build.
-  return /^https:\/\//i.test(trimmed);
+  try {
+    return new URL(url.trim()).protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function getUpstashConfig(): { url: string; token: string } | null {
