@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LinearRequestError,
@@ -9,6 +10,13 @@ import {
   EvePilotCapabilityDeniedError,
 } from '../agent/select-identity';
 import { linearIssueTool } from '../agent/tools/linear_issue';
+
+// The materialized Summer app has one fixed identity: binding another
+// identity throws cross-domain before any capability check, and the runtime
+// ignores EVE_IDENTITY. The pilot source repo can bind both identities.
+const isMaterializedSummerApp = existsSync(
+  new URL('../agent/runtime-identity.ts', import.meta.url)
+);
 
 const BASE_INPUT = {
   teamKey: 'jov',
@@ -191,11 +199,17 @@ describe('linear_issue tool session availability', () => {
 describe('linear coordination capability boundary', () => {
   it('denies the jovie identity and admits summer', () => {
     expect(() =>
-      bindEvePilotIdentity('jovie').require('linear-coordination-write')
-    ).toThrow(EvePilotCapabilityDeniedError);
-    expect(() =>
       bindEvePilotIdentity('summer').require('linear-coordination-write')
     ).not.toThrow();
+    if (isMaterializedSummerApp) {
+      // The built Summer app is single-identity: cross-domain binding is
+      // rejected before any capability check.
+      expect(() => bindEvePilotIdentity('jovie')).toThrow(/cross-domain/);
+    } else {
+      expect(() =>
+        bindEvePilotIdentity('jovie').require('linear-coordination-write')
+      ).toThrow(EvePilotCapabilityDeniedError);
+    }
   });
 });
 
@@ -209,10 +223,19 @@ describe('linear_issue tool', () => {
     sourceRef: 'imessage-thread-receipt-2026-09-21',
   };
 
-  it('denies the tool for the jovie identity runtime', async () => {
+  it('denies the tool outside the summer runtime', async () => {
     vi.stubEnv('EVE_IDENTITY', 'jovie');
     const result = await linearIssueTool.execute(input);
-    expect(result).toEqual({ ok: false, code: 'capability_denied' });
+    if (isMaterializedSummerApp) {
+      // Single-identity runtime: a foreign EVE_IDENTITY fails closed at the
+      // application boundary, and the capability gate itself never admits it.
+      expect(result).toEqual({
+        ok: false,
+        code: 'runtime_identity_unavailable',
+      });
+    } else {
+      expect(result).toEqual({ ok: false, code: 'capability_denied' });
+    }
   });
 
   it('reports linear_unconfigured instead of claiming a write when no key exists', async () => {
