@@ -11,6 +11,7 @@ import type { PublicRelease } from '@/components/features/profile/releases/types
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -549,6 +550,7 @@ async function ArtistPageContent({
 }
 
 export default async function ArtistPage({ params }: Readonly<Props>) {
+  assertLiveProfileRoute();
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
 
