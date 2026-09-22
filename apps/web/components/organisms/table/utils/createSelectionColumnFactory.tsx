@@ -26,19 +26,20 @@
  * });
  */
 
+import type { JSX, RefObject } from 'react';
 import type {
   CellContext,
   HeaderContext,
   Row,
+  RowData,
   Table,
-} from '@tanstack/react-table';
-import type { JSX, RefObject } from 'react';
+} from '@/lib/tanstack-table';
 import { TableCheckboxCell } from '../atoms/TableCheckboxCell';
 
 /**
  * Configuration options for creating selection column renderers.
  */
-export interface SelectionColumnOptions<TData> {
+export interface SelectionColumnOptions<TData extends RowData> {
   /** Ref to current selected IDs set - read at render time to prevent column recreation */
   selectedIdsRef: RefObject<Set<string>>;
   /** Ref to header checkbox state - read at render time to prevent column recreation */
@@ -60,7 +61,7 @@ export interface SelectionColumnOptions<TData> {
 /**
  * Return type for the selection column factory.
  */
-export interface SelectionColumnRenderers<TData> {
+export interface SelectionColumnRenderers<TData extends RowData> {
   /**
    * Creates the header renderer for the checkbox column.
    * Returns a function component that renders the header checkbox.
@@ -85,7 +86,7 @@ export interface SelectionColumnRenderers<TData> {
  * @param options Configuration for the selection column
  * @returns Object with createHeaderRenderer and createCellRenderer functions
  */
-export function createSelectionColumnFactory<TData>(
+export function createSelectionColumnFactory<TData extends RowData>(
   options: SelectionColumnOptions<TData>
 ): SelectionColumnRenderers<TData> {
   const {

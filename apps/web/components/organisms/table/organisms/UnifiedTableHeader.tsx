@@ -1,10 +1,10 @@
 'use client';
 
-import type { HeaderGroup } from '@tanstack/react-table';
+import type { HeaderGroup, RowData } from '@/lib/tanstack-table';
 import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import { presets } from '../table.styles';
 
-export interface UnifiedTableHeaderProps<TData> {
+export interface UnifiedTableHeaderProps<TData extends RowData> {
   /**
    * Header groups from TanStack Table
    */
@@ -33,7 +33,7 @@ export interface UnifiedTableHeaderProps<TData> {
  * />
  * ```
  */
-export function UnifiedTableHeader<TData>({
+export function UnifiedTableHeader<TData extends RowData>({
   headerGroups,
   caption,
 }: UnifiedTableHeaderProps<TData>) {

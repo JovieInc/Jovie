@@ -2,7 +2,6 @@
 
 // @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
 import {
@@ -18,6 +17,7 @@ import {
 } from '@/components/shell/DspAvatarStack';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { releaseStatusClasses } from '@/lib/library/release-status';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 

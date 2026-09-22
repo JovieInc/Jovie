@@ -44,6 +44,9 @@ describe('ReleaseTable System B style guard', () => {
     expect(sources).toContain('system-b-release-table-row--expanded');
     expect(sources).toContain('system-b-release-table-track-stack');
     expect(sources).toContain('system-b-release-table-empty-state');
+    // Table API must route through the v9 compat adapter, never the package root.
+    expect(sources).toContain("'@/lib/tanstack-table'");
+    expect(sources).not.toContain("'@tanstack/react-table'");
   });
 
   it('keeps ReleaseTable primitives token-backed', () => {

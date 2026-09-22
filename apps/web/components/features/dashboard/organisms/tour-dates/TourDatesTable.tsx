@@ -1,11 +1,7 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import { Badge, type BadgeProps, Button } from '@jovie/ui';
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type SortingState,
-} from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -16,6 +12,11 @@ import {
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type SortingState,
+} from '@/lib/tanstack-table';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
@@ -131,7 +132,7 @@ const TicketsCell = memo(function TicketsCell({
       rel='noopener noreferrer'
       className='inline-flex items-center gap-1 text-accent hover:underline'
       onClick={event => event.stopPropagation()}
-      aria-label='Buy tickets (opens in new tab)'
+      aria-label='Buy Tickets (Opens In New Tab)'
     >
       <Icon name='Ticket' className='h-4 w-4' aria-hidden='true' />
       <span className='text-app'>Buy</span>

@@ -818,6 +818,19 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('routes table API imports through the v9 compat adapter', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'@/lib/tanstack-table'");
+    expect(source).not.toContain("'@tanstack/react-table'");
+  });
+
   it('renders a single unified filter menu button in the toolbar', () => {
     renderPage();
 
@@ -1230,23 +1243,26 @@ describe('TasksPageClient', () => {
     ['loading', { isLoading: true }],
     ['error', { isError: true }],
     ['empty', {}],
-  ] as const)('uses the raised release recovery rail for the %s state', (_status, queryState) => {
-    mockReleaseEntityData = null;
-    mockReleaseEntityIsError = queryState.isError ?? false;
-    mockReleaseEntityIsLoading = queryState.isLoading ?? false;
+  ] as const)(
+    'uses the raised release recovery rail for the %s state',
+    (_status, queryState) => {
+      mockReleaseEntityData = null;
+      mockReleaseEntityIsError = queryState.isError ?? false;
+      mockReleaseEntityIsLoading = queryState.isLoading ?? false;
 
-    renderPage();
-    openTask();
-    fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
-    const rightPanel = mockRegisterRightPanel.mock.calls.at(-1)?.[0];
-    render(rightPanel as React.ReactElement);
+      renderPage();
+      openTask();
+      fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
+      const rightPanel = mockRegisterRightPanel.mock.calls.at(-1)?.[0];
+      render(rightPanel as React.ReactElement);
 
-    expect(mockEntitySidebarShell).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        workspaceSurface: 'raised',
-      })
-    );
-  });
+      expect(mockEntitySidebarShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          workspaceSurface: 'raised',
+        })
+      );
+    }
+  );
 
   it('autosaves document edits and removes the manual save button', () => {
     renderPage();

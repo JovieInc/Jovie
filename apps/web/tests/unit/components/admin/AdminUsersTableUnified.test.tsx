@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
   RightPanelProvider,
@@ -9,7 +10,6 @@ import {
 } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AdminPeopleRightPanelProvider } from '@/features/admin/AdminPeopleRightPanelProvider';
-import { AdminUsersTableUnified } from '@/features/admin/admin-users-table/AdminUsersTableUnified';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean

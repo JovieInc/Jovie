@@ -1,10 +1,12 @@
 'use client';
+// @coverage-via apps/web/tests/unit/dashboard/TaskDataTable.test.tsx
 
 import { useCallback } from 'react';
 import {
   UnifiedTable,
   type UnifiedTableProps,
 } from '@/components/organisms/table';
+import type { RowData } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
 export const TASK_DATA_TABLE_CLASSNAME = 'text-app';
@@ -14,9 +16,10 @@ export const TASK_DATA_TABLE_CONTAINER_CLASSNAME =
 
 export const TASK_DATA_TABLE_ROW_CLASSNAME = 'group/row group/task-row';
 
-export type TaskDataTableProps<TData> = UnifiedTableProps<TData>;
+export type TaskDataTableProps<TData extends RowData> =
+  UnifiedTableProps<TData>;
 
-export function TaskDataTable<TData>({
+export function TaskDataTable<TData extends RowData>({
   className,
   containerClassName,
   enableVirtualization = false,

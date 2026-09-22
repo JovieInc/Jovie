@@ -1,18 +1,21 @@
 'use client';
+// @coverage-via apps/web/tests/unit/components/admin/AdminDataTable.test.tsx
 
 import {
   UnifiedTable,
   type UnifiedTableProps,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import type { RowData } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
 export const ADMIN_DATA_TABLE_CLASSNAME =
   'text-xs [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal';
 
-export type AdminDataTableProps<TData> = UnifiedTableProps<TData>;
+export type AdminDataTableProps<TData extends RowData> =
+  UnifiedTableProps<TData>;
 
-export function AdminDataTable<TData>({
+export function AdminDataTable<TData extends RowData>({
   className,
   enableVirtualization = true,
   rowHeight = 40,

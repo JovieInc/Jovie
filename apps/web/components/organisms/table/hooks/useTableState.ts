@@ -20,12 +20,12 @@
  * });
  */
 
+import { useMemo } from 'react';
 import type {
   ColumnPinningState,
   RowSelectionState,
   SortingState,
-} from '@tanstack/react-table';
-import { useMemo } from 'react';
+} from '@/lib/tanstack-table';
 
 export interface UseTableStateOptions {
   /** Row selection state */

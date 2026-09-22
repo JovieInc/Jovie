@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -178,5 +180,18 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     expect(image).not.toBeNull();
     expect(image).toHaveAttribute('src', 'https://cdn.jov.ie/alpha.jpg');
     expect(image).toHaveAttribute('alt', '');
+  });
+
+  it('routes table API imports through the v9 compat adapter', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'@/lib/tanstack-table'");
+    expect(source).not.toContain("'@tanstack/react-table'");
   });
 });

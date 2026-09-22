@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/dashboard/TasksPageClient.test.tsx
 
 import {
   Button,
@@ -9,7 +10,6 @@ import {
   DropdownMenuTrigger,
   UserAvatar,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowLeft,
   ChevronDown,
@@ -107,6 +107,7 @@ import {
   buildTaskPitchChatPrompt,
   isPitchRelatedText,
 } from '@/lib/services/pitch/targets';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import {
   compareTasksByBoardOrder,
   getVisibleTaskBoardStatuses,

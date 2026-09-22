@@ -3,7 +3,6 @@
 // @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
 
 import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   AlertTriangle,
   ExternalLink,
@@ -29,6 +28,7 @@ import {
   type AdminReleasesSort,
   useAdminReleasesInfiniteQuery,
 } from '@/lib/queries';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
 interface AdminReleasesTableProps {
@@ -195,7 +195,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
               {release.artistAvatarUrl ? (
                 <AvatarImage src={release.artistAvatarUrl} alt='' />
               ) : null}
-              <AvatarFallback className='text-3xs'>
+              <AvatarFallback>
                 <User className='size-3' />
               </AvatarFallback>
             </Avatar>

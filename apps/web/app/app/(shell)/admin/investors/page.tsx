@@ -1,5 +1,4 @@
 import { Badge, Button } from '@jovie/ui';
-import type { ColumnDef } from '@tanstack/react-table';
 import {
   CheckCircle2,
   CircleSlash,
@@ -15,6 +14,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import type { ColumnDef } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
   InvestorTable,

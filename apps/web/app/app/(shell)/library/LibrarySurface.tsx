@@ -19,11 +19,6 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import {
-  type ColumnDef,
-  createColumnHelper,
-  type RowSelectionState,
-} from '@tanstack/react-table';
-import {
   ArrowUpDown,
   Check,
   ChevronDown,
@@ -90,7 +85,6 @@ import {
   isDspQuietListScope,
   LIBRARY_INSPECTOR_TABS,
 } from '@/components/molecules/inspector';
-
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
@@ -147,6 +141,11 @@ import {
 } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type RowSelectionState,
+} from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {

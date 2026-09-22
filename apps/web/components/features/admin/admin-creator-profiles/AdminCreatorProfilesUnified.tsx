@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import {
   CheckCircle,
@@ -380,7 +381,9 @@ export function AdminCreatorProfilesUnified({
 
   // Row selection state for TanStack Table
   const rowSelection = useMemo(() => {
-    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+    return Object.fromEntries(
+      Array.from(selectedIds).map(id => [id, true as const])
+    );
   }, [selectedIds]);
 
   // Define columns using factory function

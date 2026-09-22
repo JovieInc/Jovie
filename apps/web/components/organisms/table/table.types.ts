@@ -1,4 +1,4 @@
-import type { RowData } from '@tanstack/react-table';
+import type { CellData, RowData, TableFeatures } from '@tanstack/react-table';
 import '@tanstack/react-table';
 
 /**
@@ -10,7 +10,11 @@ import '@tanstack/react-table';
  * row-state CSS into each consumer.
  */
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
+  interface ColumnMeta<
+    in out TFeatures extends TableFeatures,
+    in out TData extends RowData,
+    TValue extends CellData = CellData,
+  > {
     /** Additional tokenized cell/header classes owned by the consumer. */
     readonly className?: string;
     /** Horizontal alignment for dense numeric/action columns. */

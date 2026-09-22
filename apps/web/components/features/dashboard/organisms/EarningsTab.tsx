@@ -1,6 +1,6 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   Check,
   Copy,
@@ -17,12 +17,13 @@ import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { type TipperRow, useEarningsQuery } from '@/lib/queries';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
 import { formatAmount } from '@/lib/utils/format-number';
 import {
@@ -109,19 +110,23 @@ const StatCard = memo(function StatCard({
   iconColor,
 }: StatCardProps) {
   return (
-    <ContentSurfaceCard className='p-2.5'>
-      <div className='flex items-center gap-2'>
-        <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg}`}
-          aria-hidden='true'
-        >
-          <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+    <ContentSurfaceCard>
+      <div className='p-2.5'>
+        <div className='flex items-center gap-2'>
+          <div
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg}`}
+            aria-hidden='true'
+          >
+            <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+          </div>
+          <dt className='text-app font-caption text-secondary-token'>
+            {label}
+          </dt>
         </div>
-        <dt className='text-app font-caption text-secondary-token'>{label}</dt>
+        <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
+          {value}
+        </dd>
       </div>
-      <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
-        {value}
-      </dd>
     </ContentSurfaceCard>
   );
 });
@@ -263,20 +268,22 @@ export function EarningsTab() {
   // ── Empty state ──────────────────────────────────
   if (!handle) {
     return (
-      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-12 text-center'>
-        <div
-          className='flex h-12 w-12 items-center justify-center rounded-xl bg-surface-0'
-          aria-hidden='true'
-        >
-          <QrCode className='h-6 w-6 text-tertiary-token' />
+      <ContentSurfaceCard>
+        <div className='flex flex-col items-center justify-center gap-3 px-6 py-12 text-center'>
+          <div
+            className='flex h-12 w-12 items-center justify-center rounded-xl bg-surface-0'
+            aria-hidden='true'
+          >
+            <QrCode className='h-6 w-6 text-tertiary-token' />
+          </div>
+          <h2 className='text-base font-semibold text-primary-token'>
+            No Handle Set
+          </h2>
+          <p className='max-w-sm text-app text-secondary-token'>
+            Set up your artist handle in profile settings to generate a QR code
+            for your tip page.
+          </p>
         </div>
-        <h2 className='text-base font-semibold text-primary-token'>
-          No Handle Set
-        </h2>
-        <p className='max-w-sm text-app text-secondary-token'>
-          Set up your artist handle in profile settings to generate a QR code
-          for your tip page.
-        </p>
       </ContentSurfaceCard>
     );
   }
@@ -294,12 +301,14 @@ export function EarningsTab() {
       {isEarningsLoading ? (
         <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           {[1, 2, 3].map(i => (
-            <ContentSurfaceCard key={i} className='space-y-2 p-2.5'>
-              <div className='flex items-center gap-2'>
-                <div className='h-7 w-7 rounded-md skeleton' />
-                <div className='h-3 w-16 rounded-sm skeleton' />
+            <ContentSurfaceCard key={i}>
+              <div className='space-y-2 p-2.5'>
+                <div className='flex items-center gap-2'>
+                  <div className='h-7 w-7 rounded-md skeleton' />
+                  <div className='h-3 w-16 rounded-sm skeleton' />
+                </div>
+                <div className='h-7 w-20 rounded-md skeleton' />
               </div>
-              <div className='h-7 w-20 rounded-md skeleton' />
             </ContentSurfaceCard>
           ))}
         </div>
@@ -356,82 +365,77 @@ export function EarningsTab() {
         QR Code
       </p>
 
-      <ContentSurfaceCard className='p-3 sm:p-4'>
-        <div className='flex items-center gap-2 mb-4'>
-          <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
-            aria-hidden='true'
-          >
-            <QrCode className='h-3.5 w-3.5 text-accent' />
-          </div>
-          <h2 className='text-app font-caption text-primary-token'>
-            Tip QR Code
-          </h2>
-        </div>
-
-        <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
-          {/* Preview */}
-          <div className='shrink-0 rounded-lg bg-white dark:bg-surface-1 p-2'>
-            <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
+      <ContentSurfaceCard>
+        <div className='p-3 sm:p-4'>
+          <div className='flex items-center gap-2 mb-4'>
+            <div
+              className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
+              aria-hidden='true'
+            >
+              <QrCode className='h-3.5 w-3.5 text-accent' />
+            </div>
+            <h2 className='text-app font-caption text-primary-token'>
+              Tip QR Code
+            </h2>
           </div>
 
-          {/* Actions */}
-          <div className='flex flex-1 flex-col gap-4'>
-            <div>
-              <p className='text-app font-caption text-primary-token'>
-                Share your tip page
-              </p>
-              <p className='mt-1 text-app leading-5 text-secondary-token'>
-                Download this QR code to print on merch, flyers, or display at
-                shows. The high-res version is 1024px for crisp output.
-              </p>
+          <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
+            {/* Preview */}
+            <div className='shrink-0 rounded-lg bg-white dark:bg-surface-1 p-2'>
+              <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
             </div>
 
-            {/* Tip URL display */}
-            <DrawerSurfaceCard className='flex items-center gap-2 rounded-md bg-surface-0 px-2.5 py-2'>
-              <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
-                {tipUrl}
-              </span>
-            </DrawerSurfaceCard>
+            {/* Actions */}
+            <div className='flex flex-1 flex-col gap-4'>
+              <div>
+                <p className='text-app font-caption text-primary-token'>
+                  Share your tip page
+                </p>
+                <p className='mt-1 text-app leading-5 text-secondary-token'>
+                  Download this QR code to print on merch, flyers, or display at
+                  shows. The high-res version is 1024px for crisp output.
+                </p>
+              </div>
 
-            {/* Action buttons */}
-            <div className='flex flex-wrap gap-2'>
-              <DrawerButton
-                tone='secondary'
-                size='sm'
-                className='gap-2'
-                onClick={handleDownloadPng}
-                disabled={isDownloadingPng}
-              >
-                <FileImage className='h-3.5 w-3.5' />
-                {isDownloadingPng ? 'Generating...' : 'Download PNG'}
-              </DrawerButton>
+              {/* Tip URL display */}
+              <div className='flex items-center gap-2 rounded-md border border-subtle bg-surface-0 px-2.5 py-2'>
+                <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
+                  {tipUrl}
+                </span>
+              </div>
 
-              <DrawerButton
-                tone='secondary'
-                size='sm'
-                className='gap-2'
-                onClick={handleDownloadSvg}
-                disabled={isDownloadingSvg}
-              >
-                <FileCode2 className='h-3.5 w-3.5' />
-                {isDownloadingSvg ? 'Generating...' : 'Download SVG'}
-              </DrawerButton>
+              {/* Action buttons */}
+              <div className='flex flex-wrap gap-2'>
+                <DrawerButton
+                  tone='secondary'
+                  size='sm'
+                  onClick={handleDownloadPng}
+                  disabled={isDownloadingPng}
+                >
+                  <FileImage className='h-3.5 w-3.5' />
+                  {isDownloadingPng ? 'Generating...' : 'Download PNG'}
+                </DrawerButton>
 
-              <DrawerButton
-                tone='ghost'
-                size='sm'
-                className='gap-2'
-                onClick={handleCopyLink}
-              >
-                {isCopySuccess ? (
-                  <Check className='h-3.5 w-3.5 text-success' />
-                ) : (
-                  <Copy className='h-3.5 w-3.5' />
-                )}
-                {isCopySuccess ? 'Copied' : 'Copy tip link'}
-              </DrawerButton>
+                <DrawerButton
+                  tone='secondary'
+                  size='sm'
+                  onClick={handleDownloadSvg}
+                  disabled={isDownloadingSvg}
+                >
+                  <FileCode2 className='h-3.5 w-3.5' />
+                  {isDownloadingSvg ? 'Generating...' : 'Download SVG'}
+                </DrawerButton>
+
+                <DrawerButton tone='ghost' size='sm' onClick={handleCopyLink}>
+                  {isCopySuccess ? (
+                    <Check className='h-3.5 w-3.5 text-success' />
+                  ) : (
+                    <Copy className='h-3.5 w-3.5' />
+                  )}
+                  {isCopySuccess ? 'Copied' : 'Copy tip link'}
+                </DrawerButton>
+              </div>
             </div>
           </div>
         </div>

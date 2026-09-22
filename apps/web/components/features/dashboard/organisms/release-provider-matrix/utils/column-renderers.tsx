@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
@@ -30,6 +29,7 @@ import {
 } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
 // ============================================================================
@@ -88,7 +88,7 @@ export function createSelectCellRenderer(
   selectedIdsRef: RefObject<Set<string>>,
   onToggleSelect: (id: string) => void
 ) {
-  return function SelectCell({ row }: CellContext<ReleaseViewModel, unknown>) {
+  return function SelectCell({ row }: CellContext<ReleaseViewModel, string>) {
     const release = row.original;
     const isChecked = selectedIdsRef.current?.has(release.id) ?? false;
     const rowNumber = row.index + 1;
@@ -178,7 +178,7 @@ export function createReleaseCellRenderer(
 ) {
   return function ReleaseCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     return (
       <ReleaseCell
         release={row.original}
@@ -199,7 +199,7 @@ export function createExpandableReleaseCellRenderer(
 ) {
   return function ExpandableReleaseCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     const release = row.original;
     const expanded = isExpanded(release.id);
     const loading = isLoading(release.id);
@@ -239,7 +239,7 @@ export function createAvailabilityCellRenderer(
 ) {
   return function AvailabilityCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     return (
       <AvailabilityCell
         release={row.original}
@@ -260,7 +260,7 @@ export function createSmartLinkCellRenderer(
 ) {
   return function SmartLinkCellRenderer({
     row,
-  }: CellContext<ReleaseViewModel, unknown>) {
+  }: CellContext<ReleaseViewModel, string>) {
     return (
       <SmartLinkCell
         release={row.original}
@@ -314,7 +314,7 @@ export function createRightMetaCellRenderer(
 export function createActionsCellRenderer(
   getContextMenuItems: (release: ReleaseViewModel) => ContextMenuItemType[]
 ) {
-  return function ActionsCell({ row }: CellContext<ReleaseViewModel, unknown>) {
+  return function ActionsCell({ row }: CellContext<ReleaseViewModel, string>) {
     const contextMenuItems = getContextMenuItems(row.original);
     const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
@@ -462,7 +462,7 @@ export function renderGenresCell({
  */
 export function renderMetricsCell({
   row,
-}: CellContext<ReleaseViewModel, unknown>) {
+}: CellContext<ReleaseViewModel, string>) {
   const release = row.original;
   const duration = release.totalDurationMs
     ? formatDuration(release.totalDurationMs)
@@ -505,7 +505,7 @@ export function renderMetricsCell({
  */
 export function renderStatsCell({
   row,
-}: CellContext<ReleaseViewModel, unknown>) {
+}: CellContext<ReleaseViewModel, string>) {
   const release = row.original;
   const dateStr = release.releaseDate
     ? formatReleaseDateMonthYear(release.releaseDate)

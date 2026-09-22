@@ -1,13 +1,13 @@
 'use client';
 
-import type { Header } from '@tanstack/react-table';
-import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
+import type { Header, RowData } from '@/lib/tanstack-table';
+import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { iconColors, tableAlignment } from '../table.styles';
 
-interface TableHeaderCellProps<TData>
+interface TableHeaderCellProps<TData extends RowData>
   extends Readonly<{
     readonly header: Header<TData, unknown>;
     readonly canSort: boolean;
@@ -25,7 +25,7 @@ interface TableHeaderCellProps<TData>
  * - Consistent styling across all table states
  * - Accessibility support (aria-labels, keyboard navigation)
  */
-export function TableHeaderCell<TData>({
+export function TableHeaderCell<TData extends RowData>({
   header,
   canSort,
   sortDirection,

@@ -1,9 +1,9 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
-import type { Row } from '@tanstack/react-table';
-import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
+// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
+import type { Row, RowData } from '@/lib/tanstack-table';
+import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { presets, rowState, tableAlignment } from '../table.styles';
@@ -22,7 +22,7 @@ type ManagedTrProps =
   | 'className'
   | 'tabIndex';
 
-export interface VirtualizedTableRowProps<TData> {
+export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly row: Row<TData>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
@@ -66,7 +66,7 @@ export interface VirtualizedTableRowProps<TData> {
  * This component is used internally by UnifiedTable and VirtualizedTableBody
  * to render individual table rows with optimal performance.
  */
-function VirtualizedTableRowComponent<TData>({
+function VirtualizedTableRowComponent<TData extends RowData>({
   row,
   rowIndex,
   rowRefsMap,
@@ -221,7 +221,7 @@ function VirtualizedTableRowComponent<TData>({
 
 // Export the memoized component with proper generic typing
 export const VirtualizedTableRow = memo(VirtualizedTableRowComponent) as <
-  TData,
+  TData extends RowData,
 >(
   props: VirtualizedTableRowProps<TData> &
     Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>

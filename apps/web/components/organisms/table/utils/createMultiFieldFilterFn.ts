@@ -1,4 +1,4 @@
-import type { FilterFn } from '@tanstack/react-table';
+import type { FilterFn, RowData } from '@/lib/tanstack-table';
 
 /**
  * Creates a TanStack Table FilterFn that searches across arbitrary fields
@@ -19,7 +19,7 @@ import type { FilterFn } from '@tanstack/react-table';
  *   globalFilterFn={filterFn}
  * />
  */
-export function createMultiFieldFilterFn<TData>(
+export function createMultiFieldFilterFn<TData extends RowData>(
   fields: Array<(row: TData) => string | number | null | undefined>
 ): FilterFn<TData> {
   return (row, _columnId, filterValue) => {

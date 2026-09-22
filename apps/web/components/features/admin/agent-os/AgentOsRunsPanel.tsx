@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/components/admin/AgentOsRunsPanel.test.tsx
 
 import { Badge, Button } from '@jovie/ui';
 import {
@@ -6,8 +7,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui/atoms/popover';
-import type { CellContext, ColumnDef } from '@tanstack/react-table';
-import { createColumnHelper } from '@tanstack/react-table';
 import {
   Bot,
   GitPullRequestArrow,
@@ -27,6 +26,8 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { rowState, TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import type { AgentRunArtifact, AgentRunStatus } from '@/lib/agent-os/artifact';
+import type { CellContext, ColumnDef } from '@/lib/tanstack-table';
+import { createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { ApprovalQueuePanel } from './ApprovalQueuePanel';
 import { ArtifactDrawer } from './ArtifactDrawer';

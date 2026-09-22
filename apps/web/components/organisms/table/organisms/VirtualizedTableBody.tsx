@@ -2,16 +2,16 @@
 
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableBody.test.tsx
 
-import type { Row } from '@tanstack/react-table';
 import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import React from 'react';
+import type { Row, RowData } from '@/lib/tanstack-table';
 import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
 import { VirtualizedTableRow } from './VirtualizedTableRow';
 
-export interface VirtualizedTableBodyProps<TData> {
+export interface VirtualizedTableBodyProps<TData extends RowData> {
   /**
    * Table rows from TanStack Table
    */
@@ -174,7 +174,7 @@ export interface VirtualizedTableBodyProps<TData> {
  * />
  * ```
  */
-export function VirtualizedTableBody<TData>({
+export function VirtualizedTableBody<TData extends RowData>({
   rows,
   shouldVirtualize,
   virtualRows,

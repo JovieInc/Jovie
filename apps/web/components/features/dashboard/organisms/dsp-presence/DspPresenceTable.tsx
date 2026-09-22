@@ -1,6 +1,6 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { memo, useCallback } from 'react';
@@ -11,6 +11,7 @@ import {
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 // ============================================================================

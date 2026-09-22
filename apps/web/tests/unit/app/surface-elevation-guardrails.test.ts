@@ -15,6 +15,10 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '../../..');
 
+function readComponent(relativePath: string) {
+  return readFileSync(join(ROOT, relativePath), 'utf-8');
+}
+
 function findMatches(
   pattern: RegExp,
   globs: string[]
@@ -463,6 +467,88 @@ describe('surface elevation guardrails', () => {
       matches,
       `Found semi-transparent bg-surface-0/XX in app shell:\n${matches.map(m => `  ${m.file}:${m.line} → ${m.text}`).join('\n')}`
     ).toHaveLength(0);
+  });
+
+  it('routes migrated table surfaces through the v9 compat adapter', () => {
+    // TanStack Table v9 removed the v8 export surface; all table components must
+    // import the v8-shaped API from the local adapter, never the package root.
+    // Literal paths assigned to asserted bindings are required — component-ship
+    // coverage-via only counts exact node:fs reads of the component source.
+    const activityTable = readComponent(
+      'components/features/admin/ActivityTableUnified.tsx'
+    );
+    const agentOsRunsPanel = readComponent(
+      'components/features/admin/agent-os/AgentOsRunsPanel.tsx'
+    );
+    const adminReleasesTable = readComponent(
+      'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx'
+    );
+    const adminUsersTable = readComponent(
+      'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx'
+    );
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+    const leadTable = readComponent(
+      'components/features/admin/leads/LeadTable.tsx'
+    );
+    const adminDataTable = readComponent(
+      'components/features/admin/table/AdminDataTable.tsx'
+    );
+    const adminWaitlistTable = readComponent(
+      'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx'
+    );
+    const dspPresenceTable = readComponent(
+      'components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx'
+    );
+    const earningsTab = readComponent(
+      'components/features/dashboard/organisms/EarningsTab.tsx'
+    );
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+    const tourDatesTable = readComponent(
+      'components/features/dashboard/organisms/tour-dates/TourDatesTable.tsx'
+    );
+
+    const adapterSources = [
+      activityTable,
+      agentOsRunsPanel,
+      adminReleasesTable,
+      adminUsersTable,
+      adminFeedbackTable,
+      leadTable,
+      adminDataTable,
+      adminWaitlistTable,
+      dspPresenceTable,
+      earningsTab,
+      releaseTable,
+      tourDatesTable,
+    ];
+
+    for (const source of adapterSources) {
+      expect(source).not.toContain("'@tanstack/react-table'");
+    }
+
+    expect(activityTable).toContain("'@/lib/tanstack-table'");
+    expect(agentOsRunsPanel).toContain("'@/lib/tanstack-table'");
+    expect(adminReleasesTable).toContain("'@/lib/tanstack-table'");
+    expect(adminUsersTable).toContain("'@/lib/tanstack-table'");
+    expect(adminFeedbackTable).toContain("'@/lib/tanstack-table'");
+    expect(leadTable).toContain("'@/lib/tanstack-table'");
+    expect(adminDataTable).toContain("'@/lib/tanstack-table'");
+    expect(adminWaitlistTable).toContain("'@/lib/tanstack-table'");
+    expect(dspPresenceTable).toContain("'@/lib/tanstack-table'");
+    expect(earningsTab).toContain("'@/lib/tanstack-table'");
+    expect(releaseTable).toContain("'@/lib/tanstack-table'");
+    expect(tourDatesTable).toContain("'@/lib/tanstack-table'");
+
+    // AdminCreatorProfilesUnified composes AdminDataTable and owns no direct
+    // table API usage; guard that it stays off the package root regardless.
+    const creatorProfiles = readComponent(
+      'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
+    );
+    expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
   });
 
   it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {

@@ -1,5 +1,4 @@
 import { Badge } from '@jovie/ui';
-import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
@@ -16,6 +15,8 @@ import {
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
+import type { AdminUserPlan } from '@/lib/admin/users';
+import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
 
 /**
  * Renders the name cell with name and email (truncated with tooltip).
@@ -139,7 +140,7 @@ export function renderUsernameCell({
  */
 export function renderCreatedDateCell({
   getValue,
-}: CellContext<AdminUserRow, Date | null>) {
+}: CellContext<AdminUserRow, Date>) {
   return <DateCell date={getValue()} />;
 }
 
@@ -148,7 +149,7 @@ export function renderCreatedDateCell({
  */
 export function renderPlanCell({
   getValue,
-}: CellContext<AdminUserRow, string>) {
+}: CellContext<AdminUserRow, AdminUserPlan>) {
   const plan = getValue();
   return (
     <Badge size='sm' variant={plan === 'pro' ? 'primary' : 'secondary'}>

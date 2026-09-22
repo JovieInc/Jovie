@@ -3,11 +3,11 @@
 // @coverage-via apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/PromoDownloadsTable.test.tsx
 
 import { IconButton, Switch } from '@jovie/ui';
-import { type ColumnDef } from '@tanstack/react-table';
 import { Music, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import { type ColumnDef } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
 export interface PromoDownloadFile {
@@ -130,7 +130,7 @@ export function PromoDownloadsTable({
               variant='inline'
               size='xs'
               ariaLabel={`Delete ${file.title}`}
-              className='hover:text-error'
+              destructive
             >
               <Trash2 className='h-3.5 w-3.5' aria-hidden='true' />
             </IconButton>
@@ -169,7 +169,7 @@ export function PromoDownloadsTable({
   return (
     <ContentSurfaceCard
       surface='table'
-      className='overflow-hidden p-0'
+      className='overflow-hidden'
       data-testid='promo-downloads-table-surface'
     >
       <UnifiedTable
