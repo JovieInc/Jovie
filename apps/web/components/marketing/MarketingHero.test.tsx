@@ -35,11 +35,13 @@ describe('MarketingHero source-backed default story', () => {
       name: 'Drop more music, with less work.',
     });
     expect(heading).toHaveClass('marketing-hero-headline', 'line-clamp-2');
+    expect(heading).not.toHaveClass('line-clamp-3');
     expect(heading).toHaveAttribute(
       'id',
       MARKETING_HERO_DEFAULT_PROPS.headingId
     );
     expect(heading).toHaveClass('marketing-h1-max-two-lines');
+    expect(heading).not.toHaveStyle({ WebkitLineClamp: '3' });
     expect(heading).not.toHaveAttribute('aria-label');
     expect(
       screen.getByText(
@@ -54,6 +56,45 @@ describe('MarketingHero source-backed default story', () => {
       '/pricing'
     );
     expect(screen.getByTestId('home-trust-section')).toBeInTheDocument();
+  });
+
+  it('supports the three-line Jovie Card headline without changing the default clamp', () => {
+    render(
+      <MarketingHero
+        headline='Your Jovie profile. Ready for the real world.'
+        subtitle='Join the list for access updates.'
+        headingId='jovie-card-heading'
+        testId='jovie-card-hero'
+        sectionVariant='split-screenshot-right'
+        headlineMaxLines={3}
+        primaryCta={{ label: 'Join the list', href: '#join-the-list' }}
+        logos={false}
+      />
+    );
+
+    const hero = screen.getByTestId('jovie-card-hero');
+    expect(hero).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/MarketingHero.tsx'
+    );
+    expect(hero).toHaveAttribute(
+      'data-marketing-variant',
+      'split-screenshot-right'
+    );
+
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Your Jovie profile. Ready for the real world.',
+    });
+    expect(heading).toHaveClass('marketing-hero-headline', 'line-clamp-3');
+    expect(heading).not.toHaveClass(
+      'line-clamp-2',
+      'marketing-h1-max-two-lines'
+    );
+    expect(heading).toHaveStyle({
+      WebkitLineClamp: '3',
+      maxBlockSize: 'calc(3 * 1lh)',
+    });
   });
 
   it('binds Storybook directly to MarketingHero and limits the Pen claim', () => {

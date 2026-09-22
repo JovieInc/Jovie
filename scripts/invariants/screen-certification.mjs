@@ -98,6 +98,7 @@ web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
+web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
 web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile

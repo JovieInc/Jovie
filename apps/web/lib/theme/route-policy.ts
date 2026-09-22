@@ -12,6 +12,7 @@ export const THEME_ROUTE_POLICY = {
     '/',
     '/new',
     '/pricing',
+    '/card',
     '/artist-profiles',
     '/artist-profile',
     '/artist-notifications',

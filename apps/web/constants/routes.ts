@@ -150,6 +150,7 @@ export const APP_ROUTES = {
   ARTIST_PROFILE_LEGACY: '/artist-profile',
   ARTISTS: '/artists',
   BLOG: '/blog',
+  CARD: '/card',
   BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',
   BRAND: '/brand',
   BLOG_THE_MYSPACE_PROBLEM: '/blog/the-myspace-problem',
