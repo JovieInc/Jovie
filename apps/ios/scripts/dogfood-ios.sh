@@ -12,7 +12,7 @@
 #   crashes/             simulator crash reports (Jovie*.ips) from the run window
 #   logs/xcodebuild.log  captured xcodebuild output
 #
-# Out of scope for this slice (documented in docs/ios-dogfood.md):
+# Out of scope for this slice (documented in docs/IOS_DOGFOOD.md):
 #   - automatic Linear issue filing (Symphony's lane — report.json is the
 #     integration artifact it would consume)
 #   - nightly/merge-queue scheduling (plug-in point documented there too)
@@ -54,8 +54,13 @@ echo "dogfood: output=$OUTPUT_DIR"
 CRASH_SNAPSHOT="$OUTPUT_DIR/logs/diagnostic-reports.before.txt"
 ls "$CRASH_DIR" 2>/dev/null | sort >"$CRASH_SNAPSHOT" || true
 
-# Reuse the canonical destination resolution + simulator reset path.
-DESTINATION="$(JOVIE_IOS_RESET_SIMULATOR=0 bash "$SCRIPT_DIR/run-xcodebuild.sh" destination)"
+# Reuse the canonical destination resolution + simulator reset path. The
+# destination action emits phase logs before the destination line — keep only
+# the `platform=...` line.
+DESTINATION="$(
+  JOVIE_IOS_RESET_SIMULATOR=0 bash "$SCRIPT_DIR/run-xcodebuild.sh" destination \
+    | awk '/^platform=/{d=$0} END{print d}'
+)"
 if [[ -z "$DESTINATION" ]]; then
   echo "dogfood: no iOS Simulator destination resolved" >&2
   exit 1
@@ -170,8 +175,8 @@ LC_ALL=en_US.UTF-8 RUBYOPT= ruby -EUTF-8:UTF-8 -rjson -e '
       "crashes_dir" => "crashes"
     }.compact,
     "integration" => {
-      "linear_filing" => "not-wired — Symphony consumes report.json to propose issues; see docs/ios-dogfood.md",
-      "scheduling" => "not-wired — intended nightly lane; see docs/ios-dogfood.md"
+      "linear_filing" => "not-wired — Symphony consumes report.json to propose issues; see docs/IOS_DOGFOOD.md",
+      "scheduling" => "not-wired — intended nightly lane; see docs/IOS_DOGFOOD.md"
     }
   }
 
