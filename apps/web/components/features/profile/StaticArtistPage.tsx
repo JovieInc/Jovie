@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import type { PublicRelease } from '@/features/profile/releases/types';
@@ -57,6 +58,7 @@ export interface StaticArtistPageProps {
   readonly hideMoreMenu?: boolean;
   readonly showClaimFooter?: boolean;
   readonly claimFooterHref?: string | null;
+  readonly releaseCredits?: readonly SmartLinkCreditGroup[];
 }
 
 export function StaticArtistPage({
@@ -95,6 +97,7 @@ export function StaticArtistPage({
   hideMoreMenu = false,
   showClaimFooter = false,
   claimFooterHref = null,
+  releaseCredits,
 }: StaticArtistPageProps) {
   assertLiveProfileRoute();
   const viewModel = buildProfilePublicViewModel({
@@ -162,6 +165,7 @@ export function StaticArtistPage({
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
+      releaseCredits={releaseCredits}
       embeddedPreview={presentation === 'compact-preview'}
     />
   );
