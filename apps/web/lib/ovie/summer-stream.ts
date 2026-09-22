@@ -18,6 +18,8 @@ export async function createSummerAssistantStreamResponse(input: {
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       let metadata: Record<string, unknown> = { ...input.metadata };
+      let hasVisibleContent = false;
+      let failureState: (SummerTurnEvent & { type: 'state' }) | undefined;
       writer.write({
         type: 'start',
         messageId,
@@ -29,6 +31,7 @@ export async function createSummerAssistantStreamResponse(input: {
       writer.write({ type: 'text-start', id: textId });
       for await (const event of input.events) {
         if (event.type === 'text-delta' && event.text) {
+          hasVisibleContent ||= event.text.trim().length > 0;
           writer.write({ type: 'text-delta', id: textId, delta: event.text });
           continue;
         }
@@ -44,9 +47,22 @@ export async function createSummerAssistantStreamResponse(input: {
         }
         if (event.type === 'state') {
           metadata = { ...metadata, summerState: event.state };
+          if (
+            [
+              'unknown',
+              'unavailable',
+              'failure',
+              'failed_tool',
+              'disconnected',
+              'unauthorized',
+            ].includes(event.state)
+          ) {
+            failureState ??= event;
+          }
           continue;
         }
         if (event.type === 'tool') {
+          hasVisibleContent = true;
           metadata = { ...metadata, toolReceipt: event.receipt };
           writer.write({
             type: 'tool-input-available',
@@ -65,6 +81,15 @@ export async function createSummerAssistantStreamResponse(input: {
             },
           });
         }
+      }
+      if (failureState && !hasVisibleContent) {
+        // Display-only status, not a Summer answer or a durable turn. Keep
+        // admission, same-turn recovery and budget checkpoint semantics intact.
+        writer.write({
+          type: 'text-delta',
+          id: textId,
+          delta: `Summer connection status: ${failureState.state}. No reply is available. Do not resend this message until the original turn has been reconciled.`,
+        });
       }
       writer.write({ type: 'text-end', id: textId });
       writer.write({ type: 'finish-step' });
