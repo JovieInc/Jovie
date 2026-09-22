@@ -20,6 +20,26 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 - **Rich feature descriptions for AI agents and marketing:** `docs/PRODUCT_CAPABILITIES.md`
 - **User-facing documentation:** `apps/docs/` (live at docs.jov.ie)
 
+## Stable Feature IDs
+
+Help Center article frontmatter may reference only IDs in this table. The IDs
+are durable contracts: feature copy may change without changing the ID. Adding
+an ID does not certify the feature or make it publicly available; status and
+access remain authoritative in the product feature list below.
+
+| Feature ID | Product feature |
+|---|---|
+| smart-link-editing-and-customization | Smart link editing and customization |
+| auto-dsp-detection-linking | Auto DSP detection & linking |
+| auto-sync-from-spotify | Auto-sync from Spotify |
+| manual-release-creation | Manual release creation |
+| public-profile-pages | Public profile pages |
+| artist-bio-social-links | Artist bio & social links |
+| click-visit-tracking | Click & visit tracking |
+| audience-intelligence-device-location-intent | Audience intelligence (device, location, intent) |
+| ai-powered-insights | AI-powered insights |
+| direct-upgrade-checkout-flow | Direct upgrade checkout flow |
+
 ## Product Feature List
 
 | Product area | Feature | Status | Access model | Flag / Gate | Notes |
