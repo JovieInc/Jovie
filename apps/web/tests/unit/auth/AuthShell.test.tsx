@@ -11,6 +11,7 @@ const {
   searchParamsState,
   signInSocialMock,
   sendOtpMock,
+  trackMock,
 } = vi.hoisted(() => ({
   authState: {
     isLoaded: true,
@@ -25,6 +26,7 @@ const {
   searchParamsState: { value: '' },
   signInSocialMock: vi.fn(),
   sendOtpMock: vi.fn(),
+  trackMock: vi.fn(),
 }));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -52,6 +54,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  track: trackMock,
+}));
+
 vi.mock('@/lib/auth/oauth-providers', async () => {
   const actual = await vi.importActual<
     typeof import('@/lib/auth/oauth-providers')
@@ -77,10 +83,16 @@ vi.mock('@/lib/utils/logger', () => ({
 
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  AUTH_OFFER_SHELL_EVENTS,
+  AUTH_OFFER_SHELL_VARIANT_ID,
+} from '@/lib/auth/auth-offer-optimization';
+import { clearPlanIntent, getPlanIntentRecord } from '@/lib/auth/plan-intent';
 
 describe('AuthShell — Better Auth SSO + email-code contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearPlanIntent();
     authState.isLoaded = true;
     authState.isSignedIn = false;
     providerEnabledState.google = true;
@@ -90,6 +102,106 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     signInSocialMock.mockResolvedValue(undefined);
     sendOtpMock.mockResolvedValue({ data: {} });
     oneTapMock.mockResolvedValue(undefined);
+    trackMock.mockReset();
+  });
+
+  it('preserves offer and artist across provider success, cancellation and auth cross-links', async () => {
+    searchParamsState.value =
+      'plan=pro&interval=monthly&artist=Tim%20White&handle=timwhite';
+    render(<AuthShell mode='sign-up' />);
+    expect(screen.getByText('Start 14-day Pro trial')).toBeInTheDocument();
+    expect(screen.getByText(/199\/month/)).toBeInTheDocument();
+    expect(screen.getByText(/No credit card/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')
+    ).toContain('artist_name=Tim+White');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /google/i })
+    );
+    const call = signInSocialMock.mock.calls[0][0];
+    for (const key of [
+      'callbackURL',
+      'newUserCallbackURL',
+      'errorCallbackURL',
+    ]) {
+      const url = new URL(call[key], 'https://n');
+      expect(url.searchParams.get('plan')).toBe('pro');
+      expect(url.searchParams.get('interval')).toBe('month');
+      expect(url.searchParams.get('artist_name')).toBe('Tim White');
+      expect(url.searchParams.get('handle')).toBe('timwhite');
+    }
+    expect(getPlanIntentRecord()).toEqual({
+      plan: 'pro',
+      interval: 'month',
+      artist: 'Tim White',
+    });
+    expect(trackMock).toHaveBeenCalledWith(
+      AUTH_OFFER_SHELL_EVENTS.EXPOSURE,
+      expect.objectContaining({
+        variantIdentity: AUTH_OFFER_SHELL_VARIANT_ID,
+        plan: 'pro',
+        interval: 'month',
+        hasArtist: true,
+      })
+    );
+    expect(trackMock).toHaveBeenCalledWith(
+      AUTH_OFFER_SHELL_EVENTS.AUTH_STARTED,
+      expect.objectContaining({
+        variantIdentity: AUTH_OFFER_SHELL_VARIANT_ID,
+        plan: 'pro',
+        hasArtist: true,
+      })
+    );
+    expect(trackMock.mock.calls.flat().join(' ')).not.toMatch(/Tim White/);
+  });
+
+  it.each(['desktop_return', 'mobile_return'])(
+    'retains %s on provider cancellation with the offer',
+    async returnKey => {
+      searchParamsState.value = `plan=pro&artist=Tim&${returnKey}=%2Fapp%2Fsettings`;
+      render(
+        <AuthShell
+          mode='sign-in'
+          fallbackRedirectUrl='/auth/callback?state=native_state_123456'
+        />
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /google/i })
+      );
+      const url = new URL(
+        signInSocialMock.mock.calls[0][0].errorCallbackURL,
+        'https://n'
+      );
+      expect(url.searchParams.get(returnKey)).toBe('/app/settings');
+      expect(url.searchParams.get('artist_name')).toBe('Tim');
+      expect(url.searchParams.get('auth_state')).toBe('native_state_123456');
+    }
+  );
+
+  it('resolves subscriber state after provider auth even for an explicit checkout return', async () => {
+    searchParamsState.value = 'plan=pro&redirect_url=%2Fonboarding%2Fcheckout';
+    render(
+      <AuthShell mode='sign-in' fallbackRedirectUrl='/onboarding/checkout' />
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /google/i })
+    );
+    expect(signInSocialMock.mock.calls[0][0].callbackURL).toBe(
+      '/signin?redirect_url=%2Fonboarding%2Fcheckout&plan=pro'
+    );
+  });
+
+  it('does not sell stale annual or Max offers in the auth shell', () => {
+    searchParamsState.value = 'plan=pro&interval=annual';
+    const { rerender } = render(<AuthShell mode='sign-up' />);
+    expect(screen.getByText('Choose an available plan')).toBeInTheDocument();
+    expect(screen.queryByText(/199\/month/)).not.toBeInTheDocument();
+    searchParamsState.value = 'plan=max';
+    rerender(<AuthShell mode='sign-up' />);
+    expect(screen.getByText('Contact sales')).toBeInTheDocument();
+    expect(screen.queryByText(/trial/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/14 days|14-day/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no card/i)).not.toBeInTheDocument();
   });
 
   it('is ready at first paint without a Clerk-loaded gate', () => {
