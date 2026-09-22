@@ -25,6 +25,7 @@ import {
   requireVerifiedOwnerForReservation,
 } from '@/lib/onboarding/ownership-gate';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
+import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -433,6 +434,23 @@ export async function materializeClaimedOnboardingProfile({
         eq(chatConversations.userId, verifiedUserId)
       )
     );
+
+  // JOV-4514: the claimed conversation now has an owner — attach its durable
+  // work record. Idempotent; non-fatal so a failure never blocks the claim.
+  if (profileId) {
+    try {
+      await ensureChatWorkRecord({
+        conversationId,
+        creatorProfileId: profileId,
+      });
+    } catch (error) {
+      await captureError('Failed to create chat work record', error, {
+        operation: 'materialize_claimed_onboarding_profile',
+        conversationId,
+        profileId,
+      });
+    }
+  }
 
   const artistLabel = describeArtistProfileForVisitor({
     ownershipVerified: true,
