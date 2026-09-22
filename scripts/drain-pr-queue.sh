@@ -2543,49 +2543,6 @@ echo "$SNAP" | jq -r '
     "  non-main: " + ([.[] | select(main_target | not)] | length | tostring)
   ] | .[]'
 
-# Queue membership is not admission authority. Remove any native entry that
-# cannot prove a fresh exact-head v2 source receipt. Ancestry after main moves
-# is enforced by the required Merge Group Admission check. The same sole writer may then
-# re-enroll an otherwise eligible PR and persist new evidence after the new
-# AddedToMergeQueueEvent. Missing queue timestamps fail closed before mutation.
-if [[ "${DRAIN_RECONCILE_ADMISSION_RECEIPTS:-0}" == "1" ]]; then
-  if [[ "$MERGE_QUEUE_BACKEND" != "native" \
-    || "$DRAIN_PROMOTION_MODE" != "normal" \
-    || ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "::error::Admission receipt reconciliation requires native normal mode and an exact current main SHA" >&2
-    exit 1
-  fi
-  echo "=== DEQUEUE (unproven native admission -> canonical re-entry) ==="
-  while read -r pr; do
-    n="$(jq -r '.n' <<<"$pr")"
-    expected_head="$(jq -r '.headOid' <<<"$pr")"
-    enqueued_at="$(jq -r '.qa // empty' <<<"$pr")"
-    if [[ ! "$enqueued_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$ ]]; then
-      echo "::error::Queued PR #$n has no authoritative enqueue timestamp; refusing admission mutation" >&2
-      exit 1
-    fi
-    if queue_reentry_receipt_is_recoverable \
-      "$n" "$expected_head" "" "$FLEET_POLICY_MAIN_SHA" "$enqueued_at"; then
-      echo "  #$n  =fresh exact-checkpoint native admission"
-      continue
-    else
-      receipt_result=$?
-      if [[ "$receipt_result" -eq 2 ]]; then
-        echo "::error::Cannot reconcile admission for #$n without producer evidence; preserving membership" >&2
-        exit 1
-      fi
-    fi
-    echo "  #$n  stale or missing exact-checkpoint admission; canonical dequeue"
-    if ! dequeue_strict "$n" "$expected_head"; then
-      echo "::error::Failed to remove unproven native admission for #$n" >&2
-      exit 1
-    fi
-    SNAP="$(jq -c --argjson n "$n" '
-      map(if .n == $n then .q = false | .qs = null | .qp = null | .qa = null else . end)
-    ' <<<"$SNAP")"
-  done < <(jq -c '.[] | select(.q == true)' <<<"$SNAP")
-fi
-
 # --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
 echo "=== DEQUEUE (hard gates → queue removal) ==="
 while read -r pr; do
