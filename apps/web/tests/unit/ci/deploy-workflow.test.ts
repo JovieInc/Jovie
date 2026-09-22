@@ -5350,6 +5350,48 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain('credentials_configured=false');
   });
 
+  it('dispatches bounded marker recovery for an interrupted deployed generation', () => {
+    const health = readFileSync(productionControllerHealthPath, 'utf8');
+    const healthEvaluation = getStepBlock(
+      health,
+      'Evaluate exact current production controller'
+    );
+
+    // The deployed base is classified before the current-main evaluation so a
+    // stall on the canonical SHA is never masked by a healthy newer lineage.
+    expect(healthEvaluation).toContain('https://jov.ie/api/health/build-info');
+    expect(healthEvaluation).toContain('deployed_marker_recovery_dispatched');
+    expect(healthEvaluation).toContain(
+      'gh workflow run production-marker-recovery.yml'
+    );
+    expect(healthEvaluation).toContain('-f sha="$deployed_sha"');
+    expect(healthEvaluation).toContain(
+      '-f deployment_id="$deployed_deployment_id"'
+    );
+    expect(healthEvaluation).toContain('-f controller_run="$deployed_run"');
+    expect(healthEvaluation).toContain(
+      '-f controller_attempt="$deployed_attempt"'
+    );
+    expect(healthEvaluation).toContain('one_interrupted_marker_safe_to_rerun');
+    expect(healthEvaluation).toContain('malformed_deployed_recovery_evidence');
+    expect(healthEvaluation).toContain(
+      'contradictory_deployed_recovery_authority'
+    );
+    expect(healthEvaluation).toContain('deployed_');
+    // One recovery per generation: skip the dispatch when a re-proof for the
+    // same SHA is already in flight.
+    expect(healthEvaluation).toContain(
+      '(.display_title // "") | contains($sha)'
+    );
+    // The dispatch is bounded by a live-bind re-read and a marker
+    // classification recheck before it fires.
+    expect(healthEvaluation.indexOf('boundary_sha')).toBeGreaterThan(-1);
+    expect(healthEvaluation.indexOf('boundary_marker')).toBeGreaterThan(-1);
+    expect(
+      healthEvaluation.indexOf('Deployed SHA moved to $boundary_sha')
+    ).toBeLessThan(healthEvaluation.indexOf('gh workflow run'));
+  });
+
   it('fails closed on expired, duplicate, foreign, or unpaired marker evidence', () => {
     const markerState = readFileSync(productionMarkerStatePath, 'utf8');
 
@@ -5452,6 +5494,12 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(validate).toContain('Sentry Error Gate (production)');
     expect(validate).toContain('Promote to Production');
     expect(validate).toContain('recovery is not permitted');
+    // An interrupted verified marker is not durable truth: admission
+    // classifies marker state and re-proves one bound to this exact source
+    // attempt instead of refusing on artifact presence alone.
+    expect(validate).toContain('production-marker-state.mjs');
+    expect(validate).toContain('one_interrupted_marker_safe_to_rerun');
+    expect(validate).toContain('expired == true');
     expect(ownership).toContain('vercel inspect jov.ie --format=json');
     expect(ownership).toContain(
       'bash .github/scripts/verify-production-alias.sh'
@@ -5464,6 +5512,11 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(preserve).toContain('marker_upload_required=false');
     expect(preserve).toContain('marker_upload_required=true');
     expect(preserve).toContain('artifacts?name=$marker_name&per_page=100');
+    // The write boundary skips the upload only when a marker is verified;
+    // an interrupted marker still bound to this source attempt is replaced.
+    expect(preserve).toContain('production-marker-state.mjs');
+    expect(preserve).toContain('recovery_available');
+    expect(preserve).toContain('refusing to write');
     // JOV-5864: an expired marker fails classification as expired_marker yet
     // holds no downloadable bytes; recovery must not treat it as durable
     // truth (deadlock) and must delete expired same-name stubs so the
