@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
+import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import type { ArtistSearchState, SpotifyArtistResult } from '@/lib/queries';
 
 // jsdom doesn't implement scrollIntoView
@@ -555,6 +556,76 @@ describe('HeroSpotifySearch', () => {
       expect(params.get('spotify_url')).toBeNull();
       expect(params.get('starter_prompt')).toBe(
         "hey, I'm xyznonexistent. show me my Spotify."
+      );
+    });
+
+    it('emits a URL that /start resolves as a spotify_artist handoff (joined contract)', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+      await user.click(screen.getByText('Taylor Swift'));
+
+      const url = mockPush.mock.calls[0][0] as string;
+      expect(url.startsWith('/start?')).toBe(true);
+      // The receiver owns the param contract: whatever the hero emits must
+      // resolve through the real /start entry-handoff parser, unchanged.
+      const params = Object.fromEntries(new URLSearchParams(url.split('?')[1]));
+      expect(resolveStartEntryHandoff(params)).toEqual({
+        kind: 'spotify_artist',
+        prompt: "hey, I'm Taylor Swift. show me my Spotify.",
+        spotifyUrl: ARTISTS[0].url,
+        artistName: 'Taylor Swift',
+      });
+    });
+
+    it('emits a URL that /start resolves as a prompt handoff for free-text submit', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Michael Jackson');
+      await user.keyboard('{Enter}');
+
+      const url = mockPush.mock.calls[0][0] as string;
+      const params = Object.fromEntries(new URLSearchParams(url.split('?')[1]));
+      expect(resolveStartEntryHandoff(params)).toEqual({
+        kind: 'prompt',
+        prompt: "hey, I'm Michael Jackson. show me my Spotify.",
+      });
+    });
+
+    it('does not replay navigation on a repeated submit while still mounted', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      const input = getInput();
+      await user.type(input, 'Taylor');
+      await user.click(screen.getByText('Taylor Swift'));
+      expect(mockPush).toHaveBeenCalledTimes(1);
+
+      // The push resolves asynchronously; before unmount, a repeated Enter,
+      // or reopening the dropdown and re-clicking the same artist, must not
+      // emit a second /start navigation.
+      await user.keyboard('{Enter}');
+      fireEvent.focus(input);
+      await user.click(screen.getByText('Taylor Swift'));
+      expect(mockPush).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-arms the funnel when the visitor types after an incomplete navigation', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      const input = getInput();
+      await user.type(input, 'Taylor');
+      await user.click(screen.getByText('Taylor Swift'));
+      expect(mockPush).toHaveBeenCalledTimes(1);
+
+      // If the component stayed mounted (prefetch cache, interrupted nav), a
+      // fresh keystroke is new intent and must release the navigation latch.
+      await user.type(input, ' Phoebe');
+      await user.keyboard('{Enter}');
+      expect(mockPush).toHaveBeenCalledTimes(2);
+      const url = mockPush.mock.calls[1][0] as string;
+      const params = new URLSearchParams(url.split('?')[1]);
+      expect(params.get('starter_prompt')).toBe(
+        "hey, I'm Taylor Phoebe. show me my Spotify."
       );
     });
 

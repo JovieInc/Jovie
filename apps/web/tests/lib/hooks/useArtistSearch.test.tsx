@@ -323,6 +323,108 @@ describe('useArtistSearchQuery', () => {
     }
   });
 
+  it('purges stale results when cleared (JOV-6034)', async () => {
+    // keepPreviousData keeps the last result set attached after clear() empties
+    // the debounced query; an idle search must never surface stale artists.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          {
+            id: 'stale-1',
+            name: 'Stale Artist',
+            url: 'https://open.spotify.com/artist/stale-1',
+            popularity: 1,
+          },
+        ]),
+    });
+
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.searchImmediate('stale artist');
+    });
+    await waitFor(() => {
+      expect(result.current.state).toBe('success');
+    });
+    expect(result.current.results).toHaveLength(1);
+
+    act(() => {
+      result.current.clear();
+    });
+
+    expect(result.current.state).toBe('idle');
+    expect(result.current.query).toBe('');
+    expect(result.current.results).toEqual([]);
+  });
+
+  it('ignores a superseded request resolving after a newer search (latest wins)', async () => {
+    let resolveStale:
+      | ((response: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    mockFetch.mockImplementation((url: string) => {
+      if (String(url).includes('q=old%20artist')) {
+        return new Promise(resolve => {
+          resolveStale = resolve;
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            {
+              id: 'fresh-1',
+              name: 'Fresh Artist',
+              url: 'https://open.spotify.com/artist/fresh-1',
+              popularity: 90,
+            },
+          ]),
+      });
+    });
+
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.searchImmediate('old artist');
+    });
+    await waitFor(() => {
+      expect(result.current.state).toBe('loading');
+    });
+
+    act(() => {
+      result.current.searchImmediate('new artist');
+    });
+    await waitFor(() => {
+      expect(result.current.state).toBe('success');
+    });
+    expect(result.current.results[0]?.name).toBe('Fresh Artist');
+
+    await act(async () => {
+      resolveStale?.({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            {
+              id: 'stale-1',
+              name: 'Stale Artist',
+              url: 'https://open.spotify.com/artist/stale-1',
+              popularity: 1,
+            },
+          ]),
+      });
+    });
+
+    // The late result lands in its own query-key cache entry and never
+    // displaces the current query's results.
+    expect(result.current.results[0]?.name).toBe('Fresh Artist');
+    expect(result.current.state).toBe('success');
+    expect(result.current.query).toBe('new artist');
+  });
+
   it('should handle rate limit error', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

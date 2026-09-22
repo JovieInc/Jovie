@@ -200,6 +200,10 @@ export function HeroSpotifySearch({
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
+      // Fresh input means the prior push never completed the route change
+      // (the component is still mounted), so re-arm the navigation latch.
+      isNavigatingRef.current = false;
+      setIsNavigating(false);
       setSearchQuery(value);
       setActiveIndex(-1);
 
