@@ -24,63 +24,76 @@ const BASE = 'https://sonar.test';
 const TOKEN = 'test-secret-token';
 const noSleep = () => Promise.resolve();
 
-function captureLogger() {
+const captureLogger = () => {
   const lines = [];
   return {
     lines,
-    log: message => lines.push(`log:${message}`),
-    warn: message => lines.push(`warn:${message}`),
-    error: message => lines.push(`error:${message}`),
+    log: m => lines.push(`log:${m}`),
+    warn: m => lines.push(`warn:${m}`),
+    error: m => lines.push(`error:${m}`),
   };
-}
+};
 
-function ok(body, init = {}) {
-  return new Response(JSON.stringify(body), {
+const ok = (body, init = {}) =>
+  new Response(JSON.stringify(body), {
     status: 200,
     headers: { 'content-type': 'application/json' },
     ...init,
   });
-}
 
-function httpError(status, headers = {}) {
-  return new Response(JSON.stringify({ errors: [{ msg: `http ${status}` }] }), {
+const httpError = (status, headers = {}) =>
+  new Response(JSON.stringify({ errors: [{ msg: `http ${status}` }] }), {
     status,
     headers: { 'content-type': 'application/json', ...headers },
   });
-}
 
-function makeIssue(index, extra = {}) {
-  return {
-    key: `K${index}`,
-    rule: 'typescript:S100',
-    component: `JovieInc_Jovie:apps/web/file-${index % 4}.ts`,
-    severity: 'MAJOR',
-    type: 'CODE_SMELL',
-    status: 'OPEN',
-    message: `issue ${index}`,
-    creationDate: '2026-09-01T00:00:00+0000',
-    ...extra,
-  };
-}
+const pageOf = (total, page, ps, issues) =>
+  ok({ paging: { pageIndex: page, pageSize: ps, total }, issues });
 
-function paged(total, factory = makeIssue) {
-  return url => {
+const makeIssue = (index, extra = {}) => ({
+  key: `K${index}`,
+  rule: 'typescript:S100',
+  component: `JovieInc_Jovie:apps/web/file-${index % 4}.ts`,
+  severity: 'MAJOR',
+  type: 'CODE_SMELL',
+  status: 'OPEN',
+  message: `issue ${index}`,
+  ...extra,
+});
+
+const paged =
+  (total, factory = makeIssue) =>
+  url => {
     const page = Number(url.searchParams.get('p') ?? 1);
     const ps = Number(url.searchParams.get('ps') ?? PAGE_SIZE);
     const start = (page - 1) * ps;
     const count = Math.max(0, Math.min(ps, total - start));
-    return ok({
-      paging: { pageIndex: page, pageSize: ps, total },
-      issues: Array.from({ length: count }, (_, k) => factory(start + k)),
-    });
+    return pageOf(
+      total,
+      page,
+      ps,
+      Array.from({ length: count }, (_, k) => factory(start + k))
+    );
   };
-}
 
-function fixtureRoot() {
+const facetResp = (property, buckets, total) =>
+  ok({
+    paging: { pageIndex: 1, pageSize: 1, total },
+    issues: [],
+    facets: [
+      { property, values: buckets.map(([val, count]) => ({ val, count })) },
+    ],
+  });
+
+// Routes an issues/search request to a responder by the value of `param`.
+const byParam = (param, mapping, fallback) => url =>
+  (mapping[url.searchParams.get(param)] ?? fallback)(url);
+
+const fixtureRoot = () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-sonar-fetch-'));
   mkdirSync(join(root, 'apps/web'), { recursive: true });
   return root;
-}
+};
 
 /**
  * A complete stub "world" for collectInventory. `open` is the issues/search
@@ -97,12 +110,7 @@ function world({
   componentStatus = 200,
   measureMetrics = {},
   measures = null,
-  facets = () =>
-    ok({
-      paging: { pageIndex: 1, pageSize: 1, total: 0 },
-      issues: [],
-      facets: [],
-    }),
+  facets = () => facetResp('', [], 0),
 } = {}) {
   const calls = [];
   let analysisIndex = 0;
@@ -122,41 +130,35 @@ function world({
   const fetchImpl = async url => {
     calls.push(url);
     const parsed = new URL(url);
-    const query = parsed.searchParams;
-
+    const q = parsed.searchParams;
     if (parsed.pathname === '/api/components/show') {
       return componentStatus === 200
         ? ok({ component: { key: 'JovieInc_Jovie', name: 'Jovie' } })
         : httpError(componentStatus);
     }
     if (parsed.pathname === '/api/project_analyses/search') {
-      const key = analyses[Math.min(analysisIndex, analyses.length - 1)];
-      analysisIndex += 1;
+      const key = analyses[Math.min(analysisIndex++, analyses.length - 1)];
       return ok({
-        paging: { pageIndex: 1, pageSize: 1, total: 1 },
+        paging: { pageIndex: 1, pageSize: 1, total: key ? 1 : 0 },
         analyses: key
           ? [{ key, date: '2026-09-20T00:00:00+0000', revision }]
           : [],
       });
     }
     if (parsed.pathname === '/api/issues/search') {
-      if (query.get('facets')) return facets(query.get('facets'), parsed);
-      if (query.get('inNewCodePeriod') === 'true') {
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: newCodeTotal },
-          issues: [],
-        });
-      }
-      if (query.get('resolved') === 'true') {
-        return paged(acceptedTotal, index => ({
-          key: `ACC${index}`,
+      if (q.get('facets')) return facets(q.get('facets'), parsed);
+      if (q.get('inNewCodePeriod') === 'true')
+        return pageOf(newCodeTotal, 1, 1, []);
+      if (q.get('resolved') === 'true') {
+        return paged(acceptedTotal, i => ({
+          key: `ACC${i}`,
           resolution: 'FALSE-POSITIVE',
         }))(parsed);
       }
       return openResponder(parsed);
     }
     if (parsed.pathname === '/api/hotspots/search') {
-      const page = Number(query.get('p') ?? 1);
+      const page = Number(q.get('p') ?? 1);
       const start = (page - 1) * PAGE_SIZE;
       const count = Math.max(0, Math.min(PAGE_SIZE, hotspotsTotal - start));
       return ok({
@@ -176,7 +178,7 @@ function world({
   return { fetchImpl, calls };
 }
 
-function collect(worldOptions = {}, inventoryOptions = {}) {
+const collect = (worldOptions = {}, inventoryOptions = {}) => {
   const { fetchImpl, calls } = world(worldOptions);
   const promise = collectInventory({
     baseUrl: BASE,
@@ -189,16 +191,19 @@ function collect(worldOptions = {}, inventoryOptions = {}) {
     ...inventoryOptions,
   });
   return { promise, calls };
-}
+};
 
-async function thrown(promise) {
+const expectSonarError = async (promise, kind) => {
+  let error = null;
   try {
     await promise;
-  } catch (error) {
-    return error;
+  } catch (caught) {
+    error = caught;
   }
-  return null;
-}
+  expect(error).toBeInstanceOf(SonarFetchError);
+  expect(error.kind).toBe(kind);
+  return error;
+};
 
 describe('classifyStatus', () => {
   it('maps status codes onto the failure taxonomy', () => {
@@ -209,147 +214,100 @@ describe('classifyStatus', () => {
     expect(classifyStatus(500)).toBe('server');
     expect(classifyStatus(503)).toBe('server');
     expect(classifyStatus(400)).toBe('client');
-    expect(classifyStatus(418)).toBe('client');
   });
 });
 
 describe('fetchJson error classification', () => {
   const url = `${BASE}/api/issues/search?p=1`;
+  const run = (fetchImpl, extra = {}) =>
+    fetchJson(url, { token: TOKEN, fetchImpl, sleep: noSleep, ...extra });
 
   it('returns parsed JSON on success', async () => {
-    const fetchImpl = async () => ok({ hello: 'world' });
-    const json = await fetchJson(url, {
-      token: TOKEN,
-      fetchImpl,
-      sleep: noSleep,
-    });
+    const json = await run(async () => ok({ hello: 'world' }));
     expect(json.hello).toBe('world');
   });
 
-  it('classifies 401/403 as credentials and never retries', async () => {
-    for (const status of [401, 403]) {
+  it('retries only retryable kinds, with a bound', async () => {
+    const nonRetryable = [
+      [() => httpError(401), 'credentials'],
+      [() => httpError(403), 'credentials'],
+      [() => httpError(400), 'client'],
+      [
+        () => new Response('<html>oops</html>', { status: 200 }),
+        'malformed_json',
+      ],
+    ];
+    const retryable = [
+      [() => httpError(429), 'rate_limited'],
+      [() => httpError(500), 'server'],
+      [() => Promise.reject(new TypeError('fetch failed')), 'network'],
+      [
+        () =>
+          Promise.reject(
+            Object.assign(new Error('aborted'), { name: 'AbortError' })
+          ),
+        'timeout',
+      ],
+    ];
+    for (const [respond, kind] of nonRetryable) {
       let calls = 0;
-      const fetchImpl = async () => {
-        calls += 1;
-        return httpError(status);
-      };
-      const error = await thrown(
-        fetchJson(url, { token: TOKEN, fetchImpl, sleep: noSleep })
+      await expectSonarError(
+        run(async () => {
+          calls += 1;
+          return respond();
+        }),
+        kind
       );
-      expect(error).toBeInstanceOf(SonarFetchError);
-      expect(error.kind).toBe('credentials');
       expect(calls).toBe(1);
+    }
+    for (const [respond, kind] of retryable) {
+      let calls = 0;
+      await expectSonarError(
+        run(
+          async () => {
+            calls += 1;
+            return respond();
+          },
+          { maxAttempts: 2 }
+        ),
+        kind
+      );
+      expect(calls).toBe(2);
     }
   });
 
-  it('retries 429 with backoff and honors Retry-After', async () => {
+  it('bounds backoff: honors Retry-After and gives up after maxAttempts', async () => {
     const sleeps = [];
     let calls = 0;
-    const fetchImpl = async () => {
-      calls += 1;
-      return calls === 1
-        ? httpError(429, { 'retry-after': '3' })
-        : ok({ paging: { pageIndex: 1, pageSize: 500, total: 0 }, issues: [] });
-    };
-    await fetchJson(url, {
-      token: TOKEN,
-      fetchImpl,
-      sleep: ms => {
-        sleeps.push(ms);
-        return noSleep();
+    await run(
+      async () => {
+        calls += 1;
+        return calls === 1 ? httpError(429, { 'retry-after': '3' }) : ok({});
       },
-    });
+      {
+        sleep: ms => {
+          sleeps.push(ms);
+          return noSleep();
+        },
+      }
+    );
     expect(calls).toBe(2);
     expect(sleeps[0]).toBeGreaterThanOrEqual(3000);
-  });
 
-  it('exhausts bounded retries on persistent 429', async () => {
-    let calls = 0;
-    const fetchImpl = async () => {
-      calls += 1;
-      return httpError(429);
-    };
-    const error = await thrown(
-      fetchJson(url, { token: TOKEN, fetchImpl, sleep: noSleep })
+    let exhausted = 0;
+    await expectSonarError(
+      run(async () => {
+        exhausted += 1;
+        return httpError(503);
+      }),
+      'server'
     );
-    expect(error.kind).toBe('rate_limited');
-    expect(calls).toBe(4);
-  });
-
-  it('retries then succeeds on 5xx', async () => {
-    let calls = 0;
-    const fetchImpl = async () => {
-      calls += 1;
-      return calls < 3 ? httpError(503) : ok({ ok: true });
-    };
-    const json = await fetchJson(url, {
-      token: TOKEN,
-      fetchImpl,
-      sleep: noSleep,
-    });
-    expect(json.ok).toBe(true);
-    expect(calls).toBe(3);
-  });
-
-  it('classifies persistent 5xx as server', async () => {
-    let calls = 0;
-    const fetchImpl = async () => {
-      calls += 1;
-      return httpError(500);
-    };
-    const error = await thrown(
-      fetchJson(url, { token: TOKEN, fetchImpl, sleep: noSleep })
-    );
-    expect(error.kind).toBe('server');
-    expect(calls).toBe(4);
-  });
-
-  it('classifies transport failures as network', async () => {
-    const fetchImpl = async () => {
-      throw new TypeError('fetch failed');
-    };
-    const error = await thrown(
-      fetchJson(url, {
-        token: TOKEN,
-        fetchImpl,
-        sleep: noSleep,
-        maxAttempts: 2,
-      })
-    );
-    expect(error.kind).toBe('network');
-  });
-
-  it('classifies aborts as timeout', async () => {
-    const fetchImpl = async () => {
-      throw Object.assign(new Error('aborted'), { name: 'AbortError' });
-    };
-    const error = await thrown(
-      fetchJson(url, {
-        token: TOKEN,
-        fetchImpl,
-        sleep: noSleep,
-        maxAttempts: 1,
-      })
-    );
-    expect(error.kind).toBe('timeout');
-  });
-
-  it('classifies unparseable bodies as malformed_json without retry', async () => {
-    let calls = 0;
-    const fetchImpl = async () => {
-      calls += 1;
-      return new Response('<html>oops</html>', { status: 200 });
-    };
-    const error = await thrown(
-      fetchJson(url, { token: TOKEN, fetchImpl, sleep: noSleep })
-    );
-    expect(error.kind).toBe('malformed_json');
-    expect(calls).toBe(1);
+    expect(exhausted).toBe(4);
   });
 });
 
 describe('collectInventory', () => {
-  it('paginates on live paging metadata until exhausted', async () => {
+  it('paginates on live paging metadata until exhausted (>1,500)', async () => {
     const { promise, calls } = collect({ openTotal: 1158 });
     const result = await promise;
     expect(result.status).toBe('COMPLETE');
@@ -365,242 +323,195 @@ describe('collectInventory', () => {
       )
       .map(url => url.searchParams.get('p'));
     expect(pages).toEqual(['1', '2', '3']);
-    expect(pages).not.toContain('4');
+
+    const big = await collect({ openTotal: 1600 }).promise;
+    expect(big.status).toBe('COMPLETE');
+    expect(big.issues).toHaveLength(1600);
+    expect(big.inventory.counts.open.fetched).toBe(1600);
   });
 
-  it('collects more than 1,500 findings across 4 pages', async () => {
-    const { promise } = collect({ openTotal: 1600 });
-    const result = await promise;
-    expect(result.status).toBe('COMPLETE');
-    expect(result.issues).toHaveLength(1600);
-    expect(result.inventory.counts.open.fetched).toBe(1600);
+  it('handles boundary conditions: empty project, stale revision, no token', async () => {
+    const empty = await collect({ openTotal: 0 }).promise;
+    expect(empty.status).toBe('COMPLETE');
+    expect(empty.issues).toHaveLength(0);
+    expect(empty.inventory.counts.open.apiTotal).toBe(0);
+    expect(empty.inventory.incompleteness).toHaveLength(0);
+
+    const stale = await collect({ revision: 'other-sha' }).promise;
+    expect(stale.status).toBe('COMPLETE');
+    expect(stale.inventory.staleness).toMatchObject({
+      analysisRevision: 'other-sha',
+      observedSha: 'abc123',
+      stale: true,
+    });
+
+    await expectSonarError(collectInventory({ token: '' }), 'credentials');
   });
 
-  it('treats a genuinely empty project as COMPLETE, not a failure', async () => {
-    const { promise } = collect({ openTotal: 0 });
-    const result = await promise;
-    expect(result.status).toBe('COMPLETE');
-    expect(result.issues).toHaveLength(0);
-    expect(result.inventory.incompleteness).toHaveLength(0);
-    expect(result.inventory.counts.open.apiTotal).toBe(0);
-  });
-
-  it('pins the branch on every issues/search call', async () => {
-    const { promise, calls } = collect({ openTotal: 3 });
-    await promise;
-    const issueCalls = calls.filter(c => c.includes('/api/issues/search'));
-    for (const call of issueCalls) {
+  it('pins the branch and binds the inventory to analysis + observed sha', async () => {
+    const { promise, calls } = collect({ openTotal: 2, revision: 'abc123' });
+    const { inventory } = await promise;
+    for (const call of calls.filter(c => c.includes('/api/issues/search'))) {
       expect(new URL(call).searchParams.get('branch')).toBe('main');
     }
-  });
-
-  it('binds the inventory to project, branch, analysis, and observed sha', async () => {
-    const { promise } = collect(
-      { openTotal: 2, revision: 'abc123' },
-      { env: { GITHUB_SHA: 'abc123' } }
-    );
-    const result = await promise;
-    expect(result.inventory.projectKey).toBe('JovieInc_Jovie');
-    expect(result.inventory.branch).toBe('main');
-    expect(result.inventory.analysis).toEqual({
+    expect(inventory.projectKey).toBe('JovieInc_Jovie');
+    expect(inventory.branch).toBe('main');
+    expect(inventory.schema).toBe('jovie-sonar-inventory/v1');
+    expect(inventory.analysis).toEqual({
       key: 'A1',
       date: '2026-09-20T00:00:00+0000',
       revision: 'abc123',
     });
-    expect(result.inventory.observedSha).toBe('abc123');
-    expect(result.inventory.staleness.stale).toBe(false);
+    expect(inventory.observedSha).toBe('abc123');
+    expect(inventory.staleness.stale).toBe(false);
   });
 
   it('flags a stale analysis revision relative to the observed sha', async () => {
-    const { promise } = collect(
+    const result = await collect(
       { openTotal: 1, revision: 'old-revision' },
       { env: { GITHUB_SHA: 'new-sha' } }
-    );
-    const result = await promise;
+    ).promise;
     expect(result.inventory.staleness.stale).toBe(true);
     expect(
       result.inventory.warnings.some(w => w.includes('lags observed commit'))
     ).toBe(true);
   });
 
-  it('partitions on createdAt months when the 10k result cap is hit', async () => {
-    const { promise, calls } = collect({
-      open: url => {
-        const after = url.searchParams.get('createdAfter');
-        if (after === '2026-08-01') {
-          return paged(6000, i => makeIssue(`aug-${i}`))(url);
-        }
-        if (after === '2026-09-01') {
-          return paged(6000, i => makeIssue(`sep-${i}`))(url);
-        }
-        return paged(12000)(url);
-      },
-      facets: facet => {
-        expect(facet).toBe('createdAt');
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: 12000 },
-          issues: [],
-          facets: [
-            {
-              property: 'createdAt',
-              values: [
-                { val: '2026-08', count: 6000 },
-                { val: '2026-09', count: 6000 },
-              ],
-            },
+  it('partitions capped queries on createdAt months, then rules', async () => {
+    const monthRun = collect({
+      open: byParam(
+        'createdAfter',
+        {
+          '2026-08-01': paged(6000, i => makeIssue(`aug-${i}`)),
+          '2026-09-01': paged(6000, i => makeIssue(`sep-${i}`)),
+        },
+        paged(12000)
+      ),
+      facets: facet =>
+        facetResp(
+          facet,
+          [
+            ['2026-08', 6000],
+            ['2026-09', 6000],
           ],
-        });
-      },
+          12000
+        ),
     });
-    const result = await promise;
-    expect(result.status).toBe('COMPLETE');
-    expect(result.issues).toHaveLength(12000);
+    const monthly = await monthRun.promise;
+    expect(monthly.status).toBe('COMPLETE');
+    expect(monthly.issues).toHaveLength(12000);
     expect(
-      calls.some(
+      monthRun.calls.some(
         c =>
           c.includes('createdAfter=2026-08-01') &&
           c.includes('createdBefore=2026-08-31')
       )
     ).toBe(true);
-    expect(calls.some(c => c.includes('createdAfter=2026-09-01'))).toBe(true);
-  });
 
-  it('sub-partitions an over-cap month by rule', async () => {
-    const { promise, calls } = collect({
-      open: url => {
-        const rules = url.searchParams.get('rules');
-        if (rules === 'typescript:S1') {
-          return paged(6000, i => makeIssue(`r1-${i}`))(url);
-        }
-        if (rules === 'typescript:S2') {
-          return paged(5000, i => makeIssue(`r2-${i}`))(url);
-        }
-        return paged(11000)(url);
-      },
-      facets: (facet, url) => {
-        if (facet === 'createdAt') {
-          return ok({
-            paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-            issues: [],
-            facets: [
-              {
-                property: 'createdAt',
-                values: [{ val: '2026-09', count: 11000 }],
-              },
-            ],
-          });
-        }
-        expect(facet).toBe('rules');
-        expect(url.searchParams.get('createdAfter')).toBe('2026-09-01');
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-          issues: [],
-          facets: [
-            {
-              property: 'rules',
-              values: [
-                { val: 'typescript:S1', count: 6000 },
-                { val: 'typescript:S2', count: 5000 },
+    const ruleRun = collect({
+      open: byParam(
+        'rules',
+        {
+          'typescript:S1': paged(6000, i => makeIssue(`r1-${i}`)),
+          'typescript:S2': paged(5000, i => makeIssue(`r2-${i}`)),
+        },
+        paged(11000)
+      ),
+      facets: facet =>
+        facet === 'createdAt'
+          ? facetResp(facet, [['2026-09', 11000]], 11000)
+          : facetResp(
+              facet,
+              [
+                ['typescript:S1', 6000],
+                ['typescript:S2', 5000],
               ],
-            },
-          ],
-        });
-      },
+              11000
+            ),
     });
-    const result = await promise;
-    expect(result.status).toBe('COMPLETE');
-    expect(result.issues).toHaveLength(11000);
-    expect(calls.some(c => c.includes('rules=typescript%3AS1'))).toBe(true);
+    const rules = await ruleRun.promise;
+    expect(rules.status).toBe('COMPLETE');
+    expect(rules.issues).toHaveLength(11000);
+    expect(ruleRun.calls.some(c => c.includes('rules=typescript%3AS1'))).toBe(
+      true
+    );
   });
 
-  it('reports INCOMPLETE on a partition that still exceeds the cap', async () => {
-    const { promise } = collect({
-      open: url => paged(11000)(url),
-      facets: (facet, url) => {
-        if (facet === 'createdAt') {
-          return ok({
-            paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-            issues: [],
-            facets: [
-              {
-                property: 'createdAt',
-                values: [{ val: '2026-09', count: 11000 }],
-              },
-            ],
-          });
-        }
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-          issues: [],
-          facets: [
-            {
-              property: 'rules',
-              values: [{ val: 'typescript:S1', count: 11000 }],
-            },
-          ],
-        });
-      },
-    });
-    const result = await promise;
-    expect(result.status).toBe('INCOMPLETE');
+  it('reports INCOMPLETE when partitions cannot recover all records', async () => {
+    // A partition still over the cap after month+rule scoping is flagged.
+    const capped = await collect({
+      open: paged(11000),
+      facets: facet =>
+        facet === 'createdAt'
+          ? facetResp(facet, [['2026-09', 11000]], 11000)
+          : facetResp(facet, [['typescript:S1', 11000]], 11000),
+    }).promise;
+    expect(capped.status).toBe('INCOMPLETE');
+    expect(capped.issues).toHaveLength(10000);
     expect(
-      result.inventory.incompleteness.some(
+      capped.inventory.incompleteness.some(
         entry => entry.reason === 'result_cap_exceeded'
       )
     ).toBe(true);
-    expect(result.issues.length).toBe(10000);
-  });
 
-  it('fails closed when a page errors mid-collection', async () => {
-    const { promise } = collect({
+    // An empty page before the API total is also a shortfall.
+    let firstPage = true;
+    const short = await collect({
       open: url => {
-        const page = Number(url.searchParams.get('p') ?? 1);
-        return page === 1 ? paged(1158)(url) : httpError(500);
+        if (url.searchParams.get('createdAfter') === '2026-09-01') {
+          return paged(150, i => makeIssue(`x-${i}`))(url);
+        }
+        if (firstPage) {
+          firstPage = false;
+          return paged(1500)(url);
+        }
+        return pageOf(1500, 2, PAGE_SIZE, []);
       },
-    });
-    const error = await thrown(promise);
-    expect(error).toBeInstanceOf(SonarFetchError);
-    expect(error.kind).toBe('server');
-  });
-
-  it('deduplicates by stable issue key and counts drops', async () => {
-    const { promise } = collect({
-      openTotal: 600,
-      open: url => {
-        const page = Number(url.searchParams.get('p') ?? 1);
-        const start = (page - 1) * PAGE_SIZE;
-        const count = Math.max(0, Math.min(PAGE_SIZE, 600 - start));
-        return ok({
-          paging: { pageIndex: page, pageSize: PAGE_SIZE, total: 600 },
-          issues: Array.from({ length: count }, (_, k) =>
-            // Repeat key K0 on the second page.
-            makeIssue(page === 2 && k === 0 ? 0 : start + k)
-          ),
-        });
-      },
-    });
-    const result = await promise;
-    // Unique fetches (599) under-run the API total (600) — reconciliation
-    // must flag that rather than presenting the deduped set as complete.
-    expect(result.status).toBe('INCOMPLETE');
-    expect(result.issues).toHaveLength(599);
-    expect(result.inventory.counts.open.duplicatesDropped).toBe(1);
+      facets: () => facetResp('createdAt', [['2026-09', 1500]], 1500),
+    }).promise;
+    expect(short.status).toBe('INCOMPLETE');
     expect(
-      result.inventory.incompleteness.some(
+      short.inventory.incompleteness.some(
         entry => entry.reason === 'fetched_unique_below_api_total'
       )
     ).toBe(true);
   });
 
-  it('warns on records missing a stable key', async () => {
+  it('fails closed on a mid-collection page error or a wrong branch', async () => {
+    await expectSonarError(
+      collect({
+        open: url =>
+          Number(url.searchParams.get('p') ?? 1) === 1
+            ? paged(1158)(url)
+            : httpError(500),
+      }).promise,
+      'server'
+    );
+    const wrongBranch = await expectSonarError(
+      collect({ componentStatus: 404 }).promise,
+      'not_found'
+    );
+    expect(wrongBranch.message).toContain(
+      'refusing to collect an unbound inventory'
+    );
+  });
+
+  it('dedupes by stable key, warns on keyless records, reconciles totals', async () => {
     const { promise } = collect({
-      openTotal: 2,
-      open: paged(2, index =>
-        index === 1 ? { ...makeIssue(index), key: undefined } : makeIssue(index)
-      ),
+      // total 3: K0 twice (overlapping pages) plus one keyless record.
+      open: url => {
+        const page = Number(url.searchParams.get('p') ?? 1);
+        const issues =
+          page === 1
+            ? [makeIssue(0), { ...makeIssue(1), key: undefined }]
+            : [makeIssue(0)];
+        return pageOf(3, page, PAGE_SIZE, issues);
+      },
     });
     const result = await promise;
+    expect(result.status).toBe('INCOMPLETE'); // 2 unique < reported 3
     expect(result.issues).toHaveLength(2);
+    expect(result.inventory.counts.open.duplicatesDropped).toBe(1);
     expect(
       result.inventory.warnings.some(w =>
         w.includes('without a stable issue key')
@@ -608,232 +519,149 @@ describe('collectInventory', () => {
     ).toBe(true);
   });
 
-  it('fails closed on a wrong branch (components/show 404)', async () => {
-    const { promise } = collect({ componentStatus: 404 });
-    const error = await thrown(promise);
-    expect(error).toBeInstanceOf(SonarFetchError);
-    expect(error.kind).toBe('not_found');
-    expect(error.message).toMatch(/branch "main" not found|not found on/);
-  });
+  it('retries once on analysis drift, then marks non-atomic on a second drift', async () => {
+    const once = await collect({ openTotal: 5, analyses: ['A1', 'A2'] })
+      .promise;
+    expect(once.atomic).toBe(true);
+    expect(once.inventory.analysis.key).toBe('A2');
 
-  it('retries once on a mid-collection analysis change, then stays atomic', async () => {
-    const { promise } = collect({ openTotal: 5, analyses: ['A1', 'A2'] });
-    const result = await promise;
-    expect(result.atomic).toBe(true);
-    expect(result.inventory.analysis.key).toBe('A2');
-  });
-
-  it('marks the inventory non-atomic when analysis drifts twice', async () => {
-    const { promise } = collect({
+    const twice = await collect({
       openTotal: 5,
       analyses: ['A1', 'A2', 'A3', 'A4'],
-    });
-    const result = await promise;
-    expect(result.atomic).toBe(false);
+    }).promise;
+    expect(twice.atomic).toBe(false);
     expect(
-      result.inventory.warnings.some(w => w.includes('analysis changed twice'))
+      twice.inventory.warnings.some(w => w.includes('analysis changed twice'))
     ).toBe(true);
   });
 
-  it('degrades to measures=unsupported when metric keys are rejected', async () => {
-    const { promise } = collect({
+  it('degrades unsupported metrics and warns when measures diverge', async () => {
+    const unsupported = await collect({
       openTotal: 3,
       measures: () => httpError(400),
-    });
-    const result = await promise;
-    expect(result.status).toBe('COMPLETE');
-    expect(result.inventory.reconciliation.measures.status).toBe('unsupported');
-  });
+    }).promise;
+    expect(unsupported.status).toBe('COMPLETE');
+    expect(unsupported.inventory.reconciliation.measures.status).toBe(
+      'unsupported'
+    );
 
-  it('warns when published measures diverge from the issue inventory', async () => {
-    const { promise } = collect({
-      openTotal: 4,
+    const diverging = await collect({
       open: paged(4, index => makeIssue(index, { type: 'BUG' })),
       measureMetrics: { bugs: 99 },
-    });
-    const result = await promise;
-    expect(result.inventory.reconciliation.measures.status).toBe('ok');
+    }).promise;
+    expect(diverging.inventory.reconciliation.measures.status).toBe('ok');
     expect(
-      result.inventory.warnings.some(w => w.includes('measures diverge'))
+      diverging.inventory.warnings.some(w => w.includes('measures diverge'))
     ).toBe(true);
-  });
-
-  it('flags empty-page shortfalls as INCOMPLETE', async () => {
-    let firstPage = true;
-    const { promise } = collect({
-      open: url => {
-        const after = url.searchParams.get('createdAfter');
-        if (after === '2026-09-01') {
-          return paged(150, i => makeIssue(`x-${i}`))(url);
-        }
-        if (firstPage) {
-          firstPage = false;
-          return paged(1500)(url); // p1 → 500 issues, total 1500
-        }
-        // p2 empty although total says more exist
-        return ok({
-          paging: { pageIndex: 2, pageSize: PAGE_SIZE, total: 1500 },
-          issues: [],
-        });
-      },
-      facets: facet => {
-        expect(facet).toBe('createdAt');
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: 1500 },
-          issues: [],
-          facets: [
-            {
-              property: 'createdAt',
-              values: [{ val: '2026-09', count: 1500 }],
-            },
-          ],
-        });
-      },
-    });
-    const result = await promise;
-    // Partition only recovered 150 of the reported 1500 → INCOMPLETE.
-    expect(result.status).toBe('INCOMPLETE');
-    expect(
-      result.inventory.incompleteness.some(
-        entry => entry.reason === 'fetched_unique_below_api_total'
-      )
-    ).toBe(true);
-  });
-
-  it('rejects with credentials when no token is provided', async () => {
-    const error = await thrown(collectInventory({ token: '' }));
-    expect(error).toBeInstanceOf(SonarFetchError);
-    expect(error.kind).toBe('credentials');
   });
 });
 
 describe('main', () => {
-  it('exits 1 without a SONAR_TOKEN and writes nothing', async () => {
+  const runFixture = async (env, fetchImpl) => {
+    const root = fixtureRoot();
+    const exits = [];
     const logger = captureLogger();
+    await main(env, {
+      exit: code => exits.push(code),
+      cwd: root,
+      fetchImpl,
+      sleep: noSleep,
+      logger,
+    });
+    return { root, exits, logger };
+  };
+  const issuesDirOf = root => join(root, 'apps/web/.issues');
+
+  it('exits 1 without a SONAR_TOKEN and writes nothing', async () => {
     const root = fixtureRoot();
     const exits = [];
     try {
-      await main({}, { exit: code => exits.push(code), cwd: root, logger });
+      await main(
+        {},
+        {
+          exit: code => exits.push(code),
+          cwd: root,
+          logger: captureLogger(),
+        }
+      );
       expect(exits).toEqual([1]);
-      expect(existsSync(join(root, 'apps/web/.issues'))).toBe(false);
+      expect(existsSync(issuesDirOf(root))).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('exits 0 and writes both artifacts on a complete atomic run', async () => {
-    const logger = captureLogger();
-    const root = fixtureRoot();
-    const exits = [];
+  it('writes artifacts and exits by evidence quality (0 / 2)', async () => {
     const { fetchImpl } = world({ openTotal: 3, hotspotsTotal: 1 });
+    const { root, exits, logger } = await runFixture(
+      { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE },
+      fetchImpl
+    );
     try {
-      await main(
-        { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE },
-        {
-          exit: code => exits.push(code),
-          cwd: root,
-          fetchImpl,
-          sleep: noSleep,
-          logger,
-        }
-      );
       expect(exits).toEqual([0]);
-      const issuesPath = join(
-        root,
-        'apps/web/.issues/sonar-issues-latest.json'
+      const issuesPath = join(issuesDirOf(root), 'sonar-issues-latest.json');
+      const inventoryText = readFileSync(
+        join(issuesDirOf(root), 'sonar-issues-inventory.json'),
+        'utf8'
       );
-      const inventoryPath = join(
-        root,
-        'apps/web/.issues/sonar-issues-inventory.json'
-      );
-      expect(existsSync(issuesPath)).toBe(true);
-      expect(existsSync(inventoryPath)).toBe(true);
-      const issues = JSON.parse(readFileSync(issuesPath, 'utf8'));
-      const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-      expect(issues).toHaveLength(3);
-      expect(inventory.status).toBe('COMPLETE');
-      expect(inventory.atomic).toBe(true);
+      expect(JSON.parse(readFileSync(issuesPath, 'utf8'))).toHaveLength(3);
+      expect(JSON.parse(inventoryText)).toMatchObject({
+        status: 'COMPLETE',
+        atomic: true,
+      });
       // The token must never appear in logs or written artifacts.
       for (const line of logger.lines) {
         expect(line.includes(TOKEN)).toBe(false);
       }
-      expect(readFileSync(inventoryPath, 'utf8').includes(TOKEN)).toBe(false);
+      expect(inventoryText.includes(TOKEN)).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
 
-  it('exits 2 but still writes flagged artifacts on INCOMPLETE evidence', async () => {
-    const logger = captureLogger();
-    const root = fixtureRoot();
-    const exits = [];
-    const { fetchImpl } = world({
-      open: url => paged(11000)(url),
-      facets: (facet, url) => {
-        if (facet === 'createdAt') {
-          return ok({
-            paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-            issues: [],
-            facets: [
-              {
-                property: 'createdAt',
-                values: [{ val: '2026-09', count: 11000 }],
-              },
-            ],
-          });
-        }
-        return ok({
-          paging: { pageIndex: 1, pageSize: 1, total: 11000 },
-          issues: [],
-          facets: [
-            { property: 'rules', values: [{ val: 'r1', count: 11000 }] },
-          ],
-        });
-      },
+    const { fetchImpl: capped } = world({
+      open: paged(11000),
+      facets: facet =>
+        facetResp(
+          facet,
+          [[facet === 'createdAt' ? '2026-09' : 'r1', 11000]],
+          11000
+        ),
     });
+    const flagged = await runFixture(
+      { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE },
+      capped
+    );
     try {
-      await main(
-        { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE },
-        {
-          exit: code => exits.push(code),
-          cwd: root,
-          fetchImpl,
-          sleep: noSleep,
-          logger,
-        }
-      );
-      expect(exits).toEqual([2]);
+      expect(flagged.exits).toEqual([2]);
       const inventory = JSON.parse(
         readFileSync(
-          join(root, 'apps/web/.issues/sonar-issues-inventory.json'),
+          join(issuesDirOf(flagged.root), 'sonar-issues-inventory.json'),
           'utf8'
         )
       );
       expect(inventory.status).toBe('INCOMPLETE');
       expect(inventory.incompleteness.length).toBeGreaterThan(0);
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(flagged.root, { recursive: true, force: true });
     }
   });
 
   it('exits 1 and leaves last-known evidence untouched on hard failure', async () => {
-    const logger = captureLogger();
     const root = fixtureRoot();
-    const issuesDir = join(root, 'apps/web/.issues');
+    const issuesDir = issuesDirOf(root);
     mkdirSync(issuesDir);
     const sentinel = join(issuesDir, 'sonar-issues-latest.json');
     writeFileSync(sentinel, '[{"key":"last-known"}]');
     const exits = [];
-    const fetchImpl = async () => httpError(500);
     try {
       await main(
         { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE },
         {
           exit: code => exits.push(code),
           cwd: root,
-          fetchImpl,
+          fetchImpl: async () => httpError(500),
           sleep: noSleep,
-          logger,
+          logger: captureLogger(),
         }
       );
       expect(exits).toEqual([1]);

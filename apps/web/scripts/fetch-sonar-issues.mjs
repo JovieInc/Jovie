@@ -1,31 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * fetch-sonar-issues.mjs — complete, commit-bound SonarCloud findings inventory.
- *
- * JOV-6245: replaces the fixed three-page curl loop with a fail-closed
- * collector:
- *  - real pagination driven by the API's paging metadata, never a fixed count
- *  - partitions by `createdAt` month (then `rules`) when the 10,000-result
- *    service cap is hit, or reports INCOMPLETE — never silently truncates
- *  - pins the branch and binds the run to the latest project analysis
- *    (key/date/revision); a mid-collection analysis change triggers one retry,
- *    then the inventory is marked non-atomic
- *  - classifies HTTP failures (credentials / 429 / timeout / 5xx / malformed
- *    JSON / genuinely empty) with bounded retry + backoff
- *  - deduplicates by stable issue key and reconciles fetched totals against
- *    the API's reported totals and published measures
- *
- * Configuration is read from the environment only; the token is never logged:
- *   SONAR_TOKEN        required bearer token
- *   SONAR_PROJECT_KEY  default JovieInc_Jovie
- *   SONAR_BRANCH       default main
- *   SONAR_BASE_URL     default https://sonarcloud.io
- *
- * Exit codes:
- *   0 — COMPLETE, atomic inventory written
- *   1 — collection failed; nothing written (last-known evidence left intact)
- *   2 — inventory written but flagged INCOMPLETE and/or non-atomic
+ * fetch-sonar-issues.mjs — fail-closed, commit-bound SonarCloud inventory.
+ * Paginates to exhaustion (createdAt/rules partitioning past the 10k cap),
+ * binds to the pinned branch + latest analysis, classifies HTTP failures,
+ * dedupes by issue key, reconciles totals. Token via env only, never logged.
+ * Exit: 0 = COMPLETE+atomic, 1 = failed (nothing written), 2 = flagged.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -54,14 +34,7 @@ const MEASURE_KEYS = [
   'new_vulnerabilities',
   'new_code_smells',
 ];
-
-const MEASURE_KEYS_FALLBACK = [
-  'bugs',
-  'vulnerabilities',
-  'code_smells',
-  'security_hotspots',
-];
-
+const MEASURE_KEYS_FALLBACK = MEASURE_KEYS.slice(0, 4);
 const RETRYABLE_KINDS = new Set([
   'rate_limited',
   'server',
@@ -105,8 +78,7 @@ function parseRetryAfterMs(headerValue) {
 
 async function errorDetail(response) {
   try {
-    const text = await response.text();
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(await response.text());
     if (Array.isArray(parsed?.errors)) {
       return parsed.errors
         .map(entry => entry?.msg)
@@ -120,11 +92,8 @@ async function errorDetail(response) {
   return '';
 }
 
-/**
- * One JSON GET against the SonarCloud web API with bounded retry/backoff.
- * Throws a typed SonarFetchError; credentials and client/shape failures are
- * never retried.
- */
+// One JSON GET with bounded retry/backoff; throws a typed SonarFetchError.
+// Credentials and client/shape failures are never retried.
 export async function fetchJson(
   url,
   {
@@ -138,6 +107,8 @@ export async function fetchJson(
 ) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const giveUp = kind =>
+      !RETRYABLE_KINDS.has(kind) || attempt === maxAttempts;
     let response;
     try {
       response = await fetchImpl(url, {
@@ -154,9 +125,7 @@ export async function fetchJson(
         `${kind} failure fetching ${url}: ${error?.message ?? error}`,
         { url }
       );
-      if (!RETRYABLE_KINDS.has(kind) || attempt === maxAttempts) {
-        throw lastError;
-      }
+      if (giveUp(kind)) throw lastError;
       await sleep(backoffMs(attempt, baseDelayMs));
       continue;
     }
@@ -169,9 +138,7 @@ export async function fetchJson(
         `${kind}: HTTP ${response.status} for ${url}${detail ? ` — ${detail}` : ''}`,
         { status: response.status, url }
       );
-      if (!RETRYABLE_KINDS.has(kind) || attempt === maxAttempts) {
-        throw lastError;
-      }
+      if (giveUp(kind)) throw lastError;
       const retryAfterMs = parseRetryAfterMs(
         response.headers?.get?.('retry-after')
       );
@@ -193,55 +160,51 @@ export async function fetchJson(
 }
 
 function requireShape(condition, message, url) {
-  if (!condition) {
+  if (!condition)
     throw new SonarFetchError('schema', `${message} from ${url}`, { url });
-  }
 }
 
 function issuesSearchUrl(baseUrl, params) {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== '') {
-      query.set(key, String(value));
-    }
-  }
-  return `${baseUrl}/api/issues/search?${query.toString()}`;
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null && value !== ''
+  );
+  return `${baseUrl}/api/issues/search?${new URLSearchParams(entries)}`;
 }
 
 async function fetchIssueSearch(ctx, params) {
   const url = issuesSearchUrl(ctx.baseUrl, params);
   const json = await fetchJson(url, ctx);
   requireShape(
-    json && typeof json === 'object',
-    'issues/search response is not an object',
-    url
-  );
-  requireShape(
-    json.paging &&
+    json &&
+      typeof json === 'object' &&
+      json.paging &&
       Number.isInteger(json.paging.pageIndex) &&
-      Number.isInteger(json.paging.total),
-    'issues/search paging metadata missing or malformed',
-    url
-  );
-  requireShape(
-    Array.isArray(json.issues),
-    'issues/search issues array missing',
+      Number.isInteger(json.paging.total) &&
+      Array.isArray(json.issues),
+    'issues/search response missing or malformed (paging/issues)',
     url
   );
   return json;
 }
 
-/**
- * Drains every page of one issues/search query. Stops at the service result
- * cap and reports `capped` when the API-reported total outruns what was
- * retrievable, rather than silently truncating.
- */
-async function collectIssuePages(ctx, params) {
-  const issues = [];
+// Drains a paged endpoint until exhausted or the service result cap.
+// `capped` = API-reported total outran what was retrievable (never silent).
+async function drainPages(fetchPage) {
+  const items = [];
   let apiTotal = 0;
   let page = 1;
-
   while ((page - 1) * PAGE_SIZE < RESULT_CAP) {
+    const { batch, total } = await fetchPage(page);
+    apiTotal = total;
+    items.push(...batch);
+    if (batch.length === 0 || items.length >= apiTotal) break;
+    page += 1;
+  }
+  return { items, apiTotal, capped: items.length < apiTotal };
+}
+
+async function collectIssuePages(ctx, params) {
+  const { items, apiTotal, capped } = await drainPages(async page => {
     const json = await fetchIssueSearch(ctx, {
       ...params,
       ps: PAGE_SIZE,
@@ -249,28 +212,17 @@ async function collectIssuePages(ctx, params) {
       s: 'SEVERITY',
       asc: 'false',
     });
-    apiTotal = json.paging.total;
-    const batch = json.issues;
-    issues.push(...batch);
-    if (batch.length === 0 || issues.length >= apiTotal) break;
-    page += 1;
-  }
-
-  // Either the service cap or an early empty page leaves fetched < apiTotal —
-  // both are reported as `capped` and routed to partitioning/reconciliation.
-  return {
-    issues,
-    apiTotal,
-    capped: issues.length < apiTotal,
-  };
+    return { batch: json.issues, total: json.paging.total };
+  });
+  return { issues: items, apiTotal, capped };
 }
 
 function monthWindow(month) {
-  const [year, monthNum] = month.split('-').map(Number);
-  const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
+  const [year, m] = month.split('-').map(Number);
+  const last = new Date(Date.UTC(year, m, 0)).getUTCDate();
   return {
     createdAfter: `${month}-01`,
-    createdBefore: `${month}-${String(lastDay).padStart(2, '0')}`,
+    createdBefore: `${month}-${String(last).padStart(2, '0')}`,
   };
 }
 
@@ -290,18 +242,12 @@ async function fetchFacetBuckets(ctx, params, facet) {
     issuesSearchUrl(ctx.baseUrl, { ...params, facets: facet })
   );
   return entry.values
-    .map(value => ({
-      val: String(value?.val ?? ''),
-      count: Number(value?.count ?? 0),
-    }))
-    .filter(value => value.val && value.count > 0);
+    .map(v => ({ val: String(v?.val ?? ''), count: Number(v?.count ?? 0) }))
+    .filter(v => v.val && v.count > 0);
 }
 
-/**
- * Collects every issue for a query, partitioning on the API-supported
- * `createdAt` month buckets (then `rules` inside an over-cap month) when the
- * 10k result cap would otherwise truncate the inventory.
- */
+// Collects every issue for a query; on a cap hit partitions on the supported
+// `createdAt` month facet, then `rules` inside an over-cap month.
 async function collectIssues(
   ctx,
   params,
@@ -356,29 +302,19 @@ async function fetchHotspots(ctx, incompleteness) {
     branch: ctx.branch,
     status: 'TO_REVIEW',
   };
-  const url = page =>
-    `${ctx.baseUrl}/api/hotspots/search?${new URLSearchParams({ ...params, ps: String(PAGE_SIZE), p: String(page) }).toString()}`;
-
-  const hotspots = [];
-  let apiTotal = 0;
-  let page = 1;
-  while ((page - 1) * PAGE_SIZE < RESULT_CAP) {
-    const pageUrl = url(page);
-    const json = await fetchJson(pageUrl, ctx);
+  const { items: hotspots, apiTotal } = await drainPages(async page => {
+    const url = `${ctx.baseUrl}/api/hotspots/search?${new URLSearchParams({ ...params, ps: String(PAGE_SIZE), p: String(page) })}`;
+    const json = await fetchJson(url, ctx);
     requireShape(
       json?.paging &&
         Number.isInteger(json.paging.pageIndex) &&
         Number.isInteger(json.paging.total) &&
         Array.isArray(json.hotspots),
       'hotspots/search paging metadata missing or malformed',
-      pageUrl
+      url
     );
-    apiTotal = json.paging.total;
-    const batch = json.hotspots;
-    hotspots.push(...batch);
-    if (batch.length === 0 || hotspots.length >= apiTotal) break;
-    page += 1;
-  }
+    return { batch: json.hotspots, total: json.paging.total };
+  });
   if (hotspots.length < apiTotal) {
     incompleteness.push({
       partition: 'hotspots:TO_REVIEW',
@@ -393,25 +329,31 @@ async function fetchHotspots(ctx, incompleteness) {
   return { hotspots, apiTotal };
 }
 
-async function latestAnalysis(ctx) {
-  const url = `${ctx.baseUrl}/api/project_analyses/search?${new URLSearchParams({ project: ctx.projectKey, branch: ctx.branch, ps: '1' }).toString()}`;
+// Best-effort endpoint: returns the fetcher's value, or null + warning on
+// failure — optional evidence degrades, never fails closed.
+async function optional(ctx, fetcher, label) {
   try {
-    const json = await fetchJson(url, ctx);
-    const analysis = Array.isArray(json?.analyses)
-      ? json.analyses[0]
-      : undefined;
-    if (!analysis?.key) return null;
-    return {
-      key: analysis.key,
-      date: analysis.date ?? null,
-      revision: analysis.revision ?? null,
-    };
+    return await fetcher();
   } catch (error) {
-    ctx.warnings.push(
-      `project analysis binding unavailable: ${error?.kind ?? 'unknown'} (${error?.message ?? error})`
-    );
+    const kind = error instanceof SonarFetchError ? error.kind : 'unknown';
+    ctx.warnings.push(`${label} unavailable: ${kind}`);
     return null;
   }
+}
+
+async function latestAnalysis(ctx) {
+  const url = `${ctx.baseUrl}/api/project_analyses/search?${new URLSearchParams({ project: ctx.projectKey, branch: ctx.branch, ps: '1' }).toString()}`;
+  return optional(
+    ctx,
+    async () => {
+      const json = await fetchJson(url, ctx);
+      const a = Array.isArray(json?.analyses) ? json.analyses[0] : undefined;
+      return a?.key
+        ? { key: a.key, date: a.date ?? null, revision: a.revision ?? null }
+        : null;
+    },
+    'project analysis binding'
+  );
 }
 
 async function validateProjectAndBranch(ctx) {
@@ -425,34 +367,33 @@ async function validateProjectAndBranch(ctx) {
     );
     return json.component;
   } catch (error) {
-    if (error instanceof SonarFetchError && error.kind === 'not_found') {
-      throw new SonarFetchError(
-        'not_found',
-        `project "${ctx.projectKey}" or branch "${ctx.branch}" not found on ${ctx.baseUrl} — refusing to collect an unbound inventory`,
-        { status: 404, url }
-      );
+    if (!(error instanceof SonarFetchError && error.kind === 'not_found')) {
+      throw error;
     }
-    throw error;
+    throw new SonarFetchError(
+      'not_found',
+      `project "${ctx.projectKey}" or branch "${ctx.branch}" not found on ${ctx.baseUrl} — refusing to collect an unbound inventory`,
+      { status: 404, url }
+    );
   }
 }
 
 async function fetchNewCodeTotal(ctx) {
-  try {
-    const json = await fetchIssueSearch(ctx, {
-      componentKeys: ctx.projectKey,
-      branch: ctx.branch,
-      resolved: 'false',
-      inNewCodePeriod: 'true',
-      ps: 1,
-      p: 1,
-    });
-    return json.paging.total;
-  } catch (error) {
-    ctx.warnings.push(
-      `new-code issue total unavailable: ${error?.kind ?? 'unknown'}`
-    );
-    return null;
-  }
+  return optional(
+    ctx,
+    async () => {
+      const json = await fetchIssueSearch(ctx, {
+        componentKeys: ctx.projectKey,
+        branch: ctx.branch,
+        resolved: 'false',
+        inNewCodePeriod: 'true',
+        ps: 1,
+        p: 1,
+      });
+      return json.paging.total;
+    },
+    'new-code issue total'
+  );
 }
 
 async function fetchMeasures(ctx) {
@@ -472,26 +413,25 @@ async function fetchMeasures(ctx) {
       }
       return { status: 'ok', metrics: measures };
     } catch (error) {
-      if (error instanceof SonarFetchError && error.kind === 'client') {
-        continue; // unsupported metric set in this project's mode — degrade
-      }
-      if (error instanceof SonarFetchError && error.kind === 'not_found') {
+      // Unsupported metric set in this project's mode — degrade.
+      if (
+        error instanceof SonarFetchError &&
+        (error.kind === 'client' || error.kind === 'not_found')
+      ) {
         continue;
       }
-      ctx.warnings.push(
-        `measures reconciliation unavailable: ${error?.kind ?? 'unknown'}`
-      );
+      const kind = error instanceof SonarFetchError ? error.kind : 'unknown';
+      ctx.warnings.push(`measures reconciliation unavailable: ${kind}`);
       return { status: 'unavailable', metrics: {} };
     }
   }
   return { status: 'unsupported', metrics: {} };
 }
 
-function observedSha(ctx) {
-  if (ctx.env?.GITHUB_SHA) return ctx.env.GITHUB_SHA;
+function gitOut(args, cwd) {
   try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: ctx.cwd,
+    return execFileSync('git', args, {
+      cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -532,19 +472,18 @@ function dedupeByKey(records) {
 async function collectAll(ctx) {
   const incompleteness = [];
 
+  const scoped = { componentKeys: ctx.projectKey, branch: ctx.branch };
   const openCollected = await collectIssues(
     ctx,
-    { componentKeys: ctx.projectKey, branch: ctx.branch, resolved: 'false' },
+    { ...scoped, resolved: 'false' },
     incompleteness,
     0,
     'issues:open'
   );
-
   const acceptedCollected = await collectIssues(
     ctx,
     {
-      componentKeys: ctx.projectKey,
-      branch: ctx.branch,
+      ...scoped,
       resolved: 'true',
       resolutions: 'FALSE-POSITIVE,WONTFIX',
     },
@@ -578,10 +517,7 @@ async function collectAll(ctx) {
   };
 }
 
-/**
- * Runs the whole collection and returns { status, issues, inventory } without
- * writing anything, so tests can drive it with a mocked fetchImpl.
- */
+/** Full collection → { status, atomic, issues, inventory }; writes nothing. */
 export async function collectInventory({
   baseUrl = DEFAULT_BASE_URL,
   projectKey = DEFAULT_PROJECT_KEY,
@@ -617,9 +553,8 @@ export async function collectInventory({
 
   await validateProjectAndBranch(ctx);
 
-  // Snapshot → collect → verify binds the inventory to one analysis. A drifted
-  // analysis means pages may mix versions: retry the full collection once, then
-  // flag non-atomic rather than presenting mixed evidence as complete.
+  // Snapshot → collect → verify binds the inventory to one analysis. On drift,
+  // retry once then flag non-atomic rather than mixing versions.
   let bundle;
   let boundAnalysis = null;
   let atomic = true;
@@ -658,42 +593,31 @@ export async function collectInventory({
     measures,
   } = bundle;
 
+  // Reconcile unique fetches against the API-reported total per collection.
+  const reconcile = (partition, reported, records) => {
+    if (reported !== null && records.length < reported) {
+      incompleteness.push({
+        partition,
+        reason: 'fetched_unique_below_api_total',
+        apiTotal: reported,
+        fetched: records.length,
+      });
+    }
+    return {
+      apiTotal: reported,
+      fetchedUnique: records.length,
+      matches: reported === null || records.length >= reported,
+    };
+  };
   const reconciliation = {
-    open: {
-      apiTotal: openReportedTotal,
-      fetchedUnique: open.records.length,
-      matches:
-        openReportedTotal === null || open.records.length >= openReportedTotal,
-    },
-    accepted: {
-      apiTotal: acceptedReportedTotal,
-      fetchedUnique: accepted.records.length,
-      matches:
-        acceptedReportedTotal === null ||
-        accepted.records.length >= acceptedReportedTotal,
-    },
+    open: reconcile('issues:open', openReportedTotal, open.records),
+    accepted: reconcile(
+      'issues:accepted',
+      acceptedReportedTotal,
+      accepted.records
+    ),
     measures,
   };
-
-  if (openReportedTotal !== null && open.records.length < openReportedTotal) {
-    incompleteness.push({
-      partition: 'issues:open',
-      reason: 'fetched_unique_below_api_total',
-      apiTotal: openReportedTotal,
-      fetched: open.records.length,
-    });
-  }
-  if (
-    acceptedReportedTotal !== null &&
-    accepted.records.length < acceptedReportedTotal
-  ) {
-    incompleteness.push({
-      partition: 'issues:accepted',
-      reason: 'fetched_unique_below_api_total',
-      apiTotal: acceptedReportedTotal,
-      fetched: accepted.records.length,
-    });
-  }
 
   const measureMismatches = [];
   const measureMap = {
@@ -704,15 +628,13 @@ export async function collectInventory({
   if (measures.status === 'ok') {
     const byType = countBy(open.records, 'type');
     for (const [type, metric] of Object.entries(measureMap)) {
-      if (metric in measures.metrics && type in byType) {
-        if (measures.metrics[metric] !== byType[type]) {
-          measureMismatches.push({
-            metric,
-            type,
-            measure: measures.metrics[metric],
-            issues: byType[type],
-          });
-        }
+      const measure = measures.metrics[metric];
+      if (
+        metric in measures.metrics &&
+        type in byType &&
+        measure !== byType[type]
+      ) {
+        measureMismatches.push({ metric, type, measure, issues: byType[type] });
       }
     }
   }
@@ -731,7 +653,7 @@ export async function collectInventory({
   const status = incompleteness.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
   const usesImpacts = open.records.some(issue => Array.isArray(issue?.impacts));
 
-  const sha = observedSha(ctx);
+  const sha = ctx.env?.GITHUB_SHA || gitOut(['rev-parse', 'HEAD'], ctx.cwd);
   const stale = Boolean(
     boundAnalysis?.revision && sha && boundAnalysis.revision !== sha
   );
@@ -794,78 +716,6 @@ export async function collectInventory({
   };
 }
 
-function printSummary(result, logger = console) {
-  const { counts } = result.inventory;
-  logger.log(`✅ Fetched ${counts.open.fetched} unique open issues`);
-  if (result.inventory.observedSha) {
-    logger.log(`   Observed commit: ${result.inventory.observedSha}`);
-  }
-  if (result.inventory.analysis) {
-    logger.log(
-      `   Bound to analysis ${result.inventory.analysis.key} (${result.inventory.analysis.date ?? 'no date'})`
-    );
-  }
-
-  const group = (by, label) => {
-    logger.log(`\n📊 Issues by ${label}:`);
-    for (const [name, count] of Object.entries(by).sort(
-      (a, b) => b[1] - a[1]
-    )) {
-      logger.log(`   ${name}: ${count}`);
-    }
-  };
-  group(counts.open.bySeverity, 'severity');
-  group(counts.open.byType, 'type');
-
-  logger.log('\n📊 Top 10 rules:');
-  const byRule = countBy(result.issues, 'rule');
-  for (const [rule, count] of Object.entries(byRule)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)) {
-    logger.log(`   ${rule}: ${count}`);
-  }
-
-  logger.log(
-    `\n   New-code issues: ${counts.newCode.apiTotal ?? 'unavailable'}`
-  );
-  logger.log(
-    `   Accepted / false-positive: ${counts.acceptedFalsePositive.fetched}`
-  );
-  logger.log(
-    `   Security hotspots to review: ${counts.hotspotsToReview.fetched}`
-  );
-  logger.log(
-    `   Status: ${result.inventory.status}, atomic: ${result.inventory.atomic}`
-  );
-
-  if (result.inventory.incompleteness.length > 0) {
-    logger.log('\n⚠️  INCOMPLETE partitions:');
-    for (const entry of result.inventory.incompleteness) {
-      logger.log(
-        `   ${entry.partition}: ${entry.reason} (${entry.fetched}/${entry.apiTotal} fetched)`
-      );
-    }
-  }
-  if (result.inventory.warnings.length > 0) {
-    logger.log('\n⚠️  Warnings:');
-    for (const warning of result.inventory.warnings) {
-      logger.log(`   ${warning}`);
-    }
-  }
-}
-
-function repoRoot(cwd) {
-  try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return cwd;
-  }
-}
-
 export async function main(
   env = process.env,
   {
@@ -884,7 +734,6 @@ export async function main(
     return exit(1);
   }
 
-  logger.log('🔍 Fetching SonarCloud issues...');
   try {
     const result = await collectInventory({
       baseUrl: env.SONAR_BASE_URL || DEFAULT_BASE_URL,
@@ -898,30 +747,22 @@ export async function main(
       logger,
     });
 
-    const root = repoRoot(cwd);
-    const issuesPath = writeIssueOutputAtomic(
-      ISSUES_FILE,
-      JSON.stringify(result.issues, null, 2),
-      { root }
-    );
-    const inventoryPath = writeIssueOutputAtomic(
-      INVENTORY_FILE,
-      JSON.stringify(result.inventory, null, 2),
-      { root }
+    const root = gitOut(['rev-parse', '--show-toplevel'], cwd) ?? cwd;
+    const [issuesPath, inventoryPath] = [
+      [ISSUES_FILE, result.issues],
+      [INVENTORY_FILE, result.inventory],
+    ].map(([file, data]) =>
+      writeIssueOutputAtomic(file, JSON.stringify(data, null, 2), { root })
     );
 
-    printSummary(result, logger);
-    logger.log(`\n💾 Saved issues to: ${issuesPath}`);
-    logger.log(`💾 Saved inventory to: ${inventoryPath}`);
-
+    logger.log(
+      `Sonar: ${result.issues.length} issues — ${result.status} (atomic: ${result.atomic}) → ${issuesPath} + ${inventoryPath}`
+    );
     return exit(result.status === 'COMPLETE' && result.atomic ? 0 : 2);
   } catch (error) {
     const kind = error instanceof SonarFetchError ? error.kind : 'unknown';
     logger.error(
-      `\n❌ SonarCloud collection failed [${kind}]: ${error?.message ?? error}`
-    );
-    logger.error(
-      '   No inventory written; last-known evidence left untouched.'
+      `❌ SonarCloud collection failed [${kind}]: ${error?.message ?? error} — no inventory written; last-known evidence left untouched`
     );
     return exit(1);
   }
