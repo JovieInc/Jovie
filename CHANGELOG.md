@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Staged production builds now receive Apple OAuth credentials (JOV-4363):** Doppler `--only-secrets` injects `AUTH_APPLE_CLIENT_ID`, `AUTH_APPLE_TEAM_ID`, `AUTH_APPLE_KEY_ID`, and `AUTH_APPLE_PRIVATE_KEY` into the production deployment build and passes them as runtime `--env`, matching staging. `--no-fallback` and the OAuth/artifact guards stay in place.
+
 ## [26.9.15] - 2026-09-21
 
 ## [26.9.14] - 2026-09-21
