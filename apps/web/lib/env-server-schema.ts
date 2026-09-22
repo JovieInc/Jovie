@@ -135,8 +135,8 @@ export const ServerEnvSchema = z.object({
     .string()
     .url()
     .regex(
-      /^https:\/\/jovie-eve-shadow-[a-z0-9]+-jovie\.vercel\.app$/u,
-      'Must be an immutable jovie-eve-shadow deployment URL'
+      /^https:\/\/(?:jovie-eve-shadow|summer-operations)-[a-z0-9]+-jovie\.vercel\.app$/u,
+      'Must be an immutable Summer deployment URL in the Jovie team'
     )
     .optional(),
   OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: z
