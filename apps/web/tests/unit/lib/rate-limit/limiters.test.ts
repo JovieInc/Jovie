@@ -605,7 +605,7 @@ describe('limiters.ts', () => {
   // =========================================================================
 
   describe('checkAnonymousChatRateLimit', () => {
-    it('charges a first touch against the dedicated first-touch budget only', async () => {
+    it('charges a first touch against the first-touch budget, then the new session bucket', async () => {
       // A shared-egress IP that already burned the anonymous pools must not
       // dead-end a brand-new visitor on message #1.
       mockLimit.mockImplementation((key: string) =>
@@ -627,8 +627,39 @@ describe('limiters.ts', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockLimit).toHaveBeenCalledTimes(1);
-      expect(mockLimit).toHaveBeenCalledWith('first_touch:203.0.113.10');
+      // First-touch pool + the fresh session's lifetime bucket (cookie-reset
+      // bypass fix: the session counter must survive cookie rotation).
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'first_touch:203.0.113.10',
+        'session:sess-new',
+      ]);
+    });
+
+    it('denies a first touch whose fresh session bucket is exhausted', async () => {
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('session:')
+            ? makeDeniedResult({
+                reason:
+                  'You have hit the conversation limit for this session. Sign up to keep going.',
+              })
+            : makeAllowedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe(
+        'You have hit the conversation limit for this session. Sign up to keep going.'
+      );
     });
 
     it('checks ip, asn, then session for an established session', async () => {
@@ -682,6 +713,26 @@ describe('limiters.ts', () => {
       ).options;
 
       expect(options?.requireRedis).toBeFalsy();
+    });
+
+    it('caps the first-touch budget at the sustained per-IP hourly rate so cookie resets cannot buy extra throughput', async () => {
+      const { anonymousOnboardingChatFirstTouchLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const config = anonymousOnboardingChatFirstTouchLimiter.getConfig() as {
+        limit: number;
+        window: string;
+      };
+      const { anonymousOnboardingChatIpLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const ipConfig = anonymousOnboardingChatIpLimiter.getConfig() as {
+        limit: number;
+        window: string;
+      };
+
+      expect(config.window).toBe(ipConfig.window);
+      expect(config.limit).toBeLessThanOrEqual(ipConfig.limit);
     });
   });
 
