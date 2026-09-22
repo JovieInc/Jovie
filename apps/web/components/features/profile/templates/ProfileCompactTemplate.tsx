@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import {
   ProfileNotificationsContext,
@@ -34,6 +35,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -121,6 +123,8 @@ interface ProfileCompactTemplateProps {
   readonly claimFooterHref?: string | null;
   readonly claimFooterLabel?: string;
   readonly proofClaim?: boolean;
+  /** Credits for the profile's latest release. Opens the shared credits drawer. */
+  readonly releaseCredits?: readonly SmartLinkCreditGroup[];
   /** True when this template is embedded in another page (marketing/demo
    *  preview) rather than serving as the outer profile document. Forwarded
    *  to the layout shell so the global viewport scroll lock skips embedded
@@ -272,8 +276,13 @@ export function ProfileCompactTemplate({
   claimFooterHref = null,
   claimFooterLabel,
   proofClaim = false,
+  releaseCredits,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
+  const visibleReleaseCredits = (releaseCredits ?? []).filter(
+    group => group.entries.length > 0
+  );
+  const [creditsOpen, setCreditsOpen] = useState(false);
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
@@ -862,6 +871,16 @@ export function ProfileCompactTemplate({
       <AnonCookieBootstrap
         onVariantResolved={setResolvedAlertOptInVariant}
         onProfilePacResolved={setResolvedProfilePacAssignment}
+      />
+      {visibleReleaseCredits.length > 0 ? (
+        <button type='button' onClick={() => setCreditsOpen(true)}>
+          Release credits
+        </button>
+      ) : null}
+      <ReleaseCreditsDrawer
+        open={creditsOpen}
+        onOpenChange={setCreditsOpen}
+        credits={visibleReleaseCredits}
       />
       <PublicProfileLayoutShell
         artistName={artist.name}

@@ -1,6 +1,7 @@
 import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
+import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
@@ -339,6 +340,9 @@ async function ArtistPageContent({
     getClientTrackingToken(profile.id).token ?? undefined;
 
   const latestRelease = fetchedLatestRelease;
+  const releaseCredits = latestRelease?.id
+    ? await loadPublicReleaseCredits(latestRelease.id).catch(() => [])
+    : [];
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -499,6 +503,7 @@ async function ArtistPageContent({
         allowFanCapture={isClaimed}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
+        releaseCredits={releaseCredits}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         pressPhotos={pressPhotos}
