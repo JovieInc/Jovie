@@ -16,7 +16,10 @@ test('owningAreaFor derives area from test path', () => {
   );
   assert.strictEqual(owningAreaFor('tests/unit/foo.test.ts'), 'unit');
   assert.strictEqual(owningAreaFor('tests/e2e/smoke.spec.ts'), 'e2e');
-  assert.strictEqual(owningAreaFor('apps/web/tests/contracts/api.test.ts'), 'contracts');
+  assert.strictEqual(
+    owningAreaFor('apps/web/tests/contracts/api.test.ts'),
+    'contracts'
+  );
   assert.strictEqual(owningAreaFor('src/lib/x.test.ts'), 'src');
 });
 

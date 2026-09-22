@@ -6,10 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const {
-  extractResolvedVersions,
-  diffDigests,
-} = require('./dep-parity.js');
+const { extractResolvedVersions, diffDigests } = require('./dep-parity.js');
 
 test('extractResolvedVersions pulls name->versions from lockfile text', () => {
   const lockfile = [

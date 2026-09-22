@@ -70,7 +70,7 @@ function owningAreaFor(file) {
  */
 function mapToLedgerPath(file) {
   if (!file) return null;
-  let f = String(file).replace(/\\/g, '/').replace(/^\.\//, '');
+  const f = String(file).replace(/\\/g, '/').replace(/^\.\//, '');
   if (f.startsWith('apps/web/')) {
     const rel = f.slice('apps/web/'.length);
     if (/^tests\/e2e\/.*\.spec\.ts$/.test(rel)) return { kind: 'e2e', path: f };
@@ -78,7 +78,8 @@ function mapToLedgerPath(file) {
       return { kind: 'unit', path: rel };
     return null;
   }
-  if (/^tests\/e2e\/.*\.spec\.ts$/.test(f)) return { kind: 'e2e', path: `apps/web/${f}` };
+  if (/^tests\/e2e\/.*\.spec\.ts$/.test(f))
+    return { kind: 'e2e', path: `apps/web/${f}` };
   if (/^tests\/.*\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f))
     return { kind: 'unit', path: f };
   return null;
@@ -118,9 +119,7 @@ function main() {
   const now = new Date();
   const nowIso = now.toISOString();
   const today = nowIso.split('T')[0];
-  const expiresAt = new Date(
-    now.getTime() + AUTO_ENTRY_TTL_DAYS * MS_PER_DAY
-  )
+  const expiresAt = new Date(now.getTime() + AUTO_ENTRY_TTL_DAYS * MS_PER_DAY)
     .toISOString()
     .split('T')[0];
 
@@ -144,8 +143,7 @@ function main() {
       e => e.signatureHash === cluster.signature || e.path === mapped.path
     );
     if (existing) {
-      existing.flakeCount =
-        (existing.flakeCount || 0) + cluster.occurrences24h;
+      existing.flakeCount = (existing.flakeCount || 0) + cluster.occurrences24h;
       existing.lastSeenFlakyAt = cluster.lastSeenAt || nowIso;
       existing.consecutiveSuccesses = 0;
       existing.signatureHash = existing.signatureHash || cluster.signature;

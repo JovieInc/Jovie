@@ -200,11 +200,17 @@ function normalizeFailureText(text) {
   return String(text || '')
     .replace(/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[\d.:Z+-]*/g, '<ts>')
     .replace(/\b\d+(\.\d+)?\s*(ms|s|min)\b/gi, '<dur>')
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>')
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      '<uuid>'
+    )
     .replace(/\b[0-9a-f]{16,}\b/gi, '<hex>')
     .replace(/\b\d{4,5}\b/g, '<port>')
     .replace(/\(\d+\/\d+\)/g, '(<shard>)')
-    .replace(/(?:[A-Za-z]:)?[\w./-]*?(?:\.run|\.work|runner|home|Users)\/[\w./-]+/g, '<path>')
+    .replace(
+      /(?:[A-Za-z]:)?[\w./-]*?(?:\.run|\.work|runner|home|Users)\/[\w./-]+/g,
+      '<path>'
+    )
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
@@ -260,7 +266,9 @@ function parseJunitXml(xml) {
     }
 
     if (!sawFlaky) {
-      const failMatch = body.match(/<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/);
+      const failMatch = body.match(
+        /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/
+      );
       if (failMatch) {
         const error = decodeXml(failMatch[1]).slice(0, 2000);
         records.push({ testId, file, name, kind: 'failure', error });
@@ -278,8 +286,7 @@ async function collectRunFailureRecords(token, owner, repo, run) {
   const artifacts = await fetchRunArtifacts(token, owner, repo, run.id);
   const junitArtifacts = artifacts.filter(
     a =>
-      !a.expired &&
-      /unit-test|test-report|junit|playwright/i.test(a.name || '')
+      !a.expired && /unit-test|test-report|junit|playwright/i.test(a.name || '')
   );
   if (junitArtifacts.length === 0) return [];
 
@@ -298,9 +305,7 @@ async function collectRunFailureRecords(token, owner, repo, run) {
     }
   }
 
-  const xmlFiles = fs
-    .readdirSync(tmpDir)
-    .filter(f => f.endsWith('.xml'));
+  const xmlFiles = fs.readdirSync(tmpDir).filter(f => f.endsWith('.xml'));
   for (const file of xmlFiles) {
     let xml;
     try {
@@ -801,13 +806,8 @@ async function main() {
     const [owner, repo] = repository.split('/');
 
     // Analyze flakiness
-    const {
-      testStats,
-      totalRuns,
-      runsWithRetries,
-      runsWithFailures,
-      runs,
-    } = await analyzeFlakiness(token, owner, repo);
+    const { testStats, totalRuns, runsWithRetries, runsWithFailures, runs } =
+      await analyzeFlakiness(token, owner, repo);
 
     const flakyTests = calculateMetrics(testStats);
 
