@@ -28,8 +28,8 @@ const NPM_DEPENDABOT = DEPENDABOT_CONFIG.match(
 const CODEQL_ACTION_USE =
   /^\s*uses:\s*github\/codeql-action\/([^@\s]+)@([^\s#]+)(?:\s+#\s+(\S+))?\s*$/gm;
 const EXPECTED_CODEQL_ACTION_REVISION =
-  'b96794f015dfd88f77b49b1c93e0fa7110f94c63';
-const EXPECTED_CODEQL_ACTION_VERSION = 'v4.38.0';
+  '1c5b675653bb5c22dbe9b12b556ec555138e09fd';
+const EXPECTED_CODEQL_ACTION_VERSION = 'v4.38.1';
 
 function collectCodeqlActionUses() {
   return WORKFLOW_FILES.flatMap(({ content, file }) =>
