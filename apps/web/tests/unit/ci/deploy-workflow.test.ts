@@ -4533,6 +4533,43 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
   });
 
+  it('retries a transient production deploy before failing without evidence', () => {
+    // JOV-4373: a single `vercel deploy` transport failure stranded the release
+    // with an empty deployment ID/URL. The exact-production deploy must retry
+    // bounded inside stage-production, mirroring the staging deploy loop.
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const stageStep = getStepBlock(
+      promoteJob,
+      'Build and stage production deployment'
+    );
+
+    const loopIndex = stageStep.indexOf('for deploy_attempt in 1 2 3; do');
+    const deployIndex = stageStep.indexOf(
+      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+    );
+    const retryIndex = stageStep.indexOf(
+      'Production prebuilt deploy attempt ${deploy_attempt}/3 failed'
+    );
+    const failIndex = stageStep.indexOf(
+      'Production prebuilt deployment failed.'
+    );
+    const outputIndex = stageStep.indexOf(
+      'echo "production_deployment_id=$production_deploy_id"'
+    );
+
+    expect(loopIndex).toBeGreaterThanOrEqual(0);
+    expect(deployIndex).toBeGreaterThan(loopIndex);
+    expect(failIndex).toBeGreaterThan(deployIndex);
+    expect(retryIndex).toBeGreaterThan(failIndex);
+    expect(outputIndex).toBeGreaterThan(retryIndex);
+    expect(stageStep).toContain('sleep 10');
+    // Still fail-closed after the bounded retry exhausts.
+    expect(stageStep).toContain(
+      'fail_stage "Production prebuilt deployment failed." production_artifact_failed'
+    );
+  });
+
   it('transports production evidence without Doppler-maskable job outputs', () => {
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');

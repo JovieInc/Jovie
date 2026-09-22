@@ -991,17 +991,27 @@ jobs:
           deploy_json=""
           export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
           export NEXT_PUBLIC_BUILD_SHA="$expected"
-          if ! deploy_json="$(./node_modules/.bin/vercel deploy \
-            --prebuilt --archive=tgz --prod --skip-domain --format=json \
-            --env VERCEL_GIT_COMMIT_SHA \
-            --env NEXT_PUBLIC_BUILD_SHA \
-            "${runtime_env_args[@]}" \
-            --meta "githubCommitSha=${EXPECTED_SHA}" \
-            --meta "jovieInputReceipt=${input_receipt_digest}" \
-            --meta "jovieArtifactDigest=${artifact_digest}" \
-            "${scope_args[@]}")"; then
-            fail_stage "Production prebuilt deployment failed." production_artifact_failed
-          fi
+          # A transient upload failure must not strand the release without any
+          # deployment evidence; mirror the staging deploy's bounded retry.
+          for deploy_attempt in 1 2 3; do
+            if deploy_json="$(./node_modules/.bin/vercel deploy \
+              --prebuilt --archive=tgz --prod --skip-domain --format=json \
+              --env VERCEL_GIT_COMMIT_SHA \
+              --env NEXT_PUBLIC_BUILD_SHA \
+              "${runtime_env_args[@]}" \
+              --meta "githubCommitSha=${EXPECTED_SHA}" \
+              --meta "jovieInputReceipt=${input_receipt_digest}" \
+              --meta "jovieArtifactDigest=${artifact_digest}" \
+              "${scope_args[@]}")"; then
+              break
+            fi
+            if [ "$deploy_attempt" -eq 3 ]; then
+              fail_stage "Production prebuilt deployment failed." production_artifact_failed
+            fi
+            echo "Production prebuilt deploy attempt ${deploy_attempt}/3 failed; retrying in 10s."
+            deploy_json=""
+            sleep 10
+          done
           if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
             fail_stage "Production deploy returned malformed JSON." production_artifact_failed
           fi
