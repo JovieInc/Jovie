@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AdminWaitlistTableUnified } from '@/features/admin/waitlist-table/AdminWaitlistTableUnified';
+import { AdminWaitlistTableUnified } from '@/components/features/admin/waitlist-table/AdminWaitlistTableUnified';
 
 let capturedGetRowClassName:
   | ((row: unknown, index: number) => string)

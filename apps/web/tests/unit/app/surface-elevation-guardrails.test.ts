@@ -15,6 +15,10 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '../../..');
 
+function readComponent(relativePath: string) {
+  return readFileSync(join(ROOT, relativePath), 'utf-8');
+}
+
 function findMatches(
   pattern: RegExp,
   globs: string[]
@@ -463,6 +467,53 @@ describe('surface elevation guardrails', () => {
       matches,
       `Found semi-transparent bg-surface-0/XX in app shell:\n${matches.map(m => `  ${m.file}:${m.line} → ${m.text}`).join('\n')}`
     ).toHaveLength(0);
+  });
+
+  it('routes migrated table surfaces through the v9 compat adapter', () => {
+    // TanStack Table v9 removed the v8 export surface; all table components must
+    // import the v8-shaped API from the local adapter, never the package root.
+    // Literal paths are required — component-ship coverage-via only counts exact
+    // node:fs reads of the component source.
+    const adapterConsumers = [
+      readComponent('components/features/admin/ActivityTableUnified.tsx'),
+      readComponent('components/features/admin/agent-os/AgentOsRunsPanel.tsx'),
+      readComponent(
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx'
+      ),
+      readComponent(
+        'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx'
+      ),
+      readComponent(
+        'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+      ),
+      readComponent('components/features/admin/leads/LeadTable.tsx'),
+      readComponent('components/features/admin/table/AdminDataTable.tsx'),
+      readComponent(
+        'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx'
+      ),
+      readComponent(
+        'components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx'
+      ),
+      readComponent('components/features/dashboard/organisms/EarningsTab.tsx'),
+      readComponent(
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+      ),
+      readComponent(
+        'components/features/dashboard/organisms/tour-dates/TourDatesTable.tsx'
+      ),
+    ];
+
+    for (const source of adapterConsumers) {
+      expect(source).toContain("'@/lib/tanstack-table'");
+      expect(source).not.toContain("'@tanstack/react-table'");
+    }
+
+    // AdminCreatorProfilesUnified composes AdminDataTable and owns no direct
+    // table API usage; guard that it stays off the package root regardless.
+    const creatorProfiles = readComponent(
+      'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
+    );
+    expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
   });
 
   it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {

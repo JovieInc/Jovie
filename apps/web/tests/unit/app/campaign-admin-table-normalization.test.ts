@@ -14,6 +14,8 @@ describe('campaign admin table normalization', () => {
 
     expect(source).toContain('AdminDataTable');
     expect(source).toContain('TableEmptyState');
+    expect(source).toContain("'@/lib/tanstack-table'");
+    expect(source).not.toContain("'@tanstack/react-table'");
     expect(source).not.toContain('CampaignDataTable');
     expect(source).not.toContain('CampaignTableHeaderCell');
     expect(source).not.toContain('CampaignTableCell');

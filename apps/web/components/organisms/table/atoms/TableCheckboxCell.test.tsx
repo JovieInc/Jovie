@@ -26,4 +26,53 @@ describe('TableCheckboxCell', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }));
     expect(onChange).toHaveBeenCalledWith(true);
   });
+
+  it('toggles via onToggleSelect in TanStack row mode', async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+
+    render(
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <TableCheckboxCell
+                isChecked={false}
+                onToggleSelect={onToggleSelect}
+                row={{} as never}
+                rowNumber={3}
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 3' }));
+    expect(onToggleSelect).toHaveBeenCalled();
+  });
+
+  it('toggles select-all via onToggleSelectAll in TanStack header mode', async () => {
+    const user = userEvent.setup();
+    const onToggleSelectAll = vi.fn();
+
+    render(
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <TableCheckboxCell
+                headerCheckboxState={false}
+                onToggleSelectAll={onToggleSelectAll}
+                table={{} as never}
+              />
+            </th>
+          </tr>
+        </thead>
+      </table>
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select All Rows' }));
+    expect(onToggleSelectAll).toHaveBeenCalled();
+  });
 });

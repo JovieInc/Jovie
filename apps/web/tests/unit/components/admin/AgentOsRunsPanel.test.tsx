@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
+import { AgentOsRunsPanel } from '@/components/features/admin/agent-os/AgentOsRunsPanel';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;

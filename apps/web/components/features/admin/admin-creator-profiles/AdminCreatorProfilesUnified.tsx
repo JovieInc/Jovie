@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import {
   CheckCircle,

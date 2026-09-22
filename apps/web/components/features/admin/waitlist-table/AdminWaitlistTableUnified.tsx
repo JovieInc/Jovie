@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/components/admin/AdminWaitlistTableUnified.test.tsx
 
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -105,5 +107,18 @@ describe('TaskDataTable', () => {
       `${TASK_DATA_TABLE_ROW_CLASSNAME} selected-row`
     );
     expect(table).toHaveAttribute('data-row-height', '72');
+  });
+
+  it('routes table API imports through the v9 compat adapter', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TaskDataTable.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'@/lib/tanstack-table'");
+    expect(source).not.toContain("'@tanstack/react-table'");
   });
 });

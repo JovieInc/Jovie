@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/components/admin/AdminUsersTableUnified.test.tsx
 
 import {
   AlertDialog,

@@ -18,6 +18,8 @@ describe('outreach admin table normalization', () => {
 
       expect(source).toContain('AdminDataTable');
       expect(source).toContain('TableEmptyState');
+      expect(source).toContain("'@/lib/tanstack-table'");
+      expect(source).not.toContain("'@tanstack/react-table'");
       expect(source).not.toContain('ContentTable');
       expect(source).not.toContain('CONTENT_TABLE_');
       expect(source).not.toMatch(/<table\b/);

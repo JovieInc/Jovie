@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
@@ -45,5 +47,18 @@ describe('ActivityTableUnified', () => {
     expect(
       container.querySelectorAll('tbody tr').length
     ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('routes table API imports through the v9 compat adapter', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/ActivityTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'@/lib/tanstack-table'");
+    expect(source).not.toContain("'@tanstack/react-table'");
   });
 });

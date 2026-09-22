@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ADMIN_DATA_TABLE_CLASSNAME,
   AdminDataTable,
-} from '@/features/admin/table/AdminDataTable';
+} from '@/components/features/admin/table/AdminDataTable';
 
 vi.mock('@/components/organisms/table', () => ({
   UnifiedTable: ({

@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/dashboard/TaskDataTable.test.tsx
 
 import { useCallback } from 'react';
 import {

@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/dashboard/TasksPageClient.test.tsx
 
 import {
   Button,

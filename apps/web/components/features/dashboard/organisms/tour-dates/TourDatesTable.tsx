@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import { Badge, type BadgeProps, Button } from '@jovie/ui';
 import { memo, useCallback, useMemo, useState } from 'react';

@@ -45,6 +45,15 @@ export const EXCLUDE_BASENAMES = new Set([
   'common-dropdown-renderer',
   'common-dropdown-types',
   'common-dropdown-utils',
+  'createselectioncolumnfactory',
+  // Pure column/render-definition factories — not shippable surfaces.
+  'column-renderers',
+  'column-definitions',
+  'columns',
+  'table-config',
+  'release-table-renderers',
+  'demo-audience-cell-renderers',
+  'library-catalog-columns',
 ]);
 
 const EXCLUDE_DIR_NAMES = new Set([

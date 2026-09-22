@@ -5,11 +5,17 @@
  * All table code must import from this module instead of
  * `@tanstack/react-table` directly so the v9 migration stays a one-file change.
  */
+
 import type {
+  ColumnHelper,
   CellContext as CoreCellContext,
   FilterFn as CoreFilterFn,
   HeaderContext as CoreHeaderContext,
   RowData,
+} from '@tanstack/react-table';
+import {
+  createColumnHelper as createColumnHelperCore,
+  flexRender,
 } from '@tanstack/react-table';
 import type { LegacyFeatures } from '@tanstack/react-table/legacy';
 
@@ -24,7 +30,6 @@ export type {
   SortingState,
   Updater,
 } from '@tanstack/react-table';
-export { flexRender } from '@tanstack/react-table';
 export type {
   LegacyCell as Cell,
   LegacyColumn as Column,
@@ -42,9 +47,23 @@ export {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  legacyCreateColumnHelper as createColumnHelper,
   useLegacyTable as useReactTable,
 } from '@tanstack/react-table/legacy';
+export { flexRender };
+
+/**
+ * v8-style `createColumnHelper<TData>()`. The `/legacy` entry is marked
+ * `'use client'`, so `legacyCreateColumnHelper` cannot run at module scope in
+ * server-evaluated files (loading shells, column definition modules). The
+ * table-core helper is server-safe; bind it to the legacy feature set so the
+ * returned helper types match `useReactTable`.
+ */
+export function createColumnHelper<TData extends RowData>(): ColumnHelper<
+  LegacyFeatures,
+  TData
+> {
+  return createColumnHelperCore<LegacyFeatures, TData>();
+}
 
 /** v8-shaped generics bound to the legacy feature set. */
 export type CellContext<

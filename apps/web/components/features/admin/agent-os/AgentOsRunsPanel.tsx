@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/components/admin/AgentOsRunsPanel.test.tsx
 
 import { Badge, Button } from '@jovie/ui';
 import {

@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
