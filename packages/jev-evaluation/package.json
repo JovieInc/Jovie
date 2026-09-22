@@ -1,0 +1,21 @@
+{
+  "name": "@jovie/jev-evaluation",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": {
+      "types": "./gateway.mjs",
+      "browser": "./browser.mjs",
+      "default": "./server.mjs"
+    }
+  },
+  "dependencies": {
+    "ai-evaluation": "npm:ai@7.0.105"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "node check-digest.mjs && node --test check-artifacts.test.mjs",
+    "generate": "node check-digest.mjs --write",
+    "test": "pnpm check && node --test --experimental-test-coverage --test-coverage-include=gateway.mjs --test-coverage-include=fingerprint.mjs --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=90 gateway.test.mjs"
+  }
+}

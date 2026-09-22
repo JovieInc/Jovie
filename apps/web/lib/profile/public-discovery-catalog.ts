@@ -2,11 +2,10 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, eq } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
-import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { loadProfileCompleteness } from './completeness.server';
 import { filterPublicDiscoveryIdentities } from './public-profile-indexing-policy';
 
 export interface ArtistsDirectoryCatalogProfile {
@@ -32,7 +31,8 @@ export type ArtistsDirectoryCatalogResult =
     };
 
 export function toArtistsDirectoryProfiles(
-  rows: readonly ArtistsDirectoryCatalogRow[] | null | undefined
+  rows: readonly ArtistsDirectoryCatalogRow[] | null | undefined,
+  eligibleIds: ReadonlySet<string> = new Set()
 ): ArtistsDirectoryCatalogProfile[] {
   if (!Array.isArray(rows)) return [];
 
@@ -41,13 +41,15 @@ export function toArtistsDirectoryProfiles(
       ...row,
       handle: row.handle ?? row.username,
     }))
-  ).map(row => ({
-    id: row.id,
-    username: row.username,
-    displayName: row.displayName,
-    avatarUrl: row.avatarUrl,
-    bio: row.bio,
-  }));
+  )
+    .filter(row => Boolean(row.avatarUrl) && eligibleIds.has(row.id))
+    .map(row => ({
+      id: row.id,
+      username: row.username,
+      displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
+      bio: row.bio,
+    }));
 }
 
 async function queryArtistsDirectoryCatalog(): Promise<ArtistsDirectoryCatalogResult> {
@@ -76,9 +78,17 @@ async function queryArtistsDirectoryCatalog(): Promise<ArtistsDirectoryCatalogRe
       )
       .orderBy(asc(creatorProfiles.displayName));
 
+    const assessments = await loadProfileCompleteness(rows.map(row => row.id));
     return {
       status: 'ok',
-      profiles: toArtistsDirectoryProfiles(rows),
+      profiles: toArtistsDirectoryProfiles(
+        rows,
+        new Set(
+          [...assessments]
+            .filter(([, result]) => result.eligible)
+            .map(([id]) => id)
+        )
+      ),
     };
   } catch (error) {
     Sentry.captureException(error);
@@ -86,11 +96,5 @@ async function queryArtistsDirectoryCatalog(): Promise<ArtistsDirectoryCatalogRe
   }
 }
 
-export const loadArtistsDirectoryProfiles = unstable_cache(
-  queryArtistsDirectoryCatalog,
-  ['artists-directory-v1'],
-  {
-    revalidate: 3600,
-    tags: [CACHE_TAGS.ARTISTS_DIRECTORY, CACHE_TAGS.PUBLIC_PROFILE],
-  }
-);
+// Certification expiry and profile edits must take effect on the next request.
+export const loadArtistsDirectoryProfiles = queryArtistsDirectoryCatalog;
