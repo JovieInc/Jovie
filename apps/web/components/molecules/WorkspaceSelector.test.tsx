@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceSelector } from './WorkspaceSelector';
+
+vi.mock('next/link', () => ({
+  default: (props: ComponentProps<'a'>) => (
+    <a {...props} data-client-navigation='true' />
+  ),
+}));
 
 vi.mock('@jovie/ui', () => ({
   DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
@@ -40,6 +46,28 @@ const workspaces = [
 ] as const;
 
 describe('WorkspaceSelector', () => {
+  it.each(['customer', 'ov'] as const)(
+    'uses a document navigation when leaving the %s workspace',
+    currentWorkspaceId => {
+      render(
+        <WorkspaceSelector
+          currentWorkspaceId={currentWorkspaceId}
+          workspaces={workspaces}
+        />
+      );
+      for (const workspace of workspaces) {
+        const link = screen.getByRole('link', { name: workspace.label });
+        expect(link).toHaveAttribute('href', workspace.href);
+        if (workspace.id === currentWorkspaceId) {
+          expect(link).toHaveAttribute('data-client-navigation', 'true');
+        } else {
+          // Crossing a workspace must remount the server-authorized shell.
+          expect(link).not.toHaveAttribute('data-client-navigation');
+        }
+      }
+    }
+  );
+
   it('renders the active workspace in a stable selector trigger', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />

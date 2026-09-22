@@ -1,5 +1,6 @@
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { isOpaqueInternalProfileHandle } from '@/lib/profile/opaque-internal-profile-handle';
+import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import { getSitemapExcludedPublicPaths } from '@/lib/seo/public-url-policy';
 
 export interface SitemapManifestRoute {
@@ -82,7 +83,7 @@ export function isSitemapIndexableMarketingRoute(
   entry: SitemapManifestRoute
 ): boolean {
   if (entry.status !== 'active' || entry.noindex || entry.aliasOf) return false;
-  if (entry.url === '/renders' || entry.url.startsWith('/renders/')) {
+  if (isRenderFixturePathname(entry.url)) {
     return false;
   }
   if (AUTH_PRIVATE_PATHS.has(entry.url)) return false;
@@ -147,11 +148,7 @@ export function collectSitemapInventoryViolations(
     if (getSitemapExcludedPublicPaths().includes(path)) {
       violations.push(`non-indexable public url: ${path}`);
     }
-    if (
-      AUTH_PRIVATE_PATHS.has(path) ||
-      path === '/renders' ||
-      path.startsWith('/renders/')
-    ) {
+    if (AUTH_PRIVATE_PATHS.has(path) || isRenderFixturePathname(path)) {
       violations.push(`private or fixture url included: ${path}`);
     }
     const lastmod = toContentRevisionDate(entry.lastModified);

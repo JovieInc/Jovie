@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RENDER_FIXTURE_X_ROBOTS_TAG } from '@/lib/render-fixture-policy';
 
 const originalVercelEnv = process.env.VERCEL_ENV;
 
@@ -40,9 +41,29 @@ describe('staging preview privacy headers', () => {
     expect(values.every(value => value.includes('nofollow'))).toBe(true);
   }, 60_000);
 
-  it('does not add the preview-only noindex header in production', async () => {
+  it('adds the preview-only noindex header in production only to the render-fixture routes', async () => {
     const rules = await loadHeaders('production');
 
-    expect(matchingHeaderValues(rules, 'X-Robots-Tag')).toEqual([]);
+    // lib/render-fixture-policy.ts owns these sources: internal render
+    // fixtures deny in production, and the profile-mode destination is a real
+    // production route that must stay non-indexable at the HTTP layer.
+    const fixtureSourceRules = rules.filter(
+      rule =>
+        rule.source === '/renders/:path*' ||
+        rule.source === '/:username/profile-mode-render/:path*'
+    );
+    expect(fixtureSourceRules).toHaveLength(2);
+    for (const rule of fixtureSourceRules) {
+      const values = matchingHeaderValues([rule], 'X-Robots-Tag');
+      expect(values).toEqual([RENDER_FIXTURE_X_ROBOTS_TAG]);
+    }
+
+    // Every other production rule stays free of the preview-only header.
+    const otherRules = rules.filter(
+      rule =>
+        rule.source !== '/renders/:path*' &&
+        rule.source !== '/:username/profile-mode-render/:path*'
+    );
+    expect(matchingHeaderValues(otherRules, 'X-Robots-Tag')).toEqual([]);
   });
 });

@@ -1,12 +1,20 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { HOMEPAGE_PROFILE_SHOWCASE_STATES } from '@/features/home/homepage-profile-preview-fixture';
 import { MARKETING_RENDER_ROUTE_SURFACES } from '@/features/home/MarketingRenderSurface';
+import {
+  isRenderFixtureEnabled,
+  RENDER_FIXTURE_METADATA,
+} from '@/lib/render-fixture-policy';
 
 export const revalidate = false;
+export const metadata = RENDER_FIXTURE_METADATA;
 
 const states = Object.keys(HOMEPAGE_PROFILE_SHOWCASE_STATES);
 
 export default function RendersIndexPage() {
+  if (!isRenderFixtureEnabled()) notFound();
+
   return (
     <div className='mx-auto max-w-2xl px-6 py-24'>
       <h1 className='text-2xl font-semibold text-primary-token line-clamp-2'>

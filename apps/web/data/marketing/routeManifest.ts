@@ -14,6 +14,7 @@
  * surfaces or sanction an exemption.
  */
 
+import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
 import { getMarketingRecipe } from './recipes';
@@ -1233,7 +1234,7 @@ function getRouteDisposition(
   if (entry.status === 'deprecated' || entry.status === 'removed') {
     return 'deprecated';
   }
-  if (entry.url === '/renders' || entry.url.startsWith('/renders/')) {
+  if (isRenderFixturePathname(entry.url)) {
     return 'internal';
   }
   if (entry.noindex) {
@@ -1294,8 +1295,7 @@ export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS: readonly MarketingExactPublic
       entry.status === 'active' &&
       (entry.healthCheck?.expected ?? 'page') === 'page' &&
       !entry.url.includes('*') &&
-      entry.url !== '/renders' &&
-      !entry.url.startsWith('/renders/')
+      !isRenderFixturePathname(entry.url)
   ).map(entry => ({
     url: entry.url,
     glob: entry.glob,

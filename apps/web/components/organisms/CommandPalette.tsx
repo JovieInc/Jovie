@@ -216,7 +216,8 @@ function CommandPaletteInner({
           APP_SHELL_WORKSPACES,
           currentWorkspace.id
         );
-        if (nextWorkspace) router.push(nextWorkspace.href);
+        // Mode is owned by the server layout, which client navigation retains.
+        if (nextWorkspace) globalThis.location.assign(nextWorkspace.href);
       }
     },
     [pathname, router]

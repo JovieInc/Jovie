@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
@@ -8,6 +8,14 @@ import { FOUNDER_DOOR_STORAGE_KEY } from '@/lib/ovie/founder-door';
 const cycleTheme = vi.fn();
 const signOut = vi.fn();
 const push = vi.fn();
+const assign = vi.fn();
+
+beforeEach(() => {
+  assign.mockClear();
+  push.mockClear();
+  vi.stubGlobal('location', { assign });
+});
+afterEach(() => vi.unstubAllGlobals());
 const shortcutState = vi.hoisted(() => ({
   isAdmin: true,
   pathname: '/app',
@@ -102,7 +110,8 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(push).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assign).toHaveBeenCalledWith('/app/ov/chat');
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('switches an admin from OV back to Jovie', () => {
@@ -117,7 +126,8 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(push).toHaveBeenCalledWith('/app');
+    expect(assign).toHaveBeenCalledWith('/app');
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('uses the physical W key when Option changes the macOS key value', () => {
@@ -133,7 +143,8 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(push).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assign).toHaveBeenCalledWith('/app/ov/chat');
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('does not expose workspace switching to non-admins', () => {
@@ -149,6 +160,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     });
 
     expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('does not switch workspaces while typing or composing', () => {
@@ -178,6 +190,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     });
 
     expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('does not switch workspaces with conflicting command modifiers', () => {
@@ -202,6 +215,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     });
 
     expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('fails closed when the dashboard provider is absent', () => {
@@ -216,6 +230,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     });
 
     expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 });
 

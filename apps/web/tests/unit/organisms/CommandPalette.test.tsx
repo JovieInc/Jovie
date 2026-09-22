@@ -14,7 +14,7 @@ import {
   within,
 } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -28,6 +28,7 @@ import {
 } from '@/contexts/HeaderActionsContext';
 
 const pushMock = vi.fn();
+const assignMock = vi.fn();
 const prefetchMock = vi.fn();
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
@@ -196,7 +197,10 @@ function withDashboard(node: ReactNode, isAdmin = false) {
 describe('CommandPalette', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/app');
+    assignMock.mockClear();
+    vi.stubGlobal('location', { assign: assignMock });
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it('renders nothing when DashboardDataContext is missing', () => {
     const { container } = render(<CommandPalette />);
@@ -341,7 +345,7 @@ describe('CommandPalette', () => {
     expect(action).toHaveTextContent('⌥ ⇧ W');
   });
 
-  it('routes the admin workspace action to the next workspace', () => {
+  it('document-navigates the admin workspace action to the next workspace', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
@@ -352,10 +356,11 @@ describe('CommandPalette', () => {
       .find(el => el.textContent?.includes('Switch to OV'));
     fireEvent.mouseDown(action!);
 
-    expect(pushMock).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assignMock).toHaveBeenCalledWith('/app/ov/chat');
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it('routes the admin workspace action from OV back to Jovie', () => {
+  it('document-navigates the admin workspace action from OV back to Jovie', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov/ops');
     render(withDashboard(<CommandPalette />, true));
@@ -366,7 +371,8 @@ describe('CommandPalette', () => {
       .find(el => el.textContent?.includes('Switch to Jovie'));
     fireEvent.mouseDown(action!);
 
-    expect(pushMock).toHaveBeenCalledWith('/app');
+    expect(assignMock).toHaveBeenCalledWith('/app');
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('does not leak the workspace action to non-admins', () => {

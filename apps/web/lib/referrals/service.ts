@@ -390,6 +390,20 @@ export async function recordCommission(params: {
 }
 
 /**
+ * Cancel the recorded commission for a reversed invoice, including historical
+ * invoices. Keep its amount and paidAt for audit/manual recovery of prior payouts.
+ * Repeated deliveries are safe; persistence failures must trigger webhook retry.
+ */
+export async function reverseReferralCommission(
+  stripeInvoiceId: string
+): Promise<void> {
+  await db
+    .update(referralCommissions)
+    .set({ status: 'cancelled' })
+    .where(eq(referralCommissions.stripeInvoiceId, stripeInvoiceId));
+}
+
+/**
  * Mark referral as churned when the referred user cancels their subscription.
  * Cancellation is terminal — the referral relationship ends.
  * If the user re-subscribes later via a new referral link, a fresh referral is created.
