@@ -1,7 +1,7 @@
 name: Test Flakiness Report
 # clock-class: skip-if-unchanged
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Devin (JOV-6507)
+# accountable-writer: Devin
 # necessary-trust-boundary: ci.yml merge_group steps may not consume secrets (enforced by merge-group-workflow-contract tests), so the workflow_run hop re-uploads queue JUnit to Codecov and files tracking issues from this privileged context; the queue itself stays secret-free.
 # revisit-trigger: Remove the workflow_run re-upload hop when Codecov test-results supports a repo-scoped credential usable without secrets in merge_group steps (e.g. stable OIDC).
 

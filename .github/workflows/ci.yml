@@ -1,6 +1,6 @@
 name: CI
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Devin (JOV-6507)
+# accountable-writer: Devin
 # capability-gap: ci-dep-parity diffs merge-group resolved-dependency digests against constituent PR-head digests; the queue head_ref carries only composite refs, so the hop rehydrates PR head SHAs via a bounded REST read (no secrets beyond GITHUB_TOKEN) — GitHub exposes no native merge-group → PR-head mapping.
 # revisit-trigger: Remove the head_ref parsing + PR rehydration hop when merge_group payloads expose constituent PR SHAs directly.
 
