@@ -107,6 +107,7 @@ function controllerRun({
 
 function runReleaseWaveStep({
   queuedRuns = [],
+  pendingRuns = [],
   inProgressRuns = [],
   malformedStatus = '',
   failStatus = '',
@@ -127,6 +128,9 @@ case "\$*" in
     ;;
   *"status=in_progress"*)
     ${failStatus === 'in_progress' ? 'exit 43' : malformedStatus === 'in_progress' ? "printf '%s\\n' 'null'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: inProgressRuns }])}'`}
+    ;;
+  *"status=pending"*)
+    ${failStatus === 'pending' ? 'exit 44' : malformedStatus === 'pending' ? "printf '%s\\n' 'null'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: pendingRuns }])}'`}
     ;;
   *) printf '%s\\n' '[]' ;;
 esac
@@ -179,6 +183,132 @@ function runTrustedPolicyStep({ workflow = 'old-trusted-main' } = {}) {
 }
 
 describe('release-wave admission backpressure', () => {
+  it('retains a pending successor after its predecessor expires without renewing either deadline', () => {
+    const prior = controllerRun({
+      id: 35452908749,
+      headSha: '3dfba7b78d064bb9463963b1166a9b2d1b1b3b71',
+      createdAt: '2026-09-19T15:47:31Z',
+    });
+    const successor = controllerRun({
+      id: 35454112267,
+      headSha: '1e3c2dc4fea2c052f77fab0ad1fcef5ce4371cb7',
+      createdAt: '2026-09-19T16:10:38Z',
+      status: 'pending',
+    });
+    const classifyAt = (now, status = 'pending') =>
+      classifyReleaseWave([prior, { ...successor, status }, successor], {
+        currentMainSha: successor.head_sha,
+        now: Date.parse(now),
+      });
+
+    expect(classifyAt('2026-09-19T16:17:31Z')).toMatchObject({
+      hold: true,
+      activeRunId: '35452908749',
+      activeRunCount: 2,
+      expiresAt: '2026-09-19T16:17:31Z',
+    });
+    for (const now of ['2026-09-19T16:18:40Z', '2026-09-19T16:25:00Z']) {
+      expect(classifyAt(now)).toMatchObject({
+        hold: true,
+        activeRunId: '35454112267',
+        activeRunStatus: 'pending',
+        activeRunCount: 1,
+        expiresAt: '2026-09-19T16:40:38Z',
+      });
+    }
+    expect(classifyAt('2026-09-19T16:21:03Z', 'in_progress')).toMatchObject({
+      hold: true,
+      activeRunStatus: 'in_progress',
+      expiresAt: '2026-09-19T16:40:38Z',
+    });
+    expect(classifyAt('2026-09-19T16:40:38Z')).toMatchObject({
+      hold: true,
+      remainingSeconds: 0,
+    });
+    expect(classifyAt('2026-09-19T16:40:38.001Z')).toMatchObject({
+      hold: false,
+      reason: 'release-wave-expired',
+      expiresAt: '2026-09-19T16:40:38Z',
+    });
+    expect(
+      classifyReleaseWave([prior, { ...successor, status: 'completed' }], {
+        currentMainSha: successor.head_sha,
+        now: Date.parse('2026-09-19T16:25:00Z'),
+      }).hold
+    ).toBe(false);
+  });
+
+  it.each([
+    { branch: 'codex/feature' },
+    { path: '.github/workflows/production-release.yml' },
+    { status: 'waiting' },
+    { status: 'requested' },
+  ])(
+    'does not expand hold authority for nonmatching pending runs: %j',
+    change => {
+      expect(
+        classifyReleaseWave(
+          [
+            controllerRun({
+              id: 901,
+              headSha: MAIN_SHA,
+              status: 'pending',
+              ...change,
+            }),
+          ],
+          { currentMainSha: MAIN_SHA, now: NOW }
+        )
+      ).toMatchObject({ hold: false, reason: 'no-active-controller' });
+    }
+  );
+
+  it('fetches the pending successor through the actual workflow after the running predecessor expires', () => {
+    const now = Date.now();
+    const { result, outputs } = runReleaseWaveStep({
+      inProgressRuns: [
+        controllerRun({
+          id: 902,
+          headSha: OLD_HEAD_A,
+          createdAt: new Date(now - 31 * 60_000).toISOString(),
+        }),
+      ],
+      pendingRuns: [
+        controllerRun({
+          id: 903,
+          headSha: MAIN_SHA,
+          status: 'pending',
+          createdAt: new Date(now - 8 * 60_000).toISOString(),
+        }),
+      ],
+    });
+    expect(result.status).toBe(0);
+    expect(outputs).toMatchObject({
+      hold: '1',
+      run_id: '903',
+      reason: 'controller-wave-active',
+    });
+    expect(Date.parse(outputs.expires_at)).toBe(now + 22 * 60_000);
+  });
+
+  it.each(['read failure', 'malformed response', 'malformed run'])(
+    'fails closed on pending-controller %s',
+    failure => {
+      const { result, outputs } = runReleaseWaveStep({
+        failStatus: failure === 'read failure' ? 'pending' : '',
+        malformedStatus: failure === 'malformed response' ? 'pending' : '',
+        pendingRuns: failure === 'malformed run' ? [{}] : [],
+      });
+      expect(result.status).toBe(2);
+      if (failure !== 'malformed run') {
+        expect(outputs).toMatchObject({
+          hold: '1',
+          reason: 'controller-state-unavailable',
+          expires_at: '',
+        });
+      }
+    }
+  );
+
   it('holds an active controller run for the current main wave', () => {
     const result = classifyReleaseWave(
       [controllerRun({ id: 101, headSha: MAIN_SHA })],
@@ -553,7 +683,9 @@ describe('release-wave admission backpressure', () => {
     expect(AUTOENROLL_WORKFLOW).toContain(
       'node scripts/lib/release-wave-admission.mjs classify'
     );
-    expect(AUTOENROLL_WORKFLOW).toContain('for status in queued in_progress');
+    expect(AUTOENROLL_WORKFLOW).toContain(
+      'for status in queued pending in_progress'
+    );
     expect(AUTOENROLL_WORKFLOW).toContain('status=$status');
     expect(AUTOENROLL_WORKFLOW).toContain(
       'error("malformed controller run response")'

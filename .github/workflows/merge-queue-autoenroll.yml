@@ -251,12 +251,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The endpoint is read-only. A queued or in-progress controller run
-          # owns the current release lease even when its head is older than the
+          # The endpoint is read-only. A queued, concurrency-pending, or running
+          # controller owns the release lease even when its head is older than the
           # latest main SHA. That preserves the hold while the old wave drains.
           controller_runs='[]'
           read_failed=0
-          for status in queued in_progress; do
+          for status in queued pending in_progress; do
             if ! status_pages="$(gh api --paginate --slurp \
               "repos/$REPO/actions/workflows/production-controller.yml/runs?branch=main&status=$status&per_page=100" 2>/dev/null)"; then
               read_failed=1

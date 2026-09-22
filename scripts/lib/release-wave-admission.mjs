@@ -16,7 +16,8 @@ export const DEFAULT_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS = 30 * 60;
 
 const SHA = /^[0-9a-f]{40}$/;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
-const ACTIVE_STATUSES = new Set(['queued', 'in_progress']);
+// GitHub reports runs waiting on workflow concurrency as pending.
+const ACTIVE_STATUSES = new Set(['queued', 'pending', 'in_progress']);
 const KNOWN_RUN_STATUSES = new Set([
   'queued',
   'in_progress',
