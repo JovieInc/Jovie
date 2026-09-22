@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Notification, Provider } from '@parse/node-apn';
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
-import { PKPass } from 'passkit-generator';
+import { type Barcode, type PassProps, PKPass } from 'passkit-generator';
 import { BASE_URL, getProfileUrl } from '@/constants/domains';
 import { createUniqueSourceLinkCode } from '@/lib/audience/source-links';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
@@ -438,44 +438,68 @@ async function renderPngAsset(
     .toBuffer();
 }
 
-async function buildStaticPassAssets(): Promise<Record<string, Buffer>> {
-  const logo = await readFile(join(process.cwd(), 'public', 'Jovie-logo.png'));
+async function buildStaticPassAssets(): Promise<{
+  readonly assets: Record<string, Buffer>;
+  readonly fallbackThumbnailSource: Buffer;
+}> {
+  const [wordmark, mark] = await Promise.all([
+    readFile(
+      join(process.cwd(), 'public', 'brand', 'Jovie-Wordmark-Cream.svg')
+    ),
+    readFile(
+      join(process.cwd(), 'public', 'brand', 'Jovie-Logo-Mark-Cream.svg')
+    ),
+  ]);
+
   return {
-    'icon.png': await renderPngAsset(logo, { width: 29, height: 29 }),
-    'icon@2x.png': await renderPngAsset(logo, { width: 58, height: 58 }),
-    'logo.png': await renderPngAsset(logo, {
-      width: 160,
-      height: 50,
-      fit: 'contain',
+    assets: {
+      'icon.png': await renderPngAsset(mark, { width: 29, height: 29 }),
+      'icon@2x.png': await renderPngAsset(mark, { width: 58, height: 58 }),
+      'logo.png': await renderPngAsset(wordmark, {
+        width: 160,
+        height: 50,
+        fit: 'contain',
+      }),
+      'logo@2x.png': await renderPngAsset(wordmark, {
+        width: 320,
+        height: 100,
+        fit: 'contain',
+      }),
+    },
+    fallbackThumbnailSource: mark,
+  };
+}
+
+async function buildThumbnailAssets(
+  source: Buffer,
+  fit: 'cover' | 'contain'
+): Promise<Record<string, Buffer>> {
+  return {
+    'thumbnail.png': await renderPngAsset(source, {
+      width: 90,
+      height: 90,
+      fit,
     }),
-    'logo@2x.png': await renderPngAsset(logo, {
-      width: 320,
-      height: 100,
-      fit: 'contain',
+    'thumbnail@2x.png': await renderPngAsset(source, {
+      width: 180,
+      height: 180,
+      fit,
     }),
   };
 }
 
 async function buildAvatarAssets(
-  pass: AppleWalletProfilePass
+  pass: Pick<AppleWalletProfilePass, 'avatarUrl' | 'creatorProfileId' | 'id'>,
+  fallbackThumbnailSource: Buffer
 ): Promise<Record<string, Buffer>> {
   const sanitizedUrl = sanitizeHttpsUrl(pass.avatarUrl);
-  if (!sanitizedUrl) return {};
+  if (!sanitizedUrl) {
+    return buildThumbnailAssets(fallbackThumbnailSource, 'contain');
+  }
 
   try {
     const downloaded = await downloadImage(sanitizedUrl);
-    return {
-      'thumbnail.png': await renderPngAsset(downloaded.buffer, {
-        width: 90,
-        height: 90,
-        fit: 'cover',
-      }),
-      'thumbnail@2x.png': await renderPngAsset(downloaded.buffer, {
-        width: 180,
-        height: 180,
-        fit: 'cover',
-      }),
-    };
+    return buildThumbnailAssets(downloaded.buffer, 'cover');
   } catch (error) {
     logger.warn('[apple-wallet] Falling back without avatar thumbnail', {
       passId: pass.id,
@@ -485,28 +509,43 @@ async function buildAvatarAssets(
       passId: pass.id,
       creatorProfileId: pass.creatorProfileId,
     }).catch(() => undefined);
-    return {};
+    return buildThumbnailAssets(fallbackThumbnailSource, 'contain');
   }
 }
 
-export async function generateAppleWalletProfilePassBuffer(
-  pass: AppleWalletProfilePass,
-  authenticationToken: string
-): Promise<Buffer> {
-  const config = getAppleWalletConfig();
-  const passJson = {
+type AppleWalletPassVisualSnapshot = Pick<
+  AppleWalletProfilePass,
+  | 'creatorProfileId'
+  | 'displayName'
+  | 'handle'
+  | 'passTypeIdentifier'
+  | 'passVersion'
+  | 'profileUrl'
+  | 'serialNumber'
+  | 'sourceLinkId'
+  | 'walletShareUrl'
+>;
+
+export function buildAppleWalletPassDefinition(
+  pass: AppleWalletPassVisualSnapshot,
+  input: {
+    readonly authenticationToken: string;
+    readonly teamIdentifier: string;
+    readonly webServiceURL: string;
+  }
+): PassProps {
+  return {
     formatVersion: 1,
     passTypeIdentifier: pass.passTypeIdentifier,
     serialNumber: pass.serialNumber,
-    teamIdentifier: config.teamIdentifier,
+    teamIdentifier: input.teamIdentifier,
     organizationName: 'Jovie',
     description: 'Jovie Profile',
-    logoText: 'Jovie',
-    foregroundColor: 'rgb(17,17,17)',
-    backgroundColor: 'rgb(255,255,255)',
-    labelColor: 'rgb(92,92,92)',
-    webServiceURL: buildAppleWalletWebServiceUrl(),
-    authenticationToken,
+    foregroundColor: 'rgb(245,244,240)',
+    backgroundColor: 'rgb(6,8,13)',
+    labelColor: 'rgb(141,141,147)',
+    webServiceURL: input.webServiceURL,
+    authenticationToken: input.authenticationToken,
     userInfo: {
       kind: 'jovie_profile',
       creatorProfileId: pass.creatorProfileId,
@@ -514,47 +553,83 @@ export async function generateAppleWalletProfilePassBuffer(
       passVersion: pass.passVersion,
     },
     generic: {
-      headerFields: [{ key: 'kind', label: 'PROFILE', value: 'JOVIE' }],
+      headerFields: [],
       primaryFields: [
-        { key: 'name', label: 'Jovie Profile', value: pass.displayName },
+        { key: 'name', label: 'PROFILE', value: pass.displayName },
       ],
       secondaryFields: [
-        { key: 'handle', label: 'Handle', value: `@${pass.handle}` },
+        { key: 'handle', label: 'HANDLE', value: `@${pass.handle}` },
       ],
       auxiliaryFields: [
         {
           key: 'status',
-          label: 'Share',
+          label: 'SHARE',
           value: 'Scan to open profile',
         },
       ],
       backFields: [
         {
           key: 'profile',
-          label: 'Profile',
+          label: 'Profile URL',
           value: pass.profileUrl,
           dataDetectorTypes: ['PKDataDetectorTypeLink'],
         },
         {
           key: 'share',
-          label: 'Share',
+          label: 'How to share',
           value: 'Show this pass and let someone scan the QR code.',
         },
         {
           key: 'open',
-          label: 'Open in Jovie',
+          label: 'Open profile',
           value: `${pass.profileUrl}?open_app=1`,
           dataDetectorTypes: ['PKDataDetectorTypeLink'],
         },
       ],
     },
   };
+}
+
+export function buildAppleWalletPassBarcode(
+  pass: Pick<AppleWalletProfilePass, 'handle' | 'walletShareUrl'>
+): Barcode {
+  return {
+    format: 'PKBarcodeFormatQR',
+    message: pass.walletShareUrl,
+    messageEncoding: 'iso-8859-1',
+    altText: `jov.ie/${pass.handle}`,
+  };
+}
+
+export async function buildAppleWalletPassAssets(
+  pass: Pick<AppleWalletProfilePass, 'avatarUrl' | 'creatorProfileId' | 'id'>
+): Promise<Record<string, Buffer>> {
   const staticAssets = await buildStaticPassAssets();
-  const avatarAssets = await buildAvatarAssets(pass);
+  const avatarAssets = await buildAvatarAssets(
+    pass,
+    staticAssets.fallbackThumbnailSource
+  );
+
+  return {
+    ...staticAssets.assets,
+    ...avatarAssets,
+  };
+}
+
+export async function generateAppleWalletProfilePassBuffer(
+  pass: AppleWalletProfilePass,
+  authenticationToken: string
+): Promise<Buffer> {
+  const config = getAppleWalletConfig();
+  const passJson = buildAppleWalletPassDefinition(pass, {
+    authenticationToken,
+    teamIdentifier: config.teamIdentifier,
+    webServiceURL: buildAppleWalletWebServiceUrl(),
+  });
+  const assets = await buildAppleWalletPassAssets(pass);
   const pkpass = new PKPass(
     {
-      ...staticAssets,
-      ...avatarAssets,
+      ...assets,
       'pass.json': Buffer.from(JSON.stringify(passJson)),
     },
     {
@@ -565,12 +640,7 @@ export async function generateAppleWalletProfilePassBuffer(
     }
   );
 
-  pkpass.setBarcodes({
-    format: 'PKBarcodeFormatQR',
-    message: pass.walletShareUrl,
-    messageEncoding: 'iso-8859-1',
-    altText: `jov.ie/${pass.handle}`,
-  });
+  pkpass.setBarcodes(buildAppleWalletPassBarcode(pass));
 
   return pkpass.getAsBuffer();
 }
