@@ -264,6 +264,21 @@ describe('live public profile lock', () => {
         showBackButton={false}
         showPayButton
         allowFanCapture
+        releaseCredits={[
+          {
+            role: 'producer',
+            label: 'Producer',
+            entries: [
+              {
+                artistId: 'ada',
+                name: 'Ada Lovelace',
+                handle: null,
+                role: 'producer',
+                position: 0,
+              },
+            ],
+          },
+        ]}
       />
     );
     await waitFor(() => {
@@ -272,7 +287,13 @@ describe('live public profile lock', () => {
         'desktop'
       );
       expect(screen.getAllByText('Get updates').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Shows').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
+    const desktopCredits = screen.getAllByText('Release credits')[0];
+    fireEvent.click(desktopCredits.closest('button') ?? desktopCredits);
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getAllByText('Credits').length).toBeGreaterThan(0);
 
     const pageSource = readFileSync(
       path.resolve(process.cwd(), 'app/[username]/page.tsx'),
