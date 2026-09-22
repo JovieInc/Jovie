@@ -394,6 +394,11 @@ export async function tryHandleAnonymousOnboardingChat(
       isFirstTouch: !existingSessionId,
     });
     if (!rate.success) {
+      // `retryAfter` is only meaningful when the limit is actually exhausted.
+      // When the check FAILED (Redis outage → rate.unavailable), the reset
+      // timestamp is a synthetic guess and telling the UI to wait for it sent
+      // a misleadingly long countdown (PR #18095 review).
+      const includeRetryAfter = rate.unavailable !== true;
       const retryAfterSeconds = Math.max(
         1,
         Math.ceil((rate.reset.getTime() - Date.now()) / 1000)
@@ -405,7 +410,7 @@ export async function tryHandleAnonymousOnboardingChat(
           errorCode: rate.unavailable
             ? 'RATE_LIMIT_UNAVAILABLE'
             : 'RATE_LIMITED',
-          retryAfter: retryAfterSeconds,
+          ...(includeRetryAfter ? { retryAfter: retryAfterSeconds } : {}),
           requestId,
         },
         {

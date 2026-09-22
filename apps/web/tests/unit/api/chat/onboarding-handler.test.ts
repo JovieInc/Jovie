@@ -965,6 +965,9 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(result?.status).toBe(503);
       const body = await result?.json();
       expect(body.errorCode).toBe('RATE_LIMIT_UNAVAILABLE');
+      // A backend outage has no real reset time — retryAfter must be omitted
+      // so the UI never shows a misleading countdown (PR #18095 review).
+      expect(body.retryAfter).toBeUndefined();
       expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     });
 
@@ -989,6 +992,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
       expect(result?.status).toBe(429);
       const body = await result?.json();
+      expect(body.errorCode).toBe('RATE_LIMITED');
       expect(body.retryAfter).toBeGreaterThan(0);
       expect(body.retryAfter).toBeLessThanOrEqual(61);
     });

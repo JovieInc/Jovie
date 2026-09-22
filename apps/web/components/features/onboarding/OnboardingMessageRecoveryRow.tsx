@@ -2,6 +2,7 @@
 
 import { RefreshCw, WifiOff } from 'lucide-react';
 import Link from 'next/link';
+import { useRef } from 'react';
 import type { ChatError } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
 import { formatTimeRemaining } from '@/lib/utils/date-formatting';
@@ -19,11 +20,34 @@ export function OnboardingMessageRecoveryRow({
   isBusy,
   isSubmitted,
 }: OnboardingMessageRecoveryRowProps) {
-  const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
+  // `retryAfter` is a DURATION (seconds) captured when the request failed.
+  // Convert it to an absolute deadline once per error (refs capture during
+  // render) so re-renders count down toward a fixed point instead of re-adding
+  // the duration to the current time — which previously kept retry hidden
+  // permanently and restarted the wait label from the full duration on every
+  // render (PR #18095 review follow-up).
+  const retryAfterDeadlineRef = useRef<number | null>(null);
+  const retryAfterKeyRef = useRef<string | null>(null);
+  const retryAfterKey =
+    chatError.retryAfter != null
+      ? `${chatError.type}:${chatError.requestId ?? ''}:${chatError.retryAfter}`
+      : null;
+  if (retryAfterKey !== retryAfterKeyRef.current) {
+    retryAfterKeyRef.current = retryAfterKey;
+    retryAfterDeadlineRef.current =
+      chatError.retryAfter != null
+        ? Date.now() + chatError.retryAfter * 1000
+        : null;
+  }
+  const retryAfterDeadline = retryAfterDeadlineRef.current;
+
+  const canRetry =
+    Boolean(chatError.failedMessage) && retryAfterDeadline === null;
   const isRateLimited = chatError.type === 'rate_limit';
-  const waitLabel = chatError.retryAfter
-    ? formatTimeRemaining(Date.now() + chatError.retryAfter * 1000)
-    : null;
+  const waitLabel =
+    retryAfterDeadline !== null
+      ? formatTimeRemaining(retryAfterDeadline)
+      : null;
 
   return (
     <div
