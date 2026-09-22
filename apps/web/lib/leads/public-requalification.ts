@@ -12,7 +12,7 @@ import {
   extractLinktreeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
-import { recordLeadFunnelEventReceipt } from '@/lib/leads/funnel-events';
+import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import {
   buildPublicRun,
   PUBLIC_REQUALIFICATION_CONTRACT,
@@ -73,7 +73,10 @@ export interface PublicRequalificationDependencies {
     eventType: string;
   }) => Promise<boolean>;
   qualify?: typeof qualifyLead;
-  spotifyEnrich?: typeof spotifyEnrichLead;
+  spotifyEnrich?: (
+    leadId: string,
+    options: { persist: false; spotifyUrl: string | null }
+  ) => Promise<SpotifyLeadEnrichment>;
   environment?: PublicRequalificationEnvironment;
 }
 function environmentFromRuntime(): PublicRequalificationEnvironment {
@@ -285,7 +288,7 @@ async function defaultPersistRunReceipt(input: {
   run: PublicCandidateRun;
   eventType: string;
 }): Promise<boolean> {
-  return recordLeadFunnelEventReceipt(
+  await recordLeadFunnelEvent(
     {
       leadId: input.leadId,
       eventType: input.eventType,
@@ -296,8 +299,9 @@ async function defaultPersistRunReceipt(input: {
       metadata: { ...input.run },
       occurredAt: new Date(input.run.observedAt),
     },
-    { required: true }
+    { idempotent: true, required: true }
   );
+  return true;
 }
 
 /**
@@ -331,7 +335,10 @@ export async function requalifyPublicLead(
   const persistRunReceipt =
     dependencies.persistRunReceipt ?? defaultPersistRunReceipt;
   const qualify = dependencies.qualify ?? qualifyLead;
-  const spotifyEnrich = dependencies.spotifyEnrich ?? spotifyEnrichLead;
+  const spotifyEnrich =
+    dependencies.spotifyEnrich ??
+    ((leadId: string, options: { persist: false; spotifyUrl: string | null }) =>
+      spotifyEnrichLead(leadId, options));
   const now = dependencies.now ?? (() => new Date());
 
   let lead = await getLeadByHandle(candidateKey);

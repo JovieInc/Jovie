@@ -46,6 +46,7 @@ function qualification(): QualificationResult {
 function spotify(): SpotifyLeadEnrichment {
   return {
     status: 'enriched',
+    reason: null,
     artistId: 'artist123',
     spotifyPopularity: 30,
     spotifyFollowers: 900,

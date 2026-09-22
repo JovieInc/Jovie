@@ -66,6 +66,7 @@ function qualification() {
 function spotify() {
   return {
     status: 'enriched' as const,
+    reason: null,
     artistId: '3z907l4sbiy6gyQ7BaWQlH',
     spotifyPopularity: 42,
     spotifyFollowers: 1200,
