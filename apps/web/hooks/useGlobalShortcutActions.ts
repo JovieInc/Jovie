@@ -15,7 +15,7 @@
  * Hook-order: every `useEffect` here is unconditional and runs once.
  */
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useContext, useEffect } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
@@ -38,7 +38,6 @@ export function useGlobalShortcutActions() {
   const { canUse: canUseFounderDoor, toggle: toggleFounderDoor } =
     useFounderDoor();
   const pathname = usePathname();
-  const router = useRouter();
 
   // Alt+T → cycle theme (skip when typing in inputs).
   useEffect(() => {
@@ -87,11 +86,12 @@ export function useGlobalShortcutActions() {
       );
       if (!nextWorkspace) return;
       e.preventDefault();
-      router.push(nextWorkspace.href);
+      // Remount the server-authorized shell when crossing workspace modes.
+      globalThis.location.assign(nextWorkspace.href);
     }
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);
-  }, [isAdmin, pathname, router]);
+  }, [isAdmin, pathname]);
 
   // Cmd+O / Ctrl+O → toggle founder door. Entitled app shell only.
   // Not entitled: do not preventDefault, so native Open can still fire.
