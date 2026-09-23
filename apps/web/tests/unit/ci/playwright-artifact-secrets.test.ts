@@ -542,6 +542,7 @@ function baseEnv(workspace: string, runner: string, extra = {}) {
     GITHUB_RUN_ID: '14442',
     GITHUB_RUN_ATTEMPT: '1',
     GITHUB_JOB: 'artifact-test',
+    GITHUB_ACTIONS: 'true',
     PLAYWRIGHT_ARTIFACT_PATHS: 'out',
     ...extra,
   };
@@ -2271,6 +2272,30 @@ ${fixtureCheckout}
       expect(() => resolveArtifactFiles([path], workspace), path).toThrow();
     expect(() => resolveArtifactFiles(['real/safe.json'], rootAlias)).toThrow();
   });
+
+  it.each([undefined, 'false'])(
+    'does not print mask commands outside GitHub Actions (%s)',
+    githubActions => {
+      const workspace = fixture();
+      const runner = fixture();
+      const secret = 'local%mask-sentinel';
+      const result = runChild(
+        workspace,
+        runner,
+        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({value:process.env.FLAGS_SECRET}));console.log('CHILD_SENTINEL')",
+        { FLAGS_SECRET: secret, GITHUB_ACTIONS: githubActions }
+      );
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(result.status).toBe(1);
+      expect(output).not.toContain('::add-mask::');
+      expect(output).not.toContain(secret);
+      expect(output).toContain('CHILD_SENTINEL');
+      expect(output).toContain('PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE');
+      expect(existsSync(join(runner, 'safe-playwright-producer/blocked'))).toBe(
+        true
+      );
+    }
+  );
 
   it('masks before the child, scans after failure, and permanently poisons leaks', () => {
     const workspace = fixture();
