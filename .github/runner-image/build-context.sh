@@ -33,9 +33,26 @@ done < <(
 
 sorted_paths=()
 while IFS= read -r path; do
-  git cat-file -e "${tree}:${path}"
   sorted_paths+=("${path}")
 done < <(printf '%s\n' "${paths[@]}" | LC_ALL=C sort -u)
+
+objects=()
+for path in "${sorted_paths[@]}"; do
+  objects+=("${tree}:${path}")
+done
+validation=$(printf '%s\n' "${objects[@]}" | git cat-file --batch-check='%(objecttype)')
+checked=0
+while IFS= read -r object_type; do
+  checked=$((checked + 1))
+  case "${object_type}" in
+    blob|tree|commit|tag) ;;
+    *) echo "Missing or invalid runner context object: ${object_type}" >&2; exit 128 ;;
+  esac
+done <<< "${validation}"
+if [[ "${checked}" != "${#sorted_paths[@]}" ]]; then
+  echo "Incomplete runner context object validation" >&2
+  exit 128
+fi
 
 if [[ "${mode}" == '--list' ]]; then
   printf '%s\n' "${sorted_paths[@]}"

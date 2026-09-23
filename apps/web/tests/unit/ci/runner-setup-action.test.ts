@@ -423,6 +423,137 @@ describe('baked runner prerequisite contract', () => {
     }
   });
 
+  function makeContextTree(missing = '', directoryInput = false) {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-context-tree-'));
+    temporaryDirectories.push(directory);
+    const paths = [
+      '.npmrc',
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      '.github/runner-image/Dockerfile',
+      '.github/runner-image/create-installed-tree.mjs',
+      '.github/runner-image/prerequisites.json',
+      '.github/runner-image/restore-installed-tree.sh',
+      '.github/runner-image/verify-prerequisites.mjs',
+      'apps/space name/package.json',
+      'packages/colon:name/package.json',
+      'patches/example.patch',
+      'private/unselected.txt',
+    ];
+    for (const path of paths) {
+      if (path === missing) continue;
+      const target = resolve(
+        directory,
+        directoryInput && path === '.npmrc' ? '.npmrc/value' : path
+      );
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      writeFileSync(
+        target,
+        path === 'pnpm-lock.yaml'
+          ? '    path: patches/example.patch\n'
+          : 'fixture\n'
+      );
+    }
+    execFileSync('git', ['init', '-q'], { cwd: directory });
+    execFileSync('git', ['add', '.'], { cwd: directory });
+    const tree = execFileSync('git', ['write-tree'], {
+      cwd: directory,
+      encoding: 'utf8',
+    }).trim();
+    return { directory, tree };
+  }
+
+  it.each(['.npmrc', 'patches/example.patch'])(
+    'refuses missing context object %s with the original exit status',
+    missing => {
+      const { directory, tree } = makeContextTree(missing);
+      const result = spawnSync(
+        'bash',
+        [runnerBuildContextScript, tree, '--list'],
+        { cwd: directory, encoding: 'utf8' }
+      );
+      expect(result.status).toBe(128);
+      expect(result.stdout).toBe('');
+    }
+  );
+
+  it.each([false, true])(
+    'preserves supported paths and object semantics (directory input: %s)',
+    directoryInput => {
+      const { directory, tree } = makeContextTree('', directoryInput);
+      const paths = execFileSync(
+        'bash',
+        [runnerBuildContextScript, tree, '--list'],
+        { cwd: directory, encoding: 'utf8' }
+      )
+        .trim()
+        .split('\n');
+      expect(paths).toContain('apps/space name/package.json');
+      expect(paths).toContain('packages/colon:name/package.json');
+      expect(paths).toContain('.npmrc');
+      expect(paths).not.toContain('private/unselected.txt');
+      expect(paths).toEqual([...paths].sort());
+      const actual = execFileSync('bash', [runnerBuildContextScript, tree], {
+        cwd: directory,
+      });
+      const expected = execFileSync(
+        'git',
+        [
+          'archive',
+          '--format=tar',
+          '--mtime=1970-01-01T00:00:00Z',
+          tree,
+          '--',
+          ...paths,
+        ],
+        { cwd: directory }
+      );
+      expect(actual.equals(expected)).toBe(true);
+      expect(
+        spawnSync('bash', [runnerBuildContextScript, tree, '--invalid'], {
+          cwd: directory,
+        }).status
+      ).toBe(64);
+    }
+  );
+
+  it.each([
+    ['exit 37', 37],
+    ["printf 'blob\\n'", 128],
+    ["printf 'invalid\\n'", 128],
+  ])(
+    'refuses failed or incomplete object validation: %s',
+    (failure, expectedStatus) => {
+      const { directory, tree } = makeContextTree();
+      const realGit = execFileSync('bash', ['-c', 'command -v git'], {
+        encoding: 'utf8',
+      }).trim();
+      const bin = resolve(directory, 'bin');
+      mkdirSync(bin);
+      writeFileSync(
+        resolve(bin, 'git'),
+        `#!/bin/sh\nif [ "$1" = cat-file ]; then\n  ${failure}\n  exit 0\nfi\nexec "$REAL_GIT" "$@"\n`,
+        { mode: 0o755 }
+      );
+      const result = spawnSync(
+        'bash',
+        [runnerBuildContextScript, tree, '--list'],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            REAL_GIT: realGit,
+          },
+        }
+      );
+      expect(result.status).toBe(expectedStatus);
+      expect(result.stdout).toBe('');
+    }
+  );
+
   it('builds a deterministic filtered context before a streamed Docker build', () => {
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
