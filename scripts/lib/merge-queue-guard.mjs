@@ -2,7 +2,6 @@ import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
 
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
-export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
 export const UI_LABEL = 'ui';
 export const NEEDS_CONFLICT_RESOLUTION_LABEL = 'needs-conflict-resolution';
 
@@ -831,8 +830,8 @@ export function uiFastTrackPolicy(pr) {
   if (!labels.has(UI_LABEL)) {
     blockers.push(`missing required label: ${UI_LABEL}`);
   }
-  if (!labels.has(FAST_TRACK_UI_LABEL)) {
-    blockers.push(`missing required label: ${FAST_TRACK_UI_LABEL}`);
+  if (!labels.has(FAST_TRACK_LABEL)) {
+    blockers.push(`missing required label: ${FAST_TRACK_LABEL}`);
   }
 
   if (changedFiles.length === 0) {
@@ -873,13 +872,12 @@ export function uiFastTrackPolicy(pr) {
   }
 
   return {
-    requested: labels.has(FAST_TRACK_UI_LABEL),
+    requested: labels.has(UI_LABEL) && labels.has(FAST_TRACK_LABEL),
     eligible: blockers.length === 0,
     blockers,
     warnings,
     labels: {
       hasUi: labels.has(UI_LABEL),
-      hasFastTrackUi: labels.has(FAST_TRACK_UI_LABEL),
       hasFast: labels.has(FAST_TRACK_LABEL),
     },
     evidence,

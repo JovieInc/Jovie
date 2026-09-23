@@ -633,7 +633,7 @@ describe('codex issue shipper prompt', () => {
     expect(uiPrompt).toContain('DESIGN_VARIANCE');
     expect(uiPrompt).toContain('product/dashboard UI');
     expect(uiPrompt).toContain('`ui`');
-    expect(uiPrompt).toContain('`fast-track-ui`');
+    expect(uiPrompt).toContain('`ui` and `fast`');
     expect(uiPrompt).toContain('`fast`');
     expect(uiPrompt).toContain('`merge-queue`');
     expect(uiPrompt).toContain('## Fast-track UI eligibility');

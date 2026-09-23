@@ -245,7 +245,7 @@ describe('fast-track policy', () => {
   it('permits generated UI fast-track when labels, files, screenshots, checks, and audit trail are present', () => {
     const policy = fastTrackPolicy({
       headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'fast' }, { name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'fast' }, { name: 'ui' }],
       title: 'fix(ui): reduce oversized title token',
       changedFiles: [
         'apps/web/components/features/profile/ProfileHeader.tsx',
@@ -286,7 +286,7 @@ describe('fast-track policy', () => {
   ])('denies UI fast-track when %s is missing', (_name, bodyOptions, blocker) => {
     const policy = uiFastTrackPolicy({
       headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: buildUiFastTrackBody(bodyOptions),
     });
@@ -297,7 +297,7 @@ describe('fast-track policy', () => {
 
   it('ignores negated evidence claims in the fast-track UI section', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: [
         '## Fast-track UI eligibility',
@@ -319,7 +319,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track when changed files are unavailable', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome; affected component test.',
       }),
@@ -333,7 +333,7 @@ describe('fast-track policy', () => {
 
   it('warns but does not block when affected test evidence is absent', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome.',
@@ -348,7 +348,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track for API, auth, billing, DB, security, infra, and routing paths', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: [
         'apps/web/app/api/profile/route.ts',
         'apps/web/lib/entitlements/server.ts',
