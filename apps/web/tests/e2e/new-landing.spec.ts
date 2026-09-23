@@ -128,7 +128,7 @@ test.describe('/new landing page', () => {
       'Pro'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      '$39'
+      '$199'
     );
     await expect(page.getByRole('link', { name: 'Release Pages' })).toHaveCount(
       0

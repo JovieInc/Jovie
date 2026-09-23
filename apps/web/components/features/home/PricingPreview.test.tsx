@@ -13,7 +13,7 @@ describe('PricingPreview', () => {
       })
     ).toHaveClass('line-clamp-2');
     expect(
-      screen.getByText('Start free. Scale as you grow.')
+      screen.getByText(/Artist profiles are free forever\./)
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Free' })).toHaveClass(
       'uppercase'
@@ -21,7 +21,10 @@ describe('PricingPreview', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Pro' })).toHaveClass(
       'uppercase'
     );
-    expect(screen.getByText('Branded profile')).toBeInTheDocument();
-    expect(screen.getByText('Your identity. Your data.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Public artist profile and audience capture')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Limited access.')).toBeInTheDocument();
+    expect(screen.getByText('$199')).toBeInTheDocument();
   });
 });
