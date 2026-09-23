@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -91,6 +92,17 @@ describe('Sheet', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
 
       expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('returns focus to the trigger after the sheet closes', async () => {
+      const user = userEvent.setup();
+      render(<TestSheet />);
+      const trigger = screen.getByRole('button', { name: /open sheet/i });
+
+      await user.click(trigger);
+      await user.click(screen.getByTestId('sheet-close-button'));
+
+      await waitFor(() => expect(trigger).toHaveFocus());
     });
   });
 
@@ -273,6 +285,29 @@ describe('Sheet', () => {
       const dialog = screen.getByRole('dialog');
       expect(dialog).toHaveAttribute('aria-describedby');
       expect(dialog).toHaveAttribute('aria-labelledby');
+    });
+
+    it('keeps keyboard focus inside the open sheet', async () => {
+      const user = userEvent.setup();
+      render(<TestSheet />);
+      const trigger = screen.getByRole('button', { name: /open sheet/i });
+
+      await user.click(trigger);
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      await user.tab();
+
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it('gives the icon close affordance an accessible name and hit target', () => {
+      render(<TestSheet open={true} />);
+      const closeButton = screen.getByTestId('sheet-close-button');
+
+      expect(closeButton).toHaveAccessibleName('Close');
+      expect(closeButton.className).toContain('before:h-11');
+      expect(closeButton.className).toContain('before:w-11');
     });
   });
 
