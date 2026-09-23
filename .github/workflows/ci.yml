@@ -2282,10 +2282,8 @@ jobs:
           test -f apps/ovie/.next/standalone/apps/ovie/server.js
           test ! -d apps/ovie/.next/standalone/apps/docs/app
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3105
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:

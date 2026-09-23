@@ -515,6 +515,7 @@ describe('merge_group workflow contract', () => {
     );
     expect(ovieBuild).not.toContain('continue-on-error');
     expect(ovieBuild).not.toContain('@jovie/web');
+    expect(ovieBuild).not.toContain('NEXT_PUBLIC_CLERK_');
     expect(ovieBuild).toContain(
       'test ! -d apps/ovie/.next/standalone/apps/docs/app'
     );
