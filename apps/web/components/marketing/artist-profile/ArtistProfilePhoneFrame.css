@@ -22,4 +22,7 @@
   border: 1px solid
     color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
   border-radius: 1.85rem;
+  aspect-ratio: 195 / 422;
+  overflow: hidden;
+  position: relative;
 }

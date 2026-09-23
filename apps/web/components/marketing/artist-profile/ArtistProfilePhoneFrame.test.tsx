@@ -14,9 +14,9 @@ describe('ArtistProfilePhoneFrame', () => {
       </ArtistProfilePhoneFrame>
     );
 
-    expect(container.querySelector('.ap-phone-frame__screen')).toHaveClass(
-      'aspect-[195/422]'
-    );
+    expect(
+      container.querySelector('.ap-phone-frame__screen')
+    ).toBeInTheDocument();
     expect(
       container.querySelector('.ap-phone-frame__notch')
     ).not.toBeInTheDocument();

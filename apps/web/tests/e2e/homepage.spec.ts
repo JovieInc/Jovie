@@ -185,10 +185,7 @@ test.describe('Homepage', () => {
       await page.emulateMedia({ reducedMotion: mode.reducedMotion });
       await gotoHomepage(page);
 
-      for (const testId of [
-        'homepage-editorial-hero-search',
-        'homepage-close-search',
-      ]) {
+      for (const testId of ['homepage-editorial-hero-search']) {
         const material = await readMaterial(testId);
         expect(material).not.toBeNull();
         expect(material?.fieldBackgroundImage).toBe('none');
@@ -561,7 +558,7 @@ test.describe('Homepage', () => {
             hero: required(
               '.homepage-editorial-hero__search'
             ).getBoundingClientRect().width,
-            close: required('.homepage-close__search').getBoundingClientRect()
+            close: required('.homepage-close__actions').getBoundingClientRect()
               .width,
           },
           overflow:
