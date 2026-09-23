@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/profile-drawers-dismiss.test.tsx
+
 import { useCallback, useEffect } from 'react';
 import { track } from '@/lib/analytics';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
@@ -9,6 +11,7 @@ interface PayDrawerProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly artistName: string;
+  readonly profileId?: string;
   readonly artistHandle: string;
   readonly venmoLink: string;
   readonly venmoUsername?: string | null;
@@ -19,6 +22,7 @@ export function PayDrawer({
   open,
   onOpenChange,
   artistName,
+  profileId,
   artistHandle,
   venmoLink,
   venmoUsername,
@@ -53,9 +57,10 @@ export function PayDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={`Pay ${artistName}`}
-      subtitle='Continue with Venmo.'
+      subtitle='Choose how to pay.'
     >
       <PayView
+        profileId={profileId}
         artistHandle={artistHandle}
         venmoLink={venmoLink}
         venmoUsername={venmoUsername}
