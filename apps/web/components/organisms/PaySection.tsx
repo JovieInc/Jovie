@@ -85,9 +85,7 @@ export function PaySection({
       if (globalThis.localStorage.getItem(PAY_METHOD_PREFERENCE) === 'venmo') {
         setSelectedMethod('venmo');
       }
-    } catch {
-      // Payment remains usable when device storage is unavailable.
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -99,9 +97,7 @@ export function PaySection({
     setSelectedMethod(next);
     try {
       globalThis.localStorage.setItem(PAY_METHOD_PREFERENCE, next);
-    } catch {
-      // The current selection still works without persistence.
-    }
+    } catch {}
   };
 
   const handleStripePayment = async (amount: number) => {
