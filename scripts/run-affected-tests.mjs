@@ -228,10 +228,12 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/fx-remediation-lane.mjs',
   'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
@@ -245,6 +247,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
