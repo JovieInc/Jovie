@@ -193,11 +193,11 @@ function snapshot(
           sourceDigest: '7'.repeat(64),
           sourceRevision: source,
         },
-          capacityAvailable: 2,
-          queuedWork: 0,
-          runtimeGeneration: '7'.repeat(64),
-          runtimeInvocationId: '8'.repeat(32),
-          ...overrides.runner,
+        capacityAvailable: 2,
+        queuedWork: 0,
+        runtimeGeneration: '7'.repeat(64),
+        runtimeInvocationId: '8'.repeat(32),
+        ...overrides.runner,
       },
       ...(overrides.existingRepair === null
         ? {}
@@ -372,9 +372,13 @@ function harness(
   store = memoryStore(),
   overrides: Partial<SummerBottleneckDependencies> = {}
 ) {
-  let dispatchedTask: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask | undefined;
+  let dispatchedTask:
+    | import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
+    | undefined;
   const dispatchToSymphony = vi.fn(
-    async (task: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask) => {
+    async (
+      task: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
+    ) => {
       dispatchedTask = task;
       return { handle: 'symphony:task_0001' };
     }
@@ -384,9 +388,13 @@ function harness(
       status: 'succeeded',
       detail: 'assigned CI repair completed',
     });
-  const observeImplementation = overrides.observeSymphonyOutcome ?? defaultObserve;
+  const observeImplementation =
+    overrides.observeSymphonyOutcome ?? defaultObserve;
   const observeSymphonyOutcome = vi.fn(
-    async (input: { readonly handle: string; readonly idempotencyKey: string }) => {
+    async (input: {
+      readonly handle: string;
+      readonly idempotencyKey: string;
+    }) => {
       const observed = await observeImplementation(input);
       const persistedTask = [...store.records.values()]
         .map(record => record.task)
@@ -427,7 +435,10 @@ function harness(
           execution: {
             assignmentDigest: task.existingRepair.assignmentDigest,
             baseHead: task.existingRepair.head,
-            finalHead: status === 'succeeded' ? 'b'.repeat(40) : task.existingRepair.head,
+            finalHead:
+              status === 'succeeded'
+                ? 'b'.repeat(40)
+                : task.existingRepair.head,
             verification: {
               headChanged: status === 'succeeded',
               taskAccepted: status === 'succeeded',
@@ -442,7 +453,6 @@ function harness(
   const dependencies: SummerBottleneckDependencies = {
     dispatchToSymphony,
     now: () => NOW,
-    observeSymphonyOutcome,
     producerVerificationKeys: new Map([[PRODUCER_KEY_ID, PRODUCER_PUBLIC_KEY]]),
     receiptSigningKey: KEY,
     receiptSigningKeyId: KEY_ID,
@@ -609,7 +619,9 @@ describe('Summer bottleneck loop', () => {
           action: 'execute-existing-owned-repair',
           authority: 'host-assigned-isolated-repair-only',
           decisionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
-          existingRepair: expect.objectContaining({ assignmentDigest: 'a'.repeat(64) }),
+          existingRepair: expect.objectContaining({
+            assignmentDigest: 'a'.repeat(64),
+          }),
           selected: {
             id: selectedId,
             sourceRevision: SOURCE,
@@ -813,7 +825,9 @@ describe('Summer bottleneck loop', () => {
         action: 'execute-existing-owned-repair',
         authority: 'host-assigned-isolated-repair-only',
         decisionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
-        existingRepair: expect.objectContaining({ assignmentDigest: 'a'.repeat(64) }),
+        existingRepair: expect.objectContaining({
+          assignmentDigest: 'a'.repeat(64),
+        }),
         selected: {
           id: 'merge-group-flake-baseline-ratchet',
           sourceRevision: SOURCE,

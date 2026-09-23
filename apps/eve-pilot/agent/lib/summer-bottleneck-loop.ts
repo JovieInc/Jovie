@@ -228,7 +228,10 @@ export const summerBottleneckSnapshotSchema = z
             capacityAvailable: z.number().int().nonnegative().nullable(),
             queuedWork: z.number().int().nonnegative().nullable(),
             runtimeGeneration: z.string().regex(DIGEST).optional(),
-            runtimeInvocationId: z.string().regex(/^[a-f0-9]{32}$/u).optional(),
+            runtimeInvocationId: z
+              .string()
+              .regex(/^[a-f0-9]{32}$/u)
+              .optional(),
           })
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
@@ -467,7 +470,8 @@ const symphonyRepairTaskV3Schema = z
     const lifetime =
       Date.parse(task.existingRepair.expiresAt) - Date.parse(task.createdAt);
     if (
-      Date.parse(task.existingRepair.issueRevision) > Date.parse(task.createdAt) ||
+      Date.parse(task.existingRepair.issueRevision) >
+        Date.parse(task.createdAt) ||
       lifetime <= 0 ||
       lifetime > MAX_EXISTING_REPAIR_LIFETIME_MS
     ) {
@@ -831,8 +835,10 @@ function hostAssignmentHoldReason(
   const providerObservation = admissions.providerObservation;
   if (
     !providerObservation ||
-    providerObservation.quotaObservedAt !== admissions.providerEligibility.observedAt ||
-    admissions.providerEligibility.sourceDigest !== digest(providerObservation) ||
+    providerObservation.quotaObservedAt !==
+      admissions.providerEligibility.observedAt ||
+    admissions.providerEligibility.sourceDigest !==
+      digest(providerObservation) ||
     providerObservation.includedRemainingPercent <= 0
   ) {
     return 'task-admission-provider-evidence-mismatch';
@@ -1018,7 +1024,12 @@ function terminalOutcomeMatchesTask(
     return false;
   }
   const execution = outcome.execution as
-    | { assignmentDigest?: unknown; baseHead?: unknown; finalHead?: unknown; verification?: unknown }
+    | {
+        assignmentDigest?: unknown;
+        baseHead?: unknown;
+        finalHead?: unknown;
+        verification?: unknown;
+      }
     | undefined;
   const verification = execution?.verification as
     | { headChanged?: unknown; taskAccepted?: unknown }
@@ -1101,15 +1112,26 @@ async function processStoredSnapshot(
       ['symphony-failed', 'symphony-succeeded'].includes(
         String(completed.decision)
       ) &&
-      (completed.symphony as { terminalOutcome?: SummerBottleneckRecord } | undefined)
-        ?.terminalOutcome?.schema !== 'jovie.symphony-repair-outcome/v3'
+      (
+        completed.symphony as
+          | { terminalOutcome?: SummerBottleneckRecord }
+          | undefined
+      )?.terminalOutcome?.schema !== 'jovie.symphony-repair-outcome/v3'
     ) {
-      const priorTerminal = await dependencies.store.read(paths(snapshot).terminal);
+      const priorTerminal = await dependencies.store.read(
+        paths(snapshot).terminal
+      );
       if (priorTerminal) {
         const conflict = signFor(
           dependencies,
           {
-            ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+            ...baseReceipt(
+              snapshot,
+              dependencies,
+              selected,
+              fingerprint,
+              ranking
+            ),
             schema: 'jovie.eve.summer-bottleneck-conflict/v1',
             decision: 'historical-v1-terminal-held-conflict',
             conflictingTerminalDigest: digest(priorTerminal),
@@ -1121,7 +1143,10 @@ async function processStoredSnapshot(
           },
           recordPaths.conflict
         );
-        const write = await dependencies.store.create(recordPaths.conflict!, conflict);
+        const write = await dependencies.store.create(
+          recordPaths.conflict!,
+          conflict
+        );
         const persisted =
           write === 'created'
             ? conflict
@@ -1159,7 +1184,11 @@ async function processStoredSnapshot(
         selected.inEnvelope && repairSelection && v3HoldReason === null
           ? 'claimed'
           : 'held',
-      terminal: !(selected.inEnvelope && repairSelection && v3HoldReason === null),
+      terminal: !(
+        selected.inEnvelope &&
+        repairSelection &&
+        v3HoldReason === null
+      ),
     },
     recordPaths.claim
   );
@@ -1347,11 +1376,21 @@ async function processStoredSnapshot(
     });
   }
 
-  if (!terminalOutcomeMatchesTask(observed.terminalOutcome, task, observed.status, observed.detail)) {
+  if (
+    !terminalOutcomeMatchesTask(
+      observed.terminalOutcome,
+      task,
+      observed.status,
+      observed.detail
+    )
+  ) {
     return signFor(dependencies, {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
       decision: 'pending-unverified-v3-outcome',
-      symphony: { handle, detail: 'v3-terminal-outcome-missing-or-cross-bound' },
+      symphony: {
+        handle,
+        detail: 'v3-terminal-outcome-missing-or-cross-bound',
+      },
       terminal: false,
     });
   }

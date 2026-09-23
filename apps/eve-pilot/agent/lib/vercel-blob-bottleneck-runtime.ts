@@ -45,29 +45,65 @@ function exactKeys(value: unknown, keys: readonly string[]): boolean {
 }
 
 const SOURCE_EVALUATION_KEYS = [
-  'schema', 'taskKey', 'taskSelectionDigest', 'sourceVersion',
-  'snapshotDigest', 'targetDigest', 'identifier', 'issueId', 'repository',
-  'pr', 'baseHead', 'finalHead', 'targetObserved', 'observedIssueId',
-  'observedIssueRevision', 'observedPrNumber', 'observedPrHead',
-  'observedRepository', 'prMergeStateStatus', 'mergeable', 'workerAttested',
-  'selectedEvidence', 'taskResolved', 'reason', 'digest',
+  'schema',
+  'taskKey',
+  'taskSelectionDigest',
+  'sourceVersion',
+  'snapshotDigest',
+  'targetDigest',
+  'identifier',
+  'issueId',
+  'repository',
+  'pr',
+  'baseHead',
+  'finalHead',
+  'targetObserved',
+  'observedIssueId',
+  'observedIssueRevision',
+  'observedPrNumber',
+  'observedPrHead',
+  'observedRepository',
+  'prMergeStateStatus',
+  'mergeable',
+  'workerAttested',
+  'selectedEvidence',
+  'taskResolved',
+  'reason',
+  'digest',
 ];
 const VERIFICATION_KEYS = [
-  'schema', 'claimRecorded', 'acceptanceRecorded', 'runStarted', 'runTerminal',
-  'resultPersisted', 'leaseHeld', 'workspaceBound', 'headObserved',
-  'headChanged', 'taskAccepted',
+  'schema',
+  'claimRecorded',
+  'acceptanceRecorded',
+  'runStarted',
+  'runTerminal',
+  'resultPersisted',
+  'leaseHeld',
+  'workspaceBound',
+  'headObserved',
+  'headChanged',
+  'taskAccepted',
 ];
 const SOURCE_EVALUATION_REASONS = new Set([
-  'target-observation-unavailable', 'target-identity-mismatch', 'head-unchanged',
-  'task-check-unresolved', 'task-check-evidence-unavailable', 'task-check-passed',
+  'target-observation-unavailable',
+  'target-identity-mismatch',
+  'head-unchanged',
+  'task-check-unresolved',
+  'task-check-evidence-unavailable',
+  'task-check-passed',
 ]);
 
 function sourceEvaluationDigest(evaluation: SummerBottleneckRecord): string {
   const { digest: _digest, ...unsigned } = evaluation;
-  return digest({ schema: 'symphony-existing-repair-source-evaluation/v1', ...unsigned });
+  return digest({
+    schema: 'symphony-existing-repair-source-evaluation/v1',
+    ...unsigned,
+  });
 }
 
-function taskAcceptanceDigest(task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): string {
+function taskAcceptanceDigest(
+  task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }
+): string {
   return digest({
     schema: 'symphony-existing-repair-task-acceptance/v1',
     taskKey: task.taskKey,
@@ -76,7 +112,9 @@ function taskAcceptanceDigest(task: SymphonyRepairTask & { schema: 'jovie-sympho
   });
 }
 
-function taskSelectionDigest(task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): string {
+function taskSelectionDigest(
+  task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }
+): string {
   return digest({
     taskKey: task.taskKey,
     action: task.action,
@@ -90,21 +128,30 @@ function selectedEvidenceShapeValid(value: unknown): boolean {
   if (
     !exactKeys(value, ['id', 'handle', 'check', 'result', 'source']) ||
     typeof value !== 'object'
-  ) return false;
+  )
+    return false;
   const evidence = value as Record<string, unknown>;
-  return typeof evidence.id === 'string' &&
+  return (
+    typeof evidence.id === 'string' &&
     typeof evidence.handle === 'string' &&
     typeof evidence.check === 'string' &&
     evidence.result === 'SUCCESS' &&
-    evidence.source === 'github-status-check-rollup';
+    evidence.source === 'github-status-check-rollup'
+  );
 }
 
-function selectedEvidenceValid(value: unknown, task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): boolean {
+function selectedEvidenceValid(
+  value: unknown,
+  task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }
+): boolean {
   if (!selectedEvidenceShapeValid(value) || value === null) return false;
   const evidence = value as Record<string, unknown>;
-  return evidence.id === task.selected.id &&
+  return (
+    evidence.id === task.selected.id &&
     evidence.handle === task.selected.handle &&
-    (evidence.check === task.selected.id || evidence.check === task.selected.handle);
+    (evidence.check === task.selected.id ||
+      evidence.check === task.selected.handle)
+  );
 }
 
 function validateExecutionOutcomeV3(
@@ -136,23 +183,44 @@ function validateExecutionOutcomeV3(
       evalRecord.observedPrHead === execRecord.finalHead &&
       evalRecord.observedRepository === target.repository);
   const executionKeys = [
-    'runId', 'provider', 'model', 'authPoolIdentity', 'leaseIdentity',
-    'evidenceDigest', 'assignmentDigest', 'providerGrantDigest',
-    'acceptanceDigest', 'runDigest', 'taskAcceptanceDigest', 'baseHead',
-    'finalHead', 'outputDigest', 'sourceEvaluation', 'verification',
+    'runId',
+    'provider',
+    'model',
+    'authPoolIdentity',
+    'leaseIdentity',
+    'evidenceDigest',
+    'assignmentDigest',
+    'providerGrantDigest',
+    'acceptanceDigest',
+    'runDigest',
+    'taskAcceptanceDigest',
+    'baseHead',
+    'finalHead',
+    'outputDigest',
+    'sourceEvaluation',
+    'verification',
   ];
   const digestKeys = [
-    'authPoolIdentity', 'leaseIdentity', 'evidenceDigest', 'assignmentDigest',
-    'providerGrantDigest', 'acceptanceDigest', 'runDigest',
-    'taskAcceptanceDigest', 'outputDigest',
+    'authPoolIdentity',
+    'leaseIdentity',
+    'evidenceDigest',
+    'assignmentDigest',
+    'providerGrantDigest',
+    'acceptanceDigest',
+    'runDigest',
+    'taskAcceptanceDigest',
+    'outputDigest',
   ];
-  const validStrings = ['runId', 'provider', 'model'].every(key =>
-    typeof execRecord?.[key] === 'string' &&
-    execRecord[key].length > 0 &&
-    execRecord[key].length <= (key === 'provider' ? 64 : 128)
+  const validStrings = ['runId', 'provider', 'model'].every(
+    key =>
+      typeof execRecord?.[key] === 'string' &&
+      execRecord[key].length > 0 &&
+      execRecord[key].length <= (key === 'provider' ? 64 : 128)
   );
-  const validDigests = digestKeys.every(key =>
-    typeof execRecord?.[key] === 'string' && /^[a-f0-9]{64}$/u.test(execRecord[key] as string)
+  const validDigests = digestKeys.every(
+    key =>
+      typeof execRecord?.[key] === 'string' &&
+      /^[a-f0-9]{64}$/u.test(execRecord[key] as string)
   );
   const sourceEvaluationValid =
     exactKeys(evaluation, SOURCE_EVALUATION_KEYS) &&
@@ -181,12 +249,19 @@ function validateExecutionOutcomeV3(
     exactKeys(verification, VERIFICATION_KEYS) &&
     verifyRecordValue.schema === 'symphony-existing-repair-evidence/v1' &&
     [
-      'claimRecorded', 'acceptanceRecorded', 'runStarted', 'runTerminal',
-      'resultPersisted', 'leaseHeld', 'workspaceBound', 'headObserved',
+      'claimRecorded',
+      'acceptanceRecorded',
+      'runStarted',
+      'runTerminal',
+      'resultPersisted',
+      'leaseHeld',
+      'workspaceBound',
+      'headObserved',
     ].every(key => verifyRecordValue[key] === true) &&
     typeof verifyRecordValue.headChanged === 'boolean' &&
     typeof verifyRecordValue.taskAccepted === 'boolean' &&
-    verifyRecordValue.headChanged === (execRecord.baseHead !== execRecord.finalHead) &&
+    verifyRecordValue.headChanged ===
+      (execRecord.baseHead !== execRecord.finalHead) &&
     verifyRecordValue.taskAccepted ===
       (evalRecord.workerAttested === true && evalRecord.taskResolved === true);
   if (
@@ -205,12 +280,16 @@ function validateExecutionOutcomeV3(
       (verifyRecordValue.headChanged !== true ||
         verifyRecordValue.taskAccepted !== true))
   ) {
-    throw new Error('Symphony outcome execution evidence is invalid or cross-bound');
+    throw new Error(
+      'Symphony outcome execution evidence is invalid or cross-bound'
+    );
   }
   const { evidenceDigest: _evidenceDigest, ...unsignedExecution } = execution;
   if (
-    digest({ schema: 'symphony-existing-repair-evidence/v1', ...unsignedExecution }) !==
-    execRecord.evidenceDigest
+    digest({
+      schema: 'symphony-existing-repair-evidence/v1',
+      ...unsignedExecution,
+    }) !== execRecord.evidenceDigest
   ) {
     throw new Error('Symphony outcome execution evidence digest is invalid');
   }
@@ -436,12 +515,7 @@ export function signSymphonyRepairOutcome(
     record.schema === 'jovie.symphony-repair-outcome/v3'
       ? 'jovie.symphony-repair-outcome/v3'
       : 'jovie.symphony-repair-outcome/v1';
-  return signRecord(
-    domain,
-    record,
-    privateKey,
-    keyId
-  );
+  return signRecord(domain, record, privateKey, keyId);
 }
 
 export function createVercelBlobBottleneckDependencies(
@@ -511,8 +585,13 @@ export function createVercelBlobBottleneckDependencies(
       if (
         !outbox ||
         !exactKeys(outbox, [
-          'schema', 'destination', 'idempotencyKey', 'status', 'task',
-          'signatureKeyId', 'signature',
+          'schema',
+          'destination',
+          'idempotencyKey',
+          'status',
+          'task',
+          'signatureKeyId',
+          'signature',
         ]) ||
         outbox.schema !== 'jovie.eve.symphony-repair-outbox/v3' ||
         outbox.destination !== 'symphony' ||
@@ -546,9 +625,17 @@ export function createVercelBlobBottleneckDependencies(
       if (
         boundTask.taskKey !== idempotencyKey ||
         !exactKeys(outcome, [
-          'schema', 'taskKey', 'decisionFingerprint', 'status', 'detail',
-          'completedAt', 'source', 'existingRepair', 'execution',
-          'signatureKeyId', 'signature',
+          'schema',
+          'taskKey',
+          'decisionFingerprint',
+          'status',
+          'detail',
+          'completedAt',
+          'source',
+          'existingRepair',
+          'execution',
+          'signatureKeyId',
+          'signature',
         ]) ||
         outcome.schema !== 'jovie.symphony-repair-outcome/v3' ||
         outcome.taskKey !== idempotencyKey ||
@@ -566,7 +653,8 @@ export function createVercelBlobBottleneckDependencies(
         !/^ed25519=[A-Za-z0-9_-]{86}$/u.test(outcome.signature) ||
         canonical(source) !==
           canonical({ ...boundTask.source, action: boundTask.action }) ||
-        canonical(outcome.existingRepair) !== canonical(boundTask.existingRepair)
+        canonical(outcome.existingRepair) !==
+          canonical(boundTask.existingRepair)
       ) {
         throw new Error(
           'Symphony outcome is malformed, unauthenticated, or cross-bound'

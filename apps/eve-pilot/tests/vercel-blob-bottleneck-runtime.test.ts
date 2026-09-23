@@ -177,7 +177,7 @@ function v3Outcome(): SummerBottleneckRecord {
   const sourceEvaluation: SummerBottleneckRecord = {
     ...sourceEvaluationBody,
     digest: digest({
-    schema: 'symphony-existing-repair-source-evaluation/v1',
+      schema: 'symphony-existing-repair-source-evaluation/v1',
       ...sourceEvaluationBody,
     }),
   };
@@ -268,7 +268,11 @@ function storeHarness() {
 }
 
 function signedOutcome(overrides: SummerBottleneckRecord = {}) {
-  return signSymphonyRepairOutcome({ ...v3Outcome(), ...overrides }, SYMPHONY_PRIVATE_KEY, 'symphony-outcome-2026-09');
+  return signSymphonyRepairOutcome(
+    { ...v3Outcome(), ...overrides },
+    SYMPHONY_PRIVATE_KEY,
+    'symphony-outcome-2026-09'
+  );
 }
 
 function signedOutcomeWithUnacceptedTask() {
@@ -502,7 +506,10 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
 
   it('refuses new v1 dispatch and keeps authenticated historical v1 outboxes held', async () => {
     const proof = storeHarness();
-    const runtime = createVercelBlobBottleneckDependencies(proof.store, security);
+    const runtime = createVercelBlobBottleneckDependencies(
+      proof.store,
+      security
+    );
     const legacyTask = {
       schema: 'jovie-symphony-repair-task/v1',
       taskKey: KEY,
