@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
@@ -166,7 +167,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
   assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
-  assert.match(mainSource, /Jovie is loading/);
+  assert.match(mainSource, /Jovie for Mac is loading/);
   assert.match(
     mainSource,
     /renderDesktopBuildIdentitySection\(desktopBuildIdentity\)/
@@ -295,7 +296,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
-test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () => {
+test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const tokenSource = await readFile(
     join(desktopRoot, 'src/system-b-tokens.ts'),
@@ -306,20 +307,107 @@ test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () 
   )?.[0];
 
   assert.ok(splashFn, 'buildDesktopBootSplashHtml must exist');
-  assert.match(tokenSource, /splashMarkSizePx: 32/);
+  const localBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+  const stagingBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.staging.yml'),
+    'utf8'
+  );
+  const productionBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.yml'),
+    'utf8'
+  );
+  const webWordmark = await readFile(
+    join(desktopRoot, '../web/public/brand/Jovie-Wordmark-Cream.svg'),
+    'utf8'
+  );
+
+  assert.match(webWordmark, /<svg/);
+  for (const config of [localBuilder, stagingBuilder, productionBuilder]) {
+    assert.match(
+      config,
+      /from: \.\.\/web\/public\/brand\/Jovie-Wordmark-Cream\.svg/
+    );
+    assert.match(config, /to: Jovie-Wordmark-Cream\.svg/);
+  }
+  assert.match(tokenSource, /macCornerMarkSizePx: 40/);
+  assert.match(tokenSource, /macCornerMarkOpacity: 0\.35/);
   assert.match(tokenSource, /markCream: '#F5F4F0'/);
-  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkOpacity/);
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
-  assert.match(splashFn, /data-desktop-splash="splash-b"/);
-  assert.match(splashFn, /aria-label="Jovie is loading"/);
+  assert.match(splashFn, /data-desktop-splash="cinematic"/);
+  assert.match(splashFn, /aria-label="Jovie for Mac is loading"/);
+  assert.match(splashFn, /data:image\/svg\+xml;base64/);
+  assert.match(splashFn, /app\.isPackaged/);
+  assert.match(splashFn, /process\.resourcesPath/);
+  assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
   assert.doesNotMatch(splashFn, /180px/);
-  assert.doesNotMatch(splashFn, /opacity:\s*0\.035/);
   assert.doesNotMatch(splashFn, /<h1>/);
   assert.doesNotMatch(splashFn, /Loading Jovie/);
   assert.doesNotMatch(splashFn, /Starting the app/);
   assert.doesNotMatch(splashFn, /renderDesktopBuildIdentitySection/);
   assert.doesNotMatch(mainSource, /width:\s*180px/);
   assert.doesNotMatch(mainSource, /height:\s*180px/);
+});
+
+test('Mac cinematic splash renders the static final lockup', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const splashFn = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const markPath = mainSource.match(
+    /const JOVIE_MARK_SVG_PATH =\s*('[^']+');/
+  )?.[1];
+  assert.ok(splashFn && markPath);
+
+  const compiled = ts.transpileModule(
+    `${splashFn}\nconst JOVIE_MARK_SVG_PATH = ${markPath};\nbuildDesktopBootSplashHtml();`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
+  ).outputText;
+  const tokens = {
+    macCornerMarkSizePx: 40,
+    macCornerMarkOpacity: 0.35,
+    macCinematicCanvas: '#030407',
+    markCream: '#F5F4F0',
+  };
+  const context = {
+    app: { isPackaged: true },
+    path: { join },
+    __dirname: '/app/dist-electron',
+    process: { resourcesPath: '/app/resources' },
+    SYSTEM_B_DESKTOP_TOKENS: tokens,
+  };
+  let loadedPath;
+  const html = runInNewContext(compiled, {
+    ...context,
+    fs: {
+      readFileSync: path => {
+        loadedPath = path;
+        return Buffer.from('<svg>canonical wordmark</svg>');
+      },
+    },
+  });
+  assert.equal(loadedPath, '/app/resources/Jovie-Wordmark-Cream.svg');
+  assert.match(html, /data-desktop-splash="cinematic"/);
+  assert.match(html, /opacity: 0\.35/);
+  assert.match(html, /width: min\(40px, 1\.786vw\)/);
+  assert.doesNotMatch(html, /@keyframes|animation:|translateX\(/);
+  assert.match(html, /class="suffix">for Mac<\/span>/);
+  assert.match(html, /data:image\/svg\+xml;base64/);
+
+  const fallback = runInNewContext(compiled, {
+    ...context,
+    fs: {
+      readFileSync: () => {
+        throw new Error('wordmark unavailable');
+      },
+    },
+  });
+  assert.match(fallback, /class="fallback-mark"/);
+  assert.doesNotMatch(fallback, /src="data:image\/svg\+xml;base64/);
 });
 
 const FORBIDDEN_MAC_ENTITLEMENTS = [
