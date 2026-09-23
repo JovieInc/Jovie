@@ -27,12 +27,18 @@ const createCheckoutSchema = z.object({
   handle: z.string().min(1).max(64),
 });
 
-const checkoutCapabilitySchema = z.object({ profileId: z.string().uuid() });
+const checkoutCapabilitySchema = z.union([
+  z.object({ profileId: z.string().uuid() }),
+  z.object({ handle: z.string().min(1).max(64) }),
+]);
 
 export async function GET(req: NextRequest) {
-  const parsed = checkoutCapabilitySchema.safeParse({
-    profileId: req.nextUrl.searchParams.get('profileId'),
-  });
+  const requestedProfileId = req.nextUrl.searchParams.get('profileId');
+  const parsed = checkoutCapabilitySchema.safeParse(
+    requestedProfileId !== null
+      ? { profileId: requestedProfileId }
+      : { handle: req.nextUrl.searchParams.get('handle') }
+  );
   if (!parsed.success) {
     return NextResponse.json(
       { available: false },
@@ -43,25 +49,29 @@ export async function GET(req: NextRequest) {
   try {
     const [profile] = await db
       .select({
+        id: creatorProfiles.id,
         isPublic: creatorProfiles.isPublic,
         stripeAccountId: creatorProfiles.stripeAccountId,
         stripePayoutsEnabled: creatorProfiles.stripePayoutsEnabled,
       })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.id, parsed.data.profileId))
+      .where(
+        'profileId' in parsed.data
+          ? eq(creatorProfiles.id, parsed.data.profileId)
+          : eq(creatorProfiles.username, parsed.data.handle.toLowerCase())
+      )
       .limit(1);
     const stripeConnectEnabled = await getAppFlagValue(
       'STRIPE_CONNECT_ENABLED'
     );
+    const available = Boolean(
+      profile?.isPublic &&
+        stripeConnectEnabled &&
+        profile.stripeAccountId &&
+        profile.stripePayoutsEnabled
+    );
     return NextResponse.json(
-      {
-        available: Boolean(
-          profile?.isPublic &&
-            stripeConnectEnabled &&
-            profile.stripeAccountId &&
-            profile.stripePayoutsEnabled
-        ),
-      },
+      { available, ...(available && profile ? { profileId: profile.id } : {}) },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

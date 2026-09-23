@@ -92,6 +92,7 @@ describe('/api/tips/create-checkout', () => {
   it('shows Stripe only for a public connected recipient with payouts enabled', async () => {
     expect(await (await GET(request('GET'))).json()).toEqual({
       available: true,
+      profileId,
     });
     mocks.flag.mockResolvedValue(false);
     expect(await (await GET(request('GET'))).json()).toEqual({
@@ -104,6 +105,15 @@ describe('/api/tips/create-checkout', () => {
     expect(await (await GET(request('GET'))).json()).toEqual({
       available: false,
     });
+  });
+
+  it('resolves an eligible public artist by handle for the mobile Pay drawer', async () => {
+    const response = await GET(
+      new NextRequest('https://jov.ie/api/tips/create-checkout?handle=artist')
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ available: true, profileId });
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
   });
 
   it('refuses checkout when the creator cannot receive the payment', async () => {
