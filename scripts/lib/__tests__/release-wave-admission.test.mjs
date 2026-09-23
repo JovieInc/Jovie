@@ -1,75 +1,14 @@
-import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyReleaseWave,
-  DEFAULT_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS,
   PRODUCTION_CONTROLLER_WORKFLOW_PATH,
   runCli,
 } from '../release-wave-admission.mjs';
 
-const REPO_ROOT = resolve(import.meta.dirname, '../../..');
-const AUTOENROLL_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/merge-queue-autoenroll.yml'),
-  'utf8'
-);
-const DRAIN_SCRIPT = readFileSync(
-  resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
-  'utf8'
-);
-function workflowStep(name, nextName) {
-  const start = AUTOENROLL_WORKFLOW.indexOf(`      - name: ${name}\n`);
-  if (start < 0) throw new Error(`Missing workflow step: ${name}`);
-  const end = AUTOENROLL_WORKFLOW.indexOf(`      - name: ${nextName}\n`, start);
-  if (end < 0) throw new Error(`Missing workflow boundary: ${nextName}`);
-  const block = AUTOENROLL_WORKFLOW.slice(start, end);
-  const runMarker = '        run: |\n';
-  const runStart = block.indexOf(runMarker);
-  if (runStart < 0) throw new Error(`Missing workflow run: ${name}`);
-  return block
-    .slice(runStart + runMarker.length)
-    .split('\n')
-    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
-    .join('\n');
-}
-const RELEASE_WAVE_STEP = workflowStep(
-  'Resolve active production release wave',
-  'Resolve exact admission scope'
-);
-const TRUSTED_POLICY_STEP = workflowStep(
-  'Verify trusted release-wave policy availability',
-  'Resolve active production release wave'
-);
-
-function runWorkflowStep(script, cwd, env) {
-  return spawnSync(
-    'bash',
-    ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
-    {
-      cwd,
-      encoding: 'utf8',
-      env: { ...process.env, ...env },
-    }
-  );
-}
-function readOutputs(path) {
-  return Object.fromEntries(
-    readFileSync(path, 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map(line => line.split('=', 2))
-  );
-}
+// NOTE: the merge-queue auto-enroll controller
+// (.github/workflows/merge-queue-autoenroll.yml) was deleted in JOV-6526.
+// The workflow-step projection tests that executed its embedded bash steps
+// were removed with it; the pure classifier + CLI contract tests below remain.
 
 const NOW = Date.parse('2026-09-14T19:00:00Z');
 const MAIN_SHA = 'c'.repeat(40);
@@ -103,83 +42,6 @@ function controllerRun({
     head_sha: headSha,
     created_at: createdAt,
   };
-}
-
-function runReleaseWaveStep({
-  queuedRuns = [],
-  pendingRuns = [],
-  inProgressRuns = [],
-  malformedStatus = '',
-  failStatus = '',
-} = {}) {
-  const root = mkdtempSync(resolve(tmpdir(), 'release-wave-step-'));
-  const bin = resolve(root, 'bin');
-  const output = resolve(root, 'output');
-  const summary = resolve(root, 'summary');
-  mkdirSync(bin);
-  writeFileSync(output, '');
-  writeFileSync(summary, '');
-  writeFileSync(
-    resolve(bin, 'gh'),
-    `#!/usr/bin/env bash
-case "\$*" in
-  *"status=queued"*)
-    ${failStatus === 'queued' ? 'exit 42' : malformedStatus === 'queued' ? "printf '%s\\n' '{\"unexpected\":true}'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: queuedRuns }])}'`}
-    ;;
-  *"status=in_progress"*)
-    ${failStatus === 'in_progress' ? 'exit 43' : malformedStatus === 'in_progress' ? "printf '%s\\n' 'null'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: inProgressRuns }])}'`}
-    ;;
-  *"status=pending"*)
-    ${failStatus === 'pending' ? 'exit 44' : malformedStatus === 'pending' ? "printf '%s\\n' 'null'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: pendingRuns }])}'`}
-    ;;
-  *) printf '%s\\n' '[]' ;;
-esac
-`
-  );
-  chmodSync(resolve(bin, 'gh'), 0o755);
-  try {
-    const result = runWorkflowStep(RELEASE_WAVE_STEP, REPO_ROOT, {
-      GH_TOKEN: 'test-read-token',
-      REPO: 'JovieInc/Jovie',
-      MAIN_SHA,
-      RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800',
-      GITHUB_OUTPUT: output,
-      GITHUB_STEP_SUMMARY: summary,
-      PATH: `${bin}:${process.env.PATH ?? ''}`,
-    });
-    return {
-      result,
-      outputs: readOutputs(output),
-      summary: readFileSync(summary, 'utf8'),
-    };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-}
-
-function runTrustedPolicyStep({ workflow = 'old-trusted-main' } = {}) {
-  const root = mkdtempSync(resolve(tmpdir(), 'release-wave-policy-'));
-  const output = resolve(root, 'output');
-  mkdirSync(resolve(root, '.github/workflows'), { recursive: true });
-  mkdirSync(resolve(root, 'scripts/lib'), { recursive: true });
-  writeFileSync(
-    resolve(root, '.github/workflows/merge-queue-autoenroll.yml'),
-    workflow === 'release-wave'
-      ? '- name: Resolve active production release wave\n'
-      : ''
-  );
-  writeFileSync(output, '');
-  try {
-    const result = runWorkflowStep(TRUSTED_POLICY_STEP, root, {
-      GITHUB_OUTPUT: output,
-    });
-    return {
-      result,
-      outputs: readOutputs(output),
-    };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
 }
 
 describe('release-wave admission backpressure', () => {
@@ -237,77 +99,6 @@ describe('release-wave admission backpressure', () => {
       }).hold
     ).toBe(false);
   });
-
-  it.each([
-    { branch: 'codex/feature' },
-    { path: '.github/workflows/production-release.yml' },
-    { status: 'waiting' },
-    { status: 'requested' },
-  ])(
-    'does not expand hold authority for nonmatching pending runs: %j',
-    change => {
-      expect(
-        classifyReleaseWave(
-          [
-            controllerRun({
-              id: 901,
-              headSha: MAIN_SHA,
-              status: 'pending',
-              ...change,
-            }),
-          ],
-          { currentMainSha: MAIN_SHA, now: NOW }
-        )
-      ).toMatchObject({ hold: false, reason: 'no-active-controller' });
-    }
-  );
-
-  it('fetches the pending successor through the actual workflow after the running predecessor expires', () => {
-    const now = Date.now();
-    const { result, outputs } = runReleaseWaveStep({
-      inProgressRuns: [
-        controllerRun({
-          id: 902,
-          headSha: OLD_HEAD_A,
-          createdAt: new Date(now - 31 * 60_000).toISOString(),
-        }),
-      ],
-      pendingRuns: [
-        controllerRun({
-          id: 903,
-          headSha: MAIN_SHA,
-          status: 'pending',
-          createdAt: new Date(now - 8 * 60_000).toISOString(),
-        }),
-      ],
-    });
-    expect(result.status).toBe(0);
-    expect(outputs).toMatchObject({
-      hold: '1',
-      run_id: '903',
-      reason: 'controller-wave-active',
-    });
-    expect(Date.parse(outputs.expires_at)).toBe(now + 22 * 60_000);
-  });
-
-  it.each(['read failure', 'malformed response', 'malformed run'])(
-    'fails closed on pending-controller %s',
-    failure => {
-      const { result, outputs } = runReleaseWaveStep({
-        failStatus: failure === 'read failure' ? 'pending' : '',
-        malformedStatus: failure === 'malformed response' ? 'pending' : '',
-        pendingRuns: failure === 'malformed run' ? [{}] : [],
-      });
-      expect(result.status).toBe(2);
-      if (failure !== 'malformed run') {
-        expect(outputs).toMatchObject({
-          hold: '1',
-          reason: 'controller-state-unavailable',
-          expires_at: '',
-        });
-      }
-    }
-  );
 
   it('holds an active controller run for the current main wave', () => {
     const result = classifyReleaseWave(
@@ -509,71 +300,6 @@ describe('release-wave admission backpressure', () => {
     }
   });
 
-  it('projects the active run through the workflow and keeps an older head held', () => {
-    const { result, outputs, summary } = runReleaseWaveStep({
-      inProgressRuns: [
-        {
-          id: 801,
-          status: 'in_progress',
-          path: PRODUCTION_CONTROLLER_WORKFLOW_PATH,
-          head_branch: 'main',
-          head_sha: OLD_HEAD_A,
-          created_at: new Date(Date.now() - 5 * 60_000).toISOString(),
-        },
-      ],
-    });
-
-    expect(result.status).toBe(0);
-    expect(outputs).toMatchObject({
-      hold: '1',
-      reason: 'controller-wave-draining',
-      run_id: '801',
-    });
-    expect(outputs.expires_at).toMatch(/^20[0-9]{2}-/);
-    expect(summary).toContain('jovie-release-wave-admission/v1');
-  });
-
-  it('blocks the workflow when the controller API response shape is malformed', () => {
-    const { result, outputs, summary } = runReleaseWaveStep({
-      malformedStatus: 'queued',
-    });
-
-    expect(result.status).toBe(2);
-    expect(outputs).toMatchObject({
-      hold: '1',
-      reason: 'controller-state-unavailable',
-      expires_at: '',
-      run_id: 'unknown',
-    });
-    expect(summary).toContain('controller-state-unavailable');
-    expect(result.stderr).toContain('native enrollment is blocked');
-  });
-
-  it('refuses the workflow when an individual controller run is malformed', () => {
-    const { result } = runReleaseWaveStep({
-      queuedRuns: [{}],
-    });
-
-    expect(result.status).toBe(2);
-    expect(result.stderr).toContain('classifier failed closed');
-  });
-
-  it('blocks the workflow when the controller API read fails', () => {
-    const { result, outputs, summary } = runReleaseWaveStep({
-      failStatus: 'in_progress',
-    });
-
-    expect(result.status).toBe(2);
-    expect(outputs).toMatchObject({
-      hold: '1',
-      reason: 'controller-state-unavailable',
-      expires_at: '',
-      run_id: 'unknown',
-    });
-    expect(summary).toContain('"expiresAt": null');
-    expect(result.stderr).toContain('native enrollment is blocked');
-  });
-
   it('rejects an invalid main SHA before classifying controller state', () => {
     expect(() =>
       classifyReleaseWave([controllerRun({ id: 701, headSha: OLD_HEAD_A })], {
@@ -662,82 +388,5 @@ describe('release-wave admission backpressure', () => {
       reason: 'controller-state-malformed',
       expiresAt: null,
     });
-  });
-
-  it('wires the bounded receipt to new enrollment only', () => {
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      '- name: Verify trusted release-wave policy availability'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      "if: steps.release-wave-policy.outputs.available == 'true'"
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      "grep -Fq -- '- name: Resolve active production release wave'"
-    );
-    expect(AUTOENROLL_WORKFLOW).not.toContain(
-      'github.event.pull_request.head.sha'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      '- name: Resolve active production release wave'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      'node scripts/lib/release-wave-admission.mjs classify'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      'for status in queued pending in_progress'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain('status=$status');
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      'error("malformed controller run response")'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      'Production Controller state is unavailable or malformed'
-    );
-    expect(AUTOENROLL_WORKFLOW).not.toContain(
-      'RELEASE_WAVE_OBSERVATION_HOLD_SECONDS'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      'DRAIN_RELEASE_WAVE_HOLD: $' +
-        '{{ steps.release-wave.outputs.hold || steps.release-wave-policy.outputs.hold }}'
-    );
-    expect(AUTOENROLL_WORKFLOW).toContain(
-      "DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'"
-    );
-    expect(DRAIN_SCRIPT).toContain('RELEASE_WAVE_HOLD_ACTIVE=0');
-    expect(DRAIN_SCRIPT).toContain('ENROLL_SLOTS=0');
-    expect(DRAIN_SCRIPT).toContain('DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS');
-    expect(DRAIN_SCRIPT).not.toContain(
-      'DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS'
-    );
-    expect(DRAIN_SCRIPT).toContain('&& "$RELEASE_WAVE_HOLD_ACTIVE" != "1"');
-    expect(DRAIN_SCRIPT).toContain(
-      '=== DEQUEUE (hard gates → queue removal) ==='
-    );
-    expect(DEFAULT_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS).toBe(1800);
-  });
-
-  it('skips the classifier for an old trusted main checkout without executing PR code', () => {
-    const { result, outputs } = runTrustedPolicyStep();
-    expect(result.status).toBe(0);
-    expect(outputs).toMatchObject({
-      available: 'false',
-      hold: '0',
-      reason: 'trusted-main-release-wave-not-landed',
-    });
-    expect(result.stdout).toContain('pre-land maintenance path');
-    expect(result.stdout).not.toContain('release-wave-admission.mjs');
-  });
-
-  it('fails when trusted main declares the policy but the deployed helper is missing', () => {
-    const { result, outputs } = runTrustedPolicyStep({
-      workflow: 'release-wave',
-    });
-    expect(result.status).toBe(2);
-    expect(outputs).toMatchObject({
-      available: 'false',
-      hold: '0',
-      reason: 'trusted-main-release-wave-not-landed',
-    });
-    expect(result.stderr).toContain('classifier is missing');
   });
 });

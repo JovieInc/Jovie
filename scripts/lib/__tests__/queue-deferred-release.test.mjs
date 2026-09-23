@@ -11,14 +11,6 @@ const workflow = readFileSync(
   resolve(repoRoot, '.github/workflows/queue-deferred-release.yml'),
   'utf8'
 );
-const autoenroll = readFileSync(
-  resolve(repoRoot, '.github/workflows/merge-queue-autoenroll.yml'),
-  'utf8'
-);
-const drain = readFileSync(
-  resolve(repoRoot, 'scripts/drain-pr-queue.sh'),
-  'utf8'
-);
 const admission = readFileSync(
   resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
   'utf8'
@@ -82,25 +74,6 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(admission).toContain('fleet-gate-not-releasable');
     expect(releaseScript).toContain('fleet-receipt-stale');
     expect(releaseScript).toContain('every queue-deferred hold stays in place');
-  });
-
-  it('carries the exact bot receipt through the degraded release lifecycle', () => {
-    expect(autoenroll).toContain(
-      "steps.admission.outputs.deferred_release == '1'"
-    );
-    expect(autoenroll).toContain("'deferred-release-only'");
-    expect(autoenroll).toContain(
-      "needs.fleet-policy.outputs.mode != 'hold-intake'"
-    );
-    expect(drain).toContain(
-      'exact-head controller queue-deferred release receipt'
-    );
-    expect(drain).toContain(
-      'controller release evidence changed during native enrollment'
-    );
-    expect(drain).toContain(
-      'Fleet receipt does not authorize the exact queue-deferred release fallback'
-    );
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
