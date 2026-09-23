@@ -277,8 +277,8 @@ importers:
         specifier: ^4.0.87
         version: 4.0.87(zod@4.3.6)
       '@ai-sdk/react':
-        specifier: ^4.0.110
-        version: 4.0.110(react@19.2.8)(zod@4.3.6)
+        specifier: ^4.0.112
+        version: 4.0.112(react@19.2.8)(zod@4.3.6)
       '@ai-sdk/xai':
         specifier: ^5.0.4
         version: 5.0.4(zod@4.3.6)
@@ -663,7 +663,7 @@ importers:
         version: 19.1.0-rc.3
       danger:
         specifier: ^14.0.7
-        version: 14.0.7(undici@8.10.2)
+        version: 14.0.7(undici@8.11.0)
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
@@ -914,8 +914,14 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/mcp@2.0.54':
-    resolution: {integrity: sha512-Q9o7KCyPNRrC7VhBtbnZh2OiApNbFhsNupjDQLW6P/y3xV6l9HES2KWeu0905T9IH6HurN6ckJwRXE0PnLL7Mg==}
+  '@ai-sdk/gateway@4.0.88':
+    resolution: {integrity: sha512-hpEdOAqrp3FOShSytk6n8BZVZ/xrCV7L9hqYA6Q55h7sQknvh99QfC0uQAIbQWjh+66tmo1Fo6ndQla8uCJGyA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/mcp@2.0.55':
+    resolution: {integrity: sha512-f0IWtAJzCRrnz/YJB14yz5yKso5yGODJfGSciQZKVKm+5wv8Ye9Dmcqxi6QZ80Q2FBJIdqrBdpDccl60BZN/DQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -940,8 +946,8 @@ packages:
     resolution: {integrity: sha512-VYMBxIQdcHqbIf1j+YZlI9Ati6LZ4wJe0GGd4z4a5H/KxTggjeOiyaVYTnfF7LHZK5jMQ+rofmzz4QPqf++NUw==}
     engines: {node: '>=22'}
 
-  '@ai-sdk/react@4.0.110':
-    resolution: {integrity: sha512-5WSYzAwdnECdDekICJjj2e83793YYNAcTk8yAEvt/sxme1NXTE3OWr3QLSJPjkyOaa6XAmJ6iE/R9l+2YvcI3Q==}
+  '@ai-sdk/react@4.0.112':
+    resolution: {integrity: sha512-x+IFOOSnc3Pp9VRmdBghTYLEhlX3SwKfYgwIiAGHNnk6dnFgCkCHdZ61gbv4ufOv8jl9WKUqju8KYgmHQ39FAA==}
     engines: {node: '>=22'}
     peerDependencies:
       react: 19.2.8
@@ -8277,6 +8283,12 @@ packages:
 
   ai@7.0.107:
     resolution: {integrity: sha512-PVYQ3W9kR8oYiGQxbg4aFIlhQzKskZm8UV+4E0zB2uKOzFr8ju3bXQncOOZtLsOgJY8vdpgyu3cXtomsfcdQYg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  ai@7.0.109:
+    resolution: {integrity: sha512-hTnm8K4GIT0R6gHrnDJHr1KRnGVAtFa26mLtjqn/TGy+ufD5Y5XXerTEabLXVgmb9iunWxSFRCPOZUZ/VeXYLQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -15994,6 +16006,10 @@ packages:
     resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
     engines: {node: '>=22.19.0'}
 
+  undici@8.11.0:
+    resolution: {integrity: sha512-AdzuGcAkzhbha3GgCSoUBx2P0quwym6qdFNCQz/fDGZc8w9XJ741wHUbt2kTmfPz+ZIOMkySFkiY7RXmiDDC8w==}
+    engines: {node: '>=22.19.0'}
+
   unicorn-magic@0.1.0:
     resolution: {integrity: sha512-lRfVq8fE8gz6QMBuDM6a+LO3IAzTi05H6gCVaUpir2E1Rwpo4ZUog45KpNXKC/Mn3Yb9UDuHumeFTo9iV/D9FQ==}
     engines: {node: '>=18'}
@@ -16791,7 +16807,14 @@ snapshots:
       '@vercel/oidc': 3.2.0
       zod: 4.3.6
 
-  '@ai-sdk/mcp@2.0.54(zod@4.3.6)':
+  '@ai-sdk/gateway@4.0.88(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.17
+      '@ai-sdk/provider-utils': 5.0.45(zod@4.3.6)
+      '@vercel/oidc': 3.2.0
+      zod: 4.3.6
+
+  '@ai-sdk/mcp@2.0.55(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.17
       '@ai-sdk/provider-utils': 5.0.45(zod@4.3.6)
@@ -16813,7 +16836,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 8.10.2
+      undici: 8.11.0
       zod: 4.3.6
 
   '@ai-sdk/provider@3.0.16':
@@ -16824,12 +16847,12 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@4.0.110(react@19.2.8)(zod@4.3.6)':
+  '@ai-sdk/react@4.0.112(react@19.2.8)(zod@4.3.6)':
     dependencies:
-      '@ai-sdk/mcp': 2.0.54(zod@4.3.6)
+      '@ai-sdk/mcp': 2.0.55(zod@4.3.6)
       '@ai-sdk/provider': 4.0.17
       '@ai-sdk/provider-utils': 5.0.45(zod@4.3.6)
-      ai: 7.0.107(zod@4.3.6)
+      ai: 7.0.109(zod@4.3.6)
       react: 19.2.8
       swr: 2.5.1(react@19.2.8)
       throttleit: 2.1.0
@@ -24820,7 +24843,7 @@ snapshots:
       '@workflow/world': 4.5.0
       async-sema: 3.1.1
       ulid: 3.0.2
-      undici: 8.10.2
+      undici: 8.11.0
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -24832,7 +24855,7 @@ snapshots:
       '@workflow/errors': 4.2.1
       '@workflow/world': 4.5.0
       cbor-x: 1.6.0
-      undici: 8.10.2
+      undici: 8.11.0
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -25016,6 +25039,13 @@ snapshots:
   ai@7.0.107(zod@4.3.6):
     dependencies:
       '@ai-sdk/gateway': 4.0.87(zod@4.3.6)
+      '@ai-sdk/provider': 4.0.17
+      '@ai-sdk/provider-utils': 5.0.45(zod@4.3.6)
+      zod: 4.3.6
+
+  ai@7.0.109(zod@4.3.6):
+    dependencies:
+      '@ai-sdk/gateway': 4.0.88(zod@4.3.6)
       '@ai-sdk/provider': 4.0.17
       '@ai-sdk/provider-utils': 5.0.45(zod@4.3.6)
       zod: 4.3.6
@@ -26597,7 +26627,7 @@ snapshots:
 
   damerau-levenshtein@1.0.8: {}
 
-  danger@14.0.7(undici@8.10.2):
+  danger@14.0.7(undici@8.11.0):
     dependencies:
       '@gitbeaker/rest': 38.12.1
       '@octokit/rest': 20.1.2
@@ -26629,7 +26659,7 @@ snapshots:
       require-from-string: 2.0.2
       supports-hyperlinks: 4.5.0
     optionalDependencies:
-      undici: 8.10.2
+      undici: 8.11.0
     transitivePeerDependencies:
       - supports-color
 
@@ -28898,7 +28928,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.20.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.20.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -31215,7 +31245,7 @@ snapshots:
       semver: 7.8.5
       tar: 7.5.21
       tinyglobby: 0.2.17
-      undici: 8.10.2
+      undici: 8.11.0
       which: 6.0.1
 
   node-gyp@9.4.1:
@@ -32649,7 +32679,7 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       react-stately: 3.48.0(react@19.2.8)
-      use-sync-external-store: 1.6.0(react@19.2.8)
+      use-sync-external-store: 1.7.0(react@19.2.8)
 
   react-compiler-runtime@19.1.0-rc.3(react@19.2.8):
     dependencies:
@@ -32751,7 +32781,7 @@ snapshots:
       '@react-types/shared': 3.36.0(react@19.2.8)
       '@swc/helpers': 0.5.23
       react: 19.2.8
-      use-sync-external-store: 1.6.0(react@19.2.8)
+      use-sync-external-store: 1.7.0(react@19.2.8)
 
   react-style-singleton@2.2.3(@types/react@19.2.18)(react@19.2.8):
     dependencies:
@@ -33185,7 +33215,7 @@ snapshots:
       retext-stringify: 4.0.0
       unified: 11.0.5
 
-  retry-axios@2.6.0(axios@1.20.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.20.0):
     dependencies:
       axios: 1.20.0(debug@4.4.3)
     optional: true
@@ -34741,6 +34771,8 @@ snapshots:
   undici@8.10.0: {}
 
   undici@8.10.2: {}
+
+  undici@8.11.0: {}
 
   unicorn-magic@0.1.0: {}
 
