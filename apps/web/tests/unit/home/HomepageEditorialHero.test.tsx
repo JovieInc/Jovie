@@ -49,7 +49,9 @@ describe('HomepageEditorialHero', () => {
     expect(
       screen.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
-    fireEvent.click(screen.getByRole('link', { name: 'Request access' }));
+    const action = screen.getByRole('link', { name: 'Request access' });
+    action.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(action);
     expect(trackAction).toHaveBeenCalledWith(
       HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
       expect.objectContaining({ placement: 'hero' })

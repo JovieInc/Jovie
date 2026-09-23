@@ -435,7 +435,7 @@ test.describe('Homepage', () => {
     expect(hydrationErrors).toEqual([]);
   });
 
-  test('locks the nine certified sections, their order, heading lines, and CLS', async ({
+  test('locks current editorial sections, action states, heading lines, and CLS', async ({
     page,
     browserName,
   }) => {
@@ -458,13 +458,9 @@ test.describe('Homepage', () => {
 
     const sectionIds = [
       'marketing-section-hero',
-      'marketing-section-logo-cloud',
       'homepage-section-connected',
-      'homepage-section-found',
-      'homepage-section-know',
       'homepage-section-relationships',
-      'homepage-section-smarter',
-      'homepage-section-built',
+      'homepage-editorial-changelog',
       'homepage-close',
     ];
     const sectionTops = await page.evaluate(
@@ -482,102 +478,35 @@ test.describe('Homepage', () => {
     expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
 
-    const heroToProofBoundary = await page.evaluate(() => {
-      const hero = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-hero"]'
-      );
-      const stack = document.querySelector<HTMLElement>(
-        '[data-testid="homepage-story-stack"]'
-      );
-      const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-logo-cloud"]'
-      );
-      if (!(hero && stack && proofSection)) return null;
-      return {
-        gap:
-          stack.getBoundingClientRect().top -
-          hero.getBoundingClientRect().bottom,
-        proofOffset:
-          proofSection.getBoundingClientRect().top -
-          stack.getBoundingClientRect().top,
-      };
-    });
-    expect(heroToProofBoundary).not.toBeNull();
-    expect(heroToProofBoundary?.gap).toBeGreaterThanOrEqual(0);
-    expect(heroToProofBoundary?.gap).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
-    ).toBeLessThanOrEqual(1);
-
-    // Section 2 retains verified logos on the page
-    // background, never a frosted card.
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(
-      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
-    ).toHaveCount(0);
-    await expect(
-      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
-    ).toBeVisible();
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
+    await expect(page.getByTestId('marketing-section-logo-cloud')).toHaveCount(
+      0
     );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-    await expect(proof.locator('svg')).toHaveCount(4);
-
-    // Locked section copy, verbatim.
-    for (const [id, headline, body] of [
-      [
-        'connected',
-        'Everything about you, connected.',
-        'Your work, links, story, and presence—organized into one living profile.',
-      ],
-      [
-        'found',
-        'Be found. Be understood.',
-        'Share the right version of you, legible wherever people want to know how you can help.',
-      ],
-      [
-        'know',
-        'Know who cares.',
-        'See who is paying attention, what brought them to you, and what they may want next.',
-      ],
-      [
-        'relationships',
-        'Turn attention into relationships.',
-        'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-      ],
-      [
-        'smarter',
-        'A presence that gets smarter.',
-        'Every interaction improves what you know, what you show, and what you do next.',
-      ],
-      [
-        'built',
-        'Built around who you are.',
-        'Jovie adapts to your work without reducing you to a category.',
-      ],
-    ] as const) {
-      const section = page.locator(
-        `[data-homepage-testid="homepage-section-${id}"]`
-      );
-      await expect(
-        section.getByRole('heading', { level: 2, name: headline })
-      ).toBeVisible();
-      await expect(section.getByText(body)).toBeVisible();
-    }
-
-    // Real product exports load at device quality where they appear.
     const connected = page.locator(
       '[data-homepage-testid="homepage-section-connected"]'
     );
+    await connected.scrollIntoViewIfNeeded();
+    await expect(
+      connected.getByRole('heading', {
+        name: 'Everything about you, connected.',
+      })
+    ).toBeVisible();
+    await expect(
+      connected.getByText('IDENTITY, ACROSS THE INTERNET')
+    ).toBeVisible();
+    await expect(
+      connected.getByText(
+        'Your work and story are scattered across the internet. Your identity should be easier to see.'
+      )
+    ).toBeVisible();
+    // The identity artwork remains editorial rather than a profile screenshot.
     await connected.scrollIntoViewIfNeeded();
     await expect(connected.locator('img')).toHaveCount(1);
     const relationships = page.locator(
       '[data-homepage-testid="homepage-section-relationships"]'
     );
     await relationships.scrollIntoViewIfNeeded();
-    await expect(relationships.locator('img')).toHaveCount(3);
+    await expect(relationships.locator('img')).toHaveCount(0);
+    await expect(relationships.getByRole('listitem')).toHaveCount(3);
     const exportSelector =
       '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
@@ -600,7 +529,7 @@ test.describe('Homepage', () => {
           };
         })
       );
-    expect(exportQuality).toHaveLength(4);
+    expect(exportQuality).toHaveLength(1);
     for (const image of exportQuality) {
       expect(
         image.naturalWidth,
@@ -662,7 +591,7 @@ test.describe('Homepage', () => {
           );
         })
       );
-      expect(headingLines).toHaveLength(8);
+      expect(headingLines).toHaveLength(4);
       await expect
         .poll(async () =>
           Math.max(
