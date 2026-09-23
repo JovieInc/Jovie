@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -2356,13 +2357,13 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
       checkResponseTimeout: 1200,
     });
     expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
-    expect(secondsReadback.drift).not.toContain(
+    expect(secondsReadback.drift).toContain(
       'check_response_timeout_minutes'
     );
     const liveGraphql = validateLiveMergeQueueRuleset(

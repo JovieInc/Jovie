@@ -706,7 +706,7 @@ describe('merge_group workflow contract', () => {
     expect(timeout).toBeLessThan(
       NATIVE_QUEUE_POLICY.check_response_timeout_minutes
     );
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
     expect(coverage).toContain('.applicable');

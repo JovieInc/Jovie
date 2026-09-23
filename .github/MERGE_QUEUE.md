@@ -67,7 +67,9 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
   two combined heads at a time (live readback 2026-09-20, JOV-6107; the 1→2
   apply is complete; do not restore the superseded 2026-08-15 three-prefix
   canary value)
-- Check response timeout: `20` minutes (synced to the live ruleset readback, JOV-5867)
+- Check response timeout: source target `60` minutes; live remains `20` until
+  the source-first cutover lands. Re-read ruleset 10512119 before claiming the
+  60-minute deadline is active. All required checks and ALLGREEN remain.
 - Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
 - Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
