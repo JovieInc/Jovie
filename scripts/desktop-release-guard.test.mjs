@@ -1601,7 +1601,10 @@ test('scheduled staging reconciliation publishes only unpublished desktop change
     git('config', 'user.email', 'test@jovie.test');
     git('config', 'user.name', 'Test');
     await mkdir(join(root, 'apps/desktop/src'), { recursive: true });
-    await writeFile(join(root, 'apps/desktop/src/main.ts'), 'export const shell = 1;\n');
+    await writeFile(
+      join(root, 'apps/desktop/src/main.ts'),
+      'export const shell = 1;\n'
+    );
     git('add', '.');
     git('commit', '-qm', 'baseline');
     const baseline = git('rev-parse', 'HEAD');
@@ -1611,7 +1614,10 @@ test('scheduled staging reconciliation publishes only unpublished desktop change
     git('commit', '-qm', 'docs');
     const docsOnly = git('rev-parse', 'HEAD');
 
-    await writeFile(join(root, 'apps/desktop/src/main.ts'), 'export const shell = 2;\n');
+    await writeFile(
+      join(root, 'apps/desktop/src/main.ts'),
+      'export const shell = 2;\n'
+    );
     git('add', '.');
     git('commit', '-qm', 'desktop repair');
     const desktopChange = git('rev-parse', 'HEAD');
