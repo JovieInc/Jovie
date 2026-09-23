@@ -14,7 +14,7 @@ describe('SmartLinksLanding', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'One release link. Their music app.',
+        name: 'One Release Link. Their Music App.',
       })
     ).toBeInTheDocument();
     expect(
