@@ -395,17 +395,47 @@ def publish(destination: Path, observe_once) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provenance", type=Path, required=True)
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--source-revision", required=True)
-    parser.add_argument("--profile", choices=("canonical", "governor-bounded"),
-                        default=os.environ.get("JOVIE_CONFIGURATION_PROFILE", "canonical"))
-    parser.add_argument("--binary", type=Path, default=Path.home() / ".local/bin/symphony")
+    parser.add_argument("--provenance", type=Path)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--source-revision")
+    parser.add_argument("--upstream-binding", type=Path)
+    parser.add_argument("--upstream-binding-sha256")
+    parser.add_argument("--profile", choices=("canonical", "governor-bounded"))
+    parser.add_argument("--binary", type=Path)
     parser.add_argument("--gem-root", type=Path, default=Path.home() / "gem-workspace")
     parser.add_argument("--check", action="store_true", help="Observe without publishing")
     args = parser.parse_args()
-    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, args.binary, args.gem_root,
-                                  profile=args.profile)
+    upstream_requested = args.upstream_binding is not None or args.upstream_binding_sha256 is not None
+    if upstream_requested:
+        # The approved digest must come from outside the binding itself. Keep
+        # upstream preservation separate from the legacy healthy/admission file.
+        if (args.upstream_binding is None or args.upstream_binding_sha256 is None
+                or any(value is not None for value in (args.provenance, args.source_root,
+                    args.source_revision, args.profile, args.binary))):
+            print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                              "reason": "mixed-or-incomplete-observation-mode"}))
+            return 78
+        observe_once = lambda: observe_upstream_preservation(
+            args.upstream_binding, args.upstream_binding_sha256)
+        try:
+            receipt = observe_once() if args.check else publish(
+                args.gem_root / "state/symphony-upstream-preservation.json",
+                lambda: observe_with_retry(observe_once))
+            print(json.dumps(receipt, sort_keys=True))
+            return 0
+        except OBSERVATION_ERRORS as error:
+            print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                              "reason": "upstream-preservation-unverified",
+                              "failureReason": failure_reason(error)}))
+            return 78
+    if any(value is None for value in (args.provenance, args.source_root, args.source_revision)):
+        print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                          "reason": "legacy-observation-inputs-missing"}))
+        return 78
+    profile = args.profile or os.environ.get("JOVIE_CONFIGURATION_PROFILE", "canonical")
+    binary = args.binary or Path.home() / ".local/bin/symphony"
+    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, binary, args.gem_root,
+                                  profile=profile)
     try:
         receipt = observe_once() if args.check else publish(
             args.gem_root / "state/gem-service-attestation.json", lambda: observe_with_retry(observe_once))

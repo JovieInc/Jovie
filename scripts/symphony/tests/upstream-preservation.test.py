@@ -101,6 +101,43 @@ class UpstreamPreservationTests(unittest.TestCase):
         self.assertEqual(before, {path: path.read_bytes() for path in before})
         self.assertFalse(self.a.events.exists())
 
+    def test_cli_publishes_upstream_separately_without_legacy_health(self):
+        approved = self.save_binding()
+        observed = self.observe(approved)
+        state = self.a.home / "state"
+        state.mkdir()
+        legacy = state / "gem-service-attestation.json"
+        legacy.write_text('{"schema":"gem-service-attestation/v1","healthy":false}')
+        args = ["emitter", "--upstream-binding", str(self.binding_path),
+                "--upstream-binding-sha256", approved, "--gem-root", str(self.a.home)]
+        with mock.patch.object(E, "observe_upstream_preservation", return_value=observed) as verify, \
+             mock.patch.object(sys, "argv", args + ["--check"]), mock.patch("builtins.print"):
+            self.assertEqual(E.main(), 0)
+            verify.assert_called_once_with(self.binding_path, approved)
+        self.assertFalse((state / "symphony-upstream-preservation.json").exists())
+        with mock.patch.object(E, "observe_upstream_preservation", return_value=observed) as verify, \
+             mock.patch.object(sys, "argv", args), mock.patch("builtins.print"):
+            self.assertEqual(E.main(), 0)
+            verify.assert_called_once_with(self.binding_path, approved)
+        saved = json.loads((state / "symphony-upstream-preservation.json").read_text())
+        self.assertEqual(saved, observed)
+        self.assertNotIn("healthy", saved)
+        self.assertFalse(json.loads(legacy.read_text())["healthy"])
+        with mock.patch.object(sys, "argv", args + ["--provenance", str(self.package)]), \
+             mock.patch("builtins.print"), \
+             mock.patch.object(E, "observe_upstream_preservation") as verify:
+            self.assertEqual(E.main(), 78)
+            verify.assert_not_called()
+        with mock.patch.object(sys, "argv", args + ["--check"]), \
+             mock.patch("builtins.print"), \
+             mock.patch.object(E, "observe_upstream_preservation", side_effect=ValueError("changed binding")):
+            self.assertEqual(E.main(), 78)
+        self.assertEqual(json.loads((state / "symphony-upstream-preservation.json").read_text()), observed)
+        with mock.patch.object(sys, "argv", ["emitter", "--source-revision", "a" * 40]), \
+             mock.patch("builtins.print"), mock.patch.object(E, "observe") as legacy:
+            self.assertEqual(E.main(), 78)
+            legacy.assert_not_called()
+
     def test_shipped_template_is_not_configuration_approval(self):
         template = ROOT / "scripts/symphony/profiles/upstream-preservation/binding.example.json"
         with mock.patch.object(H, "_activation_snapshot") as observe:
