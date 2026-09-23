@@ -182,6 +182,10 @@ function resolveLoopbackHostPatterns(): string[] {
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
   const localBetterAuthUrl = resolveLocalBetterAuthUrl();
   const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
+  const localProtocol =
+    localBetterAuthUrl?.protocol === 'http:' ||
+    env.VERCEL_ENV === 'development' ||
+    (!env.VERCEL_ENV && env.NODE_ENV !== 'production');
 
   return {
     allowedHosts: [
@@ -200,12 +204,17 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
         ].filter((host): host is string => Boolean(host))
       ),
     ],
+    // A development server can serve local HTTP and a configured remote
+    // HTTPS Ovie origin. Let Better Auth use each request's scheme in that
+    // mixed case instead of forcing remote callbacks onto HTTP.
     protocol:
-      localBetterAuthUrl?.protocol === 'http:' ||
-      env.VERCEL_ENV === 'development' ||
-      (!env.VERCEL_ENV && env.NODE_ENV !== 'production')
-        ? 'http'
-        : 'https',
+      localProtocol &&
+      ovieOrigin &&
+      !LOOPBACK_HOSTNAMES.has(ovieOrigin.hostname)
+        ? undefined
+        : localProtocol
+          ? 'http'
+          : 'https',
   };
 }
 

@@ -133,6 +133,29 @@ describe('Better Auth independent Ovie origin integration', () => {
     ).toThrow(/not in the allowed hosts list/i);
   });
 
+  it('keeps remote HTTPS callbacks secure beside local HTTP in development', async () => {
+    mocks.env.VERCEL_ENV = 'development';
+    mocks.env.OVIE_WEB_ORIGIN = 'https://ovie.example.test';
+    await import('./better-auth');
+    const options = mocks.betterAuth.mock.calls[0]![0];
+    expect(
+      resolveBaseURL(
+        options.baseURL,
+        '/api/auth',
+        new Request('https://ovie.example.test/sign-in'),
+        false
+      )
+    ).toBe('https://ovie.example.test/api/auth');
+    expect(
+      resolveBaseURL(
+        options.baseURL,
+        '/api/auth',
+        new Request('http://localhost:3100/sign-in'),
+        false
+      )
+    ).toBe('http://localhost:3100/api/auth');
+  });
+
   it('fails before creating auth when configured origin is unsafe', async () => {
     mocks.env.OVIE_WEB_ORIGIN = 'https://*.example.test';
     await expect(import('./better-auth')).rejects.toThrow('OVIE_WEB_ORIGIN');
