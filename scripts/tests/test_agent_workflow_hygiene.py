@@ -794,14 +794,18 @@ def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() 
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
-    """Main/merge-group completions must not wake PR fleet controllers."""
+    """Filter CI events before fleet policy consumes a runner."""
     for workflow, job_name in (
-        ("merge-queue-autoenroll.yml", "enroll"),
+        ("merge-queue-autoenroll.yml", "fleet-policy"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
         assert "github.event.workflow_run.event == 'pull_request'" in block, workflow
         assert "github.event.workflow_run.conclusion != 'cancelled'" in block, workflow
+
+    enroll = _job_block("merge-queue-autoenroll.yml", "enroll")
+    assert "needs: fleet-policy" in enroll
+    assert "always()" not in enroll
 
     auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
         encoding="utf-8"
