@@ -734,6 +734,7 @@ function runStructural() {
 
   const selected = selectedProductLanes();
   const operationsParts = [
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/delivery-state-machine.mjs --test-coverage-include=scripts/backlog-orchestrator/no-unattended-red.mjs --test-coverage-lines=89 --test-coverage-branches=78 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',

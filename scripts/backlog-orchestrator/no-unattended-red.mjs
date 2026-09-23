@@ -51,6 +51,7 @@ const ROUTE_TABLE = [
   ['stale-conflicted-head', 'gem', 'exact-head-branch-update', 'typed-remediation'],
   ['queue-eviction', 'gem', 'reconcile-exact-head-queue-admission', 'typed-remediation'],
   ['production-deployment-unbound', 'gem', 'collect-production-proof', 'collect-evidence'],
+  ['production-controller-failed', 'gem', 'investigate-failed-production-controller', 'typed-remediation'],
   ['provider-unavailable', 'gem', 'restore-provider-availability', 'typed-remediation'],
   ['missing-owner-lease', 'symphony', 'reconcile-exact-head-lease', 'typed-remediation'],
   ['dropped-controller-event', 'gem', 'restore-event-trigger-and-reconcile', 'typed-remediation'],
@@ -62,7 +63,7 @@ const ROUTE_TABLE = [
 // biome-ignore format: compact stall tables for the PR size guard
 const WORKFLOW_STALLS = {
   'PR Size Guard': 'size-guard', CI: 'missing-failing-checks',
-  'Production Controller': 'production-deployment-unbound',
+  'Production Controller': 'production-controller-failed',
   'Merge Queue Auto-Enroll': 'queue-eviction', 'Delivery Control Receipts': 'dropped-controller-event',
   'PR targets main': 'base-not-main',
 };
@@ -78,7 +79,7 @@ const FAILURE_STALLS = {
 // biome-ignore format: compact stall tables for the PR size guard
 export const DELIVERY_WORKFLOW_FAILURES = {
   'PR Size Guard': 'size-guard', CI: 'missing-failing-checks',
-  'Production Controller': 'production-deployment-unbound',
+  'Production Controller': 'production-controller-failed',
   'Delivery Control Receipts': 'dropped-controller-event',
 };
 

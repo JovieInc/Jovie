@@ -48,4 +48,5 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
-            --event-file="$GITHUB_EVENT_PATH"
+            --event-file="$GITHUB_EVENT_PATH" | \
+            jq -e '{status, receipt, task, loop: (.loop | {loopKey, state, owner, action, dispatchState, outcome}), queuePath}'
