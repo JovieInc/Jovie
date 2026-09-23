@@ -15,10 +15,10 @@ import {
 } from './desktop-installed-apps-audit.mjs';
 
 test('rolling staging freshness uses the current release update time', async () => {
-  const fetchImpl = async url => ({
-    ok: true,
-    json: async () =>
-      url.endsWith('/latest')
+  /** @type {typeof fetch} */
+  const fetchImpl = async input =>
+    Response.json(
+      String(input).endsWith('/latest')
         ? {
             name: '26.9.15',
             published_at: '2026-09-22T10:00:00Z',
@@ -28,8 +28,8 @@ test('rolling staging freshness uses the current release update time', async () 
             name: '26.9.16-staging.35887697816.1',
             published_at: '2026-09-09T04:08:01Z',
             updated_at: '2026-09-23T16:29:20Z',
-          },
-  });
+          }
+    );
   const shipped = await fetchShippedDesktopVersions(fetchImpl);
   assert.equal(shipped.production.publishedAt, '2026-09-22T10:00:00Z');
   assert.equal(shipped.staging.version, '26.9.16-staging.35887697816.1');
