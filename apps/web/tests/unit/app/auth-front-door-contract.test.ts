@@ -16,7 +16,7 @@ describe('auth front-door contract', () => {
 
     expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
     expect(contract.primary).toEqual({
-      label: 'Get started',
+      label: 'Request access',
       href: APP_ROUTES.SIGNUP,
     });
     expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);

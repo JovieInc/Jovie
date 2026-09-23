@@ -1,4 +1,5 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
   evaluateAcceptanceEvidence,
   evaluateRelationalGrid,
@@ -62,7 +63,7 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
   });
 
-  test('renders the editorial hero with the name search as the only control', async ({
+  test('renders the editorial hero with the configured primary action', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -79,14 +80,22 @@ test.describe('Homepage', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
-    const nameSearch = hero.getByPlaceholder('Search your name');
-    await expect(nameSearch).toBeVisible();
-    await expect(nameSearch).toHaveAccessibleName('Search your name');
-    await expect(
-      hero.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeEnabled();
-    await expect(hero.getByRole('link')).toHaveCount(0);
-    await expect(hero.getByRole('button')).toHaveCount(1);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        hero.getByRole('link', { name: 'Request access', exact: true })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+      await expect(hero.getByRole('combobox')).toHaveCount(0);
+      await expect(hero.getByRole('button')).toHaveCount(0);
+    } else {
+      const nameSearch = hero.getByPlaceholder('Search your name');
+      await expect(nameSearch).toBeVisible();
+      await expect(nameSearch).toHaveAccessibleName('Search your name');
+      await expect(
+        hero.getByRole('button', { name: 'Find me', exact: true })
+      ).toBeEnabled();
+      await expect(hero.getByRole('link')).toHaveCount(0);
+      await expect(hero.getByRole('button')).toHaveCount(1);
+    }
     await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
 
@@ -98,14 +107,16 @@ test.describe('Homepage', () => {
       (viewport?.height ?? 0) - 1
     );
 
-    const searchBox = await hero
-      .getByTestId('homepage-editorial-hero-search')
-      .boundingBox();
-    const inputBox = await hero
-      .getByPlaceholder('Search your name')
-      .boundingBox();
-    expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
-    expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
+    if (!FEATURE_FLAGS.WAITLIST_ENABLED) {
+      const searchBox = await hero
+        .getByTestId('homepage-editorial-hero-search')
+        .boundingBox();
+      const inputBox = await hero
+        .getByPlaceholder('Search your name')
+        .boundingBox();
+      expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
+      expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
+    }
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -116,7 +127,7 @@ test.describe('Homepage', () => {
     await expect(header).toBeVisible();
     await expect(header).toHaveAttribute(
       'data-presentation',
-      'marketing-glass'
+      'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
     await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
@@ -145,7 +156,7 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Get started' })
+      header.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -597,20 +608,22 @@ test.describe('Homepage', () => {
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
 
-    // Section 9 repeats the name search; CTA is Find me, never Search.
     const close = page.getByTestId('marketing-section-cta');
     await close.scrollIntoViewIfNeeded();
     await expect(
-      close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
+      close.getByRole('heading', { name: 'Take control of your presence.' })
     ).toBeVisible();
-    await expect(close.getByText('Start with your name.')).toBeVisible();
-    await expect(close.getByPlaceholder('Search your name')).toBeVisible();
-    await expect(
-      close.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeEnabled();
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        close.getByRole('link', { name: 'Request access' })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    } else {
+      await close.getByRole('button', { name: 'Find your profile' }).click();
+      await expect(page.getByPlaceholder('Search your name')).toBeFocused();
+    }
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(FEATURE_FLAGS.WAITLIST_ENABLED ? 0 : 1);
     await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
     await expect(page.getByText('Get started')).toHaveCount(0);
     await expect(page.getByText('Drop more music')).toHaveCount(0);
@@ -786,26 +799,28 @@ test.describe('Homepage', () => {
           Number.parseFloat(style.paddingRight)
         );
       }),
-      search.locator('.homepage-name-search').evaluate(element => {
-        const field = element.querySelector<HTMLElement>(
-          '.homepage-name-search__field'
-        );
-        const glow = element.querySelector<HTMLElement>(
-          '.input-aura-frame__illumination'
-        );
-        if (!(field && glow)) return null;
-        const fieldBounds = field.getBoundingClientRect();
-        const glowBounds = glow.getBoundingClientRect();
-        const glowStyle = getComputedStyle(glow);
-        return {
-          fieldLeft: fieldBounds.left,
-          fieldRight: fieldBounds.right,
-          glowLeft: glowBounds.left,
-          glowRight: glowBounds.right,
-          glowMaskComposite: glowStyle.maskComposite,
-          glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
-        };
-      }),
+      FEATURE_FLAGS.WAITLIST_ENABLED
+        ? Promise.resolve(null)
+        : search.locator('.homepage-name-search').evaluate(element => {
+            const field = element.querySelector<HTMLElement>(
+              '.homepage-name-search__field'
+            );
+            const glow = element.querySelector<HTMLElement>(
+              '.input-aura-frame__illumination'
+            );
+            if (!(field && glow)) return null;
+            const fieldBounds = field.getBoundingClientRect();
+            const glowBounds = glow.getBoundingClientRect();
+            const glowStyle = getComputedStyle(glow);
+            return {
+              fieldLeft: fieldBounds.left,
+              fieldRight: fieldBounds.right,
+              glowLeft: glowBounds.left,
+              glowRight: glowBounds.right,
+              glowMaskComposite: glowStyle.maskComposite,
+              glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
+            };
+          }),
     ]);
 
     expect(searchBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -815,20 +830,26 @@ test.describe('Homepage', () => {
     expect(searchBounds?.width ?? 0).toBeGreaterThanOrEqual(
       viewportWidth - heroInlinePadding - 1
     );
-    expect(searchMaterial).not.toBeNull();
-    expect(searchMaterial?.glowLeft).toBeCloseTo(
-      searchMaterial?.fieldLeft ?? Number.NaN,
-      0
-    );
-    expect(searchMaterial?.glowRight).toBeCloseTo(
-      searchMaterial?.fieldRight ?? Number.NaN,
-      0
-    );
-    expect(
-      searchMaterial?.glowMaskComposite === 'exclude' ||
-        searchMaterial?.glowWebkitMaskComposite === 'xor' ||
-        searchMaterial?.glowWebkitMaskComposite === 'XOR'
-    ).toBe(true);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        search.getByRole('link', { name: 'Request access' })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    } else {
+      expect(searchMaterial).not.toBeNull();
+      expect(searchMaterial?.glowLeft).toBeCloseTo(
+        searchMaterial?.fieldLeft ?? Number.NaN,
+        0
+      );
+      expect(searchMaterial?.glowRight).toBeCloseTo(
+        searchMaterial?.fieldRight ?? Number.NaN,
+        0
+      );
+      expect(
+        searchMaterial?.glowMaskComposite === 'exclude' ||
+          searchMaterial?.glowWebkitMaskComposite === 'xor' ||
+          searchMaterial?.glowWebkitMaskComposite === 'XOR'
+      ).toBe(true);
+    }
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -851,7 +872,7 @@ test.describe('Homepage', () => {
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+      mobileNav.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -1088,28 +1109,38 @@ test.describe('Homepage', () => {
         };
       });
 
-    const heroSearch = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    // K4ar1 closing owns one focus-only action; the hero field is the sole
-    // search surface, so a duplicated close-search node must stay absent.
-    expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
-    expect(heroSearch).not.toBeNull();
-    expect(heroSearch?.treatment).toBe('editorial');
-    expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      const actions = page.locator('.homepage-request-access');
+      await expect(actions).toHaveCount(2);
+      for (const action of await actions.all()) {
+        await expect(action).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+        await expect(action).toHaveAttribute('data-size', 'marketing');
+      }
+      await expect(page.getByRole('combobox')).toHaveCount(0);
+    } else {
+      const heroSearch = await measureSearch(
+        '[data-testid="homepage-editorial-hero-search"]'
+      );
+      // K4ar1 closing owns one focus-only action; the hero field is the sole
+      // search surface, so a duplicated close-search node must stay absent.
+      expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
+      expect(heroSearch).not.toBeNull();
+      expect(heroSearch?.treatment).toBe('editorial');
+      expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
+      expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
+      expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
 
-    const input = page
-      .getByTestId('homepage-editorial-hero-search')
-      .getByRole('combobox');
-    const idleBackground = heroSearch?.fieldBackground;
-    await input.focus();
-    const focused = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    expect(focused?.fieldBackground).toBe(idleBackground);
-    expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+      const input = page
+        .getByTestId('homepage-editorial-hero-search')
+        .getByRole('combobox');
+      const idleBackground = heroSearch?.fieldBackground;
+      await input.focus();
+      const focused = await measureSearch(
+        '[data-testid="homepage-editorial-hero-search"]'
+      );
+      expect(focused?.fieldBackground).toBe(idleBackground);
+      expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+    }
 
     const lightWell = page.locator('.homepage-editorial-hero__light-well');
     expect(
@@ -1171,7 +1202,7 @@ test.describe('Homepage', () => {
     // still route through /start.
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(FEATURE_FLAGS.WAITLIST_ENABLED ? 0 : 1);
 
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);

@@ -7451,3 +7451,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* HOMEPAGE SSR CONTENT FALLBACK END */
+
+/* Bloom ON: 240px action face, with the shared button hit target. */
+.homepage-request-access {
+  width: min(15rem, 100%);
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 767px) {
+  .homepage-request-access {
+    width: 100%;
+  }
+}

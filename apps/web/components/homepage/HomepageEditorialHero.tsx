@@ -1,10 +1,11 @@
 // @coverage-via apps/web/tests/unit/home/HomepageEditorialHero.test.tsx
-import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
+
 import {
   HOMEPAGE_CERTIFIED_CONTEXT,
   HOMEPAGE_CERTIFIED_EVENTS,
 } from '@/data/homepageCertifiedOptimization';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
+import { HomepagePrimaryAction } from './HomepagePrimaryAction';
 
 export interface HomepageEditorialHeroSearch {
   readonly placeholder: string;
@@ -57,7 +58,7 @@ export function HomepageEditorialHero({
           className='homepage-editorial-hero__search'
           data-testid='homepage-editorial-hero-search'
         >
-          <HeroSpotifySearch
+          <HomepagePrimaryAction
             appearance='editorial'
             inputId='homepage-name-search'
             placeholder={search.placeholder}
