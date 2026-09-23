@@ -278,15 +278,19 @@ export function PaySection({
                 else void handleStripePayment(selectedAmount);
               }}
               actionLabel={
-                selectedAmount > 0
-                  ? `Pay ${formatDollarAmount(selectedAmount)}`
-                  : 'Enter an amount'
+                selectedAmount <= 0
+                  ? 'Enter an amount'
+                  : effectiveMethod === 'venmo'
+                    ? 'Continue'
+                    : `Pay ${formatDollarAmount(selectedAmount)}`
               }
               groupLabel='Choose a payment method'
               hint={
-                methods.length > 1
-                  ? 'Swipe to switch methods. Payment starts only when you press Pay.'
-                  : 'Payment starts only when you press Pay.'
+                effectiveMethod === 'venmo'
+                  ? 'Enter the amount in Venmo before sending.'
+                  : methods.length > 1
+                    ? 'Swipe to switch methods. Payment starts only when you press Pay.'
+                    : 'Payment starts only when you press Pay.'
               }
               disabled={loading !== null || selectedAmount <= 0}
             />
