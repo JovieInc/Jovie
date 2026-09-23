@@ -1,7 +1,7 @@
 [
   {
     "heading": "## Authority and precedence",
-    "sha256": "bacc403143e3587606b957307b5b66f5ef0d062ed38853a5c5da66e5709ead75"
+    "sha256": "a336c34246bac56de9f23fb708dc11e3a2ea6d584320a849cdeca91486659dba"
   },
   {
     "heading": "## Surface Classification",
@@ -25,7 +25,7 @@
   },
   {
     "heading": "## Color System",
-    "sha256": "1c5c5f888b38f9d49e76f1aa5a1e495b88dac531c82d72b2cedf7961e2d21cf8"
+    "sha256": "44d731e6c665aeadbaa9d59dc0ce305f699da666ee3e44b5dc62c13d49c465cd"
   },
   {
     "heading": "## Spacing",
@@ -53,11 +53,11 @@
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "ca4e080e2a044a4db9f12e2ec6729806b435f91282489e77399af7456955d3d0"
+    "sha256": "6fcf58f61aadd97ae3f9f2674ef59402bb4e3d5dde32eaa0f335cf8504782397"
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "a57480cb3e67213a52dba1c26d5b079f060b5aece975ca3575b13a9d24710b96"
+    "sha256": "5a7ffc0b78175154767f01868e2976c43aac47469977d5030afa5094df10aa8c"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
