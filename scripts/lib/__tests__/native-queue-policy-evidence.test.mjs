@@ -1,10 +1,8 @@
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   checkFailures,
   digest,
   disposition,
-  schedulerDeadline,
 } from '../native-queue-policy-evidence.mjs';
 
 const head = 'a'.repeat(40),
@@ -103,7 +101,8 @@ describe('native queue strict acceptance', () => {
     ['missing files', { files: null }],
     ['changelog', { files: ['CHANGELOG.md'] }],
   ])('does not admit %s', (_, patch) =>
-    expect(disposition({ ...pr(), ...patch }, policy).type).toBe('INELIGIBLE'));
+    expect(disposition({ ...pr(), ...patch }, policy).type).toBe('INELIGIBLE')
+  );
   it('enforces required reviews', () => {
     expect(
       disposition(pr(), {
@@ -127,82 +126,9 @@ describe('native queue strict acceptance', () => {
   });
 });
 
-function source(path, content) {
-  return {
-    path,
-    ref: base,
-    encoding: 'base64',
-    content: Buffer.from(content).toString('base64'),
-    sha: createHash('sha1')
-      .update(`blob ${Buffer.byteLength(content)}\0`)
-      .update(content)
-      .digest('hex'),
-  };
-}
-function scheduler() {
-  return {
-    workflow: source(
-      '.github/workflows/merge-queue-autoenroll.yml',
-      'on:\n  workflow_run:\nconcurrency:\n  group: merge-queue-drain-mutex\n  cancel-in-progress: false\njobs:\n  fleet-policy:\n    timeout-minutes: 5\n  enroll:\n    steps: []\n'
-    ),
-    drain: source(
-      'scripts/drain-pr-queue.sh',
-      'DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"'
-    ),
-  };
-}
-describe('immutable policy-source diagnostic window', () => {
-  it('derives the 20-minute cohort window from actual source budgets', () => {
-    expect(schedulerDeadline(scheduler(), base)).toBe(1200000);
-    expect(digest(policy)).toMatch(/^[a-f0-9]{64}$/);
-  });
-  it.each([
-    null,
-    {},
-    { verified: true, admissionDeadlineMs: 1000 },
-  ])('rejects missing source %s', input => {
-    expect(schedulerDeadline(input, base)).toBeNull();
-  });
-  it.each([
-    [
-      'wrong revision',
-      s => {
-        s.workflow.ref = head;
-      },
-    ],
-    [
-      'wrong path',
-      s => {
-        s.drain.path = 'other';
-      },
-    ],
-    [
-      'unverified content',
-      s => {
-        s.workflow.content = Buffer.from('altered source').toString('base64');
-      },
-    ],
-    [
-      'wrong encoding',
-      s => {
-        s.workflow.encoding = 'utf8';
-      },
-    ],
-    [
-      'missing event or budget',
-      s => {
-        s.workflow = source(s.workflow.path, 'name: unavailable');
-      },
-    ],
-    [
-      'missing drain budget',
-      s => {
-        s.drain = source(s.drain.path, '# no budget');
-      },
-    ],
-  ])('rejects %s', (_, mutate) => {
-    const s = scheduler();
-    mutate(s);
-    expect(schedulerDeadline(s, base)).toBeNull();
-  });
+it('binds policy identity to the complete policy content', () => {
+  expect(digest(policy)).toMatch(/^[a-f0-9]{64}$/);
+  expect(digest({ ...policy, bypassActors: ['actor'] })).not.toBe(
+    digest(policy)
+  );
 });

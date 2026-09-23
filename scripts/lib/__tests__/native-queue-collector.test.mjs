@@ -26,19 +26,13 @@ if(query.includes('git/ref/heads/main')) result={object:{sha:head}};
 else if(query.includes('rules/branches/main')) result=[{type:'required_status_checks',ruleset_id:1,parameters:{required_status_checks:[{context:'PR Ready'}]}},{type:'pull_request',ruleset_id:1,parameters:{required_approving_review_count:0}},{type:'merge_queue',ruleset_id:1,parameters:{grouping_strategy:'ALLGREEN'}}];
 else if(query.includes('rulesets/1')) result={enforcement:'active',bypass_actors:[]};
 else if(query.includes('branchProtectionRule')) result={data:{repository:{ref:{branchProtectionRule:null}}}};
-else if(query.includes('contents/')) {
-  const path=args[1].split('/contents/')[1].split('?')[0];
-  const content=path.endsWith('.yml')?'on:\\n  workflow_run:\\nconcurrency:\\n  group: merge-queue-drain-mutex\\n  cancel-in-progress: false\\njobs:\\n  fleet-policy:\\n    timeout-minutes: 5\\n  enroll:\\n    steps: []\\n':'DRAIN_MAX_SECONDS="'+ '$' +'{DRAIN_MAX_SECONDS:-900}"';
-  result={path,encoding:'base64',content:Buffer.from(content).toString('base64'),sha:require('node:crypto').createHash('sha1').update('blob '+Buffer.byteLength(content)+'\\0').update(content).digest('hex')};
-} else if(query.includes('pullRequests(')) {
+else if(query.includes('pullRequests(')) {
   const mode=process.env.COLLECTOR_CASE;
   result={data:{repository:{pullRequests:{nodes:[{number:123,title:'Fixture PR',state:'OPEN',isDraft:false,headRefOid:head,baseRefOid:head,baseRefName:'main',mergeable:'MERGEABLE',isInMergeQueue:false,labels:{nodes:[],pageInfo:{hasNextPage:false}},files:{nodes:[],pageInfo:{hasNextPage:false}},commits:{nodes:[{commit:{oid:mode==='wrong-head'?'b'.repeat(40):head,statusCheckRollup:mode==='no-checks'?null:{contexts:{nodes:[],pageInfo:{hasNextPage:true}}}}}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}};
 } else if(query.includes('check-runs?')) result=[{check_runs:[check]}];
 else if(query.includes('/statuses?')) result=[[{context:'Fork PR Gate',id:2,state:'success',created_at:'2026-01-01T00:00:00Z',updated_at:'2026-01-01T00:00:01Z',creator:{login:'jovie-bot'}}]];
-else if(query.includes('merge-queue-autoenroll.yml/runs')) result={workflow_runs:[]};
 else if(query.includes('/pulls/123/files?')) result=[[{filename:'CHANGELOG.md'}]];
 else if(query.includes('/pulls/123')) result={merged:true,head:{sha:head},merge_commit_sha:head};
-else if(query.includes('pullRequest(number:')) result={data:{repository:{pullRequest:{timelineItems:{nodes:[],pageInfo:{hasPreviousPage:false}}}}}};
 else if(query.includes('ci.yml/runs?')) result={workflow_runs:[{id:123,run_attempt:1,head_sha:head,repository:{full_name:repo},path:'.github/workflows/ci.yml',status:'completed',conclusion:'success'}]};
 else if(query.includes('/jobs?')) result=[{jobs:process.env.COLLECTOR_CASE==='merged-no-job'?[]:[{id:321,run_id:123,run_attempt:1,head_sha:head,name:'PR Ready',status:'completed',conclusion:'success'},{id:322,run_id:123,run_attempt:1,head_sha:head,name:'ci-fast (remaining)',status:'completed',conclusion:'success'}]}];
 else if(query.includes('/artifacts?')) result=[{artifacts:[{name:'product-lane-final-'+head+'-1',expired:process.env.COLLECTOR_CASE==='merged-expired',workflow_run:{id:123,head_sha:head}}]}];
@@ -145,22 +139,29 @@ function collect(mode) {
 
 describe('read-only native queue collector CLI', () => {
   it('collects immutable merge, exact job and artifact receipts and removes only its temporary download', () => {
-    const { bundle, downloaded } = collect('merged');
+    const { bundle, downloaded, calls } = collect('merged');
+    expect(calls.some(args => args.join(' ').includes('timelineItems'))).toBe(
+      false
+    );
+    expect(
+      calls.some(args => args.join(' ').includes('enqueuer {__typename login}'))
+    ).toBe(true);
     expect(bundle.snapshots.at(-1).complete).toBe(true);
     expect(bundle.merges[0].gateEvidence.readyJob.run_id).toBe(123);
     expect(bundle.merges[0].gateEvidence.laneReceipt.provenance.sha).toBe(
       'a'.repeat(40)
     );
-    expect(bundle.policySources['a'.repeat(40)].readAt).toBeTruthy();
+    expect(bundle.merges[0].nativeMerge.merged).toBe(true);
+    expect(bundle.merges[0].entryId).toBe('entry');
     expect(downloaded).toHaveLength(1);
     expect(downloaded.every(path => !existsSync(path))).toBe(true);
   });
-  it.each([
-    'merged-no-job',
-    'merged-expired',
-  ])('does not fabricate unavailable artifact proof for %s', mode => {
-    expect(collect(mode).bundle.merges[0].gateEvidence).toBeNull();
-  });
+  it.each(['merged-no-job', 'merged-expired'])(
+    'does not fabricate unavailable artifact proof for %s',
+    mode => {
+      expect(collect(mode).bundle.merges[0].gateEvidence).toBeNull();
+    }
+  );
   it('binds hosted validation to the requested evaluator revision and exact job', () => {
     const { bundle } = collect('validation');
     expect(bundle.evaluatorSha).toBe('a'.repeat(40));
@@ -189,6 +190,11 @@ describe('read-only native queue collector CLI', () => {
     expect(result.status).toBe('BLOCKED');
     expect(result.blocked).toContain('two-distinct-native-merges-required');
     expect(
+      calls.some(args =>
+        /autoenroll|drain-pr-queue|contents\//.test(args.join(' '))
+      )
+    ).toBe(false);
+    expect(
       calls.every(
         args => args[0] === 'api' && !args.join(' ').includes('mutation')
       )
@@ -207,26 +213,25 @@ describe('read-only native queue collector CLI', () => {
     expect(bundle.snapshots[0].errors.length).toBeGreaterThan(0);
     expect(result.status).toBe('BLOCKED');
   });
-  it.each([
-    'truncated-files',
-    'paged',
-    'inline-checks',
-  ])('completes bounded pagination and normalization for %s', mode => {
-    const { bundle, calls } = collect(mode),
-      snapshot = bundle.snapshots[0];
-    expect(snapshot.complete).toBe(true);
-    if (mode === 'truncated-files')
-      expect(snapshot.prs[0].files).toEqual(['CHANGELOG.md']);
-    if (mode === 'inline-checks')
-      expect(snapshot.prs[0].checks.map(c => c.state)).toEqual([
-        'success',
-        'pending',
-      ]);
-    if (mode === 'paged')
-      expect(
-        calls.filter(args => args.join(' ').includes('pullRequests('))
-      ).toHaveLength(3);
-  });
+  it.each(['truncated-files', 'paged', 'inline-checks'])(
+    'completes bounded pagination and normalization for %s',
+    mode => {
+      const { bundle, calls } = collect(mode),
+        snapshot = bundle.snapshots[0];
+      expect(snapshot.complete).toBe(true);
+      if (mode === 'truncated-files')
+        expect(snapshot.prs[0].files).toEqual(['CHANGELOG.md']);
+      if (mode === 'inline-checks')
+        expect(snapshot.prs[0].checks.map(c => c.state)).toEqual([
+          'success',
+          'pending',
+        ]);
+      if (mode === 'paged')
+        expect(
+          calls.filter(args => args.join(' ').includes('pullRequests('))
+        ).toHaveLength(3);
+    }
+  );
   it('persists artifact transport failure instead of inventing a successful merge receipt', () => {
     const { bundle } = collect('merged-download-error');
     expect(bundle.snapshots.at(-1).complete).toBe(false);
@@ -240,6 +245,25 @@ describe('read-only native queue collector CLI', () => {
       const runner = vi.fn();
       expect(() => main(['evaluate', file], runner)).toThrow();
       expect(runner).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('preserves an incompatible saved cohort without requests or reinterpretation', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'queue-v1-'));
+    try {
+      const file = join(dir, 'bundle.json');
+      const old = JSON.stringify({
+        schema: 'jovie-native-queue-eval/v1',
+        repository: 'JovieInc/Jovie',
+      });
+      writeFileSync(file, old);
+      const runner = vi.fn();
+      expect(() => main(['collect', file], runner)).toThrow(
+        'Incompatible evidence bundle'
+      );
+      expect(runner).not.toHaveBeenCalled();
+      expect(readFileSync(file, 'utf8')).toBe(old);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

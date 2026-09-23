@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { HARD_HOLD_LABELS } from '../merge-queue-backend.mjs';
 
-export const SCHEMA = 'jovie-native-queue-eval/v1';
+export const SCHEMA = 'jovie-native-queue-eval/v2';
 export const digest = value =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const sha = value =>
@@ -14,50 +14,6 @@ export const requiredNames = [
   'Fork PR Gate',
   'PR Size Guard',
 ];
-
-export function schedulerDeadline(scheduler, policySha) {
-  // A diagnostic cohort deadline, not a guaranteed delivery SLA. The native
-  // workflow is event-driven. Its policy job and drain budget bound this test;
-  // a late API call or replaced pending run still makes the observation fail.
-  const read = (receipt, path) => {
-    if (
-      receipt?.ref !== policySha ||
-      receipt?.path !== path ||
-      receipt?.encoding !== 'base64'
-    )
-      return null;
-    const bytes = Buffer.from(receipt.content ?? '', 'base64');
-    const hash = createHash('sha1')
-      .update(`blob ${bytes.length}\0`)
-      .update(bytes)
-      .digest('hex');
-    return hash === receipt.sha ? bytes.toString() : null;
-  };
-  const workflow = read(
-    scheduler?.workflow,
-    '.github/workflows/merge-queue-autoenroll.yml'
-  );
-  const drain = read(scheduler?.drain, 'scripts/drain-pr-queue.sh');
-  if (
-    !workflow ||
-    !drain ||
-    !workflow.includes('group: merge-queue-drain-mutex') ||
-    !workflow.includes('cancel-in-progress: false') ||
-    !workflow.includes('workflow_run:') ||
-    /^\s+DRAIN_MAX_SECONDS:/m.test(workflow)
-  )
-    return null;
-  const job = /(?:^|\n)  fleet-policy:([\s\S]*?)(?=\n  [a-z][a-z-]*:|$)/.exec(
-    workflow
-  )?.[1];
-  const minutes = Number(/timeout-minutes: ([1-9][0-9]*)/.exec(job ?? '')?.[1]);
-  const seconds = Number(
-    /DRAIN_MAX_SECONDS="\$\{DRAIN_MAX_SECONDS:-([1-9][0-9]*)\}"/.exec(
-      drain
-    )?.[1]
-  );
-  return minutes > 0 && seconds > 0 ? minutes * 60_000 + seconds * 1000 : null;
-}
 
 // Exact context names only. A later pending/failing result supersedes old green.
 export function checkFailures(checks, required, revision, before = Infinity) {

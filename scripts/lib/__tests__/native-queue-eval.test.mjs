@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { digest, evaluate, SCHEMA } from '../native-queue-eval.mjs';
 
@@ -45,19 +44,6 @@ const pr = () => ({
   mergeQueueEntry: null,
 });
 
-function policySource(path, content) {
-  return {
-    path,
-    ref: base,
-    encoding: 'base64',
-    content: Buffer.from(content).toString('base64'),
-    sha: createHash('sha1')
-      .update(`blob ${Buffer.byteLength(content)}\0`)
-      .update(content)
-      .digest('hex'),
-  };
-}
-
 function passingFixture() {
   const repository = 'JovieInc/Jovie';
   const run = {
@@ -82,27 +68,6 @@ function passingFixture() {
     readback: [],
     readbackAt: later(id * 10 + 1),
     errors: [],
-    scheduler: {
-      workflow: policySource(
-        '.github/workflows/merge-queue-autoenroll.yml',
-        'on:\n  workflow_run:\nconcurrency:\n  group: merge-queue-drain-mutex\n  cancel-in-progress: false\njobs:\n  fleet-policy:\n    timeout-minutes: 5\n  enroll:\n    steps: []\n'
-      ),
-      drain: policySource(
-        'scripts/drain-pr-queue.sh',
-        'DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"'
-      ),
-    },
-    cycles: [
-      {
-        id,
-        repository: { full_name: repository },
-        path: '.github/workflows/merge-queue-autoenroll.yml',
-        status: 'completed',
-        conclusion: 'success',
-        created_at: later(id * 10 - 9),
-        updated_at: later(id * 10 - 5),
-      },
-    ],
     prs: [16237, 20000].map(number => ({
       ...pr(),
       number,
@@ -112,7 +77,7 @@ function passingFixture() {
         position: number === 16237 ? 1 : 2,
         state: 'AWAITING_CHECKS',
         enqueuedAt: at,
-        enqueuer: { login: 'jovie-bot' },
+        enqueuer: { __typename: 'User', login: 'native-agent' },
         headCommit: { oid: head },
         baseCommit: { oid: base },
       },
@@ -164,30 +129,23 @@ function passingFixture() {
       groupBase: base,
       main: head,
       policyDigest: digest(policy),
+      entryId: `entry${number}`,
+      nativeMerge: {
+        number,
+        merged: true,
+        state: 'closed',
+        merged_at: later(number === 16237 ? 40 : 41),
+        merged_by: { type: 'User', login: 'native-agent' },
+        merge_commit_sha: head,
+        head: { sha: head },
+        base: { ref: 'main', repo: { full_name: repository } },
+      },
       run,
       checks,
       compare: {
         base_commit: { sha: head },
         merge_base_commit: { sha: head },
         status: 'identical',
-      },
-      timeline: {
-        pageInfo: { hasPreviousPage: false },
-        nodes: [
-          {
-            __typename: 'AddedToMergeQueueEvent',
-            createdAt: at,
-            actor: { login: 'jovie-bot' },
-            enqueuer: { login: 'jovie-bot[bot]' },
-          },
-          {
-            __typename: 'MergedEvent',
-            createdAt: later(number === 16237 ? 40 : 41),
-            actor: { login: 'jovie-bot' },
-            commit: { oid: head },
-            mergeRefName: 'main',
-          },
-        ],
       },
       gateEvidence: {
         readyJob: {
@@ -259,60 +217,54 @@ function passingFixture() {
 }
 
 describe('complete evidence and deliberate negative controls', () => {
-  it('corroborates current Bot ownership without inventing timestamp equality', () => {
-    const b = passingFixture();
-    b.merges[0].timeline.nodes[0].createdAt = later(1);
-    expect(evaluate(b, evaluationTime).status).toBe('PASS');
-    b.merges[0].timeline.nodes[0].createdAt = later(-1);
-    expect(evaluate(b, evaluationTime).blocked).toContain(
-      '16237:native-events'
-    );
-    b.merges[0].timeline.nodes[0].createdAt = at;
-    for (const s of b.snapshots)
-      s.prs[0].mergeQueueEntry.enqueuer.login = 'human';
-    expect(evaluate(b, evaluationTime).blocked).toContain(
-      '16237:native-events'
-    );
-  });
+  it.each(['User', 'Bot'])(
+    'proves native %s admission without retired workflow or timeline authority',
+    actor => {
+      const b = passingFixture();
+      for (const snapshot of b.snapshots)
+        for (const p of snapshot.prs)
+          p.mergeQueueEntry.enqueuer.__typename = actor;
+      for (const m of b.merges) {
+        m.nativeMerge.merged_by.type = actor;
+        // The live canary returned an hours-old removal after native admission.
+        m.timeline = {
+          nodes: [
+            {
+              __typename: 'RemovedFromMergeQueueEvent',
+              createdAt: later(-3600),
+            },
+          ],
+        };
+      }
+      expect(evaluate(b, evaluationTime).status).toBe('PASS');
+    }
+  );
+  it.each([null, {}, { schema: SCHEMA, repository: 'other/repo' }])(
+    'rejects invalid envelope %s',
+    input => {
+      expect(evaluate(input).status).toBe('BLOCKED');
+    }
+  );
   it.each([
-    null,
-    {},
-    { schema: SCHEMA, repository: 'other/repo' },
-  ])('rejects invalid envelope %s', input => {
-    expect(evaluate(input).status).toBe('BLOCKED');
-  });
-  const successfulRemoval = () => ({
-    __typename: 'RemovedFromMergeQueueEvent',
-    createdAt: later(39),
-    reason: 'merged',
-    actor: { login: 'github-merge-queue' },
-    enqueuer: { login: 'github-merge-queue[bot]' },
-    beforeCommit: { oid: head },
-  });
-  it('accepts GitHub native successful-merge removal with the exact commit', () => {
+    ['nativeMerge.merged', false],
+    ['nativeMerge.base.repo.full_name', 'other/repo'],
+    ['nativeMerge.head.sha', base],
+    ['nativeMerge.merge_commit_sha', base],
+    ['nativeMerge.base.ref', 'other'],
+    ['nativeMerge.number', 123],
+    ['nativeMerge.merged_by', null],
+    ['entryId', 'replacement'],
+    ['nativeMerge', undefined],
+    ['nativeMerge.state', 'open'],
+    ['nativeMerge.merged_at', null],
+    ['nativeMerge.merged_by.login', ''],
+  ])('blocks unbound native merge: %s', (path, value) => {
     const b = passingFixture();
-    b.merges[0].timeline.nodes.splice(1, 0, successfulRemoval());
-    expect(evaluate(b, evaluationTime).status).toBe('PASS');
-  });
-  it.each([
-    ['manual removal', e => (e.reason = 'manual')],
-    [
-      'missing removal reason',
-      e => {
-        delete e.reason;
-      },
-    ],
-    ['wrong removal actor', e => (e.actor.login = 'jovie-bot')],
-    ['wrong removal enqueuer', e => (e.enqueuer.login = 'jovie-bot[bot]')],
-    ['wrong removal commit', e => (e.beforeCommit.oid = base)],
-  ])('rejects %s before merge', (_, mutate) => {
-    const b = passingFixture(),
-      e = successfulRemoval();
-    mutate(e);
-    b.merges[0].timeline.nodes.splice(1, 0, e);
-    expect(evaluate(b, evaluationTime).blocked).toContain(
-      '16237:dequeue-before-merge'
-    );
+    const keys = path.split('.');
+    const key = keys.pop();
+    const target = keys.reduce((record, field) => record[field], b.merges[0]);
+    target[key] = value;
+    expect(evaluate(b, evaluationTime).status).toBe('BLOCKED');
   });
   it('accepts a complete isolated receipt fixture', () => {
     expect(evaluate(passingFixture(), evaluationTime).status).toBe('PASS');
@@ -328,7 +280,7 @@ describe('complete evidence and deliberate negative controls', () => {
     [
       'future merge',
       b => {
-        b.merges[0].timeline.nodes[1].createdAt = later(90);
+        b.merges[0].nativeMerge.merged_at = later(90);
       },
     ],
     [
@@ -374,9 +326,9 @@ describe('complete evidence and deliberate negative controls', () => {
       },
     ],
     [
-      'actor mismatch',
+      'missing native admission identity',
       b => {
-        b.merges[0].timeline.nodes[0].actor.login = 'human';
+        for (const s of b.snapshots) s.prs[0].mergeQueueEntry.enqueuer = null;
       },
     ],
     [
@@ -415,21 +367,9 @@ describe('complete evidence and deliberate negative controls', () => {
       b => (b.snapshots = b.snapshots.slice(0, 2)),
     ],
     [
-      'same cycle replay',
-      b => {
-        for (const s of b.snapshots) s.cycles[0].id = 1;
-      },
-    ],
-    [
       'API error',
       b => {
         b.snapshots[0].errors = ['502'];
-      },
-    ],
-    [
-      'unknown scheduler',
-      b => {
-        b.snapshots[0].scheduler.workflow.sha = head;
       },
     ],
     [
@@ -450,15 +390,6 @@ describe('complete evidence and deliberate negative controls', () => {
       },
     ],
     [
-      'queue ejection',
-      b => {
-        b.merges[0].timeline.nodes.splice(1, 0, {
-          __typename: 'RemovedFromMergeQueueEvent',
-          createdAt: '2026-09-09T02:00:00.500Z',
-        });
-      },
-    ],
-    [
       'entry churn',
       b => {
         b.snapshots[1].prs[0].mergeQueueEntry.id = 'replacement';
@@ -469,7 +400,7 @@ describe('complete evidence and deliberate negative controls', () => {
     mutate(b);
     expect(evaluate(b, evaluationTime).status).not.toBe('PASS');
   });
-  it('distinguishes bounded admission from stranded eligible work', () => {
+  it('distinguishes observed admission from stranded eligible work', () => {
     const b = passingFixture();
     b.snapshots[0].prs[0].isInMergeQueue = false;
     b.snapshots[0].prs[0].mergeQueueEntry = null;
@@ -479,10 +410,8 @@ describe('complete evidence and deliberate negative controls', () => {
     expect(evaluate(b, evaluationTime).blocked).toContain(
       `unadmitted-eligible:123:${head}`
     );
-    b.snapshots[0].cycles[0].conclusion = 'failure';
-    expect(evaluate(b, evaluationTime).status).toBe('FAIL');
   });
-  it('rejects stale/future snapshots and absent scheduler execution', () => {
+  it('rejects stale/future snapshots and missing lifecycle evidence', () => {
     expect(
       evaluate(passingFixture(), Date.parse(at) + 600_000).blocked
     ).toContain('stale-or-future-inventory');

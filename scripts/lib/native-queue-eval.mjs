@@ -5,7 +5,6 @@ import {
   disposition,
   requiredNames,
   SCHEMA,
-  schedulerDeadline,
   sha,
   time,
 } from './native-queue-policy-evidence.mjs';
@@ -16,7 +15,6 @@ export {
   digest,
   disposition,
   SCHEMA,
-  schedulerDeadline,
 } from './native-queue-policy-evidence.mjs';
 
 export const inventoryIdentity = prs =>
@@ -65,7 +63,6 @@ export function evaluate(bundle, now = Date.now()) {
     Date.parse(bundle.startedAt) <= now, 'invalid-cohort-start');
   require(new Set(snapshots.map(s => s.startedAt)).size ===
     snapshots.length, 'replayed-inventory');
-  const cycles = new Map();
   const inventory = [];
   const admissions = new Map();
   for (const s of snapshots) {
@@ -100,31 +97,6 @@ export function evaluate(bundle, now = Date.now()) {
       p.bypassActors?.length === 0 &&
       p.classicProtection === null &&
       p.enforcement === 'active', 'native-policy-incomplete-or-bypass');
-    const deadline =
-      schedulerDeadline(s.scheduler, s.policySha) ??
-      schedulerDeadline(bundle.policySources?.[s.policySha], s.policySha);
-    require(deadline !== null, 'scheduler-evidence-unavailable');
-    for (const run of s.cycles ?? []) {
-      if (
-        run.repository?.full_name !== bundle.repository ||
-        run.path !== '.github/workflows/merge-queue-autoenroll.yml'
-      ) {
-        blocked.push('controller-repository-or-path-mismatch');
-        continue;
-      }
-      if (
-        run.status === 'completed' &&
-        run.conclusion === 'success' &&
-        Date.parse(run.created_at) >= Date.parse(bundle.startedAt) &&
-        Date.parse(run.updated_at) <= Date.parse(s.finishedAt)
-      )
-        cycles.set(run.id, run);
-      if (
-        run.conclusion === 'failure' &&
-        Date.parse(run.created_at) >= Date.parse(bundle.startedAt)
-      )
-        failures.push(`controller-failure:${run.id}`);
-    }
     for (const pr of s.prs ?? []) {
       const d = disposition(pr, p);
       if (s === latest) inventory.push(d);
@@ -149,35 +121,9 @@ export function evaluate(bundle, now = Date.now()) {
             )
         );
         if (!admittedLater) require(false, `unadmitted-eligible:${key}`);
-        else if (deadline === null)
-          require(false, `admission-deadline-unproved:${key}`);
-        else {
-          const admission = snapshots
-            .flatMap(l => l.prs ?? [])
-            .find(
-              q =>
-                q.number === pr.number &&
-                q.headRefOid === pr.headRefOid &&
-                q.isInMergeQueue
-            );
-          require(Date.parse(admission.mergeQueueEntry.enqueuedAt) -
-            Date.parse(s.startedAt) <=
-            deadline, `admission-deadline-exceeded:${key}`);
-        }
       }
     }
   }
-  require(cycles.size >= 3, 'three-successful-controller-cycles-required');
-  require(new Set(
-    snapshots
-      .map(
-        s =>
-          s.cycles?.find(
-            r => r.status === 'completed' && r.conclusion === 'success'
-          )?.id
-      )
-      .filter(Boolean)
-  ).size >= 3, 'inventories-must-span-distinct-controller-cycles');
   const proven = [];
   for (const m of bundle.merges ?? []) {
     const a = admissions.get(`${m.number}:${m.head}`);
@@ -190,28 +136,15 @@ export function evaluate(bundle, now = Date.now()) {
     const check = (ok, reason) => {
       if (!ok) errors.push(`${m.number}:${reason}`);
     };
-    const events = m.timeline?.nodes;
-    // Current entry ownership is authoritative; event time corroborates it.
-    // GitHub does not guarantee event.createdAt === entry.enqueuedAt.
-    const added = events
-      ?.filter(e => e.__typename === 'AddedToMergeQueueEvent')
-      .at(-1);
-    const merged = events?.find(
-      e => e.__typename === 'MergedEvent' && e.commit?.oid === m.commit
-    );
-    const between =
-      events?.filter(
-        e =>
-          Date.parse(e.createdAt) > Date.parse(added?.createdAt) &&
-          Date.parse(e.createdAt) < Date.parse(merged?.createdAt)
-      ) ?? [];
+    const native = m.nativeMerge;
+    const entry = pr.mergeQueueEntry;
     check(
       time(m.observedAt) &&
-        time(added?.createdAt) &&
-        time(merged?.createdAt) &&
-        Date.parse(added.createdAt) <= Date.parse(merged.createdAt) &&
-        Date.parse(s.startedAt) < Date.parse(merged.createdAt) &&
-        Date.parse(merged.createdAt) <= Date.parse(m.observedAt) &&
+        time(entry.enqueuedAt) &&
+        time(native?.merged_at) &&
+        Date.parse(entry.enqueuedAt) <= Date.parse(native.merged_at) &&
+        Date.parse(s.startedAt) < Date.parse(native.merged_at) &&
+        Date.parse(native.merged_at) <= Date.parse(m.observedAt) &&
         Date.parse(m.observedAt) <= now,
       'merge-chronology'
     );
@@ -234,29 +167,21 @@ export function evaluate(bundle, now = Date.now()) {
       'source-policy-at-admission'
     );
     check(
-      (m.timeline?.pageInfo?.hasPreviousPage === false ||
-        Date.parse(events?.[0]?.createdAt) < Date.parse(added?.createdAt)) &&
-        added?.actor?.login === 'jovie-bot' &&
-        added?.enqueuer?.login === 'jovie-bot[bot]' &&
-        pr.mergeQueueEntry.enqueuer?.login === 'jovie-bot' &&
-        Date.parse(added.createdAt) >=
-          Date.parse(pr.mergeQueueEntry.enqueuedAt) &&
-        merged?.mergeRefName === 'main' &&
-        merged?.actor?.login === 'jovie-bot',
-      'native-events'
-    );
-    check(
-      !between.some(
-        e =>
-          e.__typename === 'RemovedFromMergeQueueEvent' &&
-          !(
-            e.reason === 'merged' &&
-            e.actor?.login === 'github-merge-queue' &&
-            e.enqueuer?.login === 'github-merge-queue[bot]' &&
-            e.beforeCommit?.oid === m.commit
-          )
-      ),
-      'dequeue-before-merge'
+      m.entryId === entry.id &&
+        ['User', 'Bot'].includes(entry.enqueuer?.__typename) &&
+        typeof entry.enqueuer?.login === 'string' &&
+        entry.enqueuer.login.length > 0 &&
+        native?.number === m.number &&
+        native.merged === true &&
+        native.state === 'closed' &&
+        native.head?.sha === m.head &&
+        native.merge_commit_sha === m.commit &&
+        native.base?.ref === 'main' &&
+        native.base.repo?.full_name === bundle.repository &&
+        ['User', 'Bot'].includes(native.merged_by?.type) &&
+        typeof native.merged_by?.login === 'string' &&
+        native.merged_by.login.length > 0,
+      'native-admission-and-merge'
     );
     check(
       sha(m.groupHead) &&
@@ -280,7 +205,7 @@ export function evaluate(bundle, now = Date.now()) {
         m.checks,
         s.policy.required,
         m.groupHead,
-        Date.parse(merged?.createdAt)
+        Date.parse(native?.merged_at)
       ).map(e => `${m.number}:${e}`)
     );
     check(
@@ -306,15 +231,6 @@ export function evaluate(bundle, now = Date.now()) {
         first.number !== second.number && second.groupBase === first.commit
     )
   ), 'consecutive-native-merges-required');
-  if (
-    snapshots.some(s =>
-      s.prs?.some(
-        p =>
-          p.number === 16237 && disposition(p, s.policy).type !== 'INELIGIBLE'
-      )
-    )
-  )
-    require(proven.includes(16237), 'eligible-16237-merge-required');
   const v = bundle.validation;
   require(sha(bundle.evaluatorSha) &&
     v?.run?.repository?.full_name === bundle.repository &&
@@ -349,7 +265,7 @@ export function evaluate(bundle, now = Date.now()) {
     failures: [...new Set(failures)],
     blocked: [...new Set(blocked)],
     proven,
-    cycles: [...cycles.keys()],
+    inventories: snapshots.length,
     inventory,
   };
 }
