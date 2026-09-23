@@ -27,7 +27,7 @@ export function SmartLinksLanding() {
     <MarketingPageShell className='bg-base text-primary-token'>
       <section aria-labelledby='smart-links-title' className='py-14 sm:py-24'>
         <MarketingContainer width='page'>
-          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(340px,440px)]'>
+          <div className='grid items-center gap-12 lg:grid-cols-2'>
             <div>
               <p className='homepage-section-eyebrow'>MUSIC SMART LINKS</p>
               <h1
