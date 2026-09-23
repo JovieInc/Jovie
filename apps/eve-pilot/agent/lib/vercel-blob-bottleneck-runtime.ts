@@ -31,6 +31,194 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function digest(value: unknown): string {
+  return createHash('sha256').update(canonical(value)).digest('hex');
+}
+
+function exactKeys(value: unknown, keys: readonly string[]): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join('\0') === [...keys].sort().join('\0')
+  );
+}
+
+const SOURCE_EVALUATION_KEYS = [
+  'schema', 'taskKey', 'taskSelectionDigest', 'sourceVersion',
+  'snapshotDigest', 'targetDigest', 'identifier', 'issueId', 'repository',
+  'pr', 'baseHead', 'finalHead', 'targetObserved', 'observedIssueId',
+  'observedIssueRevision', 'observedPrNumber', 'observedPrHead',
+  'observedRepository', 'prMergeStateStatus', 'mergeable', 'workerAttested',
+  'selectedEvidence', 'taskResolved', 'reason', 'digest',
+];
+const VERIFICATION_KEYS = [
+  'schema', 'claimRecorded', 'acceptanceRecorded', 'runStarted', 'runTerminal',
+  'resultPersisted', 'leaseHeld', 'workspaceBound', 'headObserved',
+  'headChanged', 'taskAccepted',
+];
+const SOURCE_EVALUATION_REASONS = new Set([
+  'target-observation-unavailable', 'target-identity-mismatch', 'head-unchanged',
+  'task-check-unresolved', 'task-check-evidence-unavailable', 'task-check-passed',
+]);
+
+function sourceEvaluationDigest(evaluation: SummerBottleneckRecord): string {
+  const { digest: _digest, ...unsigned } = evaluation;
+  return digest({ schema: 'symphony-existing-repair-source-evaluation/v1', ...unsigned });
+}
+
+function taskAcceptanceDigest(task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): string {
+  return digest({
+    schema: 'symphony-existing-repair-task-acceptance/v1',
+    taskKey: task.taskKey,
+    assignmentDigest: task.existingRepair.assignmentDigest,
+    existingRepair: task.existingRepair,
+  });
+}
+
+function taskSelectionDigest(task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): string {
+  return digest({
+    taskKey: task.taskKey,
+    action: task.action,
+    selected: task.selected,
+    source: task.source,
+  });
+}
+
+function selectedEvidenceShapeValid(value: unknown): boolean {
+  if (value === null) return true;
+  if (
+    !exactKeys(value, ['id', 'handle', 'check', 'result', 'source']) ||
+    typeof value !== 'object'
+  ) return false;
+  const evidence = value as Record<string, unknown>;
+  return typeof evidence.id === 'string' &&
+    typeof evidence.handle === 'string' &&
+    typeof evidence.check === 'string' &&
+    evidence.result === 'SUCCESS' &&
+    evidence.source === 'github-status-check-rollup';
+}
+
+function selectedEvidenceValid(value: unknown, task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' }): boolean {
+  if (!selectedEvidenceShapeValid(value) || value === null) return false;
+  const evidence = value as Record<string, unknown>;
+  return evidence.id === task.selected.id &&
+    evidence.handle === task.selected.handle &&
+    (evidence.check === task.selected.id || evidence.check === task.selected.handle);
+}
+
+function validateExecutionOutcomeV3(
+  outcome: SummerBottleneckRecord,
+  task: SymphonyRepairTask & { schema: 'jovie-symphony-repair-task/v3' },
+  keys: ReadonlyMap<string, string>
+): void {
+  const source = outcome.source as SummerBottleneckRecord;
+  const target = outcome.existingRepair as SummerBottleneckRecord;
+  const execution = outcome.execution as SummerBottleneckRecord;
+  const evaluation = execution?.sourceEvaluation as SummerBottleneckRecord;
+  const verification = execution?.verification as SummerBottleneckRecord;
+  const evalRecord = evaluation as Record<string, unknown>;
+  const execRecord = execution as Record<string, unknown>;
+  const verifyRecordValue = verification as Record<string, unknown>;
+  const selectedEvidence = evalRecord?.selectedEvidence;
+  const targetObserved = evalRecord?.targetObserved === true;
+  const sourceTaskResolved =
+    targetObserved &&
+    evalRecord.finalHead !== evalRecord.baseHead &&
+    evalRecord.prMergeStateStatus === 'CLEAN' &&
+    evalRecord.mergeable === 'MERGEABLE' &&
+    selectedEvidenceValid(selectedEvidence, task);
+  const sourceObservationMatches =
+    !targetObserved ||
+    (evalRecord.observedIssueId === target.issueId &&
+      evalRecord.observedIssueRevision === target.issueRevision &&
+      evalRecord.observedPrNumber === target.pr &&
+      evalRecord.observedPrHead === execRecord.finalHead &&
+      evalRecord.observedRepository === target.repository);
+  const executionKeys = [
+    'runId', 'provider', 'model', 'authPoolIdentity', 'leaseIdentity',
+    'evidenceDigest', 'assignmentDigest', 'providerGrantDigest',
+    'acceptanceDigest', 'runDigest', 'taskAcceptanceDigest', 'baseHead',
+    'finalHead', 'outputDigest', 'sourceEvaluation', 'verification',
+  ];
+  const digestKeys = [
+    'authPoolIdentity', 'leaseIdentity', 'evidenceDigest', 'assignmentDigest',
+    'providerGrantDigest', 'acceptanceDigest', 'runDigest',
+    'taskAcceptanceDigest', 'outputDigest',
+  ];
+  const validStrings = ['runId', 'provider', 'model'].every(key =>
+    typeof execRecord?.[key] === 'string' &&
+    execRecord[key].length > 0 &&
+    execRecord[key].length <= (key === 'provider' ? 64 : 128)
+  );
+  const validDigests = digestKeys.every(key =>
+    typeof execRecord?.[key] === 'string' && /^[a-f0-9]{64}$/u.test(execRecord[key] as string)
+  );
+  const sourceEvaluationValid =
+    exactKeys(evaluation, SOURCE_EVALUATION_KEYS) &&
+    evalRecord.schema === 'symphony-existing-repair-source-evaluation/v1' &&
+    evalRecord.taskKey === task.taskKey &&
+    evalRecord.taskSelectionDigest === taskSelectionDigest(task) &&
+    evalRecord.sourceVersion === source.sourceVersion &&
+    evalRecord.snapshotDigest === source.snapshotDigest &&
+    evalRecord.targetDigest === digest(target) &&
+    evalRecord.identifier === target.identifier &&
+    evalRecord.issueId === target.issueId &&
+    evalRecord.repository === target.repository &&
+    evalRecord.pr === target.pr &&
+    evalRecord.baseHead === execRecord.baseHead &&
+    evalRecord.finalHead === execRecord.finalHead &&
+    typeof evalRecord.targetObserved === 'boolean' &&
+    typeof evalRecord.workerAttested === 'boolean' &&
+    selectedEvidenceShapeValid(selectedEvidence) &&
+    typeof evalRecord.taskResolved === 'boolean' &&
+    SOURCE_EVALUATION_REASONS.has(String(evalRecord.reason)) &&
+    evalRecord.digest === sourceEvaluationDigest(evaluation) &&
+    sourceObservationMatches &&
+    (!evalRecord.taskResolved || evalRecord.reason === 'task-check-passed') &&
+    evalRecord.taskResolved === sourceTaskResolved;
+  const verificationValid =
+    exactKeys(verification, VERIFICATION_KEYS) &&
+    verifyRecordValue.schema === 'symphony-existing-repair-evidence/v1' &&
+    [
+      'claimRecorded', 'acceptanceRecorded', 'runStarted', 'runTerminal',
+      'resultPersisted', 'leaseHeld', 'workspaceBound', 'headObserved',
+    ].every(key => verifyRecordValue[key] === true) &&
+    typeof verifyRecordValue.headChanged === 'boolean' &&
+    typeof verifyRecordValue.taskAccepted === 'boolean' &&
+    verifyRecordValue.headChanged === (execRecord.baseHead !== execRecord.finalHead) &&
+    verifyRecordValue.taskAccepted ===
+      (evalRecord.workerAttested === true && evalRecord.taskResolved === true);
+  if (
+    !exactKeys(execution, executionKeys) ||
+    !validStrings ||
+    execRecord.provider === 'codex' ||
+    !validDigests ||
+    execRecord.assignmentDigest !== target.assignmentDigest ||
+    execRecord.baseHead !== target.head ||
+    !/^[a-f0-9]{40}$/u.test(String(execRecord.baseHead)) ||
+    !/^[a-f0-9]{40}$/u.test(String(execRecord.finalHead)) ||
+    execRecord.taskAcceptanceDigest !== taskAcceptanceDigest(task) ||
+    !sourceEvaluationValid ||
+    !verificationValid ||
+    (outcome.status === 'succeeded' &&
+      (verifyRecordValue.headChanged !== true ||
+        verifyRecordValue.taskAccepted !== true))
+  ) {
+    throw new Error('Symphony outcome execution evidence is invalid or cross-bound');
+  }
+  const { evidenceDigest: _evidenceDigest, ...unsignedExecution } = execution;
+  if (
+    digest({ schema: 'symphony-existing-repair-evidence/v1', ...unsignedExecution }) !==
+    execRecord.evidenceDigest
+  ) {
+    throw new Error('Symphony outcome execution evidence digest is invalid');
+  }
+  if (!verifyRecord('jovie.symphony-repair-outcome/v3', outcome, keys)) {
+    throw new Error('Symphony outcome signature is invalid');
+  }
+}
+
 function signRecord(
   domain: string,
   record: SummerBottleneckRecord,
@@ -244,8 +432,12 @@ export function signSymphonyRepairOutcome(
   privateKey: string,
   keyId: string
 ): SummerBottleneckRecord {
+  const domain =
+    record.schema === 'jovie.symphony-repair-outcome/v3'
+      ? 'jovie.symphony-repair-outcome/v3'
+      : 'jovie.symphony-repair-outcome/v1';
   return signRecord(
-    'jovie.symphony-repair-outcome/v1',
+    domain,
     record,
     privateKey,
     keyId
@@ -273,10 +465,14 @@ export function createVercelBlobBottleneckDependencies(
       if (parsedTask.data.taskKey !== idempotencyKey) {
         throw new Error('Symphony task key does not match idempotency key');
       }
+      if (parsedTask.data.schema !== 'jovie-symphony-repair-task/v3') {
+        throw new Error('historical v1 tasks remain held');
+      }
+      const outboxSchema = 'jovie.eve.symphony-repair-outbox/v3';
       const outbox = signRecord(
-        'jovie.eve.symphony-repair-outbox/v1',
+        outboxSchema,
         {
-          schema: 'jovie.eve.symphony-repair-outbox/v1',
+          schema: outboxSchema,
           destination: 'symphony',
           idempotencyKey,
           status: 'ready',
@@ -300,13 +496,30 @@ export function createVercelBlobBottleneckDependencies(
       }
       const outbox = await store.read(taskPath(idempotencyKey));
       if (
+        outbox?.schema === 'jovie.eve.symphony-repair-outbox/v1' &&
+        outbox.destination === 'symphony' &&
+        outbox.idempotencyKey === idempotencyKey &&
+        outbox.status === 'ready' &&
+        verifyRecord(
+          'jovie.eve.symphony-repair-outbox/v1',
+          outbox,
+          security.eveOutboxVerificationKeys
+        )
+      ) {
+        return { status: 'pending', detail: 'historical-v1-outbox-held' };
+      }
+      if (
         !outbox ||
-        outbox.schema !== 'jovie.eve.symphony-repair-outbox/v1' ||
+        !exactKeys(outbox, [
+          'schema', 'destination', 'idempotencyKey', 'status', 'task',
+          'signatureKeyId', 'signature',
+        ]) ||
+        outbox.schema !== 'jovie.eve.symphony-repair-outbox/v3' ||
         outbox.destination !== 'symphony' ||
         outbox.idempotencyKey !== idempotencyKey ||
         outbox.status !== 'ready' ||
         !verifyRecord(
-          'jovie.eve.symphony-repair-outbox/v1',
+          'jovie.eve.symphony-repair-outbox/v3',
           outbox,
           security.eveOutboxVerificationKeys
         )
@@ -314,6 +527,13 @@ export function createVercelBlobBottleneckDependencies(
         throw new Error('Symphony outbox is unavailable or unauthenticated');
       }
       const boundTask = outbox.task as SymphonyRepairTask | undefined;
+      if (
+        !boundTask ||
+        boundTask.schema !== 'jovie-symphony-repair-task/v3' ||
+        !symphonyRepairTaskSchema.safeParse(boundTask).success
+      ) {
+        throw new Error('Symphony outbox task is malformed or not v3');
+      }
       const outcome = await store.read(outcomePath(idempotencyKey));
       if (!outcome) return { status: 'pending', detail: 'awaiting-symphony' };
       const source = outcome.source as
@@ -324,10 +544,15 @@ export function createVercelBlobBottleneckDependencies(
           }
         | undefined;
       if (
-        !boundTask ||
         boundTask.taskKey !== idempotencyKey ||
-        outcome.schema !== 'jovie.symphony-repair-outcome/v1' ||
+        !exactKeys(outcome, [
+          'schema', 'taskKey', 'decisionFingerprint', 'status', 'detail',
+          'completedAt', 'source', 'existingRepair', 'execution',
+          'signatureKeyId', 'signature',
+        ]) ||
+        outcome.schema !== 'jovie.symphony-repair-outcome/v3' ||
         outcome.taskKey !== idempotencyKey ||
+        outcome.decisionFingerprint !== boundTask.decisionFingerprint ||
         !['succeeded', 'failed'].includes(String(outcome.status)) ||
         typeof outcome.detail !== 'string' ||
         outcome.detail.length === 0 ||
@@ -335,22 +560,29 @@ export function createVercelBlobBottleneckDependencies(
         typeof outcome.completedAt !== 'string' ||
         !Number.isFinite(Date.parse(outcome.completedAt)) ||
         Date.parse(outcome.completedAt) < Date.parse(boundTask.createdAt) ||
-        source?.sourceVersion !== boundTask.source.sourceVersion ||
-        source.snapshotDigest !== boundTask.source.snapshotDigest ||
-        source.action !== boundTask.action ||
-        !verifyRecord(
-          'jovie.symphony-repair-outcome/v1',
-          outcome,
-          security.symphonyOutcomeVerificationKeys
-        )
+        typeof outcome.signatureKeyId !== 'string' ||
+        !KEY_ID.test(outcome.signatureKeyId) ||
+        typeof outcome.signature !== 'string' ||
+        !/^ed25519=[A-Za-z0-9_-]{86}$/u.test(outcome.signature) ||
+        canonical(source) !==
+          canonical({ ...boundTask.source, action: boundTask.action }) ||
+        canonical(outcome.existingRepair) !== canonical(boundTask.existingRepair)
       ) {
         throw new Error(
           'Symphony outcome is malformed, unauthenticated, or cross-bound'
         );
       }
+      validateExecutionOutcomeV3(
+        outcome,
+        boundTask as SymphonyRepairTask & {
+          schema: 'jovie-symphony-repair-task/v3';
+        },
+        security.symphonyOutcomeVerificationKeys
+      );
       return {
         status: outcome.status as 'succeeded' | 'failed',
         detail: outcome.detail,
+        terminalOutcome: outcome,
       };
     },
   };

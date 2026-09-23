@@ -12,9 +12,23 @@ const DIGEST = /^[0-9a-f]{64}$/u;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_RECOVERY_AGE_MS = 45 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const MAX_EXISTING_REPAIR_LIFETIME_MS = 90 * 60 * 1000;
+const MAX_TASK_ADMISSION_AGE_MS = 10 * 60 * 1000;
 const MAX_RECONCILED_EVENTS = 25;
 const MAX_SCANNED_EVENTS = 100;
 const PREFIX = 'summer-bottleneck';
+
+export const summerCiImprovementClassIds = [
+  'merge-group-flake-baseline-ratchet',
+  'controller-cascade-coalescing',
+  'auto-enroll-self-cancel-churn',
+  'controller-check-run-pagination-cap',
+  'obsolete-unaffected-native-lanes',
+  'affected-only-unit-selection',
+] as const;
+export type SummerCiImprovementClassId =
+  (typeof summerCiImprovementClassIds)[number];
+const ciClassId = z.enum(summerCiImprovementClassIds);
 
 const exactSha = z.string().regex(SHA);
 const timestamp = z.string().datetime({ offset: true });
@@ -29,17 +43,66 @@ const runtimeSourceFields = {
   sourceRevision: exactSha.nullable(),
 };
 
-export const summerCiImprovementClassIds = [
-  'merge-group-flake-baseline-ratchet',
-  'controller-cascade-coalescing',
-  'auto-enroll-self-cancel-churn',
-  'controller-check-run-pagination-cap',
-  'obsolete-unaffected-native-lanes',
-  'affected-only-unit-selection',
-] as const;
+const existingRepairAssignmentSchema = z
+  .object({
+    mode: z.literal('isolated-cli'),
+    identifier: z.string().regex(/^JOV-[1-9][0-9]*$/u),
+    issueId: z.string().uuid(),
+    ownerId: z.string().uuid(),
+    issueRevision: timestamp,
+    repository: z.literal('JovieInc/Jovie'),
+    pr: z.number().int().positive().safe(),
+    head: exactSha,
+    workspace: z
+      .string()
+      .max(1024)
+      .regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0\r\n]+$/u),
+    writerUnit: z.string().regex(/^[A-Za-z0-9_.@-]+\.service$/u),
+    assignmentDigest: z.string().regex(DIGEST),
+    expiresAt: timestamp,
+  })
+  .strict();
 
-export type SummerCiImprovementClassId =
-  (typeof summerCiImprovementClassIds)[number];
+const admissionRowSchema = z
+  .object({
+    state: z.enum(['ALLOWED', 'HELD', 'UNKNOWN']),
+    observedAt: timestamp.nullable(),
+    expiresAt: timestamp.nullable(),
+    sourceDigest: z.string().regex(DIGEST).nullable(),
+    reason: z.string().min(1).max(200),
+  })
+  .strict();
+
+const taskAdmissionsSchema = z
+  .object({
+    schema: z.literal('jovie.eve.summer-task-admissions/v1'),
+    assignmentDigest: z.string().regex(DIGEST),
+    selectedId: ciClassId,
+    sourceRevision: exactSha,
+    runtimeRevision: exactSha,
+    runtimeGeneration: z.string().regex(DIGEST),
+    runtimeInvocationId: z.string().regex(/^[a-f0-9]{32}$/u),
+    providerEligibility: admissionRowSchema,
+    downstreamHealth: admissionRowSchema,
+    providerObservation: z
+      .object({
+        providerGrantDigest: z.string().regex(DIGEST),
+        provider: z.string().min(1).max(64),
+        model: z.string().min(1).max(128),
+        accountUserId: z.string().min(1).max(128),
+        authPoolIdentity: z.string().regex(DIGEST),
+        executableDigest: z.string().regex(DIGEST),
+        routerDigest: z.string().regex(DIGEST),
+        outputDigest: z.string().regex(DIGEST),
+        quotaObservedAt: timestamp,
+        quotaSourceDigest: z.string().regex(DIGEST),
+        includedRemainingPercent: z.number().int().nonnegative().max(100),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 export type SymphonyRepairAction =
   | 'reconcile-release-certification-starvation'
   | 'reconcile-native-queue-starvation'
@@ -63,7 +126,6 @@ const REPAIR_ACTIONS_BY_BOTTLENECK: Record<string, SymphonyRepairAction> = {
   ),
 };
 
-const ciClassId = z.enum(summerCiImprovementClassIds);
 const runnerAuthority = z
   .object({
     schema: z.enum([
@@ -165,9 +227,14 @@ export const summerBottleneckSnapshotSchema = z
             workSource: runnerAuthority,
             capacityAvailable: z.number().int().nonnegative().nullable(),
             queuedWork: z.number().int().nonnegative().nullable(),
+            runtimeGeneration: z.string().regex(DIGEST).optional(),
+            runtimeInvocationId: z.string().regex(/^[a-f0-9]{32}$/u).optional(),
           })
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
+        existingRepair: existingRepairAssignmentSchema.optional(),
+        taskAdmissions: taskAdmissionsSchema.optional(),
+        admissions: z.record(z.string(), z.unknown()).optional(),
       })
       .strict(),
   })
@@ -289,7 +356,7 @@ export type SummerBottleneckStore = {
   write(pathname: string, record: SummerBottleneckRecord): Promise<void>;
 };
 
-export const symphonyRepairTaskSchema = z
+const symphonyRepairTaskV1Schema = z
   .object({
     schema: z.literal('jovie-symphony-repair-task/v1'),
     taskKey: z.string().regex(DIGEST),
@@ -351,6 +418,72 @@ export const symphonyRepairTaskSchema = z
     }
   });
 
+const symphonyRepairTaskV3Schema = z
+  .object({
+    schema: z.literal('jovie-symphony-repair-task/v3'),
+    taskKey: z.string().regex(DIGEST),
+    decisionFingerprint: z.string().regex(DIGEST),
+    createdAt: timestamp,
+    owner: z.literal('symphony'),
+    route: z.literal('symphony'),
+    authority: z.literal('host-assigned-isolated-repair-only'),
+    action: z.literal('execute-existing-owned-repair'),
+    existingRepair: existingRepairAssignmentSchema,
+    safety: z.literal(
+      'exact-source-ci-native-queue-production-gates-remain-required'
+    ),
+    selected: z
+      .object({
+        id: ciClassId,
+        sourceRevision: exactSha,
+        sourceDigest: z.string().regex(DIGEST),
+        owner: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{1,63}$/u),
+        handle: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:#/_-]{1,127}$/u),
+      })
+      .strict(),
+    source: z
+      .object({
+        sourceVersion: exactSha,
+        snapshotDigest: z.string().regex(DIGEST),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((task, context) => {
+    if (task.taskKey !== task.decisionFingerprint) {
+      context.addIssue({
+        code: 'custom',
+        message: 'decision fingerprint must equal the task key',
+        path: ['decisionFingerprint'],
+      });
+    }
+    if (task.selected.sourceRevision !== task.source.sourceVersion) {
+      context.addIssue({
+        code: 'custom',
+        message: 'selected source revision is cross-bound',
+        path: ['selected', 'sourceRevision'],
+      });
+    }
+    const lifetime =
+      Date.parse(task.existingRepair.expiresAt) - Date.parse(task.createdAt);
+    if (
+      Date.parse(task.existingRepair.issueRevision) > Date.parse(task.createdAt) ||
+      lifetime <= 0 ||
+      lifetime > MAX_EXISTING_REPAIR_LIFETIME_MS
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'existing repair assignment is stale or outside its lifetime',
+        path: ['existingRepair'],
+      });
+    }
+  });
+
+export const symphonyRepairTaskSchema = z.union([
+  symphonyRepairTaskV1Schema,
+  symphonyRepairTaskV3Schema,
+]);
+
 export type SymphonyRepairTask = z.infer<typeof symphonyRepairTaskSchema>;
 
 export type SummerBottleneckDependencies = {
@@ -365,6 +498,7 @@ export type SummerBottleneckDependencies = {
   }) => Promise<{
     readonly status: 'pending' | 'succeeded' | 'failed';
     readonly detail: string;
+    readonly terminalOutcome?: SummerBottleneckRecord;
   }>;
   readonly receiptSigningKeyId: string;
   readonly receiptSigningKey: string;
@@ -599,6 +733,7 @@ function fingerprintFor(
                 item => item.id === selected.id
               );
   return digest({
+    taskContract: 'jovie-symphony-repair-task/v3',
     bottleneck: selected.id,
     blockedSince: selected.blockedSince,
     ...(summerCiImprovementClassIds.some(id => id === selected.id)
@@ -612,7 +747,97 @@ function fingerprintFor(
             : {}),
     signal: semanticIdentity(signal),
     sourceVersion: snapshot.sourceVersion,
+    ...(snapshot.signals.existingRepair && snapshot.signals.taskAdmissions
+      ? {
+          hostAssignment: digest(
+            semanticIdentity({
+              existingRepair: snapshot.signals.existingRepair,
+              taskAdmissions: snapshot.signals.taskAdmissions,
+            })
+          ),
+        }
+      : {}),
   });
+}
+
+function hostAssignmentHoldReason(
+  snapshot: SummerBottleneckSnapshot,
+  selected: Candidate,
+  now: Date
+): string | null {
+  if (!isSummerCiImprovementClassId(selected.id)) {
+    return 'selection-outside-task-admission-allowlist';
+  }
+  const assignment = snapshot.signals.existingRepair;
+  const admissions = snapshot.signals.taskAdmissions;
+  if (!assignment) return 'existing-repair-assignment-missing';
+  if (!admissions) return 'selection-bound-task-admissions-missing';
+  if (
+    admissions.assignmentDigest !== assignment.assignmentDigest ||
+    admissions.selectedId !== selected.id
+  ) {
+    return 'task-admission-assignment-or-selection-mismatch';
+  }
+  const audit = snapshot.signals.ciAudit;
+  const runner = snapshot.signals.runner;
+  if (
+    admissions.sourceRevision !== snapshot.sourceVersion ||
+    admissions.sourceRevision !== audit?.sourceRevision ||
+    selected.sourceRevision !== admissions.sourceRevision
+  ) {
+    return 'task-admission-source-mismatch';
+  }
+  if (
+    !runner.sourceRevision ||
+    !runner.runtimeGeneration ||
+    !runner.runtimeInvocationId ||
+    admissions.runtimeRevision !== runner.sourceRevision ||
+    admissions.runtimeGeneration !== runner.runtimeGeneration ||
+    admissions.runtimeInvocationId !== runner.runtimeInvocationId
+  ) {
+    return 'task-admission-runtime-mismatch';
+  }
+  const nowMs = now.getTime();
+  const createdAt = Date.parse(snapshot.observedAt);
+  const expiresAt = Date.parse(assignment.expiresAt);
+  const issueRevision = Date.parse(assignment.issueRevision);
+  if (
+    !Number.isFinite(nowMs) ||
+    expiresAt <= nowMs ||
+    issueRevision > createdAt ||
+    expiresAt - createdAt <= 0 ||
+    expiresAt - createdAt > MAX_EXISTING_REPAIR_LIFETIME_MS
+  ) {
+    return 'existing-repair-assignment-expired-or-stale';
+  }
+  for (const [name, row] of [
+    ['provider-eligibility', admissions.providerEligibility],
+    ['downstream-health', admissions.downstreamHealth],
+  ] as const) {
+    const observedAt = row.observedAt ? Date.parse(row.observedAt) : Number.NaN;
+    const rowExpiresAt = row.expiresAt ? Date.parse(row.expiresAt) : Number.NaN;
+    if (
+      row.state !== 'ALLOWED' ||
+      !row.sourceDigest ||
+      !Number.isFinite(observedAt) ||
+      nowMs - observedAt > MAX_TASK_ADMISSION_AGE_MS ||
+      observedAt - nowMs > MAX_CLOCK_SKEW_MS ||
+      rowExpiresAt <= nowMs ||
+      rowExpiresAt > expiresAt
+    ) {
+      return `task-admission-${name}-unavailable-or-stale`;
+    }
+  }
+  const providerObservation = admissions.providerObservation;
+  if (
+    !providerObservation ||
+    providerObservation.quotaObservedAt !== admissions.providerEligibility.observedAt ||
+    admissions.providerEligibility.sourceDigest !== digest(providerObservation) ||
+    providerObservation.includedRemainingPercent <= 0
+  ) {
+    return 'task-admission-provider-evidence-mismatch';
+  }
+  return null;
 }
 
 type RepairSelection =
@@ -765,6 +990,51 @@ async function persistTerminal(
   return existing;
 }
 
+function terminalOutcomeMatchesTask(
+  outcome: SummerBottleneckRecord | undefined,
+  task: SymphonyRepairTask,
+  status: 'succeeded' | 'failed',
+  detail: string
+): boolean {
+  if (
+    !outcome ||
+    task.schema !== 'jovie-symphony-repair-task/v3' ||
+    outcome.schema !== 'jovie.symphony-repair-outcome/v3' ||
+    outcome.taskKey !== task.taskKey ||
+    outcome.decisionFingerprint !== task.decisionFingerprint ||
+    outcome.status !== status ||
+    outcome.detail !== detail ||
+    typeof outcome.completedAt !== 'string' ||
+    !Number.isFinite(Date.parse(outcome.completedAt)) ||
+    Date.parse(outcome.completedAt) < Date.parse(task.createdAt) ||
+    canonical(outcome.source) !==
+      canonical({ ...task.source, action: task.action }) ||
+    canonical(outcome.existingRepair) !== canonical(task.existingRepair) ||
+    typeof outcome.signatureKeyId !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(outcome.signatureKeyId) ||
+    typeof outcome.signature !== 'string' ||
+    !/^ed25519=[A-Za-z0-9_-]{86}$/u.test(outcome.signature)
+  ) {
+    return false;
+  }
+  const execution = outcome.execution as
+    | { assignmentDigest?: unknown; baseHead?: unknown; finalHead?: unknown; verification?: unknown }
+    | undefined;
+  const verification = execution?.verification as
+    | { headChanged?: unknown; taskAccepted?: unknown }
+    | undefined;
+  return (
+    execution?.assignmentDigest === task.existingRepair.assignmentDigest &&
+    execution.baseHead === task.existingRepair.head &&
+    typeof execution.finalHead === 'string' &&
+    SHA.test(execution.finalHead) &&
+    (status !== 'succeeded' ||
+      (execution.finalHead !== execution.baseHead &&
+        verification?.headChanged === true &&
+        verification.taskAccepted === true))
+  );
+}
+
 function baseReceipt(
   snapshot: SummerBottleneckSnapshot,
   dependencies: SummerBottleneckDependencies,
@@ -805,6 +1075,7 @@ async function processStoredSnapshot(
 
   const fingerprint = fingerprintFor(snapshot, selected);
   const repairSelection = repairSelectionFor(selected);
+  const v3HoldReason = hostAssignmentHoldReason(snapshot, selected, now);
   const recordPaths = paths(snapshot, fingerprint);
   const completed = await dependencies.store.read(recordPaths.outcome!);
   if (completed) {
@@ -813,6 +1084,7 @@ async function processStoredSnapshot(
       completed.terminal !== true ||
       ![
         'held-out-of-envelope',
+        'held-host-assignment',
         'symphony-failed',
         'symphony-succeeded',
       ].includes(String(completed.decision)) ||
@@ -824,6 +1096,51 @@ async function processStoredSnapshot(
       )
     ) {
       throw new Error('bottleneck outcome conflict');
+    }
+    if (
+      ['symphony-failed', 'symphony-succeeded'].includes(
+        String(completed.decision)
+      ) &&
+      (completed.symphony as { terminalOutcome?: SummerBottleneckRecord } | undefined)
+        ?.terminalOutcome?.schema !== 'jovie.symphony-repair-outcome/v3'
+    ) {
+      const priorTerminal = await dependencies.store.read(paths(snapshot).terminal);
+      if (priorTerminal) {
+        const conflict = signFor(
+          dependencies,
+          {
+            ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+            schema: 'jovie.eve.summer-bottleneck-conflict/v1',
+            decision: 'historical-v1-terminal-held-conflict',
+            conflictingTerminalDigest: digest(priorTerminal),
+            executionHold: {
+              kind: 'historical-outcome',
+              reason: 'immutable-terminal-lacks-v3-execution-evidence',
+            },
+            terminal: false,
+          },
+          recordPaths.conflict
+        );
+        const write = await dependencies.store.create(recordPaths.conflict!, conflict);
+        const persisted =
+          write === 'created'
+            ? conflict
+            : await dependencies.store.read(recordPaths.conflict!);
+        if (!persisted || digest(persisted) !== digest(conflict)) {
+          throw new Error('historical terminal conflict receipt is conflicted');
+        }
+        return persisted;
+      }
+      return persistTerminal(dependencies, snapshot, {
+        ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+        decision: 'held-historical-v1-outcome',
+        executionHold: {
+          kind: 'historical-outbox',
+          reason: 'signed-v1-outcome-has-no-v3-execution-evidence',
+        },
+        priorOutcomeDigest: digest(completed),
+        terminal: true,
+      });
     }
     return persistTerminal(dependencies, snapshot, {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
@@ -838,8 +1155,11 @@ async function processStoredSnapshot(
     {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
       schema: 'jovie.eve.summer-bottleneck-claim/v1',
-      decision: selected.inEnvelope && repairSelection ? 'claimed' : 'held',
-      terminal: !(selected.inEnvelope && repairSelection),
+      decision:
+        selected.inEnvelope && repairSelection && v3HoldReason === null
+          ? 'claimed'
+          : 'held',
+      terminal: !(selected.inEnvelope && repairSelection && v3HoldReason === null),
     },
     recordPaths.claim
   );
@@ -891,18 +1211,57 @@ async function processStoredSnapshot(
     return persistTerminal(dependencies, snapshot, persisted);
   }
 
+  if (v3HoldReason !== null) {
+    const outcome = signFor(
+      dependencies,
+      {
+        ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+        schema: 'jovie.eve.summer-bottleneck-outcome/v1',
+        decision: 'held-host-assignment',
+        executionHold: { kind: 'host-assignment', reason: v3HoldReason },
+        escalation: {
+          owner: 'Summer',
+          handle: 'symphony',
+          reason: v3HoldReason,
+        },
+        terminal: true,
+      },
+      recordPaths.outcome
+    );
+    const outcomeWrite = await dependencies.store.create(
+      recordPaths.outcome!,
+      outcome
+    );
+    const persisted =
+      outcomeWrite === 'created'
+        ? outcome
+        : await dependencies.store.read(recordPaths.outcome!);
+    if (!persisted || digest(persisted) !== digest(outcome)) {
+      throw new Error('held outcome conflict');
+    }
+    return persistTerminal(dependencies, snapshot, persisted);
+  }
+
+  if (
+    !isSummerCiImprovementClassId(selected.id) ||
+    repairSelection.action !== 'remediate-selected-ci-audit-class'
+  ) {
+    throw new Error('v3 task selection is outside the CI admission policy');
+  }
+
   const task: SymphonyRepairTask = {
-    schema: 'jovie-symphony-repair-task/v1',
+    schema: 'jovie-symphony-repair-task/v3',
     taskKey: fingerprint,
+    decisionFingerprint: fingerprint,
     createdAt: snapshot.observedAt,
     owner: 'symphony',
     route: 'symphony',
-    authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
-    action: repairSelection.action,
-    issue: 'JOV-5853',
+    authority: 'host-assigned-isolated-repair-only',
+    action: 'execute-existing-owned-repair',
+    existingRepair: snapshot.signals.existingRepair!,
     safety: 'exact-source-ci-native-queue-production-gates-remain-required',
     selected: {
-      id: repairSelection.id,
+      id: selected.id,
       sourceRevision: selected.sourceRevision,
       sourceDigest: selected.sourceDigest,
       owner: selected.owner,
@@ -988,6 +1347,15 @@ async function processStoredSnapshot(
     });
   }
 
+  if (!terminalOutcomeMatchesTask(observed.terminalOutcome, task, observed.status, observed.detail)) {
+    return signFor(dependencies, {
+      ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+      decision: 'pending-unverified-v3-outcome',
+      symphony: { handle, detail: 'v3-terminal-outcome-missing-or-cross-bound' },
+      terminal: false,
+    });
+  }
+
   const outcome = signFor(
     dependencies,
     {
@@ -997,7 +1365,13 @@ async function processStoredSnapshot(
         observed.status === 'succeeded'
           ? 'symphony-succeeded'
           : 'symphony-failed',
-      symphony: { handle, detail: observed.detail },
+      symphony: {
+        handle,
+        detail: observed.detail,
+        ...(observed.terminalOutcome
+          ? { terminalOutcome: observed.terminalOutcome }
+          : {}),
+      },
       terminal: true,
     },
     recordPaths.outcome
@@ -1189,10 +1563,21 @@ export async function reconcileMissedSummerBottleneckEvents(
           const source = terminal.source as
             | { sourceVersion?: unknown; snapshotDigest?: unknown }
             | undefined;
+          const terminalOutcome = (
+            terminal.symphony as
+              | { terminalOutcome?: SummerBottleneckRecord }
+              | undefined
+          )?.terminalOutcome;
+          const historicalV1Outcome =
+            ['symphony-failed', 'symphony-succeeded'].includes(
+              String(terminal.decision)
+            ) && terminalOutcome?.schema !== 'jovie.symphony-repair-outcome/v3';
           const validTerminal =
             [
               'healthy-noop',
               'held-out-of-envelope',
+              'held-host-assignment',
+              'held-historical-v1-outcome',
               'recovery-expired-noop',
               'symphony-failed',
               'symphony-succeeded',
@@ -1204,6 +1589,7 @@ export async function reconcileMissedSummerBottleneckEvents(
             ].includes(String(terminal.schema)) &&
             terminal.eventId === parsed.data.eventId &&
             terminal.terminal === true &&
+            !historicalV1Outcome &&
             source?.sourceVersion === parsed.data.sourceVersion &&
             source.snapshotDigest === digest(parsed.data) &&
             verifySummerBottleneckReceipt(
@@ -1220,7 +1606,17 @@ export async function reconcileMissedSummerBottleneckEvents(
               ...baseReceipt(parsed.data, dependencies, null, null),
               observedAt: parsed.data.observedAt,
               conflictingTerminalDigest: digest(terminal),
-              decision: 'invalid-terminal-conflict',
+              decision: historicalV1Outcome
+                ? 'historical-v1-terminal-held-conflict'
+                : 'invalid-terminal-conflict',
+              ...(historicalV1Outcome
+                ? {
+                    executionHold: {
+                      kind: 'historical-outcome',
+                      reason: 'immutable-terminal-lacks-v3-execution-evidence',
+                    },
+                  }
+                : {}),
               terminal: false,
             },
             paths(parsed.data).conflict
