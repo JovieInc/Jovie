@@ -57,7 +57,7 @@ export function SmartLinksDemo() {
   );
 
   return (
-    <div className='mx-auto w-full max-w-sm rounded-[2rem] border border-white/10 bg-surface-0 p-4 shadow-card-elevated sm:p-6'>
+    <div className='mx-auto w-full max-w-sm rounded-4xl border border-white/10 bg-surface-0 p-4 shadow-card-elevated sm:p-6'>
       <div className='mb-5 flex items-center justify-between gap-3'>
         <span className='text-xs font-medium text-tertiary-token'>
           LIVE DEMO
