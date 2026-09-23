@@ -892,7 +892,7 @@ describe('queue workflow mutation safety', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'
     );
-    const condition = workflowJobCondition(workflow, 'enroll');
+    const condition = workflowJobCondition(workflow, 'fleet-policy');
     const scope = workflowStep(workflow, 'Resolve exact admission scope');
     const dynamicRunName = `Production Controller ${HEAD} from CI 31699642425 attempt 1`;
     const outputs = executeAdmissionScope({
@@ -926,6 +926,47 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain(
       '[[ "$workflow_conclusion" == "success" ]] && recover_holds=1'
     );
+  });
+
+  it('skips fleet observation only when the existing enrollment path was ineligible', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const condition = workflowJobCondition(workflow, 'fleet-policy');
+    const fleetRefresh = readRepoFile(
+      '.github/workflows/fleet-gate-refresh.yml'
+    );
+    expect(extractWorkflowJobBlock(workflow, 'enroll')).toContain(
+      '    needs: fleet-policy'
+    );
+    expect(extractWorkflowJobBlock(workflow, 'rebase')).toContain(
+      '    needs: enroll'
+    );
+    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).toContain(
+      "github.event.workflow_run.conclusion != 'cancelled'"
+    );
+    for (const [eventName, conclusion, path, workflowEvent, expected] of [
+      ['pull_request', null, null, null, true],
+      ['push', null, null, null, true],
+      ['workflow_dispatch', null, null, null, true],
+      ['workflow_run', 'cancelled', '.github/workflows/ci.yml', 'pull_request', false],
+      ['workflow_run', 'success', '.github/workflows/ci.yml', 'pull_request', true],
+      ['workflow_run', 'failure', '.github/workflows/ci.yml', 'push', true],
+      ['workflow_run', 'success', '.github/workflows/ci.yml', 'merge_group', true],
+      ['workflow_run', 'success', '.github/workflows/ci.yml', 'workflow_dispatch', false],
+      ['workflow_run', 'failure', '.github/workflows/production-controller.yml', 'workflow_run', true],
+      ['workflow_run', 'cancelled', '.github/workflows/production-controller.yml', 'workflow_run', false],
+    ]) {
+      expect(
+        evaluateWorkflowJobCondition(condition, {
+          eventName,
+          conclusion,
+          path,
+          workflowEvent,
+        })
+      ).toBe(expected);
+    }
   });
 
   it('scopes each new admission to the triggering PR and exact published head', () => {

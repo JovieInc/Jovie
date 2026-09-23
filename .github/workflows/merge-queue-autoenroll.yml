@@ -74,6 +74,22 @@ permissions:
 jobs:
   fleet-policy:
     name: Resolve fleet promotion policy
+    # Skip events that cannot run enroll before taking the Gem runner. The
+    # workflow mutex still serializes the brief skipped run. Fleet Gate Refresh
+    # handles receipt refresh for eligible upstream completions; cancelled
+    # runs are skipped there as well.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        (
+          github.event.workflow_run.path == '.github/workflows/production-controller.yml' ||
+          startsWith(github.event.workflow_run.path, '.github/workflows/production-controller.yml@') ||
+          github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'push' ||
+          github.event.workflow_run.event == 'merge_group'
+        )
+      )
     # The checked-in controller evaluates a fresh receipt on Gem, where the
     # canonical integrity and Symphony state live. Unknown/unavailable evidence
     # produces no new admission; this is not a second queue or mutator.
@@ -119,18 +135,6 @@ jobs:
 
   enroll:
     needs: fleet-policy
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (
-        github.event.workflow_run.conclusion != 'cancelled' &&
-        (
-          github.event.workflow_run.path == '.github/workflows/production-controller.yml' ||
-          startsWith(github.event.workflow_run.path, '.github/workflows/production-controller.yml@') ||
-          github.event.workflow_run.event == 'pull_request' ||
-          github.event.workflow_run.event == 'push' ||
-          github.event.workflow_run.event == 'merge_group'
-        )
-      )
     # API-only fleet controller. ubuntu-latest deterministically includes gh;
     # the heterogeneous self-hosted fast pool does not.
     runs-on: ubuntu-latest
