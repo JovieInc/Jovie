@@ -475,6 +475,42 @@ function ConnectionUrlDisplay({
   );
 }
 
+function ConnectionSecondaryIdentity({
+  row,
+}: Readonly<{ row: ProfileWorkspaceRow }>) {
+  if (row.rowType === 'connector') {
+    return (
+      <ConnectionUrlDisplay
+        row={row}
+        className='text-xs text-tertiary-token max-sm:hidden'
+      />
+    );
+  }
+
+  const handle = getPresenceHandle(row);
+  const platform = getPresencePlatformLabel(row);
+  const showPlatform = row.label !== platform;
+  if (!handle && !showPlatform) return null;
+
+  return (
+    <div
+      data-testid='presence-page-identity'
+      className='truncate text-xs text-tertiary-token'
+      title={[showPlatform ? platform : null, handle]
+        .filter(Boolean)
+        .join(' · ')}
+    >
+      {showPlatform ? <span>{platform}</span> : null}
+      {showPlatform && handle ? ' · ' : null}
+      {handle ? <span>{handle}</span> : null}
+    </div>
+  );
+}
+
+function ArtistCell({ name }: Readonly<{ name: string }>) {
+  return <span className='truncate text-sm text-primary-token'>{name}</span>;
+}
+
 function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
@@ -1376,33 +1412,7 @@ export function ProfilesWorkspace({
                 <div className='truncate text-sm font-medium text-primary-token'>
                   {row.label}
                 </div>
-                {row.rowType === 'connector' ? (
-                  <ConnectionUrlDisplay
-                    row={row}
-                    className='text-xs text-tertiary-token max-sm:hidden'
-                  />
-                ) : getPresenceHandle(row) ||
-                  row.label !== getPresencePlatformLabel(row) ? (
-                  <div
-                    data-testid='presence-page-identity'
-                    className='truncate text-xs text-tertiary-token'
-                    title={
-                      getPresenceHandle(row) ?? getPresencePlatformLabel(row)
-                    }
-                  >
-                    {row.label !== getPresencePlatformLabel(row) ? (
-                      <span>{getPresencePlatformLabel(row)}</span>
-                    ) : null}
-                    {getPresenceHandle(row) ? (
-                      <>
-                        {row.label !== getPresencePlatformLabel(row)
-                          ? ' · '
-                          : null}
-                        <span>{getPresenceHandle(row)}</span>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
+                <ConnectionSecondaryIdentity row={row} />
                 <div className={styles.mobileArtist}>{data?.artist.name}</div>
                 <div className={styles.mobileStatus}>
                   <StatusCell
@@ -1420,11 +1430,7 @@ export function ProfilesWorkspace({
         header: 'Artist',
         size: 180,
         meta: { className: cn('px-3', styles.artistColumn) },
-        cell: () => (
-          <span className='truncate text-sm text-primary-token'>
-            {data?.artist.name}
-          </span>
-        ),
+        cell: () => <ArtistCell name={data?.artist.name ?? ''} />,
       }),
       columnHelper.display({
         id: 'type',
