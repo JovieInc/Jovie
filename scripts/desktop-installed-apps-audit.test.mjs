@@ -8,10 +8,41 @@ import {
   commandRunsJovieDesktopShell,
   evaluateDesktopInstalledAppsAudit,
   evaluateDesktopUpdateFreshness,
+  fetchShippedDesktopVersions,
   KNOWN_DESKTOP_BUNDLE_IDS,
   readCodesignMetadata,
   readDesktopBuildIdentity,
 } from './desktop-installed-apps-audit.mjs';
+
+test('rolling staging freshness uses the current release update time', async () => {
+  const fetchImpl = async url => ({
+    ok: true,
+    json: async () =>
+      url.endsWith('/latest')
+        ? {
+            name: '26.9.15',
+            published_at: '2026-09-22T10:00:00Z',
+            updated_at: '2026-09-23T10:00:00Z',
+          }
+        : {
+            name: '26.9.16-staging.35887697816.1',
+            published_at: '2026-09-09T04:08:01Z',
+            updated_at: '2026-09-23T16:29:20Z',
+          },
+  });
+  const shipped = await fetchShippedDesktopVersions(fetchImpl);
+  assert.equal(shipped.production.publishedAt, '2026-09-22T10:00:00Z');
+  assert.equal(shipped.staging.version, '26.9.16-staging.35887697816.1');
+  assert.equal(shipped.staging.publishedAt, '2026-09-23T16:29:20Z');
+  const freshness = evaluateDesktopUpdateFreshness({
+    channel: 'staging',
+    installedVersion: '26.8.3-staging.34309234992.1',
+    latestVersion: shipped.staging.version,
+    latestPublishedAt: shipped.staging.publishedAt,
+    now: new Date('2026-09-23T17:00:00Z'),
+  });
+  assert.equal(freshness.status, 'updating');
+});
 
 const SOURCE_REVISION = 'a'.repeat(40);
 

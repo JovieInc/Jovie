@@ -317,7 +317,7 @@ export function evaluateDesktopUpdateFreshness(input) {
   };
 }
 
-/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */
+/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */
 async function githubJson(url, fetchImpl = fetch) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -330,17 +330,19 @@ async function githubJson(url, fetchImpl = fetch) {
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
-  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */ (
+  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */ (
     response.json()
   );
 }
 
-function shippedVersion(release, prefix) {
+function shippedVersion(release, prefix, rolling = false) {
   const name = typeof release?.name === 'string' ? release.name : null;
+  // GitHub preserves published_at when the rolling staging release is updated.
+  // The current asset/feed generation is dated by updated_at instead.
+  const publishedAt = rolling ? release?.updated_at : release?.published_at;
   return {
     version: prefix && name ? name.replace(prefix, '') : name,
-    publishedAt:
-      typeof release?.published_at === 'string' ? release.published_at : null,
+    publishedAt: typeof publishedAt === 'string' ? publishedAt : null,
   };
 }
 
@@ -355,7 +357,7 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
   ).catch(() => null);
   return {
     production: shippedVersion(production),
-    staging: shippedVersion(staging, /^Desktop staging\s+/i),
+    staging: shippedVersion(staging, /^Desktop staging\s+/i, true),
   };
 }
 
