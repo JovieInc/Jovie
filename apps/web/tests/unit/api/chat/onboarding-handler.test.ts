@@ -207,6 +207,63 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.checkAnonymousChatRateLimitMock).not.toHaveBeenCalled();
   });
 
+  it('serves the first signed-in onboarding turn when the account quota allows it', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.getBetterAuthSessionMock.mockResolvedValue({
+      user: { id: 'ba-user-1' },
+    });
+    // A depleted shared IP bucket must not reject this verified account.
+    hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+      success: false,
+      reason: 'Shared network exhausted',
+      reset: new Date(Date.now() + 30_000),
+    });
+    hoisted.checkAuthenticatedOnboardingChatRateLimitMock.mockResolvedValue({
+      success: true,
+    });
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+        }: {
+          headers: Record<string, string>;
+        }) => new Response('first assistant reply', { status: 200, headers }),
+      },
+      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest(
+        { mode: 'onboarding', messages: [userMessage('hi')] },
+        'better-auth.session_token=verified'
+      ),
+      'req-signed-in-first-turn'
+    );
+
+    expect(result?.status).toBe(200);
+    await expect(result?.text()).resolves.toContain('first assistant reply');
+    expect(
+      hoisted.checkAuthenticatedOnboardingChatRateLimitMock
+    ).toHaveBeenCalledWith('ba-user-1', expect.any(String));
+    expect(hoisted.checkAnonymousChatRateLimitMock).not.toHaveBeenCalled();
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.executeChatTurnMock.mock.calls[0]?.[0]).toMatchObject({
+      mode: 'onboarding',
+      userId: null,
+      userPlan: 'free',
+    });
+    expect(result?.headers.get('set-cookie')).toContain(
+      'jovie_onboarding_session='
+    );
+  });
+
   it('treats locator-less messages without mode as onboarding (JOV-5084)', async () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
