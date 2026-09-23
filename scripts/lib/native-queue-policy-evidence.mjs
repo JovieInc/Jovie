@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { HARD_HOLD_LABELS } from '../merge-queue-backend.mjs';
+
+// Explicit stop intent is distinct from stale controller or priority labels.
+const STOP_LABELS = new Set(['hold', 'gated', 'incident']);
+const MACHINE_LABELS = new Set([
+  'queue-deferred',
+  'needs-conflict-resolution',
+  'fast',
+]);
 
 export const SCHEMA = 'jovie-native-queue-eval/v2';
 export const digest = value =>
@@ -54,8 +61,9 @@ export function disposition(pr, policy) {
   if (pr?.mergeable !== 'MERGEABLE')
     reasons.push(`mergeable:${pr?.mergeable ?? 'unknown'}`);
   if (!Array.isArray(pr?.labels)) reasons.push('labels-unavailable');
-  for (const label of pr?.labels ?? [])
-    if (HARD_HOLD_LABELS.has(label)) reasons.push(`hold:${label}`);
+  const labels = Array.isArray(pr?.labels) ? pr.labels : [];
+  for (const label of labels)
+    if (STOP_LABELS.has(label)) reasons.push(`hold:${label}`);
   if (!Array.isArray(pr?.files)) reasons.push('files-unavailable');
   if (pr?.files?.includes('CHANGELOG.md')) reasons.push('pre-land-changelog');
   if (
@@ -80,5 +88,6 @@ export function disposition(pr, policy) {
     // native membership visible, with unmet evidence separate from eligibility.
     type: admitted ? 'ADMITTED' : reasons.length ? 'INELIGIBLE' : 'ELIGIBLE',
     reasons,
+    machineLabels: labels.filter(label => MACHINE_LABELS.has(label)),
   };
 }

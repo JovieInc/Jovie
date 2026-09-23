@@ -266,6 +266,28 @@ describe('complete evidence and deliberate negative controls', () => {
     target[key] = value;
     expect(evaluate(b, evaluationTime).status).toBe('BLOCKED');
   });
+  it.each(['queue-deferred', 'needs-conflict-resolution', 'fast'])(
+    'distinguishes stale %s from a real native conflict',
+    label => {
+      const b = passingFixture();
+      for (const s of b.snapshots) s.prs[0].labels = [label];
+      expect(evaluate(b, evaluationTime).status).toBe('PASS');
+      for (const s of b.snapshots) s.prs[0].mergeable = 'CONFLICTING';
+      expect(evaluate(b, evaluationTime).blocked).toContain(
+        '16237:source-policy-at-admission'
+      );
+    }
+  );
+  it('retains review rejection despite obsolete machine labels', () => {
+    const b = passingFixture();
+    for (const s of b.snapshots) {
+      s.prs[0].labels = ['needs-conflict-resolution'];
+      s.prs[0].reviewDecision = 'CHANGES_REQUESTED';
+    }
+    expect(evaluate(b, evaluationTime).blocked).toContain(
+      '16237:source-policy-at-admission'
+    );
+  });
   it('accepts a complete isolated receipt fixture', () => {
     expect(evaluate(passingFixture(), evaluationTime).status).toBe('PASS');
   });

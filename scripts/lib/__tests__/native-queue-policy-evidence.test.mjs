@@ -96,12 +96,24 @@ describe('native queue strict acceptance', () => {
     ['unknown', { mergeable: 'UNKNOWN' }],
     ['draft', { isDraft: true }],
     ['hold', { labels: ['hold'] }],
+    ['gated', { labels: ['gated'] }],
+    ['incident', { labels: ['incident'] }],
     ['changes requested', { reviewDecision: 'CHANGES_REQUESTED' }],
     ['missing checks', { checks: [] }],
+    ['missing labels', { labels: null }],
+    ['malformed labels', { labels: {} }],
     ['missing files', { files: null }],
     ['changelog', { files: ['CHANGELOG.md'] }],
   ])('does not admit %s', (_, patch) =>
     expect(disposition({ ...pr(), ...patch }, policy).type).toBe('INELIGIBLE')
+  );
+  it.each(['queue-deferred', 'needs-conflict-resolution', 'fast'])(
+    'records %s as a machine annotation without inventing a native veto',
+    label => {
+      const d = disposition({ ...pr(), labels: [label] }, policy);
+      expect(d.type).toBe('ELIGIBLE');
+      expect(d.machineLabels).toEqual([label]);
+    }
   );
   it('enforces required reviews', () => {
     expect(

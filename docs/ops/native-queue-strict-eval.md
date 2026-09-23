@@ -41,6 +41,12 @@ Required acceptance:
   per-file coverage floors. Report local tests, hosted evaluator CI, admission,
   merges and continued progress separately.
 
+Explicit `hold`, `gated` and `incident` stop intent still blocks acceptance.
+`queue-deferred`, `needs-conflict-resolution` and `fast` are reported as machine
+annotations, never substituted for current GitHub conflict/check/review state.
+The documented `fast` UI-priority lane is not stop intent or permission to skip
+required tests. Actual conflicts, failed checks and requested changes still block.
+
 The live queue entry is admission authority. Historical timeline events can lag
 behind a current entry; an old removal is not a veto on a new native admission.
 The evaluator does not fetch Auto-Enroll source, drain budgets, controller runs or
