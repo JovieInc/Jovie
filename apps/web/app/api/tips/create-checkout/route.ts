@@ -27,6 +27,52 @@ const createCheckoutSchema = z.object({
   handle: z.string().min(1).max(64),
 });
 
+const checkoutCapabilitySchema = z.object({ profileId: z.string().uuid() });
+
+export async function GET(req: NextRequest) {
+  const parsed = checkoutCapabilitySchema.safeParse({
+    profileId: req.nextUrl.searchParams.get('profileId'),
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { available: false },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  try {
+    const [profile] = await db
+      .select({
+        isPublic: creatorProfiles.isPublic,
+        stripeAccountId: creatorProfiles.stripeAccountId,
+        stripePayoutsEnabled: creatorProfiles.stripePayoutsEnabled,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, parsed.data.profileId))
+      .limit(1);
+    const stripeConnectEnabled = await getAppFlagValue(
+      'STRIPE_CONNECT_ENABLED'
+    );
+    return NextResponse.json(
+      {
+        available: Boolean(
+          profile?.isPublic &&
+            stripeConnectEnabled &&
+            profile.stripeAccountId &&
+            profile.stripePayoutsEnabled
+        ),
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    logger.error('Tip checkout capability lookup failed:', error);
+    return NextResponse.json(
+      { available: false },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
 /**
  * Default platform fee percentage for tips (3%).
  * Configurable via TIP_PLATFORM_FEE_PERCENT env var.
@@ -98,6 +144,12 @@ export async function POST(req: NextRequest) {
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+    if (profile.username.toLowerCase() !== handle.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Artist does not match checkout request' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const artistName = profile.displayName || profile.username;
     const baseUrl = publicEnv.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
@@ -144,49 +196,34 @@ export async function POST(req: NextRequest) {
       'STRIPE_CONNECT_ENABLED'
     );
 
-    // Route tip directly to creator's Stripe Connect account when available
+    // Fail closed so an unavailable creator account never routes fan money to Jovie.
     if (
-      stripeConnectEnabled &&
-      profile.stripeAccountId &&
-      profile.stripePayoutsEnabled
+      !stripeConnectEnabled ||
+      !profile.stripeAccountId ||
+      !profile.stripePayoutsEnabled
     ) {
-      try {
-        // Verify account is still active before routing money
-        const account = await stripe.accounts.retrieve(profile.stripeAccountId);
-        if (
-          account.charges_enabled &&
-          account.payouts_enabled &&
-          !account.requirements?.currently_due?.length
-        ) {
-          sessionParams.payment_intent_data!.transfer_data = {
-            destination: profile.stripeAccountId,
-          };
-          sessionParams.payment_intent_data!.application_fee_amount =
-            platformFeeCents;
-          logger.info('Stripe Connect: routing tip to creator account', {
-            profileId,
-            stripeAccountId: profile.stripeAccountId,
-            platformFeeCents,
-          });
-        } else {
-          logger.warn(
-            'Stripe Connect: account not fully active, falling back to platform',
-            {
-              profileId,
-              stripeAccountId: profile.stripeAccountId,
-              chargesEnabled: account.charges_enabled,
-              payoutsEnabled: account.payouts_enabled,
-              currentlyDue: account.requirements?.currently_due,
-            }
-          );
-        }
-      } catch (error) {
-        logger.warn(
-          'Stripe Connect: failed to verify account, falling back to platform',
-          { profileId, error }
-        );
-      }
+      return NextResponse.json(
+        { error: 'This artist cannot accept card payments yet' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
     }
+
+    const account = await stripe.accounts.retrieve(profile.stripeAccountId);
+    if (
+      !account.charges_enabled ||
+      !account.payouts_enabled ||
+      account.requirements?.currently_due?.length
+    ) {
+      return NextResponse.json(
+        { error: 'This artist cannot accept card payments yet' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
+    sessionParams.payment_intent_data!.transfer_data = {
+      destination: profile.stripeAccountId,
+    };
+    sessionParams.payment_intent_data!.application_fee_amount =
+      platformFeeCents;
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
