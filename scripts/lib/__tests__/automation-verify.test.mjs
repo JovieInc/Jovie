@@ -1228,6 +1228,8 @@ describe('automation-verify affected scope', () => {
         'scripts/symphony/tests/gem-ops-hud.test.py',
       ],
       scriptVitestTests: [
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release.test.mjs',
@@ -2546,4 +2548,117 @@ describe('automation-verify affected scope', () => {
       '[affected-tests] complete shard 1/8 status=124'
     );
   }, 10000);
+});
+
+describe('deployment repair qualification regressions', () => {
+  const ops = [
+    '.github/workflows/delivery-control-receipts.yml',
+    'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+    'scripts/backlog-orchestrator/no-unattended-red.mjs',
+    'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+    'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+    'scripts/ci-fast-lanes.mjs',
+  ];
+  const packaging = [
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.test.tsx',
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+    'apps/web/lib/services/retouching/style.ts',
+    'apps/web/lib/services/retouching/style-prompt.ts',
+  ];
+  const available = { isFileAvailable: () => true };
+
+  it('qualifies the exact failed-controller repair with operational coverage and runner contracts', () => {
+    const plan = buildAffectedTestPlan(ops, available);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands).toContainEqual([
+      'node',
+      expect.arrayContaining([
+        '--experimental-test-coverage',
+        '--test-coverage-lines=89',
+        '--test-coverage-branches=78',
+        '--test-coverage-functions=95',
+        ops[3],
+        ops[4],
+      ]),
+    ]);
+    expect(plan.scriptVitestTests).toEqual(
+      expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ])
+    );
+  });
+
+  it('qualifies bundled prompts using the CI changed-source coverage runner and real browser story', () => {
+    const plan = buildAffectedTestPlan(packaging, available);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(
+      plan,
+      '1',
+      'a'.repeat(40),
+      'b'.repeat(40)
+    );
+    expect(commands).toContainEqual([
+      'env',
+      expect.arrayContaining([
+        'pnpm',
+        '--filter',
+        '@jovie/web',
+        'test:coverage',
+        '--changed',
+        'a'.repeat(40),
+        'JOVIE_COVERAGE_INCLUDE=components/features/admin/system-map/AdminSystemMapSkillsTab.tsx\nlib/services/retouching/style.ts\nlib/services/retouching/style-prompt.ts',
+      ]),
+    ]);
+    expect(commands).toContainEqual([
+      'pnpm',
+      expect.arrayContaining([
+        '--config=vitest.config.storybook.mts',
+        packaging[2].replace('apps/web/', ''),
+      ]),
+    ]);
+    expect(commands).toContainEqual([
+      'node',
+      [
+        'scripts/check-changed-test-coverage.mjs',
+        '--base',
+        'a'.repeat(40),
+        '--head',
+        'b'.repeat(40),
+      ],
+    ]);
+    expect(() => buildSelectedTestCommands(plan, '1')).toThrow(
+      'exact base and head'
+    );
+  });
+
+  for (const peer of [
+    'scripts/unreviewed.mjs',
+    'apps/web/lib/services/unreviewed.ts',
+    'apps/web/components/Unknown.tsx',
+    'package.json',
+    'apps/web/vitest.config.fast.mts',
+  ]) {
+    it(`retains full fallback for unknown or global peer ${peer}`, () => {
+      for (const lane of [ops, packaging]) {
+        expect(buildAffectedTestPlan([...lane, peer], available).mode).toBe(
+          'full'
+        );
+      }
+    });
+  }
+
+  it('retains full fallback for standalone CI runner edits and missing required proof files', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs'], available).mode
+    ).toBe('full');
+    for (const lane of [ops, packaging]) {
+      expect(
+        buildAffectedTestPlan(lane, { isFileAvailable: () => false }).mode
+      ).toBe('full');
+    }
+  });
 });
