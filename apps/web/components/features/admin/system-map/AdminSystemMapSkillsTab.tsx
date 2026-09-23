@@ -1,5 +1,5 @@
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
-import { WHITE_SPACE_STYLE_PROMPT } from '@/lib/services/retouching/style';
+import { WHITE_SPACE_STYLE_PROMPT } from '@/lib/services/retouching/style-prompt';
 import { SkillDocCard } from './SkillDocCard';
 
 // Use the bundled prompt; runtime Markdown is excluded from Vercel uploads.
@@ -9,7 +9,7 @@ const promptContentByPath: Record<string, string> = {
     WHITE_SPACE_STYLE_PROMPT,
 };
 
-export async function AdminSystemMapSkillsTab() {
+export function AdminSystemMapSkillsTab() {
   const skills = Object.values(SKILL_REGISTRY);
 
   const skillsWithDocs = skills.map(skill => ({
