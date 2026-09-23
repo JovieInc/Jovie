@@ -24,6 +24,13 @@ const GITHUB_REPO = 'JovieInc/Jovie';
 const BUILD_IDENTITY_RESOURCE_NAME = 'build-identity.json';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
+const STAGING_VERSION = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
+
+function versionMatchesChannel(channel, version) {
+  return channel === 'staging'
+    ? STAGING_VERSION.test(version)
+    : SEMVER.test(version);
+}
 const BUILD_IDENTITY_KEYS = new Set([
   'channel',
   'version',
@@ -66,7 +73,7 @@ function isDesktopBuildIdentityRecord(value) {
     keys.every(key => BUILD_IDENTITY_KEYS.has(key)) &&
     ['production', 'staging', 'local'].includes(value.channel) &&
     typeof value.version === 'string' &&
-    SEMVER.test(value.version) &&
+    versionMatchesChannel(value.channel, value.version) &&
     (value.sourceRevision === null ||
       (typeof value.sourceRevision === 'string' &&
         FULL_SHA.test(value.sourceRevision))) &&
@@ -103,7 +110,7 @@ export function readDesktopBuildIdentity(appPath) {
 function buildIdentityHasReleaseProvenance(identity) {
   return (
     (identity.channel === 'production' || identity.channel === 'staging') &&
-    SEMVER.test(identity.version) &&
+    versionMatchesChannel(identity.channel, identity.version) &&
     typeof identity.sourceRevision === 'string' &&
     FULL_SHA.test(identity.sourceRevision) &&
     isIsoTimestamp(identity.builtAt)

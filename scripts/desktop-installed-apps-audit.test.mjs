@@ -284,6 +284,51 @@ test('KNOWN_DESKTOP_BUNDLE_IDS marks only production as canonical', () => {
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie.local'].canonical, false);
 });
 
+test('readDesktopBuildIdentity accepts exact staging prerelease provenance', () => {
+  const temp = mkdtempSync(path.join(tmpdir(), 'jovie-staging-identity-'));
+  try {
+    const resources = path.join(temp, 'Contents', 'Resources');
+    mkdirSync(resources, { recursive: true });
+    const identity = buildIdentity({
+      channel: 'staging',
+      version: '26.8.3-staging.34309234992.1',
+    });
+    writeFileSync(
+      path.join(resources, 'build-identity.json'),
+      JSON.stringify(identity)
+    );
+    assert.deepEqual(readDesktopBuildIdentity(temp), {
+      buildIdentity: identity,
+      buildIdentityError: null,
+    });
+    const audit = evaluateDesktopInstalledAppsAudit({
+      bundles: [
+        {
+          name: 'Jovie.app',
+          path: '/Applications/Jovie.app',
+          identifier: 'app.jov.ie',
+          version: '26.6.61',
+          buildIdentity: buildIdentity(),
+          buildIdentityError: null,
+        },
+        {
+          name: 'Jovie Staging.app',
+          path: temp,
+          identifier: 'app.jov.ie.staging',
+          version: identity.version,
+          buildIdentity: identity,
+          buildIdentityError: null,
+        },
+      ],
+      processes: [],
+    });
+    assert.equal(audit.ok, true);
+    assert.deepEqual(audit.findings, []);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () => {
   const now = new Date('2026-08-29T12:00:00Z');
   const sample = (
