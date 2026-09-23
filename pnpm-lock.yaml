@@ -55,7 +55,7 @@ overrides:
   webpack: 5.105.0
   qs: 6.15.2
   js-cookie: 3.0.7
-  ws: 8.21.1
+  ws: 8.21.3
   devalue: 5.8.1
   postcss: 8.5.23
   '@lhci/cli>uuid': 11.1.1
@@ -563,10 +563,10 @@ importers:
         version: 6.2.2
       workflow:
         specifier: 4.8.9
-        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       ws:
-        specifier: 8.21.1
-        version: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: 8.21.3
+        version: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -7785,7 +7785,7 @@ packages:
     engines: {node: '>= 20'}
     peerDependencies:
       '@aws-sdk/credential-provider-web-identity': '*'
-      ws: 8.21.1
+      ws: 8.21.3
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-web-identity':
         optional: true
@@ -13645,7 +13645,7 @@ packages:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
-      ws: 8.21.1
+      ws: 8.21.3
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-node':
@@ -16649,8 +16649,8 @@ packages:
   write-file-atomic@3.0.3:
     resolution: {integrity: sha512-AvHcyZ5JnSfq3ioSyjrBkH9yW4m7Ayk8/9My/DD9onKeu/94fwrMocemO2QAJFAlnnDN+ZDS+ZjAR5ua1/PV/Q==}
 
-  ws@8.21.1:
-    resolution: {integrity: sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==}
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -17337,9 +17337,9 @@ snapshots:
       '@azure/storage-blob': 12.33.0
       '@opentelemetry/api': 1.9.1
       https-proxy-agent: 7.0.6
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       tslib: 2.8.1
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -19382,7 +19382,7 @@ snapshots:
   '@libsql/isomorphic-ws@0.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@types/ws': 8.18.1
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -20054,10 +20054,10 @@ snapshots:
   '@open-draft/until@2.1.0':
     optional: true
 
-  '@openai/agents-core@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
+  '@openai/agents-core@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.30.0(zod@4.6.5)
       zod: 4.6.5
@@ -20070,11 +20070,11 @@ snapshots:
       - ws
     optional: true
 
-  '@openai/agents-openai@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
+  '@openai/agents-openai@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
     dependencies:
-      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       debug: 4.4.3(supports-color@8.1.1)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       zod: 4.6.5
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -20087,10 +20087,10 @@ snapshots:
 
   '@openai/agents-realtime@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.6.5)':
     dependencies:
-      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       '@types/ws': 8.18.1
       debug: 4.4.3(supports-color@8.1.1)
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.5
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -20102,13 +20102,13 @@ snapshots:
       - utf-8-validate
     optional: true
 
-  '@openai/agents@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
+  '@openai/agents@0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)':
     dependencies:
-      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
-      '@openai/agents-openai': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      '@openai/agents-core': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      '@openai/agents-openai': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       '@openai/agents-realtime': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.6.5)
       debug: 4.4.3(supports-color@8.1.1)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       zod: 4.6.5
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -24042,12 +24042,12 @@ snapshots:
       - encoding
       - supports-color
 
-  '@vercel/functions@3.9.8(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@vercel/functions@3.9.8(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@vercel/oidc': 3.8.8
     optionalDependencies:
       '@aws-sdk/credential-provider-web-identity': 3.972.49
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   '@vercel/gatsby-plugin-vercel-analytics@1.0.12':
     dependencies:
@@ -24470,7 +24470,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@22.20.1)(typescript@6.0.3))(vite@8.3.0(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -24489,7 +24489,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@26.2.0)(typescript@6.0.3))(vite@6.4.3(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -24507,7 +24507,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@26.2.0)(typescript@6.0.3))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -24526,7 +24526,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@26.6.2)(typescript@6.0.3))(vite@6.4.3(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -24545,7 +24545,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@26.6.2)(typescript@6.0.3))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -24763,13 +24763,13 @@ snapshots:
 
   '@webcontainer/env@1.1.1': {}
 
-  '@workflow/astro@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/astro@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
-      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       exsolve: 1.1.1
       pathe: 2.0.3
     transitivePeerDependencies:
@@ -24778,10 +24778,10 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/builders@4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/builders@4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
       '@workflow/utils': 4.1.4
@@ -24798,14 +24798,14 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/cli@4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/cli@4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@oclif/core': 4.11.4
       '@oclif/plugin-help': 6.2.37
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
       '@vercel/cli-auth': 0.0.1
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
       '@workflow/utils': 4.1.4
@@ -24836,13 +24836,13 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/core@4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/core@4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@aws-sdk/credential-provider-web-identity': 3.972.49
       '@jridgewell/trace-mapping': 0.3.31
       '@standard-schema/spec': 1.0.0
       '@types/ms': 2.1.0
-      '@vercel/functions': 3.9.8(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@vercel/functions': 3.9.8(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
       '@workflow/serde': 4.1.2
       '@workflow/utils': 4.1.4
@@ -24868,13 +24868,13 @@ snapshots:
       '@workflow/utils': 4.1.4
       ms: 2.1.3
 
-  '@workflow/nest@4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/nest@4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@nestjs/common': 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@swc/cli': 0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
       pathe: 2.0.3
     transitivePeerDependencies:
@@ -24883,11 +24883,11 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/next@4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/next@4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
       semver: 7.7.4
       watchpack: 2.5.1
@@ -24899,14 +24899,14 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/nitro@4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/nitro@4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
-      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/web': 4.1.25
       exsolve: 1.0.8
       pathe: 2.0.3
@@ -24916,10 +24916,10 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/nuxt@4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/nuxt@4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@nuxt/kit': 4.4.8(magicast@0.5.5)
-      '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - '@swc/helpers'
@@ -24927,10 +24927,10 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/rollup@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/rollup@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
       exsolve: 1.0.7
     transitivePeerDependencies:
@@ -24945,14 +24945,14 @@ snapshots:
 
   '@workflow/serde@4.1.2': {}
 
-  '@workflow/sveltekit@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/sveltekit@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@sveltejs/load-config': 0.2.3
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/swc-plugin': 4.1.3(@swc/core@1.15.3(@swc/helpers@0.5.23))
-      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/vite': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       exsolve: 1.1.1
       fs-extra: 11.4.0
       pathe: 2.0.3
@@ -24974,9 +24974,9 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
-  '@workflow/vite@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/vite@4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
-      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - '@swc/helpers'
@@ -27265,7 +27265,7 @@ snapshots:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3(supports-color@8.1.1)
       engine.io-parser: 5.2.3
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       xmlhttprequest-ssl: 2.1.2
     transitivePeerDependencies:
       - bufferutil
@@ -27284,7 +27284,7 @@ snapshots:
       cors: 2.8.6
       debug: 4.4.3(supports-color@8.1.1)
       engine.io-parser: 5.2.3
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -29613,7 +29613,7 @@ snapshots:
       whatwg-encoding: 3.1.1
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - bufferutil
@@ -29876,7 +29876,7 @@ snapshots:
       speedline-core: 1.4.3
       third-party-web: 0.26.7
       tldts-icann: 6.1.86
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       yargs: 17.7.3
       yargs-parser: 21.1.1
     transitivePeerDependencies:
@@ -29912,7 +29912,7 @@ snapshots:
       third-party-web: 0.29.2
       tldts-icann: 7.4.10
       web-features: 3.34.2
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       yargs: 17.7.3
       yargs-parser: 21.1.1
     transitivePeerDependencies:
@@ -31655,11 +31655,11 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5):
+  openai@6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.83
       '@smithy/signature-v4': 5.7.3
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.5
 
   opener@1.5.2: {}
@@ -32449,7 +32449,7 @@ snapshots:
       mathjs: 15.2.0
       minimatch: 10.2.4
       nunjucks: 3.2.4(chokidar@5.0.0)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       opener: 1.5.2
       ora: 9.4.1
       parse5: 7.1.2
@@ -32469,7 +32469,7 @@ snapshots:
       tsx: 4.23.15
       undici: 8.10.2
       winston: 3.19.0
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.5
     optionalDependencies:
       '@anthropic-ai/claude-agent-sdk': 0.3.214(@anthropic-ai/sdk@0.112.3(zod@4.6.5))(@modelcontextprotocol/sdk@1.30.0(zod@4.6.5))(zod@4.6.5)
@@ -32489,7 +32489,7 @@ snapshots:
       '@ibm-cloud/watsonx-ai': 1.7.16
       '@langfuse/client': 5.11.1(@opentelemetry/api@1.9.1)
       '@modelcontextprotocol/sdk': 1.30.0(zod@4.6.5)
-      '@openai/agents': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
+      '@openai/agents': 0.11.8(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.5)
       '@openai/codex-sdk': 0.144.6
       '@opencode-ai/sdk': 1.18.32
       '@playwright/browser-chromium': 1.63.0
@@ -32730,7 +32730,7 @@ snapshots:
       devtools-protocol: 0.0.1581282
       typed-query-selector: 2.12.1
       webdriver-bidi-protocol: 0.4.1
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -32746,7 +32746,7 @@ snapshots:
       devtools-protocol: 0.0.1653615
       typed-query-selector: 2.12.2
       webdriver-bidi-protocol: 0.4.2
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - proxy-agent
@@ -33599,7 +33599,7 @@ snapshots:
       '@vercel/sandbox': 3.1.0
       async-retry: 1.3.3
       debug: 4.4.3(supports-color@8.1.1)
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.5
     transitivePeerDependencies:
       - bare-abort-controller
@@ -33944,7 +33944,7 @@ snapshots:
   socket.io-adapter@2.5.8(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -34150,7 +34150,7 @@ snapshots:
       recast: 0.23.21
       semver: 7.8.5
       use-sync-external-store: 1.7.0(react@19.2.8)
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
       '@types/react': 19.2.18
       prettier: 3.8.1
@@ -35576,7 +35576,7 @@ snapshots:
       opener: 1.5.2
       picocolors: 1.1.1
       sirv: 2.0.4
-      ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -35754,18 +35754,18 @@ snapshots:
   worker-f@0.1.20:
     optional: true
 
-  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
-      '@workflow/astro': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/cli': 4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/astro': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/cli': 4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
-      '@workflow/nest': 4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/nuxt': 4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/sveltekit': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/nest': 4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.5(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.2.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/nuxt': 4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/sveltekit': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/typescript-plugin': 4.0.3(typescript@6.0.3)
       '@workflow/utils': 4.1.4
       ms: 2.1.3
@@ -35816,7 +35816,7 @@ snapshots:
       signal-exit: 3.0.7
       typedarray-to-buffer: 3.1.5
 
-  ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 6.0.6
