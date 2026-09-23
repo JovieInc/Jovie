@@ -199,11 +199,12 @@ export function readApplicationBundleVersion(appPath) {
 }
 
 /**
+ * @param {typeof execFileSync} [runPs]
  * @returns {Array<{ readonly pid: string; readonly command: string }>}
  */
-export function listRunningJovieProcesses() {
+export function listRunningJovieProcesses(runPs = execFileSync) {
   try {
-    const output = execFileSync('ps', ['-axo', 'pid=,command='], {
+    const output = runPs('ps', ['-axo', 'pid=,command='], {
       encoding: 'utf8',
     });
     return output
@@ -218,8 +219,11 @@ export function listRunningJovieProcesses() {
           command: match?.[2] ?? line,
         };
       });
-  } catch {
-    return [];
+  } catch (cause) {
+    throw new Error(
+      'Running process inventory unavailable; desktop audit cannot pass.',
+      { cause }
+    );
   }
 }
 

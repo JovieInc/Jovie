@@ -10,6 +10,7 @@ import {
   evaluateDesktopUpdateFreshness,
   fetchShippedDesktopVersions,
   KNOWN_DESKTOP_BUNDLE_IDS,
+  listRunningJovieProcesses,
   readCodesignMetadata,
   readDesktopBuildIdentity,
 } from './desktop-installed-apps-audit.mjs';
@@ -74,6 +75,16 @@ test('commandRunsJovieDesktopShell counts app shells but excludes helpers and re
       '/opt/homebrew/bin/node /Users/timwhite/Jovie/apps/web/server.js'
     ),
     false
+  );
+});
+
+test('process inventory failure cannot be reported as no running apps', () => {
+  assert.throws(
+    () =>
+      listRunningJovieProcesses(() => {
+        throw new Error('ps denied');
+      }),
+    /Running process inventory unavailable/
   );
 });
 
