@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
-  classifyCanonicalAdmissionProvenance,
+  classifyNativeQueueAdmissionEvent,
   classifyRequiredCheckPage,
   normalizeLiveQueueEntriesPage,
   parseQueueHeadPullRequestNumber,
@@ -26,7 +26,6 @@ const HEAD = '2'.repeat(40);
 const HEAD_REF = 'refs/heads/gh-readonly-queue/main/pr-123-deadbeef';
 const SOURCE_HEAD = '4'.repeat(40);
 const ADMITTED_AT = '2026-09-06T20:29:15Z';
-const RECEIPT_AT = '2026-09-06T20:29:25Z';
 
 function event(overrides = {}) {
   return {
@@ -117,50 +116,8 @@ function admissionTimeline(overrides = {}) {
   };
 }
 
-function admissionStatus(overrides = {}) {
-  return {
-    context: 'jovie-queue-admission/v2',
-    creator: { login: 'jovie-bot[bot]', type: 'Bot' },
-    description: `checkpoint=verified;main=${BASE};pr=123`,
-    id: 987,
-    state: 'success',
-    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
-    updated_at: RECEIPT_AT,
-    ...overrides,
-  };
-}
-
-function admissionRun(overrides = {}) {
-  return {
-    conclusion: 'success',
-    created_at: '2026-09-06T20:29:00Z',
-    event: 'workflow_run',
-    head_branch: 'main',
-    head_repository: { full_name: 'JovieInc/Jovie' },
-    head_sha: BASE,
-    html_url: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
-    id: 123456789,
-    name: 'Merge Queue Auto-Enroll',
-    path: '.github/workflows/merge-queue-autoenroll.yml',
-    repository: { full_name: 'JovieInc/Jovie' },
-    run_attempt: 1,
-    status: 'completed',
-    updated_at: '2026-09-06T20:29:30Z',
-    ...overrides,
-  };
-}
-
-function preservedLineage(checkpointMainSha, baseSha = BASE) {
-  return {
-    base_commit: { sha: checkpointMainSha },
-    commits: [{ sha: baseSha }],
-    merge_base_commit: { sha: checkpointMainSha },
-    status: 'ahead',
-  };
-}
-
-function verifiedProvenance() {
-  return { checkpoint: 'verified', state: 'verified' };
+function verifiedEvent() {
+  return { id: 'MQAE_123', state: 'verified' };
 }
 
 function checkPage(name, status, conclusion = null, overrides = {}) {
@@ -185,6 +142,17 @@ function checkPage(name, status, conclusion = null, overrides = {}) {
 }
 
 describe('merge-group admission evidence', () => {
+  it('accepts a native GitHub user admission without an Auto-Enroll receipt', () => {
+    expect(
+      classifyNativeQueueAdmissionEvent(
+        admissionTimeline({
+          actor: { __typename: 'User', login: 'itstimwhite' },
+          enqueuer: { login: 'itstimwhite' },
+        })
+      )
+    ).toMatchObject({ state: 'verified' });
+  });
+
   it('exposes the typed CLI contract without requiring runtime credentials', () => {
     expect(
       execFileSync(
@@ -195,100 +163,29 @@ describe('merge-group admission evidence', () => {
     ).toBe(ADMISSION_CONTRACT_VERSION);
   });
 
-  it.each([
-    ['single page', null],
-    ['later receipt', null],
-    ['numeric repository link', null],
-    ['invalid url', /pagination is malformed/],
-    ['malformed page', /receipt page is malformed/],
-    ['malformed link', /pagination is malformed/],
-    ['foreign link', /pagination is malformed/],
-    ['repeated page', /pagination is malformed/],
-    ['duplicate ids', /repeated status ids/],
-    ['exhausted pages', /pagination limit exhausted/],
-    ['deadline', /API deadline expired/],
-  ])('runs the GitHub adapter: %s', async (scenario, failure) => {
-    const checkpointMainSha = '9'.repeat(40);
+  it('runs the GitHub adapter for a native user without custom receipt lookups', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
     const eventPath = join(directory, 'event.json');
     const outputPath = join(directory, 'output.txt');
-    const summaryPath = join(directory, 'summary.md');
     await writeFile(eventPath, JSON.stringify(event()), 'utf8');
     const requests = [];
-    /** @type {import('vitest').MockInstance<() => number> | undefined} */
-    let clock;
     const fetchImpl = vi.fn(async (url, init) => {
       requests.push({ url, init });
       if (url.endsWith('/graphql')) {
         const body = JSON.parse(init.body);
         if (body.query.includes('MergeGroupAdmissionTimeline')) {
-          return Response.json(admissionTimeline());
+          return Response.json(
+            admissionTimeline({
+              actor: { __typename: 'User', login: 'itstimwhite' },
+              enqueuer: { login: 'itstimwhite' },
+            })
+          );
         }
-        const cursor = body.variables.cursor;
-        return Response.json(
-          cursor
-            ? liveQueuePayload([liveQueueNode()])
-            : liveQueuePayload([], {
-                endCursor: 'page-2',
-                hasNextPage: true,
-              })
-        );
+        return Response.json(liveQueuePayload([liveQueueNode()]));
       }
       if (url.includes('/git/ref/')) return Response.json(queueRef());
-      if (url.includes('/statuses?')) {
-        const page = Number(new URL(url).searchParams.get('page'));
-        const receipt = admissionStatus({
-          description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-        });
-        if (scenario === 'single page') return Response.json([receipt]);
-        if (scenario === 'malformed page' && page === 2) {
-          return Response.json({ statuses: [receipt] });
-        }
-        const statuses = Array.from(
-          { length: page === 3 && scenario !== 'exhausted pages' ? 55 : 100 },
-          (_, index) => ({
-            id: 1000 + (page - 1) * 100 + index,
-            context: 'unrelated-check',
-          })
-        );
-        if (scenario === 'duplicate ids' && page === 2) statuses[0].id = 1000;
-        if (page === 3 && scenario !== 'exhausted pages') {
-          statuses[54] = receipt;
-          return Response.json(statuses);
-        }
-        if (scenario === 'deadline') {
-          clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600_000);
-        }
-        const next = new URL(url);
-        next.searchParams.set(
-          'page',
-          String(scenario === 'repeated page' ? page : page + 1)
-        );
-        if (scenario === 'foreign link') next.hostname = 'untrusted.example';
-        if (scenario === 'numeric repository link')
-          next.pathname = `/repositories/1030964787/statuses/${SOURCE_HEAD}`;
-        return Response.json(statuses, {
-          headers: {
-            link:
-              scenario === 'malformed link'
-                ? 'not-a-link'
-                : `<${scenario === 'invalid url' ? 'bad-url' : next}>; rel="next"`,
-          },
-        });
-      }
-      if (url.includes('/actions/runs/123456789')) {
-        return Response.json(
-          admissionRun({
-            conclusion: 'success',
-            head_sha: checkpointMainSha,
-            status: 'completed',
-          })
-        );
-      }
-      if (url.includes('/compare/')) {
-        return Response.json(preservedLineage(checkpointMainSha));
-      }
       const checkName = new URL(url).searchParams.get('check_name');
+      if (!checkName) throw new Error(`unexpected request ${url}`);
       return Response.json(checkPage(checkName, 'completed', 'success').data);
     });
     const env = {
@@ -297,60 +194,34 @@ describe('merge-group admission evidence', () => {
       GITHUB_EVENT_PATH: eventPath,
       GITHUB_OUTPUT: outputPath,
       GITHUB_REPOSITORY: 'JovieInc/Jovie',
-      GITHUB_RUN_ATTEMPT: '2',
-      GITHUB_RUN_ID: '123456789',
-      GITHUB_SERVER_URL: 'https://github.com',
       GITHUB_SHA: HEAD,
-      GITHUB_STEP_SUMMARY: summaryPath,
     };
-
     try {
-      if (failure) {
-        await expect(runAdmissionFromEnv(env, { fetchImpl })).rejects.toThrow(
-          failure
-        );
-        expect(
-          requests.filter(request => request.url.includes('/statuses?')).length
-        ).toBeLessThanOrEqual(10);
-        expect(
-          requests.some(request => request.url.includes('/actions/runs/'))
-        ).toBe(false);
-        await expect(readFile(outputPath, 'utf8')).rejects.toThrow(/ENOENT/);
-        return;
-      }
       await expect(
         runAdmissionFromEnv(env, { fetchImpl })
-      ).resolves.toMatchObject({ admitted: true, pr: 123, syntheticSha: HEAD });
-      expect(
-        requests.filter(request => request.url.includes('/statuses?'))
-      ).toHaveLength(scenario === 'single page' ? 2 : 6);
+      ).resolves.toMatchObject({
+        admitted: true,
+        pr: 123,
+        syntheticSha: HEAD,
+      });
+      expect(requests).toHaveLength(8);
       expect(
         requests.filter(request => request.url.endsWith('/graphql'))
-      ).toHaveLength(6);
+      ).toHaveLength(4);
       expect(
-        requests.filter(request => request.url.includes('/compare/'))
-      ).toHaveLength(2);
+        requests.some(request =>
+          /\/(statuses|compare|actions\/runs)\b/.test(request.url)
+        )
+      ).toBe(false);
       expect(
-        requests.every(request =>
-          request.url.startsWith('https://api.github.test/')
+        requests.every(
+          request =>
+            request.url.startsWith('https://api.github.test/') &&
+            request.init.headers.Authorization === 'Bearer test-token'
         )
       ).toBe(true);
-      for (const { init } of requests) {
-        expect(init).toMatchObject({
-          cache: 'no-store',
-          headers: {
-            Accept: 'application/vnd.github+json',
-            Authorization: 'Bearer test-token',
-            'Cache-Control': 'no-cache',
-            'X-GitHub-Api-Version': '2022-11-28',
-          },
-        });
-      }
       await expect(readFile(outputPath, 'utf8')).resolves.toContain(
         `admitted=true\nobsolete=false\npr_number=123\nsynthetic_head_sha=${HEAD}`
-      );
-      await expect(readFile(summaryPath, 'utf8')).resolves.toContain(
-        'Merge-group live queue admission'
       );
       await expect(
         runAdmissionFromEnv(env, {
@@ -359,7 +230,6 @@ describe('merge-group admission evidence', () => {
         })
       ).rejects.toThrow(/GitHub API 403/);
     } finally {
-      clock?.mockRestore();
       await rm(directory, { force: true, recursive: true });
     }
   });
@@ -445,639 +315,52 @@ describe('merge-group admission evidence', () => {
     ).toThrow(/does not expose a queue PR number/);
   });
 
-  it.each([
-    'verified',
-    'controller-repair',
-    'source-qualified',
-  ])('requires canonical Jovie Bot admission with an exact %s checkpoint receipt', checkpoint => {
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun(),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=${checkpoint};main=${BASE};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toEqual({
-      admittedAt: '2026-09-06T20:29:15.000Z',
-      checkpoint,
-      checkpointMainSha: BASE,
-      receiptAt: '2026-09-06T20:29:25.000Z',
-      state: 'verified',
-    });
+  it('accepts authenticated native User and Bot queue events', () => {
+    for (const actor of [
+      { __typename: 'User', login: 'itstimwhite' },
+      { __typename: 'Bot', login: 'jovie-bot' },
+    ]) {
+      expect(
+        classifyNativeQueueAdmissionEvent(
+          admissionTimeline({
+            actor,
+            enqueuer: { login: actor.login },
+          })
+        )
+      ).toMatchObject({
+        admittedAt: '2026-09-06T20:29:15.000Z',
+        actor: actor.login,
+        enqueuer: actor.login,
+        state: 'verified',
+      });
+    }
   });
 
-  it('preserves a v2 canonical cohort when its checkpoint main is an ancestor of the merge-group base', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          conclusion: 'success',
-          head_sha: checkpointMainSha,
-          status: 'completed',
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({
-      checkpoint: 'verified',
-      checkpointMainSha,
-      state: 'verified',
+  it('fails closed on incomplete or malformed admission timeline evidence', () => {
+    for (const timeline of [
+      null,
+      { errors: [{ message: 'denied' }] },
+      admissionTimeline({ actor: null }),
+      admissionTimeline({ enqueuer: null }),
+      admissionTimeline({ createdAt: 'not-a-date' }),
+      admissionTimeline({ id: '' }),
+      admissionTimeline({
+        actor: { __typename: 'Organization', login: 'jovie' },
+      }),
+    ]) {
+      expect(() => classifyNativeQueueAdmissionEvent(timeline)).toThrow();
+    }
+    const partial = admissionTimeline();
+    partial.data.repository.pullRequest.timelineItems.pageInfo.hasNextPage = true;
+    expect(() => classifyNativeQueueAdmissionEvent(partial)).toThrow(
+      /incomplete/
+    );
+    const removed = admissionTimeline({
+      __typename: 'RemovedFromMergeQueueEvent',
     });
-  });
-
-  it('accepts an exact producer that is still processing later admissions', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          conclusion: null,
-          head_sha: checkpointMainSha,
-          status: 'in_progress',
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({
-      checkpoint: 'verified',
-      checkpointMainSha,
-      state: 'verified',
-    });
-  });
-
-  it('accepts a pull-request producer whose event head differs from the independently attested main checkpoint', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          event: 'pull_request',
-          head_branch: 'feature/admission-trigger',
-          head_sha: SOURCE_HEAD,
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({
-      checkpoint: 'verified',
-      checkpointMainSha,
-      state: 'verified',
-    });
-  });
-
-  it('preserves an earlier per-PR receipt when later cohort work makes the producer fail', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          conclusion: 'failure',
-          head_sha: checkpointMainSha,
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({
-      checkpoint: 'verified',
-      checkpointMainSha,
-      state: 'verified',
-    });
-  });
-
-  it('waits for a canonical admission producer that has not started', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          conclusion: null,
-          head_sha: checkpointMainSha,
-          status: 'queued',
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toEqual({
-      detail: 'canonical admission producer has not started',
+    expect(classifyNativeQueueAdmissionEvent(removed)).toMatchObject({
       state: 'pending',
     });
-  });
-
-  it.each([
-    [
-      'producer created after admission',
-      {
-        status: 'completed',
-        conclusion: 'success',
-        created_at: '2026-09-06T20:29:16Z',
-      },
-    ],
-    [
-      'producer run updated before creation',
-      {
-        status: 'completed',
-        conclusion: 'success',
-        updated_at: '2026-09-06T20:28:59Z',
-      },
-    ],
-    [
-      'in-progress producer with a terminal conclusion',
-      { status: 'in_progress', conclusion: 'failure' },
-    ],
-    [
-      'completed producer without a terminal conclusion',
-      { status: 'completed', conclusion: null },
-    ],
-  ])('rejects a preserved v2 receipt from a %s', (_label, runOverrides) => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          head_sha: checkpointMainSha,
-          ...runOverrides,
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/identity is inconsistent/);
-  });
-
-  it('rejects a completed producer run whose receipt was written after completion', () => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({
-          head_sha: checkpointMainSha,
-          updated_at: '2026-09-06T20:29:24Z',
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/identity is inconsistent/);
-  });
-
-  it.each([
-    ['verified', 'behind'],
-    ['verified', 'diverged'],
-    ['source-qualified', 'behind'],
-    ['source-qualified', 'diverged'],
-  ])('rejects a %s receipt with %s lineage at the required merge-group gate', (checkpoint, status) => {
-    const checkpointMainSha = '9'.repeat(40);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        lineagePayload: {
-          ...preservedLineage(checkpointMainSha),
-          status,
-        },
-        runPayload: admissionRun({
-          conclusion: 'success',
-          head_sha: checkpointMainSha,
-          status: 'completed',
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=${checkpoint};main=${checkpointMainSha};pr=123`,
-            }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/not an ancestor/);
-  });
-
-  it('does not upgrade the observed pre-v2 receipt into canonical admission evidence', () => {
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: '1b2eb7dc9d5e659622b43f34fd58222daa7d961e',
-          prNumber: 17415,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: null,
-        sourceHeadSha: 'cfe57a252fe1d58480b63c0e98ca98e81d5872ed',
-        statusPayload: {
-          link: null,
-          sha: 'cfe57a252fe1d58480b63c0e98ca98e81d5872ed',
-          statuses: [
-            {
-              context: 'jovie-queue-reentry/v1',
-              creator: { login: 'jovie-bot[bot]', type: 'Bot' },
-              description: 'Native queue admission recorded at exact head',
-              id: 53643701168,
-              state: 'success',
-              target_url:
-                'https://github.com/JovieInc/Jovie/actions/runs/34070242354',
-              updated_at: '2026-09-07T00:38:06Z',
-            },
-          ],
-        },
-        timelinePayload: admissionTimeline({
-          createdAt: '2026-09-07T00:38:04Z',
-          id: 'MQAE_PR_17415',
-        }),
-      })
-    ).toEqual({ detail: 'admission receipt not visible', state: 'pending' });
-  });
-
-  it('rejects the observed Cursor direct-admission actor even with a valid receipt', () => {
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun(),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: admissionTimeline({
-          actor: { __typename: 'Bot', login: 'cursor' },
-          createdAt: '2026-09-06T20:29:15Z',
-          enqueuer: { login: 'cursor[bot]' },
-          id: 'MQAE_PR_17402',
-        }),
-      })
-    ).toThrow(/admission actor is not jovie-bot\[bot\]/);
-  });
-
-  it.each([
-    ['before the latest admission', '2026-09-06T20:29:14Z'],
-    ['more than five minutes after admission', '2026-09-06T20:34:16Z'],
-  ])('rejects a receipt written %s', (_label, updatedAt) => {
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun(),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus({ updated_at: updatedAt })],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/not bound to the admission time/);
-  });
-
-  it('fails closed on an untrusted or cross-PR receipt and waits for a missing receipt', () => {
-    const input = {
-      evidence: {
-        baseSha: BASE,
-        prNumber: 123,
-        repository: 'JovieInc/Jovie',
-      },
-      runPayload: admissionRun(),
-      sourceHeadSha: SOURCE_HEAD,
-      timelinePayload: admissionTimeline(),
-    };
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              creator: { login: 'cursor[bot]', type: 'Bot' },
-            }),
-          ],
-        },
-      })
-    ).toEqual({ detail: 'admission receipt not visible', state: 'pending' });
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${BASE};pr=17404`,
-            }),
-          ],
-        },
-      })
-    ).toThrow(/not bound to the merge-group PR/);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        runPayload: admissionRun({ head_sha: '9'.repeat(40) }),
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus({
-              description: `checkpoint=verified;main=${'9'.repeat(40)};pr=123`,
-            }),
-          ],
-        },
-      })
-    ).toThrow(
-      /producer run identity|checkpoint main|not an ancestor of merge-group base/
-    );
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: { link: null, sha: SOURCE_HEAD, statuses: [] },
-      })
-    ).toEqual({ detail: 'admission receipt not visible', state: 'pending' });
-  });
-
-  it('fails closed on partial histories and retains an older malformed receipt', () => {
-    const input = {
-      evidence: {
-        baseSha: BASE,
-        prNumber: 123,
-        repository: 'JovieInc/Jovie',
-      },
-      runPayload: admissionRun(),
-      sourceHeadSha: SOURCE_HEAD,
-    };
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: {
-          ...admissionTimeline(),
-          errors: [{ message: 'partial timeline' }],
-        },
-      })
-    ).toThrow(/timeline evidence is incomplete/);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: {
-          link: '<https://api.github.test/statuses?page=2>; rel="next"',
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/receipt listing is incomplete/);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [
-            admissionStatus(),
-            admissionStatus({ id: 986, updated_at: 'not-a-date' }),
-          ],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({ state: 'verified' });
-  });
-
-  it('rejects a receipt that points at any workflow except canonical Auto-Enroll', () => {
-    const input = {
-      evidence: {
-        baseSha: BASE,
-        prNumber: 123,
-        repository: 'JovieInc/Jovie',
-      },
-      sourceHeadSha: SOURCE_HEAD,
-      statusPayload: {
-        link: null,
-        sha: SOURCE_HEAD,
-        statuses: [admissionStatus()],
-      },
-      timelinePayload: admissionTimeline(),
-    };
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        runPayload: admissionRun({ path: '.github/workflows/ci.yml' }),
-      })
-    ).toThrow(/malformed or untrusted/);
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        ...input,
-        runPayload: admissionRun({ id: 987654321 }),
-      })
-    ).toThrow(/malformed or untrusted/);
-  });
-
-  it.each([
-    ['unsupported producer event', { event: 'schedule' }],
-    [
-      'pull-request run with a malformed immutable head',
-      {
-        event: 'pull_request',
-        head_sha: 'not-a-sha',
-      },
-    ],
-    [
-      'main-scoped run from a non-main branch',
-      {
-        event: 'workflow_dispatch',
-        head_branch: 'feature/not-main',
-        head_sha: '8'.repeat(40),
-      },
-    ],
-  ])('rejects a receipt from %s', (_label, runOverrides) => {
-    expect(() =>
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun(runOverrides),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toThrow(/not bound to its admission scope/);
-  });
-
-  it('preserves a cohort receipt when a pull-request producer was triggered by another exact head', () => {
-    const producerHead = '8'.repeat(40);
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun({
-          event: 'pull_request',
-          head_branch: 'feature/cohort-trigger',
-          head_sha: producerHead,
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({ state: 'verified' });
-  });
-
-  it('preserves a main-scoped producer when main advances before policy evaluation', () => {
-    expect(
-      classifyCanonicalAdmissionProvenance({
-        evidence: {
-          baseSha: BASE,
-          prNumber: 123,
-          repository: 'JovieInc/Jovie',
-        },
-        runPayload: admissionRun({
-          event: 'workflow_run',
-          head_branch: 'main',
-          head_sha: '8'.repeat(40),
-        }),
-        sourceHeadSha: SOURCE_HEAD,
-        statusPayload: {
-          link: null,
-          sha: SOURCE_HEAD,
-          statuses: [admissionStatus()],
-        },
-        timelinePayload: admissionTimeline(),
-      })
-    ).toMatchObject({ checkpointMainSha: BASE, state: 'verified' });
   });
 
   it('requires the exact live queue ref and head SHA', () => {
@@ -1119,31 +402,28 @@ describe('merge-group admission evidence', () => {
     }
   });
 
-  it.each([
-    'QUEUED',
-    'AWAITING_CHECKS',
-    'MERGEABLE',
-    'UNMERGEABLE',
-    'LOCKED',
-  ])('admits the exact live synthetic head while queue state is %s', state => {
-    const evidence = validateMergeGroupAdmissionEvent(event());
-    expect(
-      buildLiveQueueAdmissionReceipt({
-        entries: [liveEntry({ state })],
-        evidence,
-        runContext: { runAttempt: '2', runId: '123456789' },
-      })
-    ).toMatchObject({
-      admitted: true,
-      currentQueueState: state,
-      outcome: 'admitted',
-      pr: 123,
-      replacementCombinedHead: null,
-      runAttempt: '2',
-      runId: '123456789',
-      syntheticSha: HEAD,
-    });
-  });
+  it.each(['QUEUED', 'AWAITING_CHECKS', 'MERGEABLE', 'UNMERGEABLE', 'LOCKED'])(
+    'admits the exact live synthetic head while queue state is %s',
+    state => {
+      const evidence = validateMergeGroupAdmissionEvent(event());
+      expect(
+        buildLiveQueueAdmissionReceipt({
+          entries: [liveEntry({ state })],
+          evidence,
+          runContext: { runAttempt: '2', runId: '123456789' },
+        })
+      ).toMatchObject({
+        admitted: true,
+        currentQueueState: state,
+        outcome: 'admitted',
+        pr: 123,
+        replacementCombinedHead: null,
+        runAttempt: '2',
+        runId: '123456789',
+        syntheticSha: HEAD,
+      });
+    }
+  );
 
   it('marks an old synthetic head obsolete with replacement queue evidence', () => {
     const oldHead = '5'.repeat(40);
@@ -1269,7 +549,7 @@ describe('merge-group admission evidence', () => {
 
     await waitForMergeGroupAdmission({
       event: event(),
-      loadAdmissionProvenance: verifiedProvenance,
+      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -1303,7 +583,7 @@ describe('merge-group admission evidence', () => {
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadAdmissionProvenance: verifiedProvenance,
+        loadQueueEvent: verifiedEvent,
         loadCheckRuns,
         loadLiveQueueEntries,
         loadQueueRef,
@@ -1326,7 +606,7 @@ describe('merge-group admission evidence', () => {
         head_commit: { id: oldHead },
         head_sha: oldHead,
       }),
-      loadAdmissionProvenance: verifiedProvenance,
+      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries: async () => [
         liveEntry({ headCommitOid: currentHead }),
@@ -1356,7 +636,7 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadAdmissionProvenance: verifiedProvenance,
+      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries: async () => [liveEntry()],
       loadQueueRef: async () => null,
@@ -1391,7 +671,7 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadAdmissionProvenance: verifiedProvenance,
+      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -1411,16 +691,16 @@ describe('merge-group admission evidence', () => {
     expect(loadQueueRef).toHaveBeenCalledTimes(2);
   });
 
-  it('rechecks canonical admission provenance after external gates pass', async () => {
-    const loadAdmissionProvenance = vi
+  it('rechecks the native queue event after external gates pass', async () => {
+    const loadQueueEvent = vi
       .fn()
-      .mockResolvedValueOnce(verifiedProvenance())
-      .mockRejectedValueOnce(new Error('latest admission actor changed'));
+      .mockResolvedValueOnce(verifiedEvent())
+      .mockResolvedValueOnce({ id: 'MQAE_changed', state: 'verified' });
 
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadAdmissionProvenance,
+        loadQueueEvent,
         loadCheckRuns: async ({ checkName }) =>
           checkPage(checkName, 'completed', 'success'),
         loadLiveQueueEntries: async () => [liveEntry()],
@@ -1428,8 +708,53 @@ describe('merge-group admission evidence', () => {
         maxWaitMs: 10,
         pollIntervalMs: 3,
       })
-    ).rejects.toThrow(/latest admission actor changed/);
-    expect(loadAdmissionProvenance).toHaveBeenCalledTimes(2);
+    ).rejects.toThrow(/native queue event changed during admission/);
+    expect(loadQueueEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for the native Added event without an Auto-Enroll status', async () => {
+    let elapsed = 0;
+    const loadQueueEvent = vi
+      .fn()
+      .mockResolvedValueOnce({ state: 'pending', detail: 'event not visible' })
+      .mockResolvedValue(verifiedEvent());
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadQueueEvent,
+      loadCheckRuns: async ({ checkName }) =>
+        checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries: async () => [liveEntry()],
+      loadQueueRef: async () => queueRef(),
+      maxWaitMs: 10,
+      now: () => elapsed,
+      onStatus: () => {},
+      pollIntervalMs: 3,
+      sleep: async delayMs => {
+        elapsed += delayMs;
+      },
+    });
+    expect(result.receipt.admissionEvent.id).toBe('MQAE_123');
+    expect(loadQueueEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects a source head that changes during final queue reread', async () => {
+    const loadLiveQueueEntries = vi
+      .fn()
+      .mockResolvedValueOnce([liveEntry()])
+      .mockResolvedValueOnce([liveEntry({ sourceHeadSha: '5'.repeat(40) })]);
+    await expect(
+      waitForMergeGroupAdmission({
+        event: event(),
+        loadQueueEvent: verifiedEvent,
+        loadCheckRuns: async ({ checkName }) =>
+          checkPage(checkName, 'completed', 'success'),
+        loadLiveQueueEntries,
+        loadQueueRef: async () => queueRef(),
+        maxWaitMs: 10,
+        pollIntervalMs: 3,
+      })
+    ).rejects.toThrow(/source head changed during admission/);
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
   });
 
   it('rechecks live queue membership after external gates pass', async () => {
@@ -1444,7 +769,7 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadAdmissionProvenance: verifiedProvenance,
+      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -1475,7 +800,7 @@ describe('merge-group admission evidence', () => {
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadAdmissionProvenance: verifiedProvenance,
+        loadQueueEvent: verifiedEvent,
         loadCheckRuns,
         loadLiveQueueEntries,
         loadQueueRef,
