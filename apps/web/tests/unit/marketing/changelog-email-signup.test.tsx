@@ -15,6 +15,7 @@ const turnstileMock = vi.hoisted(() => ({
   failureMessage: null as string | null,
   effectCount: 0,
   unmountCount: 0,
+  resetSignal: 0,
   onToken: null as ((token: string) => void) | null,
   onStateChange: null as
     | ((state: {
@@ -32,13 +33,16 @@ vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onToken,
     onStateChange,
+    resetSignal,
   }: {
     readonly onToken: (token: string) => void;
+    readonly resetSignal?: number;
     readonly onStateChange?: (state: {
       readonly status: 'verified' | 'error' | 'interactive';
       readonly message?: string;
     }) => void;
   }) => {
+    turnstileMock.resetSignal = resetSignal ?? 0;
     useEffect(() => {
       turnstileMock.effectCount += 1;
       turnstileMock.onToken = onToken;
@@ -74,6 +78,7 @@ describe('ChangelogEmailSignup', () => {
     turnstileMock.failureMessage = null;
     turnstileMock.effectCount = 0;
     turnstileMock.unmountCount = 0;
+    turnstileMock.resetSignal = 0;
     turnstileMock.onToken = null;
     turnstileMock.onStateChange = null;
     global.fetch = vi.fn();
@@ -240,6 +245,18 @@ describe('ChangelogEmailSignup', () => {
         {
           name: 'Subscribe',
         }
+      )
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Retry Security Check' })
+    );
+    expect(turnstileMock.resetSignal).toBe(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('changelog-subscribe-form')).getByRole(
+        'button',
+        { name: 'Subscribe' }
       )
     ).toBeDisabled();
 
