@@ -84,7 +84,11 @@ import {
   queryKeys,
   STANDARD_CACHE,
 } from '@/lib/queries';
-import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,
@@ -507,8 +511,12 @@ function ConnectionSecondaryIdentity({
   );
 }
 
-function ArtistCell({ name }: Readonly<{ name: string }>) {
-  return <span className='truncate text-sm text-primary-token'>{name}</span>;
+function ArtistCell(context: CellContext<ProfileWorkspaceRow, string>) {
+  return (
+    <span className='truncate text-sm text-primary-token'>
+      {context.getValue()}
+    </span>
+  );
 }
 
 function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
@@ -1425,12 +1433,12 @@ export function ProfilesWorkspace({
           );
         },
       }),
-      columnHelper.display({
+      columnHelper.accessor(() => data?.artist.name ?? '', {
         id: 'artist',
         header: 'Artist',
         size: 180,
         meta: { className: cn('px-3', styles.artistColumn) },
-        cell: () => <ArtistCell name={data?.artist.name ?? ''} />,
+        cell: ArtistCell,
       }),
       columnHelper.display({
         id: 'type',
