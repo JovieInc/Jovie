@@ -41,6 +41,7 @@ export function resolveAppWebRoot(
     path.resolve(LIB_DIRECTORY, '..'),
     cwd,
     path.join(cwd, 'apps', 'web'),
+    path.resolve(cwd, '..', 'web'),
     path.resolve(LIB_DIRECTORY, '..', '..', '..'),
     path.resolve(LIB_DIRECTORY, '..', '..', '..', '..'),
   ]);
