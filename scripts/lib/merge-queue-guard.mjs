@@ -63,9 +63,10 @@ export function isPendingNativeCohortCutoverField(field) {
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
   // JOV-6107: measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). Keep the
-  // 20-minute check budget and ALLGREEN; see docs/PR_FLOW.md for the receipt.
-  check_response_timeout_minutes: 20,
+  // Team's 60-job budget permits two groups (45), not three (64). Preserve
+  // ALLGREEN. The prior 20-minute response deadline is shorter than the
+  // 30/40-minute required CI paths; source targets 60 minutes.
+  check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
   max_entries_to_build: 2,
   max_entries_to_merge: 5,
@@ -74,6 +75,11 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
   min_entries_to_merge_wait_minutes:
     NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
+
+/** Exact old value during the source-first timeout cutover; no broad drift. */
+export function isPendingNativeCheckTimeoutCutover(field, observed) {
+  return field === 'check_response_timeout_minutes' && observed === 20;
+}
 
 /**
  * A lower native build count is safe for source-first rollout and rollback.
@@ -1463,7 +1469,8 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
       if (
         observed[field] !== expected &&
         !isPendingNativeCohortCutoverField(field) &&
-        !isSupportedNativeBuildConcurrency(field, observed[field])
+        !isSupportedNativeBuildConcurrency(field, observed[field]) &&
+        !isPendingNativeCheckTimeoutCutover(field, observed[field])
       )
         errors.push(`live native merge_queue ${field} must be ${expected}`);
   }

@@ -187,12 +187,19 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 **Ship now:** two concurrent native speculative groups. The
 `max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
-2026-09-20 live readback shows `max_entries_to_build=2`, with the 20-minute
+2026-09-20 live readback shows `max_entries_to_build=2`, with the then 20-minute
 budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
 1/5 with wait zero preserved. The separate pending source cohort minimum/wait
 cutover is not part of this apply and remains pending. Roll back only the
 build count to one if runner waits or speculative invalidation outweigh the
 measured throughput gain.
+
+On 2026-09-23 the 20-minute response deadline proved shorter than required
+CI paths configured for 30 and 40 minutes. The source target is 60 minutes;
+the exact old 20-minute live value remains accepted during the source-first
+cutover so native enrollment continues. Apply the live timeout only after this
+guard lands, then verify live ruleset 10512119, fresh queue attempts, and
+removal reasons. This changes waiting time, not required checks or ALLGREEN.
 
 Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
@@ -391,7 +398,8 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   20-minute merge-queue check budget. Non-web heads emit an explicit
+   current merge-queue check budget (20 minutes until the 60-minute ruleset
+   cutover). Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting

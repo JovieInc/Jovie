@@ -4133,7 +4133,7 @@ jobs:
     # head. Docs-only heads keep an explicit green no-code receipt without
     # spending a runner on an empty coverage pass.
     # Job timeout must fail before GitHub merge-queue
-    # check_response_timeout_minutes=20 (policy-locked in merge-queue-guard).
+    # check_response_timeout_minutes=60 after source-first ruleset cutover.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&

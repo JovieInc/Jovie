@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
+  isPendingNativeCheckTimeoutCutover,
   isPendingNativeCohortCutoverField,
   isSupportedNativeBuildConcurrency,
   mergeNativeQueuePolicyObservations,
@@ -349,6 +350,7 @@ export function validateNativePreflightEvidence({
         `merge_queue ${field} must be ${expected}`,
         mergeQueue[field] === expected ||
           isSupportedNativeBuildConcurrency(field, mergeQueue[field]) ||
+          isPendingNativeCheckTimeoutCutover(field, mergeQueue[field]) ||
           isPendingNativeCohortCutoverField(field),
       ])
     ),
@@ -381,7 +383,8 @@ export function validateNativePreflightEvidence({
   const blockingDrift = policyReadback.drift.filter(
     field =>
       !isPendingNativeCohortCutoverField(field) &&
-      !isSupportedNativeBuildConcurrency(field, mergeQueue[field])
+      !isSupportedNativeBuildConcurrency(field, mergeQueue[field]) &&
+      !isPendingNativeCheckTimeoutCutover(field, mergeQueue[field])
   );
   if (blockingDrift.length > 0) {
     errors.push(
