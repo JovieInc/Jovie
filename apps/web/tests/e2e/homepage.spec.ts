@@ -518,16 +518,23 @@ test.describe('Homepage', () => {
     );
     const exportQuality = await page
       .locator(exportSelector)
-      .evaluateAll(elements =>
-        elements.map(element => {
-          const img = element as HTMLImageElement;
-          const rect = img.getBoundingClientRect();
-          return {
-            alt: img.alt,
-            naturalWidth: img.naturalWidth,
-            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-          };
-        })
+      .evaluateAll(async elements =>
+        Promise.all(
+          elements.map(async element => {
+            const img = element as HTMLImageElement;
+            const rect = img.getBoundingClientRect();
+            // Responsive srcset naturalWidth is density-corrected. Decode the
+            // selected resource separately to measure its actual pixel width.
+            const resource = new Image();
+            resource.src = img.currentSrc;
+            await resource.decode();
+            return {
+              alt: img.alt,
+              naturalWidth: resource.naturalWidth,
+              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+            };
+          })
+        )
       );
     expect(exportQuality).toHaveLength(1);
     for (const image of exportQuality) {
