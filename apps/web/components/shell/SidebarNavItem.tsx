@@ -116,7 +116,7 @@ export function getSidebarNavRowClassName({
 const SIDEBAR_CREATE_TONES = new Set(['primary', 'secondary']);
 
 const SIDEBAR_LABEL_FADE_MASK =
-  '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]';
+  '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]';
 
 export function sidebarNavLabelNeedsFade({
   tone = 'default',

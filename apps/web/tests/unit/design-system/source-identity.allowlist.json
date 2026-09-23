@@ -6,6 +6,18 @@
       "rule": "arbitrary-value",
       "value": "JOV-[1-9]",
       "reason": "JOV-6224: server-side issue identifier regular expression, not a Tailwind class or visual token. Preserve strict positive issue-number validation."
+    },
+    {
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "rule": "arbitrary-property",
+      "value": "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]",
+      "reason": "JOV-6181: sidebar label truncation fade mirrors the baselined sibling pattern in SidebarThreadsSection/NavMenuItem; no canonical design token exists for mask-image label fades."
+    },
+    {
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "rule": "arbitrary-property",
+      "value": "[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]",
+      "reason": "JOV-6181: sidebar label truncation fade mirrors the baselined sibling pattern in SidebarThreadsSection/NavMenuItem; no canonical design token exists for mask-image label fades."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."
