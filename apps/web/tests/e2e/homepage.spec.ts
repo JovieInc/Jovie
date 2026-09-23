@@ -1052,6 +1052,20 @@ test.describe('Homepage', () => {
         await expect(action).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
         await expect(action).toHaveAttribute('data-size', 'marketing');
       }
+      for (const width of [1440, 768, 375]) {
+        await page.setViewportSize({ width, height: 900 });
+        const action = await page
+          .getByTestId('homepage-primary-cta')
+          .boundingBox();
+        const copy = await page
+          .locator('.homepage-editorial-hero__copy')
+          .boundingBox();
+        expect(action).not.toBeNull();
+        expect(copy).not.toBeNull();
+        expect(
+          Math.abs(action!.x + action!.width / 2 - (copy!.x + copy!.width / 2))
+        ).toBeLessThanOrEqual(1);
+      }
       await expect(page.getByRole('combobox')).toHaveCount(0);
     } else {
       const heroSearch = await measureSearch(
