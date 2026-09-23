@@ -2470,8 +2470,10 @@ export async function POST(req: Request) {
     }
   }
 
-  // Validate that either profileId or artistContext is provided
+  // OV turns use the account-bound Summer door, including its unavailable
+  // response, without an artist profile. Customer chat still requires context.
   if (
+    chatMode !== 'ov' &&
     !toNullableString(profileId) &&
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {

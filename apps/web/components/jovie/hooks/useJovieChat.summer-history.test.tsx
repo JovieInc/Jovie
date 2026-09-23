@@ -61,7 +61,7 @@ function Transcript({
   readonly conversationId?: string;
 }) {
   const chat = useJovieChat({
-    profileId: 'founder-profile',
+    profileId: chatMode === 'ov' ? undefined : 'founder-profile',
     chatMode,
     conversationId,
   });
