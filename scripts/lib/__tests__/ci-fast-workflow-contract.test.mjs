@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -329,6 +330,47 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const runner = remaining
+      .split('id: storybook-browser-test')[1]
+      .split('      - name: Upload Storybook browser evidence')[0];
+    const selection = runner.slice(
+      runner.indexOf('          specs=()'),
+      runner.indexOf('          pnpm exec storybook dev')
+    );
+    const chosen = spawnSync(
+      'bash',
+      ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUN_SPOTIFY: 'true',
+          RUN_KBD: 'true',
+          RUN_CRAWLER: 'false',
+        },
+      }
+    );
+    expect(chosen.status, chosen.stderr).toBe(0);
+    const specs = chosen.stdout.trim().split('\n');
+    expect(specs).toEqual([
+      'tests/e2e/storybook-spotify-connect.spec.ts',
+      'tests/e2e/storybook-kbd-motion.spec.ts',
+    ]);
+    for (const spec of specs) {
+      expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec)), spec).toBe(true);
+    }
+    expect(runner).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    const uploader = remaining
+      .split('      - name: Upload Storybook browser evidence')[1]
+      .split('      - name: Upload ci-fast lane results')[0];
+    expect(uploader).toContain("allow-markdown: 'true'");
   });
 
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {

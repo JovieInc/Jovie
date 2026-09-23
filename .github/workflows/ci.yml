@@ -1635,6 +1635,7 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
         run: |
           set -euo pipefail
@@ -1681,6 +1682,7 @@ jobs:
           if-no-files-found: error
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
