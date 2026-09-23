@@ -18,7 +18,7 @@ export function MacCinematicSurface({
 }: MacCinematicSurfaceProps) {
   return (
     <main
-      className='relative isolate grid min-h-dvh place-items-center overflow-hidden bg-(--color-bg-base) px-6 text-primary-token [color-scheme:dark]'
+      className='relative isolate grid min-h-dvh place-items-center overflow-hidden bg-(--color-bg-base) px-6 text-primary-token'
       data-desktop-auth-state={state}
       data-auth-shell-kind={shellKind}
       data-testid={testId}
@@ -42,7 +42,7 @@ export function MacCinematicSurface({
       />
       <div
         data-mac-corner-mark
-        className='pointer-events-none absolute top-8 right-8 opacity-[0.35]'
+        className='pointer-events-none absolute top-8 right-8 opacity-35'
         aria-hidden
       >
         <BrandLogo

@@ -63,7 +63,7 @@ describe('DesktopAuthPage', () => {
     const cornerMark = screen
       .getByTestId('desktop-auth-handoff')
       .querySelector('[data-mac-corner-mark]');
-    expect(cornerMark).toHaveClass('opacity-[0.35]');
+    expect(cornerMark).toHaveClass('opacity-35');
     expect(cornerMark?.querySelector('[data-brand-mark-size]')).toHaveAttribute(
       'data-brand-mark-size',
       '20'
@@ -338,7 +338,7 @@ describe('DesktopAuthRouteHandoff', () => {
     const cornerMark = screen
       .getByTestId('desktop-auth-route-handoff')
       .querySelector('[data-mac-corner-mark]');
-    expect(cornerMark).toHaveClass('opacity-[0.35]');
+    expect(cornerMark).toHaveClass('opacity-35');
     expect(cornerMark?.querySelector('[data-brand-mark-size]')).toHaveAttribute(
       'data-brand-mark-size',
       '20'
