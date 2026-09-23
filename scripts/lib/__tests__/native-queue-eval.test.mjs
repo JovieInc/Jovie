@@ -224,18 +224,19 @@ describe('complete evidence and deliberate negative controls', () => {
       for (const snapshot of b.snapshots)
         for (const p of snapshot.prs)
           p.mergeQueueEntry.enqueuer.__typename = actor;
-      for (const m of b.merges) {
-        m.nativeMerge.merged_by.type = actor;
-        // The live canary returned an hours-old removal after native admission.
-        m.timeline = {
+      for (const m of b.merges) m.nativeMerge.merged_by.type = actor;
+      // The live canary returned an hours-old removal after native admission.
+      b.merges = b.merges.map(m => ({
+        ...m,
+        timeline: {
           nodes: [
             {
               __typename: 'RemovedFromMergeQueueEvent',
               createdAt: later(-3600),
             },
           ],
-        };
-      }
+        },
+      }));
       expect(evaluate(b, evaluationTime).status).toBe('PASS');
     }
   );
