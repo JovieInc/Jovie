@@ -512,7 +512,11 @@ def _write_null_creator_receipt_drain(
     front_churn: str = "forbid",
     allow_enroll: bool = False,
     merge_group_runs: list[dict[str, object]] | None = None,
+    merge_group_pages: list[dict[str, object]] | None = None,
+    merge_group_api_fails: bool = False,
+    merge_group_raw: str | None = None,
     timeline_events: list[dict[str, object]] | None = None,
+    timeline_events_after: list[dict[str, object]] | None = None,
     timeline_fails: bool = False,
 ) -> dict[str, Path]:
     logs = {
@@ -521,8 +525,10 @@ def _write_null_creator_receipt_drain(
         "front_churn": tmp_path / "front-churn",
         "enroll": tmp_path / "enroll",
         "dequeue": tmp_path / "dequeue",
+        "dequeue_args": tmp_path / "dequeue-args",
         "jobs": tmp_path / "jobs-scans",
         "timeline": tmp_path / "timeline-calls",
+        "group_runs": tmp_path / "group-runs-calls",
     }
     for path in logs.values():
         path.write_text("", encoding="utf-8")
@@ -552,19 +558,36 @@ def _write_null_creator_receipt_drain(
     merge_group_runs_json = json.dumps(
         merge_group_runs or [], separators=(",", ":")
     )
+    default_group_page = {
+        "total_count": len(merge_group_runs or []),
+        "workflow_runs": merge_group_runs or [],
+    }
+    merge_group_pages_json = merge_group_raw if merge_group_raw is not None else json.dumps(
+        merge_group_pages or [default_group_page], separators=(",", ":")
+    )
+    merge_group_fail_json = "true" if merge_group_api_fails else "false"
     # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
     timeline_json = json.dumps([timeline_events or []], separators=(",", ":"))
+    confirmation_events = timeline_events if timeline_events_after is None else timeline_events_after
+    timeline_confirmation_json = json.dumps([confirmation_events or []], separators=(",", ":"))
+    timeline_confirmation_enabled = "true" if timeline_events_after is not None else "false"
     timeline_case = (
         'echo "timeline read forced to fail" >&2; exit 95'
         if timeline_fails
-        else f"echo '{timeline_json}'; exit 0"
+        else f"if [[ '{timeline_confirmation_enabled}' == true ]] && [[ $(wc -l < '{logs['timeline']}') -gt 1 ]]; then echo '{timeline_confirmation_json}'; else echo '{timeline_json}'; fi; exit 0"
     )
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
+        queue_add_events = [
+            event.get("created_at", "")
+            for event in (timeline_events or [])
+            if event.get("event") == "added_to_merge_queue"
+        ]
+        queue_enqueued_at = max(queue_add_events, default="2026-08-28T14:20:00Z")
         list_state = (
             f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
-            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"2026-08-28T14:20:00Z","state":"{entry_state}","position":{queue_position}}}}}}}'
+            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"{queue_enqueued_at}","state":"{entry_state}","position":{queue_position}}}}}}}'
         )
     else:
         list_state = (
@@ -610,7 +633,7 @@ def _write_null_creator_receipt_drain(
               explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":{queued_json},"eligible":true,"reason":"eligible"}}' ;;
               prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
               {enroll_case}
-              dequeue|dequeue-ineligible) printf 'dequeue\\n' >>'{logs["dequeue"]}'; echo '{{"state":{{"queued":false}}}}' ;;
+              dequeue|dequeue-ineligible) printf 'dequeue\\n' >>'{logs["dequeue"]}'; printf '%s\\n' "$*" >>'{logs["dequeue_args"]}'; echo '{{"state":{{"queued":false}}}}' ;;
               max-queue-depth) echo 16 ;;
               {front_churn_case}
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -653,7 +676,16 @@ def _write_null_creator_receipt_drain(
             if [[ "$1" == "api" ]]; then
               printf '%s\\n' "$2" >>'{logs["api"]}'
               if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
-              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '{merge_group_runs_json}'; exit 0; fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                if [[ " $* " == *" created="* ]]; then
+                  printf '%s\\n' "$*" >>'{logs["group_runs"]}'
+                  [[ '{merge_group_fail_json}' == false ]] || {{ echo "merge-group inventory forced to fail" >&2; exit 95; }}
+                  echo '{merge_group_pages_json}'
+                  exit 0
+                fi
+                echo '{merge_group_runs_json}'
+                exit 0
+              fi
               if [[ "$2" == *"/issues/{pr}/timeline"* ]]; then
                 printf '%s\\n' "$2" >>'{logs["timeline"]}'
                 {timeline_case}
@@ -1415,6 +1447,8 @@ class TestStarvedGroupDequeue:
 
     def test_starved_awaiting_checks_entry_is_dequeued(self, tmp_path: Path) -> None:
         head = "8" * 40
+        queued_at = self._queued_iso(47)
+        lookalike_run = self._group_run(164201, self._queued_iso(35))
         logs = _write_null_creator_receipt_drain(
             tmp_path,
             pr=16420,
@@ -1424,12 +1458,8 @@ class TestStarvedGroupDequeue:
             run=_trusted_autoenroll_run(head=head),
             queued=True,
             front_churn="allow",
-            timeline_events=[
-                {
-                    "event": "added_to_merge_queue",
-                    "created_at": self._queued_iso(47),
-                }
-            ],
+            merge_group_runs=[lookalike_run],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
         )
 
         result = _run_bash(
@@ -1446,12 +1476,26 @@ class TestStarvedGroupDequeue:
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert logs["timeline"].read_text(encoding="utf-8") != ""
         assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue\n"
+        assert "dequeue-ineligible 16420 " + head in logs["dequeue_args"].read_text(encoding="utf-8")
         assert "starved-group" in result.stdout
-        assert "✗ starved-group: AWAITING_CHECKS" in result.stdout
+        assert "complete merge-group inventory and no matching run" in result.stdout
 
-    def test_existing_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
+    @staticmethod
+    def _group_run(pr: int, created_at: str, *, status: str = "in_progress") -> dict[str, object]:
+        return {
+            "id": 88,
+            "head_branch": f"gh-readonly-queue/main/pr-{pr}-{'9' * 40}",
+            "status": status,
+            "conclusion": "success" if status == "completed" else None,
+            "head_sha": "7" * 40,
+            "created_at": created_at,
+            "updated_at": created_at,
+        }
+
+    def test_existing_in_flight_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
         head = "8" * 40
-        base = "9" * 40
+        queued_at = self._queued_iso(47)
+        run_created_at = self._queued_iso(35)
         logs = _write_null_creator_receipt_drain(
             tmp_path,
             pr=16420,
@@ -1461,23 +1505,8 @@ class TestStarvedGroupDequeue:
             run=_trusted_autoenroll_run(head=head),
             queued=True,
             front_churn="active",
-            merge_group_runs=[
-                {
-                    "id": 88,
-                    "headBranch": f"gh-readonly-queue/main/pr-16420-{base}",
-                    "status": "in_progress",
-                    "conclusion": None,
-                    "headSha": "7" * 40,
-                    "createdAt": "2026-09-03T16:13:03Z",
-                    "updatedAt": "2026-09-03T16:15:46Z",
-                }
-            ],
-            timeline_events=[
-                {
-                    "event": "added_to_merge_queue",
-                    "created_at": self._queued_iso(47),
-                }
-            ],
+            merge_group_runs=[self._group_run(16420, run_created_at)],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
         )
 
         result = _run_bash(
@@ -1492,9 +1521,138 @@ class TestStarvedGroupDequeue:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "DEQUEUE (starved group" in result.stdout
-        # The merge-group run check must short-circuit before the timeline read.
-        assert logs["timeline"].read_text(encoding="utf-8") == ""
+        assert "exact merge-group branch has CI run evidence" in result.stdout
+        assert logs["timeline"].read_text(encoding="utf-8").count("timeline") == 1
+        scoped_query = logs["group_runs"].read_text(encoding="utf-8")
+        assert "event=merge_group" in scoped_query
+        assert f"created={queued_at}.." in scoped_query
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_matching_run_on_second_page_after_100_runs_leaves_entry_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        created_at = self._queued_iso(35)
+        other_runs = [
+            self._group_run(17000 + index, created_at, status="completed")
+            for index in range(100)
+        ]
+        matching_run = self._group_run(16420, created_at)
+        runs = other_runs + [matching_run]
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Group after a busy run window",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            merge_group_pages=[
+                {"total_count": 101, "workflow_runs": runs[:100]},
+                {"total_count": 101, "workflow_runs": runs[100:]},
+            ],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact merge-group branch has CI run evidence" in result.stdout
+        assert logs["group_runs"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    @pytest.mark.parametrize("case", ["api-failure", "api-cap", "incomplete-page", "malformed", "unknown-status"])
+    def test_unknown_or_incomplete_run_inventory_never_dequeues(self, tmp_path: Path, case: str) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        created_at = self._queued_iso(35)
+        run = self._group_run(17001, created_at, status="completed")
+        inventory: dict[str, object] = {}
+        if case == "api-failure":
+            inventory["merge_group_api_fails"] = True
+        elif case == "api-cap":
+            inventory["merge_group_pages"] = [{"total_count": 1000, "workflow_runs": [run]}]
+        elif case == "incomplete-page":
+            inventory["merge_group_pages"] = [{"total_count": 2, "workflow_runs": [run]}]
+        elif case == "unknown-status":
+            inventory["merge_group_pages"] = [
+                {"total_count": 1, "workflow_runs": [self._group_run(17001, created_at, status="waiting")]}
+            ]
+        else:
+            inventory["merge_group_raw"] = "{\"total_count\":0}"
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Unknown run inventory",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
+            **inventory,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "leaving queued" in result.stdout
+        assert logs["group_runs"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_replacement_queue_entry_during_inventory_is_left_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        replacement_at = self._queued_iso(1)
+        events = [{"event": "added_to_merge_queue", "created_at": queued_at}]
+        replacement_events = events + [
+            {"event": "added_to_merge_queue", "created_at": replacement_at}
+        ]
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Queue entry replaced during inventory",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=events,
+            timeline_events_after=replacement_events,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "queue entry changed during run inventory" in result.stdout
+        assert logs["timeline"].read_text(encoding="utf-8").count("timeline") == 2
         assert logs["dequeue"].read_text(encoding="utf-8") == ""
 
     def test_fresh_entry_below_threshold_is_left_alone(self, tmp_path: Path) -> None:
