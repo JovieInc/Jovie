@@ -1576,6 +1576,95 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
 });
 
+test('scheduled staging reconciliation publishes only unpublished desktop changes', async () => {
+  assert.match(desktopWorkflow, /schedule:\n\s+- cron: '17 10 \* \* \*'/);
+  const selector = shellStepBody(
+    job(desktopWorkflow, 'authorize-release'),
+    'Select desktop-relevant production generation'
+  );
+  const root = await mkdtemp(join(tmpdir(), 'jovie-staging-reconcile-'));
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'maintenance.auto',
+        GIT_CONFIG_VALUE_0: 'false',
+        GIT_CONFIG_KEY_1: 'gc.auto',
+        GIT_CONFIG_VALUE_1: '0',
+      },
+    }).trim();
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@jovie.test');
+    git('config', 'user.name', 'Test');
+    await mkdir(join(root, 'apps/desktop/src'), { recursive: true });
+    await writeFile(join(root, 'apps/desktop/src/main.ts'), 'export const shell = 1;\n');
+    git('add', '.');
+    git('commit', '-qm', 'baseline');
+    const baseline = git('rev-parse', 'HEAD');
+
+    await writeFile(join(root, 'README.md'), 'unrelated change\n');
+    git('add', '.');
+    git('commit', '-qm', 'docs');
+    const docsOnly = git('rev-parse', 'HEAD');
+
+    await writeFile(join(root, 'apps/desktop/src/main.ts'), 'export const shell = 2;\n');
+    git('add', '.');
+    git('commit', '-qm', 'desktop repair');
+    const desktopChange = git('rev-parse', 'HEAD');
+
+    const runSelector = async (source, releasedSource = baseline) => {
+      const output = join(root, 'selection-output');
+      await writeFile(output, '');
+      const result = spawnSync('bash', ['-c', selector], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          AUTHORIZED: 'true',
+          ALREADY_RELEASED: 'false',
+          MANUAL: 'false',
+          STAGING_AUTO: 'true',
+          RELEASE_SHA: source,
+          BASELINE_SHA: '',
+          GITHUB_OUTPUT: output,
+          REPOSITORY: 'JovieInc/Jovie',
+          PATH: `${root}/bin:${process.env.PATH}`,
+          STAGING_RELEASE_JSON: JSON.stringify({
+            tag_name: 'desktop-staging',
+            target_commitish: releasedSource,
+          }),
+        },
+      });
+      return { ...result, outputs: await readFile(output, 'utf8') };
+    };
+    await mkdir(join(root, 'bin'));
+    await writeFile(
+      join(root, 'bin/gh'),
+      '#!/bin/sh\n[ "$1" = api ] && [ "$2" = repos/JovieInc/Jovie/releases/tags/desktop-staging ] || exit 3\nprintf %s "$STAGING_RELEASE_JSON"\n',
+      { mode: 0o755 }
+    );
+
+    const unchanged = await runSelector(baseline);
+    assert.equal(unchanged.status, 0);
+    assert.doesNotMatch(unchanged.outputs, /^should_release=true$/m);
+    const unrelated = await runSelector(docsOnly);
+    assert.equal(unrelated.status, 0);
+    assert.doesNotMatch(unrelated.outputs, /^should_release=true$/m);
+    const changed = await runSelector(desktopChange);
+    assert.equal(changed.status, 0);
+    assert.match(changed.outputs, /^should_release=true$/m);
+    const untrusted = await runSelector(baseline, desktopChange);
+    assert.equal(untrusted.status, 1);
+    assert.doesNotMatch(untrusted.outputs, /^should_release=true$/m);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('desktop release proof rejects zero-asset and mismatched-digest releases', () => {
   const valid = desktopReleaseFixture();
   assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
