@@ -29,7 +29,7 @@ export function storybookAddonsForEnvironment(
 ) {
   return [
     '@storybook/addon-docs',
-    // The live cert and the merge-group matrix run their own pinned, fail-closed
+    // The live cert and the surface matrix run their own pinned, fail-closed
     // axe passes in the preview iframe. Keep Storybook's automatic scan for
     // normal and scheduled builds, but omit it from those manual suites so the
     // two axe runs cannot race.
