@@ -2369,6 +2369,7 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: ${{ github.event_name == 'merge_group' && '1' || '0' }}
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
