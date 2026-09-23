@@ -40,6 +40,14 @@ export interface QualificationResult {
   disqualificationReason: string | null;
 }
 
+export interface QualifyLeadOptions {
+  /**
+   * Include contact email extraction for legacy outreach qualification.
+   * Public requalification explicitly disables this private-data path.
+   */
+  includePrivateContact?: boolean;
+}
+
 /**
  * Qualifies a Linktree URL by fetching, extracting, and evaluating signals.
  *
@@ -50,17 +58,26 @@ export interface QualificationResult {
  *  - Free tier + Spotify only → disqualified ("free_tier_no_music_tool")
  */
 export async function qualifyLead(
-  linktreeUrl: string
+  linktreeUrl: string,
+  options: QualifyLeadOptions = {}
 ): Promise<QualificationResult> {
+  const includePrivateContact = options.includePrivateContact !== false;
   const html = await fetchLinktreeDocument(linktreeUrl);
-  const extraction = extractLinktree(html);
+  const extraction = extractLinktree(html, {
+    includeContactEmail: includePrivateContact,
+  });
   const hasPaidTier = detectLinktreePaidTier(html);
   const nextData = extractScriptJson<LinktreePageProps>(html, '__NEXT_DATA__');
   const isLinktreeVerified = detectLinktreeVerification(html, nextData);
 
   const platforms = extraction.links.map(l => l.platformId).filter(Boolean);
   const hasSpotifyLink = platforms.includes('spotify');
-  const spotifyLink = extraction.links.find(l => l.platformId === 'spotify');
+  const spotifyLinks = extraction.links.filter(l => l.platformId === 'spotify');
+  // Linktrees often list an album before the artist profile. Prefer the
+  // artist URL so the existing Spotify enrichment path can resolve the
+  // canonical artist without guessing from an album or track.
+  const spotifyLink =
+    spotifyLinks.find(link => /\/artist\//i.test(link.url)) ?? spotifyLinks[0];
   const instagramLink = extraction.links.find(
     l => l.platformId === 'instagram'
   );
@@ -76,7 +93,7 @@ export async function qualifyLead(
     hasPaidTier: hasPaidTier ?? undefined,
     socialLinkPlatforms: platforms as string[],
     hasSpotifyId: hasSpotifyLink,
-    hasContactEmail: !!extraction.contactEmail,
+    hasContactEmail: includePrivateContact && !!extraction.contactEmail,
     hasTrackingPixels: trackingPixelPlatforms.length > 0,
   });
 
@@ -109,7 +126,9 @@ export async function qualifyLead(
     displayName: extraction.displayName ?? null,
     bio: extraction.bio ?? null,
     avatarUrl: extraction.avatarUrl ?? null,
-    contactEmail: extraction.contactEmail ?? null,
+    contactEmail: includePrivateContact
+      ? (extraction.contactEmail ?? null)
+      : null,
     hasPaidTier,
     isLinktreeVerified,
     hasSpotifyLink,
