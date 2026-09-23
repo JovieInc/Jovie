@@ -1,9 +1,15 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
+beforeEach(() => {
+  gate.WAITLIST_ENABLED = false;
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -48,7 +54,7 @@ describe('HomepageCertifiedSections', () => {
     )!;
     expect(connected).toHaveAttribute('data-marketing-variant', 'editorial');
     expect(connected).toHaveAttribute('data-rhythm', 'product');
-    expect(connected).toHaveTextContent('ONE LIVING PROFILE');
+    expect(connected).toHaveTextContent('IDENTITY, ACROSS THE INTERNET');
     expect(connected).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[0].headline
     );
@@ -98,6 +104,14 @@ describe('HomepageCertifiedSections', () => {
 });
 
 describe('HomepageClose', () => {
+  it('requests access instead of focusing absent search when gated', () => {
+    gate.WAITLIST_ENABLED = true;
+    render(<HomepageClose />);
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
     const section = screen.getByRole('region', {

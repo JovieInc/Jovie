@@ -4,7 +4,7 @@
 // homepage-hero-next-move-contract.test.ts (hero headline/subhead/search).
 
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import {
@@ -15,6 +15,24 @@ import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHe
 import { HERO_COPY } from '@/components/homepage/intent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+vi.mock('@/lib/flags/marketing-static', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      get WAITLIST_ENABLED() {
+        return gate.WAITLIST_ENABLED;
+      },
+    },
+  };
+});
+beforeEach(() => {
+  gate.WAITLIST_ENABLED = false;
+});
 
 const CATEGORY_LOCKED_TERMS =
   /\b(?:artists?|musicians?|singers?|songwriters?|bands?|djs?|rappers?|producers?|creators?)\b/i;
@@ -90,9 +108,9 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toEqual([
       {
         id: 'connected',
-        eyebrow: 'ONE LIVING PROFILE',
+        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
         headline: 'Everything about you, connected.',
-        body: 'Your work, links, and story. One living profile.',
+        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
       },
       {
         id: 'relationships',
@@ -160,6 +178,15 @@ describe('JOV-5864 locked homepage baseline', () => {
         name: 'Take control of your presence.',
       })
     ).toBeInTheDocument();
+  });
+
+  it('uses access links in both conversion positions when gated', () => {
+    gate.WAITLIST_ENABLED = true;
+    render(<LockedHomepageBody />);
+    expect(
+      screen.getAllByRole('link', { name: 'Request access' })
+    ).toHaveLength(2);
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
   it('keeps one canonical name search with one terminal return action', () => {

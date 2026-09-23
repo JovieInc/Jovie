@@ -117,7 +117,7 @@ function ConnectedSection({
             className='homepage-connected-artwork__image'
             height={IDENTITY_ARTWORK.height}
             loading='lazy'
-            sizes='(min-width: 1024px) calc(100vw - 12rem), calc(100vw - 3rem)'
+            sizes='(min-width: 1362px) 1298px, 100vw'
             src={IDENTITY_ARTWORK.src}
             width={IDENTITY_ARTWORK.width}
           />
