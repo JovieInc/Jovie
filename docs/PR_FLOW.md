@@ -100,30 +100,16 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Source qualification is separate from production certification.** A pending,
-  missing, or failed release checkpoint by itself does not make an otherwise
-  qualified source PR ineligible. Exact-head source checks, explicit scoped
-  incident holds, and required native merge-group correctness, provenance, and
-  ancestry checks remain enforced. Admission receipts say `source-qualified`;
-  they never certify production.
+- **Source qualification is separate from production certification.** An agent
+  requests GitHub's normal Merge when ready for the exact checked head. GitHub
+  enforces required source checks and the native merge queue validates the
+  combined head. The merge-group helper checks live membership, the exact queue
+  ref and source head, and required synthetic-head checks; it accepts GitHub's
+  authenticated native User or Bot enqueue event without an Auto-Enroll receipt.
   The production controller owns deployment serialization and exact runtime
-  certification. When main and production are healthy, exact-main review is
-  current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: clean exact-head PRs may enter the native queue
-  while new implementation and deployment stay held, subject to the separate
-  release-wave pause below.
-  A separate active release-wave lease pauses only new native queue enrollment
-  and re-entry while a Production Controller run is queued, concurrency-pending
-  (GitHub status `pending`), or in progress. The workflow fixes each run's deadline
-  at 30 minutes from `created_at`. Terminal completion releases that run's hold
-  sooner; another queued, pending, or in-progress run can keep the pause active
-  against its own deadline. Repeated observations do
-  not restart a run's deadline. Already-admitted native entries remain in the
-  queue, subject to ordinary safety-dequeue checks, throughout the pause.
-  Unavailable or malformed controller state fails closed before enrollment.
-  Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An existing incident
-  hold is cleared only by its own evidence.
+  certification after merge. A pending or failed release checkpoint is not a
+  source-merge prerequisite. Legacy Auto-Enroll remains deployed during this
+  transition but has no exclusive admission authority.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -156,23 +142,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic, exact-head, and bounded.**
-  `merge-queue-autoenroll` first revalidates the PR associated with the
-  triggering PR/CI event at that event's exact published head. Because GitHub's
-  shared concurrency group retains only one pending run, every surviving pass
-  may also recover a deterministic cohort whose source-required checks are
-  freshly green. The event target, native re-entry, and missed-event recovery
-  share one admission path bounded only by native queue depth (a positive
-  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
-  uncapped), the App-backed controller remains
-  the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue
-  only. The `merge-queue` label is retired and must not be added, read, or
-  retained. You don't merge by hand.
-  Each proven native enrollment emits a `pull_request: enqueued` continuation.
-  Its already-queued exact-head target is an idempotent no-op while the surviving
-  pass advances the next bounded cohort; when no eligible remainder exists, no
-  new enrollment event is created and the chain converges.
+- **The writer requests GitHub Merge when ready for the checked PR head.**
+  GitHub enforces required checks, queue admission, merge-group checks, and the
+  final merge. Do not use a direct merge or the retired `merge-queue` label.
+  The legacy Auto-Enroll workflow may still enqueue eligible PRs while it is
+  retired, but its bot identity and status receipt are not merge-group gates.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -447,8 +421,8 @@ Before you open a PR:
    on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
    `needs-human`.
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
-   CI, then qualify the final exact, current head before ready. Don't hand-merge;
-   the queue does it.
+   CI, then qualify the final exact, current head before ready. Request normal
+   GitHub Merge when ready; the queue performs the final merge.
 5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
    admission. What's New is written after land/runtime proof. Linear is SoR.
 6. If a PR's base branch was deleted, **retarget to `main`** before debugging a
