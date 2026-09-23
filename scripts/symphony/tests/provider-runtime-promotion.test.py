@@ -98,9 +98,14 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(result.strip(), "new:reviewed-rotate\nnew\nnew")
 
     def change_pin(self, version="0.153.5"):
+        package = self.source / "codex-cli" / "package.json"
+        current = json.loads(package.read_text())["dependencies"]["@openai/codex"]
         for name in ["package.json", "package-lock.json"]:
             path = self.source / "codex-cli" / name
-            path.write_text(path.read_text().replace("0.153.4", version))
+            updated = path.read_text().replace(current, version)
+            if current == version or updated == path.read_text():
+                raise AssertionError(f"{name} pin did not change from {current}")
+            path.write_text(updated)
 
     def test_native_binary_and_rotate_ignore_shared_paths_and_environment(self):
         self.write(self.source / "symphony-codex-router",
