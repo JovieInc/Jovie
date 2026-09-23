@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
@@ -43,6 +44,27 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
+  it('attributes a standalone closing access action to its caller', () => {
+    gate.WAITLIST_ENABLED = true;
+    render(
+      <HomepagePrimaryAction
+        submitTestId='closing-access'
+        submitAnalytics={{
+          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+          properties: { placement: 'close' },
+        }}
+      />
+    );
+    const action = screen.getByRole('link', { name: 'Request access' });
+    action.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(action);
+    expect(action).toHaveAttribute('href', '/signup');
+    expect(action).toHaveAttribute('data-testid', 'closing-access');
+    expect(trackAction).toHaveBeenLastCalledWith(
+      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
+      { placement: 'close' }
+    );
+  });
   it('routes waitlist-on visitors to access with no name-search control', () => {
     gate.WAITLIST_ENABLED = true;
     renderHero();
