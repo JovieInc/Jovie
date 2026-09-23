@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
-  classifyNativeQueueAdmissionEvent,
   classifyRequiredCheckPage,
   normalizeLiveQueueEntriesPage,
   parseQueueHeadPullRequestNumber,
@@ -44,6 +43,9 @@ function event(overrides = {}) {
 
 function liveEntry(overrides = {}) {
   return {
+    id: 'MQE_123',
+    enqueuedAt: ADMITTED_AT,
+    enqueuer: { __typename: 'User', login: 'itstimwhite' },
     baseCommitOid: BASE,
     headCommitOid: HEAD,
     position: 1,
@@ -71,6 +73,9 @@ function liveQueuePayload(nodes, pageInfo = {}) {
 
 function liveQueueNode(overrides = {}) {
   return {
+    id: 'MQE_123',
+    enqueuedAt: ADMITTED_AT,
+    enqueuer: { __typename: 'User', login: 'itstimwhite' },
     baseCommit: { oid: BASE },
     headCommit: { oid: HEAD },
     position: 1,
@@ -90,34 +95,6 @@ function queueRef(overrides = {}) {
     object: { type: 'commit', sha: HEAD },
     ...overrides,
   };
-}
-
-function admissionTimeline(overrides = {}) {
-  return {
-    data: {
-      repository: {
-        pullRequest: {
-          timelineItems: {
-            nodes: [
-              {
-                __typename: 'AddedToMergeQueueEvent',
-                actor: { __typename: 'Bot', login: 'jovie-bot' },
-                createdAt: ADMITTED_AT,
-                enqueuer: { login: 'jovie-bot[bot]' },
-                id: 'MQAE_123',
-                ...overrides,
-              },
-            ],
-            pageInfo: { hasNextPage: false },
-          },
-        },
-      },
-    },
-  };
-}
-
-function verifiedEvent() {
-  return { id: 'MQAE_123', state: 'verified' };
 }
 
 function checkPage(name, status, conclusion = null, overrides = {}) {
@@ -142,17 +119,6 @@ function checkPage(name, status, conclusion = null, overrides = {}) {
 }
 
 describe('merge-group admission evidence', () => {
-  it('accepts a native GitHub user admission without an Auto-Enroll receipt', () => {
-    expect(
-      classifyNativeQueueAdmissionEvent(
-        admissionTimeline({
-          actor: { __typename: 'User', login: 'itstimwhite' },
-          enqueuer: { login: 'itstimwhite' },
-        })
-      )
-    ).toMatchObject({ state: 'verified' });
-  });
-
   it('exposes the typed CLI contract without requiring runtime credentials', () => {
     expect(
       execFileSync(
@@ -163,76 +129,85 @@ describe('merge-group admission evidence', () => {
     ).toBe(ADMISSION_CONTRACT_VERSION);
   });
 
-  it('runs the GitHub adapter for a native user without custom receipt lookups', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
-    const eventPath = join(directory, 'event.json');
-    const outputPath = join(directory, 'output.txt');
-    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
-    const requests = [];
-    const fetchImpl = vi.fn(async (url, init) => {
-      requests.push({ url, init });
-      if (url.endsWith('/graphql')) {
-        const body = JSON.parse(init.body);
-        if (body.query.includes('MergeGroupAdmissionTimeline')) {
+  it.each(['User', 'Bot'])(
+    'admits a current native %s entry without querying stale historical events',
+    async actorType => {
+      const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
+      const eventPath = join(directory, 'event.json');
+      const outputPath = join(directory, 'output.txt');
+      await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+      const requests = [];
+      const fetchImpl = vi.fn(async (url, init) => {
+        requests.push({ url, init });
+        if (url.endsWith('/graphql')) {
+          const body = JSON.parse(init.body);
+          if (
+            body.query.includes('timelineItems') ||
+            body.query.includes('Timeline')
+          ) {
+            throw new Error(
+              'stale or missing historical timeline must not be queried'
+            );
+          }
           return Response.json(
-            admissionTimeline({
-              actor: { __typename: 'User', login: 'itstimwhite' },
-              enqueuer: { login: 'itstimwhite' },
-            })
+            liveQueuePayload([
+              liveQueueNode({
+                enqueuer: { __typename: actorType, login: 'native-writer' },
+              }),
+            ])
           );
         }
-        return Response.json(liveQueuePayload([liveQueueNode()]));
-      }
-      if (url.includes('/git/ref/')) return Response.json(queueRef());
-      const checkName = new URL(url).searchParams.get('check_name');
-      if (!checkName) throw new Error(`unexpected request ${url}`);
-      return Response.json(checkPage(checkName, 'completed', 'success').data);
-    });
-    const env = {
-      GH_TOKEN: 'test-token',
-      GITHUB_API_URL: 'https://api.github.test',
-      GITHUB_EVENT_PATH: eventPath,
-      GITHUB_OUTPUT: outputPath,
-      GITHUB_REPOSITORY: 'JovieInc/Jovie',
-      GITHUB_SHA: HEAD,
-    };
-    try {
-      await expect(
-        runAdmissionFromEnv(env, { fetchImpl })
-      ).resolves.toMatchObject({
-        admitted: true,
-        pr: 123,
-        syntheticSha: HEAD,
+        if (url.includes('/git/ref/')) return Response.json(queueRef());
+        const checkName = new URL(url).searchParams.get('check_name');
+        if (!checkName) throw new Error(`unexpected request ${url}`);
+        return Response.json(checkPage(checkName, 'completed', 'success').data);
       });
-      expect(requests).toHaveLength(8);
-      expect(
-        requests.filter(request => request.url.endsWith('/graphql'))
-      ).toHaveLength(4);
-      expect(
-        requests.some(request =>
-          /\/(statuses|compare|actions\/runs)\b/.test(request.url)
-        )
-      ).toBe(false);
-      expect(
-        requests.every(
-          request =>
-            request.url.startsWith('https://api.github.test/') &&
-            request.init.headers.Authorization === 'Bearer test-token'
-        )
-      ).toBe(true);
-      await expect(readFile(outputPath, 'utf8')).resolves.toContain(
-        `admitted=true\nobsolete=false\npr_number=123\nsynthetic_head_sha=${HEAD}`
-      );
-      await expect(
-        runAdmissionFromEnv(env, {
-          fetchImpl: async () =>
-            Response.json({ message: 'denied' }, { status: 403 }),
-        })
-      ).rejects.toThrow(/GitHub API 403/);
-    } finally {
-      await rm(directory, { force: true, recursive: true });
+      const env = {
+        GH_TOKEN: 'test-token',
+        GITHUB_API_URL: 'https://api.github.test',
+        GITHUB_EVENT_PATH: eventPath,
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: 'JovieInc/Jovie',
+        GITHUB_SHA: HEAD,
+      };
+      try {
+        await expect(
+          runAdmissionFromEnv(env, { fetchImpl })
+        ).resolves.toMatchObject({
+          admitted: true,
+          pr: 123,
+          syntheticSha: HEAD,
+        });
+        expect(requests).toHaveLength(6);
+        expect(
+          requests.filter(request => request.url.endsWith('/graphql'))
+        ).toHaveLength(2);
+        expect(
+          requests.some(request =>
+            /\/(statuses|compare|actions\/runs)\b/.test(request.url)
+          )
+        ).toBe(false);
+        expect(
+          requests.every(
+            request =>
+              request.url.startsWith('https://api.github.test/') &&
+              request.init.headers.Authorization === 'Bearer test-token'
+          )
+        ).toBe(true);
+        await expect(readFile(outputPath, 'utf8')).resolves.toContain(
+          `admitted=true\nobsolete=false\npr_number=123\nsynthetic_head_sha=${HEAD}`
+        );
+        await expect(
+          runAdmissionFromEnv(env, {
+            fetchImpl: async () =>
+              Response.json({ message: 'denied' }, { status: 403 }),
+          })
+        ).rejects.toThrow(/GitHub API 403/);
+      } finally {
+        await rm(directory, { force: true, recursive: true });
+      }
     }
-  });
+  );
 
   it('neutralizes a vanished queue ref end to end and stays fail-closed on other statuses', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
@@ -313,54 +288,6 @@ describe('merge-group admission evidence', () => {
         'refs/heads/gh-readonly-queue/main/not-a-pr'
       )
     ).toThrow(/does not expose a queue PR number/);
-  });
-
-  it('accepts authenticated native User and Bot queue events', () => {
-    for (const actor of [
-      { __typename: 'User', login: 'itstimwhite' },
-      { __typename: 'Bot', login: 'jovie-bot' },
-    ]) {
-      expect(
-        classifyNativeQueueAdmissionEvent(
-          admissionTimeline({
-            actor,
-            enqueuer: { login: actor.login },
-          })
-        )
-      ).toMatchObject({
-        admittedAt: '2026-09-06T20:29:15.000Z',
-        actor: actor.login,
-        enqueuer: actor.login,
-        state: 'verified',
-      });
-    }
-  });
-
-  it('fails closed on incomplete or malformed admission timeline evidence', () => {
-    for (const timeline of [
-      null,
-      { errors: [{ message: 'denied' }] },
-      admissionTimeline({ actor: null }),
-      admissionTimeline({ enqueuer: null }),
-      admissionTimeline({ createdAt: 'not-a-date' }),
-      admissionTimeline({ id: '' }),
-      admissionTimeline({
-        actor: { __typename: 'Organization', login: 'jovie' },
-      }),
-    ]) {
-      expect(() => classifyNativeQueueAdmissionEvent(timeline)).toThrow();
-    }
-    const partial = admissionTimeline();
-    partial.data.repository.pullRequest.timelineItems.pageInfo.hasNextPage = true;
-    expect(() => classifyNativeQueueAdmissionEvent(partial)).toThrow(
-      /incomplete/
-    );
-    const removed = admissionTimeline({
-      __typename: 'RemovedFromMergeQueueEvent',
-    });
-    expect(classifyNativeQueueAdmissionEvent(removed)).toMatchObject({
-      state: 'pending',
-    });
   });
 
   it('requires the exact live queue ref and head SHA', () => {
@@ -549,7 +476,6 @@ describe('merge-group admission evidence', () => {
 
     await waitForMergeGroupAdmission({
       event: event(),
-      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -583,7 +509,6 @@ describe('merge-group admission evidence', () => {
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadQueueEvent: verifiedEvent,
         loadCheckRuns,
         loadLiveQueueEntries,
         loadQueueRef,
@@ -606,7 +531,6 @@ describe('merge-group admission evidence', () => {
         head_commit: { id: oldHead },
         head_sha: oldHead,
       }),
-      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries: async () => [
         liveEntry({ headCommitOid: currentHead }),
@@ -636,7 +560,6 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries: async () => [liveEntry()],
       loadQueueRef: async () => null,
@@ -671,7 +594,6 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -691,51 +613,46 @@ describe('merge-group admission evidence', () => {
     expect(loadQueueRef).toHaveBeenCalledTimes(2);
   });
 
-  it('rechecks the native queue event after external gates pass', async () => {
-    const loadQueueEvent = vi
-      .fn()
-      .mockResolvedValueOnce(verifiedEvent())
-      .mockResolvedValueOnce({ id: 'MQAE_changed', state: 'verified' });
-
-    await expect(
-      waitForMergeGroupAdmission({
+  it.each([false, true])(
+    'accepts the current same-content reenqueue across polls=%s',
+    async pendingFirst => {
+      let elapsed = 0;
+      let reads = 0;
+      const result = await waitForMergeGroupAdmission({
         event: event(),
-        loadQueueEvent,
-        loadCheckRuns: async ({ checkName }) =>
-          checkPage(checkName, 'completed', 'success'),
-        loadLiveQueueEntries: async () => [liveEntry()],
+        loadLiveQueueEntries: async () => [
+          liveEntry(
+            ++reads === 1
+              ? {}
+              : {
+                  id: 'MQE_reenqueued',
+                  enqueuedAt: '2026-09-23T22:17:52Z',
+                  enqueuer: {
+                    __typename: 'User',
+                    login: 'another-native-writer',
+                  },
+                  position: 2,
+                }
+          ),
+        ],
         loadQueueRef: async () => queueRef(),
+        loadCheckRuns: async ({ checkName }) =>
+          pendingFirst && elapsed === 0
+            ? checkPage(checkName, 'queued')
+            : checkPage(checkName, 'completed', 'success'),
         maxWaitMs: 10,
         pollIntervalMs: 3,
-      })
-    ).rejects.toThrow(/native queue event changed during admission/);
-    expect(loadQueueEvent).toHaveBeenCalledTimes(2);
-  });
-
-  it('waits for the native Added event without an Auto-Enroll status', async () => {
-    let elapsed = 0;
-    const loadQueueEvent = vi
-      .fn()
-      .mockResolvedValueOnce({ state: 'pending', detail: 'event not visible' })
-      .mockResolvedValue(verifiedEvent());
-    const result = await waitForMergeGroupAdmission({
-      event: event(),
-      loadQueueEvent,
-      loadCheckRuns: async ({ checkName }) =>
-        checkPage(checkName, 'completed', 'success'),
-      loadLiveQueueEntries: async () => [liveEntry()],
-      loadQueueRef: async () => queueRef(),
-      maxWaitMs: 10,
-      now: () => elapsed,
-      onStatus: () => {},
-      pollIntervalMs: 3,
-      sleep: async delayMs => {
-        elapsed += delayMs;
-      },
-    });
-    expect(result.receipt.admissionEvent.id).toBe('MQAE_123');
-    expect(loadQueueEvent).toHaveBeenCalledTimes(3);
-  });
+        now: () => elapsed,
+        sleep: async ms => {
+          elapsed += ms;
+        },
+        onStatus: () => {},
+      });
+      expect(result.admitted).toBe(true);
+      expect(result.receipt.liveEntry.id).toBe('MQE_reenqueued');
+      expect(result.receipt.liveEntry.sourceHeadSha).toBe(SOURCE_HEAD);
+    }
+  );
 
   it('rejects a source head that changes during final queue reread', async () => {
     const loadLiveQueueEntries = vi
@@ -745,7 +662,6 @@ describe('merge-group admission evidence', () => {
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadQueueEvent: verifiedEvent,
         loadCheckRuns: async ({ checkName }) =>
           checkPage(checkName, 'completed', 'success'),
         loadLiveQueueEntries,
@@ -769,7 +685,6 @@ describe('merge-group admission evidence', () => {
 
     const result = await waitForMergeGroupAdmission({
       event: event(),
-      loadQueueEvent: verifiedEvent,
       loadCheckRuns,
       loadLiveQueueEntries,
       loadQueueRef,
@@ -800,7 +715,6 @@ describe('merge-group admission evidence', () => {
     await expect(
       waitForMergeGroupAdmission({
         event: event(),
-        loadQueueEvent: verifiedEvent,
         loadCheckRuns,
         loadLiveQueueEntries,
         loadQueueRef,

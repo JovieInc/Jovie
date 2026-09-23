@@ -48,6 +48,9 @@ const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
     mergeQueue(branch:$branch){
       entries(first:$pageSize,after:$cursor){
         nodes{
+          id
+          enqueuedAt
+          enqueuer{__typename login}
           position
           state
           headCommit{oid}
@@ -55,33 +58,6 @@ const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
           pullRequest{number headRefOid baseRefName}
         }
         pageInfo{hasNextPage endCursor}
-      }
-    }
-  }
-}`;
-const ADMISSION_TIMELINE_QUERY = `query MergeGroupAdmissionTimeline(
-  $owner:String!,
-  $name:String!,
-  $pr:Int!
-){
-  repository(owner:$owner,name:$name){
-    pullRequest(number:$pr){
-      timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){
-        nodes{
-          __typename
-          ... on AddedToMergeQueueEvent{
-            id
-            createdAt
-            actor{__typename login}
-            enqueuer{login}
-          }
-          ... on RemovedFromMergeQueueEvent{
-            id
-            createdAt
-            actor{__typename login}
-          }
-        }
-        pageInfo{hasNextPage}
       }
     }
   }
@@ -175,46 +151,6 @@ export function validateMergeGroupAdmissionEvent(
   };
 }
 
-export function classifyNativeQueueAdmissionEvent(timelinePayload) {
-  const timeline =
-    timelinePayload?.data?.repository?.pullRequest?.timelineItems;
-  if (
-    (Array.isArray(timelinePayload?.errors) &&
-      timelinePayload.errors.length > 0) ||
-    !Array.isArray(timeline?.nodes) ||
-    timeline.nodes.length > 1 ||
-    timeline?.pageInfo?.hasNextPage !== false
-  ) {
-    fail('merge queue admission timeline evidence is incomplete or malformed');
-  }
-  const latest = timeline.nodes.at(-1);
-  if (!latest)
-    return { state: 'pending', detail: 'admission event not visible' };
-  if (latest.__typename !== 'AddedToMergeQueueEvent') {
-    return { state: 'pending', detail: 'latest queue event is not admission' };
-  }
-  const admittedAt = Date.parse(String(latest.createdAt ?? ''));
-  if (
-    typeof latest.id !== 'string' ||
-    latest.id.length === 0 ||
-    !Number.isFinite(admittedAt) ||
-    !['User', 'Bot'].includes(latest.actor?.__typename) ||
-    typeof latest.actor?.login !== 'string' ||
-    latest.actor.login.length === 0 ||
-    typeof latest.enqueuer?.login !== 'string' ||
-    latest.enqueuer.login.length === 0
-  ) {
-    fail('merge queue admission event is malformed');
-  }
-  return {
-    state: 'verified',
-    id: latest.id,
-    admittedAt: new Date(admittedAt).toISOString(),
-    actor: latest.actor.login,
-    enqueuer: latest.enqueuer.login,
-  };
-}
-
 function linkHasNext(link) {
   return typeof link === 'string' && /<[^>]+>;\s*rel="next"/.test(link);
 }
@@ -298,6 +234,9 @@ export function normalizeLiveQueueEntriesPage(
       );
     }
     return {
+      id: node.id,
+      enqueuedAt: node.enqueuedAt,
+      enqueuer: node.enqueuer,
       baseCommitOid: requireNullableSha(
         node?.baseCommit?.oid,
         `live merge queue baseCommit for PR #${prNumber}`
@@ -334,6 +273,9 @@ function queueSnapshot(entries) {
 function entryForReceipt(entry) {
   return entry
     ? {
+        id: entry.id,
+        enqueuedAt: entry.enqueuedAt,
+        enqueuer: entry.enqueuer,
         baseSha: entry.baseCommitOid,
         position: entry.position,
         pr: entry.prNumber,
@@ -483,7 +425,6 @@ function defaultSleep(delayMs) {
 
 export async function waitForMergeGroupAdmission({
   event,
-  loadQueueEvent,
   loadCheckRuns,
   loadLiveQueueEntries,
   loadQueueRef,
@@ -496,7 +437,6 @@ export async function waitForMergeGroupAdmission({
 }) {
   const evidence = validateMergeGroupAdmissionEvent(event);
   if (
-    typeof loadQueueEvent !== 'function' ||
     typeof loadCheckRuns !== 'function' ||
     typeof loadLiveQueueEntries !== 'function' ||
     typeof loadQueueRef !== 'function'
@@ -571,14 +511,6 @@ export async function waitForMergeGroupAdmission({
     if (!SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
       fail('live merge queue entry omitted its exact source head');
     }
-    let queueEvent = await loadQueueEvent({ ...evidence, deadlineMs });
-    if (
-      !['pending', 'verified'].includes(queueEvent?.state) ||
-      (queueEvent.state === 'verified' && !queueEvent.id)
-    ) {
-      fail('native queue event result is malformed');
-    }
-
     const pages = await Promise.all(
       REQUIRED_CHECKS.map(checkName =>
         loadCheckRuns({ ...evidence, checkName, deadlineMs })
@@ -602,11 +534,7 @@ export async function waitForMergeGroupAdmission({
       );
     }
 
-    if (
-      queueEvent.state === 'verified' &&
-      states.every(state => state.state === 'success')
-    ) {
-      const initialQueueEventId = queueEvent.id;
+    if (states.every(state => state.state === 'success')) {
       const finalQueueRef = await loadQueueRef({ ...evidence, deadlineMs });
       if (finalQueueRef === null) {
         return neutralizeVanishedQueueRef(liveReceipt);
@@ -620,29 +548,6 @@ export async function waitForMergeGroupAdmission({
       if (finalSourceHeadSha !== sourceHeadSha) {
         fail('live merge queue source head changed during admission');
       }
-      queueEvent = await loadQueueEvent({ ...evidence, deadlineMs });
-      if (!['pending', 'verified'].includes(queueEvent?.state)) {
-        fail('native queue event result is malformed');
-      }
-      if (
-        queueEvent.state === 'verified' &&
-        queueEvent.id !== initialQueueEventId
-      ) {
-        fail('native queue event changed during admission');
-      }
-      if (queueEvent.state !== 'verified') {
-        const remainingMs = deadlineMs - now();
-        if (remainingMs <= 0) {
-          fail(
-            `required merge-group checks did not pass within ${maxWaitMs}ms`
-          );
-        }
-        onStatus(
-          `Merge-group admission pending (attempt ${attempt}): queue event=${queueEvent.detail ?? queueEvent.state}, external checks=success`
-        );
-        await sleep(Math.min(pollIntervalMs, remainingMs));
-        continue;
-      }
       onStatus(
         `Merge-group admission passed for ${
           evidence.headSha
@@ -651,7 +556,7 @@ export async function waitForMergeGroupAdmission({
       return {
         ...evidence,
         admitted: true,
-        receipt: { ...finalLiveReceipt, admissionEvent: queueEvent },
+        receipt: finalLiveReceipt,
       };
     }
 
@@ -663,7 +568,7 @@ export async function waitForMergeGroupAdmission({
       (name, index) => `${name}=${states[index].detail}`
     ).join(', ');
     onStatus(
-      `Merge-group admission pending (attempt ${attempt}): queue event=${queueEvent.detail ?? queueEvent.state}, ${gateStatus}`
+      `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
     );
     await sleep(Math.min(pollIntervalMs, remainingMs));
   }
@@ -753,14 +658,6 @@ function createGitHubAdmissionApi({
   const encodedRepository = encodePathParts(repository);
   const encodedHeadRef = encodePathParts(headRef.slice('refs/'.length));
   return {
-    async loadQueueEvent({ deadlineMs, prNumber }) {
-      const timelinePayload = await githubGraphqlRequest(
-        ADMISSION_TIMELINE_QUERY,
-        { name, owner, pr: prNumber },
-        { deadlineMs, env, fetchImpl, token }
-      );
-      return classifyNativeQueueAdmissionEvent(timelinePayload);
-    },
     async loadLiveQueueEntries({ deadlineMs }) {
       const entries = [];
       let cursor = null;

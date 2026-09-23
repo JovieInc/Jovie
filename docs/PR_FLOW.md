@@ -104,12 +104,14 @@ Rules:
   requests GitHub's normal Merge when ready for the exact checked head. GitHub
   enforces required source checks and the native merge queue validates the
   combined head. The merge-group helper checks live membership, the exact queue
-  ref and source head, and required synthetic-head checks; it accepts GitHub's
-  authenticated native User or Bot enqueue event without an Auto-Enroll receipt.
+  ref and source head, and required synthetic-head checks. GitHub's current queue
+  entry is authoritative for membership; historical timeline events are not an
+  admission prerequisite. Native User and Bot enqueue requests use this same path
+  without an Auto-Enroll receipt.
   The production controller owns deployment serialization and exact runtime
   certification after merge. A pending or failed release checkpoint is not a
-  source-merge prerequisite. Legacy Auto-Enroll remains deployed during this
-  transition but has no exclusive admission authority.
+  source-merge prerequisite. Legacy Auto-Enroll is disabled while its redundant
+  source admission implementation is retired.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
