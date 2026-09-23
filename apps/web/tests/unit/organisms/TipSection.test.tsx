@@ -3,7 +3,6 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaySection } from '@/components/organisms/PaySection';
 
-// Mock Sonner toast with vi.hoisted for proper setup
 const mockToast = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
@@ -25,7 +24,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
-// Mock the ToastProvider from providers
 vi.mock('@/components/providers/ToastProvider', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -76,7 +74,6 @@ describe('TipSection', () => {
       screen.getByRole('button', { name: 'Pay $5 with Apple Pay / Card' })
     );
 
-    // Wait for the payment to fail and error toast to be called
     await waitFor(() => {
       expect(mockOnStripePayment).toHaveBeenCalledWith(5);
       expect(mockToast.error).toHaveBeenCalledWith(
@@ -119,7 +116,7 @@ describe('TipSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
     const venmoButton = await screen.findByRole('button', {
-      name: 'Pay $10 with Venmo',
+      name: 'Continue with Venmo',
     });
     const venmoLogoClass = venmoButton
       .querySelector('svg')
@@ -149,22 +146,19 @@ describe('TipSection', () => {
     fireEvent.click(venmoMethodButton);
     expect(mockOnVenmoPayment).not.toHaveBeenCalled();
 
-    // Select the $5 amount in the PaySelector
     const amountButton = screen.getByRole('button', {
       name: 'Select $5 payment amount',
     });
     fireEvent.click(amountButton);
 
-    // Click the continue button to trigger payment
     const continueButton = await screen.findByRole('button', {
-      name: /Pay \$5 with Venmo/i,
+      name: 'Continue with Venmo',
     });
     fireEvent.click(continueButton);
 
     expect(mockOnVenmoPayment).toHaveBeenCalledTimes(1);
     const urlArg = mockOnVenmoPayment.mock.calls[0][0];
 
-    // Basic checks on URL construction: base link and amount
     expect(urlArg).toContain(venmoBaseLink);
     expect(urlArg).toContain('utm_amount=5');
   });
@@ -187,7 +181,7 @@ describe('TipSection', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
-    await screen.findByRole('button', { name: 'Pay $10 with Venmo' });
+    await screen.findByRole('button', { name: 'Continue with Venmo' });
     fireEvent.click(
       screen.getByRole('button', { name: 'Select Apple Pay / Card' })
     );
@@ -209,7 +203,7 @@ describe('TipSection', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
-    await screen.findByRole('button', { name: 'Pay $10 with Venmo' });
+    await screen.findByRole('button', { name: 'Continue with Venmo' });
     await waitFor(() =>
       expect(globalThis.localStorage.getItem('jovie:pay:method')).toBe('venmo')
     );
@@ -230,7 +224,7 @@ describe('TipSection', () => {
       screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Pay \$10 with Venmo/i })
+      screen.getByRole('button', { name: 'Continue with Venmo' })
     ).toBeInTheDocument();
   });
 
@@ -248,7 +242,7 @@ describe('TipSection', () => {
     });
     expect(mockOnVenmoPayment).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Pay $12.50 with Venmo' })
+      screen.getByRole('button', { name: 'Continue with Venmo' })
     );
     expect(mockOnVenmoPayment).toHaveBeenCalledWith(
       expect.stringContaining('utm_amount=12.5')
