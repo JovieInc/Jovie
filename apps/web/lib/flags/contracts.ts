@@ -62,6 +62,12 @@ export const APP_FLAG_DEFAULTS = {
    * and approve the first live send before any customer receives it.
    */
   PAID_WELCOME_EMAIL: false,
+  /**
+   * Merch pre-publish QA gate (JOV-4739). Default OFF until a real visual
+   * reviewer lands — the stub reviewer routes every new candidate to
+   * quarantine when enabled.
+   */
+  MERCH_QA_GATE: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -90,6 +96,7 @@ export const APP_FLAG_KEYS = {
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
   ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
+  MERCH_QA_GATE: 'merch_qa_gate',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -113,6 +120,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
   ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
+  MERCH_QA_GATE: 'code:MERCH_QA_GATE',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -163,6 +171,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
   PAID_WELCOME_EMAIL:
     'Send one idempotent paid-welcome email after verified subscription entitlement. Default off — Tim publishes prod override and approves the first live send (JOV-6445).',
+  MERCH_QA_GATE:
+    'Merch pre-publish visual QA gate: persisted receipts, quarantine queue, fail-closed publish evidence (JOV-4739). Default off until a real visual reviewer replaces the stub.',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -184,4 +194,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
+  'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
 ]);
