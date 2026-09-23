@@ -43,8 +43,8 @@ function WaitlistRouteWithContract({
  * seven-field waitlist questionnaire.
  *
  * WAITLIST_PENDING stays here. A real pending row is the only success
- * condition; missing receipts recover to /signup instead of 404ing
- * acquisition traffic (JOV-6436).
+ * condition; missing receipts show a recoverable error rather than sending
+ * the user back through the /signup redirect loop (JOV-6533).
  *
  * /start is rewrite-exempt for waitlist users, so recovering to /start does
  * not re-enter the JOV-2161 proxy rewrite loop.

@@ -214,8 +214,13 @@ describe('WaitlistPage', () => {
       const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
       if (state === CanonicalUserState.WAITLIST_PENDING) {
-        await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
-        expect(mockRedirect).toHaveBeenCalledWith('/signup');
+        const { WaitlistSuccessView } = await import(
+          '@/components/features/waitlist/WaitlistSuccessView'
+        );
+        const result = await WaitlistPage();
+        expect(result.props.children.type).toBe(WaitlistSuccessView);
+        expect(result.props.children.props.outcome).toBe('receipt_unavailable');
+        expect(mockRedirect).not.toHaveBeenCalled();
         expect(mockNotFound).not.toHaveBeenCalled();
         return;
       }
