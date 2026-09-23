@@ -107,7 +107,6 @@ export function PaySection({
   const handleStripePayment = async (amount: number) => {
     if (!onStripePayment) return;
 
-    // Fire tip_intent pixel event for retargeting
     // @ts-expect-error - joviePixel is set by JoviePixel component
     if (globalThis.joviePixel?.track) {
       // @ts-expect-error - joviePixel is set by JoviePixel component
@@ -149,7 +148,6 @@ export function PaySection({
       venmoUsername ?? ''
     )}`;
 
-    // Fire venmo_link_click pixel event (distinct from tip_intent for Stripe)
     // @ts-expect-error - joviePixel is set by JoviePixel component
     if (globalThis.joviePixel?.track) {
       // @ts-expect-error - joviePixel is set by JoviePixel component
@@ -271,6 +269,9 @@ export function PaySection({
             </p>
           ) : null}
           <div className='mt-4'>
+            <p className='mb-1 text-center text-xs font-medium text-secondary-token'>
+              {effectiveMethod === 'venmo' ? 'Venmo' : 'Apple Pay / Card'}
+            </p>
             <ActionDial
               options={methods}
               selectedId={effectiveMethod}
