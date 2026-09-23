@@ -1247,6 +1247,26 @@ export class MarketingCertificationStore {
     };
   }
 
+  /** Read current certification state without creating a persisted ledger. */
+  async inspectLedger(
+    evaluatedAt = new Date().toISOString()
+  ): Promise<MarketingCertificationLedgerProjection> {
+    assertValidTimestamp(evaluatedAt, 'Ledger projection time');
+    const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+    const ledger =
+      raw === null || raw === undefined
+        ? initialLedger(this.entries, evaluatedAt)
+        : parseLedger(raw);
+    assertLedgerMatchesRegistry(ledger, this.entries, evaluatedAt);
+    return {
+      contract: JOVIE_CERTIFICATION_CONTRACT,
+      registryIds: [...ledger.registryIds],
+      rows: this.entries.map(entry =>
+        projectionRow(entry, ledger.records[entry.id], evaluatedAt)
+      ),
+    };
+  }
+
   async projectReviewReady(input: {
     readonly existingEntryId: string | null;
     readonly evaluatedAt?: string;
