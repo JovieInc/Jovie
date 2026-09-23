@@ -97,11 +97,12 @@ export function classifyJevShadow({
   if (
     isObject(previousShadow) &&
     previousShadow.schema === JEV_SHADOW_SCHEMA &&
-    previousShadow.evidenceFingerprint === fingerprint
+    previousShadow.evidenceFingerprint === fingerprint &&
+    GATEWAY_MODEL_ALLOWLIST.includes(previousShadow.model)
   ) {
     const locked = freezeCertifiedFalse({
       schema: JEV_SHADOW_SCHEMA,
-      model: resolvedModel,
+      model: previousShadow.model,
       shadow: true,
       blocking: false,
       alignment: normalizeAlignment(previousShadow.alignment),

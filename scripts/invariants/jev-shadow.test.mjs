@@ -151,6 +151,23 @@ describe('JOV-6051 calibrated Jev shadow', () => {
     assert.match(second.issues.join('\n'), /unchanged evidence/);
   });
 
+  it('keeps the original model identity when unchanged evidence is replayed', () => {
+    const first = classifyJevShadow({
+      claim: CLAIM,
+      evidence: EVIDENCE,
+      evaluate: () => ({ alignment: 'contradicted' }),
+    });
+    const replay = classifyJevShadow({
+      claim: CLAIM,
+      evidence: EVIDENCE,
+      model: 'zai/glm-5.3',
+      evaluate: () => ({ alignment: 'supported' }),
+      previousShadow: first,
+    });
+    assert.equal(replay.model, JEV_MODEL);
+    assert.equal(replay.alignment, 'contradicted');
+  });
+
   it('attaches shadow without promoting model certification onto the run', () => {
     const shadow = classifyJevShadow({
       claim: CLAIM,
