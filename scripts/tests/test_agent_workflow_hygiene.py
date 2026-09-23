@@ -15,7 +15,6 @@ HOT_PATH_WORKFLOWS = (
     "agent-tick.yml",
     "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
-    "merge-queue-autoenroll.yml",
 )
 
 FULL_CHECKOUT_JOBS = (
@@ -26,8 +25,6 @@ FLEET_CONTROLLER_JOBS = (
     ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
-    ("merge-queue-autoenroll.yml", "enroll"),
-    ("merge-queue-autoenroll.yml", "rebase"),
     ("agent-tick.yml", "auto-ready"),
 )
 
@@ -415,8 +412,7 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     for workflow_name in (
         "agent-pipeline.yml",
         "pr-conflict-handler.yml",
-        "merge-queue-autoenroll.yml",
-    ):
+        ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
 
@@ -794,18 +790,13 @@ def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() 
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
-    """Filter CI events before fleet policy consumes a runner."""
+    """Filter CI events before trusted remediation consumes a runner."""
     for workflow, job_name in (
-        ("merge-queue-autoenroll.yml", "fleet-policy"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
         assert "github.event.workflow_run.event == 'pull_request'" in block, workflow
         assert "github.event.workflow_run.conclusion != 'cancelled'" in block, workflow
-
-    enroll = _job_block("merge-queue-autoenroll.yml", "enroll")
-    assert "needs: fleet-policy" in enroll
-    assert "always()" not in enroll
 
     auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
         encoding="utf-8"
@@ -1665,13 +1656,13 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
 
 
 def test_fleet_controllers_share_one_evaluate_action() -> None:
-    """FGR, merge-queue, and production-controller share the gate CLI."""
+    """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
     script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
-        ("merge-queue-autoenroll.yml", "fleet-policy", "policy"),
+
         ("production-controller.yml", "fleet-promotion", "policy"),
     )
     for workflow, job_name, _step in callers:

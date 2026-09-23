@@ -16,7 +16,7 @@ This repository uses trunk-based development with a single long-lived branch:
 ## Drain Activation Order
 
 Workflow triggers below describe YAML capability, not live GitHub enablement.
-The all-PR drain activation is complete: **Merge Queue Auto-Enroll** is active,
+The all-PR drain is retired: **Merge Queue Auto-Enroll** is disabled and removed at source,
 while **Auto-Ready Agent Drafts** has been `disabled_manually` since
 2026-07-20 (verified 2026-09-20) — drafts are undrafted by their writer, not
 automatically; re-enabling it is a founder decision. Enable **Main CI Health
@@ -175,8 +175,8 @@ native auto-merge intent. The automated **Auto-Ready Agent Drafts** workflow is
 currently `disabled_manually` (since 2026-07-20, verified 2026-09-20); when
 active, green-source Auto-Ready undrafts a draft only after
 PR Ready + required checks are SUCCESS and mergeability is CLEAN, and
-Auto-Enroll then consumes `ready_for_review`. An unchanged `ready_for_review`
-event never launches another CI flight.
+The finishing agent requests native Merge when ready against the exact head.
+An unchanged `ready_for_review` event never launches another CI flight.
 
 <!-- ci-harness:start -->
 ## CI Agent Harness
