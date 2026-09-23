@@ -227,6 +227,54 @@ function decision(digest: string, id = 'decision-1') {
 }
 
 describe('MarketingCertificationStore', () => {
+  it('inspects the exact registry without initializing durable state', async () => {
+    const records = new Map<string, unknown>();
+    const backend: CertificationRecordBackend = {
+      async get(key) {
+        return records.get(key) ?? null;
+      },
+      async compareAndSet() {
+        throw new Error('read-only inspection attempted a write');
+      },
+      async setIfAbsent() {
+        throw new Error('read-only inspection attempted a write');
+      },
+    };
+    const store = new MarketingCertificationStore(backend, REGISTRY);
+
+    const projection = await store.inspectLedger('2026-09-04T20:00:00.000Z');
+
+    expect(records.size).toBe(0);
+    expect(projection.registryIds).toEqual(REGISTRY.map(entry => entry.id));
+    expect(projection.rows).toHaveLength(REGISTRY.length);
+    expect(projection.rows.every(row => row.packet.source === null)).toBe(true);
+    expect(
+      projection.rows.every(row => row.admission.state === 'working')
+    ).toBe(true);
+    await expect(store.inspectLedger('not-a-date')).rejects.toThrow(
+      'Ledger projection time must be a valid timestamp'
+    );
+    expect(records.size).toBe(0);
+
+    await new MarketingCertificationStore(
+      memoryBackend(records),
+      REGISTRY
+    ).projectLedger();
+    const persistedProjection = await store.inspectLedger(
+      '2026-09-04T20:00:00.000Z'
+    );
+    expect(persistedProjection.registryIds).toEqual(projection.registryIds);
+    expect(persistedProjection.rows).toHaveLength(REGISTRY.length);
+    const persisted = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    persisted.registryIds.pop();
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(persisted));
+    await expect(store.inspectLedger()).rejects.toBeInstanceOf(
+      MarketingCertificationRegistryDriftError
+    );
+  });
+
   it('persists a fail-closed placeholder for every registry identity', async () => {
     const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
     const result = await store.projectLedger('2026-09-04T20:00:00.000Z');
@@ -692,17 +740,20 @@ describe('MarketingCertificationStore', () => {
       },
       'cannot satisfy more than one requirement',
     ],
-  ])('rejects malformed assurance mapping: %s', async (_label, profile, error) => {
-    const store = new MarketingCertificationStore(memoryBackend(), [
-      REGISTRY[0],
-    ]);
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [profile as MarketingAssuranceProfile],
-        existingEntryId: null,
-      })
-    ).rejects.toThrow(error);
-  });
+  ])(
+    'rejects malformed assurance mapping: %s',
+    async (_label, profile, error) => {
+      const store = new MarketingCertificationStore(memoryBackend(), [
+        REGISTRY[0],
+      ]);
+      await expect(
+        store.projectReviewReady({
+          assuranceProfiles: [profile as MarketingAssuranceProfile],
+          existingEntryId: null,
+        })
+      ).rejects.toThrow(error);
+    }
+  );
 
   it('rejects ambiguous, stale-source, unknown, and duplicate assurance mappings', async () => {
     const entry = REGISTRY[0];
@@ -1080,18 +1131,17 @@ describe('MarketingCertificationStore', () => {
     ).rejects.toThrow('has no resolved canonical source');
   });
 
-  it.each([
-    42,
-    '{',
-    '{}',
-  ] as const)('fails closed for corrupt ledger %j', async raw => {
-    const backend = memoryBackend(
-      new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
-    );
-    await expect(
-      new MarketingCertificationStore(backend, REGISTRY).projectLedger()
-    ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
-  });
+  it.each([42, '{', '{}'] as const)(
+    'fails closed for corrupt ledger %j',
+    async raw => {
+      const backend = memoryBackend(
+        new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
+      );
+      await expect(
+        new MarketingCertificationStore(backend, REGISTRY).projectLedger()
+      ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
+    }
+  );
 
   it('rejects persisted packet, decision, audit, and replay corruption', async () => {
     for (const corruption of [
