@@ -73,6 +73,7 @@ export {
   checkAiChatRateLimitForPlan,
   checkAnonymousChatRateLimit,
   checkAppleMusicRescanRateLimit,
+  checkAuthenticatedOnboardingChatRateLimit,
   checkDspDiscoveryRateLimit,
   checkIsrcRescanRateLimit,
   checkOnboardingRateLimit,

@@ -64,6 +64,8 @@ export interface UserStateInput {
   hasDbUser: boolean;
   /** User status from DB (e.g., 'active', 'banned', 'waitlist_pending') */
   userStatus: string | null;
+  /** Durable waitlist receipt linked to this app user, if one exists. */
+  waitlistEntryId: string | null;
   /** Soft deletion timestamp */
   deletedAt: Date | null;
   /** Whether the waitlist gate is enabled globally */
@@ -127,7 +129,9 @@ export function resolveCanonicalState(
   // admin approves them. Turning the launch gate off only opens daily intake
   // capacity; it must not unlock already-waitlisted accounts by navigation.
   if (input.userStatus === 'waitlist_pending') {
-    return CanonicalUserState.WAITLIST_PENDING;
+    return input.waitlistEntryId
+      ? CanonicalUserState.WAITLIST_PENDING
+      : CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }
 
   // Waitlist gate is enabled and user is not approved

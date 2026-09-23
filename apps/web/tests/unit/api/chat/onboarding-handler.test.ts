@@ -4,6 +4,8 @@ const hoisted = vi.hoisted(() => ({
   checkGateForUserMock: vi.fn(),
   executeChatTurnMock: vi.fn(),
   checkAnonymousChatRateLimitMock: vi.fn(),
+  checkAuthenticatedOnboardingChatRateLimitMock: vi.fn(),
+  getBetterAuthSessionMock: vi.fn(),
   isTurnstileConfiguredMock: vi.fn(),
   verifyTurnstileTokenMock: vi.fn(),
   encodeSessionCookieMock: vi.fn(),
@@ -41,9 +43,15 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   checkAnonymousChatRateLimit: hoisted.checkAnonymousChatRateLimitMock,
+  checkAuthenticatedOnboardingChatRateLimit:
+    hoisted.checkAuthenticatedOnboardingChatRateLimitMock,
   createRateLimitHeaders: () => ({}),
   rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
     result.unavailable === true ? 503 : 429,
+}));
+
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: { api: { getSession: hoisted.getBetterAuthSessionMock } },
 }));
 
 vi.mock('@/lib/turnstile/verify', () => ({
@@ -148,6 +156,10 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
       success: true,
     });
+    hoisted.checkAuthenticatedOnboardingChatRateLimitMock.mockResolvedValue({
+      success: true,
+    });
+    hoisted.getBetterAuthSessionMock.mockResolvedValue(null);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     hoisted.encodeSessionCookieMock.mockImplementation(
       (id: string) => `signed.${id}.sig`
@@ -163,6 +175,36 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     const result = await tryHandleAnonymousOnboardingChat(req, 'req-1');
     expect(result).toBeNull();
     expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
+  }, 15_000);
+
+  it('uses a verified account quota for the first signed-in /start message', async () => {
+    hoisted.getBetterAuthSessionMock.mockResolvedValue({
+      user: { id: 'ba-user-1' },
+    });
+    hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+      success: false,
+      reason: 'Shared network exhausted',
+      reset: new Date(Date.now() + 30_000),
+    });
+    hoisted.checkAuthenticatedOnboardingChatRateLimitMock.mockResolvedValue({
+      success: false,
+      reason: 'Account quota reached',
+      reset: new Date(Date.now() + 30_000),
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({ mode: 'onboarding', messages: [userMessage('hi')] }),
+      'req-signed-in'
+    );
+
+    expect(result?.status).toBe(429);
+    expect((await result?.json()).message).toBe('Account quota reached');
+    expect(
+      hoisted.checkAuthenticatedOnboardingChatRateLimitMock
+    ).toHaveBeenCalledWith('ba-user-1', expect.any(String));
+    expect(hoisted.checkAnonymousChatRateLimitMock).not.toHaveBeenCalled();
   });
 
   it('treats locator-less messages without mode as onboarding (JOV-5084)', async () => {

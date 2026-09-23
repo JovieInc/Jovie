@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
-import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -113,5 +112,14 @@ export default async function WaitlistPage() {
     );
   }
 
-  redirect(APP_ROUTES.SIGNUP);
+  // A stale pending status must not claim success or bounce a signed-in user
+  // through /signup -> /waitlist indefinitely.
+  return (
+    <WaitlistRouteWithContract>
+      <WaitlistSuccessView
+        outcome='receipt_unavailable'
+        email={authResult.context.email}
+      />
+    </WaitlistRouteWithContract>
+  );
 }

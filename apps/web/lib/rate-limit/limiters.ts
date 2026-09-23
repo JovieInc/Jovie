@@ -615,6 +615,23 @@ export async function checkAnonymousChatRateLimit(
   return sessionResult;
 }
 
+/** Signed-in /start turns use a per-account spend quota and the session cap.
+ * Shared anonymous IP/ASN pools must not block an account's first message.
+ */
+export async function checkAuthenticatedOnboardingChatRateLimit(
+  betterAuthUserId: string,
+  sessionId: string
+): Promise<RateLimitResult> {
+  const sessionResult = await checkRateLimit(
+    anonymousOnboardingChatSessionLimiter,
+    `session:${sessionId}`,
+    'You have hit the conversation limit for this session.'
+  );
+  if (!sessionResult.success) return sessionResult;
+
+  return checkAiChatRateLimitForPlan(`better-auth:${betterAuthUserId}`, 'free');
+}
+
 /**
  * Check Spotify search rate limits (authenticated user)
  * Returns the first failure or success if all pass
