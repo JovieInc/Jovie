@@ -13,9 +13,10 @@ import types
 
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/symphony-burrito-workflow.test.py"
-SUITES = [SUITE, ROOT / "scripts/symphony/tests/activation-ownership.test.py"]
+SUITES = [SUITE, ROOT / "scripts/symphony/tests/activation-ownership.test.py",
+          ROOT / "scripts/symphony/tests/workflow-preservation.test.py"]
 TARGETS = {
-    "symphony_official_runtime.py": {"run_official_binary_once", "read_dispatch_admission", "_closure_snapshot_verdict", "_closure_issue_intake_allowed", "_repair_feed_reasons", "_activation_read_file", "_activation_command", "_activation_snapshot", "_activation_dropin_paths", "_activation_exec_matches", "_activation_process_generation", "activation_ownership_preflight"},
+    "symphony_official_runtime.py": {"run_official_binary_once", "read_dispatch_admission", "_closure_snapshot_verdict", "_closure_issue_intake_allowed", "_repair_feed_reasons", "_activation_read_file", "_activation_command", "_activation_snapshot", "_activation_dropin_paths", "_activation_exec_matches", "_activation_process_generation", "activation_ownership_preflight", "activation_classification"},
 }
 
 
