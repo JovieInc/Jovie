@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Chat',
-  description: 'Operator chat for the signed-in account.',
+  description: 'Operator chat surface on the signed-in artist profile.',
   robots: NOINDEX_ROBOTS,
 };
 
