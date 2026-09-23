@@ -162,7 +162,7 @@ export function SmartLinksLanding() {
             streaming service.
           </p>
           <div className='mt-8'>
-            <Button asChild variant='primary' size='md'>
+            <Button asChild variant='secondary' size='md'>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?source=smart-links&intent=create`}
               >
