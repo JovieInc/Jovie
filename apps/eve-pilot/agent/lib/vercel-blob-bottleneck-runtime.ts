@@ -44,54 +44,49 @@ function exactKeys(value: unknown, keys: readonly string[]): boolean {
   );
 }
 
-const SOURCE_EVALUATION_KEYS = [
-  'schema',
-  'taskKey',
-  'taskSelectionDigest',
-  'sourceVersion',
-  'snapshotDigest',
-  'targetDigest',
-  'identifier',
-  'issueId',
-  'repository',
-  'pr',
-  'baseHead',
-  'finalHead',
-  'targetObserved',
-  'observedIssueId',
-  'observedIssueRevision',
-  'observedPrNumber',
-  'observedPrHead',
-  'observedRepository',
-  'prMergeStateStatus',
-  'mergeable',
-  'workerAttested',
-  'selectedEvidence',
-  'taskResolved',
-  'reason',
-  'digest',
-];
-const VERIFICATION_KEYS = [
-  'schema',
-  'claimRecorded',
-  'acceptanceRecorded',
-  'runStarted',
-  'runTerminal',
-  'resultPersisted',
-  'leaseHeld',
-  'workspaceBound',
-  'headObserved',
-  'headChanged',
-  'taskAccepted',
-];
-const SOURCE_EVALUATION_REASONS = new Set([
-  'target-observation-unavailable',
-  'target-identity-mismatch',
-  'head-unchanged',
-  'task-check-unresolved',
-  'task-check-evidence-unavailable',
-  'task-check-passed',
-]);
+const SOURCE_EVALUATION_KEYS = `
+  schema taskKey taskSelectionDigest sourceVersion snapshotDigest targetDigest
+  identifier issueId repository pr baseHead finalHead targetObserved observedIssueId
+  observedIssueRevision observedPrNumber observedPrHead observedRepository
+  prMergeStateStatus mergeable workerAttested selectedEvidence taskResolved reason digest
+`
+  .trim()
+  .split(/\s+/u);
+const VERIFICATION_KEYS =
+  'schema claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved headChanged taskAccepted'.split(
+    ' '
+  );
+const SOURCE_EVALUATION_REASONS = new Set(
+  'target-observation-unavailable target-identity-mismatch head-unchanged task-check-unresolved task-check-evidence-unavailable task-check-passed'.split(
+    ' '
+  )
+);
+const EXECUTION_KEYS = `
+  runId provider model authPoolIdentity leaseIdentity evidenceDigest assignmentDigest
+  providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest baseHead
+  finalHead outputDigest sourceEvaluation verification
+`
+  .trim()
+  .split(/\s+/u);
+const DIGEST_KEYS =
+  'authPoolIdentity leaseIdentity evidenceDigest assignmentDigest providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest outputDigest'.split(
+    ' '
+  );
+const OUTBOX_V3_KEYS = `
+  schema destination idempotencyKey status task signatureKeyId signature
+`
+  .trim()
+  .split(/\s+/u);
+const OUTCOME_V3_KEYS = `
+  schema taskKey decisionFingerprint status detail completedAt source
+  existingRepair execution signatureKeyId signature
+`
+  .trim()
+  .split(/\s+/u);
+const VERIFIED_EXECUTION_STEPS =
+  'claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved'.split(
+    ' '
+  );
 
 function sourceEvaluationDigest(evaluation: SummerBottleneckRecord): string {
   const { digest: _digest, ...unsigned } = evaluation;
@@ -182,42 +177,15 @@ function validateExecutionOutcomeV3(
       evalRecord.observedPrNumber === target.pr &&
       evalRecord.observedPrHead === execRecord.finalHead &&
       evalRecord.observedRepository === target.repository);
-  const executionKeys = [
-    'runId',
-    'provider',
-    'model',
-    'authPoolIdentity',
-    'leaseIdentity',
-    'evidenceDigest',
-    'assignmentDigest',
-    'providerGrantDigest',
-    'acceptanceDigest',
-    'runDigest',
-    'taskAcceptanceDigest',
-    'baseHead',
-    'finalHead',
-    'outputDigest',
-    'sourceEvaluation',
-    'verification',
-  ];
-  const digestKeys = [
-    'authPoolIdentity',
-    'leaseIdentity',
-    'evidenceDigest',
-    'assignmentDigest',
-    'providerGrantDigest',
-    'acceptanceDigest',
-    'runDigest',
-    'taskAcceptanceDigest',
-    'outputDigest',
-  ];
-  const validStrings = ['runId', 'provider', 'model'].every(
-    key =>
-      typeof execRecord?.[key] === 'string' &&
-      execRecord[key].length > 0 &&
-      execRecord[key].length <= (key === 'provider' ? 64 : 128)
-  );
-  const validDigests = digestKeys.every(
+  const validStrings = 'runId provider model'
+    .split(' ')
+    .every(
+      key =>
+        typeof execRecord?.[key] === 'string' &&
+        execRecord[key].length > 0 &&
+        execRecord[key].length <= (key === 'provider' ? 64 : 128)
+    );
+  const validDigests = DIGEST_KEYS.every(
     key =>
       typeof execRecord?.[key] === 'string' &&
       /^[a-f0-9]{64}$/u.test(execRecord[key] as string)
@@ -248,16 +216,7 @@ function validateExecutionOutcomeV3(
   const verificationValid =
     exactKeys(verification, VERIFICATION_KEYS) &&
     verifyRecordValue.schema === 'symphony-existing-repair-evidence/v1' &&
-    [
-      'claimRecorded',
-      'acceptanceRecorded',
-      'runStarted',
-      'runTerminal',
-      'resultPersisted',
-      'leaseHeld',
-      'workspaceBound',
-      'headObserved',
-    ].every(key => verifyRecordValue[key] === true) &&
+    VERIFIED_EXECUTION_STEPS.every(key => verifyRecordValue[key] === true) &&
     typeof verifyRecordValue.headChanged === 'boolean' &&
     typeof verifyRecordValue.taskAccepted === 'boolean' &&
     verifyRecordValue.headChanged ===
@@ -265,7 +224,7 @@ function validateExecutionOutcomeV3(
     verifyRecordValue.taskAccepted ===
       (evalRecord.workerAttested === true && evalRecord.taskResolved === true);
   if (
-    !exactKeys(execution, executionKeys) ||
+    !exactKeys(execution, EXECUTION_KEYS) ||
     !validStrings ||
     execRecord.provider === 'codex' ||
     !validDigests ||
@@ -584,15 +543,7 @@ export function createVercelBlobBottleneckDependencies(
       }
       if (
         !outbox ||
-        !exactKeys(outbox, [
-          'schema',
-          'destination',
-          'idempotencyKey',
-          'status',
-          'task',
-          'signatureKeyId',
-          'signature',
-        ]) ||
+        !exactKeys(outbox, OUTBOX_V3_KEYS) ||
         outbox.schema !== 'jovie.eve.symphony-repair-outbox/v3' ||
         outbox.destination !== 'symphony' ||
         outbox.idempotencyKey !== idempotencyKey ||
@@ -624,19 +575,7 @@ export function createVercelBlobBottleneckDependencies(
         | undefined;
       if (
         boundTask.taskKey !== idempotencyKey ||
-        !exactKeys(outcome, [
-          'schema',
-          'taskKey',
-          'decisionFingerprint',
-          'status',
-          'detail',
-          'completedAt',
-          'source',
-          'existingRepair',
-          'execution',
-          'signatureKeyId',
-          'signature',
-        ]) ||
+        !exactKeys(outcome, OUTCOME_V3_KEYS) ||
         outcome.schema !== 'jovie.symphony-repair-outcome/v3' ||
         outcome.taskKey !== idempotencyKey ||
         outcome.decisionFingerprint !== boundTask.decisionFingerprint ||

@@ -638,17 +638,17 @@ describe('Summer bottleneck loop', () => {
   it('requires a fresh assignment and exact provider, target, selection, source, and runtime admission join', async () => {
     const assignment = existingRepair(NOW.toISOString());
     const staleAt = new Date(NOW.getTime() - 11 * 60_000).toISOString();
+    const admitted = (
+      target = assignment,
+      selectedId: SummerCiImprovementClassId = 'merge-group-flake-baseline-ratchet',
+      observedAt = NOW.toISOString()
+    ) => taskAdmissions(selectedId, observedAt, SOURCE, target);
     const expiredAssignment = {
       ...assignment,
       expiresAt: new Date(NOW.getTime() - 60_000).toISOString(),
     };
     const unknownProvider = {
-      ...taskAdmissions(
-        'merge-group-flake-baseline-ratchet',
-        NOW.toISOString(),
-        SOURCE,
-        assignment
-      ),
+      ...admitted(),
       providerEligibility: {
         state: 'UNKNOWN',
         observedAt: null,
@@ -670,24 +670,14 @@ describe('Summer bottleneck loop', () => {
       {
         reason: 'task-admission-assignment-or-selection-mismatch',
         overrides: {
-          taskAdmissions: taskAdmissions(
-            'controller-cascade-coalescing',
-            NOW.toISOString(),
-            SOURCE,
-            assignment
-          ),
+          taskAdmissions: admitted(assignment, 'controller-cascade-coalescing'),
         },
       },
       {
         reason: 'existing-repair-assignment-expired-or-stale',
         overrides: {
           existingRepair: expiredAssignment,
-          taskAdmissions: taskAdmissions(
-            'merge-group-flake-baseline-ratchet',
-            NOW.toISOString(),
-            SOURCE,
-            expiredAssignment
-          ),
+          taskAdmissions: admitted(expiredAssignment),
         },
       },
       {
@@ -697,24 +687,14 @@ describe('Summer bottleneck loop', () => {
       {
         reason: 'task-admission-provider-eligibility-unavailable-or-stale',
         overrides: {
-          taskAdmissions: taskAdmissions(
-            'merge-group-flake-baseline-ratchet',
-            staleAt,
-            SOURCE,
-            assignment
-          ),
+          taskAdmissions: admitted(assignment, undefined, staleAt),
         },
       },
       {
         reason: 'task-admission-runtime-mismatch',
         overrides: {
           taskAdmissions: {
-            ...taskAdmissions(
-              'merge-group-flake-baseline-ratchet',
-              NOW.toISOString(),
-              SOURCE,
-              assignment
-            ),
+            ...admitted(),
             runtimeInvocationId: 'f'.repeat(32),
           },
         },

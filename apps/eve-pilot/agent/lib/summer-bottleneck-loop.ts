@@ -18,18 +18,6 @@ const MAX_RECONCILED_EVENTS = 25;
 const MAX_SCANNED_EVENTS = 100;
 const PREFIX = 'summer-bottleneck';
 
-export const summerCiImprovementClassIds = [
-  'merge-group-flake-baseline-ratchet',
-  'controller-cascade-coalescing',
-  'auto-enroll-self-cancel-churn',
-  'controller-check-run-pagination-cap',
-  'obsolete-unaffected-native-lanes',
-  'affected-only-unit-selection',
-] as const;
-export type SummerCiImprovementClassId =
-  (typeof summerCiImprovementClassIds)[number];
-const ciClassId = z.enum(summerCiImprovementClassIds);
-
 const exactSha = z.string().regex(SHA);
 const timestamp = z.string().datetime({ offset: true });
 const sourceFields = {
@@ -43,6 +31,16 @@ const runtimeSourceFields = {
   sourceRevision: exactSha.nullable(),
 };
 
+export const summerCiImprovementClassIds = [
+  'merge-group-flake-baseline-ratchet',
+  'controller-cascade-coalescing',
+  'auto-enroll-self-cancel-churn',
+  'controller-check-run-pagination-cap',
+  'obsolete-unaffected-native-lanes',
+  'affected-only-unit-selection',
+] as const;
+export type SummerCiImprovementClassId =
+  (typeof summerCiImprovementClassIds)[number];
 const existingRepairAssignmentSchema = z
   .object({
     mode: z.literal('isolated-cli'),
@@ -73,6 +71,30 @@ const admissionRowSchema = z
   })
   .strict();
 
+export type SymphonyRepairAction =
+  | 'reconcile-release-certification-starvation'
+  | 'reconcile-native-queue-starvation'
+  | 'reconcile-closure-health-red'
+  | 'reconcile-runner-capacity-starvation'
+  | 'remediate-selected-ci-audit-class';
+
+export const repairActionsByBottleneck = {
+  'release-certification-starvation':
+    'reconcile-release-certification-starvation',
+  'native-queue-starvation': 'reconcile-native-queue-starvation',
+  'closure-health-red': 'reconcile-closure-health-red',
+  'runner-capacity-starvation': 'reconcile-runner-capacity-starvation',
+} as const satisfies Record<string, SymphonyRepairAction>;
+const REPAIR_ACTIONS_BY_BOTTLENECK: Record<string, SymphonyRepairAction> = {
+  ...repairActionsByBottleneck,
+  ...Object.fromEntries(
+    summerCiImprovementClassIds.map(
+      id => [id, 'remediate-selected-ci-audit-class'] as const
+    )
+  ),
+};
+
+const ciClassId = z.enum(summerCiImprovementClassIds);
 const taskAdmissionsSchema = z
   .object({
     schema: z.literal('jovie.eve.summer-task-admissions/v1'),
@@ -102,29 +124,6 @@ const taskAdmissionsSchema = z
       .nullable(),
   })
   .strict();
-
-export type SymphonyRepairAction =
-  | 'reconcile-release-certification-starvation'
-  | 'reconcile-native-queue-starvation'
-  | 'reconcile-closure-health-red'
-  | 'reconcile-runner-capacity-starvation'
-  | 'remediate-selected-ci-audit-class';
-
-export const repairActionsByBottleneck = {
-  'release-certification-starvation':
-    'reconcile-release-certification-starvation',
-  'native-queue-starvation': 'reconcile-native-queue-starvation',
-  'closure-health-red': 'reconcile-closure-health-red',
-  'runner-capacity-starvation': 'reconcile-runner-capacity-starvation',
-} as const satisfies Record<string, SymphonyRepairAction>;
-const REPAIR_ACTIONS_BY_BOTTLENECK: Record<string, SymphonyRepairAction> = {
-  ...repairActionsByBottleneck,
-  ...Object.fromEntries(
-    summerCiImprovementClassIds.map(
-      id => [id, 'remediate-selected-ci-audit-class'] as const
-    )
-  ),
-};
 
 const runnerAuthority = z
   .object({

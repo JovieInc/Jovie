@@ -135,7 +135,7 @@ function digest(value: unknown): string {
   return createHash('sha256').update(canonical(value)).digest('hex');
 }
 
-function v3Outcome(): SummerBottleneckRecord {
+function v3Outcome(taskAccepted = true): SummerBottleneckRecord {
   const source = { ...task.source, action: task.action };
   const sourceEvaluationBody: SummerBottleneckRecord = {
     schema: 'symphony-existing-repair-source-evaluation/v1',
@@ -212,7 +212,7 @@ function v3Outcome(): SummerBottleneckRecord {
       workspaceBound: true,
       headObserved: true,
       headChanged: true,
-      taskAccepted: true,
+      taskAccepted,
     },
   };
   const execution: SummerBottleneckRecord = {
@@ -267,26 +267,12 @@ function storeHarness() {
   return { records, store };
 }
 
-function signedOutcome(overrides: SummerBottleneckRecord = {}) {
+function signedOutcome(
+  overrides: SummerBottleneckRecord = {},
+  taskAccepted = true
+) {
   return signSymphonyRepairOutcome(
-    { ...v3Outcome(), ...overrides },
-    SYMPHONY_PRIVATE_KEY,
-    'symphony-outcome-2026-09'
-  );
-}
-
-function signedOutcomeWithUnacceptedTask() {
-  const outcome = v3Outcome();
-  const execution = { ...(outcome.execution as Record<string, unknown>) };
-  const verification = execution.verification as Record<string, unknown>;
-  delete execution.evidenceDigest;
-  execution.verification = { ...verification, taskAccepted: false };
-  execution.evidenceDigest = digest({
-    schema: 'symphony-existing-repair-evidence/v1',
-    ...execution,
-  });
-  return signSymphonyRepairOutcome(
-    { ...outcome, execution },
+    { ...v3Outcome(taskAccepted), ...overrides },
     SYMPHONY_PRIVATE_KEY,
     'symphony-outcome-2026-09'
   );
@@ -429,38 +415,30 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
     });
   });
 
-  it('rejects a correctly signed success without accepted task evidence', async () => {
-    const proof = storeHarness();
-    const runtime = createVercelBlobBottleneckDependencies(
-      proof.store,
-      security
-    );
-    await runtime.dispatchToSymphony(task, { idempotencyKey: KEY });
-    proof.records.set(
-      `summer-bottleneck/symphony-terminal/${KEY}.json`,
-      signedOutcomeWithUnacceptedTask()
-    );
-
-    await expect(
-      runtime.observeSymphonyOutcome({
-        handle: `symphony:${KEY}`,
-        idempotencyKey: KEY,
-      })
-    ).rejects.toThrow(
-      'Symphony outcome execution evidence is invalid or cross-bound'
-    );
-  });
-
   it.each([
-    ['unsigned', { schema: 'jovie.symphony-repair-outcome/v3' }],
+    [
+      'unsigned',
+      { schema: 'jovie.symphony-repair-outcome/v3' },
+      'Symphony outcome is malformed, unauthenticated, or cross-bound',
+    ],
     [
       'cross-bound',
       signedOutcome({
         source: { ...task.source, action: 'different-action' },
       }),
+      'Symphony outcome is malformed, unauthenticated, or cross-bound',
     ],
-    ['cross-task', signedOutcome({ taskKey: 'e'.repeat(64) })],
-  ])('rejects an %s Symphony outcome', async (_name, outcome) => {
+    [
+      'cross-task',
+      signedOutcome({ taskKey: 'e'.repeat(64) }),
+      'Symphony outcome is malformed, unauthenticated, or cross-bound',
+    ],
+    [
+      'signed success with unaccepted task evidence',
+      signedOutcome({}, false),
+      'Symphony outcome execution evidence is invalid or cross-bound',
+    ],
+  ])('rejects an %s Symphony outcome', async (_name, outcome, error) => {
     const proof = storeHarness();
     const runtime = createVercelBlobBottleneckDependencies(
       proof.store,
@@ -476,9 +454,7 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
         handle: `symphony:${KEY}`,
         idempotencyKey: KEY,
       })
-    ).rejects.toThrow(
-      'Symphony outcome is malformed, unauthenticated, or cross-bound'
-    );
+    ).rejects.toThrow(error);
   });
 
   it('rejects a cross-bound handle or forged outbox', async () => {
