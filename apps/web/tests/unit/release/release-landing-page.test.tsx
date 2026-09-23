@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE } from '@/lib/profile/opaque-internal-profile-handle';
 
@@ -216,15 +216,19 @@ describe('@critical ReleaseLandingPage', () => {
     expect(title).not.toHaveClass('text-[28px]', 'text-3xl', 'text-4xl');
   });
 
-  it('renders provider buttons for each provider with a URL', () => {
+  it('keeps one fixed action and switches its URL when the fan chooses another provider', async () => {
     render(<ReleaseLandingPage {...defaultProps} />);
     const buttons = screen.getAllByTestId('provider-button');
-    expect(buttons.length).toBe(2);
+    expect(buttons.length).toBe(1);
     expect(buttons[0].getAttribute('data-href')).toBe(
       'https://open.spotify.com/track/1?utm_source=jovie'
     );
-    expect(buttons[1].getAttribute('data-href')).toBe(
-      'https://music.apple.com/track/1?utm_source=jovie'
+    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('provider-button')).toHaveAttribute(
+        'data-href',
+        'https://music.apple.com/track/1?utm_source=jovie'
+      )
     );
   });
 
@@ -234,8 +238,12 @@ describe('@critical ReleaseLandingPage', () => {
 
     expect(buttons[0]).toHaveAttribute('data-label', 'Stream Now');
     expect(buttons[0]).toHaveAttribute('data-primary', 'true');
-    expect(buttons[1]).toHaveAttribute('data-label', 'Apple Music');
-    expect(buttons[1]).toHaveAttribute('data-primary', 'false');
+    expect(
+      screen.getByRole('group', { name: 'Choose a streaming service' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Select Apple Music' })
+    ).toBeInTheDocument();
   });
 
   it('keeps downloads in the secondary menu when streaming links exist', () => {

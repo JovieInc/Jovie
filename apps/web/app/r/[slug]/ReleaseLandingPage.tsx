@@ -11,7 +11,6 @@ import { Download, Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
@@ -19,10 +18,10 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
+import { MusicServiceDial } from '@/features/release/MusicServiceDial';
 import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import {
   SMART_LINK_HERO_TITLE_CLASS,
   SMART_LINK_MENU_ICON_CLASS,
@@ -363,14 +362,17 @@ export function ReleaseLandingPage({
     setMenuOpen(initialMenuOpen);
   }, [initialMenuOpen]);
 
-  const clickableProviders = providers.filter(
-    (provider): provider is Provider & { url: string } => Boolean(provider.url)
+  const clickableProviders = useMemo(
+    () =>
+      providers.filter((provider): provider is Provider & { url: string } =>
+        Boolean(provider.url)
+      ),
+    [providers]
   );
   const resolvedUtmParams = useMemo(
     () => resolveReleaseUtmParams(utmParams),
     [utmParams]
   );
-  // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
   const artistByline =
@@ -492,33 +494,13 @@ export function ReleaseLandingPage({
             />
           )}
 
-          <div className='space-y-2'>
-            {clickableProviders.map((provider, index) => {
-              const logoConfig = DSP_LOGO_CONFIG[provider.key];
-              const isStreamNow = index === 0;
-              return (
-                <SmartLinkProviderButton
-                  key={provider.key}
-                  href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
-                  onClick={() => handleProviderClick(provider.key)}
-                  label={
-                    isStreamNow
-                      ? 'Stream Now'
-                      : (logoConfig?.name ?? provider.label)
-                  }
-                  iconPath={logoConfig?.iconPath}
-                  iconColor={logoConfig?.color}
-                  ariaLabel={
-                    isStreamNow
-                      ? `Stream Now on ${logoConfig?.name ?? provider.label}`
-                      : undefined
-                  }
-                  providerKey={provider.key}
-                  primary={isStreamNow}
-                />
-              );
-            })}
-          </div>
+          {clickableProviders.length > 0 && (
+            <MusicServiceDial
+              providers={clickableProviders}
+              utmParams={resolvedUtmParams}
+              onStream={handleProviderClick}
+            />
+          )}
 
           {clickableProviders.length === 0 && (
             <div className='rounded-2xl bg-surface-1 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
