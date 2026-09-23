@@ -344,7 +344,7 @@
     "axe-core": "^4.13.0",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
     "danger": "^14.0.7",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "drizzle-zod": "^0.8.3",
     "eslint": "^10.11.0",
     "eslint-config-next": "^16.3.5",
