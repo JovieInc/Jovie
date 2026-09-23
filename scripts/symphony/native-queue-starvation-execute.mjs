@@ -274,6 +274,8 @@ export function unsignedNativeQueueExecution(input) {
       authority: decision.authority,
       pr: decision.pr,
       head: decision.head,
+      mergeQueueEntryId: decision.mergeQueueEntryId ?? null,
+      mergedAt: decision.mergedAt ?? null,
     },
     source: {
       action: input.action,

@@ -2038,12 +2038,32 @@ export function validateTaskRecords(value, task, issueIdentifier, config) {
         execution.claim.assignee.length > 0 &&
         execution.claim.assignee.length <= 120)
     ) ||
-    !exactKeys(execution.execution, [
-      'mutationAttempted',
-      'authority',
-      'pr',
-      'head',
-    ]) ||
+    !(
+      execution.execution !== null &&
+      typeof execution.execution === 'object' &&
+      !Array.isArray(execution.execution) &&
+      ['mutationAttempted', 'authority', 'pr', 'head'].every(key =>
+        Object.hasOwn(execution.execution, key)
+      ) &&
+      Object.keys(execution.execution).every(key =>
+        [
+          'mutationAttempted',
+          'authority',
+          'pr',
+          'head',
+          'mergeQueueEntryId',
+          'mergedAt',
+        ].includes(key)
+      )
+    ) ||
+    !(
+      (execution.execution.mergeQueueEntryId === null ||
+        execution.execution.mergeQueueEntryId === undefined ||
+        typeof execution.execution.mergeQueueEntryId === 'string') &&
+      (execution.execution.mergedAt === null ||
+        execution.execution.mergedAt === undefined ||
+        typeof execution.execution.mergedAt === 'string')
+    ) ||
     typeof execution.execution.mutationAttempted !== 'boolean' ||
     ![
       'native-queue-mutation-authority-unavailable',
