@@ -6,6 +6,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,18 @@ import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
+const repoRequire = createRequire(resolve(repoRoot, 'package.json'));
+const vercelRequire = createRequire(repoRequire.resolve('vercel/package.json'));
+const buildUtilsEntry = vercelRequire.resolve('@vercel/build-utils');
+const buildUtilsRequire = createRequire(buildUtilsEntry);
+const { default: getIgnoreFilter } = buildUtilsRequire(
+  resolve(dirname(buildUtilsEntry), 'get-ignore-filter.js')
+) as {
+  default: (
+    downloadPath: string,
+    rootDirectory?: string
+  ) => Promise<(filePath: string) => boolean>;
+};
 
 type VercelConfig = {
   functions?: Record<string, unknown>;
@@ -107,5 +120,25 @@ describe('Vercel function config', () => {
       expect(result.status, ref).toBe(0);
       expect(existsSync(callLog), ref).toBe(false);
     }
+  });
+
+  it('uploads the runtime quarantine ledger without uploading test artifacts', async () => {
+    const isIgnored = await getIgnoreFilter(repoRoot);
+
+    expect(isIgnored('apps/web/tests')).toBe(false);
+    expect(isIgnored('apps/web/tests/quarantine.json')).toBe(false);
+    expect(isIgnored('apps/web/tests/fixtures/seo-ratchet-baseline.json')).toBe(
+      true
+    );
+    expect(
+      isIgnored('apps/web/tests/unit/ci/fixtures/skip-success-unbound.json')
+    ).toBe(true);
+    expect(
+      isIgnored('apps/web/tests/unit/lib/testing/quarantine-ledger.test.ts')
+    ).toBe(true);
+    expect(isIgnored('apps/web/tests/e2e/smoke-manifest.ts')).toBe(true);
+    expect(isIgnored('apps/web/lib/testing/quarantine-ledger.server.ts')).toBe(
+      false
+    );
   });
 });
