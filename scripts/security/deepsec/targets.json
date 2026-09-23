@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "repository": "JovieInc/Jovie",
+  "maxTargets": 9,
+  "targets": [
+    "apps/web/app/api/images/upload/route.ts",
+    "apps/web/app/api/onboarding/claim/route.ts",
+    "apps/web/app/api/stripe/webhooks/route.ts",
+    "apps/web/lib/auth/better-auth.ts",
+    "apps/web/lib/auth/cached.ts",
+    "apps/web/lib/auth/require-auth.ts",
+    "apps/web/lib/claim/finalize.ts",
+    "apps/web/lib/entitlements/registry.ts",
+    "apps/web/lib/entitlements/server.ts"
+  ]
+}
