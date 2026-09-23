@@ -1344,9 +1344,9 @@ export function ProfilesWorkspace({
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
-        header: 'Profile / Page',
-        size: 150,
-        minSize: 100,
+        header: 'Platform / Page',
+        size: 200,
+        minSize: 140,
         meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
@@ -1367,14 +1367,15 @@ export function ProfilesWorkspace({
               )}
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
-                  {getPresenceEntityName(row, data?.artist.name ?? row.label)}
+                  {row.label}
                 </div>
                 {row.rowType === 'connector' ? (
                   <ConnectionUrlDisplay
                     row={row}
                     className='text-xs text-tertiary-token max-sm:hidden'
                   />
-                ) : (
+                ) : getPresenceHandle(row) ||
+                  row.label !== getPresencePlatformLabel(row) ? (
                   <div
                     data-testid='presence-page-identity'
                     className='truncate text-xs text-tertiary-token'
@@ -1382,15 +1383,20 @@ export function ProfilesWorkspace({
                       getPresenceHandle(row) ?? getPresencePlatformLabel(row)
                     }
                   >
-                    <span>{getPresencePlatformLabel(row)}</span>
+                    {row.label !== getPresencePlatformLabel(row) ? (
+                      <span>{getPresencePlatformLabel(row)}</span>
+                    ) : null}
                     {getPresenceHandle(row) ? (
                       <>
-                        {' '}
-                        · <span>{getPresenceHandle(row)}</span>
+                        {row.label !== getPresencePlatformLabel(row)
+                          ? ' · '
+                          : null}
+                        <span>{getPresenceHandle(row)}</span>
                       </>
                     ) : null}
                   </div>
-                )}
+                ) : null}
+                <div className={styles.mobileArtist}>{data?.artist.name}</div>
                 <div className={styles.mobileStatus}>
                   <StatusCell
                     row={row}
@@ -1401,6 +1407,17 @@ export function ProfilesWorkspace({
             </div>
           );
         },
+      }),
+      columnHelper.display({
+        id: 'artist',
+        header: 'Artist',
+        size: 180,
+        meta: { className: cn('px-3', styles.artistColumn) },
+        cell: () => (
+          <span className='truncate text-sm text-primary-token'>
+            {data?.artist.name}
+          </span>
+        ),
       }),
       columnHelper.display({
         id: 'type',
