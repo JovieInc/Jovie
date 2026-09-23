@@ -32,9 +32,9 @@ export function SmartLinksLanding() {
               <p className='homepage-section-eyebrow'>MUSIC SMART LINKS</p>
               <h1
                 id='smart-links-title'
-                className='marketing-h1-linear mt-5 max-w-3xl text-balance'
+                className='marketing-h1-linear mt-5 max-w-3xl text-balance line-clamp-2'
               >
-                One Release Link. Their Music App.
+                One Link. Their Music App.
               </h1>
               <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
                 Let fans choose where to listen. The action stays put while the
@@ -71,7 +71,7 @@ export function SmartLinksLanding() {
           <p className='homepage-section-eyebrow'>A THREE-BEAT HANDOFF</p>
           <h2
             id='smart-links-how'
-            className='mt-4 text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+            className='mt-4 text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
             Choose Your Sound. Once.
           </h2>
@@ -100,9 +100,9 @@ export function SmartLinksLanding() {
           <p className='homepage-section-eyebrow'>THE 100× EXPERIENCE</p>
           <h2
             id='smart-links-next'
-            className='mt-4 max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+            className='mt-4 max-w-2xl text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
-            The Next Release Already Knows Where To Play.
+            The Next Release Remembers.
           </h2>
           <p className='mt-5 max-w-2xl text-base leading-7 text-secondary-token'>
             Choose a service in the demo, then see the next release. The choice
@@ -119,9 +119,9 @@ export function SmartLinksLanding() {
         <MarketingContainer width='page'>
           <h2
             id='smart-links-cta'
-            className='text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+            className='text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
-            Make The Link Feel Like The Music.
+            Make Every Link Sing.
           </h2>
           <p className='mx-auto mt-4 max-w-xl text-base leading-7 text-secondary-token'>
             Give every release a home that takes fans to their chosen music app.
