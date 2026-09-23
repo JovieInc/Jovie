@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -780,6 +781,9 @@ const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
 ]);
 const NO_UNATTENDED_RED_LANE = new Set([
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/fleet-gate-refresh.yml',
@@ -810,10 +814,30 @@ const NO_UNATTENDED_RED_PYTEST_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 const NO_UNATTENDED_RED_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
+const RETOUCH_PROMPT_SOURCES = [
+  'components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
+  'lib/services/retouching/style.ts',
+  'lib/services/retouching/style-prompt.ts',
+];
+const RETOUCH_PROMPT_PROOFS = [
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.test.tsx',
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+  'apps/web/lib/services/retouching/style.test.ts',
+  'apps/web/tests/unit/app/admin-system-map.test.tsx',
+];
+const RETOUCH_PROMPT_LANE = new Set([
+  ...RETOUCH_PROMPT_SOURCES.map(file => `apps/web/${file}`),
+  ...RETOUCH_PROMPT_PROOFS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -1083,6 +1107,37 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  if (
+    files.some(file =>
+      RETOUCH_PROMPT_SOURCES.some(source => file === `apps/web/${source}`)
+    )
+  ) {
+    if (
+      !files.every(file => RETOUCH_PROMPT_LANE.has(file)) ||
+      !RETOUCH_PROMPT_PROOFS.every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/summer-commissioning/company-registry.test.mjs',
+        'scripts/summer-commissioning/project-creation-policy.test.mjs',
+      ],
+      retouchPromptCoverage: true,
+    };
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1378,8 +1433,17 @@ export function buildAffectedTestPlan(
     files.some(file => NO_UNATTENDED_RED_PRIMARY_INPUTS.has(file)) &&
     files.every(file => NO_UNATTENDED_RED_LANE.has(file));
   if (isBoundedNoUnattendedRedChange) {
+    if (
+      ![
+        ...NO_UNATTENDED_RED_NODE_TESTS,
+        ...NO_UNATTENDED_RED_SCRIPT_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
     return {
       mode: 'selected',
+      deliveryControllerCoverage: true,
       relatedFiles: [],
       mandatoryTests: [],
       selectedTests: [],
@@ -2351,8 +2415,62 @@ export function buildProjectCreationTestCommand() {
   ];
 }
 
-export function buildSelectedTestCommands(plan, maxWorkers) {
+export function buildSelectedTestCommands(
+  plan,
+  maxWorkers,
+  base = 'origin/main',
+  head
+) {
   const commands = [];
+  if (plan.deliveryControllerCoverage) {
+    commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
+  }
+  if (plan.retouchPromptCoverage) {
+    if (
+      ![base, head].every(
+        sha => typeof sha === 'string' && /^[a-f0-9]{40}$/.test(sha)
+      )
+    ) {
+      throw new Error('prompt coverage requires exact base and head SHAs');
+    }
+    // Keep the hosted changed-source runner and real browser story intact.
+    commands.push([
+      'env',
+      [
+        `JOVIE_COVERAGE_INCLUDE=${RETOUCH_PROMPT_SOURCES.join('\n')}`,
+        'pnpm',
+        '--filter',
+        '@jovie/web',
+        'test:coverage',
+        '--changed',
+        base,
+        '--bail',
+        '1',
+      ],
+    ]);
+    commands.push([
+      'node',
+      [
+        'scripts/check-changed-test-coverage.mjs',
+        '--base',
+        base,
+        '--head',
+        head,
+      ],
+    ]);
+    commands.push([
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        '--config=vitest.config.storybook.mts',
+        'components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+      ],
+    ]);
+  }
   if ((plan.nodeTests || []).length > 0) {
     const companyTest =
       'scripts/summer-commissioning/company-registry.test.mjs';
@@ -2548,9 +2666,25 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     });
   }
 
-  await runCommands(buildSelectedTestCommands(plan, maxWorkers), 1, {
-    timeoutMs: shardTimeoutMs,
-    progressIntervalMs,
-    labelPrefix: 'selected',
-  });
+  const coverageBase = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', `${base}^{commit}`], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : base;
+  const coverageHead = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : undefined;
+  await runCommands(
+    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+    1,
+    {
+      timeoutMs: shardTimeoutMs,
+      progressIntervalMs,
+      labelPrefix: 'selected',
+    }
+  );
 }

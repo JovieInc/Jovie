@@ -37,6 +37,19 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/backlog-orchestrator/delivery-state-machine.mjs',
+  '--test-coverage-include=scripts/backlog-orchestrator/no-unattended-red.mjs',
+  '--test-coverage-lines=89',
+  '--test-coverage-branches=78',
+  '--test-coverage-functions=95',
+  'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+]);
+export const DELIVERY_CONTROLLER_COVERAGE_COMMAND = `node ${DELIVERY_CONTROLLER_COVERAGE_ARGS.join(' ')}`;
+
 export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
@@ -734,7 +747,7 @@ function runStructural() {
 
   const selected = selectedProductLanes();
   const operationsParts = [
-    'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/delivery-state-machine.mjs --test-coverage-include=scripts/backlog-orchestrator/no-unattended-red.mjs --test-coverage-lines=89 --test-coverage-branches=78 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+    DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
