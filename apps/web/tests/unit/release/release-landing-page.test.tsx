@@ -170,10 +170,6 @@ const defaultProps = {
     title: 'Midnight Drive',
     artworkUrl: 'https://example.com/art.jpg',
     releaseDate: '2026-05-01',
-    previewUrl: null,
-    isrc: null,
-    previewVerification: undefined,
-    previewSource: undefined,
   },
   artist: {
     name: 'Tim White',
@@ -272,19 +268,20 @@ describe('@critical ReleaseLandingPage', () => {
     }
   });
 
-  it('renders only one audio preview when a verified preview is available', () => {
+  it('omits preview playback while keeping the streaming action', () => {
+    const legacyPreviewRelease = {
+      ...defaultProps.release,
+      previewUrl: 'https://example.com/preview.mp3',
+    };
     render(
-      <ReleaseLandingPage
-        {...defaultProps}
-        release={{
-          ...defaultProps.release,
-          previewUrl: 'https://example.com/preview.mp3',
-          previewVerification: 'verified',
-        }}
-      />
+      <ReleaseLandingPage {...defaultProps} release={legacyPreviewRelease} />
     );
 
-    expect(screen.getAllByTestId('audio-preview')).toHaveLength(1);
+    expect(screen.queryByTestId('audio-preview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('provider-button')).toHaveAttribute(
+      'data-href',
+      'https://open.spotify.com/track/1?utm_source=jovie'
+    );
   });
 
   it('shows empty state when no providers have URLs', () => {

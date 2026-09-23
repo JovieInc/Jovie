@@ -20,7 +20,6 @@ import {
 } from '@/features/release/AlbumArtworkContextMenu';
 import { MusicServiceDial } from '@/features/release/MusicServiceDial';
 import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
-import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import {
   SMART_LINK_HERO_TITLE_CLASS,
@@ -33,12 +32,7 @@ import {
   formatReleaseArtistLine,
   formatReleaseArtistLineParts,
 } from '@/lib/discography/formatting';
-import type {
-  PreviewSource,
-  PreviewVerification,
-  ProviderConfidence,
-  ProviderKey,
-} from '@/lib/discography/types';
+import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -67,10 +61,6 @@ interface ReleaseLandingPageProps
       readonly title: string;
       readonly artworkUrl: string | null;
       readonly releaseDate: string | null;
-      readonly previewUrl?: string | null;
-      readonly isrc?: string | null;
-      readonly previewVerification?: PreviewVerification;
-      readonly previewSource?: PreviewSource;
     };
     readonly artist: {
       readonly name: string;
@@ -401,13 +391,6 @@ export function ReleaseLandingPage({
       shareSlug,
     ]
   );
-  const hasPreview = Boolean(release.previewUrl);
-  const shouldShowPreview =
-    hasPreview &&
-    (release.previewVerification == null ||
-      release.previewVerification === 'verified' ||
-      release.previewVerification === 'fallback');
-
   const handleProviderClick = useCallback(
     (providerKey: ProviderKey) => {
       if (!artist.handle || !tracking?.contentId || !tracking?.contentType)
@@ -462,20 +445,6 @@ export function ReleaseLandingPage({
               featuredArtists={featuredArtists}
             />
           </div>
-          {shouldShowPreview ? (
-            <div className='mb-1 ml-3 shrink-0'>
-              <SmartLinkAudioPreview
-                contentId={tracking?.contentId ?? release.title}
-                title={release.title}
-                artistName={artistByline}
-                artworkUrl={release.artworkUrl}
-                previewUrl={release.previewUrl ?? null}
-                isrc={release.isrc}
-                previewVerification={release.previewVerification}
-                previewSource={release.previewSource}
-              />
-            </div>
-          ) : null}
         </div>
       }
     >
