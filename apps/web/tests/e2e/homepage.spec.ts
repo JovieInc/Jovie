@@ -1046,7 +1046,7 @@ test.describe('Homepage', () => {
       });
 
     if (FEATURE_FLAGS.WAITLIST_ENABLED) {
-      const actions = page.locator('.homepage-request-access');
+      const actions = page.locator('.homepage-request-access a');
       await expect(actions).toHaveCount(2);
       for (const action of await actions.all()) {
         await expect(action).toHaveAttribute('href', PUBLIC_WAITLIST_URL);

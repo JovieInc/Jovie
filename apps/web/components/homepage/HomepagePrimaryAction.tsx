@@ -17,20 +17,17 @@ export function HomepagePrimaryAction(props: HeroSpotifySearchProps) {
 
   const { primary } = getHomepageFrontDoorCtaContract(true);
   return (
-    <Button
-      asChild
-      variant='primary'
-      size='marketing'
-      className='homepage-request-access'
-    >
-      <HomepageTrackedLink
-        href={primary.href}
-        data-testid={props.submitTestId}
-        eventName={HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED}
-        eventProperties={props.submitAnalytics?.properties}
-      >
-        {primary.label}
-      </HomepageTrackedLink>
-    </Button>
+    <div className='homepage-request-access'>
+      <Button asChild variant='primary' size='marketing' className='w-full'>
+        <HomepageTrackedLink
+          href={primary.href}
+          data-testid={props.submitTestId}
+          eventName={HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED}
+          eventProperties={props.submitAnalytics?.properties}
+        >
+          {primary.label}
+        </HomepageTrackedLink>
+      </Button>
+    </div>
   );
 }
