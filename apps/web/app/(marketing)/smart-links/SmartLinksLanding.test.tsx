@@ -9,7 +9,7 @@ vi.mock('next/image', () => ({
 }));
 
 describe('SmartLinksLanding', () => {
-  it('presents the real link, the three-step journey, and a choice that follows the next release', async () => {
+  it('presents the real link, the three-step journey, and a choice that follows the next release', () => {
     render(<SmartLinksLanding />);
     expect(
       screen.getByRole('heading', {
@@ -25,9 +25,11 @@ describe('SmartLinksLanding', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
-    await screen.findByRole('link', {
-      name: 'Open live Smart Link with Apple Music',
-    });
+    expect(
+      screen.getByRole('link', {
+        name: 'Open live Smart Link with Apple Music',
+      })
+    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'See the next release →' })
     );
