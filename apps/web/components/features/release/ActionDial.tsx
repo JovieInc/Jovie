@@ -282,7 +282,7 @@ export function ActionDial({
           providerKey={active.id}
           primary
           ariaLabel={`${actionLabel} with ${active.label}`}
-          className='absolute inset-x-3 top-20 z-10 w-[calc(100%-1.5rem)]'
+          className='absolute inset-x-3 top-20 z-10 w-auto'
           onClick={event => {
             if (suppressClickRef.current) {
               event.preventDefault();
