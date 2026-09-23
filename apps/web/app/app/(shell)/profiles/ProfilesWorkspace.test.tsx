@@ -497,6 +497,16 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         name: /Spotify/,
       })
     ).toHaveTextContent('Spotify');
+    const status = within(spotifyRow as HTMLElement)
+      .getAllByText('Limit Reached')[0]
+      ?.closest('[tabindex="0"]');
+    expect(status).toHaveAttribute('tabindex', '0');
+    fireEvent.focus(status as HTMLElement);
+    expect(
+      await screen.findByText(
+        'Upgrade the monitoring limit to track this page.'
+      )
+    ).toBeInTheDocument();
     expect(
       within(spotifyRow as HTMLElement).queryByText(/open\.spotify\.com/)
     ).not.toBeInTheDocument();

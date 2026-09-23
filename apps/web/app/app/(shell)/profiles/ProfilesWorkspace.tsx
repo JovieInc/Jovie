@@ -507,7 +507,14 @@ function StatusCell({
           ? CircleX
           : Circle;
   return (
-    <SimpleTooltip content={status.label}>
+    <SimpleTooltip
+      content={
+        <span>
+          <strong className='block'>{status.label}</strong>
+          <span>{status.nextAction}</span>
+        </span>
+      }
+    >
       <span
         className={cn(
           'inline-flex min-h-7 items-center gap-1.5 text-xs text-tertiary-token',
