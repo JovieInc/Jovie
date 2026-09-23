@@ -633,7 +633,7 @@ describe('codex issue shipper prompt', () => {
     expect(uiPrompt).toContain('DESIGN_VARIANCE');
     expect(uiPrompt).toContain('product/dashboard UI');
     expect(uiPrompt).toContain('`ui`');
-    expect(uiPrompt).toContain('`fast-track-ui`');
+    expect(uiPrompt).toContain('`ui` and `fast`');
     expect(uiPrompt).toContain('`fast`');
     expect(uiPrompt).toContain('`merge-queue`');
     expect(uiPrompt).toContain('## Fast-track UI eligibility');
@@ -1142,12 +1142,15 @@ describe('agent failure disposition', () => {
   /** @type {import('../../symphony/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
   const incidentDispositions = ['provider_cooldown', 'system_retryable'];
 
-  it.each(
-    incidentDispositions
-  )('%s falls back, then releases without blocking when routes are exhausted', disposition => {
-    expect(actionForAgentFailure(disposition, true)).toBe('fallback');
-    expect(actionForAgentFailure(disposition, false)).toBe('release_incident');
-  });
+  it.each(incidentDispositions)(
+    '%s falls back, then releases without blocking when routes are exhausted',
+    disposition => {
+      expect(actionForAgentFailure(disposition, true)).toBe('fallback');
+      expect(actionForAgentFailure(disposition, false)).toBe(
+        'release_incident'
+      );
+    }
+  );
 
   it('preserves deterministic task retry without trusting terminal self-reports', () => {
     expect(actionForAgentFailure('task_retryable', true)).toBe('fallback');
