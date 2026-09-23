@@ -28,7 +28,7 @@
       "tmp": ">=0.2.6",
       "vite": "6.4.3",
       "@lhci/cli>lighthouse": "13.4.1",
-      "drizzle-orm": "0.45.2",
+      "drizzle-orm": "0.45.3",
       "jsdom": "26.1.0",
       "react": "19.2.8",
       "react-dom": "19.2.8",
