@@ -716,7 +716,7 @@ jobs:
             and (.isDraft | not)
             and .headRefOid == $expected_head
             and ([.labels[].name] | any(
-              . == "hold" or . == "gated" or . == "queue-deferred"
+              . == "hold" or . == "gated"
               or . == "needs-conflict-resolution"
               or . == "fast"
             ) | not)
@@ -773,7 +773,7 @@ jobs:
             and (.isDraft | not)
             and .headRefOid == $expected_head
             and ([.labels[].name] | any(
-              . == "hold" or . == "gated" or . == "queue-deferred"
+              . == "hold" or . == "gated"
               or . == "needs-conflict-resolution" or . == "fast"
             ) | not)
           ' <<<"$CURRENT_STATE" >/dev/null; then

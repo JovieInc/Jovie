@@ -98,6 +98,7 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     );
     expect(pipeline).not.toContain('steps.queue-pressure.outputs');
     expect(pipeline).not.toContain('labels[]=auto-approved');
+    expect(pipeline).not.toContain('queue-deferred');
 
     const directory = mkdtempSync(join(tmpdir(), 'native-agent-finish-'));
     const log = join(directory, 'mutations');
@@ -142,6 +143,10 @@ fi
         labels: [],
       };
       expect(run(state)).toEqual({
+        status: 0,
+        mutations: `pr merge 42 -R JovieInc/Jovie --auto --match-head-commit ${head}\n`,
+      });
+      expect(run({ ...state, labels: [{ name: 'queue-deferred' }] })).toEqual({
         status: 0,
         mutations: `pr merge 42 -R JovieInc/Jovie --auto --match-head-commit ${head}\n`,
       });
