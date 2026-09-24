@@ -1,0 +1,85 @@
+name: Linear Triage Assessment
+
+# Signed Linear Issue events are bridged by /api/webhooks/linear. This job
+# rereads the exact current issue on Gem, records its disposition, and wakes
+# official Symphony only after the existing reconciler moves it to Todo.
+# It does not select workers, admit issues, or bypass Summer/fleet gates.
+on:
+  repository_dispatch:
+    types: [linear_triage_assess]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linear-triage-assess-${{ github.event.client_payload.issue_id }}
+  cancel-in-progress: false
+
+jobs:
+  assess:
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact main assessment code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Assess latest Linear Triage issue
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          test -n "${LINEAR_API_KEY:-}"
+          summer_env="${HOME}/.config/symphony/summer-bottleneck.env"
+          signing_env="${HOME}/.config/symphony/summer-bottleneck-signing.env"
+          test -r "$summer_env" && test -r "$signing_env"
+          set -a
+          # Host-owned files already used by the Gem service; no new credential.
+          # shellcheck disable=SC1090
+          source "$summer_env"
+          # shellcheck disable=SC1090
+          source "$signing_env"
+          set +a
+          timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
+            --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
+          jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
+      - name: Wake the existing Symphony picker after Todo transition
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          if jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
+            curl --fail --silent --show-error --max-time 5 \
+              -H 'content-type: application/json' -d '{}' \
+              http://127.0.0.1:4041/api/v1/refresh
+          fi
+      - name: Preserve exact assessment receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linear-triage-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linear-triage-assessment.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Escalate urgent unowned intake
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          if jq -e '.requiresImmediateInvestigation == true' "$RECEIPT_FILE" >/dev/null; then
+            echo "::error::Urgent Triage issue still needs an acknowledged investigation: $(jq -r '.issue' "$RECEIPT_FILE")"
+            exit 1
+          fi
