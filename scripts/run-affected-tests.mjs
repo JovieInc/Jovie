@@ -2604,7 +2604,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.include=lib/native-queue-group-evidence.mjs',
       '--coverage.include=lib/native-queue-policy-evidence.mjs',
       '--coverage.include=lib/native-queue-eval.mjs',
-      '--coverage.include=**/scripts/native-queue-eval.mjs',
+      '--coverage.include=native-queue-eval.mjs',
       '--coverage.thresholds.perFile=true',
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',
