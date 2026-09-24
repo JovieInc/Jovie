@@ -1,0 +1,25 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": [],
+      "cache": false,
+      "passThroughEnv": [
+        "$TURBO_EXTENDS$",
+        "OVIE_*",
+        "SUMMER_*",
+        "AGENT_OS_WORKFLOWS_ENABLED"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": [],
+      "cache": false,
+      "passThroughEnv": [
+        "$TURBO_EXTENDS$",
+        "OVIE_*",
+        "AGENT_OS_WORKFLOWS_ENABLED"
+      ]
+    },
+    "test": { "dependsOn": [], "cache": false }
+  }
+}
