@@ -1110,6 +1110,8 @@ describe('read-only deployment investigation result', () => {
     number: 3,
     status: 'completed',
     conclusion: 'success',
+    started_at: '2026-09-24T00:49:00Z',
+    completed_at: '2026-09-24T00:49:10Z',
   };
   const authJob = {
     id: 889,
@@ -1258,22 +1260,22 @@ describe('read-only deployment investigation result', () => {
       },
     ],
     ...[
-      ['extra diagnostic fields', { healthy: true }],
-      ['unknown diagnostic schema', { schema: 'untrusted' }],
-      ['zero exit', { exitStatus: 0 }],
-      ['invalid wrapper attempt', { attempt: 0 }],
-      ['unknown mode', { mode: 'other' }],
-      [
-        'mismatched URL',
-        { deploymentUrl: 'https://jovie-other-jovie.vercel.app' },
-      ],
-      [
-        'malformed URL',
-        { deploymentUrl: identity.deploymentUrl + '.attacker.invalid' },
-      ],
-      ['unknown error', { errorCode: 'EACCES' }],
-      ['unknown asset', { asset: 'runtime-quarantine-ledger' }],
-    ].map(([name, patch]) => [
+      { name: 'extra diagnostic fields', patch: { healthy: true } },
+      { name: 'unknown diagnostic schema', patch: { schema: 'untrusted' } },
+      { name: 'zero exit', patch: { exitStatus: 0 } },
+      { name: 'invalid wrapper attempt', patch: { attempt: 0 } },
+      { name: 'unknown mode', patch: { mode: 'other' } },
+      {
+        name: 'mismatched URL',
+        patch: { deploymentUrl: 'https://jovie-other-jovie.vercel.app' },
+      },
+      {
+        name: 'malformed URL',
+        patch: { deploymentUrl: identity.deploymentUrl + '.attacker.invalid' },
+      },
+      { name: 'unknown error', patch: { errorCode: 'EACCES' } },
+      { name: 'unknown asset', patch: { asset: 'runtime-quarantine-ledger' } },
+    ].map(({ name, patch }) => [
       name,
       {
         readStepLogs: async () => ({
