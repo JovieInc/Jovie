@@ -1,9 +1,12 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 import textwrap
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -1406,3 +1409,49 @@ def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_alias_not_updated"
     )
+
+
+@pytest.mark.parametrize("provider_output, expected", [
+    ("token=synthetic-private-token\n::error::untrusted-provider-command\n"
+     "https://user:" + "synthetic-private-token" + "@bad.vercel.app\nhttps://safe-deployment.vercel.app\n"
+     "ENOENT: readlink '/vercel/path0/apps/web/lib/services/retouching/styles/white-space.md'\n",
+     ("ENOENT", "retouch-style-prompt", "https://safe-deployment.vercel.app")),
+    ("synthetic-private-token " * 5000 + "\n::error::untrusted-provider-command\n",
+     ("UNKNOWN", None, None)),
+    ("EACCES\nhttps://user:" + "synthetic-private-token" + "@bad.vercel.app\n"
+     "https://bad.vercel.app?token=synthetic-private-token\n", ("EACCES", None, None)),
+    ("synthetic-private-token " * 5000 + "\nENOENT /vercel/path0/apps/web/tests/quarantine.json\n",
+     ("ENOENT", "runtime-quarantine-ledger", None)),
+    ("ETIMEDOUT\nhttps://synthetic-private-token.vercel.app\n", ("ETIMEDOUT", None, None)),
+    ("", ("UNKNOWN", None, None)),
+])
+def test_failed_deploy_emits_bounded_allowlisted_diagnostics_without_secrets(
+    tmp_path: Path, provider_output: str, expected: tuple,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "vercel"
+    fake.write_text("#!/usr/bin/env bash\nprintf '%s' " + shlex.quote(provider_output) + "\nexit 23\n")
+    fake.chmod(0o755)
+    output = tmp_path / ".vercel/output"
+    output.mkdir(parents=True)
+    (output / "config.json").write_text("{}")
+    env = os.environ.copy()
+    env.update(PATH=f"{bin_dir}:{env['PATH']}", VERCEL_TOKEN="synthetic-private-token",
+               VERCEL_ORG_ID="test-org", VERCEL_ENABLE_SOURCE_FALLBACK="false",
+               VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK="false", RUNNER_TEMP=str(tmp_path))
+    result = subprocess.run(["bash", str(DEPLOY_SCRIPT), "url", "--yes"], cwd=tmp_path,
+                            env=env, capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "synthetic-private-token" not in combined
+    assert "untrusted-provider-command" not in combined
+    assert "user:" not in combined
+    lines = [line for line in result.stderr.splitlines() if line.startswith("Deploy failure diagnostic: ")]
+    assert len(lines) == 1, combined
+    assert len(lines[0]) < 500
+    receipt = json.loads(lines[0].split(": ", 1)[1])
+    code, asset, url = expected
+    assert receipt == {"schema": "jovie-vercel-deploy-failure/v1", "mode": "tgz", "attempt": 1,
+                       "exitStatus": 23, "errorCode": code, "asset": asset, "deploymentUrl": url}
+    assert not list(tmp_path.glob("jovie-vercel-deploy.*"))
