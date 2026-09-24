@@ -1226,8 +1226,17 @@ jobs:
             exit 0
           fi
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
-            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"
+          if git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push --force-with-lease="refs/heads/$HEAD_REF:$SOURCE_HEAD" \
+            "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"; then
+            :
+          else
+            push_rc=$?
+            if ! post_status "$SOURCE_HEAD" error failed; then
+              echo "::warning::Could not publish the failed conflict delivery status."
+            fi
+            exit "$push_rc"
+          fi
 
           live_after=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
