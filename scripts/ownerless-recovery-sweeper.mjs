@@ -281,21 +281,6 @@ async function pages(endpoint) {
   return (value ?? []).flat();
 }
 
-export function classifyQueueOwnership(queueState, expectedHead) {
-  if (
-    !queueState ||
-    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
-  ) {
-    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
-  }
-  if (queueState.queued === true) {
-    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
-  }
-  if (queueState.autoMergeEnabled === true) {
-    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
-  }
-  return { action: 'dispatch', outcome: 'unowned-exact-head' };
-}
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const mutationSucceeded = result =>
   result === undefined ||

@@ -290,6 +290,8 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const OWNERLESS_RECOVERY_POLICY_TEST =
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -305,7 +307,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
-  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -413,6 +415,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/pr-check-failures.mjs',
   'scripts/lib/upsert-pr-comment.sh',
@@ -429,6 +432,22 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+];
+const OWNERLESS_RECOVERY_COVERAGE_INPUTS = new Set([
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
+  'scripts/ownerless-recovery-sweeper.mjs',
+]);
+const OWNERLESS_RECOVERY_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=lib/ownerless-recovery-policy.mjs',
+  '--coverage.include=ownerless-recovery-sweeper.mjs',
+  '--coverage.thresholds.perFile=true',
+  '--coverage.thresholds.statements=60',
+  '--coverage.thresholds.lines=65',
+  '--coverage.thresholds.branches=60',
+  '--coverage.thresholds.functions=50',
 ];
 const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
   'scripts/symphony/tests/test_evaluate_fleet_gate.py',
@@ -1574,6 +1593,11 @@ export function buildAffectedTestPlan(
       pythonTests: MERGE_QUEUE_CONTROLLER_PYTHON_TESTS,
       pythonUnittestTests: [],
       scriptVitestTests: MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: files.some(file =>
+        OWNERLESS_RECOVERY_COVERAGE_INPUTS.has(file)
+      )
+        ? OWNERLESS_RECOVERY_COVERAGE_ARGS
+        : [],
       nodeTests: [],
     };
   }
@@ -2458,6 +2482,51 @@ export function buildProjectCreationTestCommand() {
   ];
 }
 
+export function buildControlCoverageCommands() {
+  const nativeCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    ...CI_CONTROL_SCRIPT_TESTS.filter(
+      file => file !== OWNERLESS_RECOVERY_POLICY_TEST
+    ).map(file => file.replace(/^scripts\//, '')),
+    '--coverage',
+    '--coverage.include=merge-queue-backend.mjs',
+    '--coverage.include=lib/merge-group-admission.mjs',
+    '--coverage.include=lib/merge-queue-guard.mjs',
+    '--coverage.include=lib/native-queue-group-evidence.mjs',
+    '--coverage.include=lib/native-queue-policy-evidence.mjs',
+    '--coverage.include=lib/native-queue-eval.mjs',
+    '--coverage.include=native-queue-eval.mjs',
+    '--coverage.include=run-affected-tests.mjs',
+    '--coverage.thresholds.perFile=true',
+    '--coverage.thresholds.lines=85',
+    '--coverage.thresholds.branches=75',
+    '--coverage.thresholds.functions=82',
+  ];
+  const ownerlessCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    OWNERLESS_RECOVERY_POLICY_TEST.replace(/^scripts\//, ''),
+    '--maxWorkers',
+    '1',
+    ...OWNERLESS_RECOVERY_COVERAGE_ARGS,
+  ];
+  return [
+    ['pnpm', nativeCoverageArgs],
+    ['pnpm', ownerlessCoverageArgs],
+  ];
+}
+
 export function buildSelectedTestCommands(
   plan,
   maxWorkers,
@@ -2543,6 +2612,7 @@ export function buildSelectedTestCommands(
         ...plan.scriptVitestTests.map(file => file.replace(/^scripts\//, '')),
         '--maxWorkers',
         maxWorkers,
+        ...(plan.scriptVitestCoverageArgs || []),
       ],
     ]);
   }
@@ -2632,27 +2702,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ...buildProjectCreationTestCommand()
     );
     if (projectStatus !== 0) process.exit(projectStatus);
-    await runCommand('pnpm', [
-      'exec',
-      'vitest',
-      '--root',
-      'scripts',
-      ...['--config', 'vitest.config.mts'],
-      'run',
-      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
-      '--coverage',
-      '--coverage.include=merge-queue-backend.mjs',
-      '--coverage.include=lib/merge-group-admission.mjs',
-      '--coverage.include=lib/merge-queue-guard.mjs',
-      '--coverage.include=lib/native-queue-group-evidence.mjs',
-      '--coverage.include=lib/native-queue-policy-evidence.mjs',
-      '--coverage.include=lib/native-queue-eval.mjs',
-      '--coverage.include=native-queue-eval.mjs',
-      '--coverage.thresholds.perFile=true',
-      '--coverage.thresholds.lines=85',
-      '--coverage.thresholds.branches=75',
-      '--coverage.thresholds.functions=82',
-    ]);
+    const [nativeCoverage, ownerlessCoverage] = buildControlCoverageCommands();
+    const nativeCoverageStatus = await runCommandStatus(...nativeCoverage);
+    if (nativeCoverageStatus !== 0) process.exit(nativeCoverageStatus);
+    await runCommand(...ownerlessCoverage);
     await runCommand('pnpm', [
       '--filter',
       '@jovie/web',
