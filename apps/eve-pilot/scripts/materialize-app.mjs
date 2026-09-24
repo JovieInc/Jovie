@@ -86,8 +86,6 @@ export const disabledTools = [
   'web_fetch',
   'web_search',
   'load_skill',
-  'connection_search',
-  'task_update',
   'task_cancel',
 ];
 
