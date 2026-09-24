@@ -1099,6 +1099,10 @@ ${fixtureCheckout}
       'Verify screenshot catalog integrity and budgets'
     );
     const screenshotDiff = stepBlock(screenshots, 'Check for changes');
+    const screenshotStage = stepBlock(
+      screenshots,
+      'Stage generated screenshot catalog for transfer'
+    );
     const screenshotUpload = stepBlock(
       screenshots,
       'Upload generated screenshot catalog'
@@ -1164,6 +1168,7 @@ ${fixtureCheckout}
       screenshotStop,
       screenshotIntegrity,
       screenshotDiff,
+      screenshotStage,
       screenshotUpload,
       screenshotDownload,
       screenshotDownloadedIntegrity,
@@ -1181,7 +1186,15 @@ ${fixtureCheckout}
       screenshotJob.indexOf(screenshotDiff)
     );
     expect(screenshotJob.indexOf(screenshotDiff)).toBeLessThan(
+      screenshotJob.indexOf(
+        '- name: Stage generated screenshot catalog for transfer'
+      )
+    );
+    expect(screenshotJob.indexOf(screenshotStage)).toBeLessThan(
       screenshotJob.indexOf('- name: Upload generated screenshot catalog')
+    );
+    expect(screenshotUpload).toContain(
+      'path: .artifacts/screenshot-catalog-transfer/'
     );
     expect(screenshotJob).not.toContain('${{ secrets.');
     expect(screenshotJob).not.toContain('Create or update screenshot PR');
@@ -1194,7 +1207,7 @@ ${fixtureCheckout}
         '- name: Verify downloaded screenshot catalog'
       )
     );
-    expect(screenshotDownload).toContain('path: apps/web');
+    expect(screenshotDownload).toContain('path: .');
     expect(
       screenshotPublisherJob.indexOf(
         '- name: Verify downloaded screenshot catalog'
