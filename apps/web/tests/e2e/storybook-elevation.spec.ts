@@ -535,7 +535,11 @@ test.describe('central runtime notifications', () => {
         },
       };
     });
-    await openStory(page, 'shell-sidebarinboxbutton--runtime-update', 'light');
+    await openStory(
+      page,
+      'dashboard-navigation-customer-rail--runtime-update',
+      'light'
+    );
     await expect
       .poll(() =>
         page.evaluate(

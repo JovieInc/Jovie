@@ -1,4 +1,4 @@
-import '../../styles/system-b-app.css';
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { InboxRuntimeNotification } from './InboxRuntimeNotification';
