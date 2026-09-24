@@ -13,8 +13,11 @@ import { describe, expect, it } from 'vitest';
 import { main as runConflictCli } from '../../pr-conflict-handler.mjs';
 import {
   hasConflictHold,
+  hasExactWorkflowRunCanary,
+  isExactConflictCanaryPlan,
   matchesHydratedConflictPr,
   matchesRawConflictPr,
+  parseConflictCanary,
   parseConflictEvent,
 } from '../pr-conflict-event.mjs';
 import {
@@ -26,6 +29,113 @@ import {
 const REPO = 'JovieInc/Jovie';
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
+function exactCanaryPlan() {
+  const identity = {
+    headRefName: 'codex/fix',
+    headRefOid: HEAD,
+    baseRefName: 'main',
+    baseRefOid: BASE,
+  };
+  const item = {
+    number: 42,
+    action: 'escalate_conflict_fx',
+    model: 'openai/gpt-5.6-sol',
+    pr: { number: 42, ...identity },
+  };
+  const fx = {
+    prNumber: 42,
+    ...identity,
+    adaptiveCap: 1,
+    model: item.model,
+  };
+  return {
+    items: [item],
+    fxMatrix: [fx],
+    exceptionMatrix: [],
+    capacity: { maxConcurrent: 1, availableCiSlots: 1 },
+  };
+}
+
+describe('validated exact canary contract', () => {
+  it('accepts only an enabled canonical PR number and one exact workflow_run association', () => {
+    expect(parseConflictCanary('true', '42')).toBe(42);
+    for (const [enabled, value] of [
+      ['false', '42'],
+      ['', '42'],
+      ['true', ''],
+      ['true', '042'],
+      ['true', '-1'],
+      ['true', '1000001'],
+      ['true', '9'.repeat(32)],
+    ]) {
+      expect(parseConflictCanary(enabled, value)).toBeNull();
+    }
+    expect(
+      hasExactWorkflowRunCanary(
+        { workflow_run: { pull_requests: [{ number: 42 }] } },
+        42
+      )
+    ).toBe(true);
+    for (const pull_requests of [
+      [],
+      [{ number: 43 }],
+      [{ number: 42 }, { number: 43 }],
+      [{ number: '42' }],
+    ]) {
+      expect(
+        hasExactWorkflowRunCanary({ workflow_run: { pull_requests } }, 42)
+      ).toBe(false);
+    }
+  });
+
+  it('rejects forged action matrices that escape the one-PR plan identity', () => {
+    const plan = exactCanaryPlan();
+    const [item] = plan.items;
+    const [fx] = plan.fxMatrix;
+    expect(isExactConflictCanaryPlan(plan, 42)).toBe(true);
+    expect(
+      isExactConflictCanaryPlan(
+        { ...plan, fxMatrix: [{ ...fx, prNumber: 43 }] },
+        42
+      )
+    ).toBe(false);
+    expect(
+      isExactConflictCanaryPlan(
+        { ...plan, fxMatrix: [{ ...fx, headRefOid: 'c'.repeat(40) }] },
+        42
+      )
+    ).toBe(false);
+    expect(
+      isExactConflictCanaryPlan(
+        { ...plan, items: [{ ...item, pr: { ...item.pr, number: 43 } }] },
+        42
+      )
+    ).toBe(false);
+    expect(
+      isExactConflictCanaryPlan(
+        {
+          ...plan,
+          fxMatrix: [{ ...fx, adaptiveCap: 0 }],
+          capacity: { ...plan.capacity, availableCiSlots: 0 },
+        },
+        42
+      )
+    ).toBe(false);
+    expect(
+      isExactConflictCanaryPlan(
+        { ...plan, capacity: { ...plan.capacity, maxConcurrent: 40 } },
+        42
+      )
+    ).toBe(false);
+    expect(
+      isExactConflictCanaryPlan(
+        { ...plan, exceptionMatrix: [{ ...fx, exceptionType: 'permission' }] },
+        42
+      )
+    ).toBe(false);
+  });
+});
+
 const SCRIPT = resolve(
   import.meta.dirname,
   '..',
@@ -39,6 +149,16 @@ const WORKFLOW = readFileSync(
     '..',
     '..',
     '.github/workflows/pr-conflict-handler.yml'
+  ),
+  'utf8'
+);
+const ROLLING_WORKFLOW = readFileSync(
+  resolve(
+    import.meta.dirname,
+    '..',
+    '..',
+    '..',
+    '.github/workflows/rolling-ci-dispatch.yml'
   ),
   'utf8'
 );
@@ -855,7 +975,12 @@ else process.exit(2);
       'event_args=(--event-payload-file "$EVENT_PAYLOAD_PATH")'
     );
     expect(WORKFLOW).toContain('queue_before_claim');
-    expect(WORKFLOW).toContain("github.event_name != 'pull_request_target'");
+    expect(WORKFLOW).toMatch(
+      /if:\s+>-[\s\S]*?github\.event_name != 'workflow_run'[\s\S]*?github\.event\.workflow_run\.conclusion != 'cancelled'/u
+    );
+    expect(WORKFLOW).toMatch(
+      /concurrency:\n  group: jovie-fx-shared-canary-slot-\$\{\{ github\.repository \}\}\n  cancel-in-progress: false\n  queue: max/u
+    );
     expect(WORKFLOW).toContain('queue_before');
     expect(
       WORKFLOW.match(
@@ -875,5 +1000,39 @@ else process.exit(2);
       "'--coverage.include=lib/pr-conflict-event.mjs'"
     );
     expect(SELECTOR).toContain("'--coverage.include=pr-conflict-handler.mjs'");
+  });
+});
+
+describe('shared hosted conflict slot', () => {
+  it('shares one stable non-cancelling repository slot across the two existing workflows', () => {
+    const sharedGroup = workflow =>
+      workflow.match(
+        /^concurrency:\n  group: (.+)\n  cancel-in-progress: false\n  queue: max$/mu
+      )?.[1];
+    expect(sharedGroup(WORKFLOW)).toBe(
+      'jovie-fx-shared-canary-slot-${{ github.repository }}'
+    );
+    expect(sharedGroup(ROLLING_WORKFLOW)).toBe(sharedGroup(WORKFLOW));
+    expect(WORKFLOW).toMatch(
+      /group: pr-conflict-handler-[^\n]+\n\s+cancel-in-progress: false\n\s+queue: max/u
+    );
+    expect(WORKFLOW).toContain(
+      'group: pr-conflict-fx-${{ github.repository }}-${{ matrix.prNumber }}'
+    );
+    expect(WORKFLOW).not.toContain('cancel-in-progress: ${{');
+    expect(WORKFLOW).toContain(
+      'pause new intake without changing the enable switch, canary PR, or HA writer'
+    );
+    expect(WORKFLOW).toContain(
+      'drain both workflow queues/runs and all work already accepted by'
+    );
+    expect(ROLLING_WORKFLOW).toContain(
+      'pause new intake without changing canary'
+    );
+    expect(ROLLING_WORKFLOW).toContain(
+      'before changing controls or restoring intake'
+    );
+    expect(ROLLING_WORKFLOW).toContain('hosted-live-canary');
+    expect(ROLLING_WORKFLOW).toContain('FX_HOSTED_REMEDIATION_ENABLED=true');
   });
 });

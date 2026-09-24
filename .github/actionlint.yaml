@@ -25,3 +25,6 @@ paths:
   .github/workflows/rolling-ci-dispatch.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'
+  .github/workflows/pr-conflict-handler.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'

@@ -701,9 +701,15 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
         assert "run: gh --version" in block, (workflow, job_name)
 
 
-def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> None:
-    """Audits may coalesce; operator and exact-PR event runs are not cancelled."""
+def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
+    """The shared canary slot queues all FX writers without cancelling work."""
     block = _job_block("pr-conflict-handler.yml", "plan")
+    workflow = (WORKFLOWS / "pr-conflict-handler.yml").read_text(
+        encoding="utf-8"
+    )
+    rolling = (WORKFLOWS / "rolling-ci-dispatch.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "runs-on: ubuntu-latest" in block
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
@@ -715,11 +721,16 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
         "format('pr-{0}', github.event.pull_request.number) || "
         "(github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}"
     ) in block
-    assert (
-        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && "
-        "github.event_name != 'pull_request_target' }}"
-        in block
+    shared_slot = (
+        "group: jovie-fx-shared-canary-slot-${{ github.repository }}\n"
+        "  cancel-in-progress: false\n"
+        "  queue: max"
     )
+    assert shared_slot in workflow
+    assert shared_slot in rolling
+    assert "cancel-in-progress: false" in block
+    assert "queue: max" in block
+    assert "cancel-in-progress: ${{" not in block
     assert "EVENT_NAME: ${{ github.event_name }}" in block
     assert "APPLY_INPUT: ${{ inputs.apply || 'false' }}" in block
     assert 'if [[ "$EVENT_NAME" == "workflow_dispatch"' in block

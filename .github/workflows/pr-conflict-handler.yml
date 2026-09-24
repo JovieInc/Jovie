@@ -34,6 +34,17 @@ on:
 
 permissions: {}
 
+# Stable repository-wide canary slot shared with Rolling CI Dispatch. Empty
+# workflow_run associations stay inside this same bounded group. Safe drain:
+# pause new intake without changing the enable switch, canary PR, or HA writer
+# suppression; drain both workflow queues/runs and all work already accepted by
+# external HA; confirm both workflows and the HA writer are idle before changing
+# controls or restoring intake.
+concurrency:
+  group: jovie-fx-shared-canary-slot-${{ github.repository }}
+  cancel-in-progress: false
+  queue: max
+
 defaults:
   run:
     shell: bash
@@ -49,12 +60,12 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Coalesce redundant CI-completion audits without ever cancelling an
-    # explicit operator run. Downstream per-PR leases remain independently
-    # serialized after a plan completes.
+    # Keep the planner's nested lease distinct from the workflow-wide shared
+    # slot. Audits, dry-runs, and fallbacks must not cancel an active plan.
     concurrency:
       group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}
-      cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && github.event_name != 'pull_request_target' }}
+      cancel-in-progress: false
+      queue: max
     permissions:
       actions: read
       checks: read
