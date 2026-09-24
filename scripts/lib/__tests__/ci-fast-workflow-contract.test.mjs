@@ -1080,10 +1080,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
     const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/fx-remediation-lane.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-dispatch.test.mjs');
     expect(fxCoverage).toContain(
-      'lib/{rolling-ci-fx,fx-remediation-lane,rolling-ci-dispatch}.mjs'
+      'lib/{rolling-ci-fx,fx-remediation-lane,rolling-ci-dispatch,rolling-ci-fx-finish}.mjs'
     );
     expect(fxCoverage).toContain('--coverage.thresholds.perFile=true');
     expect(fxCoverage).toContain('--coverage.thresholds.lines=60');
@@ -1541,9 +1542,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/lib/fx-remediation-lane.mjs',
       'scripts/lib/rolling-ci-dispatch.mjs',
       'scripts/lib/rolling-ci-fx.mjs',
+      'scripts/lib/rolling-ci-fx-finish.mjs',
       'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
       'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
       'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-fx-finish.test.mjs',
     ]) {
       expect(selectsStructural.test(fxCoveragePath)).toBe(true);
     }

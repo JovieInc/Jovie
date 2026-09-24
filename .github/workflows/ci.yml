@@ -1546,9 +1546,9 @@ jobs:
           # behavioral tests and per-file coverage, including test-only edits.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
 
-          # FX remediation policy and dispatcher source must run their real
+          # FX remediation policy, dispatcher, and finisher must run their real
           # per-file coverage suite when the implementation or tests change.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.test\.mjs$'
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
 
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
