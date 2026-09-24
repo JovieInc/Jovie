@@ -407,6 +407,34 @@ describe('REST open PR inventory', () => {
     ).rejects.toThrow('GraphQL statuses for PR #24 omitted the exact head');
   });
 
+  it('treats explicit null status as zero claims only for the exact commit', async () => {
+    const oid = 'c'.repeat(40);
+    const hydrate = (commit, errors) =>
+      hydrateOpenPrStatusContexts({
+        repo: 'JovieInc/Jovie',
+        prs: [{ number: 24, headRefOid: oid }],
+        requireStatusContexts: true,
+        request: async () => ({ errors, data: { repository: { c0: commit } } }),
+      });
+    const [empty] = await hydrate({ oid, status: null });
+    expect(empty.statusCheckRollup).toEqual([]);
+    for (const commit of [
+      { oid },
+      { oid, status: { contexts: null } },
+      { oid, status: { contexts: {} } },
+    ]) {
+      await expect(hydrate(commit)).rejects.toThrow(
+        'omitted complete capacity evidence'
+      );
+    }
+    await expect(
+      hydrate({ oid: 'd'.repeat(40), status: null })
+    ).rejects.toThrow('omitted the exact head');
+    await expect(
+      hydrate({ oid, status: null }, [{ message: 'partial status result' }])
+    ).rejects.toThrow('omitted complete capacity evidence');
+  });
+
   it('fails closed when check-run total_count is missing', async () => {
     const request = async endpoint => {
       if (endpoint.includes('/pulls?')) return [{ number: 12 }];
