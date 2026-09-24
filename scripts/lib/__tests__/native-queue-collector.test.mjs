@@ -146,6 +146,14 @@ describe('read-only native queue collector CLI', () => {
     expect(
       calls.some(args => args.join(' ').includes('enqueuer {__typename login}'))
     ).toBe(true);
+    const readbackIndex = calls.findLastIndex(args =>
+      args.join(' ').includes('InventoryReadback')
+    );
+    const mergeLookupIndex = calls.findIndex(
+      args => args.at(-1) === 'repos/JovieInc/Jovie/pulls/123'
+    );
+    expect(readbackIndex).toBeGreaterThan(-1);
+    expect(mergeLookupIndex).toBeGreaterThan(readbackIndex);
     expect(bundle.snapshots.at(-1).complete).toBe(true);
     expect(bundle.merges[0].gateEvidence.readyJob.run_id).toBe(123);
     expect(bundle.merges[0].gateEvidence.laneReceipt.provenance.sha).toBe(
