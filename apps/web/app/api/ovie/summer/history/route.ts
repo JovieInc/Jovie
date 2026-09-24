@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
+import { canUseOvChatMode } from '@/lib/chat/ov-mode';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { authorizeFounderSummerUser } from '@/lib/ovie/summer-founder-auth';
 import {
@@ -70,6 +71,15 @@ export async function GET() {
     return unavailable(
       'Summer history requires the configured founder session.',
       authorization === 'unconfigured' ? 503 : 403
+    );
+  }
+  try {
+    if (!(await canUseOvChatMode(userId))) {
+      return unavailable('Summer history requires current admin access.', 403);
+    }
+  } catch {
+    return unavailable(
+      'Summer history is unavailable. Do not resend the original turn.'
     );
   }
   let raw: string | undefined;
