@@ -487,14 +487,6 @@ describe('verified FX native finisher', () => {
     // The fixture uses the exact live native policy parameters below.
     expect(validateFxNativeState(native()).eligible).toBe(false);
     const valid = native();
-    valid.ruleset.rules[1].parameters = {
-      merge_method: 'SQUASH',
-      max_entries_to_build: 1,
-      max_entries_to_merge: 1,
-      min_entries_to_merge: 1,
-      min_entries_to_merge_wait_minutes: 0,
-      check_response_timeout_minutes: 60,
-    };
     // Use the canonical fixture to avoid reimplementing policy defaults.
     valid.ruleset = {
       ...JSON.parse(

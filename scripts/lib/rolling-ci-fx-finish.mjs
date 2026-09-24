@@ -403,6 +403,7 @@ export async function discoverCommand(
   const repairedHead = args.head;
   if (!positive(prNumber) || !SHA.test(repairedHead ?? ''))
     throw new Error('invalid PR or exact head');
+  /** @type {{sha?: string, parents?: {sha: string}[], tree?: {sha: string}}} */
   const commit = await request(
     `/git/commits/${repairedHead}`,
     process.env.GH_TOKEN
@@ -436,6 +437,7 @@ export async function discoverCommand(
     output('reason', discovery.reason);
     return;
   }
+  /** @type {{run_attempt?: number}} */
   const run = await request(
     `/actions/runs/${discovery.runId}`,
     process.env.GH_TOKEN
@@ -532,6 +534,12 @@ export async function authorizeCommand(
   output('reason', live.reason);
 }
 
+/**
+ * @param {number} prNumber
+ * @param {string} expectedHead
+ * @param {string} token
+ * @param {(command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => {status: number | null, stdout: string}} [run]
+ */
 export async function readback(prNumber, expectedHead, token, run = spawnSync) {
   const query =
     'query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){state headRefOid mergeQueueEntry{id state} autoMergeRequest{enabledAt} mergeCommit{oid}}}}';
