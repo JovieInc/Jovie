@@ -513,18 +513,25 @@ test('fails closed when the authenticated REST client returns invalid JSON, HTTP
 });
 
 test('does not require a GitHub output file and runs its CLI logger only for the entry point', async () => {
-  let writes = 0;
-  const result = await adaptDependabotWorkflowRunEvent(
-    {
-      eventPath: EVENT_PATH,
-      repository: 'invalid',
-      expectedHead: SHA,
-      token: 'token',
-    },
-    { readFile: () => '{}', appendFile: () => writes++ }
-  );
-  assert.equal(result.eligible, false);
-  assert.equal(writes, 0);
+  const originalOutputPath = process.env.GITHUB_OUTPUT;
+  delete process.env.GITHUB_OUTPUT;
+  try {
+    let writes = 0;
+    const result = await adaptDependabotWorkflowRunEvent(
+      {
+        eventPath: EVENT_PATH,
+        repository: 'invalid',
+        expectedHead: SHA,
+        token: 'token',
+      },
+      { readFile: () => '{}', appendFile: () => writes++ }
+    );
+    assert.equal(result.eligible, false);
+    assert.equal(writes, 0);
+  } finally {
+    if (originalOutputPath === undefined) delete process.env.GITHUB_OUTPUT;
+    else process.env.GITHUB_OUTPUT = originalOutputPath;
+  }
 
   const logs = [];
   await runDependabotWorkflowRunAdapterCli({
