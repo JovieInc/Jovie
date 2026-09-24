@@ -50,7 +50,8 @@ The secret/PII screen is defense in depth, not a complete declassifier.
 
 - `approval`: matching `fingerprint`, `dataApproved`, `fundingApproved`,
   `authorityRef`, `expiresAt` within five minutes, `availableUsd`, `maxUsd`, and
-  a positive `estimatedUpperBoundUsd` no greater than the authorized envelope.
+  a positive `estimatedUpperBoundUsd` no greater than the authorized envelope
+  for the default paid mode (`fundingMode` omitted or `paid`).
   These come from the trusted operator/admission owner, never model output.
   This is an admission estimate, not a provider-enforced billing cap.
 - `readCurrentFingerprint`: rereads the saved input/artifact and current policy
@@ -58,6 +59,35 @@ The secret/PII screen is defense in depth, not a complete declassifier.
 - `apiKey`: the existing Gateway credential; never persist it in the receipt.
 - Optional `signal` and `previous`: cancellation and the durable owner's prior
   receipt. Unchanged evidence returns `unchanged` without repeating inference.
+
+For an explicitly verified zero-cost promotion, use `fundingMode: 'free-only'`
+with both `maxUsd` and `estimatedUpperBoundUsd` equal to zero. The `promotion`
+record binds the exact gateway, provider (`typesafe-ai`), model, endpoint,
+nonsecret `credentialRef`, evidence reference, fresh `checkedAt`, expiry, zero
+input/output prices, zero fees, and a positive finite integer `maxCalls`. Bind
+`policyDigest` with `freePromotionDigest(promotion)` and pass the matching
+`credentialRef` separately. The trusted admission owner verifies this evidence;
+a digest or public price label alone does not establish account eligibility,
+fees, quota, or an exact promotion cutoff. Never manufacture a positive paid cap
+to bypass the zero-cost contract. Approval cannot outlive the promotion.
+
+Free mode also requires `reserveFreeCall({ policyDigest, fingerprint, maxCalls,
+expiresAt })`. The existing owner must atomically persist a reservation across
+processes and return its one-based ordinal; exceeding the bound denies transport.
+Failed and cancelled attempts consume their slot. This callback adds no new
+queue or counter service. Re-reading price evidence must not reset a campaign
+allowance: the owner maps refreshed policy digests to the same durable allowance.
+The complete deadline (at most 15 seconds) includes reservation and source checks.
+Free requests restrict Gateway to this provider and model with zero SDK retries.
+
+A free result requires exact resolved routing, a generation ID, and known zero
+`gatewayCost`, model `cost`, and `surchargeCost` in Gateway metadata. Missing cost
+returns `cost-unknown`; positive cost returns `cost-violation`. These checks
+precede source/output validation so stale evidence cannot hide a cost failure.
+Neither attaches advice. These are provider-reported receipts, not independently audited invoices.
+The owner must persist them and stop further calls on unknown or positive cost.
+Costs already observed are retained if subsequent validation or source freshness
+fails. Valid supplied choice probabilities are copied into the receipt.
 
 The existing owner must serialize calls for the same artifact and persist every
 terminal result in its existing evidence store. This function does not create a
