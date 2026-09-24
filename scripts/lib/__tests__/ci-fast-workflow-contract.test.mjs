@@ -109,9 +109,20 @@ describe('ci-fast bounded parallel workflow', () => {
       const invoked = readFileSync(calls, 'utf8');
       if (scenario.available) {
         expect(invoked).toContain('-m coverage run --branch');
-        expect(invoked).toContain('-m pytest scripts/tests/test_gh_retry.py');
-        expect(invoked).toContain(
-          'scripts/tests/test_symphony_reconciler_runtime.py -v'
+        const pytestInvocation = invoked
+          .split('\n')
+          .find(call => call.startsWith('-m pytest '));
+        expect(pytestInvocation).toBe(
+          [
+            '-m pytest --durations=20',
+            'scripts/tests/test_gh_retry.py',
+            'scripts/tests/test_vercel_prebuilt_deploy.py',
+            'scripts/tests/test_brand_scrub.py',
+            'scripts/tests/test_agent_workflow_hygiene.py',
+            'scripts/tests/test_runner_routing.py',
+            'scripts/tests/test_symphony_ui_pilot_runtime.py',
+            'scripts/tests/test_symphony_reconciler_runtime.py -v',
+          ].join(' ')
         );
       } else {
         expect(invoked.trim()).toBe('-c import coverage, pytest');
