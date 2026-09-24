@@ -44,6 +44,7 @@ jobs:
       plan_b64: ${{ steps.plan.outputs.plan_b64 }}
       prelaunch_b64: ${{ steps.plan.outputs.prelaunch_b64 }}
       pr_number: ${{ steps.plan.outputs.pr_number }}
+      success_candidate: ${{ steps.plan.outputs.success_candidate }}
     steps:
       - name: Checkout trusted controller policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,6 +95,7 @@ jobs:
             echo 'plan_b64='
             echo 'prelaunch_b64='
             echo 'pr_number='
+            echo 'success_candidate=false'
           } >> "$GITHUB_OUTPUT"
 
           if [[ "${FX_HOSTED_REMEDIATION_ENABLED:-}" != 'true' ]]; then
@@ -226,6 +228,8 @@ jobs:
           fi
           echo "pr_number=$PR_NUMBER_EVENT" >> "$GITHUB_OUTPUT"
           if [[ "$CONCLUSION" == 'success' ]]; then
+            echo "expected_head=$EXPECTED_HEAD" >> "$GITHUB_OUTPUT"
+            echo 'success_candidate=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ "$(jq -r '.mutate' "$RUNNER_TEMP/dispatch.json")" != 'true' || ! "$(jq -r '.action' "$RUNNER_TEMP/dispatch.json")" =~ ^dispatch_(implementer|superseding_head)$ ]]; then
@@ -775,6 +779,132 @@ jobs:
             ${{ runner.temp }}/hosted-repair/terminal.json
           if-no-files-found: error
           retention-days: 7
+
+  finish:
+    name: Finish only the verified FX-written PR through native GitHub merge
+    needs: plan
+    if: needs.plan.outputs.success_candidate == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout trusted default-branch finisher policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/rolling-ci-fx-finish.mjs
+            scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/fx-remediation-lane.mjs
+            scripts/lib/changed-test-coverage.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/native-queue-policy-evidence.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/repo-hygiene-limits.mjs
+            scripts/ci-fast-lanes.mjs
+            scripts/design-conformance-paths.mjs
+            scripts/run-affected-tests.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+      - name: Setup Node.js for trusted policy
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Discover provider-bound FX write receipts
+        id: discover
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.plan.outputs.pr_number }}
+          REPAIRED_HEAD: ${{ needs.plan.outputs.expected_head }}
+        run: |
+          set -euo pipefail
+          node scripts/lib/rolling-ci-fx-finish.mjs discover \
+            --pr "$PR_NUMBER" --head "$REPAIRED_HEAD" \
+            --output "$RUNNER_TEMP/fx-finish-discovery.json"
+      - name: Download trusted writer receipts
+        if: steps.discover.outputs.eligible == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.discover.outputs.write_artifact_id }}
+          run-id: ${{ steps.discover.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/fx-finish/write
+      - name: Download immutable patch and original repair plan
+        if: steps.discover.outputs.eligible == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.discover.outputs.patch_artifact_id }}
+          run-id: ${{ steps.discover.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/fx-finish/patch
+      - name: Download published terminal receipt
+        if: steps.discover.outputs.eligible == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.discover.outputs.terminal_artifact_id }}
+          run-id: ${{ steps.discover.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/fx-finish/published
+      - name: Verify repair lineage and fresh native admission state
+        if: steps.discover.outputs.eligible == 'true'
+        id: authorize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
+          SUCCESS_RUN_ID: ${{ github.event.workflow_run.id }}
+          SUCCESS_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          node scripts/lib/rolling-ci-fx-finish.mjs authorize \
+            --discovery "$RUNNER_TEMP/fx-finish-discovery.json" \
+            --plan "$RUNNER_TEMP/fx-finish/patch/plan.json" \
+            --patch "$RUNNER_TEMP/fx-finish/patch/repair.patch" \
+            --acceptance "$RUNNER_TEMP/fx-finish/write/acceptance.json" \
+            --writer-terminal "$RUNNER_TEMP/fx-finish/write/terminal.json" \
+            --published-terminal "$RUNNER_TEMP/fx-finish/published/terminal.json" \
+            --success-run-id "$SUCCESS_RUN_ID" \
+            --success-run-attempt "$SUCCESS_RUN_ATTEMPT"
+      - name: Generate existing Jovie Bot native-finisher token
+        if: steps.authorize.outputs.eligible == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: JovieInc
+          repositories: Jovie
+          permission-actions: read
+          permission-checks: read
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Request native GitHub Merge when ready at exact head
+        if: steps.authorize.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
+          SUCCESS_RUN_ID: ${{ github.event.workflow_run.id }}
+          SUCCESS_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          node scripts/lib/rolling-ci-fx-finish.mjs request \
+            --discovery "$RUNNER_TEMP/fx-finish-discovery.json" \
+            --success-run-id "$SUCCESS_RUN_ID" \
+            --success-run-attempt "$SUCCESS_RUN_ATTEMPT"
 
   terminal:
     name: Publish typed terminal receipt
