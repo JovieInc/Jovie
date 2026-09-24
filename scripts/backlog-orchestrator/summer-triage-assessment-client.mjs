@@ -75,7 +75,6 @@ export async function requestSummerAssessment(
     ![
       'stale-event',
       'urgent-investigation-required',
-      'assigned-owner-review',
       'existing-intake-reconcile',
     ].includes(receipt.decision)
   )

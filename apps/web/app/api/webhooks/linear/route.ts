@@ -13,8 +13,7 @@
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
  *
- * Dedupe: provider webhook identity (with a deterministic fallback) held for
- * six hours. Definite dispatch rejection releases the lock; an ambiguous
+ * Dedupe: keyed digest of the verified webhook body held for six hours. Definite dispatch rejection releases the lock; an ambiguous
  * timeout stays locked for the reconciliation backstop instead of replaying.
  *
  * Side effects: POSTs to
@@ -269,14 +268,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // webhookId identifies the subscription; Linear-Delivery identifies this
-    // delivery. Reusing webhookId would suppress every later issue event.
-    const providerDeliveryId = request.headers.get('linear-delivery')?.trim();
+    // The signature authenticates the body, not Linear-Delivery. A replay with
+    // a changed header must remain the same event; distinct signed revisions
+    // get independent keys. The keyed digest does not expose issue content.
     const eventKind = isTriageEvent ? 'triage-assess' : 'plan';
-    const fallbackId = isPlanReadyEvent
-      ? `${(payload.data as LinearCommentData | undefined)?.id ?? issueId}:${payload.createdAt ?? issueData?.updatedAt ?? ''}`
-      : `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${payload.action ?? ''}`;
-    const dedupeKey = `${providerDeliveryId || fallbackId}:${eventKind}`;
+    const authenticatedDeliveryId = createHmac('sha256', webhookSecret)
+      .update(body)
+      .digest('hex');
+    const dedupeKey = `${authenticatedDeliveryId}:${eventKind}`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
@@ -324,7 +323,7 @@ export async function POST(request: NextRequest) {
             ? 'linear_triage_assess'
             : 'linear_plan_ready',
           client_payload: {
-            delivery_id: providerDeliveryId ?? dedupeKey,
+            delivery_id: authenticatedDeliveryId,
             provider_timestamp: observedAt ?? payload.createdAt ?? null,
             issue_id: issueId,
             issue_identifier: issueData?.identifier ?? null,

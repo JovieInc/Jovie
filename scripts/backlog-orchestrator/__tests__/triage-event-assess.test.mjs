@@ -196,3 +196,53 @@ test('rejects a changed issue after Summer assessed the prior revision', async (
   );
   assert.equal(writes, 0);
 });
+
+test('preserves founder steering eligibility through canonical Jovie ownership policy', async () => {
+  let transitions = 0;
+  const snapshot = issue({
+    assignee: { id: 'bb142ab2-e0e9-4f89-b330-b484d6b32139', name: 'Tim White' },
+    labels: { nodes: [{ id: 'label-1', name: 'agent-ready' }] },
+  });
+  const client = {
+    fetchIssue: async () => snapshot,
+    addComment: async () => ({ success: true }),
+    transitionIssue: async () => {
+      transitions += 1;
+      return { success: true };
+    },
+  };
+  const receipt = await assessTriageEvent(
+    event(),
+    client,
+    summer('existing-intake-reconcile')
+  );
+  assert.equal(receipt.wakeSymphony, true);
+  assert.equal(transitions, 1);
+});
+
+test('holds an actual assigned owner under canonical Jovie ownership policy', async () => {
+  let writes = 0;
+  const snapshot = issue({
+    assignee: { id: 'other-owner', name: 'Another Owner' },
+    labels: { nodes: [{ id: 'label-1', name: 'agent-ready' }] },
+  });
+  const client = {
+    fetchIssue: async () => snapshot,
+    addComment: async () => {
+      writes += 1;
+      return { success: true };
+    },
+    transitionIssue: async () => {
+      writes += 1;
+      return { success: true };
+    },
+  };
+  const receipt = await assessTriageEvent(
+    event(),
+    client,
+    summer('existing-intake-reconcile')
+  );
+  assert.equal(receipt.wakeSymphony, false);
+  assert.equal(receipt.disposition, 'owned-active');
+  assert.equal(writes, 0);
+});

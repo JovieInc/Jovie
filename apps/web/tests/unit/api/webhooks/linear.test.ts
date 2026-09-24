@@ -47,6 +47,10 @@ function sign(body: string): string {
   return createHmac('sha256', 'linear-secret').update(body).digest('hex');
 }
 
+function eventId(body: string, kind: 'plan' | 'triage-assess'): string {
+  return `${sign(body)}:${kind}`;
+}
+
 function planReadyPayload(webhookId?: string) {
   return {
     type: 'Comment',
@@ -98,7 +102,7 @@ describe('POST /api/webhooks/linear', () => {
     expect(data).toEqual({
       received: true,
       deduplicated: true,
-      eventId: 'comment_123:2026-03-10T00:00:00.000Z:plan',
+      eventId: eventId(body, 'plan'),
     });
     expect(mockServerFetch).not.toHaveBeenCalled();
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
@@ -168,7 +172,7 @@ describe('POST /api/webhooks/linear', () => {
       received: true,
       dispatchState: 'ambiguous',
       reconcileRequired: true,
-      eventId: 'comment_123:2026-03-10T00:00:00.000Z:plan',
+      eventId: eventId(body, 'plan'),
     });
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
@@ -269,15 +273,15 @@ describe('POST /api/webhooks/linear', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      eventId: 'linear-delivery-5306:plan',
+      eventId: eventId(body, 'plan'),
     });
     const dispatch = JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body);
     expect(Object.keys(dispatch.client_payload).length).toBeLessThanOrEqual(10);
-    expect(dispatch.client_payload.delivery_id).toBe('linear-delivery-5306');
+    expect(dispatch.client_payload.delivery_id).toBe(sign(body));
     expect(dispatch.event_type).toBe('linear_plan_ready');
     expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
       'linear',
-      'linear-delivery-5306:plan',
+      eventId(body, 'plan'),
       21_600
     );
   });
@@ -317,12 +321,12 @@ describe('POST /api/webhooks/linear', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       dispatched: true,
-      eventId: 'delivery-one:triage-assess',
+      eventId: eventId(body, 'triage-assess'),
     });
     const dispatch = JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body);
     expect(dispatch.event_type).toBe('linear_triage_assess');
     expect(dispatch.client_payload).toMatchObject({
-      delivery_id: 'delivery-one',
+      delivery_id: sign(body),
       issue_identifier: 'JOV-6500',
       team_key: 'JOV',
       state_name: 'Triage',
@@ -332,16 +336,15 @@ describe('POST /api/webhooks/linear', () => {
     expect(JSON.stringify(dispatch)).not.toContain('Sensitive');
     expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
       'linear',
-      'delivery-one:triage-assess',
+      eventId(body, 'triage-assess'),
       21_600
     );
   });
 
-  it('does not deduplicate distinct deliveries from the same webhook subscription', async () => {
-    mockAcquireRecentDispatch.mockResolvedValue({
-      acquired: true,
-      reason: 'acquired',
-    });
+  it('deduplicates a verified body replay even when its delivery header changes', async () => {
+    mockAcquireRecentDispatch
+      .mockResolvedValueOnce({ acquired: true, reason: 'acquired' })
+      .mockResolvedValueOnce({ acquired: false, reason: 'duplicate' });
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
     const { POST } = await import('@/app/api/webhooks/linear/route');
     const body = JSON.stringify({
@@ -369,9 +372,50 @@ describe('POST /api/webhooks/linear', () => {
       expect(response.status).toBe(200);
     }
     expect(mockAcquireRecentDispatch.mock.calls.map(call => call[1])).toEqual([
-      'delivery-a:triage-assess',
-      'delivery-b:triage-assess',
+      eventId(body, 'triage-assess'),
+      eventId(body, 'triage-assess'),
     ]);
+    expect(mockServerFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches distinct signed issue revisions under the same subscription', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const bodies = ['2026-09-24T00:00:00.000Z', '2026-09-24T00:01:00.000Z'].map(
+      updatedAt =>
+        JSON.stringify({
+          type: 'Issue',
+          action: 'update',
+          webhookId: 'same-subscription',
+          data: {
+            id: '68b3e8de-588e-46ba-8209-84329d154627',
+            identifier: 'JOV-6500',
+            teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+            stateId: '9844cfe6-6cf4-4347-842c-893a68f349b8',
+            updatedAt,
+          },
+        })
+    );
+    for (const body of bodies) {
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: {
+            'linear-signature': sign(body),
+            'linear-delivery': 'same-header',
+          },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+    }
+    expect(mockAcquireRecentDispatch.mock.calls.map(call => call[1])).toEqual(
+      bodies.map(body => eventId(body, 'triage-assess'))
+    );
     expect(mockServerFetch).toHaveBeenCalledTimes(2);
   });
 
