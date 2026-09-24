@@ -1,4 +1,4 @@
-import { TooltipProvider } from '@jovie/ui';
+import { TooltipProvider } from '@jovie/ui/atoms/tooltip';
 import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';

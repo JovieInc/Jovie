@@ -1635,6 +1635,7 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
         run: |
           set -euo pipefail
@@ -1681,6 +1682,7 @@ jobs:
           if-no-files-found: error
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -2369,7 +2371,9 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -2377,6 +2381,7 @@ jobs:
         with:
           name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
       - name: Upload input Storybook evidence
         if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}

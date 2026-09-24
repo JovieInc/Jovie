@@ -68,6 +68,8 @@ const imageUploads =
     '|'
   );
 const markdownUploads = [
+  'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
   'production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}',
@@ -812,6 +814,33 @@ describe('Playwright artifact secret boundary', () => {
       );
     }
   );
+
+  it('keeps every combined Storybook run on manual Axe with scanned Markdown evidence', () => {
+    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const job = jobBlock(source, 'ci-build-layout');
+    const steps = workflowStepBlocks(job);
+    const surface = steps.find(step =>
+      step.startsWith(
+        '      - name: Run surface elevation matrix (Storybook)\n'
+      )
+    );
+    const upload = steps.find(step =>
+      step.startsWith('      - name: Upload combined layout failure evidence\n')
+    );
+
+    expect(surface).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
+    expect(surface).not.toContain('JOVIE_LIVE_STORYBOOK_CERT');
+    expect(surface).toContain('guard-playwright-artifacts.mjs" --run --');
+    expect(surface).toContain('tests/e2e/storybook-sheet.spec.ts');
+    expect(surface).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(yamlPropertyBlock(job, 'env', 4)).not.toContain(
+      'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+    );
+    expect(upload).toContain(
+      'uses: ./.github/actions/upload-safe-playwright-artifact'
+    );
+    expect(upload).toContain("allow-markdown: 'true'");
+  });
 
   it('routes the exact upload and producer inventory through staged-only guards', () => {
     const uploads: string[] = [];
@@ -1880,7 +1909,7 @@ ${fixtureCheckout}
     });
   });
 
-  it('stages sanitized error-context.md and does not poison markdown-only failures', () => {
+  it.each([0, 1])('stages safe Markdown (exit %i)', producerExit => {
     const email = 'standing-user@example.test';
     const authCode = 'oauth-authorization-code-value';
     const workspace = fixture();
@@ -1901,7 +1930,7 @@ ${fixtureCheckout}
       `'- /url: /app?code=${authCode}',`,
       "'const cookies = await page.context().cookies();',",
       "].join('\\n'));",
-      'process.exit(1);',
+      `process.exit(${producerExit});`,
     ].join('');
 
     const result = runChild(workspace, runner, child, {
@@ -1910,7 +1939,7 @@ ${fixtureCheckout}
       PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
     });
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(producerExit);
     const output = `${result.stdout}\n${result.stderr}`;
     expect(output).toContain('secret guard passed');
     expect(output).not.toContain('PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE');
