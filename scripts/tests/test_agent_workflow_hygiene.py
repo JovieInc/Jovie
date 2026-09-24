@@ -889,15 +889,18 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
         assert exact_identity_check in workflow
     assert ".base.sha" not in workflow
     assert re.search(
-        r'push\s+"https://github\.com/\$REPOSITORY\.git"\s+'
-        r'"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs/heads/\$HEAD_REF"',
+        r'push\s+--force-with-lease="refs/heads/\$HEAD_REF:\$SOURCE_HEAD"\s*\\?\s*'
+        r'"https://github\.com/\$REPOSITORY\.git"\s+'
+        r'"HEAD:refs/heads/\$HEAD_REF"',
         workflow,
         re.IGNORECASE,
     )
+    assert 'git merge-base --is-ancestor "$SOURCE_HEAD" "$resolved_commit"' in workflow
+    assert 'git merge-base --is-ancestor "$BASE_HEAD" "$resolved_commit"' in workflow
+    assert not re.search(r'\bpush\s+--force(?:\s|=|$)', workflow, re.IGNORECASE)
     assert "expected_base:0:12" not in workflow
     assert "BASE_HEAD:0:12" not in workflow
     for forbidden in (
-        "force-with-lease",
         "git push --force",
         "gh pr merge",
         "gh pr ready",

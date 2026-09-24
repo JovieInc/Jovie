@@ -1698,7 +1698,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(WORKFLOW).not.toContain('expected_base:0:12');
     expect(WORKFLOW).not.toContain('BASE_HEAD:0:12');
     const pushMatch =
-      /git[\s\S]{0,240}?\bpush\s+"https:\/\/github\.com\/\$REPOSITORY\.git"\s+"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs\/heads\/\$HEAD_REF"/iu.exec(
+      /if git[\s\S]{0,240}?\bpush --force-with-lease="refs\/heads\/\$HEAD_REF:\$SOURCE_HEAD"\s*\\\s*"https:\/\/github\.com\/\$REPOSITORY\.git"\s+"HEAD:refs\/heads\/\$HEAD_REF"; then/iu.exec(
         WORKFLOW
       );
     expect(pushMatch).not.toBeNull();
@@ -1714,10 +1714,10 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(prePush).toMatch(/same_repo|full_name/u);
     expect(WORKFLOW).toMatch(/rev-parse HEAD|HEAD\^\{commit\}/u);
 
-    expect(WORKFLOW).not.toMatch(
-      /git[\s\S]{0,160}?\bpush\b[^\n]*(?:--force(?:-with-lease)?|\s-f(?:\s|$))/u
-    );
-    expect(WORKFLOW).not.toContain('force-with-lease');
+    expect(WORKFLOW).not.toMatch(/\bpush\s+(?:--force(?:\s|$)|-f(?:\s|$))/u);
+    expect(WORKFLOW).not.toMatch(/--force-with-lease(?:\s|$)/u);
+    expect(WORKFLOW.match(/--force-with-lease=/gu)).toHaveLength(1);
+    expect(WORKFLOW.match(/^\s*push\s+/gmu)).toHaveLength(1);
     expect(WORKFLOW).not.toMatch(/\bgh\s+pr\s+merge\b/u);
     expect(WORKFLOW).not.toContain('.base.sha');
     const claim = workflowStep('Build plan and claim exact heads');
@@ -1736,6 +1736,198 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(WORKFLOW).not.toContain(
       'GH_TOKEN="$GH_MUTATION_TOKEN" gh api graphql'
     );
+  });
+
+  it('executes the trusted parent guard and exact-ref CAS push against local bare remotes', () => {
+    const delivery = workflowRunScript('Validate, reread, and deliver once');
+    const guardStart = delivery.indexOf(
+      'test "$(git rev-parse "$resolved_commit^1")"'
+    );
+    const guardEnd = delivery.indexOf(
+      'git checkout --detach "$resolved_commit"',
+      guardStart
+    );
+    const pushStart = delivery.indexOf('auth=$(printf', guardEnd);
+    const pushEnd = delivery.indexOf('\n\nlive_after=', pushStart);
+    expect(Math.min(guardStart, guardEnd, pushStart, pushEnd)).toBeGreaterThan(
+      -1
+    );
+    const guard = delivery.slice(
+      guardStart,
+      guardEnd + 'git checkout --detach "$resolved_commit"'.length
+    );
+    const push = delivery.slice(pushStart, pushEnd);
+    expect(push).toContain(
+      '--force-with-lease="refs/heads/$HEAD_REF:$SOURCE_HEAD"'
+    );
+    expect(push).toContain('"HEAD:refs/heads/$HEAD_REF"; then');
+
+    const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-cas-'));
+    const repo = join(root, 'repo');
+    const bare = join(root, 'remote.git');
+    mkdirSync(repo);
+    try {
+      runGit(repo, ['init', '-b', 'main']);
+      runGit(repo, ['config', 'user.name', 'Conflict CAS Test']);
+      runGit(repo, ['config', 'user.email', 'cas@example.test']);
+      writeFileSync(join(repo, 'file.txt'), 'root\n');
+      runGit(repo, ['add', 'file.txt']);
+      runGit(repo, ['commit', '-m', 'root']);
+      const rootHead = runGit(repo, ['rev-parse', 'HEAD']);
+      runGit(repo, ['switch', '-c', 'source']);
+      writeFileSync(join(repo, 'file.txt'), 'source\n');
+      runGit(repo, ['commit', '-am', 'source']);
+      const sourceHead = runGit(repo, ['rev-parse', 'HEAD']);
+      runGit(repo, ['switch', '-c', 'base', rootHead]);
+      writeFileSync(join(repo, 'file.txt'), 'base\n');
+      runGit(repo, ['commit', '-am', 'base']);
+      const baseHead = runGit(repo, ['rev-parse', 'HEAD']);
+      const tree = runGit(repo, ['rev-parse', `${sourceHead}^{tree}`]);
+      const candidate = runGit(repo, [
+        'commit-tree',
+        tree,
+        '-p',
+        sourceHead,
+        '-p',
+        baseHead,
+        '-m',
+        'resolved',
+      ]);
+      const wrongParent = runGit(repo, [
+        'commit-tree',
+        tree,
+        '-p',
+        baseHead,
+        '-p',
+        sourceHead,
+        '-m',
+        'wrong parent',
+      ]);
+      runGit(repo, ['switch', '-c', 'divergent', rootHead]);
+      writeFileSync(join(repo, 'file.txt'), 'divergent\n');
+      runGit(repo, ['commit', '-am', 'divergent']);
+      const divergent = runGit(repo, ['rev-parse', 'HEAD']);
+      runGit(root, ['init', '--bare', bare]);
+      runGit(repo, ['push', bare, `${sourceHead}:refs/heads/source`]);
+      runGit(repo, [
+        'push',
+        bare,
+        `${baseHead}:refs/heads/fixture-base`,
+        `${divergent}:refs/heads/fixture-divergent`,
+      ]);
+      runGit(repo, [
+        'config',
+        `url.file://${bare}.insteadOf`,
+        'https://github.com/JovieInc/Jovie.git',
+      ]);
+      const remoteHead = () =>
+        runGit(root, ['--git-dir', bare, 'rev-parse', 'refs/heads/source']);
+      const runCase = (
+        name,
+        remote,
+        resolvedCommit = candidate,
+        statusFails = false
+      ) => {
+        runGit(root, [
+          '--git-dir',
+          bare,
+          'update-ref',
+          'refs/heads/source',
+          sourceHead,
+        ]);
+        if (remote === null)
+          runGit(root, [
+            '--git-dir',
+            bare,
+            'update-ref',
+            '-d',
+            'refs/heads/source',
+          ]);
+        else if (remote !== sourceHead)
+          runGit(root, [
+            '--git-dir',
+            bare,
+            'update-ref',
+            'refs/heads/source',
+            remote,
+          ]);
+        const marker = join(root, `${name}.success`);
+        const statusLog = join(root, `${name}.status`);
+        const script = `set -euo pipefail
+post_status() { printf '%s %s %s\\n' "$1" "$2" "$3" >> "$STATUS_LOG"; if [ "$STATUS_FAIL" = 1 ]; then return 23; fi; }
+${guard}
+${push}
+printf 'success\\n' > "$SUCCESS_MARKER"`;
+        const result = spawnSync('bash', ['-c', script], {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH ?? '',
+            HOME: root,
+            GIT_ALLOW_PROTOCOL: 'file',
+            GIT_CONFIG_GLOBAL: '/dev/null',
+            GIT_CONFIG_SYSTEM: '/dev/null',
+            GH_TOKEN: 'test-only',
+            REPOSITORY: 'JovieInc/Jovie',
+            HEAD_REF: 'source',
+            SOURCE_HEAD: sourceHead,
+            BASE_HEAD: baseHead,
+            resolved_commit: resolvedCommit,
+            STATUS_LOG: statusLog,
+            STATUS_FAIL: statusFails ? '1' : '0',
+            SUCCESS_MARKER: marker,
+          },
+        });
+        return { result, marker, statusLog };
+      };
+
+      const matched = runCase('matched', sourceHead);
+      expect(matched.result.status, matched.result.stderr).toBe(0);
+      expect(remoteHead()).toBe(candidate);
+      expect(readFileSync(matched.marker, 'utf8')).toBe('success\n');
+      const divergentRace = runCase('divergent', divergent);
+      expect(divergentRace.result.status).toBeGreaterThan(0);
+      expect(remoteHead()).toBe(divergent);
+      expect(readFileSync(divergentRace.statusLog, 'utf8')).toBe(
+        `${sourceHead} error failed\n`
+      );
+      expect(() => readFileSync(divergentRace.marker)).toThrow();
+      const ancestorRace = runCase('ancestor', baseHead);
+      runGit(repo, ['merge-base', '--is-ancestor', baseHead, candidate]);
+      expect(ancestorRace.result.status).toBeGreaterThan(0);
+      expect(remoteHead()).toBe(baseHead);
+      expect(() => readFileSync(ancestorRace.marker)).toThrow();
+      const deleted = runCase('deleted', null);
+      expect(deleted.result.status).toBeGreaterThan(0);
+      expect(
+        runGit(root, [
+          '--git-dir',
+          bare,
+          'for-each-ref',
+          '--format=%(refname)',
+          'refs/heads/source',
+        ])
+      ).toBe('');
+      expect(() => readFileSync(deleted.marker)).toThrow();
+      const wrong = runCase('wrong-parent', sourceHead, wrongParent);
+      expect(wrong.result.status).toBeGreaterThan(0);
+      expect(remoteHead()).toBe(sourceHead);
+      expect(() => readFileSync(wrong.marker)).toThrow();
+      const statusFailure = runCase(
+        'status-failure',
+        divergent,
+        candidate,
+        true
+      );
+      expect(statusFailure.result.status).toBe(divergentRace.result.status);
+      expect(statusFailure.result.stdout).toContain(
+        '::warning::Could not publish'
+      );
+      expect(remoteHead()).toBe(divergent);
+      expect(() => readFileSync(statusFailure.marker)).toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('preserves native auto-merge without a ready mutation or dequeue side flight', () => {
