@@ -1324,40 +1324,8 @@ changelog_collision_decision_for_pr() {  # <num>
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
-deferred_state_is_releasable() {  # state json <expected head> <expected base>
-  jq -e --arg expected_head "$2" --arg expected_base "$3" '
-    .state == "OPEN"
-    and (.isDraft | not)
-    and .mergeable == "MERGEABLE"
-    and (.headRefOid // "") == $expected_head
-    and .baseRefName == "main"
-    and (.baseRefOid // "") == $expected_base
-    and .autoMergeRequest != null
-    and ([.labels[].name] | index("queue-deferred")) != null
-    and ([.labels[].name] | any(
-      . == "fast" or . == "needs-conflict-resolution"
-      or '"$MACHINE_HOLD_JQ"'
-    ) | not)
-  ' <<<"$1" >/dev/null
-}
-
-restore_deferred_hold() {  # restore_deferred_hold <num>
-  local n="$1"
-  [[ "$DRY_RUN" == "1" ]] && return 0
-  if gh_mutate_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
-    echo "    +queue-deferred on #$n (compensated changed release state)"
-    return 0
-  fi
-  echo "    !! could not compensate queue-deferred release for #$n" >&2
-  return 1
-}
-
-# Release only a previously pressure-deferred PR after main advances. This is
-# intentionally called only by Merge Queue Auto-Enroll's existing `push: main`
-# path. A candidate must be live/current, retain its auto-merge request, have
-# no stronger hold, and pass the same canonical source-gate classifier used by
-# normal enrollment. Any race restores the deferral hold rather than enrolling
-# an unproven revision.
+# Automatic queue-deferred release remains disabled. Keep this legacy call as
+# an explicit no-op so maintenance runs preserve the hold pending owner action.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
   [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]] && return 0
@@ -1365,98 +1333,6 @@ reconcile_deferred_auto_merge_after_main_push() {
   echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
   echo "  ~ no typed pressure-deferral provenance; owner release required"
   return 0
-
-  local main_oid candidates pr n expected_head before failures before_release after
-  echo "=== RECONCILE (current auto-merge deferred PRs after main push) ==="
-
-  if ! main_oid="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha' 2>/dev/null)" \
-    || [[ ! "$main_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
-    echo "  !! could not resolve exact main SHA; preserving queue-deferred holds" >&2
-    return 0
-  fi
-  main_oid="$(printf '%s' "$main_oid" | tr '[:upper:]' '[:lower:]')"
-
-  if ! candidates="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid --jq '
-      [ .[] | select(.isDraft == false) | select(.mergeable == "MERGEABLE")
-        | select(.baseRefName == "main")
-        | select([.labels[].name] | index("queue-deferred"))
-        | { n: .number, head: (.headRefOid // ""), base: (.baseRefOid // "") } ]')"; then
-    echo "  !! could not read deferred PR candidates; preserving holds" >&2
-    return 0
-  fi
-
-  while IFS= read -r pr; do
-    stop_if_budget_exhausted && break
-    n="$(jq -r '.n' <<<"$pr")"
-    expected_head="$(jq -r '.head // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    expected_base="$(jq -r '.base // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    echo "  #$n"
-
-    if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ || "$expected_base" != "$main_oid" ]]; then
-      echo "    ~ not based on current main; preserving deferral"
-      continue
-    fi
-
-    if ! before="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
-      echo "    ~ could not read live state; preserving deferral"
-      continue
-    fi
-    if ! deferred_state_is_releasable "$before" "$expected_head" "$main_oid"; then
-      echo "    ~ live state is not a current, clean auto-merge defer; preserving"
-      continue
-    fi
-
-    failures="$(check_failures_for_pr "$n")"
-    if [[ "$(jq 'length' <<<"$failures")" -ne 0 ]]; then
-      echo "    ~ canonical source gates are not green: $(jq -r 'join(", ")' <<<"$failures")"
-      continue
-    fi
-
-    # Re-read after checks so neither a new head nor a stronger hold can inherit
-    # an old source-gate result.
-    if ! before_release="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
-      echo "    ~ could not re-read live state; preserving deferral"
-      continue
-    fi
-    if ! deferred_state_is_releasable "$before_release" "$expected_head" "$main_oid"; then
-      echo "    ~ head, base, hold, or auto-merge changed; preserving deferral"
-      continue
-    fi
-
-    if [[ "$DRY_RUN" == "1" ]]; then
-      echo "    [dry-run] would -queue-deferred on #$n"
-      continue
-    fi
-    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
-      echo "    !! failed to remove queue-deferred on #$n" >&2
-      continue
-    fi
-
-    if ! after="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)" \
-      || ! jq -e --arg expected_head "$expected_head" --arg expected_base "$main_oid" '
-        .state == "OPEN"
-        and (.isDraft | not)
-        and .mergeable == "MERGEABLE"
-        and (.headRefOid // "") == $expected_head
-        and .baseRefName == "main"
-        and (.baseRefOid // "") == $expected_base
-        and .autoMergeRequest != null
-        and ([.labels[].name] | index("queue-deferred")) == null
-        and ([.labels[].name] | any(
-          . == "fast" or . == "needs-conflict-resolution"
-      or '"$MACHINE_HOLD_JQ"'
-        ) | not)
-      ' <<<"$after" >/dev/null; then
-      echo "    !! release state changed; restoring queue-deferred hold" >&2
-      restore_deferred_hold "$n" || return 1
-      continue
-    fi
-    echo "    -queue-deferred on #$n (current main + exact green head)"
-  done < <(jq -c '.[]' <<<"$candidates")
 }
 
 # Record the effective read identity without ever printing a token. The

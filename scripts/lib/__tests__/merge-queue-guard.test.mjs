@@ -2585,7 +2585,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       ) +
       drain.slice(
         drain.indexOf('pr_changed_paths_json() {'),
-        drain.indexOf('deferred_state_is_releasable() {')
+        drain.indexOf('reconcile_deferred_auto_merge_after_main_push() {')
       );
     const snapshot = [{ n: 17463, head: branch, q: false }];
     const files = Object.fromEntries([
