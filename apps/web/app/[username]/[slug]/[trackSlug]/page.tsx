@@ -158,6 +158,7 @@ export default async function TrackDeepLinkPage({
       artworkUrl: track.artworkUrl,
       releaseDate: track.releaseDate,
       providerLinks: effectiveProviderLinks,
+      primaryArtists: track.primaryArtists,
       durationMs: track.durationMs,
       isrc: track.isrc,
       trackNumber: track.trackNumber,

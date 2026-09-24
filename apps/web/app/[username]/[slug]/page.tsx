@@ -220,6 +220,7 @@ export default async function ContentSmartLinkPage({
       releaseType: content.releaseType,
       totalTracks: content.totalTracks,
       credits: content.credits,
+      primaryArtists: content.primaryArtists,
       durationMs: content.durationMs,
       isrc: content.isrc,
       trackNumber: content.trackNumber,
