@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: February 2026_
+_Last updated: September 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -67,6 +67,7 @@ Our stack uses a small set of trusted partners:
 - **Vercel** for hosting, edge functions, file storage, web analytics, and AI Gateway routing
 - **Sentry** for error tracking and performance monitoring
 - **Resend** for transactional email delivery
+- **Pen** for design-asset vectorization and related image processing; Pen runs this work on secure virtual machines hosted on Amazon Web Services (AWS)
 
 We never introduce other analytics platforms or tracking cookies without explicit notice.
 
@@ -135,7 +136,7 @@ You can choose not to use AI features. The AI chat assistant is optional and doe
 
 We do not sell data to anyone. We may share data with:
 
-- Service providers who assist in operating Jovie (Clerk, Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend)
+- Service providers who assist in operating Jovie (Clerk, Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend, Pen)
 - Legal authorities when required by law or to protect against fraud
 - Partners only when you explicitly connect a service (e.g., Spotify)
 

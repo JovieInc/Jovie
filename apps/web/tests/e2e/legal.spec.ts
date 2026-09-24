@@ -149,7 +149,7 @@ test.describe('Legal Pages', () => {
 
     test('displays privacy policy page correctly', async ({ page }) => {
       await expect(page.locator('h1')).toContainText('Privacy Policy');
-      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(page.getByText('Last updated: September 2026')).toBeVisible();
       await expect(
         page.getByText('We collect only what is essential')
       ).toBeVisible();
