@@ -105,6 +105,7 @@ export function SmartLinksDemo() {
         <Link
           className='text-sm text-secondary-token underline underline-offset-4'
           href='/tim'
+          prefetch={false}
         >
           Artist profile
         </Link>
