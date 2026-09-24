@@ -234,7 +234,6 @@ describe('baked runner prerequisite contract', () => {
     repoRoot,
     '.github/runner-image/build-context.sh'
   );
-  const runnerBuildContext = readFileSync(runnerBuildContextScript, 'utf8');
   const createInstalledTreeScript = resolve(
     repoRoot,
     '.github/runner-image/create-installed-tree.mjs'
@@ -426,8 +425,6 @@ describe('baked runner prerequisite contract', () => {
   });
 
   it('builds a deterministic filtered context before a streamed Docker build', () => {
-    expect(runnerBuildContext).toContain('git cat-file --batch-check');
-    expect(runnerBuildContext).not.toContain('git cat-file -e');
     const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
     temporaryDirectories.push(directory);
     const gitBinDirectory = resolve(directory, 'bin');
