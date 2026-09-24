@@ -973,6 +973,8 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         'content-type': 'application/json',
       },
     });
+    expect(init?.headers).not.toHaveProperty('x-vercel-protection-bypass');
+    expect(init?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
     const delivered = JSON.parse(String(init?.body));
     expect(delivered.producerAttestation).toMatchObject({
       algorithm: 'Ed25519',
@@ -990,6 +992,51 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         Buffer.from(delivered.producerAttestation.signature, 'base64url')
       )
     ).toBe(true);
+  });
+
+  it('attaches the eve-shadow bypass secret without a cookie or query secret', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'eve-shadow-secret');
+    vi.stubEnv('VERCEL_AUTOMATION_BYPASS_SECRET', 'jovie-project-secret');
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        {
+          ok: true,
+          receipt: { eventId: validSnapshot().eventId, decision: 'accepted' },
+        },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(202);
+    const [url, init] = fetch.mock.calls[0] as Parameters<
+      typeof globalThis.fetch
+    >;
+    expect(String(url)).not.toContain('eve-shadow-secret');
+    expect(String(url)).not.toContain('x-vercel-protection-bypass');
+    expect(init?.headers).toMatchObject({
+      authorization: `Bearer ${oidcToken()}`,
+      'x-vercel-trusted-oidc-idp-token': oidcToken(),
+      'x-vercel-protection-bypass': 'eve-shadow-secret',
+    });
+    expect(init?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
+    expect(JSON.stringify(init?.headers)).not.toContain('jovie-project-secret');
+  });
+
+  it('rejects a header-unsafe eve bypass secret before delivery', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'bad\nsecret');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'eve_protection_bypass_invalid',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('accepts main ahead of the deployed bridge and preserves explicit unknown authorities', async () => {
