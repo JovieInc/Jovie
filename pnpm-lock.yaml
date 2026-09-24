@@ -189,8 +189,8 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0
       electron:
-        specifier: ^44.4.3
-        version: 44.4.3
+        specifier: ^44.4.5
+        version: 44.4.5
       electron-builder:
         specifier: ^26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@25.1.8)
@@ -727,7 +727,7 @@ importers:
         version: 19.1.0-rc.3
       danger:
         specifier: ^14.0.7
-        version: 14.0.7(undici@8.11.0)
+        version: 14.0.7(undici@8.11.2)
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
@@ -10200,8 +10200,8 @@ packages:
   electron-updater@6.8.9:
     resolution: {integrity: sha512-ZhVxM9iGONUpZGI1FxdMRgJjUFXi7AYGVa5PwKlO1tV1/4zDxQmfKpXOHVztKrd6L9rLcFjERvi1Mf2vxyTkig==}
 
-  electron@44.4.3:
-    resolution: {integrity: sha512-LTpSFTB40qVCXIX5xMo+cgHI/Jjkbjw7VpB26PccEbroqOn72LBukeaDwPVo1fBYzSzs0c9iPuAucFCO7Tw81Q==}
+  electron@44.4.5:
+    resolution: {integrity: sha512-SjgoaeYsSWZfJzubgQU7juvuXMTvn6/e1gAHdGFA/yuMbpF+I+skYqIJ6DdXBXHeWbkbpNpmwZCTpiivtlWZSw==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -15993,6 +15993,10 @@ packages:
     resolution: {integrity: sha512-AdzuGcAkzhbha3GgCSoUBx2P0quwym6qdFNCQz/fDGZc8w9XJ741wHUbt2kTmfPz+ZIOMkySFkiY7RXmiDDC8w==}
     engines: {node: '>=22.19.0'}
 
+  undici@8.11.2:
+    resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
+    engines: {node: '>=22.19.0'}
+
   unicorn-magic@0.1.0:
     resolution: {integrity: sha512-lRfVq8fE8gz6QMBuDM6a+LO3IAzTi05H6gCVaUpir2E1Rwpo4ZUog45KpNXKC/Mn3Yb9UDuHumeFTo9iV/D9FQ==}
     engines: {node: '>=18'}
@@ -16777,7 +16781,7 @@ snapshots:
       '@ai-sdk/provider': 3.0.16
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.1
-      undici: 8.10.2
+      undici: 8.11.2
       zod: 4.6.5
 
   '@ai-sdk/provider-utils@5.0.43(zod@4.6.5)':
@@ -18229,7 +18233,7 @@ snapshots:
       semver: 7.8.5
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 8.10.2
+      undici: 8.11.2
     transitivePeerDependencies:
       - supports-color
 
@@ -24031,7 +24035,7 @@ snapshots:
       ms: 2.1.3
       picocolors: 1.1.1
       tar-stream: 3.1.7
-      undici: 8.11.0
+      undici: 8.11.2
       xdg-app-paths: 5.1.0
       zod: 4.6.5
     transitivePeerDependencies:
@@ -24580,7 +24584,7 @@ snapshots:
       '@workflow/world': 4.5.0
       async-sema: 3.1.1
       ulid: 3.0.2
-      undici: 8.11.0
+      undici: 8.11.2
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -24592,7 +24596,7 @@ snapshots:
       '@workflow/errors': 4.2.1
       '@workflow/world': 4.5.0
       cbor-x: 1.6.0
-      undici: 8.11.0
+      undici: 8.11.2
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -26371,7 +26375,7 @@ snapshots:
 
   damerau-levenshtein@1.0.8: {}
 
-  danger@14.0.7(undici@8.11.0):
+  danger@14.0.7(undici@8.11.2):
     dependencies:
       '@gitbeaker/rest': 38.12.1
       '@octokit/rest': 20.1.2
@@ -26403,7 +26407,7 @@ snapshots:
       require-from-string: 2.0.2
       supports-hyperlinks: 4.5.0
     optionalDependencies:
-      undici: 8.11.0
+      undici: 8.11.2
     transitivePeerDependencies:
       - supports-color
 
@@ -26810,7 +26814,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@44.4.3:
+  electron@44.4.5:
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0
@@ -30906,7 +30910,7 @@ snapshots:
       semver: 7.8.5
       tar: 7.5.21
       tinyglobby: 0.2.17
-      undici: 8.11.0
+      undici: 8.11.2
       which: 6.0.1
 
   node-gyp@9.4.1:
@@ -34362,6 +34366,8 @@ snapshots:
   undici@8.10.2: {}
 
   undici@8.11.0: {}
+
+  undici@8.11.2: {}
 
   unicorn-magic@0.1.0: {}
 
