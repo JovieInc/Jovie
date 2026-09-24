@@ -16,10 +16,12 @@ import { describe, it } from 'node:test';
 import {
   attestGemService,
   buildDeliveryReceipt,
+  collectDeploymentInvestigation,
   DELIVERY_RECEIPT_SCHEMA,
   PR_LIFECYCLE_POLICY_DIGEST,
   persistClosureHealthActions,
   persistDeliveryOutcome,
+  persistDeploymentInvestigation,
   reconcileDeliveryHeartbeat,
   transitionDeliveryReceipt,
 } from '../delivery-state-machine.mjs';
@@ -1023,6 +1025,486 @@ describe('delivery state machine', () => {
       );
       assert.equal(result.loop.stallClass, 'missing-failing-checks');
       assert.equal(result.queue.items[0].issue, 'JOV-5390');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('read-only deployment investigation result', () => {
+  const repairHead = 'b'.repeat(40);
+  const now = '2026-09-24T01:00:00.000Z';
+  const identity = {
+    repository: REPO,
+    run: 777,
+    attempt: 1,
+    repairPr: 18201,
+    repairHead,
+    deploymentId: 'dpl_testDeployment123',
+  };
+  const run = {
+    id: 777,
+    run_attempt: 1,
+    path: '.github/workflows/production-controller.yml',
+    head_branch: 'main',
+    status: 'completed',
+    conclusion: 'failure',
+    head_sha: HEAD,
+    repository: { full_name: REPO },
+    html_url: 'https://github.com/JovieInc/Jovie/actions/runs/777',
+  };
+  const repair = {
+    number: 18201,
+    headRefOid: repairHead,
+    baseRefName: 'main',
+    state: 'OPEN',
+    isDraft: false,
+    mergeQueueEntry: { id: 'MQE_current' },
+  };
+  const source = {
+    encoding: 'base64',
+    content: Buffer.from(
+      "import { WHITE_SPACE_STYLE_PROMPT } from '@/lib/services/retouching/style-prompt';"
+    ).toString('base64'),
+  };
+  const deployment = {
+    id: identity.deploymentId,
+    url: 'jovie-fixture-jovie.vercel.app',
+    readyState: 'ERROR',
+    meta: { githubCommitSha: HEAD },
+    errorCode: 'ENOENT',
+    errorMessage:
+      '/vercel/path0/apps/web/lib/services/retouching/styles/white-space.md synthetic-private-output',
+  };
+  const jobs = {
+    jobs: [
+      {
+        id: 888,
+        run_id: 777,
+        run_attempt: 1,
+        name: 'Production Release / deploy-staging',
+        status: 'completed',
+        conclusion: 'failure',
+      },
+    ],
+  };
+  const log = 'deployment https://jovie-fixture-jovie.vercel.app';
+  const reads = (overrides = {}) => ({
+    now,
+    readGithub: async endpoint =>
+      endpoint.includes('/contents/')
+        ? source
+        : endpoint.includes('/jobs?')
+          ? jobs
+          : run,
+    readRepair: async () => repair,
+    readDeployment: async () => deployment,
+    readJobLog: async () => log,
+    ...overrides,
+  });
+
+  it('derives a bounded diagnosis from real API readers and strips provider messages', async () => {
+    const result = await collectDeploymentInvestigation(identity, reads());
+    assert.equal(result.sourceHead, HEAD);
+    assert.equal(result.diagnosis, 'retouch-style-prompt-missing');
+    assert.equal(result.capability, 'read-only-investigation');
+    assert.equal(
+      JSON.stringify(result).includes('synthetic-private-output'),
+      false
+    );
+    assert.equal(result.healthy, undefined);
+  });
+
+  for (const [name, overrides] of [
+    [
+      'wrong staging attempt',
+      {
+        readGithub: async endpoint =>
+          endpoint.includes('/contents/')
+            ? source
+            : endpoint.includes('/jobs?')
+              ? { jobs: [{ ...jobs.jobs[0], run_attempt: 2 }] }
+              : run,
+      },
+    ],
+    [
+      'successful staging job',
+      {
+        readGithub: async endpoint =>
+          endpoint.includes('/contents/')
+            ? source
+            : endpoint.includes('/jobs?')
+              ? { jobs: [{ ...jobs.jobs[0], conclusion: 'success' }] }
+              : run,
+      },
+    ],
+    [
+      'malformed provider URL',
+      {
+        readDeployment: async () => ({
+          ...deployment,
+          url: 'jovie-fixture-jovie.vercel.app.attacker.invalid',
+        }),
+      },
+    ],
+    [
+      'wrong provider source',
+      {
+        readDeployment: async () => ({
+          ...deployment,
+          meta: { githubCommitSha: repairHead },
+        }),
+      },
+    ],
+    [
+      'wrong deployment',
+      {
+        readDeployment: async () => ({
+          ...deployment,
+          id: 'dpl_otherDeployment123',
+        }),
+      },
+    ],
+    [
+      'healthy deployment',
+      { readDeployment: async () => ({ ...deployment, readyState: 'READY' }) },
+    ],
+    [
+      'unknown error',
+      { readDeployment: async () => ({ ...deployment, errorCode: 'EACCES' }) },
+    ],
+    [
+      'unknown asset',
+      {
+        readDeployment: async () => ({
+          ...deployment,
+          errorMessage: '/some/other/file',
+        }),
+      },
+    ],
+    [
+      'wrong run attempt',
+      { readGithub: async () => ({ ...run, run_attempt: 2 }) },
+    ],
+    [
+      'wrong workflow',
+      { readGithub: async () => ({ ...run, path: 'unrelated.yml' }) },
+    ],
+    [
+      'successful controller',
+      { readGithub: async () => ({ ...run, conclusion: 'success' }) },
+    ],
+    [
+      'changed PR head',
+      { readRepair: async () => ({ ...repair, headRefOid: HEAD }) },
+    ],
+    [
+      'unqueued PR',
+      { readRepair: async () => ({ ...repair, mergeQueueEntry: null }) },
+    ],
+    [
+      'closed unmerged PR',
+      { readRepair: async () => ({ ...repair, state: 'CLOSED' }) },
+    ],
+    ['draft PR', { readRepair: async () => ({ ...repair, isDraft: true }) }],
+    [
+      'unchanged runtime read',
+      {
+        readGithub: async endpoint =>
+          endpoint.includes('/contents/')
+            ? {
+                ...source,
+                content: Buffer.from("import fs from 'node:fs';").toString(
+                  'base64'
+                ),
+              }
+            : run,
+      },
+    ],
+  ]) {
+    it(`rejects ${name}`, async () => {
+      await assert.rejects(
+        collectDeploymentInvestigation(identity, reads(overrides)),
+        /deployment-investigation:/
+      );
+    });
+  }
+
+  async function seed(directory) {
+    return persistDeliveryOutcome(
+      buildDeliveryReceipt(
+        {
+          action: 'completed',
+          repository: { full_name: REPO },
+          workflow_run: run,
+        },
+        { now }
+      ),
+      { stateDir: directory }
+    );
+  }
+
+  it('executes the producer and existing dispatch CLI through actual read-only commands', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-investigation-cli-'));
+    try {
+      await seed(directory);
+      const bin = join(directory, 'bin');
+      await mkdir(bin);
+      await writeFile(
+        join(bin, 'gh'),
+        `#!${process.execPath}\nconst a=process.argv.slice(2);if(a[0]!=='api')process.exit(17);if(a[1].endsWith('/logs')){process.stdout.write(${JSON.stringify(log)});process.exit(0);}const value=a[1]==='graphql'?{data:{repository:{pullRequest:${JSON.stringify(repair)}}}}:a[1].includes('/contents/')?${JSON.stringify(source)}:a[1].includes('/jobs?')?${JSON.stringify(jobs)}:${JSON.stringify(run)};process.stdout.write(JSON.stringify(value));`,
+        { mode: 0o755 }
+      );
+      await writeFile(
+        join(bin, 'doppler'),
+        `#!${process.execPath}\nconst a=process.argv.slice(2);if(a.slice(0,8).join(' ')!=='run --project jovie-web --config dev -- vercel api'||a[9]!=='--method'||a[10]!=='GET')process.exit(17);process.stdout.write(${JSON.stringify(JSON.stringify(deployment))});`,
+        { mode: 0o755 }
+      );
+      const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+      const scriptPath = new URL(
+        '../delivery-state-machine.mjs',
+        import.meta.url
+      ).pathname;
+      const produced = spawnSync(
+        process.execPath,
+        [
+          scriptPath,
+          '--investigate-controller-run=777',
+          '--attempt=1',
+          '--repair-pr=18201',
+          `--repair-head=${repairHead}`,
+          `--deployment-id=${identity.deploymentId}`,
+        ],
+        { env, encoding: 'utf8' }
+      );
+      assert.equal(produced.status, 0, produced.stderr);
+      const result = JSON.parse(produced.stdout);
+      const eventFile = join(directory, 'event.json');
+      const event = {
+        action: 'delivery-investigation-result',
+        repository: { full_name: REPO },
+        client_payload: { investigation: result },
+      };
+      await writeFile(eventFile, JSON.stringify(event));
+      const accepted = spawnSync(
+        process.execPath,
+        [scriptPath, `--event-file=${eventFile}`, `--state-dir=${directory}`],
+        { env, encoding: 'utf8' }
+      );
+      assert.equal(accepted.status, 0, accepted.stderr);
+      assert.equal(JSON.parse(accepted.stdout).loop.state, 'repair-verifying');
+      const dryRun = spawnSync(
+        process.execPath,
+        [
+          scriptPath,
+          `--event-file=${eventFile}`,
+          `--state-dir=${directory}`,
+          '--dry-run',
+        ],
+        { env, encoding: 'utf8' }
+      );
+      assert.equal(dryRun.status, 0, dryRun.stderr);
+      assert.equal(JSON.parse(dryRun.stdout).status, 'dry-run');
+      await writeFile(
+        join(bin, 'doppler'),
+        `#!${process.execPath}\nprocess.stderr.write('synthetic-private-output');process.exit(1);`,
+        { mode: 0o755 }
+      );
+      const failed = spawnSync(
+        process.execPath,
+        [
+          scriptPath,
+          '--investigate-controller-run=777',
+          '--attempt=1',
+          '--repair-pr=18201',
+          `--repair-head=${repairHead}`,
+          `--deployment-id=${identity.deploymentId}`,
+        ],
+        { env, encoding: 'utf8' }
+      );
+      assert.equal(failed.status, 1);
+      assert.match(failed.stderr, /read-unavailable/);
+      assert.equal(failed.stderr.includes('synthetic-private-output'), false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('persists one read-only result, tolerates queued-to-merged, and leaves the loop open', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-investigation-'));
+    try {
+      await seed(directory);
+      const result = await collectDeploymentInvestigation(identity, reads());
+      const merged = reads({
+        readRepair: async () => ({
+          ...repair,
+          state: 'MERGED',
+          mergeQueueEntry: null,
+          mergeCommit: { oid: 'c'.repeat(40) },
+        }),
+      });
+      const accepted = await persistDeploymentInvestigation(result, {
+        ...merged,
+        stateDir: directory,
+      });
+      assert.equal(accepted.status, 'created');
+      assert.equal(accepted.investigation.repairState, 'MERGED');
+      assert.equal(accepted.loop.state, 'repair-verifying');
+      assert.equal(accepted.loop.outcome, 'open');
+      assert.equal(accepted.loop.terminal, false);
+      assert.equal(accepted.loop.externalMutations, 0);
+      const replay = await persistDeploymentInvestigation(result, {
+        ...merged,
+        stateDir: directory,
+      });
+      assert.equal(replay.status, 'duplicate');
+      assert.equal(replay.loop.loopKey, accepted.loop.loopKey);
+      assert.equal(replay.loop.attempt, accepted.loop.attempt);
+      const queue = JSON.parse(await readFile(accepted.queuePath, 'utf8'));
+      assert.equal(
+        queue.items.filter(item => item.outcome === 'open').length,
+        1
+      );
+      assert.equal(queue.items[0].state, 'repair-verifying');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a forged dispatch and a same-source deployment absent from the exact attempt log', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-investigation-forgery-')
+    );
+    try {
+      await seed(directory);
+      const result = await collectDeploymentInvestigation(identity, reads());
+      await assert.rejects(
+        persistDeploymentInvestigation(
+          { ...result, deploymentId: 'dpl_inventedDeployment123' },
+          { ...reads(), stateDir: directory }
+        ),
+        /provider-binding-or-diagnosis-invalid/
+      );
+      await assert.rejects(
+        collectDeploymentInvestigation(
+          identity,
+          reads({
+            readJobLog: async () => 'https://jovie-older-jovie.vercel.app',
+          })
+        ),
+        /provider-not-bound-to-controller-attempt/
+      );
+      await assert.rejects(readdir(join(directory, 'investigation-results')), {
+        code: 'ENOENT',
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers an interrupted accepted write after expiry using only the exact accepted payload', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-investigation-recovery-')
+    );
+    try {
+      await seed(directory);
+      const result = await collectDeploymentInvestigation(identity, reads());
+      const accepted = await persistDeploymentInvestigation(result, {
+        ...reads(),
+        stateDir: directory,
+      });
+      await rm(join(directory, 'red-loop', `${accepted.loop.loopKey}.json`));
+      const later = {
+        ...reads({
+          now: '2026-09-24T02:00:00.000Z',
+          readDeployment: async () => {
+            throw new Error('must not recollect accepted proof');
+          },
+        }),
+        stateDir: directory,
+      };
+      const recovered = await persistDeploymentInvestigation(result, later);
+      assert.equal(recovered.status, 'duplicate');
+      assert.equal(recovered.loop.loopKey, accepted.loop.loopKey);
+      assert.equal(recovered.loop.attempt, accepted.loop.attempt);
+      await assert.rejects(
+        persistDeploymentInvestigation(
+          { ...result, observedAt: '2026-09-24T02:00:00.000Z' },
+          later
+        ),
+        /accepted-result-payload-mismatch/
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('does not accept a result when the persisted retry budget is exhausted', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-investigation-budget-')
+    );
+    try {
+      const seeded = await seed(directory);
+      const loopPath = join(
+        directory,
+        'red-loop',
+        `${seeded.loop.loopKey}.json`
+      );
+      await writeFile(
+        loopPath,
+        JSON.stringify({
+          ...seeded.loop,
+          attempt: seeded.loop.attemptBudget - 1,
+        })
+      );
+      const result = await collectDeploymentInvestigation(identity, reads());
+      await assert.rejects(
+        persistDeploymentInvestigation(result, {
+          ...reads(),
+          stateDir: directory,
+        }),
+        /investigation-transition-not-permitted/
+      );
+      await assert.rejects(readdir(join(directory, 'investigation-results')), {
+        code: 'ENOENT',
+      });
+      assert.equal(
+        JSON.parse(await readFile(loopPath, 'utf8')).state,
+        seeded.loop.state
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed on stale, cross-bound, or authority-bearing results without creating an acceptance', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-investigation-negative-')
+    );
+    try {
+      await seed(directory);
+      const result = await collectDeploymentInvestigation(identity, reads());
+      for (const change of [
+        { sourceHead: repairHead },
+        { attempt: 2 },
+        { capability: 'execute-repair' },
+        { observedAt: '2026-09-23T01:00:00Z' },
+        { observedAt: '2026-09-25T01:00:00Z' },
+        { healthy: true },
+        { terminal: true },
+        { repairPr: -1 },
+        { repository: 'other/repo' },
+      ]) {
+        await assert.rejects(
+          persistDeploymentInvestigation(
+            { ...result, ...change },
+            { ...reads(), stateDir: directory }
+          )
+        );
+      }
+      await assert.rejects(readdir(join(directory, 'investigation-results')), {
+        code: 'ENOENT',
+      });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
