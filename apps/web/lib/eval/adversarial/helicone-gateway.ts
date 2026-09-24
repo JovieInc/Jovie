@@ -4,6 +4,8 @@
 
 import { createGateway } from '@ai-sdk/gateway';
 
+import { assertGatewayAllowlistedModel } from '@/lib/ai/gateway-allowlist';
+
 const HELICONE_VERCEL_GATEWAY_BASE_URL = 'https://vercel.helicone.ai/v1/ai';
 
 export function isRealModelEvalEnabled(): boolean {
@@ -25,7 +27,7 @@ export function createHeliconeGateway() {
     throw new Error('HELICONE_API_KEY is required for real-model evals');
   }
 
-  return createGateway({
+  const provider = createGateway({
     apiKey,
     baseURL: HELICONE_VERCEL_GATEWAY_BASE_URL,
     headers: {
@@ -34,4 +36,15 @@ export function createHeliconeGateway() {
       'Helicone-Property-Branch': process.env.GITHUB_HEAD_REF ?? 'local',
     },
   });
+
+  /**
+   * Fail-closed Gateway allowlist (Tim STRICT 2026-09-17) — mirrors the
+   * @/lib/ai/sdk gateway() chokepoint: a denied model id throws before any
+   * network call. Real-model eval lanes select language models through this
+   * callable form.
+   */
+  return ((modelId: string) =>
+    provider(assertGatewayAllowlistedModel(modelId))) as unknown as ReturnType<
+    typeof createGateway
+  >;
 }

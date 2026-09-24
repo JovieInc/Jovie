@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import { isGatewayAllowlistedModel } from '@/lib/ai/gateway-allowlist';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
@@ -7753,7 +7754,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
     usesTitleModelConstant:
-      TITLE_MODEL === 'google/gemini-2.0-flash' &&
+      isGatewayAllowlistedModel(TITLE_MODEL) &&
       routeSource.includes('gateway(TITLE_MODEL)'),
     keepsTitleOnlyPrompt: textIncludesAll(systemPrompt, [
       'Generate a short, descriptive title',

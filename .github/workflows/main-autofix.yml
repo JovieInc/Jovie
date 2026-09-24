@@ -473,7 +473,7 @@ jobs:
           }
 
           PRIMARY_MODEL="google/gemini-flash-1.5:free"
-          FALLBACK_MODEL="openai/gpt-4o-mini"
+          FALLBACK_MODEL="zai/glm-5.3-flash"
 
           if ! run_model "$PRIMARY_MODEL"; then
             if ! run_model "$FALLBACK_MODEL"; then

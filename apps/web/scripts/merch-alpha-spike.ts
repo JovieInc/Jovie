@@ -26,7 +26,7 @@ const PROMPT = [
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const result = await generateImage({
-    model: gateway.image('openai/gpt-image-1.5'),
+    model: gateway.image('recraft/recraft-v3'),
     prompt: PROMPT,
     size: '1024x1024',
     providerOptions: { openai: { background: 'transparent' } },

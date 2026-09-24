@@ -427,7 +427,7 @@ jobs:
         env:
           FX_AUTO_UPGRADE: '0'
           FX_PERMISSION_MODE: ask
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
@@ -556,16 +556,115 @@ jobs:
             > "$artifact_dir/receipt.json"
           echo "model_required=$([[ "$outcome" == 'model_required' ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      - name: Jev decision gate before generative FX
+        id: jev
+        if: steps.prepare.outputs.model_required == 'true'
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          HOME: ${{ runner.temp }}/fx-home
+        run: |
+          set -euo pipefail
+          decision_dir="$RUNNER_TEMP/jev-decision"
+          mkdir -p "$decision_dir"
+          # Policy code runs from trusted main, never from the PR head.
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git show origin/main:scripts/lib/conflict-fx-jev-decision.mjs \
+            > "$decision_dir/conflict-fx-jev-decision.mjs"
+          npm --prefix "$decision_dir" install --no-save --ignore-scripts \
+            --no-audit --no-fund ai @ai-sdk/gateway
+          cd "$decision_dir"
+          node --input-type=module <<'NODE' > "$decision_dir/decision.json"
+            import { readFileSync } from 'node:fs';
+            import { generateObject, jsonSchema } from 'ai';
+            import { createGateway } from '@ai-sdk/gateway';
+            const { runJevDecision } = await import(
+              `${process.env.RUNNER_TEMP}/jev-decision/conflict-fx-jev-decision.mjs`
+            );
+
+            const receipt = JSON.parse(
+              readFileSync(
+                `${process.env.RUNNER_TEMP}/conflict-fx-artifact/receipt.json`,
+                'utf8'
+              )
+            );
+            const provider = createGateway({
+              apiKey: process.env.AI_GATEWAY_API_KEY,
+            });
+            const gateway = {
+              evaluationModel: model => provider(model),
+            };
+            const evaluate = async ({ model, state, questions }) => {
+              const { object } = await generateObject({
+                model: gateway.evaluationModel(model),
+                schema: jsonSchema({
+                  type: 'object',
+                  properties: {
+                    strategy: {
+                      type: 'object',
+                      properties: {
+                        choice: {
+                          type: 'string',
+                          enum: Object.keys(questions.strategy.criteria),
+                        },
+                      },
+                      required: ['choice'],
+                      additionalProperties: false,
+                    },
+                    safeToAttempt: {
+                      type: 'object',
+                      properties: {
+                        probability: { type: 'number' },
+                      },
+                      required: ['probability'],
+                      additionalProperties: false,
+                    },
+                    risk: {
+                      type: 'object',
+                      properties: {
+                        score: {
+                          type: 'integer',
+                          minimum: 1,
+                          maximum: questions.risk.criteria.length,
+                        },
+                      },
+                      required: ['score'],
+                      additionalProperties: false,
+                    },
+                  },
+                  required: ['strategy', 'safeToAttempt', 'risk'],
+                  additionalProperties: false,
+                }),
+                prompt: JSON.stringify({ state, questions }),
+              });
+              return { answers: object };
+            };
+            const decision = await runJevDecision({
+              state: {
+                prNumber: receipt.pr,
+                attempt: receipt.attempt,
+                maxAttempts: receipt.maxAttempts,
+                conflictFiles: receipt.conflictFiles,
+                competingChanges: receipt.competingChanges,
+              },
+              evaluate,
+            });
+            process.stdout.write(`${JSON.stringify(decision)}\n`);
+          NODE
+          jev_proceed=$(jq -r '.proceed' "$decision_dir/decision.json")
+          jq '{schema,model,strategy,risk,safeToAttemptProbability,reason,proceed}' \
+            "$decision_dir/decision.json"
+          echo "jev_proceed=$jev_proceed" >> "$GITHUB_OUTPUT"
+
       - name: Run pinned stronger-model FX with no executable tools
         id: model
-        if: steps.prepare.outputs.model_required == 'true'
+        if: steps.prepare.outputs.model_required == 'true' && steps.jev.outputs.jev_proceed == 'true'
         continue-on-error: true
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           FX_AUTO_UPGRADE: '0'
           FX_DISABLE_KEYCHAIN: '1'
           FX_MAX_AGENT_STEPS: '12'
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           FX_PERMISSION_MODE: ask
           HOME: ${{ runner.temp }}/fx-home
         run: |
@@ -602,7 +701,7 @@ jobs:
         if: always()
         env:
           MODEL_STEP_OUTCOME: ${{ steps.model.outcome }}
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           SOURCE_HEAD: ${{ matrix.headRefOid }}
         run: |
           set -euo pipefail
@@ -732,7 +831,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
         run: |
           set -euo pipefail
           candidate_dir="$RUNNER_TEMP/conflict-fx-verified"
@@ -917,7 +1016,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           VERIFICATION_OUTCOME: ${{ steps.verification.outcome }}
@@ -983,7 +1082,7 @@ jobs:
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
           COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           DELIVERABLE: ${{ steps.prevalidate.outputs.deliverable }}

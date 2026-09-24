@@ -17,6 +17,7 @@ import { env } from '@/lib/env-server';
  */
 
 /** Gateway slug — matches SKILL_REGISTRY.retouch.model. */
+/** Not on Tim STRICT Gateway allowlist — gateway() fails closed until #17938. */
 export const RETOUCH_MODEL_ID = 'google/gemini-2.5-flash-image';
 
 /**

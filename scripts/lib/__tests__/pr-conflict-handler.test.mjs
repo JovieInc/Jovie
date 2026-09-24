@@ -597,7 +597,7 @@ describe('conflict mutation policy', () => {
       triggersCi: true,
       attempt: 1,
       maxAttempts: 2,
-      model: 'openai/gpt-5.6-sol',
+      model: 'zai/glm-5.3',
       label: undefined,
     });
     expect(plan.fxMatrix).toEqual([
@@ -1300,7 +1300,7 @@ describe('conflict workflow contract', () => {
               BASE_REF: 'main',
               COHORT_ID: 'invalid-byte-test',
               FX_AUTO_UPGRADE: '0',
-              FX_MODEL: 'openai/gpt-5.6-sol',
+              FX_MODEL: 'zai/glm-5.3',
               FX_PERMISSION_MODE: 'ask',
               GITHUB_OUTPUT: githubOutput,
               HEAD_REF: 'source',
@@ -1395,7 +1395,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
             BASE_REF: 'main',
             COHORT_ID: 'valid-utf8-test',
             FX_AUTO_UPGRADE: '0',
-            FX_MODEL: 'openai/gpt-5.6-sol',
+            FX_MODEL: 'zai/glm-5.3',
             FX_PERMISSION_MODE: 'ask',
             GITHUB_OUTPUT: githubOutput,
             HEAD_REF: 'source',
@@ -1593,7 +1593,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
   });
 
   it('binds the stronger FX model and immutable artifact before granting writer authority', () => {
-    expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?openai\/gpt-5\.6-sol['"]?/u);
+    expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?zai\/glm-5\.3['"]?/u);
     expect(WORKFLOW).toContain('AI_GATEWAY_API_KEY');
     expect(WORKFLOW).toContain('fx ask');
     expect(WORKFLOW).toContain('jovie-conflict-fx-artifact/v1');
@@ -1610,7 +1610,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       WORKFLOW.indexOf('\n  deliver:')
     );
     expect(fxJob).toContain('AI_GATEWAY_API_KEY');
-    expect(fxJob).toContain('FX_MODEL: openai/gpt-5.6-sol');
+    expect(fxJob).toContain('FX_MODEL: zai/glm-5.3');
     expect(fxJob).not.toContain('actions/create-github-app-token@');
     expect(fxJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(fxJob).not.toContain('GH_TOKEN:');
@@ -1618,10 +1618,29 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     const modelStep = workflowStep(
       'Run pinned stronger-model FX with no executable tools'
     );
+    const jevStep = workflowStep('Jev decision gate before generative FX');
     expect(modelStep).toContain(
       'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
     );
-    expect(WORKFLOW.replace(modelStep, '')).not.toContain('AI_GATEWAY_API_KEY');
+    // Only the Jev decision gate and the generative FX step may hold the
+    // Gateway secret; nothing else in the workflow can mint AI spend.
+    expect(WORKFLOW.replace(modelStep, '').replace(jevStep, '')).not.toContain(
+      'AI_GATEWAY_API_KEY'
+    );
+    expect(jevStep).toContain(
+      'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
+    );
+    // The Jev gate owns the strategy decision from trusted-main policy code;
+    // the generative FX step only runs when Jev selects the generative
+    // strategy at acceptable risk. PR-controlled policy code never executes.
+    expect(modelStep).toContain(
+      "if: steps.prepare.outputs.model_required == 'true' && steps.jev.outputs.jev_proceed == 'true'"
+    );
+    expect(jevStep).toContain(
+      'git show origin/main:scripts/lib/conflict-fx-jev-decision.mjs'
+    );
+    expect(jevStep).toContain('gateway.evaluationModel');
+    expect(jevStep).toContain("jq -r '.proceed'");
     expect(modelStep).toContain('HOME: ${{ runner.temp }}/fx-home');
     expect(modelStep).toContain('.session_permission_grants == 0');
     expect(modelStep).toContain('.mcp.connection_check == "not_checked"');

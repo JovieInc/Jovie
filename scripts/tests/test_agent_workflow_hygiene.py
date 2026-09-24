@@ -865,7 +865,7 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
     assert "gh pr update-branch" not in fleet
     assert "JOV-INV-021" in workflow
     assert "fx ask" in workflow
-    assert "FX_MODEL: openai/gpt-5.6-sol" in workflow
+    assert "FX_MODEL: zai/glm-5.3" in workflow
     assert workflow.count("actions/create-github-app-token@") >= 2
     assert (
         workflow.count(

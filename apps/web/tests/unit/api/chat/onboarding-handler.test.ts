@@ -278,7 +278,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv();
     hoisted.executeChatTurnMock.mockRejectedValue(
-      new Error('anthropic 529 overloaded')
+      new Error('gateway 529 overloaded')
     );
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
@@ -418,7 +418,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '',
       toolNames: [],
       modelMessages: [],
@@ -453,7 +453,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '',
       toolNames: [],
       modelMessages: [],
@@ -546,7 +546,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '',
       toolNames: [],
       modelMessages: [],
@@ -582,7 +582,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '',
       toolNames: [],
       modelMessages: [],
@@ -684,7 +684,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '<onboarding prompt>',
       toolNames: [
         'checkHandle',
@@ -768,7 +768,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
           headers: Record<string, string>;
         }) => new Response('ok', { status: 200, headers }),
       },
-      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      selectedModel: 'zai/glm-5.3-flash',
       systemPrompt: '',
       toolNames: [],
       modelMessages: [],
@@ -810,7 +810,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
             headers: Record<string, string>;
           }) => new Response('ok', { status: 200, headers }),
         },
-        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        selectedModel: 'zai/glm-5.3-flash',
         systemPrompt: '',
         toolNames: [],
         modelMessages: [],
