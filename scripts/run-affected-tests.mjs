@@ -496,6 +496,24 @@ const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
   '--coverage.thresholds.branches=90',
   '--coverage.thresholds.functions=95',
 ];
+const DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS = [
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-lines=95',
+  DEPENDABOT_AUTO_MERGE_NODE_TESTS[0],
+];
+const DEPENDABOT_POLICY_CONTROL_TEST_ARGS = [
+  'exec',
+  'vitest',
+  '--root',
+  'scripts',
+  '--config',
+  'vitest.config.mts',
+  'run',
+  'lib/__tests__/dependabot-update-policy.test.mjs',
+  ...DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
@@ -2770,6 +2788,8 @@ export function buildControlTestCommands() {
     buildCompanyRegistryTestCommand(),
     buildProjectCreationTestCommand(),
     ...buildControlCoverageCommands(),
+    ['node', DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS],
+    ['pnpm', DEPENDABOT_POLICY_CONTROL_TEST_ARGS],
     // The event test also executes the CLI entrypoint in-process. Its broad
     // manual fleet path predates this slice, so enforce the measured CLI
     // subset separately from the new event validator's per-file 85/75/82 gate.

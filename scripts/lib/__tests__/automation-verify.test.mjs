@@ -17,9 +17,9 @@ import {
 } from '../../run-affected-tests.mjs';
 
 describe('structural control stage execution', () => {
-  it('runs registry, project, native and ownerless coverage, CLI coverage, and web sequentially', async () => {
+  it('runs registry, project, control coverage, Dependabot coverage, CLI coverage, and web sequentially', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(6);
+    expect(stages).toHaveLength(8);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -29,10 +29,39 @@ describe('structural control stage execution', () => {
     expect(stages[3][1]).toContain(
       '--coverage.include=lib/ownerless-recovery-policy.mjs'
     );
-    expect(stages[4][1]).toContain(
+    expect(stages[4]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+        '--test-coverage-lines=95',
+        'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+      ],
+    ]);
+    expect(stages[5]).toEqual([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/dependabot-update-policy.test.mjs',
+        '--coverage.enabled',
+        '--coverage.provider=v8',
+        '--coverage.include=dependabot-update-policy.mjs',
+        '--coverage.thresholds.lines=95',
+        '--coverage.thresholds.branches=90',
+        '--coverage.thresholds.functions=95',
+      ],
+    ]);
+    expect(stages[6][1]).toContain(
       '--coverage.include=pr-conflict-handler.mjs'
     );
-    expect(stages[5][1]).toContain('@jovie/web');
+    expect(stages[7][1]).toContain('@jovie/web');
     const visited = [];
     expect(
       await runControlTestCommands(async (command, args) => {
@@ -44,7 +73,9 @@ describe('structural control stage execution', () => {
   });
 
   it('propagates each failed stage and never starts its successor', async () => {
-    for (const failedStage of [0, 1, 2, 3, 4, 5]) {
+    for (const failedStage of buildControlTestCommands().map(
+      (_, index) => index
+    )) {
       const visited = [];
       const status = await runControlTestCommands(async (command, args) => {
         visited.push([command, args]);
