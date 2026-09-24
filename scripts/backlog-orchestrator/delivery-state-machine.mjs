@@ -1351,11 +1351,52 @@ function readInvestigationJson(command, args) {
     throw new Error('deployment-investigation:read-unavailable');
   }
 }
-function readInvestigationJobLog(id) {
-  return readInvestigationText('gh', [
-    'api',
-    `repos/JovieInc/Jovie/actions/jobs/${id}/logs`,
-  ]);
+function readInvestigationStepLogs(input, entries) {
+  try {
+    const archive = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/JovieInc/Jovie/actions/runs/${input.run}/attempts/${input.attempt}/logs`,
+      ],
+      {
+        timeout: 30000,
+        maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    // Python is already part of the fixed runner toolchain. Read exact members
+    // in memory; never extract an archive path or print raw log/error output.
+    return JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          '-c',
+          `
+import io,json,sys,zipfile
+archive=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
+paths=json.loads(sys.argv[1])
+result={}
+for key,path in paths.items():
+    entries=[entry for entry in archive.infolist() if entry.filename==path]
+    if len(entries)!=1 or entries[0].file_size>2*1024*1024: raise ValueError('step mapping unavailable')
+    result[key]=archive.read(entries[0]).decode('utf-8')
+print(json.dumps(result))
+`,
+          JSON.stringify(entries),
+        ],
+        {
+          input: archive,
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 8 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }
+      )
+    );
+  } catch {
+    throw new Error('deployment-investigation:step-logs-unavailable');
+  }
 }
 
 function readInvestigationGithub(endpoint) {
@@ -1384,8 +1425,10 @@ function validateInvestigationIdentity(input) {
     'repair-head-invalid'
   );
   investigationAssert(
-    /^dpl_[a-zA-Z0-9]{10,80}$/.test(input.deploymentId ?? ''),
-    'deployment-id-invalid'
+    /^https:\/\/jovie-[a-z0-9]+-jovie\.vercel\.app$/.test(
+      input.deploymentUrl ?? ''
+    ),
+    'deployment-url-invalid'
   );
 }
 
@@ -1437,30 +1480,13 @@ async function observeInvestigationBindings(input, { readGithub, readRepair }) {
   return { run, pr };
 }
 
-/** Fixed read-only API producer; only the provider read uses Doppler. */
+/** Read only authenticated records emitted by the existing deploy wrapper. */
 export async function collectDeploymentInvestigation(
   input,
   {
     readGithub = readInvestigationGithub,
     readRepair = readInvestigationRepair,
-    readJobLog = readInvestigationJobLog,
-    readDeployment = id =>
-      readInvestigationJson('doppler', [
-        'run',
-        '--project',
-        'jovie-web',
-        '--config',
-        'dev',
-        '--',
-        'vercel',
-        'api',
-        `/v13/deployments/${id}`,
-        '--method',
-        'GET',
-        '--scope',
-        'jovie',
-        '--raw',
-      ]),
+    readStepLogs = readInvestigationStepLogs,
     now = new Date().toISOString(),
   } = {}
 ) {
@@ -1468,22 +1494,6 @@ export async function collectDeploymentInvestigation(
     readGithub,
     readRepair,
   });
-  const deployment = await readDeployment(input.deploymentId);
-  investigationAssert(
-    deployment?.id === input.deploymentId &&
-      deployment.readyState === 'ERROR' &&
-      deployment.meta?.githubCommitSha === run.head_sha &&
-      deployment.errorCode === 'ENOENT' &&
-      typeof deployment.errorMessage === 'string' &&
-      deployment.errorMessage.includes(
-        '/apps/web/lib/services/retouching/styles/white-space.md'
-      ),
-    'provider-binding-or-diagnosis-invalid'
-  );
-  investigationAssert(
-    /^jovie-[a-z0-9]+-jovie\.vercel\.app$/.test(deployment.url ?? ''),
-    'provider-url-invalid'
-  );
   const jobs = await readGithub(
     `repos/JovieInc/Jovie/actions/runs/${input.run}/attempts/${input.attempt}/jobs?per_page=100`
   );
@@ -1499,32 +1509,179 @@ export async function collectDeploymentInvestigation(
       Number.isSafeInteger(staging[0].id),
     'staging-attempt-binding-invalid'
   );
-  const log = await readJobLog(staging[0].id);
-  const urls =
-    typeof log === 'string'
-      ? log.match(
-          /https:\/\/jovie-[a-z0-9]+-jovie\.vercel\.app(?=[\s"'<>]|$)/g
-        ) || []
-      : [];
-  investigationAssert(
-    urls.includes(`https://${deployment.url}`),
-    'provider-not-bound-to-controller-attempt'
+  const job = staging[0];
+  const selectStep = (selectedJob, predicate, conclusion) => {
+    const matches = selectedJob.steps?.filter(predicate);
+    investigationAssert(
+      matches?.length === 1 &&
+        matches[0].status === 'completed' &&
+        matches[0].conclusion === conclusion &&
+        Number.isSafeInteger(matches[0].number),
+      'staging-step-binding-invalid'
+    );
+    return matches[0];
+  };
+  const checkout = selectStep(
+    job,
+    step => /^Run actions\/checkout@[0-9a-f]{40}$/.test(step.name),
+    'success'
   );
-  // Never forward raw provider text, credentials, caller-supplied URLs, or a
-  // claim that the queued fix is already deployed.
+  const deploy = selectStep(
+    job,
+    step => step.name === 'Deploy (staging preview, prebuilt)',
+    'failure'
+  );
+  const authorizers = jobs.jobs.filter(
+    candidate => candidate.name === 'Authorize exact main CI evidence'
+  );
+  investigationAssert(
+    authorizers.length === 1 &&
+      authorizers[0].run_id === input.run &&
+      authorizers[0].run_attempt === input.attempt &&
+      authorizers[0].status === 'completed' &&
+      authorizers[0].conclusion === 'success',
+    'source-authorization-job-invalid'
+  );
+  const authorize = selectStep(
+    authorizers[0],
+    step => step.name === 'Cross-prove exact successful push CI',
+    'success'
+  );
+  const stepPath = (name, step) =>
+    `${name.replaceAll('/', '_')}/${step.number}_${step.name.replaceAll('/', '_')}.txt`;
+  const logs = await readStepLogs(input, {
+    checkout: stepPath(job.name, checkout),
+    deploy: stepPath(job.name, deploy),
+    authorize: stepPath(authorizers[0].name, authorize),
+  });
+  const lines = key => {
+    investigationAssert(
+      typeof logs?.[key] === 'string' && logs[key].length > 0,
+      'staging-log-unavailable'
+    );
+    return logs[key]
+      .split('\n')
+      .map(line =>
+        line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z /, '')
+      );
+  };
+  const authLines = lines('authorize');
+  const expected = [
+    ...new Set(
+      authLines.flatMap(
+        line => /^  EXPECTED_SHA: ([0-9a-f]{40})$/.exec(line)?.slice(1) || []
+      )
+    ),
+  ];
+  const receipts = authLines.flatMap(line => {
+    const match =
+      /^Authorized production from exact CI run ([1-9][0-9]*) attempt ([1-9][0-9]*) over deployed range [0-9a-f]{40}\.\.([0-9a-f]{40}) \(Web=true bind=[a-z_]+\)\.$/.exec(
+        line
+      );
+    return match
+      ? [{ run: Number(match[1]), attempt: Number(match[2]), sha: match[3] }]
+      : [];
+  });
+  investigationAssert(
+    expected.length === 1 &&
+      receipts.length === 1 &&
+      receipts[0].sha === expected[0],
+    'authorized-source-receipt-invalid'
+  );
+  const sourceCi = await readGithub(
+    `repos/JovieInc/Jovie/actions/runs/${receipts[0].run}/attempts/${receipts[0].attempt}`
+  );
+  investigationAssert(
+    sourceCi?.id === receipts[0].run &&
+      sourceCi.run_attempt === receipts[0].attempt &&
+      sourceCi.head_sha === expected[0] &&
+      sourceCi.path === '.github/workflows/ci.yml' &&
+      sourceCi.head_branch === 'main' &&
+      sourceCi.event === 'push' &&
+      sourceCi.status === 'completed' &&
+      sourceCi.conclusion === 'success' &&
+      sourceCi.repository?.full_name === input.repository,
+    'authorized-source-ci-invalid'
+  );
+  const checkoutHeads = new Set(
+    lines('checkout').filter(line => /^[0-9a-f]{40}$/.test(line))
+  );
+  const deployLines = lines('deploy');
+  const deployHeads = new Set(
+    deployLines.flatMap(
+      line =>
+        /^  VERCEL_GIT_COMMIT_SHA: ([0-9a-f]{40})$/.exec(line)?.slice(1) || []
+    )
+  );
+  investigationAssert(
+    checkoutHeads.size === 1 &&
+      deployHeads.size === 1 &&
+      checkoutHeads.has(expected[0]) &&
+      deployHeads.has(expected[0]),
+    'deployed-source-binding-invalid'
+  );
+  const records = new Map();
+  for (const line of deployLines) {
+    if (!line.startsWith('Deploy failure diagnostic: ')) continue;
+    let diagnostic;
+    try {
+      diagnostic = JSON.parse(line.slice('Deploy failure diagnostic: '.length));
+    } catch {
+      throw new Error('deployment-investigation:diagnostic-malformed');
+    }
+    investigationAssert(
+      diagnostic &&
+        Object.keys(diagnostic).sort().join(',') ===
+          [
+            'schema',
+            'mode',
+            'attempt',
+            'exitStatus',
+            'errorCode',
+            'asset',
+            'deploymentUrl',
+          ]
+            .sort()
+            .join(',') &&
+        diagnostic.schema === 'jovie-vercel-deploy-failure/v1' &&
+        ['tgz', 'split-tgz', 'plain', 'source'].includes(diagnostic.mode) &&
+        Number.isSafeInteger(diagnostic.attempt) &&
+        diagnostic.attempt > 0 &&
+        Number.isSafeInteger(diagnostic.exitStatus) &&
+        diagnostic.exitStatus > 0 &&
+        diagnostic.exitStatus <= 255,
+      'diagnostic-invalid'
+    );
+    if (diagnostic.deploymentUrl !== input.deploymentUrl) continue;
+    records.set(digest(diagnostic), diagnostic);
+  }
+  investigationAssert(records.size === 1, 'diagnostic-missing-or-conflicting');
+  const diagnostic = [...records.values()][0];
+  investigationAssert(
+    diagnostic.errorCode === 'ENOENT' &&
+      diagnostic.asset === 'retouch-style-prompt',
+    'diagnosis-not-covered'
+  );
+  // This proves the wrapper's observed failure, not the provider's current state.
   return {
     schema: INVESTIGATION_SCHEMA,
     repository: input.repository,
     run: input.run,
     attempt: input.attempt,
-    sourceHead: run.head_sha,
-    deploymentId: input.deploymentId,
+    controllerHead: run.head_sha,
+    sourceHead: expected[0],
+    sourceCiRun: sourceCi.id,
+    sourceCiAttempt: sourceCi.run_attempt,
+    deploymentUrl: input.deploymentUrl,
     repairPr: input.repairPr,
     repairHead: input.repairHead,
     diagnosis: 'retouch-style-prompt-missing',
     errorCode: 'ENOENT',
     capability: 'read-only-investigation',
     observedAt: now,
+    jobId: job.id,
+    stepNumber: deploy.number,
+    diagnosticDigest: digest(diagnostic),
   };
 }
 
@@ -1536,8 +1693,7 @@ export async function persistDeploymentInvestigation(
     dryRun = false,
     readGithub = readInvestigationGithub,
     readRepair = readInvestigationRepair,
-    readDeployment,
-    readJobLog = readInvestigationJobLog,
+    readStepLogs = readInvestigationStepLogs,
     now = new Date().toISOString(),
   } = {}
 ) {
@@ -1550,7 +1706,13 @@ export async function persistDeploymentInvestigation(
           'run',
           'attempt',
           'sourceHead',
-          'deploymentId',
+          'controllerHead',
+          'sourceCiRun',
+          'sourceCiAttempt',
+          'deploymentUrl',
+          'jobId',
+          'stepNumber',
+          'diagnosticDigest',
           'repairPr',
           'repairHead',
           'diagnosis',
@@ -1574,7 +1736,7 @@ export async function persistDeploymentInvestigation(
     readRepair,
   });
   investigationAssert(
-    run.head_sha === input.sourceHead,
+    run.head_sha === input.controllerHead,
     'source-head-mismatch'
   );
   const expected = buildDeliveryReceipt({
@@ -1587,7 +1749,7 @@ export async function persistDeploymentInvestigation(
   );
   investigationAssert(
     receipt.receiptKey === expected.receiptKey &&
-      receipt.event.headSha === input.sourceHead &&
+      receipt.event.headSha === input.controllerHead &&
       receipt.event.evidence?.workflowRun?.attempt === input.attempt &&
       receipt.event.evidence.workflowRun.id === input.run &&
       receipt.event.failure === 'production-controller-failed',
@@ -1607,7 +1769,7 @@ export async function persistDeploymentInvestigation(
   const resultKey = digest({
     taskKey: task.taskKey,
     sourceHead: input.sourceHead,
-    deploymentId: input.deploymentId,
+    deploymentUrl: input.deploymentUrl,
     repairPr: input.repairPr,
     repairHead: input.repairHead,
     diagnosis: input.diagnosis,
@@ -1636,14 +1798,17 @@ export async function persistDeploymentInvestigation(
       Number.isFinite(age) && age >= 0 && age <= 15 * 60 * 1000,
       'result-stale-or-future'
     );
-    // A dispatch payload is a request to investigate, never provider evidence.
-    await collectDeploymentInvestigation(input, {
+    // Dispatch asks for an investigation; authenticated wrapper logs supply truth.
+    const observed = await collectDeploymentInvestigation(input, {
       readGithub,
       readRepair,
-      readDeployment,
-      readJobLog,
-      now,
+      readStepLogs,
+      now: input.observedAt,
     });
+    investigationAssert(
+      isDeepStrictEqual(observed, input),
+      'result-does-not-match-observed-diagnostic'
+    );
   }
   const original = classifyAndOpenFromDelivery(receipt.event, {
     now: receipt.observedAt,
@@ -1754,7 +1919,7 @@ async function main() {
       attempt: Number(option('--attempt')),
       repairPr: Number(option('--repair-pr')),
       repairHead: option('--repair-head'),
-      deploymentId: option('--deployment-id'),
+      deploymentUrl: option('--deployment-url'),
     });
     process.stdout.write(`${JSON.stringify(result)}\n`);
     return;

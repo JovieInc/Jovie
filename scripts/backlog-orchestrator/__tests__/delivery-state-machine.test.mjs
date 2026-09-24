@@ -1040,7 +1040,7 @@ describe('read-only deployment investigation result', () => {
     attempt: 1,
     repairPr: 18201,
     repairHead,
-    deploymentId: 'dpl_testDeployment123',
+    deploymentUrl: 'https://jovie-fixture-jovie.vercel.app',
   };
   const run = {
     id: 777,
@@ -1067,14 +1067,30 @@ describe('read-only deployment investigation result', () => {
       "import { WHITE_SPACE_STYLE_PROMPT } from '@/lib/services/retouching/style-prompt';"
     ).toString('base64'),
   };
-  const deployment = {
-    id: identity.deploymentId,
-    url: 'jovie-fixture-jovie.vercel.app',
-    readyState: 'ERROR',
-    meta: { githubCommitSha: HEAD },
+  const diagnostic = {
+    schema: 'jovie-vercel-deploy-failure/v1',
+    mode: 'tgz',
+    attempt: 3,
+    exitStatus: 1,
     errorCode: 'ENOENT',
-    errorMessage:
-      '/vercel/path0/apps/web/lib/services/retouching/styles/white-space.md synthetic-private-output',
+    asset: 'retouch-style-prompt',
+    deploymentUrl: identity.deploymentUrl,
+  };
+  const checkout = {
+    name: `Run actions/checkout@${'c'.repeat(40)}`,
+    number: 2,
+    status: 'completed',
+    conclusion: 'success',
+    started_at: '2026-09-24T00:50:00Z',
+    completed_at: '2026-09-24T00:50:10Z',
+  };
+  const deploy = {
+    name: 'Deploy (staging preview, prebuilt)',
+    number: 15,
+    status: 'completed',
+    conclusion: 'failure',
+    started_at: '2026-09-24T00:55:00Z',
+    completed_at: '2026-09-24T00:56:00Z',
   };
   const jobs = {
     jobs: [
@@ -1085,10 +1101,49 @@ describe('read-only deployment investigation result', () => {
         name: 'Production Release / deploy-staging',
         status: 'completed',
         conclusion: 'failure',
+        steps: [checkout, deploy],
       },
     ],
   };
-  const log = 'deployment https://jovie-fixture-jovie.vercel.app';
+  const authorize = {
+    name: 'Cross-prove exact successful push CI',
+    number: 3,
+    status: 'completed',
+    conclusion: 'success',
+  };
+  const authJob = {
+    id: 889,
+    run_id: 777,
+    run_attempt: 1,
+    name: 'Authorize exact main CI evidence',
+    status: 'completed',
+    conclusion: 'success',
+    steps: [authorize],
+  };
+  jobs.jobs.push(authJob);
+  const sourceCi = {
+    ...run,
+    id: 999,
+    path: '.github/workflows/ci.yml',
+    event: 'push',
+    conclusion: 'success',
+  };
+  const prefix = `2026-09-24T00:50:05.000Z ${HEAD}\n2026-09-24T00:55:00.500Z   VERCEL_GIT_COMMIT_SHA: ${HEAD}\n`;
+  const diagnosticLine = value =>
+    `2026-09-24T00:55:30.000Z Deploy failure diagnostic: ${JSON.stringify(value)}`;
+  const log = prefix + diagnosticLine(diagnostic);
+  const logs = {
+    checkout: `2026-09-24T00:50:10.900Z ${HEAD}\n`,
+    deploy: log,
+    authorize: `2026-09-24T00:49:00Z   EXPECTED_SHA: ${HEAD}\n2026-09-24T00:49:10Z Authorized production from exact CI run 999 attempt 1 over deployed range ${'c'.repeat(40)}..${HEAD} (Web=true bind=selected_lane).\n`,
+  };
+
+  const githubWithJob = patch => async endpoint =>
+    endpoint.includes('/contents/')
+      ? source
+      : endpoint.includes('/jobs?')
+        ? { jobs: [{ ...jobs.jobs[0], ...patch }, authJob] }
+        : run;
   const reads = (overrides = {}) => ({
     now,
     readGithub: async endpoint =>
@@ -1096,14 +1151,15 @@ describe('read-only deployment investigation result', () => {
         ? source
         : endpoint.includes('/jobs?')
           ? jobs
-          : run,
+          : endpoint.includes('/runs/999/')
+            ? sourceCi
+            : run,
     readRepair: async () => repair,
-    readDeployment: async () => deployment,
-    readJobLog: async () => log,
+    readStepLogs: async () => logs,
     ...overrides,
   });
 
-  it('derives a bounded diagnosis from real API readers and strips provider messages', async () => {
+  it('derives a bounded observed wrapper diagnosis from authenticated API readers', async () => {
     const result = await collectDeploymentInvestigation(identity, reads());
     assert.equal(result.sourceHead, HEAD);
     assert.equal(result.diagnosis, 'retouch-style-prompt-missing');
@@ -1118,70 +1174,114 @@ describe('read-only deployment investigation result', () => {
   for (const [name, overrides] of [
     [
       'wrong staging attempt',
-      {
-        readGithub: async endpoint =>
-          endpoint.includes('/contents/')
-            ? source
-            : endpoint.includes('/jobs?')
-              ? { jobs: [{ ...jobs.jobs[0], run_attempt: 2 }] }
-              : run,
-      },
+      { readGithub: githubWithJob({ run_attempt: 2 }) },
     ],
     [
       'successful staging job',
-      {
-        readGithub: async endpoint =>
-          endpoint.includes('/contents/')
-            ? source
-            : endpoint.includes('/jobs?')
-              ? { jobs: [{ ...jobs.jobs[0], conclusion: 'success' }] }
-              : run,
-      },
+      { readGithub: githubWithJob({ conclusion: 'success' }) },
     ],
     [
-      'malformed provider URL',
+      'wrong deploy step',
       {
-        readDeployment: async () => ({
-          ...deployment,
-          url: 'jovie-fixture-jovie.vercel.app.attacker.invalid',
+        readGithub: githubWithJob({
+          steps: [checkout, { ...deploy, name: 'Unrelated' }],
         }),
       },
     ],
     [
-      'wrong provider source',
+      'successful deploy step',
       {
-        readDeployment: async () => ({
-          ...deployment,
-          meta: { githubCommitSha: repairHead },
+        readGithub: githubWithJob({
+          steps: [checkout, { ...deploy, conclusion: 'success' }],
         }),
       },
     ],
     [
-      'wrong deployment',
+      'wrong checkout source',
+      { readStepLogs: async () => ({ ...logs, checkout: repairHead }) },
+    ],
+    [
+      'wrong deployed source',
       {
-        readDeployment: async () => ({
-          ...deployment,
-          id: 'dpl_otherDeployment123',
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: log.replace(
+            `VERCEL_GIT_COMMIT_SHA: ${HEAD}`,
+            `VERCEL_GIT_COMMIT_SHA: ${repairHead}`
+          ),
         }),
       },
     ],
     [
-      'healthy deployment',
-      { readDeployment: async () => ({ ...deployment, readyState: 'READY' }) },
-    ],
-    [
-      'unknown error',
-      { readDeployment: async () => ({ ...deployment, errorCode: 'EACCES' }) },
-    ],
-    [
-      'unknown asset',
+      'wrong authorized source',
       {
-        readDeployment: async () => ({
-          ...deployment,
-          errorMessage: '/some/other/file',
+        readStepLogs: async () => ({
+          ...logs,
+          authorize: logs.authorize.replaceAll(HEAD, repairHead),
         }),
       },
     ],
+    [
+      'missing authorization receipt',
+      { readStepLogs: async () => ({ ...logs, authorize: 'untrusted' }) },
+    ],
+    [
+      'adjacent-step spoof',
+      {
+        readStepLogs: async () => ({ ...logs, deploy: prefix, adjacent: log }),
+      },
+    ],
+    [
+      'command echo injection',
+      {
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: log.replace('Z Deploy failure', 'Z echo Deploy failure'),
+        }),
+      },
+    ],
+    [
+      'truncated diagnostic',
+      { readStepLogs: async () => ({ ...logs, deploy: log.slice(0, -1) }) },
+    ],
+    [
+      'unavailable log',
+      { readStepLogs: async () => ({ ...logs, deploy: '' }) },
+    ],
+    [
+      'conflicting retry records',
+      {
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: log + '\n' + diagnosticLine({ ...diagnostic, attempt: 4 }),
+        }),
+      },
+    ],
+    ...[
+      ['extra diagnostic fields', { healthy: true }],
+      ['unknown diagnostic schema', { schema: 'untrusted' }],
+      ['zero exit', { exitStatus: 0 }],
+      ['invalid wrapper attempt', { attempt: 0 }],
+      ['unknown mode', { mode: 'other' }],
+      [
+        'mismatched URL',
+        { deploymentUrl: 'https://jovie-other-jovie.vercel.app' },
+      ],
+      [
+        'malformed URL',
+        { deploymentUrl: identity.deploymentUrl + '.attacker.invalid' },
+      ],
+      ['unknown error', { errorCode: 'EACCES' }],
+      ['unknown asset', { asset: 'runtime-quarantine-ledger' }],
+    ].map(([name, patch]) => [
+      name,
+      {
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: prefix + diagnosticLine({ ...diagnostic, ...patch }),
+        }),
+      },
+    ]),
     [
       'wrong run attempt',
       { readGithub: async () => ({ ...run, run_attempt: 2 }) },
@@ -1229,20 +1329,90 @@ describe('read-only deployment investigation result', () => {
       );
     });
   }
+  it('collapses identical wrapper records without conflating wrapper and GitHub attempts', async () => {
+    const result = await collectDeploymentInvestigation(
+      identity,
+      reads({
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: log + '\n' + diagnosticLine(diagnostic),
+        }),
+      })
+    );
+    assert.equal(result.attempt, 1);
+    assert.equal(result.jobId, 888);
+    assert.equal(result.stepNumber, 15);
+  });
 
-  async function seed(directory) {
+  async function seed(directory, controller = run) {
     return persistDeliveryOutcome(
       buildDeliveryReceipt(
         {
           action: 'completed',
           repository: { full_name: REPO },
-          workflow_run: run,
+          workflow_run: controller,
         },
         { now }
       ),
       { stateDir: directory }
     );
   }
+
+  const archiveEntries = {
+    [`Production Release _ deploy-staging/2_Run actions_checkout@${'c'.repeat(40)}.txt`]:
+      logs.checkout,
+    'Production Release _ deploy-staging/15_Deploy (staging preview, prebuilt).txt':
+      logs.deploy,
+    'Authorize exact main CI evidence/3_Cross-prove exact successful push CI.txt':
+      logs.authorize,
+  };
+  function archive(entries = Object.entries(archiveEntries)) {
+    const zipped = spawnSync(
+      'python3',
+      [
+        '-c',
+        'import sys,json,zipfile,io; b=io.BytesIO(); z=zipfile.ZipFile(b,"w",compression=zipfile.ZIP_DEFLATED); [z.writestr(k,v) for k,v in json.load(sys.stdin)]; z.close(); sys.stdout.buffer.write(b.getvalue())',
+      ],
+      { input: JSON.stringify(entries) }
+    );
+    assert.equal(zipped.status, 0, zipped.stderr.toString());
+    return zipped.stdout.toString('base64');
+  }
+
+  it('accepts completion-second logs and binds deployed source separately from controller source', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-investigation-source-')
+    );
+    try {
+      const controller = { ...run, head_sha: repairHead };
+      await seed(directory, controller);
+      const bound = reads({
+        readGithub: async endpoint =>
+          endpoint.includes('/contents/')
+            ? source
+            : endpoint.includes('/jobs?')
+              ? jobs
+              : endpoint.includes('/runs/999/')
+                ? sourceCi
+                : controller,
+        readStepLogs: async () => ({
+          ...logs,
+          deploy: log.replace('00:55:30.000', '00:56:00.900'),
+        }),
+      });
+      const result = await collectDeploymentInvestigation(identity, bound);
+      assert.equal(result.controllerHead, repairHead);
+      assert.equal(result.sourceHead, HEAD);
+      const accepted = await persistDeploymentInvestigation(result, {
+        ...bound,
+        stateDir: directory,
+      });
+      assert.equal(accepted.loop.state, 'repair-verifying');
+      assert.equal(accepted.investigation.sourceCiRun, 999);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 
   it('executes the producer and existing dispatch CLI through actual read-only commands', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-investigation-cli-'));
@@ -1252,12 +1422,7 @@ describe('read-only deployment investigation result', () => {
       await mkdir(bin);
       await writeFile(
         join(bin, 'gh'),
-        `#!${process.execPath}\nconst a=process.argv.slice(2);if(a[0]!=='api')process.exit(17);if(a[1].endsWith('/logs')){process.stdout.write(${JSON.stringify(log)});process.exit(0);}const value=a[1]==='graphql'?{data:{repository:{pullRequest:${JSON.stringify(repair)}}}}:a[1].includes('/contents/')?${JSON.stringify(source)}:a[1].includes('/jobs?')?${JSON.stringify(jobs)}:${JSON.stringify(run)};process.stdout.write(JSON.stringify(value));`,
-        { mode: 0o755 }
-      );
-      await writeFile(
-        join(bin, 'doppler'),
-        `#!${process.execPath}\nconst a=process.argv.slice(2);if(a.slice(0,8).join(' ')!=='run --project jovie-web --config dev -- vercel api'||a[9]!=='--method'||a[10]!=='GET')process.exit(17);process.stdout.write(${JSON.stringify(JSON.stringify(deployment))});`,
+        `#!${process.execPath}\nconst a=process.argv.slice(2);if(a[0]!=='api')process.exit(17);if(a[1].endsWith('/logs')){process.stdout.write(Buffer.from(process.env.TEST_ARCHIVE_BASE64 || ${JSON.stringify(archive())},'base64'));process.exit(0);}const value=a[1]==='graphql'?{data:{repository:{pullRequest:${JSON.stringify(repair)}}}}:a[1].includes('/contents/')?${JSON.stringify(source)}:a[1].includes('/jobs?')?${JSON.stringify(jobs)}:a[1].includes('/runs/999/')?${JSON.stringify(sourceCi)}:${JSON.stringify(run)};process.stdout.write(JSON.stringify(value));`,
         { mode: 0o755 }
       );
       const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
@@ -1273,12 +1438,46 @@ describe('read-only deployment investigation result', () => {
           '--attempt=1',
           '--repair-pr=18201',
           `--repair-head=${repairHead}`,
-          `--deployment-id=${identity.deploymentId}`,
+          `--deployment-url=${identity.deploymentUrl}`,
         ],
         { env, encoding: 'utf8' }
       );
       assert.equal(produced.status, 0, produced.stderr);
       const result = JSON.parse(produced.stdout);
+      for (const archiveOverride of [
+        Buffer.from('not a zip').toString('base64'),
+        archive(Object.entries(archiveEntries).slice(1)),
+        archive([
+          ...Object.entries(archiveEntries),
+          Object.entries(archiveEntries)[0],
+        ]),
+        archive(
+          Object.entries(archiveEntries).map(([key, value], index) => [
+            key,
+            index === 0 ? 'x'.repeat(2 * 1024 * 1024 + 1) : value,
+          ])
+        ),
+      ]) {
+        const rejected = spawnSync(
+          process.execPath,
+          [
+            scriptPath,
+            '--investigate-controller-run=777',
+            '--attempt=1',
+            '--repair-pr=18201',
+            `--repair-head=${repairHead}`,
+            `--deployment-url=${identity.deploymentUrl}`,
+          ],
+          {
+            env: { ...env, TEST_ARCHIVE_BASE64: archiveOverride },
+            encoding: 'utf8',
+          }
+        );
+        assert.equal(rejected.status, 1);
+        assert.match(rejected.stderr, /step-logs-unavailable/);
+        assert.equal(rejected.stdout, '');
+      }
+
       const eventFile = join(directory, 'event.json');
       const event = {
         action: 'delivery-investigation-result',
@@ -1306,7 +1505,7 @@ describe('read-only deployment investigation result', () => {
       assert.equal(dryRun.status, 0, dryRun.stderr);
       assert.equal(JSON.parse(dryRun.stdout).status, 'dry-run');
       await writeFile(
-        join(bin, 'doppler'),
+        join(bin, 'gh'),
         `#!${process.execPath}\nprocess.stderr.write('synthetic-private-output');process.exit(1);`,
         { mode: 0o755 }
       );
@@ -1318,7 +1517,7 @@ describe('read-only deployment investigation result', () => {
           '--attempt=1',
           '--repair-pr=18201',
           `--repair-head=${repairHead}`,
-          `--deployment-id=${identity.deploymentId}`,
+          `--deployment-url=${identity.deploymentUrl}`,
         ],
         { env, encoding: 'utf8' }
       );
@@ -1380,19 +1579,30 @@ describe('read-only deployment investigation result', () => {
       const result = await collectDeploymentInvestigation(identity, reads());
       await assert.rejects(
         persistDeploymentInvestigation(
-          { ...result, deploymentId: 'dpl_inventedDeployment123' },
+          {
+            ...result,
+            deploymentUrl: 'https://jovie-invented-jovie.vercel.app',
+          },
           { ...reads(), stateDir: directory }
         ),
-        /provider-binding-or-diagnosis-invalid/
+        /diagnostic-missing-or-conflicting/
       );
       await assert.rejects(
         collectDeploymentInvestigation(
           identity,
           reads({
-            readJobLog: async () => 'https://jovie-older-jovie.vercel.app',
+            readStepLogs: async () => ({
+              ...logs,
+              deploy:
+                prefix +
+                diagnosticLine({
+                  ...diagnostic,
+                  deploymentUrl: 'https://jovie-older-jovie.vercel.app',
+                }),
+            }),
           })
         ),
-        /provider-not-bound-to-controller-attempt/
+        /diagnostic-missing-or-conflicting/
       );
       await assert.rejects(readdir(join(directory, 'investigation-results')), {
         code: 'ENOENT',
@@ -1417,7 +1627,7 @@ describe('read-only deployment investigation result', () => {
       const later = {
         ...reads({
           now: '2026-09-24T02:00:00.000Z',
-          readDeployment: async () => {
+          readStepLogs: async () => {
             throw new Error('must not recollect accepted proof');
           },
         }),
@@ -1494,6 +1704,9 @@ describe('read-only deployment investigation result', () => {
         { terminal: true },
         { repairPr: -1 },
         { repository: 'other/repo' },
+        { deploymentUrl: identity.deploymentUrl + '/bad' },
+        { diagnosticDigest: 'forged' },
+        { jobId: 999 },
       ]) {
         await assert.rejects(
           persistDeploymentInvestigation(
