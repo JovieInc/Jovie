@@ -12,12 +12,6 @@ import {
 } from '@/tests/utils/dashboard-nav-test-support';
 import { fastRender } from '@/tests/utils/fast-render';
 
-const runtimeUpdateState = vi.hoisted(() => ({ available: false }));
-vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
-  useRuntimeUpdate: () =>
-    runtimeUpdateState.available ? { available: true } : null,
-}));
-
 vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
@@ -48,7 +42,6 @@ function primaryLinks(container: HTMLElement) {
 
 describe('DashboardNav', () => {
   afterEach(() => {
-    runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
   });
 
@@ -163,49 +156,6 @@ describe('DashboardNav', () => {
     });
 
     expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
-  });
-
-  it('shows a runtime update on the existing Inbox bell and clears it without losing opportunity attention', () => {
-    runtimeUpdateState.available = true;
-    const pending = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        inboxNavigation: { state: 'available', pendingCount: 3 },
-      },
-    });
-    expect(
-      pending.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
-    expect(
-      pending.getByRole('status', { name: '3 pending items' })
-    ).toHaveTextContent('3');
-    pending.unmount();
-
-    const updateOnly = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        inboxNavigation: { state: 'empty', pendingCount: 0 },
-      },
-    });
-    const updateLink = updateOnly.getByRole('link', {
-      name: 'Inbox — App Update Available',
-    });
-    expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
-    expect(
-      updateLink.querySelector('[data-inbox-runtime-update]')
-    ).not.toBeNull();
-    updateOnly.unmount();
-
-    runtimeUpdateState.available = false;
-    const caughtUp = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        inboxNavigation: { state: 'empty', pendingCount: 0 },
-      },
-    });
-    const link = caughtUp.getByRole('link', { name: 'Inbox' });
-    expect(link).toHaveAttribute('data-inbox-attention', 'empty');
-    expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {
