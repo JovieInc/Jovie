@@ -24,16 +24,16 @@
     "@vercel/blob": "2.8.0",
     "ai": "7.0.107",
     "braintrust": "3.34.0",
-    "eve": "0.47.7",
+    "eve": "0.63.0",
     "just-bash": "3.4.2",
-    "microsandbox": "0.7.2",
+    "microsandbox": "0.5.5",
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
+    "@types/node": "26.5.1",
     "@vitest/coverage-v8": "5.0.1",
     "typescript": "6.0.3",
-    "vercel": "59.16.0",
+    "vercel": "59.23.2",
     "vitest": "5.0.1"
   }
 }

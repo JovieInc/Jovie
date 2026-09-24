@@ -113,6 +113,46 @@ run_deploy() {
   "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
+emit_failure_diagnostic() {
+  # Never echo provider output: it may contain credentials or workflow commands.
+  # Node is already required by the Vercel CLI. Read only a bounded tail and
+  # emit allowlisted fields; diagnostic failure must not change deploy status.
+  node - "$1" "$2" "$3" "$4" <<'NODE'
+const fs = require('node:fs');
+const [file, mode, attempt, status] = process.argv.slice(2);
+let fd;
+try {
+  fd = fs.openSync(file, 'r');
+  const size = fs.fstatSync(fd).size;
+  const buffer = Buffer.alloc(Math.min(size, 32768));
+  const read = fs.readSync(fd, buffer, 0, buffer.length, Math.max(0, size - buffer.length));
+  const output = buffer.subarray(0, read).toString('utf8');
+  const codes = ['ENOENT', 'EACCES', 'ENOSPC', 'ENOTFOUND', 'EAI_AGAIN',
+    'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED'];
+  const errorCode = codes.find(code => new RegExp(`\\b${code}\\b`).test(output)) || 'UNKNOWN';
+  const urls = [...output.matchAll(/https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app(?=\/?(?:\s|$))/gi)];
+  const candidate = urls.at(-1)?.[0] || null;
+  const token = process.env.VERCEL_TOKEN;
+  const deploymentUrl = candidate && !(token && candidate.includes(token)) ? candidate : null;
+  const asset = errorCode === 'ENOENT' && output.includes('/retouching/styles/white-space.md')
+    ? 'retouch-style-prompt' : errorCode === 'ENOENT' && output.includes('/tests/quarantine.json')
+      ? 'runtime-quarantine-ledger' : null;
+  const receipt = {
+    schema: 'jovie-vercel-deploy-failure/v1',
+    mode: ['tgz', 'split-tgz', 'plain', 'source'].includes(mode) ? mode : 'unknown',
+    attempt: /^\d+$/.test(attempt) ? Number(attempt) : null,
+    exitStatus: /^\d+$/.test(status) ? Number(status) : null,
+    errorCode, asset, deploymentUrl,
+  };
+  process.stderr.write(`Deploy failure diagnostic: ${JSON.stringify(receipt)}\n`);
+} catch {
+  process.stderr.write('Deploy failure diagnostic unavailable\n');
+} finally {
+  if (fd !== undefined) fs.closeSync(fd);
+}
+NODE
+}
+
 try_mode() {
   local mode="$1"
   local attempt="$2"
@@ -125,6 +165,9 @@ try_mode() {
   run_deploy "$mode" "$@" >"$deploy_output_file" 2>&1 || deploy_status=$?
   local deployment_url=""
   deployment_url="$(parse_deployment_url_file "$deploy_output_file")"
+  if [ "$deploy_status" -ne 0 ]; then
+    emit_failure_diagnostic "$deploy_output_file" "$mode" "$attempt" "$deploy_status" || true
+  fi
   rm -f "$deploy_output_file"
   if [ "$deploy_status" -eq 0 ]; then
     if [ -z "$deployment_url" ]; then

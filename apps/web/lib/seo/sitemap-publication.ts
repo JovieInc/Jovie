@@ -138,10 +138,29 @@ export function collectSitemapInventoryViolations(
   const seen = new Set<string>();
   for (const [index, entry] of entries.entries()) {
     const path = paths[index] ?? '/';
-    if (!entry.url.startsWith('https://jov.ie')) {
+    let canonicalUrl = false;
+    try {
+      const parsed = new URL(entry.url);
+      canonicalUrl =
+        (parsed.href === entry.url || entry.url === parsed.origin) &&
+        parsed.protocol === 'https:' &&
+        parsed.origin === 'https://jov.ie' &&
+        parsed.username === '' &&
+        parsed.password === '' &&
+        parsed.port === '' &&
+        parsed.search === '' &&
+        parsed.hash === '';
+    } catch {
+      // Relative and malformed values are not publishable sitemap URLs.
+    }
+    if (!canonicalUrl) {
       violations.push(`non-canonical url: ${entry.url}`);
     }
-    if (!seen.add(path)) violations.push(`duplicate sitemap url: ${path}`);
+    if (seen.has(path)) {
+      violations.push(`duplicate sitemap url: ${path}`);
+    } else {
+      seen.add(path);
+    }
     if (manifest.some(route => route.url === path && route.aliasOf)) {
       violations.push(`alias included: ${path}`);
     }

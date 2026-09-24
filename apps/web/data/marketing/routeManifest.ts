@@ -536,6 +536,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/smart-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
+      'hero',
+      'how-it-works',
+      'feature-split',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'JOV-6560 source and canonical Pen draft',
+      notes:
+        'Interactive two-release dial is source-backed; mounted render and native save proof are pending.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/smart-links',
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(

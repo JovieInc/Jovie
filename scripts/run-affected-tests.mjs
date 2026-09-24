@@ -229,10 +229,12 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/fx-remediation-lane.mjs',
   'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
@@ -246,6 +248,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
@@ -1100,6 +1103,15 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+const VERCEL_DEPLOY_DIAGNOSTICS_PAIR = new Set([
+  '.github/scripts/vercel-prebuilt-deploy.sh',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+]);
+const VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR = new Set([
+  ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+
 export function buildAffectedTestPlan(
   changedFiles,
   { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
@@ -1107,6 +1119,37 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  // The shell wrapper's behavior is exercised by the existing Python CI
+  // suite. Admit only the complete pair, optionally with the complete local
+  // selector pair; unknown peers and unavailable proof retain full fallback.
+  const isExactDeployDiagnostics = [
+    VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+    VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR,
+  ].some(
+    manifest =>
+      files.length === manifest.size && files.every(file => manifest.has(file))
+  );
+  if (isExactDeployDiagnostics) {
+    if (
+      ![
+        ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: VERCEL_CONGESTION_CONTROL_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   if (
     files.some(file =>
@@ -2604,7 +2647,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.include=lib/native-queue-group-evidence.mjs',
       '--coverage.include=lib/native-queue-policy-evidence.mjs',
       '--coverage.include=lib/native-queue-eval.mjs',
-      '--coverage.include=**/scripts/native-queue-eval.mjs',
+      '--coverage.include=native-queue-eval.mjs',
       '--coverage.thresholds.perFile=true',
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',

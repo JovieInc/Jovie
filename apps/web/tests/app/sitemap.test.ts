@@ -33,21 +33,19 @@ vi.mock('@/lib/changelog-source', () => ({ getChangelogReleases }));
 
 const queryMock = vi.fn();
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
-const innerJoinMock = vi.fn(() => ({
-  innerJoin: innerJoinMock,
-  leftJoin: leftJoinMock,
-  where: whereMock,
-}));
-const leftJoinMock = vi.fn(() => ({
-  innerJoin: innerJoinMock,
-  leftJoin: leftJoinMock,
-  where: whereMock,
-}));
-const fromMock = vi.fn(() => ({
+const innerJoinMock = vi.fn();
+const leftJoinMock = vi.fn();
+const orderByMock = vi.fn();
+const queryBuilder = {
   where: whereMock,
   innerJoin: innerJoinMock,
   leftJoin: leftJoinMock,
-}));
+  orderBy: orderByMock,
+};
+innerJoinMock.mockReturnValue(queryBuilder);
+leftJoinMock.mockReturnValue(queryBuilder);
+orderByMock.mockReturnValue(queryBuilder);
+const fromMock = vi.fn(() => queryBuilder);
 const selectMock = vi.fn(() => ({ from: fromMock }));
 
 vi.mock('@/lib/db', () => ({
@@ -152,7 +150,7 @@ describe('sitemap', () => {
     ]);
   });
 
-  it('returns marketing, blog, profile, release, and deduplicated track URLs', async () => {
+  it('returns canonical nested track URLs and uses the earliest eligible release once', async () => {
     getBlogPosts.mockResolvedValue([
       {
         slug: 'hello-world',
@@ -188,11 +186,19 @@ describe('sitemap', () => {
         {
           username: 'tim',
           slug: 'album',
+          releaseSlug: 'album',
+          updatedAt: new Date('2026-01-03'),
+        },
+        {
+          username: 'tim',
+          slug: 'album',
+          releaseSlug: 'best-of',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'tim',
           slug: 'single',
+          releaseSlug: 'single-release',
           updatedAt: new Date('2026-01-04'),
         },
       ])
@@ -224,7 +230,8 @@ describe('sitemap', () => {
         'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',
         'https://jov.ie/tim/album',
-        'https://jov.ie/tim/single',
+        'https://jov.ie/tim/album/album',
+        'https://jov.ie/tim/single-release/single',
       ])
     );
 
@@ -232,6 +239,12 @@ describe('sitemap', () => {
       entry => entry.url === 'https://jov.ie/tim/album'
     );
     expect(albumMatches).toHaveLength(1);
+    expect(entries.map(entry => entry.url)).not.toContain(
+      'https://jov.ie/tim/best-of/album'
+    );
+    expect(entries.map(entry => entry.url)).not.toContain(
+      'https://jov.ie/tim/single'
+    );
 
     for (const blockedUrl of [
       'https://jov.ie/demo',
@@ -274,6 +287,7 @@ describe('sitemap', () => {
     expect(entries.length).toBeGreaterThan(0);
     expect(selectMock).toHaveBeenCalledTimes(4);
     expect(queryMock).toHaveBeenCalled();
+    expect(orderByMock).toHaveBeenCalledWith('releaseDate');
   });
 
   it('uses catalog revision dates and omits lastmod when the revision is unknown', async () => {
@@ -386,11 +400,13 @@ describe('sitemap', () => {
         {
           username: 'testartist',
           slug: 'fixture-track',
+          releaseSlug: 'fixture-release',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'dualipa-official',
           slug: 'real-track',
+          releaseSlug: 'real-release',
           updatedAt: new Date('2026-01-03'),
         },
       ])
@@ -402,10 +418,14 @@ describe('sitemap', () => {
     expect(urls).not.toContain('https://jov.ie/dualipa');
     expect(urls).not.toContain('https://jov.ie/dualipa/fixture-release');
     expect(urls).not.toContain('https://jov.ie/testartist');
-    expect(urls).not.toContain('https://jov.ie/testartist/fixture-track');
+    expect(urls).not.toContain(
+      'https://jov.ie/testartist/fixture-release/fixture-track'
+    );
     expect(urls).toContain('https://jov.ie/dualipa-official');
     expect(urls).toContain('https://jov.ie/dualipa-official/real-release');
-    expect(urls).toContain('https://jov.ie/dualipa-official/real-track');
+    expect(urls).toContain(
+      'https://jov.ie/dualipa-official/real-release/real-track'
+    );
   });
 
   it('excludes claimed Clerk-test machine-handle profiles and every URL under them (JOV-6126 canary)', async () => {
@@ -470,6 +490,7 @@ describe('sitemap', () => {
         {
           username: 'tmoc209131l1r6w',
           slug: 'qa-track-1',
+          releaseSlug: 'qa-release-986',
           updatedAt: new Date('2026-09-10'),
         },
       ])
@@ -493,7 +514,9 @@ describe('sitemap', () => {
     expect(urls).not.toContain(
       'https://jov.ie/tmoc9mm7xfvx02c/gp-moc-test-release'
     );
-    expect(urls).not.toContain('https://jov.ie/tmoc209131l1r6w/qa-track-1');
+    expect(urls).not.toContain(
+      'https://jov.ie/tmoc209131l1r6w/qa-release-986/qa-track-1'
+    );
     // The whole sitemap stays well-formed: no tmoc* URL of any shape.
     for (const url of urls) {
       expect(url).not.toMatch(/jov\.ie\/tmoc[0-9a-z]{10,}(\/|$)/);
@@ -660,5 +683,40 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
         'non-indexable public url: /privacy',
       ])
     );
+  });
+
+  it('rejects non-canonical origins and malformed sitemap URLs', () => {
+    const invalidUrls = [
+      '/artist-profiles',
+      'not a URL',
+      'http://jov.ie/artist-profiles',
+      'https://jov.ievil/artist-profiles',
+      'https://user@jov.ie/artist-profiles',
+      'https://jov.ie:8443/artist-profiles',
+      'https://jov.ie:443/artist-profiles',
+      'https://jov.ie/artist-profiles?source=test',
+      'https://jov.ie/artist-profiles#section',
+    ];
+
+    const violations = collectSitemapInventoryViolations(
+      invalidUrls.map(url => ({ url })),
+      { manifest: [] }
+    );
+
+    for (const url of invalidUrls) {
+      expect(violations).toContain(`non-canonical url: ${url}`);
+    }
+  });
+
+  it('flags repeated normalized sitemap paths', () => {
+    expect(
+      collectSitemapInventoryViolations(
+        [
+          { url: 'https://jov.ie/artist-profiles' },
+          { url: 'https://jov.ie/artist-profiles' },
+        ],
+        { manifest: [] }
+      )
+    ).toContain('duplicate sitemap url: /artist-profiles');
   });
 });

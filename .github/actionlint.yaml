@@ -22,3 +22,6 @@ paths:
   .github/workflows/production-marker-recovery.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'
+  .github/workflows/rolling-ci-dispatch.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'

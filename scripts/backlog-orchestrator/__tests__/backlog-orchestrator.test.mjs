@@ -1722,7 +1722,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {
+  it('preserves fleet production gates while GitHub owns source admission', async () => {
     const controller = resolve(
       ORCHESTRATOR_DIR,
       '../symphony/gem-priority-gate.py'
@@ -1863,15 +1863,22 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.match(workflowSource, /Always open a non-draft PR/);
     assert.match(workflowSource, /Do not create draft PRs/);
-    assert.match(workflowSource, /including when the gate is `GREEN`/);
-    assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
+    assert.match(workflowSource, /GitHub's normal `Merge when ready` action/);
     assert.match(
       workflowSource,
-      /fresh `GREEN` receipt or the exact isolated exception/
+      /GitHub owns queue enrollment, admission, and merge/
+    );
+    assert.doesNotMatch(
+      workflowSource,
+      /gh pr edit --add-label queue-deferred/
     );
     assert.match(
       workflowSource,
-      /Labels and path-only classification are not eligibility evidence/
+      /production deployment and promotion require a fresh `GREEN` receipt and their independent production gates/
+    );
+    assert.match(
+      workflowSource,
+      /exact current PR head, required checks, and absence of explicit human `hold`, `gated`, or `incident` labels/
     );
     assert.match(workflowSource, /max_concurrent_agents: 4/);
     assert.doesNotMatch(workflowSource, /Open a non-draft PR/);

@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -11,17 +11,19 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_PATHS,
   CERTIFICATION_KERNEL_COMMAND,
+  changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
+  listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
   selectBillingCoverageCommands,
@@ -1064,6 +1066,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain(
       '&& node scripts/run-affected-tests.mjs --control'
     );
+    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/fx-remediation-lane.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-dispatch.test.mjs');
+    expect(fxCoverage).toContain(
+      'lib/{rolling-ci-fx,fx-remediation-lane,rolling-ci-dispatch}.mjs'
+    );
+    expect(fxCoverage).toContain('--coverage.thresholds.perFile=true');
+    expect(fxCoverage).toContain('--coverage.thresholds.lines=60');
+    expect(fxCoverage).toContain('--coverage.thresholds.branches=60');
+    expect(fxCoverage).toContain('--coverage.thresholds.functions=70');
   });
 
   it('enforces external shared health contract coverage for package and test changes', () => {
@@ -1451,11 +1465,21 @@ describe('ci-fast bounded parallel workflow', () => {
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
     )?.[1];
+    const controlPatternAdditions = Array.from(
+      remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+      match => match[1]
+    );
     const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
 
-    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
+    const selectsStructural = new RegExp(
+      [
+        controlPattern,
+        ...controlPatternAdditions.map(addition => addition.replace(/^\|/, '')),
+        uiPattern,
+      ].join('|')
+    );
     expect(
       selectsStructural.test(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
@@ -1469,6 +1493,16 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       selectsStructural.test('scripts/verification/admission-shadow.mjs')
     ).toBe(true);
+    for (const fxCoveragePath of [
+      'scripts/lib/fx-remediation-lane.mjs',
+      'scripts/lib/rolling-ci-dispatch.mjs',
+      'scripts/lib/rolling-ci-fx.mjs',
+      'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+    ]) {
+      expect(selectsStructural.test(fxCoveragePath)).toBe(true);
+    }
     for (const mergeQueueControllerPath of [
       'scripts/automation-verify.sh',
       'scripts/run-affected-tests.mjs',
@@ -1810,4 +1844,69 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   expect(CI_FAST_SOURCE).toContain(
     '--coverage.include=lib/ovie/summer-admissions.ts'
   );
+});
+
+describe('CI diff selection on a divergent PR', () => {
+  it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
+    const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+    const select = (event, base = '') => {
+      vi.stubEnv('GITHUB_EVENT_NAME', event);
+      vi.stubEnv('GITHUB_BASE_REF', 'main');
+      vi.stubEnv('TURBO_SCM_BASE', base);
+      return {
+        all: listAllChangedFiles(repository),
+        ts: changedFiles(['*.ts'], repository),
+      };
+    };
+    try {
+      git('init', '-b', 'main');
+      git('config', 'user.name', 'CI test');
+      git('config', 'user.email', 'ci-test@example.invalid');
+      writeFileSync(join(repository, 'shared.ts'), 'export const value = 1;\n');
+      git('add', '.');
+      git('commit', '-m', 'base');
+      const base = git('rev-parse', 'HEAD');
+      writeFileSync(
+        join(repository, 'main-only.ts'),
+        'export const onlyMain = true;\n'
+      );
+      git('add', '.');
+      git('commit', '-m', 'main moves ahead');
+      git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      git('checkout', '-b', 'pr', base);
+      writeFileSync(
+        join(repository, 'pr-only.ts'),
+        'export const onlyPr = true;\n'
+      );
+      writeFileSync(join(repository, 'notes.md'), 'PR note\n');
+      git('add', '.');
+      git('commit', '-m', 'PR change');
+      expect(select('pull_request')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
+        ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('push')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(select('pull_request', base)).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      expect(select('pull_request', 'missing-base')).toEqual({
+        all: null,
+        ts: null,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+    }
+  });
 });

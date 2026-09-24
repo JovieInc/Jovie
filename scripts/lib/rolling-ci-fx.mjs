@@ -4,11 +4,13 @@ import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { validateFxExecutorIdentity } from './fx-remediation-lane.mjs';
 import {
   parseRollingCiState,
   ROLLING_CI_POLICY_VERSION,
   rollingCiStateMarker,
   runDispatch,
+  TRUSTED_CI_WORKFLOW_PATH,
   TRUSTED_REPOSITORY,
 } from './rolling-ci-dispatch.mjs';
 import {
@@ -45,10 +47,10 @@ export const HOSTED_ACCEPTANCE_RECEIPT_SCHEMA =
   'jovie-hosted-ci-acceptance-receipt/v1';
 export const HOSTED_TERMINAL_RECEIPT_SCHEMA =
   'jovie-hosted-ci-terminal-receipt/v1';
-export const HOSTED_REPAIR_MAX_CONCURRENT = 1;
+// Eight native GitHub prepare-job concurrency shards bound aggregate FX runs.
+export const HOSTED_REPAIR_MAX_CONCURRENT = 8;
 export const HOSTED_REPAIR_MAX_FILES = 8;
 export const HOSTED_REPAIR_MAX_PATCH_BYTES = 512 * 1024;
-export const HOSTED_GATE_MAX_AGE_MS = 5 * 60 * 1000;
 export const HOSTED_ACCEPTANCE_TTL_MS = 45 * 60 * 1000;
 
 const HOSTED_REPAIR_TEST_COMMANDS = Object.freeze([
@@ -132,6 +134,15 @@ function assertHostedRepairPlan(plan) {
   }
   assertExactSha(plan.expectedHeadOid, 'expectedHeadOid');
   assertSafeHeadRef(plan.headRefName);
+  if (
+    !Array.isArray(plan.allowedPaths) ||
+    plan.allowedPaths.length < 1 ||
+    plan.allowedPaths.length > HOSTED_REPAIR_MAX_FILES ||
+    new Set(plan.allowedPaths).size !== plan.allowedPaths.length ||
+    plan.allowedPaths.some(path => !validateHostedRepairPath(path).allowed)
+  ) {
+    throw new Error('hosted repair plan requires bounded source paths');
+  }
   const expectedKey = `${plan.repository}:pr-${plan.prNumber}:${plan.expectedHeadOid}:${plan.fingerprint}:${plan.policyVersion}`;
   if (plan.idempotencyKey !== expectedKey) {
     throw new Error('hosted repair idempotency key is not exact-head bound');
@@ -154,6 +165,20 @@ export function buildHostedRepairPlan(input = {}) {
   ) {
     throw new Error('dispatch does not authorize a hosted repair');
   }
+  if (
+    !Array.isArray(input.changedFiles) ||
+    input.changedFiles.length < 1 ||
+    input.changedFiles.length > 99 ||
+    input.changedFiles.some(
+      file =>
+        file?.status !== 'modified' ||
+        !validateHostedRepairPath(file?.filename).allowed
+    )
+  ) {
+    throw new Error(
+      'entire PR diff must contain only admitted modified source paths'
+    );
+  }
   const plan = {
     schema: HOSTED_REPAIR_PLAN_SCHEMA,
     policyVersion: ROLLING_CI_POLICY_VERSION,
@@ -170,6 +195,7 @@ export function buildHostedRepairPlan(input = {}) {
       check: candidate.check,
       failedSteps: [...(candidate.failedSteps ?? [])],
     })),
+    allowedPaths: input.changedFiles.map(file => file.filename).sort(),
     idempotencyKey: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
     maxConcurrent: HOSTED_REPAIR_MAX_CONCURRENT,
   };
@@ -202,44 +228,6 @@ export function isHostedRemediationSelfTrigger({ plan, commitMessage }) {
     message.includes(`Policy: ${plan.policyVersion}`) &&
     message.includes(`Failure: ${plan.fingerprint}`)
   );
-}
-
-/**
- * @param {{receipt?: Record<string, any>, now?: Date, maxAgeMs?: number}} [options]
- */
-export function validateHostedGateAdmission({
-  receipt,
-  now = new Date(),
-  maxAgeMs = HOSTED_GATE_MAX_AGE_MS,
-} = {}) {
-  const observedAt = Date.parse(receipt?.observedAt ?? '');
-  const ageMs = new Date(now).getTime() - observedAt;
-  const remediation = receipt?.remediationAdmission;
-  const gem = receipt?.concurrency?.gem;
-  const valid =
-    receipt?.schema === 'jovie-fleet-gate/v1' &&
-    Number.isFinite(observedAt) &&
-    ageMs >= -60_000 &&
-    ageMs <= maxAgeMs &&
-    remediation?.allowed === true &&
-    remediation?.localAllowed === true &&
-    remediation?.pushAllowed === true &&
-    remediation?.authority === 'single-pr-writer-exact-head' &&
-    remediation?.activities?.includes('expected-head-pr-update') &&
-    Number.isInteger(remediation?.maxConcurrent) &&
-    remediation.maxConcurrent >= HOSTED_REPAIR_MAX_CONCURRENT &&
-    gem?.evidenceAccepted === true &&
-    gem?.newMutationAllowed === true &&
-    Number.isInteger(gem?.maxConcurrent) &&
-    gem.maxConcurrent >= HOSTED_REPAIR_MAX_CONCURRENT;
-  return valid
-    ? {
-        accepted: true,
-        observedAt: receipt.observedAt,
-        receiptSha256: sha256(Buffer.from(JSON.stringify(receipt))),
-        maxConcurrent: HOSTED_REPAIR_MAX_CONCURRENT,
-      }
-    : { accepted: false, reason: 'fresh-typed-capacity-not-admitted' };
 }
 
 export function validateHostedRepairPath(path) {
@@ -289,26 +277,23 @@ function validateHostedChanges(changes) {
 
 export function buildHostedAcceptanceReceipt({
   plan,
-  gateReceipt,
   patchBytes,
   changes,
   executor,
   now = new Date(),
 }) {
   assertHostedRepairPlan(plan);
-  const gate = validateHostedGateAdmission({ receipt: gateReceipt, now });
-  if (!gate.accepted) throw new Error(gate.reason);
   const patch = Buffer.from(patchBytes ?? '');
   if (patch.length < 1 || patch.length > HOSTED_REPAIR_MAX_PATCH_BYTES) {
     throw new Error('hosted repair patch is empty or exceeds the byte limit');
   }
   const acceptedChanges = validateHostedChanges(changes);
   if (
-    executor?.kind !== 'cursor-cli' ||
-    !/^[0-9a-f]{64}$/.test(executor?.installerSha256 ?? '') ||
-    typeof executor?.version !== 'string' ||
-    executor.version.length < 1
+    acceptedChanges.some(change => !plan.allowedPaths.includes(change.path))
   ) {
+    throw new Error('repair changed a path outside the exact PR diff');
+  }
+  if (!validateFxExecutorIdentity(executor)) {
     throw new Error('executor identity is missing or malformed');
   }
   return {
@@ -323,7 +308,6 @@ export function buildHostedAcceptanceReceipt({
     fingerprint: plan.fingerprint,
     idempotencyKey: plan.idempotencyKey,
     maxConcurrent: HOSTED_REPAIR_MAX_CONCURRENT,
-    gate,
     executor,
     patchSha256: sha256(patch),
     changedFiles: acceptedChanges,
@@ -333,17 +317,9 @@ export function buildHostedAcceptanceReceipt({
   };
 }
 
-export function validateHostedAcceptance({
-  plan,
-  acceptance,
-  gateReceipt,
-  patchBytes,
-  now = new Date(),
-}) {
+export function validateHostedAcceptance({ plan, acceptance, patchBytes }) {
   try {
     assertHostedRepairPlan(plan);
-    const gate = validateHostedGateAdmission({ receipt: gateReceipt, now });
-    if (!gate.accepted) return gate;
     if (
       acceptance?.schema !== HOSTED_ACCEPTANCE_RECEIPT_SCHEMA ||
       acceptance.policyVersion !== plan.policyVersion ||
@@ -355,19 +331,21 @@ export function validateHostedAcceptance({
       acceptance.maxConcurrent !== HOSTED_REPAIR_MAX_CONCURRENT ||
       acceptance.testsPassed !== true ||
       acceptance.patchSha256 !== sha256(Buffer.from(patchBytes ?? '')) ||
-      acceptance.gate?.receiptSha256 === undefined ||
-      acceptance.gate.receiptSha256 !== gate.receiptSha256 ||
-      acceptance.executor?.kind !== 'cursor-cli' ||
-      !/^[0-9a-f]{64}$/.test(acceptance.executor?.installerSha256 ?? '') ||
-      typeof acceptance.executor?.version !== 'string' ||
-      acceptance.executor.version.length < 1 ||
+      !validateFxExecutorIdentity(acceptance.executor) ||
       JSON.stringify(acceptance.testCommands) !==
         JSON.stringify(HOSTED_REPAIR_TEST_COMMANDS)
     ) {
       return { accepted: false, reason: 'acceptance-identity-mismatch' };
     }
     validateHostedChanges(acceptance.changedFiles);
-    return { accepted: true, gate };
+    if (
+      acceptance.changedFiles.some(
+        change => !plan.allowedPaths.includes(change.path)
+      )
+    ) {
+      return { accepted: false, reason: 'acceptance-path-not-in-plan' };
+    }
+    return { accepted: true };
   } catch (error) {
     return {
       accepted: false,
@@ -379,17 +357,13 @@ export function validateHostedAcceptance({
 export function buildHostedCommitVariables({
   plan,
   acceptance,
-  gateReceipt,
   patchBytes,
   fileContents,
-  now = new Date(),
 }) {
   const accepted = validateHostedAcceptance({
     plan,
     acceptance,
-    gateReceipt,
     patchBytes,
-    now,
   });
   if (!accepted.accepted) throw new Error(accepted.reason);
   const additions = acceptance.changedFiles.map(change => {
@@ -1110,69 +1084,189 @@ async function githubJson(
   return text ? JSON.parse(text) : null;
 }
 
+const HOSTED_CANARY_HOLD_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
+  'needs-conflict-resolution',
+  'needs-manual-rebase',
+]);
+const HOSTED_HA_RECEIPT_CONTEXT = 'ha-ci-remediator-poke';
+
+function classifyHostedCiRunInventory(plan, runs) {
+  const workflowRuns = runs?.workflow_runs;
+  if (
+    !Array.isArray(workflowRuns) ||
+    !Number.isSafeInteger(runs?.total_count) ||
+    runs.total_count !== workflowRuns.length ||
+    workflowRuns.length >= 100 ||
+    workflowRuns.some(
+      run =>
+        !run ||
+        typeof run !== 'object' ||
+        Array.isArray(run) ||
+        !Number.isSafeInteger(run.id) ||
+        run.id < 1 ||
+        !Number.isSafeInteger(run.run_attempt) ||
+        run.run_attempt < 1 ||
+        typeof run.name !== 'string' ||
+        typeof run.path !== 'string' ||
+        run.event !== 'pull_request' ||
+        run.head_sha !== plan.expectedHeadOid ||
+        typeof run.status !== 'string' ||
+        !(run.conclusion === null || typeof run.conclusion === 'string')
+    )
+  ) {
+    return { allowed: false, reason: 'ci-run-inventory-incomplete' };
+  }
+
+  const matchingRuns = workflowRuns
+    .filter(
+      run =>
+        run.name === 'CI' &&
+        run.path === TRUSTED_CI_WORKFLOW_PATH &&
+        run.event === 'pull_request' &&
+        run.head_sha === plan.expectedHeadOid
+    )
+    .sort((left, right) => right.id - left.id);
+  const latest = matchingRuns[0];
+  if (latest?.conclusion === 'success') {
+    return { allowed: false, reason: 'ci-superseded-green' };
+  }
+  if (
+    String(latest?.id ?? '') !== String(plan.workflowRunId) ||
+    latest?.run_attempt !== plan.workflowRunAttempt ||
+    latest?.status !== 'completed' ||
+    latest?.conclusion !== 'failure'
+  ) {
+    return { allowed: false, reason: 'ci-attempt-stale' };
+  }
+  return { allowed: true, reason: 'ci-failure-attempt-current' };
+}
+
+async function revalidateHostedCiAttempt({ plan, token, request }) {
+  const runs = await request(
+    `/repos/${plan.repository}/actions/runs?event=pull_request&head_sha=${plan.expectedHeadOid}&per_page=100`,
+    { token }
+  );
+  return classifyHostedCiRunInventory(plan, runs);
+}
+
+/**
+ * Re-read the live PR and exact-head HA receipt state at a spend/write boundary.
+ * The activation values are the workflow's repository-variable snapshot; GitHub's
+ * GITHUB_TOKEN cannot read repository variables, so changes require an operator
+ * disable-and-drain before changing the selected canary.
+ */
+export async function revalidateHostedCanaryState({
+  plan,
+  activationEnabled,
+  activationCanaryPr,
+  token,
+  request = githubJson,
+}) {
+  assertHostedRepairPlan(plan);
+  if (activationEnabled !== 'true') {
+    return { allowed: false, reason: 'canary-disabled' };
+  }
+  if (activationCanaryPr !== String(plan.prNumber)) {
+    return { allowed: false, reason: 'canary-pr-mismatch' };
+  }
+  if (!String(token ?? '').trim()) {
+    return { allowed: false, reason: 'github-read-token-missing' };
+  }
+
+  const pr = await request(`/repos/${plan.repository}/pulls/${plan.prNumber}`, {
+    token,
+  });
+  if (
+    pr?.state !== 'open' ||
+    pr?.draft !== false ||
+    pr?.base?.ref !== 'main' ||
+    pr?.base?.repo?.full_name !== TRUSTED_REPOSITORY ||
+    pr?.head?.repo?.full_name !== TRUSTED_REPOSITORY ||
+    pr?.head?.repo?.fork === true ||
+    pr?.head?.ref !== plan.headRefName ||
+    pr?.head?.sha !== plan.expectedHeadOid
+  ) {
+    return { allowed: false, reason: 'live-pr-or-head-mismatch' };
+  }
+  const labels = new Set((pr.labels ?? []).map(label => label?.name));
+  if ([...HOSTED_CANARY_HOLD_LABELS].some(label => labels.has(label))) {
+    return { allowed: false, reason: 'live-pr-hold' };
+  }
+
+  const statuses = await request(
+    `/repos/${plan.repository}/commits/${plan.expectedHeadOid}/statuses?per_page=100`,
+    { token }
+  );
+  if (!Array.isArray(statuses) || statuses.length >= 100) {
+    return { allowed: false, reason: 'ha-receipt-inventory-incomplete' };
+  }
+  if (
+    statuses.some(
+      status =>
+        status?.context === HOSTED_HA_RECEIPT_CONTEXT &&
+        ['success', 'pending'].includes(status?.state)
+    )
+  ) {
+    return { allowed: false, reason: 'ha-remediation-receipt-present' };
+  }
+
+  const ciAttempt = await revalidateHostedCiAttempt({ plan, token, request });
+  if (!ciAttempt.allowed) return ciAttempt;
+  return { allowed: true, reason: 'live-canary-clear' };
+}
+
+async function hostedLiveCanaryCommand(args) {
+  const plan = readJson(args.plan);
+  const result = await revalidateHostedCanaryState({
+    plan,
+    activationEnabled: process.env.FX_HOSTED_REMEDIATION_ENABLED,
+    activationCanaryPr: process.env.FX_HOSTED_REMEDIATION_CANARY_PR,
+    token: process.env.GH_TOKEN,
+  });
+  if (!result.allowed)
+    throw new Error(`hosted canary blocked: ${result.reason}`);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 /**
  * Revalidate exact-head PR/CI state, then perform the one atomic writer action.
  */
 export async function commitHostedRepair({
   plan,
   acceptance,
-  gateReceipt,
   patchBytes,
   fileContents,
   readToken,
   writeToken,
-  now = new Date(),
+  activationEnabled,
+  activationCanaryPr,
   request = githubJson,
 }) {
   const variables = buildHostedCommitVariables({
     plan,
     acceptance,
-    gateReceipt,
     patchBytes,
     fileContents,
-    now,
   });
-  const pr = await request(`/repos/${plan.repository}/pulls/${plan.prNumber}`, {
+  const canaryState = await revalidateHostedCanaryState({
+    plan,
+    activationEnabled,
+    activationCanaryPr,
     token: readToken,
+    request,
   });
-  if (
-    pr?.state !== 'open' ||
-    pr?.base?.ref !== 'main' ||
-    pr?.base?.repo?.full_name !== TRUSTED_REPOSITORY ||
-    pr?.head?.repo?.full_name !== TRUSTED_REPOSITORY ||
-    pr?.head?.repo?.fork === true ||
-    pr?.head?.ref !== plan.headRefName
-  ) {
-    return { committed: false, outcome: 'stale_head' };
-  }
-  if (pr?.head?.sha !== plan.expectedHeadOid) {
-    return { committed: false, outcome: 'stale_head' };
-  }
-
-  const runs = await request(
-    `/repos/${plan.repository}/actions/runs?event=pull_request&head_sha=${plan.expectedHeadOid}&per_page=100`,
-    { token: readToken }
-  );
-  const matchingRuns = (runs?.workflow_runs ?? [])
-    .filter(
-      run =>
-        run?.name === 'CI' &&
-        run?.path === '.github/workflows/ci.yml' &&
-        run?.event === 'pull_request' &&
-        run?.head_sha === plan.expectedHeadOid
-    )
-    .sort((left, right) => Number(right.id ?? 0) - Number(left.id ?? 0));
-  const latest = matchingRuns[0];
-  if (latest?.conclusion === 'success') {
-    return { committed: false, outcome: 'superseded_green' };
-  }
-  if (
-    String(latest?.id ?? '') !== String(plan.workflowRunId) ||
-    Number(latest?.run_attempt ?? 0) !== plan.workflowRunAttempt ||
-    latest?.status !== 'completed' ||
-    latest?.conclusion !== 'failure'
-  ) {
-    return { committed: false, outcome: 'stale_head' };
+  if (!canaryState.allowed) {
+    if (canaryState.reason === 'ci-superseded-green') {
+      return { committed: false, outcome: 'superseded_green' };
+    }
+    return {
+      committed: false,
+      outcome: 'stale_head',
+      blockedBy: canaryState.reason,
+    };
   }
 
   const response = await request('/graphql', {
@@ -1220,6 +1314,7 @@ function hostedPlanCommand(args) {
   const plan = buildHostedRepairPlan({
     dispatch: input.dispatch,
     headRefName: input.headRefName,
+    changedFiles: input.changedFiles,
   });
   writeJson(args.output, plan);
   process.stdout.write(`${JSON.stringify(plan)}\n`);
@@ -1270,6 +1365,9 @@ function hostedStageCommand(args) {
       };
     })
   );
+  if (changes.some(change => !plan.allowedPaths.includes(change.path))) {
+    throw new Error('repair changed a path outside the exact PR diff');
+  }
   const patchBytes = execFileSync(
     'git',
     ['diff', '--binary', '--no-ext-diff', 'HEAD', '--', ...paths],
@@ -1300,7 +1398,6 @@ function hostedStageCommand(args) {
 function hostedAcceptanceCommand(args) {
   const receipt = buildHostedAcceptanceReceipt({
     plan: readJson(args.plan),
-    gateReceipt: readJson(args.gate),
     patchBytes: readFileSync(args.patch),
     changes: readJson(args.changes),
     executor: readJson(args.executor),
@@ -1321,11 +1418,12 @@ async function hostedCommitCommand(args) {
   const result = await commitHostedRepair({
     plan,
     acceptance,
-    gateReceipt: readJson(args.gate),
     patchBytes: readFileSync(args.patch),
     fileContents,
     readToken: process.env.STATUS_TOKEN,
     writeToken: process.env.GH_TOKEN,
+    activationEnabled: process.env.FX_HOSTED_REMEDIATION_ENABLED,
+    activationCanaryPr: process.env.FX_HOSTED_REMEDIATION_CANARY_PR,
   });
   const terminal = buildHostedTerminalReceipt({
     plan,
@@ -1361,6 +1459,7 @@ async function main() {
     if (command === 'hosted-plan') return hostedPlanCommand(args);
     if (command === 'hosted-prelaunch') return hostedPrelaunchCommand(args);
     if (command === 'hosted-stage') return hostedStageCommand(args);
+    if (command === 'hosted-live-canary') return hostedLiveCanaryCommand(args);
     if (command === 'hosted-acceptance') return hostedAcceptanceCommand(args);
     if (command === 'hosted-commit') return hostedCommitCommand(args);
     if (command === 'hosted-terminal') return hostedTerminalCommand(args);

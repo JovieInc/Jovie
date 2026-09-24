@@ -330,9 +330,6 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         autoenroll = (
             ROOT / ".github/workflows/merge-queue-autoenroll.yml"
         ).read_text()
-        deferred_release = (
-            ROOT / ".github/workflows/queue-deferred-release.yml"
-        ).read_text()
         wrapper = SCRIPT.read_text()
         self.assertIn(
             "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
@@ -344,18 +341,13 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             "ref: ${{ needs.fleet-policy.outputs.main_sha }}",
         ):
             self.assertIn(needle, autoenroll)
-        for workflow in (autoenroll, deferred_release):
-            self.assertIn(
-                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
-            )
+        self.assertIn(
+            "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", autoenroll
+        )
         self.assertIn("Base64 bounded admission projection", action)
         self.assertIn(
             "value: ${{ steps.evaluate.outputs.receipt_b64 }}",
             action,
-        )
-        self.assertIn(
-            'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
-            deferred_release,
         )
         self.assertIn("fleet_admission_receipt.py", wrapper)
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)

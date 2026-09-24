@@ -12,7 +12,6 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
   workflow_run:
-    # Do not listen to downstream Queue-Deferred Release: that creates a loop.
     # Marker Recovery dispatches after durable bytes to stay within GitHub's
     # three-level workflow_run chain ceiling.
     workflows: [CI, Production Controller]

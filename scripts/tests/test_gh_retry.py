@@ -5899,10 +5899,6 @@ class TestMissingCiRecovery:
 # ---------------------------------------------------------------------------
 
 _RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
-_RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "queue-deferred-release.yml"
-_FLEET_GATE_REFRESH_WORKFLOW = (
-    _REPO_ROOT / ".github" / "workflows" / "fleet-gate-refresh.yml"
-)
 
 
 def _release_command(tmp_path: Path, *, extra_env: str = "") -> str:
@@ -6050,48 +6046,6 @@ def _run_single_candidate_release(
 
 
 class TestReleaseQueueDeferred:
-    def test_workflow_is_event_driven_with_no_cron(self) -> None:
-        workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
-        fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
-        assert "schedule:" not in workflow
-        assert "workflow_run:" in workflow
-        # CI and Production Controller are direct upstream semantic inputs.
-        # Marker Recovery dispatches a fresh Fleet Gate event after durable
-        # bytes so downstream release remains inside the workflow_run cap.
-        assert (
-            "workflows: [CI, Production Controller]"
-            in fleet_gate_refresh
-        )
-        assert "Production Marker Recovery]" not in fleet_gate_refresh
-        assert "Queue-Deferred Release]" not in fleet_gate_refresh
-        assert "workflows: ['Fleet Gate Refresh']" in workflow
-        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
-        assert "pull_request_target:" in fleet_gate_refresh
-        assert "\n  pull_request:\n" not in fleet_gate_refresh
-        assert "converted_to_draft" in fleet_gate_refresh
-        assert "github.event_name != 'pull_request_target'" in fleet_gate_refresh
-        assert "branches: [main]" in fleet_gate_refresh
-        assert "github.event.workflow_run.conclusion != 'cancelled'" in fleet_gate_refresh
-        assert "github.event.pull_request.merged != true" in fleet_gate_refresh
-        # The trigger allowlist owns workflow identity. Job admission must not
-        # compare `workflow_run.name`: custom `run-name` values include dynamic
-        # SHAs and caused successful Production Controller wakes to skip.
-        assert "github.event.workflow_run.name" not in workflow
-        assert "github.event.workflow_run.event == 'pull_request'" in workflow
-        assert "github.event.workflow_run.event != 'pull_request'" in workflow
-        assert "github.event.workflow_run.conclusion == 'success'" in workflow
-        assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
-        assert "pull-requests: write" in workflow
-        assert "READY_GH_TOKEN" not in workflow
-        assert "bash scripts/release-queue-deferred.sh" in workflow
-        assert "ATTEMPT_COOLDOWN_MINUTES: 5" in workflow
-        assert 'RELEASE_RETRY_FILE="$retry_file"' in workflow
-        assert 'sleep "$retry_seconds"' in workflow
-        assert "for pass in 1 2" in workflow
-        # Mutations must fire real PR events that wake the autoenroll
-        # controller; a GITHUB_TOKEN mutation would not cascade.
-        assert "steps.app-token.outputs.token" in workflow
-
     def test_report_lists_age_and_typed_reason_with_alarm(
         self, tmp_path: Path
     ) -> None:

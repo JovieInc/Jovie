@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { FX_EXECUTOR_POLICY } from '../fx-remediation-lane.mjs';
 import {
   normalizeFailureEvents,
   planFailureDispatch,
@@ -30,7 +31,7 @@ import {
   resolveDispatchWriter,
   resolveFxNamedOutcome,
   resolveWebhookRemediationRoute,
-  validateHostedGateAdmission,
+  revalidateHostedCanaryState,
   validateHostedRepairPath,
 } from '../rolling-ci-fx.mjs';
 import {
@@ -51,25 +52,6 @@ const trustedSource = {
   workflowPath: TRUSTED_CI_WORKFLOW_PATH,
 };
 const fxAdapter = { name: FX_ADAPTER_NAME, authConfigured: true };
-const gateReceipt = {
-  schema: 'jovie-fleet-gate/v1',
-  observedAt: '2026-08-29T20:00:00.000Z',
-  remediationAdmission: {
-    allowed: true,
-    localAllowed: true,
-    pushAllowed: true,
-    activities: ['bounded-local-diagnostics', 'expected-head-pr-update'],
-    maxConcurrent: 4,
-    authority: 'single-pr-writer-exact-head',
-  },
-  concurrency: {
-    gem: {
-      maxConcurrent: 4,
-      evidenceAccepted: true,
-      newMutationAllowed: true,
-    },
-  },
-};
 const activeReceipt = {
   schema: HANDOFF_SCHEMA,
   pr: 17,
@@ -113,6 +95,7 @@ function hostedFixture() {
   const plan = buildHostedRepairPlan({
     dispatch: dispatchResult,
     headRefName: 'codex/repair-proof',
+    changedFiles: [{ filename: 'apps/web/lib/proof.ts', status: 'modified' }],
   });
   const patchBytes = Buffer.from(
     'diff --git a/apps/web/lib/proof.ts b/apps/web/lib/proof.ts\n'
@@ -129,17 +112,51 @@ function hostedFixture() {
   ];
   const acceptance = buildHostedAcceptanceReceipt({
     plan,
-    gateReceipt,
     patchBytes,
     changes,
     executor: {
-      kind: 'cursor-cli',
-      installerSha256: 'f'.repeat(64),
-      version: '2026.08.29',
+      ...FX_EXECUTOR_POLICY,
+      observedModel: FX_EXECUTOR_POLICY.expectedModel,
+      stepsUsed: 12,
     },
     now: new Date('2026-08-29T20:01:00.000Z'),
   });
   return { plan, patchBytes, fileBytes, changes, acceptance };
+}
+
+function hostedCiRun(overrides = {}) {
+  return {
+    id: 9001,
+    run_attempt: 1,
+    name: 'CI',
+    path: '.github/workflows/ci.yml',
+    event: 'pull_request',
+    head_sha: head,
+    status: 'completed',
+    conclusion: 'failure',
+    ...overrides,
+  };
+}
+
+function hostedCanaryRequest(runInventory) {
+  return vi.fn(async (path, _options) => {
+    if (path.endsWith('/pulls/17')) {
+      return {
+        state: 'open',
+        draft: false,
+        base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+        head: {
+          ref: 'codex/repair-proof',
+          sha: head,
+          repo: { full_name: 'JovieInc/Jovie', fork: false },
+        },
+        labels: [],
+      };
+    }
+    if (path.includes('/statuses?')) return [];
+    if (path.includes('/actions/runs?')) return runInventory;
+    throw new Error(`unexpected hosted canary request: ${path}`);
+  });
 }
 
 describe('hosted rolling CI repair policy', () => {
@@ -152,10 +169,11 @@ describe('hosted rolling CI repair policy', () => {
       prNumber: 17,
       expectedHeadOid: head,
       producerEvent: 'pull_request',
-      maxConcurrent: 1,
+      maxConcurrent: 8,
     });
     expect(plan.idempotencyKey).toContain(plan.fingerprint);
     expect(plan.idempotencyKey).toContain(ROLLING_CI_POLICY_VERSION);
+    expect(plan.allowedPaths).toEqual(['apps/web/lib/proof.ts']);
     expect(() =>
       buildHostedRepairPlan({
         dispatch: dispatch({
@@ -168,39 +186,11 @@ describe('hosted rolling CI repair policy', () => {
       buildHostedRepairPlan({
         dispatch: dispatch(),
         headRefName: 'gh-readonly-queue/main/pr-17-deadbeef',
+        changedFiles: [
+          { filename: 'apps/web/lib/proof.ts', status: 'modified' },
+        ],
       })
     ).toThrow('main, synthetic, or not a safe branch ref');
-  });
-
-  it('requires a fresh typed gate and clamps effective concurrency to one', () => {
-    expect(
-      validateHostedGateAdmission({
-        receipt: gateReceipt,
-        now: new Date('2026-08-29T20:04:59.000Z'),
-      })
-    ).toMatchObject({ accepted: true, maxConcurrent: 1 });
-    expect(
-      validateHostedGateAdmission({
-        receipt: gateReceipt,
-        now: new Date('2026-08-29T20:05:01.000Z'),
-      })
-    ).toEqual({
-      accepted: false,
-      reason: 'fresh-typed-capacity-not-admitted',
-    });
-    expect(
-      validateHostedGateAdmission({
-        receipt: {
-          ...gateReceipt,
-          remediationAdmission: {
-            ...gateReceipt.remediationAdmission,
-            pushAllowed: false,
-            maxConcurrent: 0,
-          },
-        },
-        now: new Date('2026-08-29T20:01:00.000Z'),
-      }).accepted
-    ).toBe(false);
   });
 
   it('strictly denies workflows, secrets, migrations, auth, billing, release, deploy, and tests', () => {
@@ -231,15 +221,49 @@ describe('hosted rolling CI repair policy', () => {
     }
   });
 
+  it('limits the model patch to modified source files in the authenticated PR diff', () => {
+    const { plan, patchBytes, changes, acceptance } = hostedFixture();
+    expect(() =>
+      buildHostedRepairPlan({
+        dispatch: dispatch({ writer: 'fx-hosted' }),
+        headRefName: 'codex/repair-proof',
+        changedFiles: [
+          { filename: '.github/workflows/ci.yml', status: 'modified' },
+        ],
+      })
+    ).toThrow(
+      'entire PR diff must contain only admitted modified source paths'
+    );
+    expect(() =>
+      buildHostedRepairPlan({
+        dispatch: dispatch({ writer: 'fx-hosted' }),
+        headRefName: 'codex/repair-proof',
+        changedFiles: [
+          { filename: 'apps/web/lib/proof.ts', status: 'modified' },
+          { filename: 'scripts/run-affected-tests.mjs', status: 'modified' },
+        ],
+      })
+    ).toThrow(
+      'entire PR diff must contain only admitted modified source paths'
+    );
+    expect(() =>
+      buildHostedAcceptanceReceipt({
+        plan,
+        patchBytes,
+        changes: [{ ...changes[0], path: 'apps/web/lib/unrelated.ts' }],
+        executor: acceptance.executor,
+        now: new Date('2026-08-29T20:01:00.000Z'),
+      })
+    ).toThrow('outside the exact PR diff');
+  });
+
   it('binds tested artifact bytes to an atomic expected-head update', () => {
     const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
     const variables = buildHostedCommitVariables({
       plan,
       acceptance,
-      gateReceipt,
       patchBytes,
       fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-      now: new Date('2026-08-29T20:02:00.000Z'),
     });
     expect(variables.input).toMatchObject({
       branch: {
@@ -258,12 +282,10 @@ describe('hosted rolling CI repair policy', () => {
       buildHostedCommitVariables({
         plan,
         acceptance,
-        gateReceipt,
         patchBytes,
         fileContents: {
           'apps/web/lib/proof.ts': Buffer.from('tampered'),
         },
-        now: new Date('2026-08-29T20:02:00.000Z'),
       })
     ).toThrow('immutable artifact hash mismatch');
   });
@@ -274,6 +296,7 @@ describe('hosted rolling CI repair policy', () => {
       if (path.endsWith('/pulls/17')) {
         return {
           state: 'open',
+          draft: false,
           base: {
             ref: 'main',
             repo: { full_name: 'JovieInc/Jovie' },
@@ -285,20 +308,11 @@ describe('hosted rolling CI repair policy', () => {
           },
         };
       }
+      if (path.includes('/statuses?')) return [];
       if (path.includes('/actions/runs?')) {
         return {
-          workflow_runs: [
-            {
-              id: 9001,
-              run_attempt: 1,
-              name: 'CI',
-              path: '.github/workflows/ci.yml',
-              event: 'pull_request',
-              head_sha: head,
-              status: 'completed',
-              conclusion: 'failure',
-            },
-          ],
+          total_count: 1,
+          workflow_runs: [hostedCiRun()],
         };
       }
       expect(path).toBe('/graphql');
@@ -314,12 +328,12 @@ describe('hosted rolling CI repair policy', () => {
     const result = await commitHostedRepair({
       plan,
       acceptance,
-      gateReceipt,
       patchBytes,
       fileContents: { 'apps/web/lib/proof.ts': fileBytes },
       readToken: 'read-token',
       writeToken: 'write-token',
-      now: new Date('2026-08-29T20:02:00.000Z'),
+      activationEnabled: 'true',
+      activationCanaryPr: '17',
       request,
     });
     expect(result).toMatchObject({
@@ -327,7 +341,7 @@ describe('hosted rolling CI repair policy', () => {
       outcome: 'repaired',
       committedHeadOid: 'b'.repeat(40),
     });
-    expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledTimes(4);
   });
 
   it('aborts a green exact head before the writer and never calls GraphQL', async () => {
@@ -336,6 +350,7 @@ describe('hosted rolling CI repair policy', () => {
       if (path.endsWith('/pulls/17')) {
         return {
           state: 'open',
+          draft: false,
           base: {
             ref: 'main',
             repo: { full_name: 'JovieInc/Jovie' },
@@ -347,35 +362,336 @@ describe('hosted rolling CI repair policy', () => {
           },
         };
       }
-      return {
-        workflow_runs: [
-          {
-            id: 9002,
-            run_attempt: 2,
-            name: 'CI',
-            path: '.github/workflows/ci.yml',
-            event: 'pull_request',
-            head_sha: head,
-            status: 'completed',
-            conclusion: 'success',
-          },
-        ],
-      };
+      if (path.includes('/statuses?')) return [];
+      if (path.includes('/actions/runs?')) {
+        return {
+          total_count: 1,
+          workflow_runs: [
+            hostedCiRun({
+              id: 9002,
+              run_attempt: 2,
+              conclusion: 'success',
+            }),
+          ],
+        };
+      }
+      throw new Error(`unexpected hosted writer request: ${path}`);
     });
     await expect(
       commitHostedRepair({
         plan,
         acceptance,
-        gateReceipt,
         patchBytes,
         fileContents: { 'apps/web/lib/proof.ts': fileBytes },
         readToken: 'read-token',
         writeToken: 'write-token',
-        now: new Date('2026-08-29T20:02:00.000Z'),
+        activationEnabled: 'true',
+        activationCanaryPr: '17',
         request,
       })
     ).resolves.toEqual({ committed: false, outcome: 'superseded_green' });
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    [{ draft: true }, 'live-pr-or-head-mismatch'],
+    [{ labels: [{ name: 'incident' }] }, 'live-pr-hold'],
+  ])(
+    'rejects a live PR hold or draft before the atomic writer',
+    async (change, blockedBy) => {
+      const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+      const request = vi.fn(async () => ({
+        state: 'open',
+        draft: false,
+        base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+        head: {
+          ref: 'codex/repair-proof',
+          sha: head,
+          repo: { full_name: 'JovieInc/Jovie', fork: false },
+        },
+        ...change,
+      }));
+      await expect(
+        commitHostedRepair({
+          plan,
+          acceptance,
+          patchBytes,
+          fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+          readToken: 'read-token',
+          writeToken: 'write-token',
+          activationEnabled: 'true',
+          activationCanaryPr: '17',
+          request,
+        })
+      ).resolves.toMatchObject({
+        committed: false,
+        outcome: 'stale_head',
+        blockedBy,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('revalidates the run-scoped canary values against live PR and HA status state', async () => {
+    const { plan } = hostedFixture();
+    const request = hostedCanaryRequest({
+      total_count: 1,
+      workflow_runs: [hostedCiRun()],
+    });
+    await expect(
+      revalidateHostedCanaryState({
+        plan,
+        activationEnabled: 'true',
+        activationCanaryPr: '17',
+        token: 'read-token',
+        request,
+      })
+    ).resolves.toEqual({ allowed: true, reason: 'live-canary-clear' });
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(
+      request.mock.calls.every(([, options]) => options.token === 'read-token')
+    ).toBe(true);
+  });
+
+  it.each([
+    [
+      'green rerun',
+      hostedCiRun({ run_attempt: 2, conclusion: 'success' }),
+      { allowed: false, reason: 'ci-superseded-green' },
+    ],
+    [
+      'changed failed attempt',
+      hostedCiRun({ run_attempt: 2 }),
+      { allowed: false, reason: 'ci-attempt-stale' },
+    ],
+    [
+      'same failed attempt',
+      hostedCiRun(),
+      { allowed: true, reason: 'live-canary-clear' },
+    ],
+  ])(
+    'requires the exact current failed CI attempt before spend: %s',
+    async (_name, run, expected) => {
+      const { plan } = hostedFixture();
+      const request = hostedCanaryRequest({
+        total_count: 1,
+        workflow_runs: [run],
+      });
+      await expect(
+        revalidateHostedCanaryState({
+          plan,
+          activationEnabled: 'true',
+          activationCanaryPr: '17',
+          token: 'read-token',
+          request,
+        })
+      ).resolves.toEqual(expected);
+      expect(request).toHaveBeenCalledTimes(3);
+    }
+  );
+
+  it.each([
+    ['malformed response', null],
+    ['missing workflow run list', { total_count: 1 }],
+    [
+      'truncated page',
+      {
+        total_count: 100,
+        workflow_runs: Array.from({ length: 100 }, (_, index) =>
+          hostedCiRun({ id: 9001 + index })
+        ),
+      },
+    ],
+    [
+      'reported count mismatch',
+      { total_count: 2, workflow_runs: [hostedCiRun()] },
+    ],
+  ])(
+    'fails closed when the latest CI run inventory is incomplete: %s',
+    async (_name, runInventory) => {
+      const { plan } = hostedFixture();
+      const request = hostedCanaryRequest(runInventory);
+      await expect(
+        revalidateHostedCanaryState({
+          plan,
+          activationEnabled: 'true',
+          activationCanaryPr: '17',
+          token: 'read-token',
+          request,
+        })
+      ).resolves.toEqual({
+        allowed: false,
+        reason: 'ci-run-inventory-incomplete',
+      });
+      expect(request).toHaveBeenCalledTimes(3);
+    }
+  );
+
+  it.each([
+    [
+      { activationEnabled: 'false', activationCanaryPr: '17' },
+      'canary-disabled',
+    ],
+    [
+      { activationEnabled: 'true', activationCanaryPr: '18' },
+      'canary-pr-mismatch',
+    ],
+  ])(
+    'fails closed when the canary snapshot changes: %s',
+    async (activation, reason) => {
+      const { plan } = hostedFixture();
+      const request = vi.fn();
+      await expect(
+        revalidateHostedCanaryState({
+          plan,
+          ...activation,
+          token: 'read-token',
+          request,
+        })
+      ).resolves.toEqual({ allowed: false, reason });
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [{ headSha: 'c'.repeat(40) }, 'live-pr-or-head-mismatch'],
+    [{ labels: [{ name: 'incident' }] }, 'live-pr-hold'],
+  ])(
+    'blocks the live FX boundary on a changed head or PR hold: %s',
+    async (change, reason) => {
+      const { plan } = hostedFixture();
+      const changedHeadSha = 'headSha' in change ? change.headSha : head;
+      const labels = 'labels' in change ? change.labels : [];
+      const request = vi.fn(async () => ({
+        state: 'open',
+        draft: false,
+        base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+        labels,
+        head: {
+          ref: 'codex/repair-proof',
+          sha: changedHeadSha,
+          repo: { full_name: 'JovieInc/Jovie', fork: false },
+        },
+      }));
+      await expect(
+        revalidateHostedCanaryState({
+          plan,
+          activationEnabled: 'true',
+          activationCanaryPr: '17',
+          token: 'read-token',
+          request,
+        })
+      ).resolves.toEqual({ allowed: false, reason });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    ['success', 'ha-remediation-receipt-present'],
+    ['pending', 'ha-remediation-receipt-present'],
+  ])(
+    'blocks FX when an exact-head HA %s receipt predates the run',
+    async (state, reason) => {
+      const { plan } = hostedFixture();
+      const request = vi.fn(async path => {
+        if (path.endsWith('/pulls/17')) {
+          return {
+            state: 'open',
+            draft: false,
+            base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+            head: {
+              ref: 'codex/repair-proof',
+              sha: head,
+              repo: { full_name: 'JovieInc/Jovie', fork: false },
+            },
+            labels: [],
+          };
+        }
+        return [{ context: 'ha-ci-remediator-poke', state }];
+      });
+      await expect(
+        revalidateHostedCanaryState({
+          plan,
+          activationEnabled: 'true',
+          activationCanaryPr: '17',
+          token: 'read-token',
+          request,
+        })
+      ).resolves.toEqual({ allowed: false, reason });
+    }
+  );
+
+  it('blocks when the exact-head HA status inventory is truncated', async () => {
+    const { plan } = hostedFixture();
+    const request = vi.fn(async path => {
+      if (path.endsWith('/pulls/17')) {
+        return {
+          state: 'open',
+          draft: false,
+          base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+          head: {
+            ref: 'codex/repair-proof',
+            sha: head,
+            repo: { full_name: 'JovieInc/Jovie', fork: false },
+          },
+          labels: [],
+        };
+      }
+      return Array.from({ length: 100 }, () => ({}));
+    });
+    await expect(
+      revalidateHostedCanaryState({
+        plan,
+        activationEnabled: 'true',
+        activationCanaryPr: '17',
+        token: 'read-token',
+        request,
+      })
+    ).resolves.toEqual({
+      allowed: false,
+      reason: 'ha-receipt-inventory-incomplete',
+    });
+  });
+
+  it('blocks the trusted writer when a pre-existing HA receipt appears after testing', async () => {
+    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+    const request = vi.fn(async path => {
+      if (path.endsWith('/pulls/17')) {
+        return {
+          state: 'open',
+          draft: false,
+          base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+          head: {
+            ref: 'codex/repair-proof',
+            sha: head,
+            repo: { full_name: 'JovieInc/Jovie', fork: false },
+          },
+          labels: [],
+        };
+      }
+      return [{ context: 'ha-ci-remediator-poke', state: 'pending' }];
+    });
+    await expect(
+      commitHostedRepair({
+        plan,
+        acceptance,
+        patchBytes,
+        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+        readToken: 'read-token',
+        writeToken: 'write-token',
+        activationEnabled: 'true',
+        activationCanaryPr: '17',
+        request,
+      })
+    ).resolves.toMatchObject({
+      committed: false,
+      outcome: 'stale_head',
+      blockedBy: 'ha-remediation-receipt-present',
+    });
     expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.some(([path]) => path === '/graphql')).toBe(
+      false
+    );
   });
 
   it('uses typed acceptance and terminal receipts for liveness', () => {
