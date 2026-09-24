@@ -786,3 +786,180 @@ test('refuses unsigned extra result fields and missing host signing configuratio
   c.deps.outcomePrivateKey = null;
   await assert.rejects(runCycle(c.deps), /signing-configuration-missing/);
 });
+
+function acceptedRuntimeFixture(context) {
+  const f = admissionFixture(context);
+  const runtime = runtimeFor(f.task);
+  runtime.running = [
+    {
+      issueId: f.task.issue.id,
+      identifier: f.task.issue.identifier,
+      sessionId: 'official-session-1',
+      startedAt: f.task.createdAt,
+    },
+  ];
+  const issue = {
+    issueId: f.task.issue.id,
+    identifier: f.task.issue.identifier,
+    leaseDigest: '8'.repeat(64),
+    admittedAt: f.task.createdAt,
+    state: 'In Progress',
+  };
+  let admissions = 0;
+  const adapter = () =>
+    createRuntimeBoundShippingAdmitter({
+      journal: f.open(),
+      loadSource: async () => ({
+        sourceRevision: f.task.source.sourceVersion,
+        observeRuntime: async () => runtime,
+        observeIssue: async () => issue,
+        admit: async (task, { beforeMutation }) => {
+          admissions++;
+          await beforeMutation(f.intent);
+          return { status: 'admitted', identifier: task.issue.identifier };
+        },
+      }),
+    });
+  return { ...f, adapter, runtime, issue, admissions: () => admissions };
+}
+
+test('official running worker and exact lease persist acceptance across restart without releasing the reservation', async context => {
+  const f = acceptedRuntimeFixture(context);
+  const first = await f.adapter().execute(f.task);
+  assert.equal(first.status, 'held');
+  assert.equal(
+    first.reason,
+    'shipping-lead-owner-accepted-awaiting-terminal-proof'
+  );
+  const receipt = f.open().read().active.admissionProgress.ownerAcceptance;
+  assert.equal(receipt.sessionId, 'official-session-1');
+  assert.equal(receipt.taskDigest, shippingDigest(f.task));
+  f.runtime.running = [];
+  f.issue.state = 'Done';
+  const next = await f.adapter().execute(f.task);
+  assert.equal(next.status, 'held');
+  assert.deepEqual(
+    f.open().read().active.admissionProgress.ownerAcceptance,
+    receipt
+  );
+  assert.equal(f.admissions(), 1);
+});
+
+test('missing, duplicate, mismatched or pre-admission running worker never proves acceptance', async context => {
+  for (const change of [
+    () => [],
+    rows => [...rows, ...rows],
+    rows => [{ ...rows[0], issueId: 'other' }],
+    rows => [{ ...rows[0], startedAt: '2020-01-01T00:00:00Z' }],
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    f.runtime.running = change(f.runtime.running);
+    assert.equal(
+      (await f.adapter().execute(f.task)).reason,
+      'shipping-lead-awaiting-worker-acceptance'
+    );
+    assert.equal(
+      f.open().read().active.admissionProgress.ownerAcceptance,
+      undefined
+    );
+  }
+});
+
+test('malformed worker evidence and changed canonical lease fail closed', async context => {
+  for (const patch of [
+    { sessionId: null },
+    { sessionId: '' },
+    { sessionId: 'x'.repeat(513) },
+    { startedAt: 'bad' },
+    { startedAt: '2099-01-01T00:00:00Z' },
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    Object.assign(f.runtime.running[0], patch);
+    await assert.rejects(
+      f.adapter().execute(f.task),
+      /owner-acceptance-invalid/
+    );
+    assert.equal(
+      f.open().read().active.admissionProgress.ownerAcceptance,
+      undefined
+    );
+  }
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  f.issue.leaseDigest = '9'.repeat(64);
+  await assert.rejects(f.adapter().execute(f.task), /canonical-lease-changed/);
+});
+
+test('cross-bound or malformed live lease cannot record owner acceptance', async context => {
+  for (const patch of [
+    { issueId: 'other' },
+    { identifier: 'JOV-1' },
+    { leaseDigest: 'bad' },
+    { admittedAt: 'bad' },
+    { admittedAt: '2020-01-01T00:00:00Z' },
+    { admittedAt: '2099-01-01T00:00:00Z' },
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    Object.assign(f.issue, patch);
+    await assert.rejects(
+      f.adapter().execute(f.task),
+      /canonical-lease-unavailable/
+    );
+  }
+});
+
+test('retained owner evidence is strict and bound to the signed request and recorded mutation', async context => {
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  const state = f.open().read(),
+    original = state.active.admissionProgress.ownerAcceptance;
+  for (const patch of [
+    { schema: 'unknown' },
+    { taskDigest: '0'.repeat(64) },
+    { leaseDigest: 'bad' },
+    { stateDigest: 'bad' },
+    { runtime: { ...f.task.runtime, invocationId: '0'.repeat(32) } },
+    { extra: true },
+    { startedAt: 'bad' },
+    { observedAt: 'bad' },
+    { sessionId: null },
+  ]) {
+    state.active.admissionProgress.ownerAcceptance = { ...original, ...patch };
+    assert.throws(() => f.journal.write(state), /owner-acceptance-invalid/);
+  }
+  state.active.admissionProgress.ownerAcceptance = original;
+  state.active.admissionProgress.mutationCount = 0;
+  state.active.admissionProgress.lastMutation = null;
+  state.active.admissionProgress.admissionDigest = null;
+  assert.throws(() => f.journal.write(state), /owner-acceptance-invalid/);
+});
+
+test('uncertain canonical write never becomes worker acceptance from a running row alone', async context => {
+  const f = admissionFixture(context);
+  const first = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    loadSource: async () => ({
+      sourceRevision: f.task.source.sourceVersion,
+      observeRuntime: async () => runtimeFor(f.task),
+      admit: async (task, { beforeMutation }) => {
+        await beforeMutation(f.intent);
+        throw new Error('lost acknowledgement');
+      },
+    }),
+  });
+  await assert.rejects(first.execute(f.task), /lost acknowledgement/);
+  const recovered = createRuntimeBoundShippingAdmitter({
+    journal: f.open(),
+    loadSource: async () => {
+      throw new Error('must not reload or redispatch');
+    },
+  });
+  assert.equal(
+    (await recovered.execute(f.task)).reason,
+    'shipping-lead-mutation-outcome-unknown'
+  );
+  assert.equal(
+    f.open().read().active.admissionProgress.ownerAcceptance,
+    undefined
+  );
+});

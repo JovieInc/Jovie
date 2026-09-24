@@ -179,10 +179,14 @@ export async function loadCanonicalShippingAdmission({
         throw new Error('shipping-lead-source-content-mismatch');
     }
     const module = await import(pathToFileURL(join(root, ENTRY)).href);
-    if (typeof module.admitShippingLeadRequest !== 'function')
+    if (
+      typeof module.admitShippingLeadRequest !== 'function' ||
+      typeof module.observeShippingLeadIssue !== 'function'
+    )
       throw new Error('shipping-lead-canonical-entry-unavailable');
     return {
       admit: module.admitShippingLeadRequest,
+      observeIssue: module.observeShippingLeadIssue,
       sourceRevision: revision,
       observeRuntime: () =>
         JSON.parse(
