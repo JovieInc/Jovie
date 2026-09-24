@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { SHIPPING_TASK, SHIPPING_OUTBOX, validateShippingTask, validateShippingOutcome,
-  signShippingOutcome } from './summer-shipping-lead-contract.mjs';
 import {
   createHash,
   createPrivateKey,
@@ -30,6 +28,13 @@ import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+  SHIPPING_OUTBOX,
+  SHIPPING_TASK,
+  signShippingOutcome,
+  validateShippingOutcome,
+  validateShippingTask,
+} from './summer-shipping-lead-contract.mjs';
 
 export const READ_DOMAIN = 'summer.symphony-outbox-read/v1';
 export const OUTBOX_DOMAIN = 'jovie.eve.symphony-repair-outbox/v1';
@@ -448,7 +453,7 @@ export function verifyOutboxRecord(record, keys) {
           ? OUTBOX_DOMAIN_V3
           : record?.schema === SHIPPING_OUTBOX
             ? SHIPPING_OUTBOX
-          : null;
+            : null;
   if (
     !exactKeys(record, [
       'schema',
@@ -1123,12 +1128,11 @@ export function validateState(state, keys, outcomePublicKey = null) {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record', 'outcome'])) {
       throw new Error('consumer-state-invalid');
     }
-    (task.schema === SHIPPING_TASK ? validateShippingOutcome :
-      task.schema.endsWith('/v3') ? validateOutcomeV3 : validateOutcomeV2)(
-      state.active.outcome,
-      task,
-      outcomePublicKey
-    );
+    (task.schema === SHIPPING_TASK
+      ? validateShippingOutcome
+      : task.schema.endsWith('/v3')
+        ? validateOutcomeV3
+        : validateOutcomeV2)(state.active.outcome, task, outcomePublicKey);
   } else {
     throw new Error('consumer-state-invalid');
   }
@@ -1436,31 +1440,63 @@ export async function runCycle({
     };
   }
   if (task.schema === SHIPPING_TASK) {
-    if (!outcomePrivateKey || !outcomePublicKey || !KEY_ID.test(outcomeKeyId ?? ''))
+    if (
+      !outcomePrivateKey ||
+      !outcomePublicKey ||
+      !KEY_ID.test(outcomeKeyId ?? '')
+    )
       throw new Error('shipping-lead-signing-configuration-missing');
     if (state.active.phase === 'discovered') {
-      if (!shippingLeadAdmitter) return { status: 'execution-held', taskKey: task.taskKey,
-        reason: 'canonical-shipping-lead-admitter-unavailable' };
+      if (!shippingLeadAdmitter)
+        return {
+          status: 'execution-held',
+          taskKey: task.taskKey,
+          reason: 'canonical-shipping-lead-admitter-unavailable',
+        };
       // Expiry revokes new admission, not evidence of an earlier attempt. Only
       // the canonical admitter can prove that a prior attempt never started.
       const expired = Date.parse(task.expiresAt) <= Date.now();
       if (expired && typeof shippingLeadAdmitter.rejectExpired !== 'function')
-        return { status: 'execution-held', taskKey: task.taskKey,
-          reason: 'expired-shipping-lead-terminal-proof-unavailable' };
+        return {
+          status: 'execution-held',
+          taskKey: task.taskKey,
+          reason: 'expired-shipping-lead-terminal-proof-unavailable',
+        };
       const result = expired
         ? await shippingLeadAdmitter.rejectExpired(task)
         : await shippingLeadAdmitter.execute(task);
       if (result?.status === 'held' && typeof result.reason === 'string')
-        return { status: 'execution-held', taskKey: task.taskKey, reason: result.reason };
-      const outcome = signShippingOutcome(task, result, outcomePrivateKey, outcomeKeyId);
-      state = { ...state, active: { phase: 'outcome-pending', taskKey: task.taskKey,
-        record: state.active.record, outcome } };
+        return {
+          status: 'execution-held',
+          taskKey: task.taskKey,
+          reason: result.reason,
+        };
+      const outcome = signShippingOutcome(
+        task,
+        result,
+        outcomePrivateKey,
+        outcomeKeyId
+      );
+      state = {
+        ...state,
+        active: {
+          phase: 'outcome-pending',
+          taskKey: task.taskKey,
+          record: state.active.record,
+          outcome,
+        },
+      };
       journal.write(state);
     }
     validateShippingOutcome(state.active.outcome, task, outcomePublicKey);
     const acknowledgement = await transport.writeOutcome(state.active.outcome);
-    if (journal.clear) journal.clear(task.taskKey); else journal.write(emptyState());
-    return { status: 'execution-recorded', taskKey: task.taskKey, acknowledgement: acknowledgement.status };
+    if (journal.clear) journal.clear(task.taskKey);
+    else journal.write(emptyState());
+    return {
+      status: 'execution-recorded',
+      taskKey: task.taskKey,
+      acknowledgement: acknowledgement.status,
+    };
   }
   if (task.schema === 'jovie-symphony-repair-task/v3') {
     if (
