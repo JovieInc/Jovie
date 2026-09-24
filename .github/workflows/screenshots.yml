@@ -33,6 +33,7 @@ on:
       - 'apps/web/scripts/check-screenshot-catalog.ts'
       - 'apps/web/scripts/png-optimization.ts'
       - 'apps/web/scripts/stage-screenshot-catalog-transfer.ts'
+      - 'apps/web/scripts/sync-screenshot-public-export.ts'
       - 'apps/web/tests/product-screenshots/**'
       - 'apps/web/tests/visual-qa/**'
       - 'apps/web/tailwind.config.*'
@@ -212,6 +213,19 @@ jobs:
           allow-images: true
           public-images: true
           diagnostic-paths: true
+
+      # Keep this readback before catalog.spec.ts refreshes canonical screenshots.
+      - name: Verify public screenshot exports from production build
+        timeout-minutes: 5
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/public-export-serving.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREENSHOT_BUILD_MODE: production
 
       - name: Capture screenshot catalog
         timeout-minutes: 30

@@ -80,6 +80,28 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(workflow).toContain("- 'apps/web/tests/visual-qa/**'");
   });
 
+  it('checks production public exports before catalog capture', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const serving = getStepBlock(
+      workflow,
+      'Verify public screenshot exports from production build'
+    );
+
+    expect(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    ).toBeLessThan(stepIndex(workflow, 'Capture screenshot catalog'));
+    expect(serving).toContain(
+      'tests/product-screenshots/public-export-serving.spec.ts'
+    );
+    expect(serving).toContain('--config=playwright.config.screenshots.ts');
+    expect(serving).toContain('--project=screenshots');
+    expect(serving).toContain('BASE_URL: http://localhost:3000');
+    expect(serving).toContain('SCREENSHOT_BUILD_MODE: production');
+  });
+
   it('reruns when the screenshot producer or safe transport changes', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
@@ -90,6 +112,7 @@ describe('Product Screenshots provenance cleanliness', () => {
       'apps/web/scripts/check-screenshot-catalog.ts',
       'apps/web/scripts/png-optimization.ts',
       'apps/web/scripts/stage-screenshot-catalog-transfer.ts',
+      'apps/web/scripts/sync-screenshot-public-export.ts',
     ]) {
       expect(workflow).toContain(`- '${producerPath}'`);
     }

@@ -100,7 +100,7 @@ const producerCounts: Record<string, number> = {
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
   'production-release.yml': 3,
-  'screenshots.yml': 3,
+  'screenshots.yml': 4,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 6,
 };
@@ -1092,6 +1092,10 @@ ${fixtureCheckout}
       screenshots,
       'Capture screenshot catalog'
     );
+    const screenshotServing = stepBlock(
+      screenshots,
+      'Verify public screenshot exports from production build'
+    );
     const screenshotStart = stepBlock(screenshots, 'Start production server');
     const screenshotStop = stepBlock(screenshots, 'Stop production server');
     const screenshotIntegrity = stepBlock(
@@ -1123,6 +1127,7 @@ ${fixtureCheckout}
     expect(screenshotJob).not.toBe('');
     expect(screenshotPublisherJob).not.toBe('');
     expect(screenshotCapture).not.toBe('');
+    expect(screenshotServing).not.toBe('');
     expect(screenshotJob).toMatch(
       /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
     );
@@ -1137,6 +1142,27 @@ ${fixtureCheckout}
     const screenshotCaptureEnv = yamlPropertyBlock(screenshotCapture, 'env', 8);
     expect(screenshotWorkflowEnv).toBe('');
     expect(screenshotCaptureEnv).not.toBe('');
+    expect(screenshotJob).toContain(screenshotServing);
+    expect(screenshotJob.indexOf(screenshotServing)).toBeLessThan(
+      screenshotJob.indexOf(screenshotCapture)
+    );
+    expect(screenshotServing).toContain(
+      'tests/product-screenshots/public-export-serving.spec.ts'
+    );
+    expect(screenshotServing).toContain(
+      '--config=playwright.config.screenshots.ts'
+    );
+    expect(screenshotServing).toContain('--project=screenshots');
+    expect(screenshotServing).toContain('BASE_URL: http://localhost:3000');
+    expect(screenshotServing).toContain('SCREENSHOT_BUILD_MODE: production');
+    expect(
+      secretReferenceViolations(
+        screenshotWorkflowEnv,
+        screenshotJobEnv,
+        screenshotServing
+      )
+    ).toEqual([]);
+    expect(screenshotServing).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(
       secretReferenceViolations(
         screenshotWorkflowEnv,
