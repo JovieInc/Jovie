@@ -22,6 +22,14 @@ function readRepo(relativePath) {
   return readFileSync(`${repoRoot}/${relativePath}`, 'utf8');
 }
 
+function extractLivePrPredicates(source) {
+  return [
+    ...source.matchAll(
+      /jq -e --arg expected_head "\$PR_HEAD_SHA" '([\s\S]*?)'\s*<<<"\$CURRENT_STATE"/g
+    ),
+  ].map(match => match[1]);
+}
+
 describe('agent QC wire honesty (JOV-5235)', () => {
   const pipeline = readRepo('.github/workflows/agent-pipeline.yml');
   const landing = readRepo('.github/workflows/agent-landing-sweep.yml');
@@ -91,6 +99,8 @@ describe('agent QC wire honesty (JOV-5235)', () => {
       .split('\n')
       .map(line => (line.startsWith('          ') ? line.slice(10) : line))
       .join('\n');
+    const livePredicates = extractLivePrPredicates(pipeline);
+    expect(livePredicates).toHaveLength(2);
     expect(pipeline).toContain('ref: main');
     expect(pipeline).toContain('persist-credentials: false');
     expect(pipeline).toContain(
@@ -99,6 +109,50 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     expect(pipeline).not.toContain('steps.queue-pressure.outputs');
     expect(pipeline).not.toContain('labels[]=auto-approved');
     expect(pipeline).not.toContain('queue-deferred');
+
+    const hasCurrentOpenHead = (predicate, state) =>
+      spawnSync('jq', ['-e', '--arg', 'expected_head', head, predicate], {
+        encoding: 'utf8',
+        input: JSON.stringify(state),
+      }).status === 0;
+    for (const predicate of livePredicates) {
+      const currentState = {
+        state: 'OPEN',
+        isDraft: false,
+        headRefOid: head,
+        labels: [],
+      };
+      expect(hasCurrentOpenHead(predicate, currentState)).toBe(true);
+      for (const label of [
+        'queue-deferred',
+        'needs-conflict-resolution',
+        'fast',
+      ]) {
+        expect(
+          hasCurrentOpenHead(predicate, {
+            ...currentState,
+            labels: [{ name: label }],
+          })
+        ).toBe(true);
+      }
+      for (const label of ['hold', 'gated', 'incident']) {
+        expect(
+          hasCurrentOpenHead(predicate, {
+            ...currentState,
+            labels: [{ name: label }],
+          })
+        ).toBe(false);
+      }
+      expect(
+        hasCurrentOpenHead(predicate, {
+          ...currentState,
+          headRefOid: 'b'.repeat(40),
+        })
+      ).toBe(false);
+      expect(
+        hasCurrentOpenHead(predicate, { ...currentState, isDraft: true })
+      ).toBe(false);
+    }
 
     const directory = mkdtempSync(join(tmpdir(), 'native-agent-finish-'));
     const log = join(directory, 'mutations');
@@ -146,14 +200,22 @@ fi
         status: 0,
         mutations: `pr merge 42 -R JovieInc/Jovie --auto --match-head-commit ${head}\n`,
       });
-      expect(run({ ...state, labels: [{ name: 'queue-deferred' }] })).toEqual({
-        status: 0,
-        mutations: `pr merge 42 -R JovieInc/Jovie --auto --match-head-commit ${head}\n`,
-      });
+      for (const label of [
+        'queue-deferred',
+        'needs-conflict-resolution',
+        'fast',
+      ]) {
+        expect(run({ ...state, labels: [{ name: label }] })).toEqual({
+          status: 0,
+          mutations: `pr merge 42 -R JovieInc/Jovie --auto --match-head-commit ${head}\n`,
+        });
+      }
       for (const blocked of [
         { ...state, headRefOid: 'b'.repeat(40) },
         { ...state, isDraft: true },
         { ...state, labels: [{ name: 'hold' }] },
+        { ...state, labels: [{ name: 'gated' }] },
+        { ...state, labels: [{ name: 'incident' }] },
       ]) {
         expect(run(blocked)).toEqual({ status: 1, mutations: '' });
       }

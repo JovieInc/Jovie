@@ -717,8 +717,7 @@ jobs:
             and .headRefOid == $expected_head
             and ([.labels[].name] | any(
               . == "hold" or . == "gated"
-              or . == "needs-conflict-resolution"
-              or . == "fast"
+              or . == "incident"
             ) | not)
           ' <<<"$CURRENT_STATE" >/dev/null; then
             echo "Refusing auto-approval: live PR state, head, or hard-gate labels changed."
@@ -774,7 +773,7 @@ jobs:
             and .headRefOid == $expected_head
             and ([.labels[].name] | any(
               . == "hold" or . == "gated"
-              or . == "needs-conflict-resolution" or . == "fast"
+              or . == "incident"
             ) | not)
           ' <<<"$CURRENT_STATE" >/dev/null; then
             echo "Refusing native auto-merge: live PR head or hard gate changed." >&2
