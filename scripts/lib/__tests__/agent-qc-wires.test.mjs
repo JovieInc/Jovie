@@ -89,6 +89,18 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     expect(FORBIDDEN_PINNED_JOB_CONTEXTS).not.toContain('needs-human');
   });
 
+  it('leaves required reviews to GitHub without a bot self-approval prerequisite', () => {
+    const finish = pipeline.match(
+      /      - name: Request native GitHub Merge when ready[\s\S]*?(?=\n      - name:)/
+    )?.[0];
+    expect(finish).toBeDefined();
+    expect(finish).toContain("steps.check-statuses.outputs.all_passed == 'true'");
+    expect(finish).toContain("steps.sensitive-check.outputs.is_safe == 'true'");
+    expect(pipeline).not.toContain('id: auto-approve');
+    expect(pipeline).not.toContain('steps.auto-approve.outputs');
+    expect(pipeline).not.toContain('-f event="APPROVE"');
+  });
+
   it('requests native auto-merge only for the current ungated exact head', () => {
     const head = 'a'.repeat(40);
     const match = pipeline.match(
@@ -100,7 +112,7 @@ describe('agent QC wire honesty (JOV-5235)', () => {
       .map(line => (line.startsWith('          ') ? line.slice(10) : line))
       .join('\n');
     const livePredicates = extractLivePrPredicates(pipeline);
-    expect(livePredicates).toHaveLength(2);
+    expect(livePredicates).toHaveLength(1);
     expect(pipeline).toContain('ref: main');
     expect(pipeline).toContain('persist-credentials: false');
     expect(pipeline).toContain(
