@@ -1,16 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
-const releaseScript = readFileSync(
-  resolve(repoRoot, 'scripts/release-queue-deferred.sh'),
-  'utf8'
-);
-const admission = readFileSync(
-  resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
-  'utf8'
-);
 const fleetGateRefreshWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/fleet-gate-refresh.yml'),
   'utf8'
@@ -40,34 +32,16 @@ function assertTrustedStackHealthContract(value) {
   expect(value).toContain("steps.stack-actions.outcome == 'success'");
 }
 
-describe('queue-deferred release closed loop (JOV-5054)', () => {
-  it('scans every queue-deferred PR, not only agent-branch PRs', () => {
-    expect(releaseScript).toContain('scanning open queue-deferred PRs');
-    expect(releaseScript).not.toContain(
-      'scanning open queue-deferred agent PRs'
-    );
-    expect(releaseScript).not.toContain('AGENT_BRANCH_RE');
-    expect(releaseScript).not.toContain('select(.head | test($branch_re))');
-    expect(releaseScript).toContain('select(.owner == $repo_owner)');
-  });
-
-  it('releases untyped ready holds only through fresh controller admission', () => {
-    expect(releaseScript).toContain('classify-hold');
-    expect(releaseScript).toContain('untyped-ready-hold');
-    expect(releaseScript).toContain(
-      'releasing only after fresh controller admission'
-    );
-    expect(releaseScript).not.toContain('never released automatically');
-    expect(releaseScript).toContain('node "$LIB" mechanical-hold-re');
-  });
-
-  it('still fail-closes machine holds and non-admitted fleet receipts', () => {
-    expect(releaseScript).toContain('mechanical-hold-re');
-    expect(releaseScript).not.toContain('human-policy-re');
-    expect(releaseScript).toContain('queue-deferred-release-admission.mjs');
-    expect(admission).toContain('fleet-gate-not-releasable');
-    expect(releaseScript).toContain('fleet-receipt-stale');
-    expect(releaseScript).toContain('every queue-deferred hold stays in place');
+describe('retired queue release and retained fleet refresh', () => {
+  it('keeps the retired workflow and standalone release writer absent', () => {
+    expect(
+      existsSync(
+        resolve(repoRoot, '.github/workflows/queue-deferred-release.yml')
+      )
+    ).toBe(false);
+    expect(
+      existsSync(resolve(repoRoot, 'scripts/release-queue-deferred.sh'))
+    ).toBe(false);
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {

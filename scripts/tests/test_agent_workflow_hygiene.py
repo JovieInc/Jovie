@@ -1582,7 +1582,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/release-queue-deferred.sh",
         REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(

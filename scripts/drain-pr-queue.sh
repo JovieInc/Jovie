@@ -201,9 +201,8 @@ fi
 DRAIN_STARTED_AT="$SECONDS"
 # `queue-deferred` is a hard hold. Typed provenance now exists as
 # `jovie-queue-deferral/v1` (scripts/lib/queue-deferral-receipt.mjs), and the
-# queue-deferred release controller (scripts/release-queue-deferred.sh) owns
-# lifting mechanical holds before enrollment. This reconcile path stays
-# disabled: without a typed receipt on the exact head, main maintenance still
+# responsible PR owner verifies and releases the actual hold. This reconcile
+# path stays disabled: without a typed receipt on the exact head, maintenance
 # cannot distinguish temporary queue pressure from a current repair hold. A
 # prior main-push reconciliation removed explicit repair holds and its
 # `unlabeled` events immediately re-admitted those exact heads.
