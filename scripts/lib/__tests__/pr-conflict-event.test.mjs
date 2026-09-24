@@ -66,7 +66,6 @@ function event(overrides = {}) {
     ...overrides,
   };
 }
-
 function detail(overrides = {}) {
   return {
     number: 42,
@@ -258,7 +257,6 @@ describe('exact PR conflict event boundary', () => {
     for (const mutation of invalid)
       expect(parseConflictEvent(event(mutation), REPO)).toBeNull();
   });
-
   it('fails closed on missing REST identity, holds, or GraphQL identity overlay', () => {
     const scope = parseConflictEvent(event(), REPO);
     expect(matchesRawConflictPr(scope, detail())).toBe(true);
@@ -311,7 +309,6 @@ describe('exact PR conflict event boundary', () => {
     ]);
     expect(plan.summary.byAction).toEqual({});
   });
-
   it('rejects an invalid event without a fleet query or claim', () => {
     const { result, plan, calls } = runEvent(event({ action: 'closed' }));
     expect(result.status, result.stderr).toBe(0);
@@ -347,7 +344,6 @@ describe('exact PR conflict event boundary', () => {
       'pull_request_target requires --event-payload-file'
     );
   });
-
   it('keeps the legacy manual dry-run fleet path available', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jovie-conflict-manual-'));
     try {
@@ -395,7 +391,6 @@ else process.exit(2);
       rmSync(dir, { recursive: true, force: true });
     }
   });
-
   it('binds the FX matrix to the exact dirty event PR while reading shared capacity', () => {
     const { result, plan, calls } = runEvent(event());
     expect(result.status, result.stderr).toBe(0);
@@ -418,7 +413,6 @@ else process.exit(2);
       ])
     );
   });
-
   it('covers the real CLI event entrypoint with exact read, hydration drift, and UNKNOWN nonactions', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'jovie-conflict-cli-'));
     const eventPath = join(dir, 'event.json');
@@ -569,7 +563,6 @@ else process.exit(2);
       rmSync(dir, { recursive: true, force: true });
     }
   });
-
   it('reserves shared pending capacity without admitting observer PRs', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'jovie-conflict-capacity-'));
     const eventPath = join(dir, 'event.json');
@@ -775,7 +768,6 @@ else process.exit(2);
       rmSync(dir, { recursive: true, force: true });
     }
   });
-
   it('fails closed when exact native queue inventory is unavailable', () => {
     const unavailable = runEvent(event(), detail(), {
       data: { repository: {} },
@@ -788,7 +780,6 @@ else process.exit(2);
       )
     ).toBe(false);
   });
-
   it('executes both live writer identity predicates against held and stale fixtures', () => {
     const identityFilters = WORKFLOW.split('\n')
       .filter(
@@ -854,7 +845,6 @@ else process.exit(2);
         expect(check({ ...input, ...changed }).status).toBe(1);
     }
   });
-
   it('binds workflow trigger, event file, trusted checkout and live hold/queue gates', () => {
     expect(WORKFLOW).toMatch(
       /pull_request_target:\s+types: \[opened, reopened, synchronize\]/u

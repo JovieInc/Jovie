@@ -702,7 +702,7 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
 
 
 def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> None:
-    """CI-completion audits may supersede each other, never operator runs."""
+    """Audits may coalesce; operator and exact-PR event runs are not cancelled."""
     block = _job_block("pr-conflict-handler.yml", "plan")
 
     assert "runs-on: ubuntu-latest" in block
@@ -711,11 +711,13 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert (
         "group: pr-conflict-handler-${{ github.repository }}-"
-        "${{ github.event_name == 'workflow_dispatch' && "
-        "'operator' || 'audit' }}"
+        "${{ github.event_name == 'pull_request_target' && "
+        "format('pr-{0}', github.event.pull_request.number) || "
+        "(github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}"
     ) in block
     assert (
-        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}"
+        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && "
+        "github.event_name != 'pull_request_target' }}"
         in block
     )
     assert "EVENT_NAME: ${{ github.event_name }}" in block
