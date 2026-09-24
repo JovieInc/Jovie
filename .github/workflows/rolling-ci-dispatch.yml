@@ -56,6 +56,8 @@ jobs:
             scripts/lib/rolling-ci-fx.mjs
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/changed-test-coverage.mjs
+            scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
 
@@ -136,10 +138,11 @@ jobs:
             exit 0
           fi
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_EVENT" \
-            --jq '{number,head:.head.sha,ref:.head.ref,state,draft,labels:[.labels[].name],fork:(.head.repo.fork // false),head_repo:.head.repo.full_name,same_repo:(.head.repo.full_name == .base.repo.full_name),base_repo:.base.repo.full_name,base_ref:.base.ref}')
+            --jq '{number,head:.head.sha,ref:.head.ref,state,draft,labels:[.labels[].name],fork:(.head.repo.fork // false),head_repo:.head.repo.full_name,same_repo:(.head.repo.full_name == .base.repo.full_name),base_repo:.base.repo.full_name,base_ref:.base.ref,base_sha:.base.sha}')
           LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
           LIVE_REF=$(jq -r '.ref' <<<"$LIVE_PR")
-          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != 'open' || "$(jq -r '.draft' <<<"$LIVE_PR")" == 'true' || "$(jq -r '.fork' <<<"$LIVE_PR")" == 'true' || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != 'true' || "$(jq -r '.base_repo' <<<"$LIVE_PR")" != 'JovieInc/Jovie' || "$(jq -r '.base_ref' <<<"$LIVE_PR")" != 'main' || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$LIVE_REF" == 'main' || "$LIVE_REF" == refs/* || "$LIVE_REF" == gh-readonly-queue/* ]]; then
+          BASE_SHA=$(jq -r '.base_sha' <<<"$LIVE_PR")
+          if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ || "$(jq -r '.state' <<<"$LIVE_PR")" != 'open' || "$(jq -r '.draft' <<<"$LIVE_PR")" == 'true' || "$(jq -r '.fork' <<<"$LIVE_PR")" == 'true' || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != 'true' || "$(jq -r '.base_repo' <<<"$LIVE_PR")" != 'JovieInc/Jovie' || "$(jq -r '.base_ref' <<<"$LIVE_PR")" != 'main' || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$LIVE_REF" == 'main' || "$LIVE_REF" == refs/* || "$LIVE_REF" == gh-readonly-queue/* ]]; then
             echo 'PR is stale, draft, forked, closed, main, or synthetic; refusing remediation.'
             exit 0
           fi
@@ -166,6 +169,20 @@ jobs:
             echo 'PR file evidence is missing or exceeds the bounded source policy.'
             exit 0
           fi
+          PR_COMMIT=$(gh api "repos/$REPOSITORY/git/commits/$EXPECTED_HEAD")
+          PR_TREE_SHA=$(jq -er --arg head "$EXPECTED_HEAD" 'select(.sha == $head) | .tree.sha | select(test("^[0-9a-f]{40}$"))' <<<"$PR_COMMIT")
+          PR_TREE=$(gh api "repos/$REPOSITORY/git/trees/$PR_TREE_SHA?recursive=1")
+          if ! jq -e --arg tree "$PR_TREE_SHA" '.sha == $tree and .truncated == false and (.tree | type == "array")' <<<"$PR_TREE" >/dev/null; then
+            echo 'Exact-head PR tree is incomplete; refusing to infer file modes or blob identities.'
+            exit 0
+          fi
+          printf '%s' "$PR_FILES" > "$RUNNER_TEMP/pr-files.json"
+          printf '%s' "$PR_TREE" > "$RUNNER_TEMP/pr-tree.json"
+          PR_FILE_INVENTORY=$(jq -n --slurpfile files "$RUNNER_TEMP/pr-files.json" --slurpfile tree "$RUNNER_TEMP/pr-tree.json" '
+            [$files[0][] as $file | ($tree[0].tree[] | select(.path == $file.filename)) as $entry |
+              {filename:$file.filename,status:$file.status,mode:$entry.mode,blobSha:$entry.sha}] |
+            if length != ($files[0] | length) then error("PR file missing from exact-head tree") else . end
+          ')
 
           FAILED_JOBS='[]'
           if [[ "$CONCLUSION" == 'failure' ]]; then
@@ -216,9 +233,9 @@ jobs:
             exit 0
           fi
 
-          jq -n --slurpfile dispatch "$RUNNER_TEMP/dispatch.json" --arg headRefName "$LIVE_REF" \
-            --argjson changedFiles "$PR_FILES" \
-            '{dispatch:$dispatch[0],headRefName:$headRefName,changedFiles:$changedFiles}' > "$RUNNER_TEMP/hosted-input.json"
+          jq -n --slurpfile dispatch "$RUNNER_TEMP/dispatch.json" --arg headRefName "$LIVE_REF" --arg baseSha "$BASE_SHA" \
+            --argjson changedFiles "$PR_FILE_INVENTORY" \
+            '{dispatch:$dispatch[0],headRefName:$headRefName,baseSha:$baseSha,changedFiles:$changedFiles}' > "$RUNNER_TEMP/hosted-input.json"
           node scripts/lib/rolling-ci-fx.mjs hosted-plan \
             --input "$RUNNER_TEMP/hosted-input.json" \
             --output "$RUNNER_TEMP/plan.json" >/dev/null
@@ -493,19 +510,39 @@ jobs:
     timeout-minutes: 35
     permissions:
       contents: read
+    outputs:
+      test_artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      test_commit: ${{ steps.apply.outputs.test_commit }}
+      test_tree: ${{ steps.apply.outputs.test_tree }}
     steps:
       - name: Checkout exact candidate head without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.plan.outputs.expected_head }}
           path: candidate
+          fetch-depth: 0
           persist-credentials: false
+      - name: Checkout trusted selector and evidence policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .fx-policy
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/fx-remediation-lane.mjs
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/changed-test-coverage.mjs
+            scripts/run-affected-tests.mjs
+          sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
       - name: Apply exact patch and create local test commit
+        id: apply
         working-directory: candidate
         env:
           EXPECTED_HEAD: ${{ needs.plan.outputs.expected_head }}
@@ -516,11 +553,30 @@ jobs:
           mapfile -t CHANGED < <(jq -r '.[].path' "$RUNNER_TEMP/hosted-repair/changes.json")
           git add -- "${CHANGED[@]}"
           TREE=$(git write-tree)
-          TEST_COMMIT=$(printf '%s\n' 'hosted remediation test tree' | \
+          TEST_COMMIT=$(printf '%s\n' 'hosted remediation verification tree' | \
             GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com' \
             GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com' \
+            GIT_AUTHOR_DATE='@0 +0000' GIT_COMMITTER_DATE='@0 +0000' \
             git commit-tree "$TREE" -p "$EXPECTED_HEAD")
           git checkout --detach "$TEST_COMMIT"
+          echo "test_commit=$TEST_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "test_tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: Build trusted affected-test and exact-head coverage plan
+        env:
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+          AI_GATEWAY_API_KEY: ''
+          CURSOR_API_KEY: ''
+          TEST_COMMIT: ${{ steps.apply.outputs.test_commit }}
+        run: |
+          set -euo pipefail
+          node .fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-test-plan \
+            --plan "$RUNNER_TEMP/hosted-repair/plan.json" \
+            --patch "$RUNNER_TEMP/hosted-repair/repair.patch" \
+            --changes "$RUNNER_TEMP/hosted-repair/changes.json" \
+            --repository candidate \
+            --test-commit "$TEST_COMMIT" \
+            --output "$RUNNER_TEMP/hosted-repair/test-plan.json"
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -538,16 +594,65 @@ jobs:
         working-directory: candidate
         run: |
           set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
           mapfile -t CHANGED < <(jq -r '.[].path' "$RUNNER_TEMP/hosted-repair/changes.json")
           pnpm biome check "${CHANGED[@]}"
       - name: Typecheck repository
         working-directory: candidate
-        run: pnpm run typecheck
-      - name: Run exact affected tests
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
+          pnpm run typecheck
+      - name: Run trusted selected unit tests with a structured report
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
+          rm -rf "$RUNNER_TEMP/hosted-repair/test-proof"
+          mkdir -p "$RUNNER_TEMP/hosted-repair/test-proof"
+          mapfile -t SELECTED < <(jq -er '.selectedTests[] | sub("^apps/web/"; "")' "$RUNNER_TEMP/hosted-repair/test-plan.json")
+          test "${#SELECTED[@]}" -gt 0
+          pnpm --filter @jovie/web exec vitest run "${SELECTED[@]}" \
+            --reporter=json --outputFile="$RUNNER_TEMP/hosted-repair/test-proof/test-report.json"
+      # This binds the trusted runner output and tree; PR tests and their assertions remain untrusted test data, not a malicious-test attestation.
+      - name: Run exact-head changed-line coverage when applicable
         working-directory: candidate
         env:
-          EXPECTED_HEAD: ${{ needs.plan.outputs.expected_head }}
-        run: node scripts/run-affected-tests.mjs --base "$EXPECTED_HEAD"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
+          if [[ "$(jq -r '.coveragePlan.applicable' "$RUNNER_TEMP/hosted-repair/test-plan.json")" != 'true' ]]; then
+            echo 'No changed web product source is coverable by the exact-head V8 ratchet.'
+            exit 0
+          fi
+          rm -rf apps/web/coverage
+          include=$(jq -er '.coveragePlan.coverageInclude | .[]' "$RUNNER_TEMP/hosted-repair/test-plan.json")
+          test -n "$include"
+          export JOVIE_COVERAGE_INCLUDE="$include"
+          BASE_SHA=$(jq -er '.baseSha' "$RUNNER_TEMP/hosted-repair/test-plan.json")
+          timeout --kill-after=20s 17m \
+            pnpm --filter @jovie/web test:coverage --changed "$BASE_SHA" --bail 1
+          cp apps/web/coverage/coverage-final.json \
+            "$RUNNER_TEMP/hosted-repair/test-proof/coverage-final.json"
+      - name: Verify tested tree after commands
+        env:
+          TEST_COMMIT: ${{ steps.apply.outputs.test_commit }}
+          TEST_TREE: ${{ steps.apply.outputs.test_tree }}
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "$TEST_COMMIT"
+          test "$(git -C candidate rev-parse 'HEAD^{tree}')" = "$TEST_TREE"
+          test -z "$(git -C candidate status --porcelain=v1 --untracked-files=all)"
+      - name: Upload raw test report and coverage
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hosted-ci-test-proof-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
+          path: ${{ runner.temp }}/hosted-repair/test-proof/*.json
+          if-no-files-found: error
+          retention-days: 1
 
   commit:
     name: Validate acceptance and atomically update exact PR head
@@ -573,13 +678,65 @@ jobs:
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
-      - name: Create typed acceptance receipt after tests
+      - name: Download raw test report and coverage artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.test.outputs.test_artifact_id }}
+          path: ${{ runner.temp }}/hosted-repair/test-proof
+      - name: Checkout authenticated PR tree for trusted revalidation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.expected_head }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Recreate immutable test tree from authenticated patch
+        id: verify-tree
+        working-directory: candidate
+        env:
+          EXPECTED_HEAD: ${{ needs.plan.outputs.expected_head }}
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git apply --check "$RUNNER_TEMP/hosted-repair/repair.patch"
+          git apply "$RUNNER_TEMP/hosted-repair/repair.patch"
+          mapfile -t CHANGED < <(jq -r '.[].path' "$RUNNER_TEMP/hosted-repair/changes.json")
+          git add -- "${CHANGED[@]}"
+          TREE=$(git write-tree)
+          VERIFY_COMMIT=$(printf '%s\n' 'hosted remediation verification tree' | \
+            GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com' \
+            GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com' \
+            GIT_AUTHOR_DATE='@0 +0000' GIT_COMMITTER_DATE='@0 +0000' \
+            git commit-tree "$TREE" -p "$EXPECTED_HEAD")
+          git checkout --detach "$VERIFY_COMMIT"
+          echo "verification_commit=$VERIFY_COMMIT" >> "$GITHUB_OUTPUT"
+      - name: Create typed acceptance receipt after tests
+        env:
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PATCH_ARTIFACT_ID: ${{ needs.prepare.outputs.artifact_id }}
+          TEST_ARTIFACT_ID: ${{ needs.test.outputs.test_artifact_id }}
+          TEST_COMMIT: ${{ needs.test.outputs.test_commit }}
+          TEST_TREE: ${{ needs.test.outputs.test_tree }}
+          VERIFY_COMMIT: ${{ steps.verify-tree.outputs.verification_commit }}
+        run: |
+          set -euo pipefail
           node scripts/lib/rolling-ci-fx.mjs hosted-acceptance \
             --plan "$RUNNER_TEMP/hosted-repair/plan.json" \
             --patch "$RUNNER_TEMP/hosted-repair/repair.patch" \
             --changes "$RUNNER_TEMP/hosted-repair/changes.json" \
             --executor "$RUNNER_TEMP/hosted-repair/executor.json" \
+            --repository candidate \
+            --verification-commit "$VERIFY_COMMIT" \
+            --test-report "$RUNNER_TEMP/hosted-repair/test-proof/test-report.json" \
+            --coverage "$RUNNER_TEMP/hosted-repair/test-proof/coverage-final.json" \
+            --run-id "$WORKFLOW_RUN_ID" \
+            --run-attempt "$WORKFLOW_RUN_ATTEMPT" \
+            --patch-artifact-id "$PATCH_ARTIFACT_ID" \
+            --test-artifact-id "$TEST_ARTIFACT_ID" \
+            --test-commit "$TEST_COMMIT" \
+            --test-tree "$TEST_TREE" \
             --output "$RUNNER_TEMP/hosted-repair/acceptance.json"
       - name: Generate Jovie-only short-lived writer token
         id: app-token
@@ -639,6 +796,8 @@ jobs:
             scripts/lib/rolling-ci-fx.mjs
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/changed-test-coverage.mjs
+            scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
       - name: Resolve terminal outcome from typed job states
