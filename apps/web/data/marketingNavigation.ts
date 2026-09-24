@@ -64,6 +64,11 @@ export const MARKETING_FOR_FLYOUT_LINKS = [
 
 export const MARKETING_TOOLS_FLYOUT_LINKS = [
   {
+    href: APP_ROUTES.SMART_LINKS,
+    label: 'Music Smart Links',
+    description: 'One release link with a remembered streaming choice.',
+  },
+  {
     href: APP_ROUTES.ARTIST_NOTIFICATIONS,
     label: 'Fan Notifications',
     description: 'Collect opt-ins once and bring fans back automatically.',
@@ -91,6 +96,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     links: [
       { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+      { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
       { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
       { href: APP_ROUTES.PAY, label: 'Pay' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },

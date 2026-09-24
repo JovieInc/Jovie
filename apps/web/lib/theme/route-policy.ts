@@ -22,6 +22,7 @@ export const THEME_ROUTE_POLICY = {
     '/instant-merch',
     '/youtube-thumbnails',
     '/product',
+    '/smart-links',
     '/launch',
     '/about',
     '/support',
