@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-/** Observation-only v2: accepting measurements never accepts an execution class. */
+/** One accepted class mapping. Measurements stay non-dispatchable. */
+const ACCEPTED_CLASS_ID = 'affected-only-unit-selection';
+
 export function createSummerCiAuditV2Schema<T extends string>(
   ids: readonly [T, ...T[]]
 ) {
@@ -10,13 +12,23 @@ export function createSummerCiAuditV2Schema<T extends string>(
     .regex(/^[a-f0-9]{40}$/u)
     .refine(value => value !== '0'.repeat(40));
   const reason = z.enum(['head-drift', 'incomplete-observation']);
+  const acceptedClass = z
+    .object({
+      id: z.literal(ACCEPTED_CLASS_ID),
+      state: z.enum(['open', 'partial']),
+      owner: z.literal('ci-risk-classifier'),
+      'impact-rule': z.literal('affected-unit-paths-only'),
+      action: z.literal('remediate-selected-ci-audit-class'),
+      handle: z.literal('audit:affected-only-units'),
+    })
+    .strict();
   return z
     .object({
       schema: z.literal('jovie-ci-bottleneck-audit/v2'),
       observedAt: timestamp,
       sourceRevision: sha,
       sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u),
-      classes: z.array(z.never()).length(0),
+      classes: z.array(acceptedClass).length(1),
       excludedClasses: z
         .array(
           z
@@ -26,7 +38,7 @@ export function createSummerCiAuditV2Schema<T extends string>(
             })
             .strict()
         )
-        .length(ids.length),
+        .length(ids.length - 1),
       measurements: z
         .array(
           z
@@ -72,15 +84,19 @@ export function createSummerCiAuditV2Schema<T extends string>(
     })
     .strict()
     .superRefine((value, context) => {
-      const sortedIds = [...ids].sort((left, right) =>
-        left.localeCompare(right)
-      );
+      const excludedIds = [...ids]
+        .filter(id => id !== ACCEPTED_CLASS_ID)
+        .sort((left, right) => left.localeCompare(right));
       if (
-        value.excludedClasses.some((row, index) => row.id !== sortedIds[index])
+        !(ids as readonly string[]).includes(ACCEPTED_CLASS_ID) ||
+        value.excludedClasses.some(
+          (row, index) => row.id !== excludedIds[index]
+        )
       ) {
         context.addIssue({
           code: 'custom',
-          message: 'Every unmapped class must remain excluded exactly once',
+          message:
+            'Exactly one accepted class may be open; every other class stays excluded once',
         });
       }
       const identities = value.measurements.map(

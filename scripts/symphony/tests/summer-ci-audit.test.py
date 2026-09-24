@@ -49,8 +49,10 @@ class AuditTests(unittest.TestCase):
     def test_real_failure_is_preserved_without_owner_impact_or_action_authority(self):
         value = fixture()
         self.assertEqual(self.validate(value), value)
-        self.assertEqual(value["classes"], [])
-        self.assertEqual(len(value["excludedClasses"]), 6)
+        self.assertEqual(value["classes"], [audit.ACCEPTED_CLASS])
+        self.assertEqual(value["excludedClasses"], audit.excluded_classes())
+        self.assertEqual(len(value["excludedClasses"]), 5)
+        self.assertNotIn(audit.ACCEPTED_CLASS_ID, [row["id"] for row in value["excludedClasses"]])
         row = value["measurements"][0]
         self.assertEqual(row["completedAt"], "2026-09-14T21:00:00Z")
         self.assertFalse(row["dispatchable"])
@@ -86,7 +88,7 @@ class AuditTests(unittest.TestCase):
                     return {"commit":{"sha":SHA}} if path == "branches/main" else response
                 value=audit.observe_ci_audit("JovieInc/Jovie",SHA,reader,clock=lambda:NOW)
                 self.assertIn("incomplete-observation",value["sample"]["reasons"])
-                self.assertEqual(value["classes"],[])
+                self.assertEqual(value["classes"],[audit.ACCEPTED_CLASS])
                 self.validate(value)
         for error in (OSError("private"),subprocess.TimeoutExpired("private",1)):
             value=audit.observe_ci_audit("JovieInc/Jovie",SHA,mock.Mock(side_effect=error),clock=lambda:NOW)
@@ -116,7 +118,7 @@ class AuditTests(unittest.TestCase):
             return {"total_count":0,"check_runs":[]}
         value=audit.observe_ci_audit("JovieInc/Jovie",SHA,reader,targets=[repair_target()],clock=lambda:NOW)
         self.assertFalse(value["sample"]["complete"])
-        self.assertEqual(value["classes"],[])
+        self.assertEqual(value["classes"],[audit.ACCEPTED_CLASS])
 
     def test_actual_fleet_lifecycle_records_select_observations_without_stealing_ownership(self):
         target = repair_target(42, "merge-state-dirty")
@@ -124,7 +126,7 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(target['owner'], 'gem')
         value = fixture(targets=[target])
         self.assertEqual([row['pr'] for row in value['measurements']], [None, 42])
-        self.assertEqual(value['classes'], [])
+        self.assertEqual(value['classes'], [audit.ACCEPTED_CLASS])
         self.validate(value)
         self.assertEqual(fixture(targets=[{**target, 'terminal': True}]), fixture())
         self.assertEqual(fixture(targets=[{**target, 'sourceState': 'held'}]), fixture())
@@ -147,8 +149,17 @@ class AuditTests(unittest.TestCase):
 
     def test_crossed_bindings_duplicate_measurements_and_forged_permission_are_rejected(self):
         value=fixture()
+        accepted = audit.ACCEPTED_CLASS
         mutations=[{"extra":True},{"sourceRevision":OTHER},{"sourceDigest":"bad"},
                    {"classes":[{"id":audit.CLASS_IDS[0],"state":"open","impact":100}]},
+                   {"classes":[]},
+                   {"classes":[{**accepted,"id":"auto-enroll-self-cancel-churn"}]},
+                   {"classes":[{**accepted,"state":"implemented"}]},
+                   {"classes":[{**accepted,"owner":"forged"}]},
+                   {"classes":[{**accepted,"impact-rule":"forged"}]},
+                   {"classes":[{**accepted,"action":"forged"}]},
+                   {"classes":[{**accepted,"handle":"forged"}]},
+                   {"classes":[accepted, accepted]},
                    {"excludedClasses":[]},{"measurements":value["measurements"]*2},
                    {"measurements":[{**value["measurements"][0],"dispatchable":True}]},
                    {"measurements":[{**value["measurements"][0],"checkId":2**53}]},
@@ -160,6 +171,15 @@ class AuditTests(unittest.TestCase):
         for changes in mutations:
             with self.subTest(changes=changes),self.assertRaises((ValueError,TypeError)):
                 self.validate({**value,**changes})
+
+    def test_accepted_mapping_may_be_partial_and_matches_the_published_fixture(self):
+        value = fixture()
+        partial = {**value, "classes": [{**audit.ACCEPTED_CLASS, "state": "partial"}]}
+        self.assertEqual(self.validate(partial)["classes"][0]["state"], "partial")
+        published = json.loads((Path(__file__).resolve().parents[3]
+                                / "apps/web/lib/ovie/fixtures/summer-ci-audit-v2.json").read_text())
+        self.assertEqual(published["classes"], [audit.ACCEPTED_CLASS])
+        self.assertEqual(published["excludedClasses"], audit.excluded_classes())
 
 
 if __name__ == "__main__":
