@@ -21,7 +21,6 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 GATE = ROOT / "scripts/symphony/gem-priority-gate.py"
-AUTOENROLL_WORKFLOW = ROOT / ".github/workflows/merge-queue-autoenroll.yml"
 # Historical stub printed by the __main__ except block before JOV-5067.
 # Auto-Enroll jq fail-closed on this shape: missing observedAt, signals,
 # isolatedPromotionAdmission, and promotionMode.
@@ -3743,10 +3742,14 @@ class ScheduledFreshnessTests(unittest.TestCase):
 class WorkflowContractTests(unittest.TestCase):
     WORKFLOWS = ROOT / ".github" / "workflows"
 
-    def test_autoenroll_persists_fleet_receipt_without_dry_run(self):
-        content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
-        self.assertIn("./.github/actions/evaluate-fleet-gate", content)
-        self.assertIn("dry-run: 'false'", content)
+    def test_retired_autoenroll_cannot_write_fleet_receipts(self):
+        self.assertFalse((self.WORKFLOWS / "merge-queue-autoenroll.yml").exists())
+        refresh = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+        self.assertIn("./.github/actions/evaluate-fleet-gate", refresh)
+        self.assertIn(
+            "dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}",
+            refresh,
+        )
         wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
         self.assertIn("fleet | deployment", wrapper)

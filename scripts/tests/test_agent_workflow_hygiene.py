@@ -412,7 +412,7 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     for workflow_name in (
         "agent-pipeline.yml",
         "pr-conflict-handler.yml",
-        ):
+    ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
 
@@ -1662,7 +1662,6 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
-
         ("production-controller.yml", "fleet-promotion", "policy"),
     )
     for workflow, job_name, _step in callers:
