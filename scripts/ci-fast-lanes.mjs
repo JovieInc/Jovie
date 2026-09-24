@@ -69,6 +69,8 @@ export const RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-wave-admission.test.mjs --coverage --coverage.allowExternal --coverage.include=release-wave-admission.mjs --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80';
 const SCREENSHOT_CATALOG_CONTRACT_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -837,6 +839,7 @@ export function runStructural(opts = {}) {
     ...(selected.has('operations') || selected.has('web')
       ? [
           SCREENSHOT_CATALOG_CONTRACT_COMMAND,
+          STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
         ]
       : []),

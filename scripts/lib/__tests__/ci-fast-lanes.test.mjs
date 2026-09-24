@@ -11,6 +11,8 @@ import {
 
 const SCREENSHOT_CATALOG_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 describe('CI control selector', () => {
@@ -124,12 +126,14 @@ describe('runStructural screenshot contract discovery', () => {
   const originalEventName = process.env.GITHUB_EVENT_NAME;
   const originalProductLanes = process.env.CI_PRODUCT_LANES;
   const originalSkipStructural = process.env.CI_FAST_SKIP_STRUCTURAL;
+  const originalScmBase = process.env.TURBO_SCM_BASE;
 
   afterEach(() => {
     for (const [name, value] of [
       ['GITHUB_EVENT_NAME', originalEventName],
       ['CI_PRODUCT_LANES', originalProductLanes],
       ['CI_FAST_SKIP_STRUCTURAL', originalSkipStructural],
+      ['TURBO_SCM_BASE', originalScmBase],
     ]) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
@@ -161,6 +165,9 @@ describe('runStructural screenshot contract discovery', () => {
       expect(screenshotCalls).toHaveLength(expected ? 1 : 0);
       if (expected) {
         expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
+        expect(execute.mock.calls[1][0]).toBe(
+          STRUCTURAL_RUNNER_COVERAGE_COMMAND
+        );
       } else {
         expect(result.skipped).toBe(true);
         expect(execute).not.toHaveBeenCalled();
@@ -197,5 +204,42 @@ describe('runStructural screenshot contract discovery', () => {
       output: 'fixture drift\n',
     });
     expect(execute).toHaveBeenCalledExactlyOnceWith(SCREENSHOT_CATALOG_COMMAND);
+  });
+
+  it('stops when runner coverage falls below its hosted floor', () => {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    process.env.CI_PRODUCT_LANES = 'operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi
+      .fn()
+      .mockReturnValueOnce({ code: 0, output: 'screenshot pass\n' })
+      .mockReturnValueOnce({ code: 19, output: 'coverage floor failed\n' });
+
+    expect(runStructural({ execute })).toMatchObject({
+      code: 19,
+      output: 'screenshot pass\ncoverage floor failed\n',
+    });
+    expect(execute.mock.calls.map(([command]) => command)).toEqual([
+      SCREENSHOT_CATALOG_COMMAND,
+      STRUCTURAL_RUNNER_COVERAGE_COMMAND,
+    ]);
+  });
+
+  it('uses the default executor on the structural skip path', () => {
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'true';
+
+    expect(runStructural()).toMatchObject({ code: 0, skipped: true });
+  });
+
+  it('keeps empty checkout diffs fail closed to structural execution', () => {
+    process.env.GITHUB_EVENT_NAME = 'push';
+    process.env.TURBO_SCM_BASE = 'HEAD';
+    process.env.CI_PRODUCT_LANES = 'operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
+
+    expect(runStructural({ execute })).toMatchObject({ code: 0 });
+    expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
+    expect(execute.mock.calls[1][0]).toBe(STRUCTURAL_RUNNER_COVERAGE_COMMAND);
   });
 });
