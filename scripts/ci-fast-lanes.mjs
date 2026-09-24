@@ -416,6 +416,33 @@ function excerpt(text, max = 1200) {
   return `…${trimmed.slice(-max)}`;
 }
 
+/** Keep only registered pytest identities; assertion bodies are not diagnostic labels. */
+function structuralFailureExcerpt(command, output, index, count, code) {
+  const pytestArgs = /\bpython3 -m pytest\s+([^;&]+)/u.exec(command)?.[1] || '';
+  const targets = new Set(
+    pytestArgs
+      .split(/\s+/u)
+      .filter(path => /^scripts\/[\w./-]+\.py$/u.test(path))
+  );
+  const identities = new Set();
+  for (const line of output.split('\n')) {
+    const match =
+      /^FAILED (scripts\/[\w./-]+\.py)::([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)(?=\[| - |$)/u.exec(
+        line
+      );
+    if (!match || !targets.has(match[1])) continue;
+    const identity = `FAILED ${match[1]}::${match[2]}`;
+    if (identity.length > 200) continue;
+    identities.add(identity);
+    if (identities.size === 3) break;
+  }
+  const header = [
+    `Structural command ${index + 1}/${count} failed (exit ${code}).`,
+    ...identities,
+  ].join('\n');
+  return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
+}
+
 function runBiome() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch') {
@@ -853,11 +880,20 @@ export function runStructural(opts = {}) {
   }
 
   let combined = '';
-  for (const cmd of parts) {
+  for (const [index, cmd] of parts.entries()) {
     const result = execute(cmd);
     combined += result.output;
     if (result.code !== 0) {
-      return { code: result.code, output: combined };
+      return {
+        code: result.code,
+        output: structuralFailureExcerpt(
+          cmd,
+          result.output,
+          index,
+          parts.length,
+          result.code
+        ),
+      };
     }
   }
   return { code: 0, output: combined };
@@ -869,7 +905,10 @@ function annotateFailure(lane, logExcerpt) {
   console.error(`::error title=${lane.name}::${msg}`);
   if (logExcerpt) {
     // Keep annotation body short; full log is in the step output.
-    const short = logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
+    const short =
+      lane.id === 'structural' && logExcerpt.startsWith('Structural command ')
+        ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
+        : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
     console.error(`::error::${short}`);
   }
 }
