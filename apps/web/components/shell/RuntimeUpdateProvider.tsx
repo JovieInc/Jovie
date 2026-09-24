@@ -41,16 +41,24 @@ export function RuntimeUpdateProvider({
       : isDesktop
         ? 'Restart Jovie To Update'
         : 'Reload Jovie To Update';
-  const description = downloading
-    ? 'The update will be ready to install when the download completes.'
-    : isDesktop
-      ? 'Install the available update when you are ready.'
-      : `${getVersionUpdateTitle(web.mismatchInfo?.newVersion)}. Reload when ready.`;
+  const description = applying
+    ? 'Installing the update and restarting Jovie…'
+    : downloading
+      ? 'The update will be ready to install when the download completes.'
+      : isDesktop
+        ? 'Install the available update when you are ready.'
+        : `${getVersionUpdateTitle(web.mismatchInfo?.newVersion)}. Reload when ready.`;
   const apply = () => {
     if (!available || busy) return;
     setApplying(true);
-    if (isDesktop) desktop.install();
-    else globalThis.location.reload();
+    if (isDesktop) {
+      void desktop
+        .install()
+        .then(started => {
+          if (!started) setApplying(false);
+        })
+        .catch(() => setApplying(false));
+    } else globalThis.location.reload();
   };
   return (
     <RuntimeUpdateContext.Provider
