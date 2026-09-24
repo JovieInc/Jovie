@@ -454,21 +454,21 @@ describe('merge queue backend resolution', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('refuses a live drain without a dedicated GitHub App mutation token', () => {
+  it('refuses the retired Auto-Enroll live drain even with a token', () => {
     const result = spawnSync('bash', ['scripts/drain-pr-queue.sh'], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       env: {
         ...process.env,
         DRAIN_MUTATION_AUTHORIZATION: 'merge-queue-autoenroll',
-        GH_MUTATION_TOKEN: '',
+        GH_MUTATION_TOKEN: 'writer-token-fixture',
         GH_TOKEN: 'read-token-fixture',
       },
     });
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain(
-      'Refusing live drain without GH_MUTATION_TOKEN'
+      'Merge Queue Auto-Enroll is retired'
     );
   });
 });
@@ -1149,7 +1149,7 @@ describe('native live preflight', () => {
     });
   });
 
-  it('derives controller visibility only from the exact CLI authorization', async () => {
+  it('does not trust retired CLI authorization for bypass visibility or mutation', async () => {
     const ruleset = structuredClone(VALID_RULESET);
     delete ruleset.bypass_actors;
     await expect(
@@ -1174,28 +1174,28 @@ describe('native live preflight', () => {
         runner: createNativeRunner({ ruleset }),
         write: vi.fn(),
       })
-    ).resolves.toMatchObject({ ready: true, bypassActorsVisible: false });
+    ).rejects.toMatchObject({ code: 'native_preflight_failed' });
 
-    await expect(
-      runCli(['enroll', '14359', HEAD], {
-        env: {
-          MERGE_QUEUE_BACKEND: 'native',
-          GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
-        },
-        runner: createNativeRunner({
-          ruleset,
-          states: [
-            prState({
-              isInMergeQueue: true,
-              mergeQueueEntry: QUEUE_ENTRY,
-              autoMergeRequest: AUTO_MERGE,
-            }),
-          ],
-        }),
-        write: vi.fn(),
-      })
-    ).resolves.toMatchObject({ changed: false });
+    const retiredRunner = vi.fn();
+    for (const args of [
+      ['enroll', '14359', HEAD],
+      ['dequeue', '14359'],
+      ['dequeue-ineligible', '14359', HEAD],
+    ]) {
+      await expect(
+        runCli(args, {
+          env: {
+            MERGE_QUEUE_BACKEND: 'native',
+            GITHUB_REPOSITORY: REPOSITORY,
+            MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+            GH_MUTATION_TOKEN: 'writer-token-fixture',
+          },
+          runner: retiredRunner,
+          write: vi.fn(),
+        })
+      ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
+    }
+    expect(retiredRunner).not.toHaveBeenCalled();
   });
 
   it('reports every unsafe activation condition instead of partially enabling native mode', () => {
@@ -1317,7 +1317,7 @@ describe('native mutation actor boundary', () => {
         env: {
           MERGE_QUEUE_BACKEND: 'native',
           GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
         },
         runner,
         write: vi.fn(),
@@ -2261,7 +2261,7 @@ describe('native dequeue', () => {
         env: {
           MERGE_QUEUE_BACKEND: 'native',
           GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
         },
         runner: readRunner,
         mutationRunner,
@@ -2315,7 +2315,7 @@ describe('native dequeue', () => {
         env: {
           MERGE_QUEUE_BACKEND: 'native',
           GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
         },
         runner: readRunner,
         mutationRunner,
@@ -2352,7 +2352,7 @@ describe('native dequeue', () => {
         env: {
           MERGE_QUEUE_BACKEND: 'native',
           GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
         },
         runner: readRunner,
         mutationRunner,
@@ -2389,7 +2389,7 @@ describe('native dequeue', () => {
         env: {
           MERGE_QUEUE_BACKEND: 'native',
           GITHUB_REPOSITORY: REPOSITORY,
-          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
         },
         runner: readRunner,
         mutationRunner,

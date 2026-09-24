@@ -66,17 +66,16 @@ set -euo pipefail
 DRY_RUN="${DRY_RUN:-0}"
 if [[ "$DRY_RUN" != "1" ]]; then
   case "${DRAIN_MUTATION_AUTHORIZATION:-}" in
-    merge-queue-autoenroll | test-fixture) ;;
+    test-fixture) ;;
+    merge-queue-autoenroll)
+      echo "::error::Merge Queue Auto-Enroll is retired; refusing its live drain" >&2
+      exit 2
+      ;;
     *)
       echo "::error::Refusing live drain without recognized DRAIN_MUTATION_AUTHORIZATION" >&2
       exit 2
       ;;
   esac
-  if [[ "${DRAIN_MUTATION_AUTHORIZATION:-}" == "merge-queue-autoenroll" \
-    && -z "${GH_MUTATION_TOKEN:-}" ]]; then
-    echo "::error::Refusing live drain without GH_MUTATION_TOKEN" >&2
-    exit 2
-  fi
 fi
 if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
   resolved_gh="$(command -v gh || true)"
