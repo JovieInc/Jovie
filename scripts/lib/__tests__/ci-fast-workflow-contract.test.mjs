@@ -1640,7 +1640,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/test_fleet_admission_receipt.py',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
-      expect(spawnSync('grep', ['-Eq', selectsStructural.source], { input: mergeQueueControllerPath + '\n' }).status).toBe(0);
+      expect(
+        spawnSync('grep', ['-Eq', selectsStructural.source], {
+          input: mergeQueueControllerPath + '\n',
+        }).status
+      ).toBe(0);
     }
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
