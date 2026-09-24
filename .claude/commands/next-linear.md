@@ -42,7 +42,7 @@ pnpm --version
 
 Required:
 
-- Node.js 22.x
+- Node.js 24.x
 - pnpm 9.15.4
 
 Use root commands only. Secret-bound commands must be run through Doppler as documented in `AGENTS.md`.

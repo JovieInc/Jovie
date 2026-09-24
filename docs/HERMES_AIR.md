@@ -18,7 +18,7 @@ launchctl bootout gui/$(id -u)/co.jovie.hermes.voice-memo-watcher 2>/dev/null ||
 
 Once that exclusion is verified, the bootstrap script is idempotent. It will:
 
-1. Verify Node 22 / pnpm 9.15.4.
+1. Verify Node 24 / pnpm 9.15.4.
 2. Install (if missing): Hermes (`hermes-agent-rs`), gbrain CLI, Doppler, Tailscale, Ollama.
 3. Pull the Ollama fallback model (`qwen3:4b-q4_K_M`).
 4. Render `~/.hermes/config.yaml` from `scripts/symphony/config.air.template.yaml` + Doppler secrets.

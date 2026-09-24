@@ -54,8 +54,8 @@ jobs:
             echo "::error::This workflow may only publish from refs/heads/main."
             exit 1
           }
-          test "$(node --version)" = v22.23.2 || {
-            echo "::error::The release lane requires Node.js v22.23.2."
+          test "$(node --version)" = v24.21.0 || {
+            echo "::error::The release lane requires Node.js v24.21.0."
             exit 1
           }
 

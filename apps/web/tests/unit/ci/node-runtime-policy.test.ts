@@ -37,6 +37,7 @@ const schedule = {
 };
 const releaseIndex = [
   { version: 'v26.8.1', date: '2026-08-25', security: false },
+  { version: 'v24.21.0', date: '2026-09-07', security: false },
   { version: 'v24.20.0', date: '2026-08-25', security: false },
   { version: 'v22.23.2', date: '2026-08-12', security: true },
 ];
@@ -60,18 +61,18 @@ describe('Node runtime lifecycle policy', () => {
       getReleaseStatus({ ...schedule.v24, lts: 'invalid' }, now)
     ).toThrow('Invalid schedule boundary lts: invalid');
   });
-  it('resolves Node 24 as blocking candidate and Node 26 as non-blocking shadow', () => {
+  it('resolves Node 26 as the blocking candidate after Node 24 production', () => {
     const result = evaluateOfficialReleases({
-      policy: { ...policy, productionVersion: '22.23.2' },
+      policy: { ...policy, productionVersion: '24.21.0' },
       schedule,
       index: releaseIndex,
       now,
     });
     expect(result.errors).toEqual([]);
     expect(result.production).toEqual({
-      version: '22.23.2',
-      latest: '22.23.2',
-      status: 'maintenance_lts',
+      version: '24.21.0',
+      latest: '24.21.0',
+      status: 'active_lts',
     });
     expect(
       result.matrix.map(candidate => [
@@ -82,10 +83,7 @@ describe('Node runtime lifecycle policy', () => {
         candidate.status,
         candidate.minimumPromotionStatus,
       ])
-    ).toEqual([
-      [24, '24.20.0', 'candidate', true, 'active_lts', 'active_lts'],
-      [26, '26.8.1', 'shadow', false, 'current', 'active_lts'],
-    ]);
+    ).toEqual([[26, '26.8.1', 'candidate', true, 'current', 'active_lts']]);
   });
   it('does not hide an overdue security release behind a newer regular patch', () => {
     const result = evaluateOfficialReleases({
@@ -134,11 +132,11 @@ describe('Node runtime lifecycle policy', () => {
     );
   });
   it('requires both consecutive green runs and the soak window before promotion', () => {
-    const lts = { major: 24, status: 'active_lts' };
+    const lts = { major: 26, status: 'active_lts' };
     expect(isPromotionReady(policy, lts, 2, 18)).toBe(false);
     expect(isPromotionReady(policy, lts, 3, 18)).toBe(true);
     const currentMinimum = structuredClone(policy);
-    currentMinimum.compatibility.candidates[1].minimumPromotionStatus =
+    currentMinimum.compatibility.candidates[0].minimumPromotionStatus =
       'current';
     expect(
       isPromotionReady(

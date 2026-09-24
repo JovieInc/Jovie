@@ -28,7 +28,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -60,6 +61,43 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+export const NODE_RUNTIME_CONTRACT_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --reporter=json --outputFile="$CI_FAST_NODE_RUNTIME_REPORT" tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const NODE_RUNTIME_CONTRACT_TEST_FILES = Object.freeze([
+  'tests/unit/ci/node-runtime-policy.test.ts',
+  'tests/unit/ci/node-runtime-contract.test.ts',
+  'tests/unit/ci/runner-setup-action.test.ts',
+]);
+export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
+  '.nvmrc',
+  '.node-version',
+  'config/node-runtime-policy.json',
+  'scripts/node-runtime-policy.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'pnpm-lock.yaml',
+  'package.json',
+  'apps/console/package.json',
+  'apps/web/package.json',
+  'apps/docs/package.json',
+  'apps/should-i-make/package.json',
+  'apps/eve-pilot/package.json',
+  'packages/ui/package.json',
+  'patches/**',
+  '.github/actions/setup-node-pnpm/**',
+  '.github/actions/setup-playwright/**',
+  '.github/runner-image/**',
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  '.github/workflows/node-runtime-compatibility.yml',
+  '.github/workflows/node-runtime-freshness.yml',
+  '.github/workflows/pr-conflict-handler.yml',
+  'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
+  'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -153,6 +191,12 @@ const LANES = [
     run: runBillingCoverage,
   },
   {
+    id: 'node-runtime-contracts',
+    name: 'Node runtime contracts',
+    nextLocalCommand: NODE_RUNTIME_CONTRACT_COMMAND,
+    run: runNodeRuntimeContracts,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -190,6 +234,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'profile-admission',
     'billing-coverage',
+    'node-runtime-contracts',
     'structural',
   ]),
 });
@@ -385,6 +430,116 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+export function selectNodeRuntimeContractCommands({ event, runtimeFiles }) {
+  if (
+    event === 'workflow_dispatch' ||
+    !Array.isArray(runtimeFiles) ||
+    runtimeFiles.length > 0
+  ) {
+    return [NODE_RUNTIME_CONTRACT_COMMAND];
+  }
+  return [];
+}
+
+/**
+ * @param {{
+ *   commandResult: { code: number, output: string },
+ *   reportText?: string,
+ *   reportReadError?: Error,
+ * }} options
+ */
+export function evaluateNodeRuntimeContractResult({
+  commandResult,
+  reportText,
+  reportReadError,
+}) {
+  let report;
+  try {
+    if (reportReadError) throw reportReadError;
+    report = JSON.parse(reportText);
+  } catch (error) {
+    return {
+      code: commandResult.code === 0 ? 1 : commandResult.code,
+      output: `${commandResult.output}\nNode runtime Vitest JSON report was missing or invalid: ${error.message}\n`,
+    };
+  }
+
+  const testResults = Array.isArray(report.testResults)
+    ? report.testResults
+    : [];
+  const actualTestFiles = testResults
+    .map(testResult =>
+      String(testResult?.name || '')
+        .replaceAll('\\', '/')
+        .split('/apps/web/')
+        .at(-1)
+    )
+    .sort();
+  const expectedTestFiles = [...NODE_RUNTIME_CONTRACT_TEST_FILES].sort();
+  const reportPassed =
+    report.success === true &&
+    testResults.length === expectedTestFiles.length &&
+    testResults.every(testResult => testResult?.status === 'passed') &&
+    report.numFailedTests === 0 &&
+    report.numTotalTests > 0 &&
+    report.numPassedTests === report.numTotalTests &&
+    JSON.stringify(actualTestFiles) === JSON.stringify(expectedTestFiles);
+  const summary = `Node runtime contracts: ${testResults.length}/${expectedTestFiles.length} target files ran; ${report.numPassedTests}/${report.numTotalTests} tests passed.`;
+
+  return {
+    code:
+      commandResult.code === 0 && reportPassed ? 0 : commandResult.code || 1,
+    output: `${commandResult.output}\n${summary}\n`,
+    report,
+  };
+}
+
+function runNodeRuntimeContracts() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const runtimeFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(NODE_RUNTIME_CONTRACT_PATHS);
+  const commands = selectNodeRuntimeContractCommands({ event, runtimeFiles });
+
+  if (commands.length === 0) {
+    return {
+      code: 0,
+      output:
+        'Node runtime contracts skipped (no runtime contract files changed)\n',
+      skipped: true,
+    };
+  }
+
+  const reportPath = resolve(
+    process.env.RUNNER_TEMP || tmpdir(),
+    `jovie-node-runtime-contracts-${process.pid}.json`
+  );
+  rmSync(reportPath, { force: true });
+  const result = shell(commands[0], {
+    env: {
+      ...process.env,
+      CI_FAST_NODE_RUNTIME_REPORT: reportPath,
+    },
+  });
+
+  let reportText;
+  let reportReadError;
+  try {
+    reportText = readFileSync(reportPath, 'utf8');
+  } catch (error) {
+    reportReadError = error;
+  } finally {
+    rmSync(reportPath, { force: true });
+  }
+
+  return evaluateNodeRuntimeContractResult({
+    commandResult: result,
+    reportText,
+    reportReadError,
+  });
 }
 
 export function listAllChangedFiles(cwd = REPO_ROOT) {

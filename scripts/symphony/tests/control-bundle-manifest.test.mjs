@@ -51,7 +51,7 @@ async function fixture(t, prefix = 'symphony-control-bundle-') {
     artifactPath: 'bundle.tar.gz',
     componentPaths: [...CONTROL_BUNDLE_POLICY.components],
     testReceipt: { status: 'PASS', command: 'focused', runId: '12345' },
-    toolchain: { node: 'v22.23.2', pnpm: '9.15.4' },
+    toolchain: { node: 'v24.21.0', pnpm: '9.15.4' },
     signature: {
       type: 'github-artifact-attestation',
       identity: CONTROL_BUNDLE_POLICY.signatureIdentity,
@@ -153,6 +153,11 @@ const POLICY_REJECTIONS = [
     pattern: /test receipt/,
   },
   { name: 'absent toolchain', patch: { toolchain: {} }, pattern: /toolchain/ },
+  {
+    name: 'incompatible node major',
+    patch: { toolchain: { node: 'v22.23.2', pnpm: '9.15.4' } },
+    pattern: /toolchain/,
+  },
   {
     name: 'incompatible runtime',
     patch: {
@@ -298,7 +303,7 @@ test('real build CLI rejects failed evidence and forged identity', async t => {
       '--tests',
       JSON.stringify({ status: 'FAIL' }),
       '--toolchain',
-      JSON.stringify({ node: 'v22.23.2', pnpm: '9.15.4' }),
+      JSON.stringify({ node: 'v24.21.0', pnpm: '9.15.4' }),
       '--signature',
       JSON.stringify({ type: 'unsigned', identity: 'attacker' }),
       '--compatibility',

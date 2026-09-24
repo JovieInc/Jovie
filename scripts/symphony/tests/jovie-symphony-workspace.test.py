@@ -153,7 +153,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         wrapper = root / "wrapper"
         receipts.mkdir()
 
-        (bin_dir / "node").write_text("#!/usr/bin/env bash\nprintf 'v22.23.2\\n'\n")
+        (bin_dir / "node").write_text("#!/usr/bin/env bash\nprintf 'v24.21.0\\n'\n")
         (bin_dir / "pnpm").write_text("#!/usr/bin/env bash\nprintf '9.15.4\\n'\n")
         (bin_dir / "realpath").write_text(
             "#!/usr/bin/env bash\n"
@@ -177,7 +177,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         wrapper_source = wrapper_source.replace('/usr/local/sbin/jovie-symphony-workspace', str(helper))
         wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/jovie-workspace-clone', str(clone))
         wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/symphony-nvme-package-cache', str(cache))
-        wrapper_source = wrapper_source.replace('/home/timwhite/.nvm/versions/node/v22.23.2/bin', str(bin_dir))
+        wrapper_source = wrapper_source.replace('/home/timwhite/.nvm/versions/node/v24.21.0/bin', str(bin_dir))
         wrapper_source = wrapper_source.replace(
             '/srv/git/receipts/workspace-mounts/package-cache', str(receipts)
         )

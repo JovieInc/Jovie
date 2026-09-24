@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e "const [major, minor] = process.versions.node.split('.').map(Number); if (major !== 22 || minor < 13) { throw new Error('Expected Node >=22.13 <23, got ' + process.versions.node); }"
+          node -e "const [major] = process.versions.node.split('.').map(Number); if (major !== 24) { throw new Error('Expected Node 24.x, got ' + process.versions.node); }"
           test "$(pnpm --version)" = "9.15.4"
           node --version
           pnpm --version
