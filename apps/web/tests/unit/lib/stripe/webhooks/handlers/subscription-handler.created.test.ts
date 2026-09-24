@@ -112,6 +112,56 @@ describe('@critical SubscriptionHandler - Created', () => {
     );
   });
 
+  it('keeps subscription metadata correlation on paid conversion and replay', async () => {
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_created_correlated',
+        type: 'customer.subscription.created',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'sub_created_correlated',
+            status: 'active',
+            customer: 'cus_correlated',
+            metadata: {
+              clerk_user_id: 'user_correlated',
+              claim_id: 'claim_abc',
+              run_id: 'run_def',
+              offer_version: 'launch-acquisition:premade-artist-profile:v1',
+              first_touch: 'claim_invite',
+            },
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_created_correlated',
+      stripeEventTimestamp: new Date(),
+    };
+
+    await handler.handle(context);
+    await handler.handle(context);
+
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          claimId: 'claim_abc',
+          runId: 'run_def',
+          offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+          firstTouch: 'claim_invite',
+        }),
+      })
+    );
+    expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledTimes(2);
+    for (const call of mockAttributeLeadPaidConversionByAppUserId.mock.calls) {
+      expect(call[2]).toEqual({
+        claimId: 'claim_abc',
+        runId: 'run_def',
+        offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+        firstTouch: 'claim_invite',
+      });
+    }
+  });
+
   it('fails closed when paid_converted write throws so Stripe retries', async () => {
     mockAttributeLeadPaidConversionByAppUserId.mockRejectedValue(
       new Error('injected event-write failure')

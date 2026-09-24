@@ -209,6 +209,93 @@ describe('POST /api/stripe/checkout', () => {
     );
   });
 
+  it('creates checkout session with durable correlation IDs', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_correlated',
+      url: 'https://checkout.stripe.com/pay/cs_correlated',
+    });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priceId: 'price_123',
+        claimId: 'claim_abc',
+        runId: 'run_def',
+        candidateId: 'candidate_ghi',
+        offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+        firstTouch: 'claim_invite',
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlation: {
+          claimId: 'claim_abc',
+          runId: 'run_def',
+          candidateId: 'candidate_ghi',
+          offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+          firstTouch: 'claim_invite',
+        },
+      })
+    );
+    const correlatedCall = mockCreateCheckoutSession.mock.calls[0][0] as {
+      idempotencyKey: string;
+    };
+    expect(correlatedCall.idempotencyKey).toContain(
+      'checkout:user_123:price_123'
+    );
+    expect(correlatedCall.idempotencyKey.split(':')).toHaveLength(6);
+  });
+
+  it('keeps legacy checkout callers working when correlation fields are omitted', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_legacy',
+      url: 'https://checkout.stripe.com/pay/cs_legacy',
+    });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_123' }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        correlation: expect.anything(),
+      })
+    );
+    const legacyCall = mockCreateCheckoutSession.mock.calls[0][0] as {
+      idempotencyKey: string;
+    };
+    expect(legacyCall.idempotencyKey).toMatch(
+      /^checkout:user_123:price_123:default:\d+$/
+    );
+  });
+
+  it('returns 400 when a provided correlation field is not a durable string', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_123', claimId: 12 }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid checkout correlation field: claimId',
+    });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it('creates checkout session for authenticated user', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

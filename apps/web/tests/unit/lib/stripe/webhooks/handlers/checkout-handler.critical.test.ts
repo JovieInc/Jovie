@@ -176,7 +176,8 @@ describe('@critical CheckoutSessionHandler', () => {
       );
       expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledWith(
         betterAuthRow.id,
-        'sub_123'
+        'sub_123',
+        undefined
       );
       expect(enqueuePaidWelcomeAfterEntitlement).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -597,6 +598,117 @@ describe('@critical CheckoutSessionHandler', () => {
           isPro: false,
         })
       );
+    });
+  });
+
+  describe('handle - checkout correlation (JOV-6444)', () => {
+    const correlationMetadata = {
+      clerk_user_id: 'user_correlated',
+      claim_id: 'claim_abc',
+      run_id: 'run_def',
+      candidate_id: 'candidate_ghi',
+      offer_version: 'launch-acquisition:premade-artist-profile:v1',
+      first_touch: 'claim_invite',
+    } as const;
+
+    function buildCorrelatedContext(): WebhookContext {
+      return {
+        event: {
+          id: 'evt_correlated',
+          type: 'checkout.session.completed',
+          created: Math.floor(Date.now() / 1000),
+          data: {
+            object: {
+              id: 'cs_correlated',
+              customer: 'cus_correlated',
+              subscription: 'sub_correlated',
+              metadata: { ...correlationMetadata },
+            } as unknown as Stripe.Checkout.Session,
+          },
+        } as Stripe.Event,
+        stripeEventId: 'evt_correlated',
+        stripeEventTimestamp: new Date(),
+      };
+    }
+
+    it('persists session correlation into billing audit and paid_converted receipts', async () => {
+      const mockSubscription = {
+        id: 'sub_correlated',
+        status: 'active',
+        customer: 'cus_correlated',
+        metadata: {
+          clerk_user_id: 'user_correlated',
+          claim_id: 'claim_abc',
+          run_id: 'run_def',
+        },
+        items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+      } as unknown as Stripe.Subscription;
+
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: 'app_user_correlated',
+      });
+
+      const result = await handler.handle(buildCorrelatedContext());
+
+      expect(result.success).toBe(true);
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            claimId: 'claim_abc',
+            runId: 'run_def',
+            candidateId: 'candidate_ghi',
+            offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+            firstTouch: 'claim_invite',
+          }),
+        })
+      );
+      expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledWith(
+        'app_user_correlated',
+        'sub_correlated',
+        {
+          claimId: 'claim_abc',
+          runId: 'run_def',
+          candidateId: 'candidate_ghi',
+          offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+          firstTouch: 'claim_invite',
+        }
+      );
+    });
+
+    it('does not drop correlation when the webhook is replayed', async () => {
+      const mockSubscription = {
+        id: 'sub_correlated',
+        status: 'active',
+        customer: 'cus_correlated',
+        metadata: { ...correlationMetadata },
+        items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+      } as unknown as Stripe.Subscription;
+
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: 'app_user_correlated',
+      });
+
+      const context = buildCorrelatedContext();
+      await handler.handle(context);
+      await handler.handle(context);
+
+      expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledTimes(
+        2
+      );
+      for (const call of mockAttributeLeadPaidConversionByAppUserId.mock
+        .calls) {
+        expect(call[2]).toEqual({
+          claimId: 'claim_abc',
+          runId: 'run_def',
+          candidateId: 'candidate_ghi',
+          offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+          firstTouch: 'claim_invite',
+        });
+      }
     });
   });
 
