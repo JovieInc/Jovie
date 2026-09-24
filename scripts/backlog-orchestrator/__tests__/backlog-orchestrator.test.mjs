@@ -2212,11 +2212,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const body = source.slice(start, end);
     assert.ok(start >= 0 && end > start);
     assert.match(body, /stage: 'collision-preflight'/);
+    assert.match(body, /options\.preflight \|\| admissionPreflight/);
+    const initialPreflight = body.indexOf('checkPreflight(team, selected)');
     assert.ok(
-      body.indexOf('admissionPreflight(team, selected)') <
-        body.indexOf('buildDeterministicPlanEvidence')
+      initialPreflight >= 0 &&
+        initialPreflight < body.indexOf('buildDeterministicPlanEvidence')
     );
-    assert.match(body, /admissionPreflight\(team, current\)/);
+    assert.match(body, /checkPreflight\(team, current\)/);
   });
 
   it('rechecks refreshed research receipts before reading fingerprints', async () => {

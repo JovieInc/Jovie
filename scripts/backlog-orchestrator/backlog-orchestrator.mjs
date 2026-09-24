@@ -47,6 +47,7 @@ import * as reporter from './reporter.mjs';
 import * as researchGate from './research-gate.mjs';
 import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
+import { gateShippingLeadRequest } from './shipping-lead-gate.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import {
   buildRoutingReceipt,
@@ -285,7 +286,7 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function approveSymphonyRoute(issue, isDryRun) {
+async function approveSymphonyRoute(issue, isDryRun, client = linear) {
   const preAdmission = preAdmissionDecision(issue);
   if (!preAdmission.allowed)
     return {
@@ -302,10 +303,10 @@ async function approveSymphonyRoute(issue, isDryRun) {
   if (decision.status === 'blocked') return decision;
   if (isDryRun) return { status: 'would-route', route: decision.route };
   const receipt = buildRoutingReceipt(decision.route);
-  const result = await linear.addComment(issue.id, receipt);
+  const result = await client.addComment(issue.id, receipt);
   if (!result?.commentCreate?.success && !result?.success)
     throw new Error('symphony-routing-receipt-mutation-failed');
-  const reread = await linear.fetchIssue(issue.identifier);
+  const reread = await client.fetchIssue(issue.identifier);
   const verified = verifyRoutingReceipt(reread, {
     requireCapacityEvidence: true,
   });
@@ -485,7 +486,11 @@ async function recoverStaleLeases(team, isDryRun) {
   };
 }
 
-async function admissionPreflight(team, candidate = null) {
+async function admissionPreflight(
+  team,
+  candidate = null,
+  { excludeIssueId = null } = {}
+) {
   const fleetGate = await fleetGateForTeam(team);
   if (
     !fleetGate.workAdmission.allowed ||
@@ -498,7 +503,9 @@ async function admissionPreflight(team, candidate = null) {
       fleetGate,
     };
   }
-  const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
+  const symphonyIssues = (await linear.fetchTeamSymphonyIssues(team.id)).filter(
+    issue => issue.id !== excludeIssueId
+  );
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
   const maxConcurrent = fleetGate.concurrency?.gem?.maxConcurrent ?? 0;
   if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
@@ -635,9 +642,12 @@ async function evaluateGateCandidate(
   selected,
   isDryRun,
   preflight,
-  staleLeaseRecovery
+  staleLeaseRecovery,
+  options = {}
 ) {
-  const collisionPreflight = await admissionPreflight(team, selected);
+  const client = options.client || linear;
+  const checkPreflight = options.preflight || admissionPreflight;
+  const collisionPreflight = await checkPreflight(team, selected);
   if (!collisionPreflight.open) {
     return {
       status: 'blocked',
@@ -701,7 +711,7 @@ async function evaluateGateCandidate(
         mutations: 0,
       };
     }
-    const routing = await approveSymphonyRoute(selected, true);
+    const routing = await approveSymphonyRoute(selected, true, client);
     return {
       status: 'would-admit',
       issue: selected.identifier,
@@ -717,7 +727,7 @@ async function evaluateGateCandidate(
   const contextResult = await contextGate.approveContext({
     issue: selected,
     gbrain: cliGbrainClient,
-    client: linear,
+    client,
   });
   if (contextResult.status === 'rejected') {
     return {
@@ -732,7 +742,7 @@ async function evaluateGateCandidate(
     };
   }
 
-  let current = await linear.fetchIssue(selected.identifier);
+  let current = await client.fetchIssue(selected.identifier);
 
   let researchResult;
   if (researchNeed.decision === 'not-required') {
@@ -748,7 +758,7 @@ async function evaluateGateCandidate(
         findings: [],
         observedAt: new Date().toISOString(),
       },
-      client: linear,
+      client,
     });
   } else {
     const researchReceipt = researchGate.researchGateReceipt(current);
@@ -776,52 +786,53 @@ async function evaluateGateCandidate(
     };
   }
 
-  current = await linear.fetchIssue(selected.identifier);
+  current = await client.fetchIssue(selected.identifier);
 
   const planResult = await planGate.approvePlan({
     issue: current,
     evidence: plan.evidence,
-    client: linear,
+    client,
     teamId: team.id,
   });
   if (planResult.status === 'rejected')
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
-  current = await linear.fetchIssue(selected.identifier);
-  const finalPreflight = await admissionPreflight(team, current);
+  current = await client.fetchIssue(selected.identifier);
+  const finalPreflight = await checkPreflight(team, current);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
 
-  const routing = await approveSymphonyRoute(current, false);
+  const routing = await approveSymphonyRoute(current, false, client);
   if (routing.status === 'blocked')
     throw new Error(`symphony routing blocked: ${routing.reason}`);
-  current = await linear.fetchIssue(selected.identifier);
+  current = await client.fetchIssue(selected.identifier);
 
   const admissionResult = await admissionGate.approveAdmission({
     issue: current,
-    client: linear,
+    client,
     teamId: team.id,
   });
   if (admissionResult.status === 'rejected')
     throw new Error(`admission gate rejected: ${admissionResult.reason}`);
 
-  current = await linear.fetchIssue(selected.identifier);
+  current = await client.fetchIssue(selected.identifier);
   const classification = {
     ...classifier.classifyDeterministic(current, [current]),
     issue: current,
+    ...(options.fingerprint ? { fingerprint: options.fingerprint } : {}),
     labels: current.labels.nodes.map(label => label.name),
   };
   const lease = await admitter.admitIssue({
     issue: current,
     classification,
-    client: linear,
+    client,
     teamId: team.id,
     todoStateId: team.todoStateId,
   });
   if (!['admitted', 'already-admitted'].includes(lease.status))
     throw new Error(`lease rejected: ${lease.reason}`);
 
-  const verified = await linear.fetchIssue(selected.identifier);
+  const verified = await client.fetchIssue(selected.identifier);
   const evidence = admitter.hasAdmissionEvidence(verified);
   const load = deterministicGates.admissionIntentLoad([verified]);
   if (verified.state?.name !== 'Todo' || !evidence.eligible || load.count !== 1)
@@ -843,6 +854,17 @@ async function evaluateGateCandidate(
     routing,
     mutations: 'verified',
   };
+}
+
+/** Existing single-issue pipeline; no pool sweep, stale-lease recovery, or new controller. */
+export async function admitShippingLeadRequest(task, options = {}) {
+  return gateShippingLeadRequest(task, {
+    client: linear,
+    preflight: admissionPreflight,
+    evaluate: evaluateGateCandidate,
+    team: TEAM_CONFIGS.find(team => team.key === 'JOV'),
+    ...options,
+  });
 }
 
 async function runTeamGateNext(team, isDryRun, issueArg) {
@@ -1348,25 +1370,29 @@ async function runRemediate(isDryRun) {
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch(err => {
-  const cooldown = linear.activeLinearCooldown(err);
-  const deferred = process.argv[2] === 'remediate' && cooldown !== null;
-  const receipt = {
-    schema: 'backlog-orchestrator/failure/v1',
-    status: deferred ? 'deferred' : 'blocked',
-    code: deferred ? 'RATE_LIMITED' : err.code || 'UNKNOWN',
-    attempts: err.attempts,
-    message: err.message,
-    ...(deferred ? cooldown : {}),
-  };
-  console.error('Failure receipt:', JSON.stringify(receipt));
-  if (deferred) {
-    console.error(
-      `Linear credential cooldown is active; the scheduled remediation clock will retry at or after ${receipt.retryAt}.`
-    );
-    process.exitCode = 0;
-    return;
-  }
-  console.error('Fatal error:', err);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
+  main().catch(err => {
+    const cooldown = linear.activeLinearCooldown(err);
+    const deferred = process.argv[2] === 'remediate' && cooldown !== null;
+    const receipt = {
+      schema: 'backlog-orchestrator/failure/v1',
+      status: deferred ? 'deferred' : 'blocked',
+      code: deferred ? 'RATE_LIMITED' : err.code || 'UNKNOWN',
+      attempts: err.attempts,
+      message: err.message,
+      ...(deferred ? cooldown : {}),
+    };
+    console.error('Failure receipt:', JSON.stringify(receipt));
+    if (deferred) {
+      console.error(
+        `Linear credential cooldown is active; the scheduled remediation clock will retry at or after ${receipt.retryAt}.`
+      );
+      process.exitCode = 0;
+      return;
+    }
+    console.error('Fatal error:', err);
+    process.exitCode = 1;
+  });
