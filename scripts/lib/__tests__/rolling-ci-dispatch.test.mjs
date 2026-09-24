@@ -36,6 +36,35 @@ const WORKFLOW = readFileSync(
   ),
   'utf8'
 );
+
+function workflowShellGuard(startText) {
+  const start = WORKFLOW.indexOf(startText);
+  if (start < 0) throw new Error(`Missing workflow guard: ${startText}`);
+  const end = WORKFLOW.indexOf('\n          fi', start);
+  if (end < 0) throw new Error(`Unterminated workflow guard: ${startText}`);
+  return WORKFLOW.slice(start, end + '\n          fi'.length);
+}
+
+/** @param {{ enabled?: string, canaryPr?: string, resolvedPr?: string }} input */
+function runHostedFxActivationGuards({ enabled, canaryPr, resolvedPr } = {}) {
+  const script = [
+    workflowShellGuard('if [[ "${FX_HOSTED_REMEDIATION_ENABLED:-}"'),
+    workflowShellGuard('if [[ ! "${FX_HOSTED_REMEDIATION_CANARY_PR:-}"'),
+    workflowShellGuard(
+      'if [[ "$PR_NUMBER_EVENT" != "$FX_HOSTED_REMEDIATION_CANARY_PR" ]]'
+    ),
+    "printf '%s\\n' 'candidate-authorized'",
+  ].join('\n');
+  return spawnSync('bash', ['-euc', script], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      FX_HOSTED_REMEDIATION_ENABLED: enabled ?? '',
+      FX_HOSTED_REMEDIATION_CANARY_PR: canaryPr ?? '',
+      PR_NUMBER_EVENT: resolvedPr ?? '',
+    },
+  });
+}
 const trustedSource = {
   eventName: 'workflow_run',
   workflow: 'CI',
@@ -517,6 +546,34 @@ describe('rolling CI failure dispatch', () => {
 });
 
 describe('rolling CI dispatch CLI and workflow', () => {
+  it('fails closed unless enabled and the resolved PR exactly matches one valid canary', () => {
+    for (const input of [
+      {},
+      { enabled: 'false', canaryPr: '18100', resolvedPr: '18100' },
+      { enabled: 'True', canaryPr: '18100', resolvedPr: '18100' },
+      { enabled: 'true' },
+      { enabled: 'true', canaryPr: '0', resolvedPr: '0' },
+      { enabled: 'true', canaryPr: '018100', resolvedPr: '18100' },
+      { enabled: 'true', canaryPr: ' 18100', resolvedPr: '18100' },
+      { enabled: 'true', canaryPr: 'not-a-number', resolvedPr: '18100' },
+      { enabled: 'true', canaryPr: '18100', resolvedPr: '18101' },
+    ]) {
+      const result = runHostedFxActivationGuards(input);
+      expect(result.status, JSON.stringify(input)).toBe(0);
+      expect(result.stdout, JSON.stringify(input)).not.toContain(
+        'candidate-authorized'
+      );
+    }
+
+    const canary = runHostedFxActivationGuards({
+      enabled: 'true',
+      canaryPr: '18100',
+      resolvedPr: '18100',
+    });
+    expect(canary.status).toBe(0);
+    expect(canary.stdout).toContain('candidate-authorized');
+  });
+
   it('deliberate red: CLI fails closed on unauthenticated source', () => {
     const ok = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify(dispatchInput()),
@@ -551,6 +608,11 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'WORKFLOW_PATH: ${{ github.event.workflow_run.path',
       'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id',
       'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha',
+      'FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}',
+      'FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}',
+      'if [[ "${FX_HOSTED_REMEDIATION_ENABLED:-}" != \'true\' ]]',
+      'if [[ ! "${FX_HOSTED_REMEDIATION_CANARY_PR:-}" =~ ^[1-9][0-9]*$ ]]',
+      'if [[ "$PR_NUMBER_EVENT" != "$FX_HOSTED_REMEDIATION_CANARY_PR" ]]',
       'ref: ${{ github.sha }}',
       'persist-credentials: false',
       'actions: read',
@@ -558,27 +620,53 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'contents: read',
       'pull-requests: write',
       'GH_TOKEN: ${{ github.token }}',
-      'secrets.CURSOR_API_KEY',
+      'secrets.FX_AI_GATEWAY_API_KEY',
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
-      'group: rolling-ci-remediation-global-v1',
+      'group: rolling-ci-remediation-',
+      'group: jovie-fx-model-lane-',
+      'queue: max',
       'cancel-in-progress: false',
-      'Cursor patch artifact without GitHub authority',
+      'FX patch artifact without GitHub authority',
+      'Reject symlinked or missing source paths before model execution',
       'Upload prelaunch receipt before model execution',
       'Create typed acceptance receipt after tests',
       'Publish typed terminal receipt',
       'runs-on: ubuntu-24.04',
-      'runs-on: [self-hosted, Linux, X64, jovie-fixed]',
       'permission-contents: write',
       'repositories: Jovie',
       'hosted-commit',
-      'Shell(*)',
-      'WebFetch(*)',
-      'Mcp(*:*)',
+      'FX_MAX_AGENT_STEPS',
+      'fx ask --json --no-save',
+      "GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com'",
+      "GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com'",
       'startup_failure',
     ]) {
       expect(WORKFLOW, token).toContain(token);
     }
+    const prepareStart = WORKFLOW.indexOf('\n  prepare:\n');
+    const testStart = WORKFLOW.indexOf('\n  test:\n', prepareStart);
+    const prepareJob = WORKFLOW.slice(prepareStart, testStart);
+    const preparePermissions = prepareJob.match(
+      /^    permissions:\n((?:^      [^\n]+\n)+)/m
+    )?.[1];
+    expect(preparePermissions).toBe(
+      '      actions: read\n      contents: read\n      pull-requests: read\n      statuses: read\n'
+    );
+    expect(WORKFLOW.indexOf("!= 'true'")).toBeLessThan(
+      WORKFLOW.indexOf('PR_CANDIDATES=$(gh api')
+    );
+    expect(WORKFLOW.indexOf('FX_HOSTED_REMEDIATION_CANARY_PR:-}')).toBeLessThan(
+      WORKFLOW.indexOf('PR_CANDIDATES=$(gh api')
+    );
+    expect(
+      WORKFLOW.indexOf('PR_NUMBER_EVENT" != "$FX_HOSTED_REMEDIATION_CANARY_PR')
+    ).toBeLessThan(WORKFLOW.indexOf('LIVE_PR=$(gh api'));
+    expect(WORKFLOW.indexOf("!= 'true'")).toBeLessThan(
+      WORKFLOW.indexOf(
+        'AI_GATEWAY_API_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}'
+      )
+    );
     expect(WORKFLOW).toMatch(/^permissions: \{\}$/m);
     expect(WORKFLOW).not.toMatch(/^\s+contents:\s+write\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_suite:\s*$/m);
@@ -729,5 +817,73 @@ describe('rolling CI dispatch CLI and workflow', () => {
         steps: ['Late failing step'],
       },
     ]);
+  });
+
+  it('accepts an empty GitHub run association only after exact branch resolution', () => {
+    expect(WORKFLOW).toContain('-f head="JovieInc:$HEAD_BRANCH"');
+    expect(WORKFLOW).toContain('length == 1 and .[0].head == $head');
+    const filter = WORKFLOW.match(
+      /if ! jq -e --arg repository "\$REPOSITORY"[\s\S]*?'([\s\S]*?)' "\$GITHUB_EVENT_PATH"/
+    )?.[1];
+    expect(filter).toBeDefined();
+    const payload = {
+      action: 'completed',
+      repository: { full_name: TRUSTED_REPOSITORY },
+      workflow_run: {
+        head_repository: { full_name: TRUSTED_REPOSITORY },
+        head_sha: head,
+        head_branch: 'feature/x',
+        pull_requests: [],
+      },
+    };
+    const check = event =>
+      spawnSync(
+        'jq',
+        [
+          '-e',
+          '--arg',
+          'repository',
+          TRUSTED_REPOSITORY,
+          '--arg',
+          'head',
+          head,
+          '--arg',
+          'branch',
+          'feature/x',
+          '--argjson',
+          'number',
+          '17',
+          filter,
+        ],
+        { input: JSON.stringify(event), encoding: 'utf8' }
+      ).status;
+    expect(check(payload)).toBe(0);
+    expect(
+      check({
+        ...payload,
+        workflow_run: {
+          ...payload.workflow_run,
+          pull_requests: [{ number: 17, head: { sha: head } }],
+        },
+      })
+    ).toBe(0);
+    expect(
+      check({
+        ...payload,
+        workflow_run: {
+          ...payload.workflow_run,
+          pull_requests: [
+            { number: 17, head: { sha: head } },
+            { number: 18, head: { sha: head } },
+          ],
+        },
+      })
+    ).not.toBe(0);
+    expect(
+      check({
+        ...payload,
+        workflow_run: { ...payload.workflow_run, head_sha: nextHead },
+      })
+    ).not.toBe(0);
   });
 });
