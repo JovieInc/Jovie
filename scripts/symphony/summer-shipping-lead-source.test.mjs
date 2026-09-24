@@ -257,3 +257,28 @@ test('executes the exact installed read-only runtime command and parses its resu
     loaded.cleanup();
   }
 });
+
+test('reconciliation accepts only an ancestor with the same signed contract, never a future or incompatible revision', async t => {
+  const f = fixture(t);
+  const path = 'scripts/symphony/summer-shipping-lead-contract.mjs';
+  const original = readFileSync(join(f.mirror, path));
+  writeFileSync(join(f.mirror, path), '// incompatible old contract\n');
+  f.git('add', '.');
+  f.git('commit', '-qm', 'old incompatible contract');
+  const incompatible = f.git('rev-parse', 'HEAD');
+  writeFileSync(join(f.mirror, path), original);
+  f.git('add', '.');
+  f.git('commit', '-qm', 'current supported contract');
+  f.receipt.sourceRevision = f.git('rev-parse', 'HEAD');
+  f.save();
+  const loaded = await loadCanonicalShippingAdmission(f);
+  t.after(loaded.cleanup);
+  assert.equal(loaded.canReconcileSource(f.revision), true);
+  assert.equal(loaded.canReconcileSource(f.receipt.sourceRevision), true);
+  assert.equal(loaded.canReconcileSource(incompatible), false);
+  assert.equal(loaded.canReconcileSource('bad'), false);
+  assert.equal(loaded.canReconcileSource('a'.repeat(40)), false);
+  f.git('commit', '--allow-empty', '-qm', 'future uninstalled source');
+  assert.equal(loaded.canReconcileSource(f.git('rev-parse', 'HEAD')), false);
+  assert.equal(typeof loaded.observeIssue, 'function');
+});

@@ -188,6 +188,18 @@ export async function loadCanonicalShippingAdmission({
       admit: module.admitShippingLeadRequest,
       observeIssue: module.observeShippingLeadIssue,
       sourceRevision: revision,
+      canReconcileSource: priorRevision => {
+        if (!/^[a-f0-9]{40}$/u.test(priorRevision ?? '')) return false;
+        try {
+          git(['merge-base', '--is-ancestor', priorRevision, revision]);
+          const path = 'scripts/symphony/summer-shipping-lead-contract.mjs';
+          return git(['rev-parse', `${priorRevision}:${path}`]).equals(
+            git(['rev-parse', `${revision}:${path}`])
+          );
+        } catch {
+          return false;
+        }
+      },
       observeRuntime: () =>
         JSON.parse(
           execFileSync(

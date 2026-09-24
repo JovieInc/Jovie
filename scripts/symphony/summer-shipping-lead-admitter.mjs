@@ -53,8 +53,15 @@ export function createRuntimeBoundShippingAdmitter({
     loaded ??= await loadSource();
     return loaded;
   };
-  const checkRuntime = async (task, code) => {
-    if (code.sourceRevision !== task.source.sourceVersion)
+  const checkRuntime = async (task, code, reconciliation = false) => {
+    if (
+      code.sourceRevision !== task.source.sourceVersion &&
+      !(
+        reconciliation &&
+        typeof code.canReconcileSource === 'function' &&
+        (await code.canReconcileSource(task.source.sourceVersion))
+      )
+    )
       throw new Error('shipping-lead-control-source-changed');
     const observed = await code.observeRuntime();
     const observedAt = Date.parse(observed?.observedAt);
@@ -94,9 +101,9 @@ export function createRuntimeBoundShippingAdmitter({
           status: 'held',
           reason: 'shipping-lead-awaiting-owner-terminal-proof',
         };
-      await checkRuntime(task, code);
+      await checkRuntime(task, code, true);
       const issue = await code.observeIssue(task);
-      const observed = await checkRuntime(task, code);
+      const observed = await checkRuntime(task, code, true);
       if (
         issue?.issueId !== task.issue.id ||
         issue?.identifier !== task.issue.identifier ||

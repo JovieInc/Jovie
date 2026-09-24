@@ -963,3 +963,41 @@ test('uncertain canonical write never becomes worker acceptance from a running r
     undefined
   );
 });
+
+test('a verified compatible control update can reconcile prior acceptance but never authorize fresh admission', async context => {
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  let compatible = true;
+  const code = {
+    sourceRevision: '4'.repeat(40),
+    canReconcileSource: async revision => {
+      assert.equal(revision, f.task.source.sourceVersion);
+      return compatible;
+    },
+    observeIssue: async () => f.issue,
+    observeRuntime: async () => f.runtime,
+    admit: async () => {
+      throw new Error('must not admit from a changed source');
+    },
+  };
+  const afterUpgrade = createRuntimeBoundShippingAdmitter({
+    journal: f.open(),
+    loadSource: async () => code,
+  });
+  assert.equal(
+    (await afterUpgrade.execute(f.task)).reason,
+    'shipping-lead-owner-accepted-awaiting-terminal-proof'
+  );
+  compatible = false;
+  await assert.rejects(afterUpgrade.execute(f.task), /control-source-changed/);
+  const fresh = admissionFixture(context);
+  compatible = true;
+  await assert.rejects(
+    createRuntimeBoundShippingAdmitter({
+      journal: fresh.journal,
+      loadSource: async () => code,
+    }).execute(fresh.task),
+    /control-source-changed/
+  );
+  assert.equal(fresh.open().read().active.admissionProgress, undefined);
+});
