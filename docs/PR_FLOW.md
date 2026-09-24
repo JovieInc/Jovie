@@ -169,11 +169,11 @@ build count to one if runner waits or speculative invalidation outweigh the
 measured throughput gain.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
-CI paths configured for 30 and 40 minutes. The source target is 60 minutes;
-the exact old 20-minute live value remains accepted during the source-first
-cutover so native enrollment continues. Apply the live timeout only after this
-guard lands, then verify live ruleset 10512119, fresh queue attempts, and
-removal reasons. This changes waiting time, not required checks or ALLGREEN.
+CI paths configured for 30 and 40 minutes. The source-first repair landed and
+live ruleset `10512119` was read back at 60 minutes on 2026-09-24. Re-read the
+live ruleset before changing capacity and retain exact queue attempts and
+removal reasons as outcome evidence. This changes waiting time, not required
+checks or ALLGREEN.
 
 Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
@@ -200,46 +200,28 @@ Mac demand fit with background headroom. This is a capacity ceiling, not a
 permanent preference for two. Required tests run on every synthetic head;
 GitHub's merge batch limit does not combine their builds or reuse stale results.
 
-### Native queue reconciliation
+### Native admission and production health
 
-`drain-pr-queue.sh` reads authoritative GitHub queue state, not the audit
-label. Every enrollment uses the exact current head SHA and proves the PR is
-queued after mutation. Hard-gated, conflicting, or terminal-red entries are
-dequeued through the native API and then have their audit label removed.
-Pending, queued, and cancelled check runs are not terminal failures, preventing
-dequeue/re-enroll loops during ordinary CI cancellation or main movement.
-An agent conflict that already carries `needs-conflict-resolution` is reported
-without repeating the same label mutation on every drain pass.
-When a non-draft main PR's required source checks never registered any
-check-run on its exact head (missing, not failing), the drain re-fires source
-CI with a bounded close+reopen: at most two per run, heads at least two hours
-old, and never twice on the same exact head (a bot-comment marker is the
-idempotency record). Terminal red checks still route to the fix agent instead.
-When a merge-group run proves a classified product failure, Gem writes the
-bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
-refusal. That success status preserves source-head cleanliness while acting as
-an exact-head tombstone after bounded Actions history rolls over; only a new
-source commit resets the product-failure memory.
+The finishing agent requests normal GitHub Merge when ready for its qualified
+exact head. GitHub's current queue entry, required checks, and combined-head
+result determine admission and landing. The Auto-Enroll and Queue-Deferred
+Release workflows are retired; do not wait for a drain pass, bot receipt, or
+fleet-health status before making that normal request. Historical product
+failure tombstones do not replace fresh source and combined-head evidence.
 
-### Fleet degradation policy
-
-The normal queue requires a fresh `GREEN` fleet receipt. When production is
-explicitly red but source `main` is green, the same controller may admit one
-exact-head UI/docs delta only after the semantic-isolation contract in
-`.github/MERGE_QUEUE.md` succeeds. All ordinary queue entries are held, and the
-production controller continues to reject deployment and promotion. Labels
-remain mechanical intent/hold signals and are never proof of isolation.
-
-When source `main` is red, no PR may merge and no deployment may start; UI/docs
-work may exist only as a draft. Unknown or stale production/main/controller/
-integrity evidence and severe integrity incidents admit nothing. The exception
-never permits business logic, auth, data, API, runtime, dependency, config, or
-control-plane changes, and a path-only classification is insufficient.
+Production health still governs deployment and promotion through the existing
+production controls. A production hold does not prohibit source repairs or
+create another source-admission controller. Required source, review, security,
+and combined-head gates stay in force. See
+[the native merge policy](../.github/MERGE_QUEUE.md) for live configuration
+receipts and the distinction between source landing and runtime certification.
 
 ### Summer closure-health stop-line
 
-Summer owns closure health; Gem remains the only native-queue and promotion
-writer. The closure observer classifies every open PR as `close`, `repair`,
+Summer owns closure health and the existing production writer retains
+promotion authority. The finishing agent requests native source admission;
+Gem is not the exclusive source-queue writer. The closure observer classifies
+every open PR as `close`, `repair`,
 `promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
 `close` requires the repository's explicit `duplicate` lifecycle label;
 matching titles or Linear issue IDs never prove semantic redundancy.
@@ -251,9 +233,11 @@ systems-down and fail every product closed. Promotion and deploy holds remain
 Jovie-scoped. Missing or malformed closure evidence fails new Jovie intake
 closed.
 
-Closure health is red when the sole queue controller stays non-green for more
-than 10 minutes, the native queue stays empty with eligible clean PRs for more
-than 15 minutes, an open PR stays unclassified for more than 15 minutes,
+The legacy closure observer includes a controller-health predicate that needs
+separate runtime reconciliation after Auto-Enroll retirement; its old result
+does not authorize another source-admission gate. Remaining closure signals
+include the native queue staying empty with eligible clean PRs for more than
+15 minutes, an open PR stays unclassified for more than 15 minutes,
 overlapping active artifacts for one Linear issue remain unresolved, an
 explicit hold expires, or no PR merges for one hour while open PRs remain.
 Held or draft PRs are not duplicate active writers; hold expiry governs them
@@ -323,7 +307,7 @@ each plane as separate evidence, never as a reason to repeat the mutation.
 |---|---|---|
 | `pr-size-guard` | Oversized PRs (codemods use `big-pr`) |
 | stack-depth guard (JOV-3457) | Runaway base-on-base agent stacks |
-| `drain-pr-queue.sh` (terminal-failure-only) | Zombie-check churn dequeuing green PRs |
+| GitHub native queue and exact-head merge-group checks | Landing without current combined-head proof |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
 
