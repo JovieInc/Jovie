@@ -11,10 +11,12 @@ import { GET } from './route';
 
 const h = vi.hoisted(() => ({
   session: vi.fn(),
+  admin: vi.fn(),
   store: vi.fn(),
   env: { OVIE_SUMMER_FOUNDER_APP_USER_ID: 'founder' },
 }));
 vi.mock('@/lib/auth/session', () => ({ getSessionContext: h.session }));
+vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.admin }));
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: h.store,
 }));
@@ -51,6 +53,7 @@ describe('founder Summer history readback', () => {
     vi.clearAllMocks();
     h.env.OVIE_SUMMER_FOUNDER_APP_USER_ID = 'founder';
     h.session.mockResolvedValue({ user: { id: 'founder' } });
+    h.admin.mockResolvedValue(true);
     store = new MemoryOperatingStore();
     h.store.mockReturnValue(store);
   });
@@ -226,6 +229,25 @@ describe('founder Summer history readback', () => {
       expect(h.store).not.toHaveBeenCalled();
     }
   );
+
+  it('denies a configured founder whose admin role was revoked before reading history', async () => {
+    h.admin.mockResolvedValue(false);
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(h.admin).toHaveBeenCalledWith('founder');
+    expect(h.store).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when current admin status cannot be checked', async () => {
+    h.admin.mockRejectedValue(new Error('private role backend detail'));
+    const response = await GET();
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(await response.json())).not.toContain(
+      'private role backend detail'
+    );
+    expect(h.store).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['Unauthorized', 401],
