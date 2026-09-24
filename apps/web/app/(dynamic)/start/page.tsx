@@ -82,6 +82,7 @@ export default async function StartPage(
 
   return (
     <OnboardingShell
+      isSignedIn={authResult.state !== CanonicalUserState.UNAUTHENTICATED}
       intentId={intentId}
       sessionLabel='pending'
       starterHandoff={starterHandoff}

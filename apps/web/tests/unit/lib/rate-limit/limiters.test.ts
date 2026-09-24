@@ -767,6 +767,42 @@ describe('limiters.ts', () => {
   // checkSpotifySearchRateLimit
   // =========================================================================
 
+  describe('checkAuthenticatedOnboardingChatRateLimit', () => {
+    it('charges a signed-in account and session without shared IP or ASN keys', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+      const { checkAuthenticatedOnboardingChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+
+      const result = await checkAuthenticatedOnboardingChatRateLimit(
+        'ba-user-1',
+        'session-1'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'session:session-1',
+        'better-auth:ba-user-1',
+        'better-auth:ba-user-1',
+      ]);
+    });
+
+    it('stops when the session lifetime cap is exhausted', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+      const { checkAuthenticatedOnboardingChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+
+      const result = await checkAuthenticatedOnboardingChatRateLimit(
+        'ba-user-1',
+        'session-1'
+      );
+
+      expect(result.success).toBe(false);
+      expect(mockLimit).toHaveBeenCalledExactlyOnceWith('session:session-1');
+    });
+  });
+
   describe('checkSpotifySearchRateLimit', () => {
     it('returns success when under limit', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());

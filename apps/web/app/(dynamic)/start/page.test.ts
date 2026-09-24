@@ -29,6 +29,17 @@ describe('StartPage', () => {
     });
   });
 
+  it('passes signed-in state into the chat shell after OTP', async () => {
+    mockResolveUserState.mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      context: { email: 'test@example.com' },
+    });
+
+    const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.isSignedIn).toBe(true);
+  });
+
   it('passes homepage intent and a validated starter handoff into the shell', async () => {
     const result = await StartPage({
       searchParams: Promise.resolve({
