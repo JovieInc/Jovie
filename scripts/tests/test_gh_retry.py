@@ -95,7 +95,7 @@ def _drain_command(
             """), encoding="utf-8")
         producer_gh.chmod(producer_gh.stat().st_mode | stat.S_IXUSR)
     expected = expected_gh or (gh_path / "gh")
-    authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
+    authorization = "test-fixture"
     env_prefix = (
         f'PATH="{gh_path}:{tmp_path}:$PATH" '
         'GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 '
@@ -2555,7 +2555,7 @@ class TestReleaseWaveAdmissionHold:
                 tmp_path,
                 backend="native",
                 extra_env=(
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_RELEASE_WAVE_HOLD=1 "
                     "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
                     f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
@@ -2634,6 +2634,67 @@ class TestReleaseWaveAdmissionHold:
 
 
 class TestDrainPrQueueWiring:
+    def test_retired_autoenroll_cannot_drain_or_rebase_before_github_calls(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "gh-called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+        env = {
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "GH_TOKEN": "read-token-fixture",
+            "GH_MUTATION_TOKEN": "writer-token-fixture",
+            "DRAIN_MUTATION_AUTHORIZATION": "merge-queue-autoenroll",
+            "MERGE_QUEUE_NATIVE_AUTHORIZATION": "merge-queue-autoenroll",
+            "DRY_RUN": "0",
+            "DRAIN_RELEASE_WAVE_HOLD": "0",
+            "GITHUB_WORKFLOW": "Merge Queue Auto-Enroll",
+            "GITHUB_WORKFLOW_REF": "JovieInc/Jovie/.github/workflows/merge-queue-autoenroll.yml@refs/pull/18220/merge",
+        }
+
+        command = ["bash", str(_DRAIN_SCRIPT)]
+        result = subprocess.run(
+            command,
+            cwd=_REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode == 2, result.stdout
+        assert "Merge Queue Auto-Enroll is retired" in result.stderr
+        assert not called.exists(), "retired drain reached gh"
+
+        rebase_command = [
+            "node",
+            str(_REPO_ROOT / "scripts" / "drain-pr-remediate.mjs"),
+            "--apply",
+        ]
+        for workflow_name, workflow_ref in (
+            ("Merge Queue Auto-Enroll", ""),
+            ("Other Workflow", env["GITHUB_WORKFLOW_REF"]),
+        ):
+            result = subprocess.run(
+                rebase_command,
+                cwd=_REPO_ROOT,
+                env={
+                    **env,
+                    "GITHUB_WORKFLOW": workflow_name,
+                    "GITHUB_WORKFLOW_REF": workflow_ref,
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            assert result.returncode != 0, result.stdout
+            assert "Merge Queue Auto-Enroll is retired" in result.stderr
+            assert not called.exists(), "retired rebase reached gh"
+
     def test_exact_admission_rereads_transient_unknown_mergeability(
         self, tmp_path: Path
     ) -> None:
@@ -3944,7 +4005,7 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRY_RUN=0 GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
@@ -3964,7 +4025,7 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRY_RUN=0 GITHUB_RUN_ID=79 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
@@ -3987,7 +4048,7 @@ JSON
                 extra_env=(
                     "DRY_RUN=0 TEST_MAIN_DRIFT_AFTER_ENROLL=1 "
                     "GITHUB_RUN_ID=78 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
