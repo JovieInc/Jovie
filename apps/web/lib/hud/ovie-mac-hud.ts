@@ -1,3 +1,5 @@
+import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
+
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
 export const YC_GOOD_GROWTH_MIN = 0.05;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -84,6 +86,7 @@ export type OvieMacHudSnapshot = {
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
 
@@ -571,6 +574,7 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
 }): OvieMacHudSnapshot {
@@ -585,6 +589,7 @@ export function composeOvieMacHudSnapshot(input: {
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };
 }

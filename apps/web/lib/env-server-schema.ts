@@ -152,6 +152,7 @@ export const ServerEnvSchema = z.object({
 
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
+  REVENUECAT_LYB_SECRET_API_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
@@ -510,6 +511,7 @@ export const ENV_KEYS = [
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
+  'REVENUECAT_LYB_SECRET_API_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
