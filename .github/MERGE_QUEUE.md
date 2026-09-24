@@ -14,33 +14,28 @@ parent lands. There is no second landing transport.
    be enrolled while that parent base is live. Do not add `merge-queue`.
 2. After the parent lands, retarget the child to `main`, rebase it from the
    recorded parent tip, and prove its exact remote head lease and semantic
-   ancestry. Mark the child ready. Native autoenroll owns queue mutation;
-   do not `gh pr merge` / `--auto` / `--admin`, and do not add `merge-queue`.
-3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
-   labels, the first source CI flight, and exact head SHA. It enrolls through
-   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
-   mutation. `ready_for_review` never launches a second source CI flight.
+   ancestry. Mark the child ready and request GitHub's normal Merge when ready
+   for its checked head. Do not use `--admin` or add `merge-queue`.
+3. GitHub validates required source checks and admits the PR to its native
+   merge queue. `ready_for_review` never launches a second source CI flight.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
    transitions its Linear issue to `Done`.
 
-Do not directly merge queue-eligible PRs or use a second transport. After the
-finishing agent verifies the exact current head, required checks, and absence
-of explicit human `hold`, `gated`, or `incident` labels, it requests GitHub's
-normal `Merge when ready` action. GitHub owns queue enrollment, admission,
-and merge.
+Do not directly merge queue-eligible PRs or use a second transport. GitHub's
+normal Merge when ready records intent and owns admission.
 
 ## Required contexts and CI stages
 
 Branch protection pins aggregate contexts only—never individual CI jobs.
 
-| Context | Source PR | Native `merge_group` |
-| --- | --- | --- |
-| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
-| `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
-| `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
-| `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |
+| Context           | Source PR                                                                                                                | Native `merge_group`                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
+| `Migration Guard` | Path-gated migration policy                                                                                              | Re-emitted and evaluated on the combined head                                                                                                                                        |
+| `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
+| `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 
 Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
 lanes are hosted manual, scheduled, repository-event, or post-merge work. They
@@ -62,18 +57,21 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
   latest-`main` validation.
 - Merge method: `SQUASH`
 - Grouping strategy: `ALLGREEN`
-- Minimum entries to merge: `5` (typed cohort; GitHub waits for this size or the bounded timeout)
-- Minimum entries wait: `10` minutes (low-traffic timeout so a partial cohort can still land)
+- Minimum entries to merge: live `1`; checked-in target `5` remains unapplied.
+- Minimum entries wait: live `0` minutes; checked-in target `10` remains
+  unapplied (live readback 2026-09-24). Do not apply the cohort target as part
+  of documentation or controller retirement.
 - Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
 - Maximum entries building concurrently: `2` — the live ruleset builds up to
   two combined heads at a time (live readback 2026-09-20, JOV-6107; the 1→2
   apply is complete; do not restore the superseded 2026-08-15 three-prefix
   canary value)
-- Check response timeout: source target `60` minutes; live remains `20` until
-  the source-first cutover lands. Re-read ruleset 10512119 before claiming the
-  60-minute deadline is active. All required checks and ALLGREEN remain.
-- Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
-- Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
+- Check response timeout: `60` minutes (source-first cutover and live readback
+  verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
+- Production health governs deployment and promotion through the existing
+  production controls. Native source admission uses the required checks above;
+  the retired Auto-Enroll fleet gate does not create a second admission gate.
+- Re-read live ruleset `10512119` before claiming the source cohort settings are active; the custom Auto-Enroll workflow is retired.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
   separate reviewed cutover, not an implicit source reapply.
@@ -91,8 +89,9 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
 `ci:merge-queue:verify` (live ruleset `10512119` via `gh api`) runs in
 `.github/workflows/merge-queue-ruleset-verify.yml` on a daily schedule, on
 `main` pushes that touch the ruleset/check sources, and on `workflow_dispatch`.
-It is not a source `PR Ready` context. Failures notify Slack. Pending native
-cohort cutover fields are already exempted in `validateLiveMergeQueueRuleset`.
+It is not a source `PR Ready` context. Failures notify Slack. Always inspect
+differences between checked-in intent and the current live ruleset before any
+policy change; a documentation value is not an apply receipt.
 
 Bare local controller/check commands default to `native`, matching the live
 repository variable. Unknown backends fail closed. Native enrollment/dequeue
@@ -101,50 +100,26 @@ bare local command cannot mutate queue state accidentally.
 
 ## Reconciliation and loop prevention
 
-`drain-pr-queue.sh` reads GitHub's GraphQL queue state once per bounded drain.
-It fails closed if an open PR is missing from that authoritative snapshot.
+The finishing agent requests GitHub Merge when ready against the exact PR head.
+GitHub owns queue membership, combined-head checks, and merge ordering. A
+one-shot `gh pr merge --auto --match-head-commit` request is not a queue receipt;
+read `mergeQueueEntry` before claiming admission.
 
-- Enrollment refreshes PR metadata immediately before mutation and binds the
-  request to a full 40-character head SHA.
-- Enrollment and dequeue prove their postconditions; failed mutations are
-  reconciled from fresh state rather than blindly retried.
-- Explicit `hold`, `gated`, and `incident` labels, actual conflicts, and
-  terminal-red checks remove native queue membership and the audit label.
-- Pending, queued, and cancelled checks are not terminal red. This prevents
-  cancellation churn from becoming a dequeue/re-enroll loop.
-- Main movement triggers event-driven reconciliation and bounded mechanical
-  update-branch/rebase repair for agent branches. There is no polling watchdog
-  or legacy vendor label-cycle loop in the native path.
-- Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
-  race another controller instance.
-- An above-target count of eligible PRs is queue-pressure telemetry, not a
-  promotion blocker. Closing admission at that threshold would set native
-  capacity to zero and deadlock the only controller that can drain the
-  backlog. New issue intake pauses until the count returns to target, while
-  existing implementation and the native drain continue. Unknown or malformed
-  queue evidence still fails closed.
-- UNMERGEABLE auto-eject (JOV-5291): a parked `UNMERGEABLE` native entry is
-  dequeued with a typed exact-head success receipt
-  (`jovie-native-unmergeable/v1`). The source PR can stay MERGEABLE/CLEAN —
-  GitHub parked the group, not the PR. The same head is not re-enqueued.
-  Tell it worked: `list-state` shows no `UNMERGEABLE` members, and the eject
-  receipt's description starts with `ejected:`.
-- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch is
-  currently `disabled_manually` (since 2026-09-02, verified 2026-09-20), and
-  its source gate accepts only `pull_request` producers, so it does not fire
-  on failed `merge_group` runs today. Until it is re-enabled and its gate is
-  widened (a founder/fleet decision), a failed combined head is repaired by
-  hand: fix the failing source PR and let GitHub rebuild the group. When
-  active, Rolling CI Dispatch accepts
-  completed `CI` `workflow_run` events whose producer is `merge_group`,
-  resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
-  launches FX against that source branch. Tell it worked (only once
-  re-enabled): a failed merge_group
-  CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
-  Runner-class failures (checkout, infra, flake) still launch FX and record a
-  named Actions outcome (`launched` / `repaired` / `skipped_stale` /
-  `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
-  is live or `LIVE_AUTHOR` is blank (JOV-5335).
+`drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
+source-admission and rebase path has no automatic caller. Hard-gate labels block
+the agent finishing request; required GitHub checks govern landing. Pending,
+queued, and cancelled checks do not imply a terminal source failure.
+
+- Hosted FX remediation: `rolling-ci-dispatch.yml` consumes completed source-PR
+  CI events. The workflow remains disabled, and both
+  `FX_HOSTED_REMEDIATION_ENABLED` and `FX_HOSTED_REMEDIATION_CANARY_PR` are
+  unset at the 2026-09-24 live readback. Its bounded lane admits modified source
+  with immutable ordinary test companions, validates actual behavioral tests
+  and coverage, and uses a separate trusted writer to compare-and-swap the
+  current PR head. Source landing does not prove activation or a successful
+  repair. Existing Hyperagent delivery handles merge-group failures; an
+  accepted webhook is not a repair or merge receipt. Repair findings in their
+  source PR and let GitHub rebuild the group. No new queue controller is needed.
 - Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
   ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
   group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
@@ -156,40 +131,25 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   only after land/runtime proof through the release/UI path. This is a
   classified skip, not an `enroll` product failure (it must not mark the PR
   UNSTABLE).
-- Enroll live policy (JOV-5291): preflight reads GraphQL
-  `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
-  `max_entries_to_build` drift cannot fail `enroll` after the lock already
-  matches the live build count. Tell it worked: a CLEAN PR's `enroll` check
-  stays green while GraphQL reads the live value (`2` at the 2026-09-20
-  readback).
-- Front-item churn guard (JOV-5030): every native group build runs on
-  `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
-  CI runs identify which PR fronted each failed attempt and against which
-  exact main base. The drain refuses to re-enroll — and actively dequeues — a
-  PR whose unchanged head already fronted a failed attempt on the exact
-  current main base, because the rebuilt group would deterministically fail
-  again and force every follower through a duplicate full merge-group CI run.
-  The guard lifts when the head moves or main advances, and never acts on
-  missing evidence (`unknown` → no dequeue, pre-guard enrollment behavior).
-  The pipeline scoreboard measures real `merge_group` attempts from the
-  Actions API and alarms on `merge_queue_churn` (≥3 attempts at ≥2 attempts
-  per merge).
+- Cancellation diagnosis: read the queue timeline's actor and reason, the
+  exact combined SHA, and the matching CI run before attributing a dequeue.
+  Native supersession, real failed checks, merge conflicts, and bot-driven
+  removals are different outcomes. Missing or incomplete run inventory is
+  unknown evidence and must not authorize a dequeue.
 
-## Retired queue-deferred release workflow
+## Retired admission automation
 
-The Queue-Deferred Release workflow is retired. `queue-deferred` and
-`needs-conflict-resolution` are retired machine annotations; native queue
-admission ignores both labels. After verifying the exact current PR head,
-required checks, and absence of explicit human `hold`, `gated`, or `incident`
-labels, the finishing agent requests GitHub's normal `Merge when ready`
-action. GitHub owns queue enrollment, admission, and merge. Actual merge
-conflicts and failed required checks also prevent admission. Shared deferral
-receipt helpers remain available for existing records but do not authorize
-queue admission.
+`merge-queue-autoenroll.yml`, its heartbeat dispatch, and ownerless source
+admission are retired. The Queue-Deferred Release workflow and its automatic
+label writer are also retired. Do not re-enable those paths to finish a PR.
 
-## Ownerless focused recovery
+`queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical
+machine annotations, not native admission authority. Actual conflicts, failed
+required checks, draft state, and explicit human `hold`, `gated`, or `incident`
+labels still block the finishing request. Shared receipt and fleet helpers
+remain for their other callers and historical records; their presence does
+not make a retired workflow active.
 
-`ownerless-recovery-sweep.yml` is a hosted fallback independent of Gem, Symphony, and fleet health. It carries no schedule of its own: Runner Heartbeat's remediation clock dispatches it every 10 minutes (`runner-heartbeat.yml`, cron `*/10 * * * *`). On each dispatch it may promote a PR unassigned for at least one hour only when the exact head is same-repo, current with `main`, unstacked, conflict-free, focused to CI, DevEx, delivery control, or waitlist-canary files, and has passing focused checks. Incomplete patches and credential, privacy, destructive, production-promotion, or check-bypass changes fail closed. It records an attempt receipt before mutation; success requires the same head to be merged or to have a positive authoritative native queue position.
 ### Update Branch convergence
 
 Update Branch can advance the branch Git ref before the PR database, timeline,
@@ -221,66 +181,25 @@ entitlements, data writes, security/CSP, infra, routing, package manifests, CI,
 and broad refactors fail closed out of this lane. The policy lives in
 `scripts/lib/merge-queue-guard.mjs`.
 
-## Production-red isolated admission
+## Source landing and production
 
-The canonical fleet gate separates source-main health from production health.
-There is one deliberately narrow exception to the normal `GREEN` promotion
-requirement:
-
-- If source `main` is explicitly green, production is explicitly red, the
-  controller/integrity/queue evidence is fresh and unambiguous, the existing
-  native queue may hold at most one semantically isolated UI/docs PR.
-- Production deployment and promotion remain frozen. Landing the source does
-  not assert, imply, or initiate a deployment.
-- If `main` is red, source merge and deployment are frozen. UI/docs work may be
-  preserved only as a draft. Unknown, stale, malformed, severe-integrity, or
-  mixed failure evidence admits nothing.
-
-Eligibility is computed by `scripts/lib/isolated-ui-docs-policy.mjs` inside the
-existing `merge-queue-autoenroll` controller. It is never inferred from labels
-or path matches alone. Each admission pins the exact PR number, current `main`
-base SHA, published head SHA, complete paginated file manifest, blob SHAs, and a
-deterministic diff digest. Every file must be in the small docs/assets/styles/
-UI-atom allowlist; semantic source inspection rejects auth, identity, data,
-database, API, billing, entitlement, runtime, dependency, configuration,
-server-action, network, storage, routing, and control-plane behavior. Deletes,
-renames, broad refactors, escaping imports, or ambiguity fail closed.
-
-UI changes additionally require an additive focused test delta, before/after
-visual evidence, focused-test, typecheck, and lint/Biome receipts. Docs-only
-changes require rendered-docs proof. The four live branch-protection contexts
-must be successful on the exact head. The controller re-evaluates the complete
-receipt immediately before and after native enrollment and compensates by
-dequeueing if mutable evidence changes during the operation. Ordinary queued
-PRs are held outside the native queue until production returns green; no second
-queue, alternate transport, label authority, or CI bypass exists. Before a
-fleet-driven dequeue in `isolated-only`, the controller writes a pending
-`jovie-fleet-queue-hold/v1` commit status on that exact head with an explicit
-expiry. Waiting lanes (`hold-intake`, `draft-only` / main-not-green, and
-blocked-unknown) must not stamp an unbounded pending hold or strip enroll from
-CLEAN unrelated PRs. A later successful `Production Controller` completion
-under a fresh normal `GREEN` gate may still consume remaining receipts and
-re-enroll the still-current heads through the same native preflight and
-postcondition checks. Any pending hold that outlives `FLEET_HOLD_TTL_SECONDS`
-(default 12 minutes) is closed to success or failure with a terminal reason.
-The recovery signal binds the stable workflow path (including GitHub's optional
-`@ref` suffix), not the controller's dynamic run title. Main-push and
-untargeted manual runs cannot perform this recovery.
+The Auto-Enroll isolated UI/docs exception is retired with that controller.
+Finishing agents request native Merge when ready after exact-head checks and
+human holds are verified. GitHub validates the current combined head before
+merging. Existing production health, deployment, budget, and promotion controls
+retain their own authority. A native source merge does not prove deployment,
+runtime behavior, or Summer commissioning.
 
 ## Monitoring and troubleshooting
 
 - Queue state: GitHub's repository merge queue UI or
   `node scripts/merge-queue-backend.mjs list-state` with authenticated `gh`.
-- PR not entering: check draft/mergeability, hard-gate labels, required check
-  conclusions, controller App credentials, and the auto-enroll run.
-- Combined head red: repair the failing source PR, update its branch through the
-  controller flow, and let GitHub rebuild the queue group. Do not force a stale
-  combined head through production.
-- Queue controller refuses mutation: confirm the repository variable is exactly
-  `native`; a missing/non-native value intentionally fails the workflow closed.
-- Emergency response: pause auto-enrollment, drain or dequeue native entries
-  through the controller, repair the native ruleset/workflow, and prove one
-  canary before resuming. Do not introduce a second landing transport.
+- PR not entering: inspect the exact-head Merge when ready request, current
+  draft/mergeability state, hard-gate labels, and required GitHub checks.
+- Combined head red: repair the source PR and let GitHub rebuild the queue
+  group. Do not force a stale combined head through production.
+- Emergency response: inspect the native ruleset and exact queue entry,
+  repair the source or required check, and prove a fresh native canary.
 
 ## Signed commits
 
