@@ -273,13 +273,13 @@ function shell(command, opts = {}) {
   };
 }
 
-function changedFiles(patterns) {
+export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   let diffBase = 'HEAD^1';
   if (event === 'pull_request') {
     const base = process.env.GITHUB_BASE_REF || 'main';
     // Prefer origin/<base> when available (fetch done by workflow).
-    const probe = shell(`git rev-parse --verify origin/${base}`);
+    const probe = shell(`git rev-parse --verify origin/${base}`, { cwd });
     diffBase =
       probe.code === 0
         ? `origin/${base}`
@@ -288,9 +288,14 @@ function changedFiles(patterns) {
     diffBase = process.env.TURBO_SCM_BASE;
   }
 
+  // A PR diff starts at its merge base; main-only updates are not PR changes.
+  // Combined-head and push checks retain their exact two-tree comparison.
+  const range =
+    event === 'pull_request' ? `${diffBase}...HEAD` : `${diffBase} HEAD`;
   const pathspecs = patterns.map(p => `'${p}'`).join(' ');
   const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD -- ${pathspecs}`
+    `git diff --diff-filter=ACDMRT --name-only ${range} -- ${pathspecs}`,
+    { cwd }
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).
@@ -381,27 +386,8 @@ export function runBillingCoverage() {
   return { code: 0, output: combined };
 }
 
-function listAllChangedFiles() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  let diffBase = 'HEAD^1';
-  if (event === 'pull_request') {
-    const base = process.env.GITHUB_BASE_REF || 'main';
-    const probe = shell(`git rev-parse --verify origin/${base}`);
-    diffBase =
-      probe.code === 0
-        ? `origin/${base}`
-        : process.env.TURBO_SCM_BASE || diffBase;
-  } else if (process.env.TURBO_SCM_BASE) {
-    diffBase = process.env.TURBO_SCM_BASE;
-  }
-  const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD`
-  );
-  if (result.code !== 0) return null;
-  return result.output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+export function listAllChangedFiles(cwd = REPO_ROOT) {
+  return changedFiles([], cwd);
 }
 
 let cachedRepoLanes = null;
