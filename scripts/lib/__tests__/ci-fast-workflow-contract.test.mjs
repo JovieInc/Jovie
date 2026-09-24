@@ -1207,7 +1207,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'summer-symphony-outbox-(consumer(\\.test)?|contract\\.test)\\.mjs$'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
+      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-admitter.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-source.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs scripts/symphony/summer-shipping-lead-source.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
@@ -1618,6 +1618,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
       'scripts/symphony/summer-shipping-lead-contract.mjs',
       'scripts/symphony/summer-shipping-lead-contract.test.mjs',
+      'scripts/symphony/summer-shipping-lead-admitter.mjs',
+      'scripts/symphony/summer-shipping-lead-source.mjs',
+      'scripts/symphony/summer-shipping-lead-source.test.mjs',
       'scripts/symphony/native-queue-starvation-execute.test.mjs',
       'scripts/symphony/systemd/gem-disk-reclaim.service',
       'scripts/symphony/systemd/gem-disk-reclaim.timer',

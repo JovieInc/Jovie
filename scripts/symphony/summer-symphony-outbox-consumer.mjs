@@ -29,12 +29,17 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  createRuntimeBoundShippingAdmitter,
+  validateAdmissionProgress,
+} from './summer-shipping-lead-admitter.mjs';
+import {
   SHIPPING_OUTBOX,
   SHIPPING_TASK,
   signShippingOutcome,
   validateShippingOutcome,
   validateShippingTask,
 } from './summer-shipping-lead-contract.mjs';
+import { loadCanonicalShippingAdmission } from './summer-shipping-lead-source.mjs';
 
 export const READ_DOMAIN = 'summer.symphony-outbox-read/v1';
 export const OUTBOX_DOMAIN = 'jovie.eve.symphony-repair-outbox/v1';
@@ -1077,9 +1082,21 @@ export function validateState(state, keys, outcomePublicKey = null) {
       throw new Error('consumer-state-invalid');
     }
   } else if (state.active.phase === 'discovered') {
-    if (!exactKeys(state.active, ['phase', 'taskKey', 'record'])) {
+    const hasAdmission =
+      task.schema === SHIPPING_TASK &&
+      Object.hasOwn(state.active, 'admissionProgress');
+    if (
+      !exactKeys(state.active, [
+        'phase',
+        'taskKey',
+        'record',
+        ...(hasAdmission ? ['admissionProgress'] : []),
+      ])
+    ) {
       throw new Error('consumer-state-invalid');
     }
+    if (hasAdmission)
+      validateAdmissionProgress(state.active.admissionProgress, task);
   } else if (state.active.phase?.startsWith('execution-')) {
     const { phase, execution, attempts } = state.active;
     const hasExecution = ['execution-pending', 'execution-recorded'].includes(
@@ -2309,26 +2326,37 @@ export function configFromEnvironment(environment = process.env) {
 
 async function main() {
   const config = configFromEnvironment();
-  const result = await runCycle({
-    journal: createFileJournal(
-      config.workspace,
-      config.keys,
-      config.outcomePublicKey
-    ),
-    transport: createHttpTransport(config),
-    keys: config.keys,
-    executor: createOwnedRepairExecutor(),
-    projector: config.linearApiKey ? createLinearProjector(config) : null,
-    outcomePrivateKey: config.outcomePrivateKey,
-    outcomePublicKey: config.outcomePublicKey,
-    outcomeKeyId: config.outcomeKeyId,
-  });
-  process.stdout.write(
-    `${JSON.stringify({
-      schema: 'jovie.summer-symphony-consumer-cycle/v1',
-      ...result,
-    })}\n`
+  const journal = createFileJournal(
+    config.workspace,
+    config.keys,
+    config.outcomePublicKey
   );
+  const shippingLeadAdmitter = createRuntimeBoundShippingAdmitter({
+    journal,
+    loadSource: () =>
+      loadCanonicalShippingAdmission({ workspace: config.workspace }),
+  });
+  try {
+    const result = await runCycle({
+      journal,
+      shippingLeadAdmitter,
+      transport: createHttpTransport(config),
+      keys: config.keys,
+      executor: createOwnedRepairExecutor(),
+      projector: config.linearApiKey ? createLinearProjector(config) : null,
+      outcomePrivateKey: config.outcomePrivateKey,
+      outcomePublicKey: config.outcomePublicKey,
+      outcomeKeyId: config.outcomeKeyId,
+    });
+    process.stdout.write(
+      `${JSON.stringify({
+        schema: 'jovie.summer-symphony-consumer-cycle/v1',
+        ...result,
+      })}\n`
+    );
+  } finally {
+    shippingLeadAdmitter.close();
+  }
 }
 
 if (

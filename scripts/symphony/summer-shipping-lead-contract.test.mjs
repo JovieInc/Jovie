@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import {
+  createRuntimeBoundShippingAdmitter,
+  createShippingLeadAdmitter,
+} from './summer-shipping-lead-admitter.mjs';
 import {
   SHIPPING_OUTBOX,
   SHIPPING_OUTCOME,
@@ -12,6 +19,7 @@ import {
   validateShippingTask,
 } from './summer-shipping-lead-contract.mjs';
 import {
+  createFileJournal,
   runCycle,
   STATE_SCHEMA,
   validateState,
@@ -89,6 +97,367 @@ function terminal() {
     executionTerminated: true,
   };
 }
+
+function admissionFixture(context, value = fixture()) {
+  const root = mkdtempSync(join(tmpdir(), 'shipping-admission-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const open = () => createFileJournal(root, keys, host.publicKey);
+  const journal = open();
+  journal.write({
+    schema: STATE_SCHEMA,
+    active: {
+      phase: 'discovered',
+      taskKey: value.taskKey,
+      record: outbox(value),
+    },
+  });
+  return {
+    journal,
+    open,
+    task: value,
+    intent: {
+      taskKey: value.taskKey,
+      issueId: value.issue.id,
+      method: 'transitionIssue',
+    },
+  };
+}
+
+function runtimeFor(task) {
+  const observedAt = new Date().toISOString();
+  return {
+    schema: 'symphony-shipping-runtime-observation/v1',
+    sourceRevision: task.runtime.sourceRevision,
+    generation: task.runtime.generation,
+    invocationId: task.runtime.invocationId,
+    observedAt,
+    generatedAt: observedAt,
+    stateDigest: '1'.repeat(64),
+    running: [],
+    retrying: [],
+    blocked: [],
+  };
+}
+
+test('production adapter loads once and revalidates runtime before durable mutation intent', async context => {
+  const f = admissionFixture(context);
+  const events = [];
+  const adapter = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    loadSource: async () => {
+      events.push('load');
+      return {
+        sourceRevision: f.task.source.sourceVersion,
+        observeRuntime: async () => {
+          events.push('runtime');
+          return runtimeFor(f.task);
+        },
+        admit: async (task, { beforeMutation }) => {
+          await beforeMutation(f.intent);
+          assert.equal(
+            f.open().read().active.admissionProgress.mutationCount,
+            1
+          );
+          events.push('provider');
+          return { status: 'admitted' };
+        },
+        cleanup: () => events.push('cleanup'),
+      };
+    },
+  });
+  assert.equal(
+    (await adapter.execute(f.task)).reason,
+    'shipping-lead-awaiting-owner-terminal-proof'
+  );
+  assert.deepEqual(events, ['load', 'runtime', 'runtime', 'provider']);
+  await adapter.execute(f.task);
+  adapter.close();
+  assert.deepEqual(events, [
+    'load',
+    'runtime',
+    'runtime',
+    'provider',
+    'cleanup',
+  ]);
+});
+
+test('production adapter holds changed control or live runtime identities before writes', async context => {
+  const f = admissionFixture(context);
+  const now = Date.now();
+  for (const changed of [
+    { schema: 'foreign' },
+    { sourceRevision: 'b'.repeat(40) },
+    { generation: 'b'.repeat(64) },
+    { invocationId: 'b'.repeat(32) },
+    { stateDigest: 'bad' },
+    { running: null },
+    { generatedAt: 'bad' },
+    { observedAt: 'bad' },
+    { observedAt: new Date(now - 601_000).toISOString() },
+    { observedAt: new Date(now + 61_000).toISOString() },
+    { generatedAt: new Date(now - 601_000).toISOString() },
+    { generatedAt: new Date(now + 1000).toISOString() },
+  ]) {
+    let calls = 0;
+    const adapter = createRuntimeBoundShippingAdmitter({
+      journal: f.journal,
+      now: () => now,
+      loadSource: async () => ({
+        sourceRevision: f.task.source.sourceVersion,
+        observeRuntime: async () => ({ ...runtimeFor(f.task), ...changed }),
+        admit: async () => {
+          calls++;
+        },
+        cleanup: () => {},
+      }),
+    });
+    await assert.rejects(adapter.execute(f.task), /runtime-binding/);
+    assert.equal(calls, 0);
+    adapter.close();
+  }
+  const changedSource = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    loadSource: async () => ({ sourceRevision: 'b'.repeat(40) }),
+  });
+  await assert.rejects(changedSource.execute(f.task), /control-source-changed/);
+  assert.equal(f.open().read().active.admissionProgress, undefined);
+});
+
+test('runtime generation change during canonical gates prevents the provider mutation', async context => {
+  const f = admissionFixture(context);
+  let reads = 0,
+    writes = 0;
+  const adapter = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    loadSource: async () => ({
+      sourceRevision: f.task.source.sourceVersion,
+      observeRuntime: async () => ({
+        ...runtimeFor(f.task),
+        generation: ++reads === 1 ? f.task.runtime.generation : 'b'.repeat(64),
+      }),
+      admit: async (_task, { beforeMutation }) => {
+        await beforeMutation(f.intent);
+        writes++;
+      },
+      cleanup: () => {},
+    }),
+  });
+  await assert.rejects(adapter.execute(f.task), /runtime-binding/);
+  assert.equal(writes, 0);
+  assert.equal(f.open().read().active.admissionProgress, undefined);
+  adapter.close();
+});
+
+test('an expired untouched request does not load canonical code or probe runtime', async context => {
+  const f = admissionFixture(context);
+  const adapter = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    now: () => Date.parse(f.task.expiresAt) + 1,
+    loadSource: async () => {
+      throw new Error('must not load');
+    },
+  });
+  assert.equal(
+    (await adapter.rejectExpired(f.task)).resolution,
+    'rejected-before-execution'
+  );
+  adapter.close();
+});
+
+test('durable mutation intent survives lost response and never admits twice', async context => {
+  const f = admissionFixture(context);
+  let attempts = 0;
+  const admit = async (_task, { beforeMutation }) => {
+    attempts++;
+    await beforeMutation(f.intent);
+    assert.equal(f.open().read().active.admissionProgress.mutationCount, 1);
+    throw new Error('provider response lost');
+  };
+  await assert.rejects(
+    createShippingLeadAdmitter({ journal: f.journal, admit }).execute(f.task),
+    /response lost/
+  );
+  const resumed = createShippingLeadAdmitter({ journal: f.open(), admit });
+  assert.equal(
+    (await resumed.execute(f.task)).reason,
+    'shipping-lead-mutation-outcome-unknown'
+  );
+  const expired = createShippingLeadAdmitter({
+    journal: f.open(),
+    admit,
+    now: () => Date.parse(f.task.expiresAt) + 1,
+  });
+  assert.equal(
+    (await expired.rejectExpired(f.task)).reason,
+    'shipping-lead-mutation-outcome-unknown'
+  );
+  assert.equal(attempts, 1);
+});
+
+test('canonical admission persists separately from terminal owner proof', async context => {
+  const f = admissionFixture(context);
+  let attempts = 0;
+  const admit = async (_task, { beforeMutation }) => {
+    attempts++;
+    await beforeMutation({ ...f.intent, method: 'addComment' });
+    await beforeMutation(f.intent);
+    return {
+      status: 'admitted',
+      issue: f.task.issue.identifier,
+      mutations: 'verified',
+    };
+  };
+  const result = await createShippingLeadAdmitter({
+    journal: f.journal,
+    admit,
+  }).execute(f.task);
+  assert.equal(result.reason, 'shipping-lead-awaiting-owner-terminal-proof');
+  const progress = f.open().read().active.admissionProgress;
+  assert.equal(progress.mutationCount, 2);
+  assert.match(progress.admissionDigest, /^[a-f0-9]{64}$/u);
+  const resumed = createShippingLeadAdmitter({
+    journal: f.open(),
+    admit,
+    observe: async (task, retained) => {
+      assert.equal(task.taskKey, f.task.taskKey);
+      assert.deepEqual(retained, progress);
+      return { status: 'held', reason: 'worker-still-running' };
+    },
+  });
+  assert.equal((await resumed.execute(f.task)).reason, 'worker-still-running');
+  assert.equal(attempts, 1);
+});
+
+test('expires only untouched requests and retains canonical gate holds', async context => {
+  const f = admissionFixture(context);
+  const untouched = createShippingLeadAdmitter({ journal: f.journal });
+  assert.equal(
+    (await untouched.execute(f.task)).reason,
+    'canonical-shipping-lead-admitter-unavailable'
+  );
+  assert.equal(
+    (await untouched.rejectExpired(f.task)).reason,
+    'shipping-lead-request-not-expired'
+  );
+  for (const result of [{ status: 'blocked', reason: 'fleet-held' }, null]) {
+    const a = createShippingLeadAdmitter({
+      journal: f.open(),
+      admit: async () => result,
+    });
+    assert.equal((await a.execute(f.task)).status, 'held');
+    assert.equal(f.open().read().active.admissionProgress, undefined);
+  }
+  const completedAt = Date.parse(f.task.expiresAt) + 1;
+  const expired = createShippingLeadAdmitter({
+    journal: f.open(),
+    now: () => completedAt,
+  });
+  const result = await expired.execute(f.task);
+  assert.equal(result.resolution, 'rejected-before-execution');
+  assert.equal(result.ownerAcceptanceDigest, null);
+  assert.equal(result.executionTerminated, true);
+  signShippingOutcome(
+    f.task,
+    result,
+    host.privateKey,
+    'host-outcomes',
+    completedAt
+  );
+});
+
+test('journal failures and crossed mutation targets stop before provider mutation', async context => {
+  const f = admissionFixture(context);
+  let providerWrites = 0;
+  const admit = async (_task, { beforeMutation }) => {
+    await beforeMutation(f.intent);
+    providerWrites++;
+    return { status: 'admitted' };
+  };
+  const broken = {
+    read: () => f.journal.read(),
+    write: () => {
+      throw new Error('disk full');
+    },
+  };
+  await assert.rejects(
+    createShippingLeadAdmitter({ journal: broken, admit }).execute(f.task),
+    /disk full/
+  );
+  assert.equal(providerWrites, 0);
+  for (const intent of [
+    { ...f.intent, method: 'deleteIssue' },
+    { ...f.intent, issueId: 'foreign' },
+    { ...f.intent, taskKey: '0'.repeat(64) },
+    { ...f.intent, extra: true },
+  ]) {
+    await assert.rejects(
+      createShippingLeadAdmitter({
+        journal: f.journal,
+        admit: async (_task, { beforeMutation }) => beforeMutation(intent),
+      }).execute(f.task),
+      /intent-cross-bound/
+    );
+  }
+  await assert.rejects(
+    createShippingLeadAdmitter({
+      journal: f.journal,
+      admit: async () => ({ status: 'admitted' }),
+    }).execute(f.task),
+    /without-journal/
+  );
+  await assert.rejects(
+    createShippingLeadAdmitter({ journal: f.journal }).execute({
+      ...f.task,
+      taskKey: 'b'.repeat(64),
+    }),
+    /journal-cross-bound/
+  );
+});
+
+test('partial canonical writes remain held and malformed retained progress is rejected', async context => {
+  const f = admissionFixture(context);
+  const admit = async (_task, { beforeMutation }) => {
+    await beforeMutation(f.intent);
+    return { status: 'blocked', reason: 'gate-changed' };
+  };
+  assert.equal(
+    (
+      await createShippingLeadAdmitter({ journal: f.journal, admit }).execute(
+        f.task
+      )
+    ).reason,
+    'shipping-lead-mutation-outcome-unknown'
+  );
+  const state = f.open().read();
+  const p = state.active.admissionProgress;
+  for (const change of [
+    { schema: 'foreign' },
+    { taskDigest: 'f'.repeat(64) },
+    { mutationCount: -1 },
+    { mutationCount: 101 },
+    { mutationCount: 0 },
+    { mutationCount: 0.5 },
+    { lastMutation: null },
+    { admissionDigest: 'bad' },
+    { lastMutation: { ...p.lastMutation, recordedAt: 'bad' } },
+    { lastMutation: { ...p.lastMutation, recordedAt: '2000-01-01T00:00:00Z' } },
+    { lastMutation: { ...p.lastMutation, method: 'deleteIssue' } },
+    { lastMutation: { ...p.lastMutation, issueId: 'foreign' } },
+    { extra: true },
+  ]) {
+    assert.throws(
+      () =>
+        f.journal.write({
+          ...state,
+          active: {
+            ...state.active,
+            admissionProgress: { ...p, ...change },
+          },
+        }),
+      /progress-invalid/
+    );
+  }
+});
 function cycle(record = outbox()) {
   let state = {
     schema: STATE_SCHEMA,
