@@ -273,6 +273,7 @@ function shell(command, opts = {}) {
   };
 }
 
+/** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   let diffBase = 'HEAD^1';
