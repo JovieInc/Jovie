@@ -658,6 +658,12 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 "completedAt": MODULE.isoformat(now),
             },
         }
+        controller_signal = {
+            "status": "green",
+            "kind": "symphony",
+            "source": "live",
+            "observedAt": MODULE.isoformat(now),
+        }
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
             args = MODULE.argparse.Namespace(
@@ -682,8 +688,8 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 mock.patch.object(
                     MODULE,
                     "observe_controller",
-                    return_value={"status": "green"},
-                ),
+                    return_value=controller_signal,
+                ) as controller_observer,
                 mock.patch.object(
                     MODULE,
                     "observe_integrity",
@@ -705,7 +711,8 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     MODULE,
                     "observe_closure_health",
                     return_value=GREEN_SIGNALS["closureHealth"],
-                ),
+                ) as closure_observer,
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
                 mock.patch.object(
                     MODULE,
                     "observe_lease",
@@ -718,6 +725,25 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 ),
             ):
                 signals = MODULE.observe_signals(args, now)
+
+        controller_observer.assert_called_once_with(
+            args.symphony_url,
+            snapshot_path=MODULE.fleet_sidecar_path(
+                state_dir, args.repo, "controller-snapshot.json"
+            ),
+            now=now,
+        )
+        closure_observer.assert_called_once_with(
+            args.repo,
+            None,
+            now,
+            controller_observation=controller_signal,
+        )
+        self.assertIs(signals["controller"], controller_signal)
+        self.assertIs(
+            closure_observer.call_args.kwargs["controller_observation"],
+            controller_signal,
+        )
 
         audit_observer.assert_called_once_with("JovieInc/Jovie", main["sha"], MODULE.gh_json,
                                               targets=GREEN_SIGNALS["closureHealth"].get("lifecycleActions", []))
@@ -2290,6 +2316,33 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_issue_blocked_and_systems_down_keep_distinct_admission_effects(self):
+        closure_blocked = dict(GREEN_SIGNALS)
+        closure_blocked["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+        issue_receipt = self.evaluate(closure_blocked)
+        self.assertEqual(issue_receipt["state"], "GREEN")
+        self.assertFalse(issue_receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(issue_receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(issue_receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(issue_receipt["remediationAdmission"]["allowed"])
+
+        systems_down = dict(GREEN_SIGNALS)
+        systems_down["controller"] = {
+            "status": "failed",
+            "kind": "symphony",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        system_receipt = self.evaluate(systems_down)
+        self.assertEqual(system_receipt["promotionMode"], "hold-intake")
+        self.assertTrue(system_receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(system_receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(system_receipt["deploymentAdmission"]["allowed"])
 
     def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
         """native-queue-empty-with-eligible is a feed signal: blocking
