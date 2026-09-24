@@ -3,7 +3,11 @@ name: Rolling CI Dispatch
 # accountable-writer: Gem
 # necessary-trust-boundary: Hosted workflow_run classifies exact-head CI failures; FX has no write token and a trusted writer applies tested patches.
 # activation: Requires repository variable FX_HOSTED_REMEDIATION_ENABLED=true and FX_HOSTED_REMEDIATION_CANARY_PR=<one positive PR number>; both are fail-closed.
-# GITHUB_TOKEN cannot read repository variables, so a dispatched run cannot observe mid-run changes. To change canaries: set enabled=false, cancel/drain every queued or running run of this workflow, wait for zero active runs, change the canary PR, then re-enable.
+# GITHUB_TOKEN cannot read repository variables, so an admitted run cannot
+# observe mid-run changes. Safe drain: pause new intake without changing canary
+# variables or HA suppression; drain both workflow queues/runs and all work
+# already accepted by external HA; confirm both workflows and the external HA
+# writer are idle before changing controls or restoring intake.
 # removal-trigger: Remove when CI self-heals failed exact-head runs without a hosted remediation hop and this workflow is unused.
 
 on:
@@ -13,10 +17,11 @@ on:
 
 permissions: {}
 
-# One workflow run per PR at a time; GitHub queues later events and each run
-# revalidates its exact head before model spend and writing.
+# Stable repository slot shared with PR Conflict Handler. Rolling CI rejects
+# non-canary candidates before model spend and writing; no-op events may use a
+# bounded queue slot while the configured canary is frozen.
 concurrency:
-  group: rolling-ci-remediation-${{ github.event.workflow_run.head_branch || github.event.workflow_run.id }}
+  group: jovie-fx-shared-canary-slot-${{ github.repository }}
   cancel-in-progress: false
   queue: max
 

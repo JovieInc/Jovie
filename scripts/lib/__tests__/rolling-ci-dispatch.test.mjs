@@ -623,7 +623,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'secrets.FX_AI_GATEWAY_API_KEY',
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
-      'group: rolling-ci-remediation-',
+      'group: jovie-fx-shared-canary-slot-${{ github.repository }}',
       'group: jovie-fx-model-lane-',
       'queue: max',
       'cancel-in-progress: false',

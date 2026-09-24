@@ -2,6 +2,84 @@ const SHA = /^[0-9a-f]{40}$/u;
 const ACTIONS = new Set(['opened', 'reopened', 'synchronize']);
 const HOLD_LABELS = new Set(['hold', 'gated', 'incident']);
 
+export function parseConflictCanary(enabled, prValue) {
+  if (
+    enabled !== 'true' ||
+    typeof prValue !== 'string' ||
+    !/^[1-9][0-9]*$/u.test(prValue)
+  ) {
+    return null;
+  }
+  const number = Number(prValue);
+  return Number.isSafeInteger(number) && number <= 1_000_000 ? number : null;
+}
+
+export function hasExactWorkflowRunCanary(payload, canary) {
+  const associatedPrs = payload?.workflow_run?.pull_requests;
+  return (
+    Array.isArray(associatedPrs) &&
+    associatedPrs.length === 1 &&
+    Number.isSafeInteger(associatedPrs[0]?.number) &&
+    associatedPrs[0].number === canary
+  );
+}
+
+export function isExactConflictCanaryPlan(plan, canary) {
+  const items = plan?.items;
+  const fxMatrix = plan?.fxMatrix;
+  const exceptionMatrix = plan?.exceptionMatrix;
+  const capacity = plan?.capacity;
+  if (
+    !Number.isSafeInteger(canary) ||
+    canary < 1 ||
+    !Array.isArray(items) ||
+    !Array.isArray(fxMatrix) ||
+    !Array.isArray(exceptionMatrix) ||
+    !capacity ||
+    capacity.maxConcurrent !== 1 ||
+    !Number.isInteger(capacity.availableCiSlots) ||
+    capacity.availableCiSlots < 0 ||
+    capacity.availableCiSlots > 1 ||
+    items.length > 1 ||
+    fxMatrix.length + exceptionMatrix.length > 1 ||
+    (fxMatrix.length > 0 && capacity.availableCiSlots !== 1) ||
+    items.some(item => item?.number !== canary || item?.pr?.number !== canary)
+  ) {
+    return false;
+  }
+
+  const samePrIdentity = (item, matrixItem) =>
+    matrixItem?.prNumber === canary &&
+    matrixItem.baseRefName === item?.pr?.baseRefName &&
+    matrixItem.baseRefOid === item?.pr?.baseRefOid &&
+    matrixItem.headRefName === item?.pr?.headRefName &&
+    matrixItem.headRefOid === item?.pr?.headRefOid &&
+    matrixItem.adaptiveCap === capacity.availableCiSlots &&
+    Number.isInteger(matrixItem.adaptiveCap) &&
+    matrixItem.adaptiveCap <= 1;
+
+  return (
+    fxMatrix.every(matrixItem =>
+      items.some(
+        item =>
+          item.action === 'escalate_conflict_fx' &&
+          item.model === matrixItem.model &&
+          samePrIdentity(item, matrixItem)
+      )
+    ) &&
+    exceptionMatrix.every(matrixItem =>
+      items.some(
+        item =>
+          (matrixItem.exceptionType === 'permission'
+            ? item.action === 'emit_permission_exception'
+            : matrixItem.exceptionType === 'exhausted' &&
+              item.action === 'emit_steering_exception') &&
+          samePrIdentity(item, matrixItem)
+      )
+    )
+  );
+}
+
 export function parseConflictEvent(payload, repo) {
   const pr = payload?.pull_request;
   const number = pr?.number;
