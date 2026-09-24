@@ -1890,6 +1890,12 @@ it('runs the attestation observation coverage gate for publisher-only edits', ()
   expect(CI_FAST_SOURCE).toContain(
     'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
   );
+  expect(
+    selected.test('scripts/symphony/install-gem-service-attestation.sh')
+  ).toBe(true);
+  expect(
+    selected.test('scripts/symphony/systemd/gem-service-attestation.service')
+  ).toBe(true);
 });
 
 it('runs authenticated Summer bridge coverage for admission-only edits', () => {
