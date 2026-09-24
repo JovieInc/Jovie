@@ -146,9 +146,9 @@ describe('read-only native queue collector CLI', () => {
     expect(
       calls.some(args => args.join(' ').includes('enqueuer {__typename login}'))
     ).toBe(true);
-    const readbackIndex = calls.findLastIndex(args =>
-      args.join(' ').includes('InventoryReadback')
-    );
+    const readbackIndex = calls
+      .map(args => args.join(' ').includes('InventoryReadback'))
+      .lastIndexOf(true);
     const mergeLookupIndex = calls.findIndex(
       args => args.at(-1) === 'repos/JovieInc/Jovie/pulls/123'
     );
