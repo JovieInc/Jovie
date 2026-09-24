@@ -1,6 +1,6 @@
 // biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -26,7 +26,6 @@ import {
   fastTrackPolicy,
   frontItemChurnDecision,
   isAutonomousBranch,
-  MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   mapGraphqlCheckResponseTimeoutToMinutes,
   mergeNativeQueuePolicyObservations,
@@ -45,7 +44,6 @@ import {
   unmergeableReenqueueDecision,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
-  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
   validateNativeDrainQueueLabelIsolation,
 } from '../merge-queue-guard.mjs';
@@ -506,21 +504,14 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
-    const autoenrollYaml = readFileSync(
-      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
-      'utf8'
-    );
-    const enrollBlock = extractWorkflowJobBlock(autoenrollYaml, 'enroll');
-
-    expect(enrollBlock).toMatch(/drain-pr-queue\.sh/);
-    for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
-      expect(rule.pattern.test(enrollBlock), rule.id).toBe(false);
-    }
-
-    const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
-    expect(result.ok).toBe(true);
-    expect(result.errors).toEqual([]);
+  it('retires custom source admission and its automatic wake paths', () => {
+    expect(existsSync(resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow))).toBe(false);
+    const heartbeat = readFileSync(resolve(REPO_ROOT, '.github/workflows/runner-heartbeat.yml'), 'utf8');
+    const ownerless = readFileSync(resolve(REPO_ROOT, 'scripts/ownerless-recovery-sweeper.mjs'), 'utf8');
+    const loop = readFileSync(resolve(REPO_ROOT, 'scripts/loop-orchestrator.sh'), 'utf8');
+    expect(heartbeat).not.toContain('gh workflow run merge-queue-autoenroll.yml');
+    expect(ownerless).not.toContain('ownerless-recovery-admission');
+    expect(loop).not.toContain('run_logged drain.log');
   });
 
   it('isolates the legacy label from native drain enrollment and dequeue', () => {

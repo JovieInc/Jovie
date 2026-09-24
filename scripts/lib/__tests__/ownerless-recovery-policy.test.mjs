@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   classifyQueueOwnership,
-  countsAsRecoveryFailure,
   fetchOfficialSymphonyState,
   ownerlessRecoveryFailureDisposition,
   processFleetClosureRemediationIntents,
@@ -349,9 +348,6 @@ describe('ownerless recovery policy', () => {
     expect(
       classifyQueueOwnership({ headRefOid: head, queued: true }, head).outcome
     ).toBe('already-delegated-exact-head');
-    expect(countsAsRecoveryFailure({ queued: false, pending: false })).toBe(
-      true
-    );
     expect(
       readFileSync(new URL('../upsert-pr-comment.sh', import.meta.url), 'utf8')
     ).toContain('${4:+:$4}');

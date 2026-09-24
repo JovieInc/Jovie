@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "aeaf66b744e87693197d3862601e2b33c49d19100049f8ba98e7176bdc94c500"
+    "bodySha256": "b538ae4a2b72eb4f2db4c330ec18b51a25d2bbb886039ce0b120183033180914"
   },
   {
     "file": ".claude/rules/code-style.md",

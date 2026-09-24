@@ -110,8 +110,7 @@ Rules:
   without an Auto-Enroll receipt.
   The production controller owns deployment serialization and exact runtime
   certification after merge. A pending or failed release checkpoint is not a
-  source-merge prerequisite. Legacy Auto-Enroll is disabled while its redundant
-  source admission implementation is retired.
+  source-merge prerequisite. The legacy Auto-Enroll workflow is retired.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -147,8 +146,7 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 - **The writer requests GitHub Merge when ready for the checked PR head.**
   GitHub enforces required checks, queue admission, merge-group checks, and the
   final merge. Do not use a direct merge or the retired `merge-queue` label.
-  The legacy Auto-Enroll workflow may still enqueue eligible PRs while it is
-  retired, but its bot identity and status receipt are not merge-group gates.
+  The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
