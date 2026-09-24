@@ -14,10 +14,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import pathlib
 import subprocess
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
@@ -34,6 +36,7 @@ FLEET_PATH = pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest
 ATTESTATION_PATH = (
     pathlib.Path.home() / "gem-workspace/state/gem-service-attestation.json"
 )
+UPSTREAM_ATTESTATION_PATH = ATTESTATION_PATH.with_name("symphony-upstream-preservation.json")
 CONCURRENCY_PATH = pathlib.Path.home() / "gem-workspace/state/symphony-concurrency.json"
 RUNTIME_URL = "http://127.0.0.1:4041/api/v1/state"
 BRIDGE_URL = "https://jov.ie/api/internal/ovie/summer-bottleneck"
@@ -297,6 +300,107 @@ def load_service_attestation() -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+UPSTREAM_OBSERVATION_SCHEMA = "symphony-upstream-runtime-observation/v1"
+UPSTREAM_IDENTITY_FIELDS = (
+    "sourceRevision", "packageSha256", "payloadManifestSha256",
+    "configurationBindingSha256", "workflowSha256", "invocationId", "runtimeGeneration",
+)
+
+
+class LiveUpstreamObservation(dict):
+    """In-process provenance from the live reader, never obtained by JSON load.
+
+    A schema string in the legacy receipt or a fixture cannot select a different
+    trust path. Deserializing this observation deliberately loses its provenance.
+    """
+
+
+def upstream_runtime_revision(value: object, runtime: dict, now: datetime) -> str | None:
+    """Observation only: preservation cannot grant activation or work admission.
+
+    Require a fresh published timer receipt and matching live checks on both
+    sides of the exact state read. A preservation file by itself is insufficient.
+    """
+    try:
+        if not isinstance(value, dict) or value.get("schema") != UPSTREAM_OBSERVATION_SCHEMA:
+            return None
+        if value.get("stateDigest") != digest(runtime):
+            return None
+        rows = [record(value.get(key), key) for key in ("published", "before", "after")]
+        for row in rows:
+            if (row.get("schema") != "symphony-upstream-preservation/v1"
+                    or row.get("mode") != "upstream-preserved"
+                    or row.get("service") != "symphony-elixir.service"
+                    or row.get("activation") != "not-activated" or row.get("admission") != "unverified"):
+                return None
+            observed = parse_time(row.get("observedAt"), "upstream observation")
+            if not -MAX_CLOCK_SKEW_SECONDS <= (now - observed).total_seconds() <= EVIDENCE_MAX_AGE_SECONDS:
+                return None
+            exact_sha(row.get("sourceRevision"), "upstream source")
+            for key in UPSTREAM_IDENTITY_FIELDS:
+                if key in ("sourceRevision", "invocationId"):
+                    continue
+                exact_digest(row.get(key), key)
+            invocation = row.get("invocationId")
+            if not isinstance(invocation, str) or len(invocation) != 32 or not set(invocation) <= DIGEST:
+                return None
+        if any(any(row[key] != rows[0][key] for key in UPSTREAM_IDENTITY_FIELDS) for row in rows[1:]):
+            return None
+        before = parse_time(rows[1]["observedAt"], "before")
+        after = parse_time(rows[2]["observedAt"], "after")
+        state_at = parse_time(runtime.get("generated_at"), "runtime state")
+        # A state produced before the opening live process check cannot prove
+        # this generation's queue. Clock skew does not excuse a cross-generation read.
+        if (state_at.timestamp() < math.floor(before.timestamp()) + 1
+                or state_at > after or (after - before).total_seconds() > 60):
+            return None
+        return rows[0]["sourceRevision"]
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def read_upstream_sources() -> tuple[dict, dict, dict]:
+    """Read existing publisher proof; never refresh the file or restart a service."""
+    binding = os.environ.get("SYMPHONY_UPSTREAM_BINDING", "")
+    approved = os.environ.get("SYMPHONY_UPSTREAM_BINDING_SHA256", "")
+    if not pathlib.Path(binding).is_absolute():
+        raise ValueError("upstream binding path unavailable")
+    exact_digest(approved, "approved upstream binding")
+    if any(os.environ.get(key) for key in ("SYMPHONY_RELEASE_PROVENANCE",
+            "JOVIE_CONFIGURATION_SOURCE_ROOT", "JOVIE_CONFIGURATION_SOURCE_REVISION", "JOVIE_CONFIGURATION_PROFILE")):
+        raise ValueError("mixed upstream and legacy observation inputs")
+    emitter = pathlib.Path(__file__).with_name("emit-gem-service-attestation.py")
+    def check():
+        raw = subprocess.check_output([sys.executable, str(emitter), "--check",
+            "--upstream-binding", binding, "--upstream-binding-sha256", approved],
+            timeout=40, stderr=subprocess.DEVNULL)
+        if len(raw) > MAX_BYTES:
+            raise ValueError("upstream observation exceeds limit")
+        return record(json.loads(raw), "live upstream observation")
+    raw = UPSTREAM_ATTESTATION_PATH.read_bytes()
+    if len(raw) > MAX_BYTES:
+        raise ValueError("published upstream observation exceeds limit")
+    published = record(json.loads(raw), "published upstream observation")
+    before = check()
+    # The upstream state API emits whole seconds. Let that clock tick before
+    # the read if the completed opening check still falls in the same second;
+    # keep the strict identity bracket instead of accepting an older state.
+    before_at = parse_time(before.get("observedAt"), "opening upstream observation")
+    delay = math.floor(before_at.timestamp()) + 1 - datetime.now(timezone.utc).timestamp()
+    if delay > 1:
+        raise ValueError("opening upstream observation clock inconsistent")
+    if delay > 0:
+        time.sleep(delay)
+    fleet, runtime = read_sources(None)
+    after = check()
+    evidence = {"schema": UPSTREAM_OBSERVATION_SCHEMA, "stateDigest": digest(runtime),
+                "published": published, "before": before, "after": after}
+    if (published.get("configurationBindingSha256") != approved
+            or upstream_runtime_revision(evidence, runtime, datetime.now(timezone.utc)) is None):
+        raise ValueError("upstream runtime observation unverified")
+    return fleet, runtime, LiveUpstreamObservation(evidence)
+
+
 def attested_runtime_revision(
     signals: dict[str, Any],
     runtime: dict[str, Any],
@@ -312,7 +416,9 @@ def attested_runtime_revision(
     """
     if attestation is None:
         attestation = load_service_attestation()
-    revision = service_attestation_revision(attestation, now)
+    revision = (upstream_runtime_revision(attestation, runtime, now)
+                if isinstance(attestation, LiveUpstreamObservation)
+                else service_attestation_revision(attestation, now))
     if revision is None:
         return None
     evidence = signals.get("concurrencyEvidence")
@@ -445,6 +551,10 @@ def compose_snapshot(
         "workSource": work_source,
     }
     attested_runtime = attestation.get("runtime", {}) if isinstance(attestation, dict) else {}
+    if isinstance(attestation, LiveUpstreamObservation):
+        upstream = attestation.get("after", {})
+        attested_runtime = {"generation": upstream.get("runtimeGeneration"),
+                            "invocationId": upstream.get("invocationId")}
     if runtime_revision is not None and isinstance(attested_runtime, dict):
         generation = attested_runtime.get("generation")
         invocation = attested_runtime.get("invocationId")
@@ -627,10 +737,18 @@ def main() -> int:
     parser.add_argument("--source-bundle")
     parser.add_argument("--submit", action="store_true")
     args = parser.parse_args()
-    fleet, runtime = read_sources(args.source_bundle)
+    mode = os.environ.get("GEM_SERVICE_ATTESTATION_MODE", "legacy")
+    if mode not in ("legacy", "upstream-preservation"):
+        raise ValueError("unknown attestation mode")
+    if mode == "upstream-preservation":
+        if args.source_bundle:
+            raise ValueError("upstream observation requires a live state read")
+        fleet, runtime, attestation = read_upstream_sources()
+    else:
+        fleet, runtime = read_sources(args.source_bundle)
+        attestation = load_service_attestation()
     concurrency = None if args.source_bundle else load_concurrency_observation()
     existing_repair = None if args.source_bundle else load_existing_repair_reference()
-    attestation = load_service_attestation()
     now = datetime.now(timezone.utc)
     snapshot = compose_snapshot(fleet, runtime, now, attestation=attestation,
                                 concurrency=concurrency, existing_repair=existing_repair)

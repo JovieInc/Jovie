@@ -70,6 +70,40 @@ until a separately reviewed installer/consumer cutover and current host approval
 
 ## Legacy publisher
 
+### Summer observation consumer after upstream cutover
+
+The existing `summer_bottleneck_producer.py` accepts explicit
+`GEM_SERVICE_ATTESTATION_MODE=upstream-preservation` with the same independently
+approved `SYMPHONY_UPSTREAM_BINDING` and `SYMPHONY_UPSTREAM_BINDING_SHA256` as the
+publisher. The existing `gem-pr-drain.service` already loads `runner-source.env`;
+no new service, timer or scheduler is needed. Do not mix legacy source inputs
+into that mode. The installed emitter must support the reviewed upstream check.
+
+The consumer requires a fresh published preservation receipt, then runs the
+existing emitter's read-only `--check` before and after its live state API read.
+All three receipts must identify the same source, package, payload, approved
+configuration, workflow, invocation and process generation. The state generation
+timestamp must fall between the two checks, no more than 60 seconds apart. Each
+receipt retains the existing 600-second expiry. Any mismatch, timeout or missing
+binding stops publication; a fixture bundle cannot select this path.
+
+Only this measured combination supplies the existing runner `workSource` with
+schema `symphony-runtime-state/v1`, source revision and work count. A preservation
+file alone cannot do so. It does not convert preservation into activation or
+admission, supply missing provider/downstream grants, or authorize task dispatch.
+The signed snapshot uses the existing one-shot submission path. Runtime-owner
+acceptance, two distinct actual timer observations and downstream signed readback
+remain required after normal source review and deployment.
+
+Cost: two bounded local emitter checks and one existing local state request per
+existing producer invocation; no new external service, model call or cadence.
+Checks revalidate the package and extracted payload, so host CPU and disk reads
+increase. Each subprocess is limited to 40 seconds and an oversized result fails.
+Re-evaluate if this exceeds the existing drain cycle budget; do not cache across
+process generations or extend freshness to mask latency.
+
+## Legacy publisher details
+
 JOV-6163 is the runner-source prerequisite for JOV-5853. This replaces the
 implementation behind the existing `gem-service-attestation.timer`; it does not
 introduce a timer, controller, enrollment grant, or execution path. Summer cannot
