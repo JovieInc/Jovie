@@ -164,10 +164,10 @@ const oneTestReportBytes = (...args) =>
   Buffer.from(JSON.stringify(hostedOneTestReport(...args)));
 
 function hostedCoverageBytes(
-  statementMap = {
+  statementMap = /** @type {Record<string, unknown>} */ ({
     0: { start: { line: 1, column: 0 }, end: { line: 1, column: 20 } },
-  },
-  s = { 0: 1 }
+  }),
+  s = /** @type {Record<string, number>} */ ({ 0: 1 })
 ) {
   return Buffer.from(
     JSON.stringify({ 'apps/web/lib/proof.ts': { statementMap, s } })
