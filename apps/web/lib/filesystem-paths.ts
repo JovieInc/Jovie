@@ -1,72 +1,119 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 
-// Playwright's TypeScript loader executes test dependencies as CommonJS while
-// the app source is authored as ESM. Keep root discovery cwd-based so shared
-// path helpers remain loadable in both runners.
-const LIB_DIRECTORY = path.join(process.cwd(), 'lib');
-const safeExistsSync: (candidatePath: string) => boolean =
-  typeof fs.existsSync === 'function' ? fs.existsSync : () => false;
+const MODULE_CWD = process.cwd();
 
 function dedupeCandidates(candidates: readonly string[]): string[] {
   return [...new Set(candidates.map(candidate => path.resolve(candidate)))];
 }
 
+// Capture cwd once without deriving an absolute lib directory: NFT can treat
+// that derived directory as a file dependency and expand it to the whole app.
+// Do not probe package.json, content, or turbo.json here. The deployed launcher
+// starts in apps/web; known monorepo, web, and Ovie cwd shapes are enough to
+// resolve these roots.
+function rootsFromCwd(cwd: string): {
+  appWebRoot: string;
+  monorepoRoot: string;
+} {
+  const resolvedCwd = path.resolve(cwd);
+  let appRoot = resolvedCwd;
+
+  while (true) {
+    const appName = path.basename(appRoot);
+    const appsDirectory = path.dirname(appRoot);
+
+    if (
+      path.basename(appsDirectory) === 'apps' &&
+      (appName === 'web' || appName === 'ovie')
+    ) {
+      return {
+        appWebRoot:
+          appName === 'web' ? appRoot : path.join(appsDirectory, 'web'),
+        monorepoRoot: path.dirname(appsDirectory),
+      };
+    }
+
+    const parent = path.dirname(appRoot);
+    if (parent === appRoot) {
+      break;
+    }
+    appRoot = parent;
+  }
+
+  return {
+    appWebRoot: path.join(resolvedCwd, 'apps', 'web'),
+    monorepoRoot: resolvedCwd,
+  };
+}
+
+function appWebRootFromPredicate(
+  cwd: string,
+  pathIsPresent: (candidatePath: string) => boolean
+): string {
+  const candidates = dedupeCandidates([
+    path.resolve(MODULE_CWD),
+    cwd,
+    path.join(cwd, 'apps', 'web'),
+    path.resolve(cwd, '..', 'web'),
+    path.resolve(MODULE_CWD, '..', '..'),
+    path.resolve(MODULE_CWD, '..', '..', '..'),
+  ]);
+
+  return (
+    candidates.find(candidate => isAppWebRoot(candidate, pathIsPresent)) ??
+    path.resolve(MODULE_CWD)
+  );
+}
+
 function isAppWebRoot(
   candidate: string,
-  exists: (candidatePath: string) => boolean
+  pathIsPresent: (candidatePath: string) => boolean
 ): boolean {
   return (
-    exists(path.join(candidate, 'package.json')) &&
-    exists(path.join(candidate, 'content'))
+    pathIsPresent(path.join(candidate, 'package.json')) &&
+    pathIsPresent(path.join(candidate, 'content'))
   );
 }
 
 function isMonorepoRoot(
   candidate: string,
-  exists: (candidatePath: string) => boolean
+  pathIsPresent: (candidatePath: string) => boolean
 ): boolean {
   return (
-    exists(path.join(candidate, 'turbo.json')) &&
-    exists(path.join(candidate, 'apps', 'web', 'package.json'))
+    pathIsPresent(path.join(candidate, 'turbo.json')) &&
+    pathIsPresent(path.join(candidate, 'apps', 'web', 'package.json'))
   );
 }
 
 export function resolveAppWebRoot(
   cwd = process.cwd(),
-  exists: (candidatePath: string) => boolean = safeExistsSync
+  pathIsPresent?: (candidatePath: string) => boolean
 ): string {
-  const candidates = dedupeCandidates([
-    path.resolve(LIB_DIRECTORY, '..'),
-    cwd,
-    path.join(cwd, 'apps', 'web'),
-    path.resolve(cwd, '..', 'web'),
-    path.resolve(LIB_DIRECTORY, '..', '..', '..'),
-    path.resolve(LIB_DIRECTORY, '..', '..', '..', '..'),
-  ]);
-
-  return (
-    candidates.find(candidate => isAppWebRoot(candidate, exists)) ??
-    path.resolve(LIB_DIRECTORY, '..')
-  );
+  return pathIsPresent
+    ? appWebRootFromPredicate(cwd, pathIsPresent)
+    : rootsFromCwd(cwd).appWebRoot;
 }
 
 export function resolveMonorepoRoot(
   cwd = process.cwd(),
-  exists: (candidatePath: string) => boolean = safeExistsSync
+  pathIsPresent?: (candidatePath: string) => boolean
 ): string {
-  const appWebRoot = resolveAppWebRoot(cwd, exists);
+  if (!pathIsPresent) {
+    return rootsFromCwd(cwd).monorepoRoot;
+  }
+
+  const appWebRoot = resolveAppWebRoot(cwd, pathIsPresent);
   const candidates = dedupeCandidates([
     path.resolve(appWebRoot, '..', '..'),
     cwd,
     path.resolve(cwd, '..', '..'),
-    path.resolve(LIB_DIRECTORY, '..', '..'),
-    path.resolve(LIB_DIRECTORY, '..', '..', '..', '..'),
+    path.resolve(MODULE_CWD, '..'),
+    path.resolve(MODULE_CWD, '..', '..', '..'),
   ]);
 
   return (
-    candidates.find(candidate => isMonorepoRoot(candidate, exists)) ??
+    candidates.find(candidate => isMonorepoRoot(candidate, pathIsPresent)) ??
     appWebRoot
   );
 }
