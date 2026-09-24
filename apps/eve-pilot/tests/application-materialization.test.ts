@@ -16,6 +16,20 @@ describe('independent application source export', () => {
         expect(receipt.status).toBe('prepared-not-commissioned');
         expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
         expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
+        // Eve 0.63 retired task_update; an orphan disableTool slot fails
+        // discovery before the generated agent can enforce its tool boundary.
+        expect(
+          existsSync(join(destination, 'agent/tools/task_update.ts'))
+        ).toBe(false);
+        // Eve requires connection_search when connections exist; this export
+        // declares none, and its real compiler proof must expose no tools.
+        expect(
+          existsSync(join(destination, 'agent/tools/connection_search.ts'))
+        ).toBe(false);
+        expect(existsSync(join(destination, 'agent/connections'))).toBe(false);
+        expect(
+          existsSync(join(destination, 'agent/tools/task_cancel.ts'))
+        ).toBe(true);
         expect(existsSync(join(destination, '.env'))).toBe(false);
         expect(
           JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
