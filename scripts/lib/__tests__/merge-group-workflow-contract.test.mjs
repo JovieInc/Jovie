@@ -1856,11 +1856,20 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.pull_request.head.sha }}'
     );
     expect(sourceSizeGuard).toContain('persist-credentials: false');
+    expect(sourceSizeGuard).toContain('fetch-depth: 0');
+    expect(sourceSizeGuard).toContain('id: pr-merge-base');
     expect(sourceSizeGuard).toContain(
-      'git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"'
+      'PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'
     );
     expect(sourceSizeGuard).toContain(
-      'repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"'
+      'PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}'
+    );
+    expect(sourceSizeGuard).toContain('git merge-base --all');
+    expect(sourceSizeGuard).toContain(
+      'PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}'
+    );
+    expect(sourceSizeGuard).toContain(
+      'repo-hygiene-guard.mjs --diff-base "$PR_DIFF_BASE"'
     );
     expect(MEMBER_POLICY).toContain('fetchComparison');
     expect(MEMBER_POLICY).toContain('fetchPullRequest');
@@ -2113,6 +2122,181 @@ ${selectedGateScript}`,
     expect(FORK_GATE_WORKFLOW.match(/-f context="Fork PR Gate"/g)).toHaveLength(
       3
     );
+  });
+});
+
+describe('PR Size Guard merge-base comparison', () => {
+  const tempRoots = [];
+
+  afterEach(() => {
+    for (const root of tempRoots.splice(0)) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function git(cwd, args) {
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    return result.stdout.trim();
+  }
+
+  function commitFile(cwd, path, contents, message) {
+    const absolutePath = join(cwd, path);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, contents);
+    git(cwd, ['add', path]);
+    git(cwd, ['commit', '-q', '-m', message]);
+    return git(cwd, ['rev-parse', 'HEAD']);
+  }
+
+  it('compares the exact PR head with its ancestor, excluding main-only controller and screenshot changes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-size-merge-base-'));
+    tempRoots.push(root);
+    const origin = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    const work = join(root, 'work');
+    git(root, ['init', '--bare', '-q', origin]);
+    git(root, ['init', '-q', '-b', 'main', seed]);
+    git(seed, ['config', 'user.name', 'Size Guard Test']);
+    git(seed, ['config', 'user.email', 'size-guard@example.invalid']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    git(seed, ['remote', 'add', 'origin', origin]);
+    const ancestor = commitFile(seed, 'README.md', 'root\n', 'root');
+    git(seed, ['switch', '-q', '-c', 'pr']);
+    const head = commitFile(
+      seed,
+      'apps/web/certification.test.ts',
+      'export const certified = true;\n',
+      'PR certification change'
+    );
+    git(seed, ['push', '-q', 'origin', 'pr']);
+    git(seed, ['switch', '-q', 'main']);
+    commitFile(
+      seed,
+      '.github/workflows/agent-pipeline.yml',
+      'name: Main-only controller\n',
+      'main-only controller'
+    );
+    const eventBase = commitFile(
+      seed,
+      'apps/web/lib/screenshots/main-only.ts',
+      'export const screenshot = true;\n',
+      'main-only screenshot change'
+    );
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(root, ['clone', '-q', '--branch', 'pr', `file://${origin}`, work]);
+    expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('false');
+
+    const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');
+    const mergeBaseScript = getStepRunScript(
+      sourceSizeGuard,
+      'Resolve exact PR merge base'
+    );
+    const mergeBaseOutput = join(root, 'merge-base-output');
+    const env = {
+      ...process.env,
+      PR_BASE_SHA: eventBase,
+      PR_HEAD_SHA: head,
+      GITHUB_OUTPUT: mergeBaseOutput,
+    };
+    const resolved = spawnSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', mergeBaseScript],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env,
+      }
+    );
+    expect(resolved.status, resolved.stderr || resolved.stdout).toBe(0);
+    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(`sha=${ancestor}\n`);
+
+    const shallowWork = join(root, 'shallow-work');
+    git(root, [
+      'clone',
+      '-q',
+      '--depth=1',
+      '--branch',
+      'pr',
+      `file://${origin}`,
+      shallowWork,
+    ]);
+    expect(git(shallowWork, ['rev-parse', '--is-shallow-repository'])).toBe(
+      'true'
+    );
+    const shallow = spawnSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', mergeBaseScript],
+      {
+        cwd: shallowWork,
+        encoding: 'utf8',
+        env: { ...env, GITHUB_OUTPUT: join(root, 'shallow-output') },
+      }
+    );
+    expect(shallow.status).not.toBe(0);
+    expect(existsSync(join(root, 'shallow-output'))).toBe(false);
+    expect(
+      git(work, ['diff', '--name-only', ancestor, 'HEAD']).split('\n')
+    ).toEqual(['apps/web/certification.test.ts']);
+    expect(git(work, ['diff', '--name-only', eventBase, 'HEAD'])).toContain(
+      '.github/workflows/agent-pipeline.yml'
+    );
+
+    const screenshotOutput = join(root, 'screenshot-output');
+    const screenshotScript = getStepRunScript(
+      sourceSizeGuard,
+      'Detect screenshot integrity changes'
+    );
+    const screenshot = spawnSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', screenshotScript],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env: {
+          ...env,
+          PR_DIFF_BASE: ancestor,
+          GITHUB_OUTPUT: screenshotOutput,
+        },
+      }
+    );
+    expect(screenshot.status, screenshot.stderr || screenshot.stdout).toBe(0);
+    expect(readFileSync(screenshotOutput, 'utf8')).toBe('required=false\n');
+
+    writeFileSync(screenshotOutput, '');
+    const invalidScreenshotBase = spawnSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', screenshotScript],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env: {
+          ...env,
+          PR_DIFF_BASE: 'f'.repeat(40),
+          GITHUB_OUTPUT: screenshotOutput,
+        },
+      }
+    );
+    expect(invalidScreenshotBase.status).not.toBe(0);
+    expect(readFileSync(screenshotOutput, 'utf8')).toBe('');
+
+    for (const badEnv of [
+      { PR_BASE_SHA: 'invalid' },
+      { PR_HEAD_SHA: ancestor },
+    ]) {
+      writeFileSync(mergeBaseOutput, '');
+      const rejected = spawnSync(
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', mergeBaseScript],
+        {
+          cwd: work,
+          encoding: 'utf8',
+          env: { ...env, ...badEnv },
+        }
+      );
+      expect(rejected.status).not.toBe(0);
+      expect(readFileSync(mergeBaseOutput, 'utf8')).toBe('');
+    }
   });
 });
 

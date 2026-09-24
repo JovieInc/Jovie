@@ -123,14 +123,30 @@ jobs:
           # event's base SHA remains older, so repository hygiene can charge
           # main growth to this PR. Source policy must inspect the exact head.
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          # The repository hygiene and screenshot checks compare with the PR's
+          # exact merge base, which requires the full ancestry of both tips.
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Fetch PR base
-        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+      - name: Resolve exact PR merge base
+        id: pr-merge-base
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]] || exit 1
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
+          merge_bases="$(git merge-base --all "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          [[ "$merge_bases" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "sha=$merge_bases" >> "$GITHUB_OUTPUT"
 
       - name: Enforce repository hygiene
-        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}" --report repo-health-receipt.json
+        env:
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+        run: node scripts/repo-hygiene-guard.mjs --diff-base "$PR_DIFF_BASE" --report repo-health-receipt.json
 
       - name: Upload repository health receipt
         if: always()
@@ -146,14 +162,19 @@ jobs:
 
       - name: Detect screenshot integrity changes
         id: screenshot-integrity
+        env:
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
         run: |
-          if git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- \
+          set -euo pipefail
+          if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
             apps/web/lib/screenshots/ \
             apps/web/screenshot-catalog/current/ \
             apps/web/public/product-screenshots/ \
             'apps/web/scripts/check-screenshot-catalog*.ts'; then
             echo "required=false" >> "$GITHUB_OUTPUT"
           else
+            status=$?
+            [[ "$status" -eq 1 ]] || exit "$status"
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
 
