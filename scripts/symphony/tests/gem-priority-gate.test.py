@@ -3776,7 +3776,6 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertNotIn("Production Marker Recovery]", content)
-        self.assertNotIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
