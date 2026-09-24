@@ -1694,7 +1694,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(prepare).not.toContain('GH_TOKEN');
   });
 
-  it('binds conflict delivery to the exact source ref with an explicit lease', () => {
+  it('deliberate red: workflow refuses stale-head or force-push conflict delivery', () => {
     expect(WORKFLOW).not.toContain('expected_base:0:12');
     expect(WORKFLOW).not.toContain('BASE_HEAD:0:12');
     const pushMatch =
