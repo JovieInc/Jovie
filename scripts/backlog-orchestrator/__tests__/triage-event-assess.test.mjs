@@ -2,9 +2,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  assessTriageEvent,
+  assessTriageEvent as assessWithRealClient,
   parseTriageEvent,
 } from '../triage-event-assess.mjs';
+
+/** Partial clients are deliberate test doubles; production uses the full Linear module.
+ * @param {any} event
+ * @param {any} client
+ * @param {any} summer
+ * @returns {Promise<any>}
+ */
+function assessTriageEvent(event, client, summer) {
+  return assessWithRealClient(event, client, summer);
+}
 
 const ISSUE_ID = '68b3e8de-588e-46ba-8209-84329d154627';
 const TRIAGE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';

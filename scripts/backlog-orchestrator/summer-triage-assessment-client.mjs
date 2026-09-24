@@ -6,6 +6,19 @@ export const TRIAGE_ASSESSMENT_DOMAIN =
   'jovie.linear-triage-assessment-request/v1';
 const ROUTE = '/summer/v1/symphony/triage-assessments';
 
+/**
+ * @typedef {{
+ *   schema: 'summer.linear-triage-assessment/v1',
+ *   issueIdentifier: string,
+ *   issueId: string,
+ *   deliveryId: string,
+ *   linearUpdatedAt: string,
+ *   decision: 'stale-event' | 'urgent-investigation-required' | 'existing-intake-reconcile',
+ *   authorizesDispatch: false,
+ *   acceptedInvestigation: false,
+ * }} SummerTriageAssessmentReceipt
+ */
+
 export function summerAssessmentConfig(environment = process.env) {
   const origin = new URL(environment.SUMMER_BOTTLENECK_ORIGIN ?? '');
   if (
@@ -31,6 +44,7 @@ export function summerAssessmentConfig(environment = process.env) {
   return { origin: origin.origin, keyId, privateKey };
 }
 
+/** @returns {Promise<SummerTriageAssessmentReceipt>} */
 export async function requestSummerAssessment(
   delivery,
   {
@@ -62,7 +76,9 @@ export async function requestSummerAssessment(
   });
   if (!response.ok)
     throw new Error(`summer-triage-assessment-http-${response.status}`);
-  const receipt = await response.json();
+  const receipt = /** @type {SummerTriageAssessmentReceipt} */ (
+    await response.json()
+  );
   if (
     receipt?.schema !== 'summer.linear-triage-assessment/v1' ||
     receipt.issueIdentifier !== delivery.identifier ||

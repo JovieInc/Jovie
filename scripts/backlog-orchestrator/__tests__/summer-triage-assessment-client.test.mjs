@@ -48,6 +48,8 @@ test('signs a bounded host request and validates Summer identity and authority',
       );
       assert.equal(options.method, 'POST');
       assert.equal(options.redirect, 'error');
+      if (typeof options.body !== 'string')
+        throw new Error('expected-json-body');
       const body = JSON.parse(options.body);
       const { signature, ...unsigned } = body;
       assert.equal(body.schema, TRIAGE_ASSESSMENT_DOMAIN);
