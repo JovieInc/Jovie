@@ -298,6 +298,26 @@ async function withOutput(callback) {
 }
 
 describe('verified FX native finisher', () => {
+  it.each(
+    [[], [{ sha: 'invalid' }], commit.parents.concat(commit.parents)].map(
+      parents => [parents]
+    )
+  )(
+    'reports malformed parent evidence without artifact discovery: %j',
+    async parents => {
+      await withOutput(async () => {
+        const request = vi.fn(async () => ({ ...commit, parents }));
+        await discoverCommand(
+          { pr: String(prNumber), head: repairedHead },
+          { request, now: NOW }
+        );
+        expect(readFileSync(process.env.GITHUB_OUTPUT, 'utf8')).toBe(
+          'eligible=false\nreason=repair-parent-invalid\n'
+        );
+        expect(request).toHaveBeenCalledTimes(1);
+      });
+    }
+  );
   it('discovers the exact trusted run and writes artifact IDs for cross-run download', async () => {
     await withOutput(async directory => {
       const requests = [];

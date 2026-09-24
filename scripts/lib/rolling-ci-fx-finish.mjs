@@ -409,7 +409,10 @@ export async function discoverCommand(
     process.env.GH_TOKEN
   );
   const parent = one(commit?.parents ?? [])?.sha;
-  if (!SHA.test(parent ?? '')) return output('eligible', 'false');
+  if (!SHA.test(parent ?? '')) {
+    output('eligible', 'false');
+    return output('reason', 'repair-parent-invalid');
+  }
   const names = [
     `hosted-ci-patch-${prNumber}-${parent}`,
     `hosted-ci-write-receipts-${prNumber}-${parent}`,
