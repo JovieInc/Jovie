@@ -129,6 +129,7 @@ function queueResponse(nodes = []) {
   };
 }
 
+/** @param {unknown} queueResult */
 function runEvent(payload, rest = detail(), queueResult = queueResponse()) {
   const dir = mkdtempSync(join(tmpdir(), 'jovie-conflict-event-'));
   try {
@@ -207,7 +208,7 @@ process.stdout.write(JSON.stringify(result));
           return readFileSync(logPath, 'utf8')
             .trim()
             .split('\n')
-            .map(JSON.parse);
+            .map(line => JSON.parse(line));
         } catch {
           return [];
         }
@@ -385,7 +386,7 @@ else process.exit(2);
       const calls = readFileSync(logPath, 'utf8')
         .trim()
         .split('\n')
-        .map(JSON.parse);
+        .map(line => JSON.parse(line));
       expect(
         calls.some(args => args.some(arg => arg.includes('pulls?state=open')))
       ).toBe(true);
