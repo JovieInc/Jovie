@@ -1613,14 +1613,19 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(fxJob).toContain('FX_MODEL: openai/gpt-5.6-sol');
     expect(fxJob).not.toContain('actions/create-github-app-token@');
     expect(fxJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
-    expect(fxJob).not.toContain('GH_TOKEN:');
+    const preSpendStep = workflowStep(
+      'Recheck live PR identity and queue before FX spend'
+    );
+    expect(preSpendStep).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(fxJob.replace(preSpendStep, '')).not.toContain('GH_TOKEN:');
 
     const modelStep = workflowStep(
       'Run pinned stronger-model FX with no executable tools'
     );
     expect(modelStep).toContain(
-      'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
+      'AI_GATEWAY_API_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}'
     );
+    expect(modelStep).not.toContain('secrets.AI_GATEWAY_API_KEY');
     expect(WORKFLOW.replace(modelStep, '')).not.toContain('AI_GATEWAY_API_KEY');
     expect(modelStep).toContain('HOME: ${{ runner.temp }}/fx-home');
     expect(modelStep).toContain('.session_permission_grants == 0');

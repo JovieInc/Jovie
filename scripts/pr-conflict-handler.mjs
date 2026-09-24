@@ -15,8 +15,11 @@ import {
 } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
+  hasExactWorkflowRunCanary,
+  isExactConflictCanaryPlan,
   matchesHydratedConflictPr,
   matchesRawConflictPr,
+  parseConflictCanary,
   parseConflictEvent,
 } from './lib/pr-conflict-event.mjs';
 import {
@@ -190,14 +193,15 @@ function logDecision(item, extra = {}) {
 
 /**
  * @param {string[]} args
- * @param {{ retries?: number; token?: string }} [options]
+ * @param {{ retries?: number; token?: string; timeoutMs?: number }} [options]
  */
-async function ghJson(args, { retries = 3, token } = {}) {
+async function ghJson(args, { retries = 3, token, timeoutMs } = {}) {
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
       const { stdout } = await execFileAsync('gh', args, {
         encoding: 'utf8',
         maxBuffer: 50 * 1024 * 1024,
+        ...(timeoutMs ? { timeout: timeoutMs, killSignal: 'SIGKILL' } : {}),
         env: token
           ? {
               ...process.env,
@@ -417,7 +421,11 @@ async function withMutationToken(run) {
   }
 }
 
-async function executePlan(plan, options) {
+async function executePlan(
+  plan,
+  options,
+  { request = ghJson, rebaseImpl = tryGitHubRebase } = {}
+) {
   if (options.dryRun) return [];
   const mutableItems = plan.items.filter(
     item => item.action === 'request_github_rebase'
@@ -427,18 +435,92 @@ async function executePlan(plan, options) {
   }
   if (mutableItems.length === 0) return [];
 
+  const readToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
+  const readRequest = (args, requestOptions = {}) =>
+    request(args, { ...requestOptions, token: readToken });
+
   return withMutationToken(async () => {
     const results = [];
     for (const item of mutableItems) {
       logDecision(item, { phase: 'execute' });
       try {
-        const result = await tryGitHubRebase({
+        const result = await rebaseImpl({
           repo: options.repo,
           pr: item.pr,
           expectedBaseRefName: item.pr.baseRefName,
           expectedBaseOid: item.pr.baseRefOid,
           expectedHeadOid: item.pr.headRefOid,
           dryRun: false,
+          preMutationCheckImpl: async ({
+            prNumber,
+            expectedBaseRefName,
+            expectedBaseOid,
+            expectedHeadOid,
+            timeoutMs,
+          }) => {
+            if (!readToken) {
+              return {
+                ok: false,
+                category: 'verification_failure',
+                observedHeadOid: null,
+                reason:
+                  'read-only GitHub token is unavailable at the rebase boundary',
+              };
+            }
+            const detail = await readRequest(
+              [
+                'api',
+                '--method',
+                'GET',
+                `repos/${options.repo}/pulls/${prNumber}`,
+              ],
+              { timeoutMs }
+            );
+            const scope = {
+              repo: options.repo,
+              number: prNumber,
+              baseRef: expectedBaseRefName,
+              headRef: item.pr.headRefName,
+              base: expectedBaseOid,
+              head: expectedHeadOid,
+            };
+            if (!matchesRawConflictPr(scope, detail)) {
+              return {
+                ok: false,
+                category: 'stale_pr',
+                observedHeadOid: detail?.head?.sha ?? null,
+                reason: 'fresh PR identity or hold check changed before rebase',
+              };
+            }
+            if (
+              detail.mergeable !== true ||
+              String(detail.mergeable_state ?? '').toLowerCase() !== 'behind'
+            ) {
+              return {
+                ok: false,
+                category: 'stale_pr',
+                observedHeadOid: detail.head.sha,
+                reason:
+                  'PR is no longer a mergeable behind branch before rebase',
+              };
+            }
+            const currentPr = normalizeRestPullRequest(detail, []);
+            await annotateQueue([currentPr], options, readRequest);
+            if (currentPr.isInMergeQueue !== false) {
+              return {
+                ok: false,
+                category: 'native_queue',
+                observedHeadOid: currentPr.headRefOid,
+                reason: 'native merge queue owns this PR before rebase',
+              };
+            }
+            return {
+              ok: true,
+              observedHeadOid: currentPr.headRefOid,
+              reason:
+                'fresh PR identity, hold, BEHIND state, and native queue revalidated before rebase',
+            };
+          },
         });
         results.push({ pr: item.number, action: item.action, ...result });
       } catch (error) {
@@ -464,9 +546,32 @@ async function executePlan(plan, options) {
 
 export async function main(
   argv = process.argv.slice(2),
-  { request = ghJson } = {}
+  { request = ghJson, rebaseImpl = tryGitHubRebase } = {}
 ) {
   const options = parseArgs(argv);
+  let canary = null;
+  if (options.apply) {
+    canary = parseConflictCanary(
+      process.env.FX_HOSTED_REMEDIATION_ENABLED,
+      process.env.FX_HOSTED_REMEDIATION_CANARY_PR
+    );
+    if (canary === null) {
+      throw new Error(
+        'apply requires FX_HOSTED_REMEDIATION_ENABLED=true and one valid FX_HOSTED_REMEDIATION_CANARY_PR'
+      );
+    }
+    if (
+      process.env.GITHUB_REPOSITORY &&
+      process.env.GITHUB_REPOSITORY !== options.repo
+    ) {
+      throw new Error(
+        'apply repository does not match the hosted canary scope'
+      );
+    }
+    // The hosted conflict route has exactly one admitted PR regardless of an
+    // operator-supplied ceiling or the fleet capacity estimate.
+    options.maxConcurrent = 1;
+  }
   if (
     process.env.GITHUB_EVENT_NAME === 'pull_request_target' &&
     !options.eventPayloadFile
@@ -477,6 +582,21 @@ export async function main(
   let degradedChecks = false;
   let nonAction = null;
   let eventScope = null;
+  let workflowRunNonAction = null;
+  if (options.apply && process.env.GITHUB_EVENT_NAME === 'workflow_run') {
+    let payload;
+    try {
+      payload = JSON.parse(
+        readFileSync(process.env.GITHUB_EVENT_PATH ?? '', 'utf8')
+      );
+    } catch {
+      payload = null;
+    }
+    if (!hasExactWorkflowRunCanary(payload, canary)) {
+      workflowRunNonAction =
+        'workflow_run_association_missing_ambiguous_or_outside_canary';
+    }
+  }
   if (options.eventPayloadFile) {
     let payload;
     try {
@@ -485,7 +605,12 @@ export async function main(
       payload = null;
     }
     eventScope = parseConflictEvent(payload, options.repo);
-    if (eventScope) {
+    if (options.apply && eventScope?.number !== canary) {
+      prs = [];
+      nonAction = eventScope
+        ? 'event_outside_configured_canary'
+        : 'invalid_or_unsupported_event';
+    } else if (eventScope) {
       ({ prs, nonAction } = await fetchEventPr(options, eventScope, request));
       degradedChecks = true;
       if (prs.length === 1) {
@@ -524,12 +649,37 @@ export async function main(
       nonAction = 'invalid_or_unsupported_event';
     }
     options.cohortHistory ??= [];
+  } else if (workflowRunNonAction) {
+    prs = [];
+    options.cohortHistory = [];
+    nonAction = workflowRunNonAction;
   } else {
     const [inventory, cohortHistory] = await Promise.all([
-      fetchOpenPrs(options),
-      fetchCohortHistory(options),
+      fetchOpenPrs(options, {
+        ghRequest: request,
+        forCapacity: options.apply,
+      }),
+      fetchCohortHistory(options, request, options.apply),
     ]);
-    ({ prs, degradedChecks } = inventory);
+    if (options.apply) {
+      const target = inventory.prs.find(pr => pr.number === canary);
+      options.capacityPrs = inventory.prs.filter(pr => pr.number !== canary);
+      if (!target) {
+        prs = [];
+        nonAction = 'configured_canary_not_in_open_inventory';
+      } else {
+        await annotateQueue([target], options, request);
+        if (target.isInMergeQueue !== false) {
+          prs = [];
+          nonAction = 'configured_canary_in_native_queue';
+        } else {
+          prs = [target];
+        }
+      }
+    } else {
+      ({ prs } = inventory);
+    }
+    degradedChecks = inventory.degradedChecks;
     options.cohortHistory = cohortHistory;
   }
   if (degradedChecks) {
@@ -542,6 +692,9 @@ export async function main(
     );
   }
   const plan = buildPlan(prs, options);
+  if (options.apply && !isExactConflictCanaryPlan(plan, canary)) {
+    throw new Error('apply plan escaped the exact single-PR canary scope');
+  }
   if (options.eventPayloadFile) {
     plan.eventNonAction = nonAction;
     plan.eventScope = eventScope;
@@ -568,6 +721,8 @@ export async function main(
     ) {
       throw new Error('exact-PR event plan escaped its DIRTY identity scope');
     }
+  } else if (workflowRunNonAction || nonAction) {
+    plan.eventNonAction = nonAction;
   }
 
   if (options.planFile) {
@@ -581,7 +736,7 @@ export async function main(
   for (const item of plan.items) logDecision(item, { phase: 'plan' });
   if (options.json) console.log(JSON.stringify(plan, null, 2));
 
-  const results = await executePlan(plan, options);
+  const results = await executePlan(plan, options, { request, rebaseImpl });
   if (results.length > 0) {
     console.log(
       JSON.stringify({ ts: new Date().toISOString(), results }, null, 2)
