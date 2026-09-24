@@ -1643,7 +1643,9 @@ describe('automation-verify affected scope', () => {
       const plan = buildAffectedTestPlan([input]);
 
       expect(plan.mode).toBe('selected');
-      expect(plan.scriptVitestTests).toEqual(DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS);
+      expect(plan.scriptVitestTests).toEqual(
+        DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS
+      );
       expect(plan.scriptVitestCoverageArgs).toEqual(
         DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS
       );
