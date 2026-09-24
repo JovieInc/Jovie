@@ -17,9 +17,9 @@ import {
 } from '../../run-affected-tests.mjs';
 
 describe('structural control stage execution', () => {
-  it('runs registry, project, native and ownerless coverage, CLI coverage, and web sequentially', async () => {
+  it('runs registry, project, control coverage, Dependabot coverage, CLI coverage, and web sequentially', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(6);
+    expect(stages).toHaveLength(8);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -29,10 +29,39 @@ describe('structural control stage execution', () => {
     expect(stages[3][1]).toContain(
       '--coverage.include=lib/ownerless-recovery-policy.mjs'
     );
-    expect(stages[4][1]).toContain(
+    expect(stages[4]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+        '--test-coverage-lines=95',
+        'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+      ],
+    ]);
+    expect(stages[5]).toEqual([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/dependabot-update-policy.test.mjs',
+        '--coverage.enabled',
+        '--coverage.provider=v8',
+        '--coverage.include=dependabot-update-policy.mjs',
+        '--coverage.thresholds.lines=95',
+        '--coverage.thresholds.branches=90',
+        '--coverage.thresholds.functions=95',
+      ],
+    ]);
+    expect(stages[6][1]).toContain(
       '--coverage.include=pr-conflict-handler.mjs'
     );
-    expect(stages[5][1]).toContain('@jovie/web');
+    expect(stages[7][1]).toContain('@jovie/web');
     const visited = [];
     expect(
       await runControlTestCommands(async (command, args) => {
@@ -44,7 +73,9 @@ describe('structural control stage execution', () => {
   });
 
   it('propagates each failed stage and never starts its successor', async () => {
-    for (const failedStage of [0, 1, 2, 3, 4, 5]) {
+    for (const failedStage of buildControlTestCommands().map(
+      (_, index) => index
+    )) {
       const visited = [];
       const status = await runControlTestCommands(async (command, args) => {
         visited.push([command, args]);
@@ -277,6 +308,46 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/run-affected-tests.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/native-merge-intent.test.mjs',
+  'scripts/lib/__tests__/source-admission-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-include=scripts/native-merge-intent.mjs',
+  '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
+  '--test-coverage-lines=95',
+];
+const DEPENDABOT_AUTO_MERGE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const DEPENDABOT_AUTO_MERGE_INPUTS = [
+  '.github/workflows/dependabot-auto-merge.yml',
+  '.github/dependabot.yml',
+  'scripts/dependabot-update-policy.mjs',
+  'scripts/dependabot-workflow-run-adapter.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=dependabot-update-policy.mjs',
+  '--coverage.thresholds.lines=95',
+  '--coverage.thresholds.branches=90',
+  '--coverage.thresholds.functions=95',
+];
+const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+];
+const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
+  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
   '.github/actions/evaluate-fleet-gate/action.yml',
@@ -1592,12 +1663,68 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual([
-      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'scripts/symphony/tests/test_fleet_admission_receipt.py',
-      'scripts/tests/test_gh_retry.py',
-    ]);
+    expect(plan.pythonTests).toEqual(MERGE_QUEUE_CONTROLLER_PYTHON_TESTS);
+    expect(plan.nodeTests).toEqual([]);
     expect(plan.selectedTests).toEqual([]);
+  });
+
+  it.each(DEPENDABOT_AUTO_MERGE_INPUTS)(
+    'routes Dependabot automation input %s to its focused policy and runtime checks',
+    input => {
+      const plan = buildAffectedTestPlan([input]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(
+        DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS
+      );
+      expect(plan.scriptVitestCoverageArgs).toEqual(
+        DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS
+      );
+      expect(plan.pythonTests).toEqual(DEPENDABOT_AUTO_MERGE_PYTHON_TESTS);
+      expect(plan.nodeTests).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TESTS);
+      expect(plan.nodeTestArgs).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS);
+    }
+  );
+
+  it('keeps the Dependabot lane bounded to its own surface and selector companions', () => {
+    const plan = buildAffectedTestPlan([
+      ...DEPENDABOT_AUTO_MERGE_INPUTS,
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS);
+    expect(plan.scriptVitestCoverageArgs).toEqual(
+      DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS
+    );
+    expect(plan.pythonTests).toEqual(DEPENDABOT_AUTO_MERGE_PYTHON_TESTS);
+    expect(plan.nodeTests).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TESTS);
+    expect(plan.nodeTestArgs).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS);
+    const commands = buildSelectedTestCommands(plan, '2');
+    expect(commands).toContainEqual([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/automation-verify.test.mjs',
+        'lib/__tests__/dependabot-update-policy.test.mjs',
+        '--maxWorkers',
+        '2',
+        ...DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+      ],
+    ]);
+    expect(
+      buildAffectedTestPlan([
+        ...DEPENDABOT_AUTO_MERGE_INPUTS,
+        'scripts/lib/unknown-dependabot-peer.mjs',
+      ]).mode
+    ).toBe('full');
   });
 
   it('covers ownerless recovery policy and sweep behavior in that controller suite', () => {
@@ -1700,11 +1827,8 @@ describe('automation-verify affected scope', () => {
       expect(plan.scriptVitestTests).toEqual(
         MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS
       );
-      expect(plan.pythonTests).toEqual([
-        'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-        'scripts/symphony/tests/test_fleet_admission_receipt.py',
-        'scripts/tests/test_gh_retry.py',
-      ]);
+      expect(plan.pythonTests).toEqual(MERGE_QUEUE_CONTROLLER_PYTHON_TESTS);
+      expect(plan.nodeTests).toEqual([]);
     }
   );
 
