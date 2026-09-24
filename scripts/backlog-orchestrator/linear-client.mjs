@@ -1135,7 +1135,7 @@ export async function fetchIssue(identifier, options = {}) {
     children { nodes { id identifier title } }
     relations { nodes { type relatedIssue { id identifier title } } }
     state { id name type }
-    comments { nodes { id body createdAt } }
+    ${options.includeAdmissionEvidence ? 'comments(first: 100) { nodes { id body createdAt } pageInfo { hasNextPage } }' : 'comments { nodes { id body createdAt } }'}
   `;
   const keyMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(value);
 

@@ -51,7 +51,7 @@ function setup() {
       '- target_system: jovie-product\n- target_repo: JovieInc/Jovie\n- artifact: scripts/backlog-orchestrator/admission-gate.mjs\n- verification_authority: JovieInc/Jovie CI',
     labels: { nodes: [] },
     state: { name: 'In Progress' },
-    comments: { nodes: [] },
+    comments: { nodes: [], pageInfo: { hasNextPage: false } },
   };
   const lease = buildAdmissionReceipt(issue, {
     now: task.createdAt,
@@ -59,7 +59,8 @@ function setup() {
   });
   issue.comments.nodes.push({ body: lease });
   const client = {
-    fetchIssue: async identifier => {
+    fetchIssue: async (identifier, options) => {
+      assert.deepEqual(options, { includeAdmissionEvidence: true });
       assert.equal(identifier, task.issue.identifier);
       return issue;
     },
@@ -127,4 +128,45 @@ test('missing issue, wrong identity, missing lease, ambiguity or invalid lease t
   const f = setup();
   f.client.fetchIssue = async () => null;
   await assert.rejects(readShippingLeadIssue(f.task, f), /issue-mismatch/);
+});
+
+test('newer or simultaneous different leases cannot reuse a prior task acceptance', async () => {
+  for (const at of [null, 'later', 'bad']) {
+    const f = setup();
+    const timestamp =
+      at === 'later'
+        ? f.task.expiresAt
+        : at === 'bad'
+          ? 'bad'
+          : f.task.createdAt;
+    f.issue.comments.nodes.push({
+      body: f.lease
+        .replace(f.task.taskKey, '9'.repeat(64))
+        .replace(f.task.createdAt, timestamp),
+    });
+    await assert.rejects(readShippingLeadIssue(f.task, f), /lease-superseded/);
+  }
+  const f = setup();
+  f.issue.comments.nodes.push({
+    body: f.lease
+      .replace(f.task.taskKey, '9'.repeat(64))
+      .replace(f.task.createdAt, '2020-01-01T00:00:00Z'),
+  });
+  assert.equal(
+    (await readShippingLeadIssue(f.task, f)).admittedAt,
+    f.task.createdAt
+  );
+});
+
+test('truncated, missing or malformed pagination cannot hide a superseding lease', async () => {
+  for (const pageInfo of [
+    undefined,
+    {},
+    { hasNextPage: true },
+    { hasNextPage: 'false' },
+  ]) {
+    const f = setup();
+    f.issue.comments.pageInfo = pageInfo;
+    await assert.rejects(readShippingLeadIssue(f.task, f), /lease-incomplete/);
+  }
 });

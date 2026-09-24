@@ -244,6 +244,7 @@ describe('Gem Linear transport', () => {
       const issue = await linear.fetchIssue('JOV-123', { fetchImpl });
       await linear.transitionIssue('issue-1', 'state-1', { fetchImpl });
       assert.deepEqual(issue, { id: 'issue-1' });
+      assert.doesNotMatch(requests[0].query, /pageInfo/);
       assert.match(requests[0].query, /issues\s*\(/);
       assert.doesNotMatch(requests[0].query, /issueSearch/);
       assert.deepEqual(requests[0].variables, { teamKey: 'JOV', number: 123 });
@@ -833,5 +834,37 @@ describe('durable credential budget', () => {
           Number.isSafeInteger(error.resetAt)
       );
     });
+  });
+});
+
+it('requests explicit bounded pagination evidence only for Shipping Lead observations', async () => {
+  await withKey('test-key-admission-observer', async () => {
+    const requests = [];
+    const fetchImpl = async (_url, options) => {
+      const request = JSON.parse(options.body);
+      requests.push(request);
+      const issue = {
+        id: '00000000-0000-4000-8000-000000006586',
+        comments: { nodes: [], pageInfo: { hasNextPage: false } },
+      };
+      return jsonResponse({
+        data: request.variables.id ? { issue } : { issues: { nodes: [issue] } },
+      });
+    };
+    for (const identifier of [
+      'JOV-6586',
+      '00000000-0000-4000-8000-000000006586',
+    ]) {
+      const issue = await linear.fetchIssue(identifier, {
+        fetchImpl,
+        includeAdmissionEvidence: true,
+      });
+      assert.equal(issue.comments.pageInfo.hasNextPage, false);
+    }
+    for (const request of requests)
+      assert.match(
+        request.query,
+        /comments\(first: 100\)[\s\S]*pageInfo \{ hasNextPage \}/
+      );
   });
 });
