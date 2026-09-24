@@ -94,7 +94,9 @@ describe('agent QC wire honesty (JOV-5235)', () => {
       /      - name: Request native GitHub Merge when ready[\s\S]*?(?=\n      - name:)/
     )?.[0];
     expect(finish).toBeDefined();
-    expect(finish).toContain("steps.check-statuses.outputs.all_passed == 'true'");
+    expect(finish).toContain(
+      "steps.check-statuses.outputs.all_passed == 'true'"
+    );
     expect(finish).toContain("steps.sensitive-check.outputs.is_safe == 'true'");
     expect(pipeline).not.toContain('id: auto-approve');
     expect(pipeline).not.toContain('steps.auto-approve.outputs');
