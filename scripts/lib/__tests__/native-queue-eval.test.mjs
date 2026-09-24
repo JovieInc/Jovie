@@ -217,6 +217,32 @@ function passingFixture() {
 }
 
 describe('complete evidence and deliberate negative controls', () => {
+  it.each([
+    ['hosted colorized table', '', 'PASS'],
+    ['colored failure', '\u001b[31mTest Files 1 failed\u001b[39m', 'BLOCKED'],
+    [
+      'coverage failure',
+      'ERROR: Coverage for lines does not meet threshold',
+      'BLOCKED',
+    ],
+    ['missing table', 'missing', 'BLOCKED'],
+  ])('validates %s coverage evidence', (_name, suffix, status) => {
+    const b = passingFixture();
+    // Successful hosted job 107432527829 uses V8 table output and ANSI colors.
+    b.validation.log = [
+      'lib/__tests__/native-queue-eval.test.mjs --coverage.include=lib/native-queue-eval.mjs',
+      '2026-09-24T00:02:27.4730687Z \u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m50 passed\u001b[39m',
+      ...(suffix === 'missing'
+        ? []
+        : [
+            ' % Coverage report from v8',
+            'File | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s',
+            'All files | 89.54 | 81.54 | 92.11 | 90.33 |',
+          ]),
+      suffix,
+    ].join('\n');
+    expect(evaluate(b, evaluationTime).status).toBe(status);
+  });
   it.each(['User', 'Bot'])(
     'proves native %s admission without retired workflow or timeline authority',
     actor => {

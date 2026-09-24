@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import { groupEvidenceFailures } from './native-queue-group-evidence.mjs';
 import {
   checkFailures,
@@ -232,6 +233,7 @@ export function evaluate(bundle, now = Date.now()) {
     )
   ), 'consecutive-native-merges-required');
   const v = bundle.validation;
+  const log = typeof v?.log === 'string' ? stripVTControlCharacters(v.log) : '';
   require(sha(bundle.evaluatorSha) &&
     v?.run?.repository?.full_name === bundle.repository &&
     v.run.head_sha === bundle.evaluatorSha &&
@@ -252,13 +254,15 @@ export function evaluate(bundle, now = Date.now()) {
         step.status === 'completed' &&
         step.conclusion === 'success'
     ) &&
-    typeof v.log === 'string' &&
-    v.log.includes('lib/__tests__/native-queue-eval.test.mjs') &&
-    v.log.includes('--coverage.include=lib/native-queue-eval.mjs') &&
-    /Test Files\s+\d+ passed/.test(v.log) &&
-    /Lines\s+:\s+[\d.]+%/.test(v.log) &&
+    log.includes('lib/__tests__/native-queue-eval.test.mjs') &&
+    log.includes('--coverage.include=lib/native-queue-eval.mjs') &&
+    /Test Files\s+\d+ passed/.test(log) &&
+    (/Lines\s+:\s+[\d.]+%/.test(log) ||
+      (log.includes('% Coverage report from v8') &&
+        /File\s*\| % Stmts \| % Branch \| % Funcs \| % Lines/.test(log) &&
+        /All files\s*\|(?:\s*\d+(?:\.\d+)?\s*\|){4}/.test(log))) &&
     !/ERROR: Coverage|Test Files.*failed|FAIL\s+\|workspace-scripts\|/.test(
-      v.log
+      log
     ), 'authoritative-evaluator-ci-tests-and-coverage-required');
   return {
     status: failures.length ? 'FAIL' : blocked.length ? 'BLOCKED' : 'PASS',
