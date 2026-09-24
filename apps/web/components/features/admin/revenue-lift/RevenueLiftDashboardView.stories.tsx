@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RevenueLiftDashboardView } from '@/app/app/(shell)/admin/revenue-lift/RevenueLiftDashboardView';
+import { presentCreatorOutcomeDashboard } from '@/lib/metrics/creator-outcomes';
 import type { RevenueLiftDashboardData } from '@/lib/metrics/revenue-lift-dashboard';
 
 const source = {
@@ -36,11 +37,19 @@ const data: RevenueLiftDashboardData = {
     },
   ],
   interpretationTable: [tile],
+  creatorOutcomes: presentCreatorOutcomeDashboard({
+    verifiedGmvCents: 1_250_000,
+    attributedNewFans: 842,
+    causalVerifiedMoneyLiftCents: 24_00,
+    causalStatus: 'measured',
+  }),
   cohorts: {
     activeCount: 24,
     controlCount: 18,
     activeMedianLiftCents: 24_00,
     controlMedianLiftCents: 3_00,
+    activeMedianVerifiedMoneyLiftCents: 24_00,
+    controlMedianVerifiedMoneyLiftCents: null,
     rows: [],
     source,
   },

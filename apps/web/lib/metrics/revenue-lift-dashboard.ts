@@ -15,6 +15,11 @@ import {
   listArtistCohortRevenueRows,
 } from '@/lib/metrics/artist-revenue-cohorts';
 import {
+  type CreatorOutcomeMetricStatus,
+  type CreatorOutcomePresentation,
+  presentCreatorOutcomeDashboard,
+} from '@/lib/metrics/creator-outcomes';
+import {
   getIRPAA,
   getRolling30DayIRPAA,
   type IrpaaResult,
@@ -47,6 +52,8 @@ export interface CohortSummary {
   readonly controlCount: number;
   readonly activeMedianLiftCents: number | null;
   readonly controlMedianLiftCents: number | null;
+  readonly activeMedianVerifiedMoneyLiftCents: number | null;
+  readonly controlMedianVerifiedMoneyLiftCents: number | null;
   readonly rows: readonly ArtistCohortRevenueRow[];
   readonly source: MetricSourceMeta;
 }
@@ -65,6 +72,7 @@ export interface RevenueLiftDashboardData {
   readonly irpaa: IrpaaResult | null;
   readonly irpaaPrior: IrpaaResult | null;
   readonly irpaaSource: MetricSourceMeta;
+  readonly creatorOutcomes: CreatorOutcomePresentation;
   readonly kpiTree: readonly RevenueLiftKpiTile[];
   readonly interpretationTable: readonly RevenueLiftKpiTile[];
   readonly cohorts: CohortSummary;
@@ -122,6 +130,51 @@ function formatCents(cents: number): string {
 
 function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
+}
+
+function medianVerifiedMoneyLift(
+  rows: readonly ArtistCohortRevenueRow[],
+  cohort: ArtistCohortRevenueRow['cohort']
+): number | null {
+  return median(
+    rows
+      .filter(
+        row =>
+          row.cohort === cohort &&
+          row.causalVerifiedMoneyLiftStatus === 'measured' &&
+          row.causalVerifiedMoneyLiftCents != null
+      )
+      .map(row => row.causalVerifiedMoneyLiftCents as number)
+  );
+}
+
+function aggregateActiveCausalLift(rows: readonly ArtistCohortRevenueRow[]): {
+  readonly cents: number | null;
+  readonly status: CreatorOutcomeMetricStatus;
+} {
+  const active = rows.filter(row => row.cohort === 'jovie_active');
+  const measured = active.filter(
+    row =>
+      row.causalVerifiedMoneyLiftStatus === 'measured' &&
+      row.causalVerifiedMoneyLiftCents != null
+  );
+  if (measured.length > 0) {
+    return {
+      cents: median(
+        measured.map(row => row.causalVerifiedMoneyLiftCents as number)
+      ),
+      status: 'measured',
+    };
+  }
+  if (
+    active.some(row => row.causalVerifiedMoneyLiftStatus === 'inconclusive')
+  ) {
+    return { cents: null, status: 'inconclusive' };
+  }
+  if (active.length === 0) {
+    return { cents: null, status: 'inconclusive' };
+  }
+  return { cents: null, status: 'unmeasured' };
 }
 
 function formatMs(ms: number | null): string {
@@ -208,9 +261,26 @@ export async function loadRevenueLiftDashboard(
     controlCount: controlRows.length,
     activeMedianLiftCents: median(activeLifts),
     controlMedianLiftCents: median(controlLifts),
+    activeMedianVerifiedMoneyLiftCents: medianVerifiedMoneyLift(
+      cohortRows,
+      'jovie_active'
+    ),
+    controlMedianVerifiedMoneyLiftCents: medianVerifiedMoneyLift(
+      cohortRows,
+      'control'
+    ),
     rows: cohortRows.slice(0, 50),
     source: cohortSource,
   };
+  const causalLift = aggregateActiveCausalLift(cohortRows);
+  const creatorOutcomes = presentCreatorOutcomeDashboard({
+    verifiedGmvCents: irpaa ? irpaa.totals.gmvDeltaCents : null,
+    verifiedTipsCents: null,
+    attributedDspClicks: irpaa ? irpaa.totals.dspClickDelta : null,
+    attributedNewFans: irpaa ? irpaa.totals.newFansDelta : null,
+    causalVerifiedMoneyLiftCents: causalLift.cents,
+    causalStatus: causalLift.status,
+  });
 
   let agents: AgentContributionRow[] = [];
   let agentsSource: MetricSourceMeta;
@@ -296,43 +366,43 @@ export async function loadRevenueLiftDashboard(
         ? `${irpaa.activeArtists} active artists · ${irpaa.runCount} runs · weights ${weights.version}`
         : 'No IRPAA snapshot',
       vcInterpretation:
-        'North Star: incremental revenue per active artist from Jovie-shipped automations. Up-and-to-the-right proves the claim.',
+        'Blended composite of verified GMV plus labeled engagement proxies. Not verified money and not causal lift.',
       source: irpaaSource,
     },
     {
       id: 'gmv-lift',
       tier: 'B',
-      label: 'Direct GMV Lift',
+      label: 'Verified GMV',
       valueLabel: irpaa ? formatCents(irpaa.totals.gmvDeltaCents) : '—',
-      signal: 'Σ workflow_run_outcomes.gmv_delta_cents (real merch GMV)',
+      signal: 'Σ workflow_run_outcomes.gmv_delta_cents (settled merch GMV)',
       vcInterpretation:
-        'Real dollars settled via Stripe/Printful, attributed only through the automation spine.',
+        'Verified money on completed automations. Not causal lift and not a proxy.',
       source: irpaaSource,
     },
     {
       id: 'dsp-clicks',
       tier: 'B',
-      label: 'DSP Click Delta',
+      label: 'Attributed listens',
       valueLabel: irpaa ? String(irpaa.totals.dspClickDelta) : '—',
-      signal: `Proxy · ${weights.streamingValueWeightCentsPerDspClick}¢ / click (weights ${weights.version})`,
+      signal: `Attributed engagement · proxy weight ${weights.streamingValueWeightCentsPerDspClick}¢ / click (${weights.version})`,
       vcInterpretation:
-        'Streaming value proxy until royalty feeds land; always labeled with the weight version.',
+        'Attributed engagement, not verified money. The proxy weight stays labeled and stays out of causal lift.',
       source: irpaaSource,
     },
     {
       id: 'new-fans',
       tier: 'B',
-      label: 'New Fans Delta',
+      label: 'Attributed new fans',
       valueLabel: irpaa ? String(irpaa.totals.newFansDelta) : '—',
-      signal: `Proxy · ${weights.fanCaptureLtvWeightCentsPerFan}¢ LTV / fan (weights ${weights.version})`,
+      signal: `Attributed engagement · proxy weight ${weights.fanCaptureLtvWeightCentsPerFan}¢ / fan (${weights.version})`,
       vcInterpretation:
-        'Fan-capture LTV proxy; validated against realized tips/GMV on a 30-day cadence.',
+        'Attributed engagement, not verified money and not causal lift.',
       source: irpaaSource,
     },
     {
       id: 'cohort-lift',
       tier: 'B',
-      label: 'Active vs Control Lift',
+      label: 'Blended signal difference',
       valueLabel:
         cohorts.activeMedianLiftCents != null
           ? `${formatCents(cohorts.activeMedianLiftCents)} vs ${
@@ -341,9 +411,9 @@ export async function loadRevenueLiftDashboard(
                 : '—'
             }`
           : '—',
-      signal: `${cohorts.activeCount} active · ${cohorts.controlCount} control (median lift)`,
+      signal: `${cohorts.activeCount} active · ${cohorts.controlCount} control (median blended signal)`,
       vcInterpretation:
-        'Holdout signal: active-artist median lift should exceed control, or attribution is noise.',
+        'Blended GMV, tips, and engagement proxies versus each artist baseline. Not causal verified-money lift.',
       source: cohortSource,
     },
     {
@@ -383,6 +453,7 @@ export async function loadRevenueLiftDashboard(
     irpaa,
     irpaaPrior,
     irpaaSource,
+    creatorOutcomes,
     kpiTree,
     interpretationTable: kpiTree,
     cohorts,

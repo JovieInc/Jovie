@@ -157,5 +157,48 @@ describe('listArtistCohortRevenueRows', () => {
     });
     expect(rows[0]?.signal?.revenueSignalCents).toBe(3000);
     expect(rows[0]?.liftCents).toBe(2000);
+    expect(rows[0]?.causalVerifiedMoneyLiftCents).toBe(2000);
+    expect(rows[0]?.causalVerifiedMoneyLiftStatus).toBe('measured');
+  });
+
+  it('keeps engagement proxies out of causal verified-money lift', async () => {
+    const cohortRow = {
+      id: 'cohort-1',
+      userId: 'user-1',
+      creatorProfileId: 'profile-1',
+      cohort: 'jovie_active',
+      assignedAt: new Date('2026-05-01T00:00:00.000Z'),
+      activatedAt: new Date('2026-05-01T00:00:00.000Z'),
+      matchCriteria: {},
+      baselineWindowStart: new Date('2026-04-01T00:00:00.000Z'),
+      baselineWindowEnd: new Date('2026-05-01T00:00:00.000Z'),
+      baselineGmvCents: 1000,
+      baselineTipsCents: 0,
+      baselineDspClickCount: 0,
+      baselineNewFanCount: 0,
+      baselineRevenueSignalCents: 1000,
+      baselineWeightsVersion: 'v1',
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+    };
+
+    mockDbSelect
+      .mockReturnValueOnce(mockWhereChain([cohortRow]))
+      .mockReturnValueOnce(
+        mockGroupByChain([{ creatorProfileId: 'profile-1', gmvCents: 3000 }])
+      )
+      .mockReturnValueOnce(mockGroupByChain([]))
+      .mockReturnValueOnce(
+        mockGroupByChain([{ creatorProfileId: 'profile-1', dspClickCount: 50 }])
+      )
+      .mockReturnValueOnce(mockGroupByChain([]));
+
+    const rows = await listArtistCohortRevenueRows({ window });
+    const proxyCents = 50 * STREAMING_VALUE_WEIGHT_CENTS_PER_DSP_CLICK;
+
+    expect(rows[0]?.signal?.revenueSignalCents).toBe(3000 + proxyCents);
+    expect(rows[0]?.liftCents).toBe(2000 + proxyCents);
+    expect(rows[0]?.causalVerifiedMoneyLiftCents).toBe(2000);
+    expect(rows[0]?.causalVerifiedMoneyLiftStatus).toBe('measured');
   });
 });

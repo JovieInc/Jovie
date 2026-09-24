@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { RevenueLiftDashboardView } from '@/app/app/(shell)/admin/revenue-lift/RevenueLiftDashboardView';
+import { presentCreatorOutcomeDashboard } from '@/lib/metrics/creator-outcomes';
 import type { RevenueLiftDashboardData } from '@/lib/metrics/revenue-lift-dashboard';
 
 const source = {
@@ -28,11 +29,19 @@ const DATA: RevenueLiftDashboardData = {
   irpaaSource: source,
   kpiTree: [{ ...tile, id: 'irpaa', tier: 'A', label: 'IRPAA' }, tile],
   interpretationTable: [tile],
+  creatorOutcomes: presentCreatorOutcomeDashboard({
+    verifiedGmvCents: 12500,
+    attributedDspClicks: 4,
+    attributedNewFans: 1,
+    causalStatus: 'inconclusive',
+  }),
   cohorts: {
     activeCount: 0,
     controlCount: 0,
     activeMedianLiftCents: null,
     controlMedianLiftCents: null,
+    activeMedianVerifiedMoneyLiftCents: null,
+    controlMedianVerifiedMoneyLiftCents: null,
     rows: [],
     source,
   },
@@ -69,6 +78,21 @@ describe('RevenueLiftDashboardView', () => {
     expect(screen.getByTestId('revenue-lift-agent-outreach')).toHaveTextContent(
       '75.0%'
     );
+    expect(screen.getByTestId('revenue-lift-verified-money')).toHaveTextContent(
+      '$125.00'
+    );
+    expect(screen.getByTestId('revenue-lift-verified-money')).toHaveTextContent(
+      'Tips are unmeasured'
+    );
+    expect(
+      screen.getByTestId('revenue-lift-attributed-engagement')
+    ).toHaveTextContent('4 listens · 1 fan');
+    expect(screen.getByTestId('revenue-lift-causal-lift')).toHaveTextContent(
+      'Inconclusive'
+    );
+    expect(
+      screen.getByTestId('revenue-lift-causal-lift')
+    ).not.toHaveTextContent('$125.00');
   });
 
   it('preserves cohort empty-state and source trust labels', () => {

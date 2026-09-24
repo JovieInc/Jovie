@@ -98,16 +98,51 @@ export function RevenueLiftDashboardView({
             : null}
         </p>
         <p className='mt-2 text-xs text-secondary-token'>
-          Total lift {irpaa ? formatAmount(irpaa.totalRevenueLiftCents) : '—'}{' '}
-          over the rolling 30-day window. Weights{' '}
-          {irpaa?.weights.version ?? '—'}
+          Blended total{' '}
+          {irpaa ? formatAmount(irpaa.totalRevenueLiftCents) : '—'} over the
+          rolling 30-day window. Weights {irpaa?.weights.version ?? '—'}
           {irpaa?.weights.lastValidatedAt
             ? ` (validated ${irpaa.weights.lastValidatedAt})`
             : ''}
-          .
+          . IRPAA mixes verified GMV with engagement proxies. It is not verified
+          money and it is not causal lift.
         </p>
         <SourceLine source={data.irpaaSource} />
       </ContentSurfaceCard>
+
+      <section aria-labelledby='creator-outcomes-heading'>
+        <h2
+          id='creator-outcomes-heading'
+          className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
+        >
+          Creator outcomes
+        </h2>
+        <div className='grid gap-3 sm:grid-cols-3'>
+          {data.creatorOutcomes.layers.map(layer => (
+            <ContentSurfaceCard
+              key={layer.id}
+              surface='nested'
+              className='p-4'
+              data-testid={`revenue-lift-${layer.id}`}
+            >
+              <div className='flex items-start justify-between gap-2'>
+                <p className='text-xs font-medium text-secondary-token'>
+                  {layer.label}
+                </p>
+                <span className='rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'>
+                  {layer.statusLabel}
+                </span>
+              </div>
+              <p className='mt-2 min-h-8 text-2xl font-semibold tracking-tight text-primary-token'>
+                {layer.valueLabel}
+              </p>
+              <p className='mt-1 min-h-8 text-xs text-secondary-token'>
+                {layer.disclosure}
+              </p>
+            </ContentSurfaceCard>
+          ))}
+        </div>
+      </section>
 
       {/* KPI tree */}
       <section aria-labelledby='revenue-lift-kpi-heading'>
@@ -201,9 +236,15 @@ export function RevenueLiftDashboardView({
               {data.cohorts.activeCount}
             </p>
             <p className='mt-1 text-xs text-secondary-token'>
-              Median lift{' '}
+              Median blended signal{' '}
               {data.cohorts.activeMedianLiftCents != null
                 ? formatAmount(data.cohorts.activeMedianLiftCents)
+                : '—'}
+            </p>
+            <p className='mt-1 text-xs text-secondary-token'>
+              Median verified-money lift{' '}
+              {data.cohorts.activeMedianVerifiedMoneyLiftCents != null
+                ? formatAmount(data.cohorts.activeMedianVerifiedMoneyLiftCents)
                 : '—'}
             </p>
           </ContentSurfaceCard>
@@ -213,9 +254,15 @@ export function RevenueLiftDashboardView({
               {data.cohorts.controlCount}
             </p>
             <p className='mt-1 text-xs text-secondary-token'>
-              Median lift{' '}
+              Median blended signal{' '}
               {data.cohorts.controlMedianLiftCents != null
                 ? formatAmount(data.cohorts.controlMedianLiftCents)
+                : '—'}
+            </p>
+            <p className='mt-1 text-xs text-secondary-token'>
+              Median verified-money lift{' '}
+              {data.cohorts.controlMedianVerifiedMoneyLiftCents != null
+                ? formatAmount(data.cohorts.controlMedianVerifiedMoneyLiftCents)
                 : '—'}
             </p>
           </ContentSurfaceCard>
@@ -232,13 +279,16 @@ export function RevenueLiftDashboardView({
                   Cohort
                 </th>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>
-                  Signal
+                  Blended signal
                 </th>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>
-                  Baseline
+                  Blended baseline
                 </th>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>
-                  Lift
+                  Blended lift
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Verified-money lift
                 </th>
               </tr>
             </thead>
@@ -246,7 +296,7 @@ export function RevenueLiftDashboardView({
               {data.cohorts.rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className='px-3 py-6 text-center text-secondary-token'
                   >
                     No cohort rows yet. Artists are tagged when automation
@@ -277,6 +327,14 @@ export function RevenueLiftDashboardView({
                       {row.liftCents != null
                         ? formatAmount(row.liftCents)
                         : '—'}
+                    </td>
+                    <td className='px-3 py-2 text-primary-token'>
+                      {row.causalVerifiedMoneyLiftStatus === 'measured' &&
+                      row.causalVerifiedMoneyLiftCents != null
+                        ? formatAmount(row.causalVerifiedMoneyLiftCents)
+                        : row.causalVerifiedMoneyLiftStatus === 'inconclusive'
+                          ? 'Inconclusive'
+                          : '—'}
                     </td>
                   </tr>
                 ))
@@ -365,8 +423,10 @@ export function RevenueLiftDashboardView({
       </section>
 
       <p className='text-2xs text-tertiary-token'>
-        Generated {formatSourceFreshness(data.generatedAtIso)}. Proxy terms
-        always carry the weights version; see docs/REVENUE_LIFT_METRICS.md.
+        Generated {formatSourceFreshness(data.generatedAtIso)}. Verified money,
+        attributed engagement, and causal lift stay separate. Proxy weights stay
+        on the blended IRPAA composite; see
+        docs/product/creator-outcomes-measurement-contract.md.
       </p>
     </div>
   );
