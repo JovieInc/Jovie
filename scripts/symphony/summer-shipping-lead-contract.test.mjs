@@ -115,6 +115,7 @@ function cycle(record = outbox()) {
       },
     },
     shippingLeadAdmitter: {
+      /** @returns {Promise<ReturnType<typeof terminal> | {status: string, reason: string}>} */
       async execute() {
         executions++;
         return terminal();
@@ -214,6 +215,7 @@ for (const [name, mutate] of [
 ]) {
   test(`rejects ${name} before owner dispatch`, () => {
     const task = fixture();
+    assert.ok(typeof mutate === 'function');
     mutate(task);
     assert.throws(
       () => validateShippingTask(task),
@@ -367,6 +369,7 @@ for (const [name, mutate] of [
         'host-outcomes'
       );
     const { signature, signatureKeyId, ...body } = outcome;
+    assert.ok(typeof mutate === 'function');
     mutate(body);
     const changed = signRecord(
       SHIPPING_OUTCOME,
