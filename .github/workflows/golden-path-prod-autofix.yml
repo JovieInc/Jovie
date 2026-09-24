@@ -57,7 +57,7 @@ jobs:
             --origin https://jov.ie \
             --receipt /tmp/golden-path-lock/receipt.json
 
-      - name: Fail closed if Cursor cannot autofix a break
+      - name: Classify the prod probe before any autofix
         if: always()
         env:
           PROBE_OUTCOME: ${{ steps.probe.outcome }}
@@ -68,8 +68,21 @@ jobs:
             exit 1
           fi
           if [[ "$PROBE_OUTCOME" == "success" ]]; then
-            echo "Live golden path passed. Cursor-direct not launched."
-            exit 0
+            if jq -e '.ok == true and .inconclusive != true' /tmp/golden-path-lock/receipt.json >/dev/null; then
+              echo "Live golden-path probe passed; the first-message stream reached a clean finish event. Cursor-direct not launched."
+              exit 0
+            fi
+            echo "::error::Probe command succeeded without an all-pass production receipt; refusing to claim success or autofix."
+            exit 1
+          fi
+          if jq -e '.inconclusive == true and ([.checks[] | select(.ok == false and .inconclusive != true)] | length == 0)' /tmp/golden-path-lock/receipt.json >/dev/null; then
+            echo "::error title=Golden path unverified::The chat request reached Turnstile, but no valid token was supplied. The post-challenge first-message path was not exercised; no autofix was attempted."
+            echo "Golden path status: inconclusive. Turnstile was reached, but the first-message path was not tested. No autofix was attempted." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if jq -e '.ok == true and .inconclusive != true' /tmp/golden-path-lock/receipt.json >/dev/null; then
+            echo "::error::Probe command failed despite an all-pass production receipt; refusing autofix."
+            exit 1
           fi
           if [[ -z "${CURSOR_API_KEY:-}" ]]; then
             echo "::error::CURSOR_API_KEY is missing. Detect without a ship lock is a hole."
