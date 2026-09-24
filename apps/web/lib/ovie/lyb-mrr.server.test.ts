@@ -8,12 +8,12 @@ const NOW = new Date('2026-09-24T05:00:00Z');
 const DAY = Date.parse('2026-09-24T00:00:00Z');
 const options = {
   object: 'chart_options',
-  resolutions: [{ id: 'day', display_name: 'day' }],
+  resolutions: [{ id: 'P1D', display_name: 'day' }],
 };
 const chart = {
   object: 'chart_data',
   category: 'revenue',
-  resolution: 'day',
+  resolution: 'P1D',
   yaxis_currency: 'USD',
   yaxis: '$',
   start_date: DAY,
@@ -56,7 +56,7 @@ describe('RevenueCat LogYourBody MRR read', () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       currency: 'USD',
       realtime: 'true',
-      resolution: 'day',
+      resolution: 'P1D',
       start_date: '2026-09-24',
       end_date: '2026-09-24',
       selectors: '{"revenue_type":"revenue"}',

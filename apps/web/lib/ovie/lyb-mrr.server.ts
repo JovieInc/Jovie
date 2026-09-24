@@ -84,7 +84,8 @@ export async function getLybDailyMrr(
       await response.json(),
       LYB_REVENUECAT_PROJECT_ID,
       asOfDate,
-      now
+      now,
+      dayResolution
     );
   } catch {
     return missing('unreconciled');

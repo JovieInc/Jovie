@@ -70,7 +70,8 @@ export function parseLybMrrChart(
   input: unknown,
   projectId: string,
   asOfDate: string,
-  now: Date
+  now: Date,
+  dayResolution: string
 ): LybDailyMrr {
   const dayStart = Date.parse(`${asOfDate}T00:00:00.000Z`);
   if (
@@ -79,7 +80,8 @@ export function parseLybMrrChart(
     !isRecord(input) ||
     input.object !== 'chart_data' ||
     input.category !== 'revenue' ||
-    input.resolution !== 'day' ||
+    !dayResolution ||
+    input.resolution !== dayResolution ||
     input.yaxis_currency !== 'USD' ||
     input.yaxis !== '$' ||
     !Number.isSafeInteger(input.last_computed_at) ||

@@ -39,7 +39,7 @@ describe('LogYourBody daily MRR chart', () => {
 
   it('records one dated gross recurring USD value with provenance', () => {
     expect(
-      parseLybMrrChart(chart(), 'proj_lyb', '2026-09-24', NOW)
+      parseLybMrrChart(chart(), 'proj_lyb', '2026-09-24', NOW, 'day')
     ).toMatchObject({
       product: 'logyourbody',
       definition: 'active-paid-subscriptions-monthly-normalized-gross',
@@ -54,13 +54,14 @@ describe('LogYourBody daily MRR chart', () => {
 
   it('preserves measured zero and suppresses stale values', () => {
     expect(
-      parseLybMrrChart(chart(0), 'proj_lyb', '2026-09-24', NOW).mrrCents
+      parseLybMrrChart(chart(0), 'proj_lyb', '2026-09-24', NOW, 'day').mrrCents
     ).toBe(0);
     const stale = parseLybMrrChart(
       chart(42.5, Date.parse('2026-09-24T01:00:00Z')),
       'proj_lyb',
       '2026-09-24',
-      new Date('2026-09-26T01:00:00Z')
+      new Date('2026-09-26T01:00:00Z'),
+      'day'
     );
     expect(stale).toMatchObject({ state: 'stale', mrrCents: null });
   });
@@ -88,8 +89,27 @@ describe('LogYourBody daily MRR chart', () => {
     ];
     for (const payload of invalid) {
       expect(() =>
-        parseLybMrrChart(payload, 'proj_lyb', '2026-09-24', NOW)
+        parseLybMrrChart(payload, 'proj_lyb', '2026-09-24', NOW, 'day')
       ).toThrow();
     }
+  });
+
+  it('accepts only the discovered provider day resolution ID', () => {
+    const dayResolution = parseLybMrrDayResolution({
+      object: 'chart_options',
+      resolutions: [{ id: 'P1D', display_name: 'day' }],
+    });
+    expect(
+      parseLybMrrChart(
+        { ...chart(), resolution: 'P1D' },
+        'proj_lyb',
+        '2026-09-24',
+        NOW,
+        dayResolution
+      ).mrrCents
+    ).toBe(4250);
+    expect(() =>
+      parseLybMrrChart(chart(), 'proj_lyb', '2026-09-24', NOW, dayResolution)
+    ).toThrow();
   });
 });
