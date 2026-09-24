@@ -1775,6 +1775,70 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it.each([false, true])(
+    'runs the real deploy-wrapper suite for the exact pair (selector=%s)',
+    withSelector => {
+      const files = [
+        '.github/scripts/vercel-prebuilt-deploy.sh',
+        'scripts/tests/test_vercel_prebuilt_deploy.py',
+      ];
+      if (withSelector)
+        files.push(
+          'scripts/run-affected-tests.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs'
+        );
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonTests).toEqual([
+        'scripts/tests/test_vercel_prebuilt_deploy.py',
+      ]);
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/automation-verify.test.mjs'
+      );
+      expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+        'python3',
+        ['-m', 'pytest', 'scripts/tests/test_vercel_prebuilt_deploy.py', '-q'],
+      ]);
+    }
+  );
+
+  it.each([
+    '.github/scripts/unknown-vercel-control.mjs',
+    'package.json',
+    'apps/web/lib/unknown.ts',
+    'scripts/run-affected-tests.mjs',
+  ])(
+    'keeps deploy diagnostics on full fallback for extra/incomplete peer %s',
+    peer => {
+      expect(
+        buildAffectedTestPlan([
+          '.github/scripts/vercel-prebuilt-deploy.sh',
+          'scripts/tests/test_vercel_prebuilt_deploy.py',
+          peer,
+        ]).mode
+      ).toBe('full');
+    }
+  );
+
+  it.each([
+    '.github/scripts/vercel-prebuilt-deploy.sh',
+    'scripts/tests/test_vercel_prebuilt_deploy.py',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ])(
+    'keeps deploy diagnostics on full fallback when proof file %s is unavailable',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          [
+            '.github/scripts/vercel-prebuilt-deploy.sh',
+            'scripts/tests/test_vercel_prebuilt_deploy.py',
+          ],
+          { isFileAvailable: file => file !== missing }
+        ).mode
+      ).toBe('full');
+    }
+  );
+
   it('keeps the Vercel congestion-control diff on its focused cross-runtime suites', () => {
     const plan = buildAffectedTestPlan(VERCEL_CONGESTION_CONTROL_MANIFEST);
 
