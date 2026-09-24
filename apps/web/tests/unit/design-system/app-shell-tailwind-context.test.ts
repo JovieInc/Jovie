@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const WEB_ROOT = join(import.meta.dirname, '..', '..', '..');
@@ -12,6 +14,13 @@ const FOUNDATION_CSS = readFileSync(
   join(WEB_ROOT, 'styles', 'tailwind-foundation.css'),
   'utf8'
 );
+const PUBLIC_ROUTE_SOURCE_PATHS = [
+  'app/(marketing)/pay/page.tsx',
+  'app/(dynamic)/legal/error.tsx',
+  'components/organisms/ErrorBoundary.tsx',
+  'components/features/pay/PayLanding.tsx',
+  'components/features/feedback/ErrorDetails.tsx',
+] as const;
 
 /**
  * JOV-2269 regression guard.
@@ -70,6 +79,48 @@ describe('app-shell Tailwind context boundary (JOV-2269)', () => {
         `globals.css is missing @source not "${dir}"`
       ).toContain(`@source not "${dir}"`);
     }
+  });
+
+  it('keeps utility styles for public route leaves inside excluded trees', async () => {
+    const [payRoute, legalError, errorBoundary, payLanding, errorDetails] =
+      PUBLIC_ROUTE_SOURCE_PATHS.map(sourcePath =>
+        readFileSync(join(WEB_ROOT, sourcePath), 'utf8')
+      );
+
+    expect(payRoute).toContain("from '@/features/pay/PayLanding'");
+    expect(legalError).toContain("from '@/components/organisms/ErrorBoundary'");
+    expect(errorBoundary).toContain("from '@/features/feedback/ErrorDetails'");
+    expect(payLanding).toContain('max-w-[10ch]');
+    expect(errorDetails).toContain('break-words');
+
+    const publicFeatureSources = GLOBALS_CSS.split('\n').filter(line =>
+      /^@source(?: not)? "\.\.\/components\/features\/(?:pay|feedback)(?:\/|\")/.test(
+        line
+      )
+    );
+    expect(publicFeatureSources).toContain(
+      '@source not "../components/features/pay";'
+    );
+    expect(publicFeatureSources).toContain(
+      '@source not "../components/features/feedback";'
+    );
+    const css = await postcss([
+      tailwindcss({ base: join(WEB_ROOT, 'app') }),
+    ]).process(
+      `@import "tailwindcss" source(none);\n${publicFeatureSources.join('\n')}`,
+      { from: join(WEB_ROOT, 'app', 'globals.css') }
+    );
+    const selectors: string[] = [];
+    postcss.parse(css.css).walkRules(rule => selectors.push(rule.selector));
+
+    expect(selectors).toContain('.max-w-\\[10ch\\]');
+    expect(selectors).toContain('.break-words');
+    expect(publicFeatureSources).toContain(
+      '@source "../components/features/pay/PayLanding.tsx";'
+    );
+    expect(publicFeatureSources).toContain(
+      '@source "../components/features/feedback/ErrorDetails.tsx";'
+    );
   });
 
   it('scans every app-shell dir in the system-b context', () => {

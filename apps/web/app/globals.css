@@ -52,9 +52,8 @@
 /* Server-only subtrees: route handlers / actions never emit classNames. */
 @source not "../app/api";
 @source not "../app/actions";
-/* Feature/component trees with no importers outside app-shell routes
-   (verified via the apps/web import graph); app routes regenerate their
-   classes through the system-b-app.css context instead. */
+/* Keep app-shell feature trees out of the shared scan. Public route UI leaves
+   that live inside these trees are re-included individually below. */
 @source not "../components/features/bridge";
 @source not "../components/features/connectors";
 @source not "../components/features/creator";
@@ -70,6 +69,9 @@
 @source not "../components/features/settings";
 @source not "../components/features/tracking";
 @source not "../components/features/ui";
+/* /pay and public error boundaries do not load the app-shell stylesheet. */
+@source "../components/features/pay/PayLanding.tsx";
+@source "../components/features/feedback/ErrorDetails.tsx";
 @source not "../components/onboarding";
 @source not "../components/canonical";
 /* Unreferenced component trees (no importers anywhere). */
