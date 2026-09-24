@@ -1,4 +1,8 @@
 # Agent Pipeline
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The existing trusted-main approval job requests native GitHub Merge when ready without executing PR code with its App token.
+# removal-trigger: Remove this finish step when the originating agent requests native merge itself; no separate admission controller is retained.
 # JOV-INV-028: bounded failures remain in autonomous remediation.
 #
 # PURPOSE: Unified automation pipeline for agent-generated PRs. Handles both
@@ -9,7 +13,7 @@
 #
 # TRIGGERS:
 # 1. CI failure on agent branches → fix job (Claude Code fixes)
-# 2. CI PR Ready succeeds → approve job (auto-approve + queue handoff)
+# 2. CI PR Ready succeeds → approve job (auto-approve + native merge request)
 #
 # NOTE: CodeRabbit blocking review trigger (pull_request_review) was removed
 # because bot-submitted reviews create action_required runs that clog the
