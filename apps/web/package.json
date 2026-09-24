@@ -316,7 +316,7 @@
     "@biomejs/biome": "^2.5.14",
     "@chromatic-com/storybook": "^5.3.1",
     "@lhci/cli": "^0.15.1",
-    "@next/bundle-analyzer": "^16.3.5",
+    "@next/bundle-analyzer": "^16.3.6",
     "@playwright/test": "1.63.0",
     "@sentry/node": "^10.75.1",
     "@shadcn/lint": "0.1.5",
