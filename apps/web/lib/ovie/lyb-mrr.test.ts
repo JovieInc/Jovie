@@ -8,6 +8,7 @@ const OBSERVED = Date.parse('2026-09-24T04:00:00.000Z');
 function chart(value: unknown = 42.5, computed: unknown = OBSERVED) {
   return {
     object: 'chart_data',
+    category: 'revenue',
     resolution: 'day',
     yaxis_currency: 'USD',
     yaxis: '$',
@@ -16,6 +17,7 @@ function chart(value: unknown = 42.5, computed: unknown = OBSERVED) {
     last_computed_at: computed,
     values: [[value]],
     segments: [],
+    user_selectors: { revenue_type: 'revenue' },
   };
 }
 
@@ -68,11 +70,21 @@ describe('LogYourBody daily MRR chart', () => {
       { ...chart(), values: [[]] },
       { ...chart(), values: [[1, 2]] },
       { ...chart(), values: [[-1]] },
+      { ...chart(), values: [[{ value: 42.5, timestamp: DAY - 1 }]] },
       { ...chart(), yaxis_currency: 'EUR' },
+      { ...chart(), category: 'proceeds' },
       { ...chart(), resolution: 'week' },
       { ...chart(), last_computed_at: NOW.getTime() + 1 },
+      { ...chart(), start_date: DAY - 86400000 },
+      { ...chart(), end_date: DAY + 86400000 },
+      { ...chart(), segments: [{ id: 'app-store' }] },
       { ...chart(), segments: [{ id: 'a' }, { id: 'b' }] },
       { ...chart(), user_selectors: { revenue_type: 'proceeds' } },
+      {
+        ...chart(),
+        user_selectors: { revenue_type: 'revenue', app: 'one-app' },
+      },
+      { ...chart(), user_selectors: 'proceeds' },
     ];
     for (const payload of invalid) {
       expect(() =>

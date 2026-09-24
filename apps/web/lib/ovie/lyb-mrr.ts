@@ -18,7 +18,6 @@ export interface LybDailyMrr {
 }
 
 const MAX_AGE_MS = 36 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -55,16 +54,15 @@ function onlyPoint(values: unknown): number {
     throw new Error('RevenueCat MRR chart has ambiguous daily points');
   }
   const point = series[0];
-  const value = isRecord(point) ? point.value : point;
   if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value) ||
-    value < 0 ||
-    !Number.isSafeInteger(Math.round(value * 100))
+    typeof point !== 'number' ||
+    !Number.isFinite(point) ||
+    point < 0 ||
+    !Number.isSafeInteger(Math.round(point * 100))
   ) {
     throw new Error('RevenueCat MRR chart value malformed');
   }
-  return value;
+  return point;
 }
 
 /** One UTC day, one unsegmented gross USD point, with provider computation time. */
@@ -80,6 +78,7 @@ export function parseLybMrrChart(
     new Date(dayStart).toISOString().slice(0, 10) !== asOfDate ||
     !isRecord(input) ||
     input.object !== 'chart_data' ||
+    input.category !== 'revenue' ||
     input.resolution !== 'day' ||
     input.yaxis_currency !== 'USD' ||
     input.yaxis !== '$' ||
@@ -93,13 +92,14 @@ export function parseLybMrrChart(
   if (
     computedMs < dayStart ||
     computedMs > now.getTime() ||
-    (input.start_date as number) > dayStart ||
-    (input.end_date as number) < dayStart ||
-    (input.end_date as number) >= dayStart + DAY_MS * 2 ||
-    (Array.isArray(input.segments) && input.segments.length > 1) ||
-    (isRecord(input.user_selectors) &&
-      input.user_selectors.revenue_type !== undefined &&
-      input.user_selectors.revenue_type !== 'revenue')
+    input.start_date !== dayStart ||
+    input.end_date !== dayStart ||
+    (input.segments != null &&
+      (!Array.isArray(input.segments) || input.segments.length !== 0)) ||
+    (input.user_selectors != null &&
+      (!isRecord(input.user_selectors) ||
+        Object.keys(input.user_selectors).length !== 1 ||
+        input.user_selectors.revenue_type !== 'revenue'))
   ) {
     throw new Error('RevenueCat daily MRR chart scope ambiguous');
   }

@@ -31,7 +31,8 @@ It requires `REVENUECAT_LYB_SECRET_API_KEY` with project-scoped read-only
 project still contains only LogYourBody billing apps and the chart's daily
 point layout, USD unit scale, timestamp, selector, and dashboard MRR agree. The
 current parser assumes the chart's numeric MRR value is in USD major units;
-that assumption needs a live same-day dashboard comparison. A source
+it accepts only one unsegmented, exact-day numeric point. The unit assumption
+and provider response shape need a live same-day dashboard comparison. A source
 PR, test fixture, or configured key is not a live metric receipt. The Ovie
 scoreboard and Summer CLI/MCP binding owners consume this same record after
 provider readback; they do not infer a zero from an unavailable response.

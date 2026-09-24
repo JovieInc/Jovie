@@ -12,6 +12,7 @@ const options = {
 };
 const chart = {
   object: 'chart_data',
+  category: 'revenue',
   resolution: 'day',
   yaxis_currency: 'USD',
   yaxis: '$',
@@ -19,6 +20,7 @@ const chart = {
   end_date: DAY,
   last_computed_at: Date.parse('2026-09-24T04:00:00Z'),
   values: [[0]],
+  user_selectors: { revenue_type: 'revenue' },
 };
 
 afterEach(() => vi.unstubAllEnvs());
