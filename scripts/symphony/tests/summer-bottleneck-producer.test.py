@@ -644,8 +644,8 @@ class UpstreamObservationTests(unittest.TestCase):
                "invocationId": "e" * 32, "runtimeGeneration": "f" * 64}
         before = {**row, "observedAt": "2026-09-05T19:29:30Z"}
         after = {**row, "observedAt": "2026-09-05T19:29:40Z"}
-        evidence = {"schema": MODULE.UPSTREAM_OBSERVATION_SCHEMA, "published": row,
-                    "before": before, "after": after, "stateDigest": MODULE.digest(runtime)}
+        evidence = MODULE.LiveUpstreamObservation({"schema": MODULE.UPSTREAM_OBSERVATION_SCHEMA, "published": row,
+                    "before": before, "after": after, "stateDigest": MODULE.digest(runtime)})
         return fleet, runtime, evidence
 
     def test_proven_source_and_work_count_remain_separate_from_admission(self):
@@ -718,7 +718,29 @@ class UpstreamObservationTests(unittest.TestCase):
                 observed = MODULE.read_upstream_sources()
             self.assertEqual(events, ["check", "state", "check"])
             self.assertEqual(observed, (fleet, runtime, evidence))
+            self.assertIsInstance(observed[2], MODULE.LiveUpstreamObservation)
             self.assertEqual(path.read_bytes(), raw)
+
+    def test_serialized_wrapper_cannot_switch_legacy_or_fixture_trust_path(self):
+        fleet, runtime, evidence = self.evidence()
+        decoded = json.loads(json.dumps(evidence))
+        self.assertIsNone(MODULE.attested_runtime_revision(fleet["signals"], runtime, NOW, decoded))
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "legacy.json"
+            path.write_text(json.dumps(evidence))
+            with mock.patch.dict(MODULE.os.environ, {}, clear=True), \
+                 mock.patch.object(sys, "argv", ["producer", "--source-bundle", "/fixture.json"]), \
+                 mock.patch.object(MODULE, "ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE, "read_sources", return_value=(fleet, runtime)), \
+                 mock.patch.object(MODULE, "read_upstream_sources") as live, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock, \
+                 mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                clock.now.return_value = NOW
+                self.assertEqual(MODULE.main(), 0)
+                runner = json.loads(output.getvalue())["signals"]["runner"]
+                self.assertIsNone(runner["sourceRevision"])
+                self.assertIsNone(runner["queuedWork"])
+                live.assert_not_called()
 
     def test_reader_rejects_missing_mixed_or_mismatched_operator_binding(self):
         fleet, runtime, evidence = self.evidence()
@@ -740,6 +762,49 @@ class UpstreamObservationTests(unittest.TestCase):
                  mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
                 clock.now.return_value = NOW
                 with self.assertRaisesRegex(ValueError, "unverified"): MODULE.read_upstream_sources()
+
+    def test_reader_handles_second_precision_without_weakening_strict_bracket(self):
+        fleet, runtime, evidence = self.evidence()
+        evidence["before"]["observedAt"] = "2026-09-05T19:29:30.250000Z"
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "receipt.json"
+            path.write_text(json.dumps(evidence["published"]))
+            env = {"SYMPHONY_UPSTREAM_BINDING": "/approved.json", "SYMPHONY_UPSTREAM_BINDING_SHA256": "c" * 64}
+            events = []
+            def read(bundle):
+                events.append("read")
+                return fleet, runtime
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=[json.dumps(evidence["before"]).encode(), json.dumps(evidence["after"]).encode()]), \
+                 mock.patch.object(MODULE, "read_sources", side_effect=read), \
+                 mock.patch.object(MODULE.time, "sleep", side_effect=lambda delay: events.append(("wait", delay))), \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.side_effect = [datetime(2026, 9, 5, 19, 29, 30, 500000, tzinfo=timezone.utc), NOW]
+                self.assertEqual(MODULE.read_upstream_sources()[2], evidence)
+            self.assertEqual(events, [("wait", 0.5), "read"])
+            old_runtime = {**runtime, "generated_at": "2026-09-05T19:29:30Z"}
+            self.assertIsNone(MODULE.upstream_runtime_revision({**evidence, "stateDigest": MODULE.digest(old_runtime)}, old_runtime, NOW))
+            exact_second = copy.deepcopy(evidence)
+            exact_second["before"]["observedAt"] = "2026-09-05T19:29:30Z"
+            self.assertIsNone(MODULE.upstream_runtime_revision({**exact_second, "stateDigest": MODULE.digest(old_runtime)}, old_runtime, NOW))
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=[json.dumps(exact_second["before"]).encode(), json.dumps(exact_second["after"]).encode()]), \
+                 mock.patch.object(MODULE, "read_sources", return_value=(fleet, runtime)), \
+                 mock.patch.object(MODULE.time, "sleep") as sleep, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.side_effect = [datetime(2026, 9, 5, 19, 29, 30, 500000, tzinfo=timezone.utc), NOW]
+                self.assertIsInstance(MODULE.read_upstream_sources()[2], MODULE.LiveUpstreamObservation)
+                sleep.assert_called_once_with(0.5)
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", return_value=json.dumps(evidence["before"]).encode()), \
+                 mock.patch.object(MODULE, "read_sources") as read, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.return_value = datetime(2026, 9, 5, 19, 29, 28, tzinfo=timezone.utc)
+                with self.assertRaisesRegex(ValueError, "clock inconsistent"): MODULE.read_upstream_sources()
+                read.assert_not_called()
 
     def test_live_reader_propagates_failed_or_oversized_checks_without_submission(self):
         fleet, runtime, evidence = self.evidence()

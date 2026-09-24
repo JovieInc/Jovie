@@ -14,10 +14,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import pathlib
 import subprocess
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
@@ -305,6 +307,14 @@ UPSTREAM_IDENTITY_FIELDS = (
 )
 
 
+class LiveUpstreamObservation(dict):
+    """In-process provenance from the live reader, never obtained by JSON load.
+
+    A schema string in the legacy receipt or a fixture cannot select a different
+    trust path. Deserializing this observation deliberately loses its provenance.
+    """
+
+
 def upstream_runtime_revision(value: object, runtime: dict, now: datetime) -> str | None:
     """Observation only: preservation cannot grant activation or work admission.
 
@@ -341,7 +351,8 @@ def upstream_runtime_revision(value: object, runtime: dict, now: datetime) -> st
         state_at = parse_time(runtime.get("generated_at"), "runtime state")
         # A state produced before the opening live process check cannot prove
         # this generation's queue. Clock skew does not excuse a cross-generation read.
-        if not before <= state_at <= after or (after - before).total_seconds() > 60:
+        if (state_at.timestamp() < math.floor(before.timestamp()) + 1
+                or state_at > after or (after - before).total_seconds() > 60):
             return None
         return rows[0]["sourceRevision"]
     except (KeyError, TypeError, ValueError):
@@ -371,6 +382,15 @@ def read_upstream_sources() -> tuple[dict, dict, dict]:
         raise ValueError("published upstream observation exceeds limit")
     published = record(json.loads(raw), "published upstream observation")
     before = check()
+    # The upstream state API emits whole seconds. Let that clock tick before
+    # the read if the completed opening check still falls in the same second;
+    # keep the strict identity bracket instead of accepting an older state.
+    before_at = parse_time(before.get("observedAt"), "opening upstream observation")
+    delay = math.floor(before_at.timestamp()) + 1 - datetime.now(timezone.utc).timestamp()
+    if delay > 1:
+        raise ValueError("opening upstream observation clock inconsistent")
+    if delay > 0:
+        time.sleep(delay)
     fleet, runtime = read_sources(None)
     after = check()
     evidence = {"schema": UPSTREAM_OBSERVATION_SCHEMA, "stateDigest": digest(runtime),
@@ -378,7 +398,7 @@ def read_upstream_sources() -> tuple[dict, dict, dict]:
     if (published.get("configurationBindingSha256") != approved
             or upstream_runtime_revision(evidence, runtime, datetime.now(timezone.utc)) is None):
         raise ValueError("upstream runtime observation unverified")
-    return fleet, runtime, evidence
+    return fleet, runtime, LiveUpstreamObservation(evidence)
 
 
 def attested_runtime_revision(
@@ -397,7 +417,7 @@ def attested_runtime_revision(
     if attestation is None:
         attestation = load_service_attestation()
     revision = (upstream_runtime_revision(attestation, runtime, now)
-                if isinstance(attestation, dict) and attestation.get("schema") == UPSTREAM_OBSERVATION_SCHEMA
+                if isinstance(attestation, LiveUpstreamObservation)
                 else service_attestation_revision(attestation, now))
     if revision is None:
         return None
@@ -531,7 +551,7 @@ def compose_snapshot(
         "workSource": work_source,
     }
     attested_runtime = attestation.get("runtime", {}) if isinstance(attestation, dict) else {}
-    if isinstance(attestation, dict) and attestation.get("schema") == UPSTREAM_OBSERVATION_SCHEMA:
+    if isinstance(attestation, LiveUpstreamObservation):
         upstream = attestation.get("after", {})
         attested_runtime = {"generation": upstream.get("runtimeGeneration"),
                             "invocationId": upstream.get("invocationId")}
