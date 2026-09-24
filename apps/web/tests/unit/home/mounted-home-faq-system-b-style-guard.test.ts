@@ -74,11 +74,14 @@ describe('mounted homepage FAQ System B source contract', () => {
     );
     const trigger = screen.getByRole('button', { name: 'What is Jovie?' });
     const themes: string[] = [];
-    postcss
-      .parse(readFileSync(path.join(webRoot, 'app/globals.css'), 'utf8'))
-      .walkAtRules('theme', rule => {
-        themes.push(rule.toString());
-      });
+    // PostCSS parses this source directly and does not follow globals.css
+    // imports, so include the foundation file that globals.css imports.
+    const themeSources = ['app/globals.css', 'styles/tailwind-foundation.css']
+      .map(sourcePath => readFileSync(path.join(webRoot, sourcePath), 'utf8'))
+      .join('\n');
+    postcss.parse(themeSources).walkAtRules('theme', rule => {
+      themes.push(rule.toString());
+    });
     const compiler = await compile(
       `${themes.join('\n')}\n@tailwind utilities;`
     );

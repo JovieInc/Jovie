@@ -9,7 +9,14 @@ import {
   PROFILE_HERO_MIN_HEIGHT_PX,
 } from './composition';
 
-const GLOBALS_CSS = join(process.cwd(), 'app', 'globals.css');
+// globals.css imports the shared Tailwind foundation, but this source guard
+// reads files directly, so include that canonical theme source explicitly.
+const THEME_CSS = [
+  join(process.cwd(), 'app', 'globals.css'),
+  join(process.cwd(), 'styles', 'tailwind-foundation.css'),
+]
+  .map(filePath => readFileSync(filePath, 'utf8'))
+  .join('\n');
 
 /**
  * Contract tests for the profile composition layer (GitHub #11899).
@@ -47,9 +54,7 @@ describe('profile composition layer', () => {
   });
 
   it('registers the composition aspect tokens in the Tailwind theme', () => {
-    const globals = readFileSync(GLOBALS_CSS, 'utf8');
-
-    expect(globals).toMatch(/--aspect-hero:\s*16\s*\/\s*7\s*;/);
-    expect(globals).toMatch(/--aspect-card-standard:\s*4\s*\/\s*5\s*;/);
+    expect(THEME_CSS).toMatch(/--aspect-hero:\s*16\s*\/\s*7\s*;/);
+    expect(THEME_CSS).toMatch(/--aspect-card-standard:\s*4\s*\/\s*5\s*;/);
   });
 });
