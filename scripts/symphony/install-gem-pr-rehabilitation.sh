@@ -43,6 +43,7 @@ readonly -a RELATIVE_SOURCES=(
   scripts/symphony/summer_existing_repair.py
   scripts/symphony/summer_ci_audit.py
   scripts/symphony/summer-symphony-outbox-consumer.mjs
+  scripts/symphony/summer-shipping-lead-contract.mjs
   scripts/symphony/config/existing-repair-controller-manifest.json
   scripts/symphony/gem_repo_registry.py
   scripts/symphony/gem_rehabilitation_policy.py
@@ -68,6 +69,7 @@ readonly -a TARGETS=(
   "${GEM_ROOT}/scripts/summer_existing_repair.py"
   "${GEM_ROOT}/scripts/summer_ci_audit.py"
   "${GEM_ROOT}/scripts/summer-symphony-outbox-consumer.mjs"
+  "${GEM_ROOT}/scripts/summer-shipping-lead-contract.mjs"
   "${GEM_ROOT}/config/existing-repair-controller-manifest.json"
   "${GEM_ROOT}/scripts/gem_repo_registry.py"
   "${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
@@ -271,6 +273,7 @@ pairs = {
     "summerExistingRepair": (source_root / "scripts/symphony/summer_existing_repair.py", gem_root / "scripts/summer_existing_repair.py"),
     "summerCiAudit": (source_root / "scripts/symphony/summer_ci_audit.py", gem_root / "scripts/summer_ci_audit.py"),
     "summerSymphonyConsumer": (source_root / "scripts/symphony/summer-symphony-outbox-consumer.mjs", gem_root / "scripts/summer-symphony-outbox-consumer.mjs"),
+    "summerShippingLeadContract": (source_root / "scripts/symphony/summer-shipping-lead-contract.mjs", gem_root / "scripts/summer-shipping-lead-contract.mjs"),
     "existingRepairControllerManifest": (source_root / "scripts/symphony/config/existing-repair-controller-manifest.json", gem_root / "config/existing-repair-controller-manifest.json"),
     "registryModule": (source_root / "scripts/symphony/gem_repo_registry.py", gem_root / "scripts/gem_repo_registry.py"),
     "policy": (source_root / "scripts/symphony/gem_rehabilitation_policy.py", gem_root / "scripts/gem_rehabilitation_policy.py"),

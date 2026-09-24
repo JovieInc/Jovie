@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { SHIPPING_TASK, SHIPPING_OUTBOX, validateShippingTask, validateShippingOutcome,
+  signShippingOutcome } from './summer-shipping-lead-contract.mjs';
 import {
   createHash,
   createPrivateKey,
@@ -268,6 +270,7 @@ export function validateExistingRepair(target) {
 }
 
 export function validateTask(task) {
+  if (task?.schema === SHIPPING_TASK) return validateShippingTask(task);
   const isV1 = task?.schema === 'jovie-symphony-repair-task/v1';
   const isV2 = task?.schema === 'jovie-symphony-repair-task/v2';
   const isV3 = task?.schema === 'jovie-symphony-repair-task/v3';
@@ -443,6 +446,8 @@ export function verifyOutboxRecord(record, keys) {
         ? OUTBOX_DOMAIN_V2
         : record?.schema === OUTBOX_DOMAIN_V3
           ? OUTBOX_DOMAIN_V3
+          : record?.schema === SHIPPING_OUTBOX
+            ? SHIPPING_OUTBOX
           : null;
   if (
     !exactKeys(record, [
@@ -469,7 +474,8 @@ export function verifyOutboxRecord(record, keys) {
     (domain === OUTBOX_DOMAIN_V2 &&
       task.schema !== 'jovie-symphony-repair-task/v2') ||
     (domain === OUTBOX_DOMAIN_V3 &&
-      task.schema !== 'jovie-symphony-repair-task/v3')
+      task.schema !== 'jovie-symphony-repair-task/v3') ||
+    (domain === SHIPPING_OUTBOX && task.schema !== SHIPPING_TASK)
   ) {
     throw new Error('outbox-wire-version-cross-bound');
   }
@@ -1117,7 +1123,8 @@ export function validateState(state, keys, outcomePublicKey = null) {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record', 'outcome'])) {
       throw new Error('consumer-state-invalid');
     }
-    (task.schema.endsWith('/v3') ? validateOutcomeV3 : validateOutcomeV2)(
+    (task.schema === SHIPPING_TASK ? validateShippingOutcome :
+      task.schema.endsWith('/v3') ? validateOutcomeV3 : validateOutcomeV2)(
       state.active.outcome,
       task,
       outcomePublicKey
@@ -1372,6 +1379,7 @@ export async function runCycle({
   keys,
   projector = null,
   executor = null,
+  shippingLeadAdmitter = null,
   outcomePrivateKey = null,
   outcomePublicKey = null,
   outcomeKeyId = null,
@@ -1426,6 +1434,33 @@ export async function runCycle({
       taskKey: state.active.taskKey,
       reason: EXECUTION_HOLD,
     };
+  }
+  if (task.schema === SHIPPING_TASK) {
+    if (!outcomePrivateKey || !outcomePublicKey || !KEY_ID.test(outcomeKeyId ?? ''))
+      throw new Error('shipping-lead-signing-configuration-missing');
+    if (state.active.phase === 'discovered') {
+      if (!shippingLeadAdmitter) return { status: 'execution-held', taskKey: task.taskKey,
+        reason: 'canonical-shipping-lead-admitter-unavailable' };
+      // Expiry revokes new admission, not evidence of an earlier attempt. Only
+      // the canonical admitter can prove that a prior attempt never started.
+      const expired = Date.parse(task.expiresAt) <= Date.now();
+      if (expired && typeof shippingLeadAdmitter.rejectExpired !== 'function')
+        return { status: 'execution-held', taskKey: task.taskKey,
+          reason: 'expired-shipping-lead-terminal-proof-unavailable' };
+      const result = expired
+        ? await shippingLeadAdmitter.rejectExpired(task)
+        : await shippingLeadAdmitter.execute(task);
+      if (result?.status === 'held' && typeof result.reason === 'string')
+        return { status: 'execution-held', taskKey: task.taskKey, reason: result.reason };
+      const outcome = signShippingOutcome(task, result, outcomePrivateKey, outcomeKeyId);
+      state = { ...state, active: { phase: 'outcome-pending', taskKey: task.taskKey,
+        record: state.active.record, outcome } };
+      journal.write(state);
+    }
+    validateShippingOutcome(state.active.outcome, task, outcomePublicKey);
+    const acknowledgement = await transport.writeOutcome(state.active.outcome);
+    if (journal.clear) journal.clear(task.taskKey); else journal.write(emptyState());
+    return { status: 'execution-recorded', taskKey: task.taskKey, acknowledgement: acknowledgement.status };
   }
   if (task.schema === 'jovie-symphony-repair-task/v3') {
     if (
