@@ -8,7 +8,7 @@ The handler classifies every open PR, orders safe work, and mutates only an adap
 
 | Classification | Signal | Action |
 | --- | --- | --- |
-| `DIRTY` | `mergeable=CONFLICTING` or `mergeStateStatus=DIRTY` | Same-repository branch: run bounded stronger-model FX on `ubuntu-latest`, verify the resolution, reread exact head and base, then plain non-force push. Forks emit a typed permission exception. Exhaustion is terminal for that exact head/base pair; a changed pair starts a fresh bounded lease. Neither path adds a human-hold label. |
+| `DIRTY` | `mergeable=CONFLICTING` or `mergeStateStatus=DIRTY` | Same-repository branch: run bounded stronger-model FX on `ubuntu-latest`, verify the resolution, reread exact head and base, then a fast-forward push leased to the validated source head. Forks emit a typed permission exception. Exhaustion is terminal for that exact head/base pair; a changed pair starts a fresh bounded lease. Neither path adds a human-hold label. |
 | `BEHIND` | `mergeStateStatus=BEHIND` and mergeable | Use GitHub `update-branch`; cheaper and less risky than force-rebase. |
 | `BLOCKED` | required aggregate check failing/missing or `mergeStateStatus=BLOCKED` | Do **not** rebase. Label/flag for CI repair because rebasing just wastes CI. |
 | `UNSTABLE` | `mergeStateStatus=UNSTABLE` or any check is running/queued | Wait. Pushing would cancel the in-flight run via concurrency groups. |
@@ -29,7 +29,7 @@ Clean-behind updates and true-conflict FX share one adaptive trigger budget, so 
 
 ## Conflict handling policy
 
-Clean `BEHIND` branches use GitHub's exact-head Update Branch rebase. A true conflict starts an ephemeral merge of the exact current base into the exact PR head so the resulting commit is a fast-forward child of the PR head. FX may edit only the original unmerged file set. The job rejects FX-created commits, unresolved paths, unexpected files, stale source/base reads, and an unverified model response. It runs affected tests, rereads the live PR head and base immediately before delivery, and uses the Jovie App token for one plain push without force.
+Clean `BEHIND` branches use GitHub's exact-head Update Branch rebase. A true conflict starts an ephemeral merge of the exact current base into the exact PR head so the resulting commit is a fast-forward child of the PR head. FX may edit only the original unmerged file set. The job rejects FX-created commits, unresolved paths, unexpected files, stale source/base reads, and an unverified model response. It runs affected tests, rereads the live PR head and base immediately before delivery, and uses the Jovie App token for one push with an explicit lease on the validated source head. The ancestry guard still requires a fast-forward child; a changed or deleted remote head rejects the push without retry.
 
 Every attempt writes a trusted status receipt on the exact head. A cohort becomes clean only after the exact repaired heads pass `PR Ready`, `Migration Guard`, and `Fork PR Gate`; its durable issue receipt records those runs' p95 latency and drives ramp/backoff after PRs merge. Human taste and steering happen before a shipping PR opens or in a separate follow-up PR; they never add a hold to the current shipping PR.
 
