@@ -456,6 +456,46 @@ const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
   'scripts/symphony/tests/test_fleet_admission_receipt.py',
   'scripts/tests/test_gh_retry.py',
 ];
+const DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS = new Set([
+  '.github/workflows/dependabot-auto-merge.yml',
+  '.github/dependabot.yml',
+  'scripts/dependabot-update-policy.mjs',
+  'scripts/dependabot-workflow-run-adapter.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+]);
+const DEPENDABOT_AUTO_MERGE_LANE = new Set([
+  ...DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/tests/test_agent_workflow_hygiene.py',
+]);
+const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/native-merge-intent.test.mjs',
+  'scripts/lib/__tests__/source-admission-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-include=scripts/native-merge-intent.mjs',
+  '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
+  '--test-coverage-lines=95',
+];
+const DEPENDABOT_AUTO_MERGE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=dependabot-update-policy.mjs',
+  '--coverage.thresholds.lines=95',
+  '--coverage.thresholds.branches=90',
+  '--coverage.thresholds.functions=95',
+];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
@@ -1573,6 +1613,31 @@ export function buildAffectedTestPlan(
   const earlySelectorInputCount = files.filter(file =>
     AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
   ).length;
+  const dependabotAutoMergeInputCount = files.filter(file =>
+    DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS.has(file)
+  ).length;
+  const isBoundedDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 &&
+    files.every(file => DEPENDABOT_AUTO_MERGE_LANE.has(file)) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const hasIncompleteDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 && !isBoundedDependabotAutoMergeChange;
+  if (isBoundedDependabotAutoMergeChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: DEPENDABOT_AUTO_MERGE_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+      nodeTests: DEPENDABOT_AUTO_MERGE_NODE_TESTS,
+      nodeTestArgs: DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS,
+    };
+  }
   const mergeQueueControllerInputCount = files.filter(file =>
     MERGE_QUEUE_CONTROLLER_INPUTS.has(file)
   ).length;
@@ -2239,6 +2304,7 @@ export function buildAffectedTestPlan(
         !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
       hasUnboundedBacklogRemediationChange ||
+      hasIncompleteDependabotAutoMergeChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||
       hasIncompletePrerequisiteTrain ||
@@ -2601,7 +2667,10 @@ export function buildSelectedTestCommands(
       file => file !== companyTest && file !== projectTest
     );
     if (otherTests.length > 0)
-      commands.push(['node', ['--test', ...otherTests]]);
+      commands.push([
+        'node',
+        [...(plan.nodeTestArgs || []), '--test', ...otherTests],
+      ]);
   }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([

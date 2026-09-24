@@ -37,6 +37,13 @@ function classify(overrides = {}) {
     actor: 'cursor[bot]',
     pullRequest: pullRequest(),
     updateType: 'version-update:semver-minor',
+    updatedDependenciesJson: JSON.stringify([
+      {
+        updateType: 'version-update:semver-minor',
+        prevVersion: '1.2.0',
+        newVersion: '1.3.0',
+      },
+    ]),
     ...overrides,
   });
 }
@@ -48,6 +55,57 @@ describe('Dependabot event policy', () => {
       expect(classify({ updateType })).toMatchObject({
         decision: 'queue',
         reason: 'safe-update-eligible',
+      });
+    }
+  );
+
+  it('holds pre-1.0 minor updates for package-specific review', () => {
+    expect(
+      classify({
+        updatedDependenciesJson: JSON.stringify([
+          {
+            updateType: 'version-update:semver-minor',
+            prevVersion: '0.5.5',
+            newVersion: '0.7.2',
+          },
+        ]),
+      })
+    ).toMatchObject({
+      decision: 'noop',
+      reason: 'pre-1x-minor-requires-review',
+    });
+  });
+
+  it.each([
+    ['missing metadata', undefined],
+    ['malformed JSON', '{'],
+    ['empty metadata', '[]'],
+    [
+      'metadata without a minor row',
+      JSON.stringify([
+        {
+          updateType: 'version-update:semver-patch',
+          prevVersion: '1.0.0',
+          newVersion: '1.0.1',
+        },
+      ]),
+    ],
+    [
+      'invalid version evidence',
+      JSON.stringify([
+        {
+          updateType: 'version-update:semver-minor',
+          prevVersion: 'unknown',
+          newVersion: '1.2.0',
+        },
+      ]),
+    ],
+  ])(
+    'fails closed when minor version evidence is %s',
+    (_name, updatedDependenciesJson) => {
+      expect(classify({ updatedDependenciesJson })).toMatchObject({
+        decision: 'noop',
+        reason: 'minor-version-evidence-unavailable',
       });
     }
   );
@@ -331,18 +389,30 @@ describe('Dependabot reconciliation workflow contract', () => {
   it('runs write-capable reconciliation only from trusted base definitions', () => {
     expect(WORKFLOW).toMatch(/\non:\n(?:[\s\S]*?\n)?  pull_request_target:/);
     expect(WORKFLOW).not.toMatch(/\n  pull_request:/);
+    expect(WORKFLOW).toContain('ref: ${{ github.sha }}');
     expect(WORKFLOW).toContain(
-      'ref: ${{ github.event.pull_request.base.sha }}'
+      'github.event.workflow_run.workflow_id == 178737329'
     );
+    expect(WORKFLOW).toContain('types: [completed]');
+    expect(WORKFLOW).toContain('scripts/dependabot-workflow-run-adapter.mjs');
+    expect(WORKFLOW).toContain("steps.run-context.outputs.eligible == 'true'");
+    expect(WORKFLOW).toContain('timeout-minutes: 10');
+    expect(WORKFLOW).toContain('cancel-in-progress: false');
     expect(WORKFLOW).toContain('persist-credentials: false');
-    expect(WORKFLOW).not.toContain('github.event.pull_request.head.sha');
+    expect(WORKFLOW).not.toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
+    expect(WORKFLOW).not.toContain(
+      'ref: ${{ github.event.workflow_run.head_sha }}'
+    );
     expect(WORKFLOW).not.toContain('ready_for_review');
     expect(WORKFLOW).toContain('contents: read');
+    expect(WORKFLOW).toContain('actions: read');
     expect(WORKFLOW).toContain('pull-requests: write');
     expect(WORKFLOW).not.toContain('echo "Dependency: ${{');
     expect(WORKFLOW).not.toContain('echo "Update type: ${{');
 
-    const externalActions = [...WORKFLOW.matchAll(/uses: ([^\s#]+)/g)].map(
+    const externalActions = [...WORKFLOW.matchAll(/^\s+uses: ([^\s#]+)/gm)].map(
       match => match[1]
     );
     expect(externalActions.length).toBeGreaterThan(0);
@@ -372,9 +442,9 @@ describe('Dependabot reconciliation workflow contract', () => {
 
   it('skips instead of failing when fetch-metadata cannot certify Dependabot commits', () => {
     expect(WORKFLOW).toMatch(
-      /id: meta\n\s+continue-on-error: true\n\s+uses: dependabot\/fetch-metadata@/
+      /id: meta\n(?:(?!- name:)[\s\S])*continue-on-error: true\n\s+uses: dependabot\/fetch-metadata@/
     );
-    expect(WORKFLOW).toContain("if: steps.meta.outcome != 'success'");
+    expect(WORKFLOW).toContain("steps.meta.outcome != 'success'");
     expect(WORKFLOW).toContain("if: steps.meta.outcome == 'success'");
     expect(WORKFLOW).toContain('Skip uncertified Dependabot head');
     expect(WORKFLOW).toContain('mergeStateStatus is not UNSTABLE');
@@ -383,10 +453,19 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).not.toContain('gh pr merge --auto');
   });
 
-  it('keeps patch/minor queue-intent for certified Dependabot-authored heads', () => {
-    expect(WORKFLOW).toContain(
-      'Leave native autoenroll as the queue writer (patch + minor)'
-    );
+  it('records native auto-merge intent only after certification and classification', () => {
+    expect(WORKFLOW).toContain('scripts/native-merge-intent.mjs');
+    expect(
+      readFileSync(
+        resolve(REPO_ROOT, 'scripts/native-merge-intent.mjs'),
+        'utf8'
+      )
+    ).toContain('--match-head-commit');
+    expect(WORKFLOW).not.toContain('gh pr merge --auto');
+    expect(WORKFLOW).toContain('permission-checks: read');
+    expect(WORKFLOW).toContain('permission-contents: write');
+    expect(WORKFLOW).toContain('permission-pull-requests: write');
+    expect(WORKFLOW).toContain('permission-statuses: read');
     expect(WORKFLOW).toMatch(/steps\.policy\.outputs\.decision == 'queue'$/m);
     expect(WORKFLOW).toContain(
       "steps.policy.outputs.decision == 'queue-recovered'"
@@ -411,6 +490,15 @@ describe('Dependabot discovery contract', () => {
     expect(npm).toContain('semver-patch-days: 1');
     expect(npm).toContain('semver-minor-days: 3');
     expect(npm).toContain('semver-major-days: 7');
+  });
+
+  it('does not create default reviewer requests for the founder', () => {
+    const ecosystems = CONFIG.split('  - package-ecosystem:').slice(1);
+    expect(ecosystems).toHaveLength(3);
+    for (const ecosystem of ecosystems) {
+      expect(ecosystem).not.toMatch(/^\s+reviewers:/m);
+      expect(ecosystem).toContain("assignees:\n      - 'itstimwhite'");
+    }
   });
 
   it('routes framework majors instead of silently ignoring them', () => {

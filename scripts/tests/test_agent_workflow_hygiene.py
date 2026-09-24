@@ -1588,7 +1588,37 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "Native autoenroll owns queue mutation" in dependabot
+    assert "scripts/native-merge-intent.mjs" in dependabot
+    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    assert "workflow_run.workflow_id == 178737329" in dependabot
+    adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "run?.workflow_id !== CI_WORKFLOW_ID" in adapter
+    assert "run.head_repository?.full_name" in adapter
+    assert "ref: ${{ github.sha }}" in dependabot
+    assert "Native autoenroll owns queue mutation" not in dependabot
+
+
+def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
+    """Both wake-up paths use only base policy and the helper's local imports."""
+    step = _step_block("dependabot-auto-merge.yml", "Checkout trusted reconciliation policy")
+    materialized = _sparse_checkout_paths(step)
+    workflow = (WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
+
+    assert "ref: ${{ github.sha }}" in step
+    assert "persist-credentials: false" in step
+    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
+    assert "github.event.workflow_run.event == 'pull_request'" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "actions/download-artifact" not in workflow
+    assert "      actions: read" in workflow
+    for entrypoint in (
+        "scripts/dependabot-workflow-run-adapter.mjs",
+        "scripts/native-merge-intent.mjs",
+    ):
+        assert entrypoint in materialized
+        _assert_local_runtime_closure(materialized, entrypoint)
 
 
 def test_retired_merge_queue_label_has_no_active_producers() -> None:
