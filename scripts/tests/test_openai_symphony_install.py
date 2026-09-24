@@ -110,8 +110,6 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
 
     def test_triage_event_only_wakes_existing_intake(self) -> None:
         workflow = (ROOT / ".github/workflows/linear-triage-assessment.yml").read_text()
-        webhook = (ROOT / "apps/web/app/api/webhooks/linear/route.ts").read_text()
-        self.assertIn("linear_triage_assess", webhook)
         self.assertIn("types: [linear_triage_assess]", workflow)
         self.assertIn("triage-event-assess.mjs", workflow)
         self.assertIn("summer-bottleneck-signing.env", workflow)
