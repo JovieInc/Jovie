@@ -7,10 +7,6 @@ const releaseScript = readFileSync(
   resolve(repoRoot, 'scripts/release-queue-deferred.sh'),
   'utf8'
 );
-const workflow = readFileSync(
-  resolve(repoRoot, '.github/workflows/queue-deferred-release.yml'),
-  'utf8'
-);
 const admission = readFileSync(
   resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
   'utf8'
@@ -53,8 +49,6 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(releaseScript).not.toContain('AGENT_BRANCH_RE');
     expect(releaseScript).not.toContain('select(.head | test($branch_re))');
     expect(releaseScript).toContain('select(.owner == $repo_owner)');
-    expect(workflow).toContain('every queue-deferred PR');
-    expect(workflow).not.toContain('Untyped holds are never');
   });
 
   it('releases untyped ready holds only through fresh controller admission', () => {
@@ -78,20 +72,12 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
     // CI and Production Controller are direct upstream semantic inputs.
-    // Marker Recovery dispatches the gate as a fresh event after durable bytes
-    // so Queue-Deferred Release stays within GitHub's workflow_run chain cap.
+    // Marker Recovery dispatches the gate after durable bytes so it remains
+    // within GitHub's workflow_run chain cap.
     const upstream = fleetGateRefreshWorkflow.match(
       /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
     )?.[1];
-    const downstream = workflow.match(
-      /workflow_run:\s*\n\s*workflows:\s*\[([^\]]+)\]/
-    )?.[1];
-
     expect(upstream).toBe('CI, Production Controller');
-    expect(downstream).toBe("'Fleet Gate Refresh'");
-    expect(upstream).not.toContain('Queue-Deferred Release');
-    expect(downstream).not.toContain('CI');
-    expect(downstream).not.toContain('Production Controller');
     expect(fleetGateRefreshWorkflow).toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
@@ -102,7 +88,6 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       'github.event.pull_request.merged != true'
     );
     expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
-    expect(workflow).toContain('workflow_dispatch:');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
       'utf8'

@@ -25,9 +25,11 @@ parent lands. There is no second landing transport.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
    transitions its Linear issue to `Done`.
 
-Do not manually merge queue-eligible PRs or use a second transport. Native
-auto-merge records merge-when-ready intent; the controller owns exact-head
-enrollment and postcondition checks.
+Do not directly merge queue-eligible PRs or use a second transport. After the
+finishing agent verifies the exact current head, required checks, and absence
+of explicit human `hold`, `gated`, or `incident` labels, it requests GitHub's
+normal `Merge when ready` action. GitHub owns queue enrollment, admission,
+and merge.
 
 ## Required contexts and CI stages
 
@@ -106,8 +108,8 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   request to a full 40-character head SHA.
 - Enrollment and dequeue prove their postconditions; failed mutations are
   reconciled from fresh state rather than blindly retried.
-- `hold`, `gated`, `queue-deferred`, conflicts, and terminal-red
-  checks remove native queue membership and the audit label.
+- Explicit `hold`, `gated`, and `incident` labels, actual conflicts, and
+  terminal-red checks remove native queue membership and the audit label.
 - Pending, queued, and cancelled checks are not terminal red. This prevents
   cancellation churn from becoming a dequeue/re-enroll loop.
 - Main movement triggers event-driven reconciliation and bounded mechanical
@@ -173,42 +175,17 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   Actions API and alarms on `merge_queue_churn` (≥3 attempts at ≥2 attempts
   per merge).
 
-## Typed queue deferral (`jovie-queue-deferral/v1`)
+## Retired queue-deferred release workflow
 
-`queue-deferred` is a mechanical hold placed at a draft's birth (Symphony) or
-under queue pressure (agent-pipeline). The label alone has no provenance, so
-every deferral posts a typed receipt — one upserted PR comment with the
-`<!-- bot-comment:queue-deferral -->` marker — recording the repository, exact
-head, typed reason (`symphony-birth-hold` or `queue-pressure`), its
-reason-bound source, and the deferral time. Only comments authored by the
-canonical Jovie bot or repository owner are authority.
-`scripts/lib/queue-deferral-receipt.mjs` is the canonical reader/writer; public
-comments cannot create release authority.
-
-`queue-deferred-release.yml` runs after PR CI, successful production-controller
-completion, and the fleet-receipt refresh dispatched by Runner Heartbeat's
-10-minute remediation clock (`runner-heartbeat.yml`, cron `*/10 * * * *`;
-there is no separate five-minute schedule). That upstream
-durability tick means a PR checked during AMBER self-heals after GREEN even when
-the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
-
-- **Report pass** — prints age and reason for every `queue-deferred` PR
-  (not only agent-branch PRs) and raises a warning once a hold exceeds the
-  12-minute SLA. A missing receipt reports as `untyped-ready-hold` and is
-  released automatically when the live PR is ready, mergeable, exact-head
-  green, and a fresh GREEN fleet receipt agrees. A malformed typed receipt
-  stays held. Legacy human, taste, and no-auto labels are ignored and scrubbed.
-- **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
-  with `promotionAdmission.allowed`, and only when the live PR is non-draft,
-  mergeable, same-repo/main, no separate machine hold is present, and
-  required checks are green: removes `queue-deferred`. Typed mechanical
-  receipts (`symphony-birth-hold`, `queue-pressure`) still bind reason to
-  source. Untyped ready holds are dropped rather than waiting for a human.
-  The `unlabeled` event re-enters the normal admission path above, which
-  independently revalidates the exact head before enrollment. Under
-  AMBER/RED/stale fleet state no mutation happens — the hold stays in place.
-  `queue-pressure` holds additionally re-run the canonical live queue-depth
-  policy and remain held while pressure is still above its threshold.
+The Queue-Deferred Release workflow is retired. `queue-deferred` and
+`needs-conflict-resolution` are retired machine annotations; native queue
+admission ignores both labels. After verifying the exact current PR head,
+required checks, and absence of explicit human `hold`, `gated`, or `incident`
+labels, the finishing agent requests GitHub's normal `Merge when ready`
+action. GitHub owns queue enrollment, admission, and merge. Actual merge
+conflicts and failed required checks also prevent admission. Shared deferral
+receipt helpers remain available for existing records but do not authorize
+queue admission.
 
 ## Ownerless focused recovery
 
