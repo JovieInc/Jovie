@@ -16,7 +16,7 @@ import {
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { classifyConnectionInput } from './AddConnectionRail';
-import type { ProfilesWorkspaceData } from './data';
+import type { ProfilesWorkspaceData, ProfileWorkspaceSurfaceRow } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const navigationMock = vi.hoisted(() => ({
@@ -368,7 +368,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(selectedReveal).toHaveStyle({ color: '#1DB954' });
   });
 
-  it('shows recurring artist outcomes, all monitored pages, and a focused header action', async () => {
+  it('shows monitored pages with compact type and status and a focused header action', async () => {
     renderWorkspace(data);
 
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
@@ -385,16 +385,14 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(within(outcomes).getByText('#2')).toBeInTheDocument();
     expect(within(outcomes).getByText('Answer Visibility')).toBeInTheDocument();
     expect(within(outcomes).getByText('Published')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Audience Quality')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Engagement Scored')).toBeInTheDocument();
     expect(within(outcomes).getByText('Monitored Pages')).toBeInTheDocument();
     expect(within(outcomes).getByText('1 of 5')).toBeInTheDocument();
     expect(
+      within(outcomes).queryByText('Audience Quality')
+    ).not.toBeInTheDocument();
+    expect(
       within(outcomes).getByRole('link', { name: /Published/i })
     ).toHaveAttribute('href', '/tim');
-    expect(
-      within(outcomes).getByRole('link', { name: /Engagement Scored/i })
-    ).toHaveAttribute('href', '/app/contacts');
     expect(screen.queryByText('7')).not.toBeInTheDocument();
 
     // JOV-6170: presence outcomes group by artist goal, not raw type.
@@ -421,6 +419,14 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     const spotifyRow = screen.getByText('Spotify').closest('tr');
     expect(spotifyRow).not.toBeNull();
+    expect(within(spotifyRow as HTMLElement).getByText(/DSP ·/)).toHaveClass(
+      'sm:hidden'
+    );
+    expect(
+      within(spotifyRow as HTMLElement).getByText('Limit Reached', {
+        selector: 'span.text-warning',
+      })
+    ).toBeInTheDocument();
     expect(
       within(spotifyRow as HTMLElement)
         .getAllByText('Limit Reached')
@@ -487,6 +493,30 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(signalList).getByTestId('presence-signal-finding')
     ).toHaveTextContent('Needs Qualification');
+  });
+
+  it('names a review state in compact rows without relying on its color', () => {
+    renderWorkspace({
+      ...data,
+      rows: [
+        {
+          ...(data.rows[1] as ProfileWorkspaceSurfaceRow),
+          id: 'apple-music',
+          label: 'Apple Music',
+          platform: 'apple_music',
+          qualificationStatus: 'conflicting',
+          monitoringState: 'active',
+        },
+      ],
+    });
+
+    const row = screen.getByText('Apple Music').closest('tr');
+    expect(row).not.toBeNull();
+    expect(
+      within(row as HTMLElement).getByText('Needs Review', {
+        selector: 'span.text-warning',
+      })
+    ).toBeInTheDocument();
   });
 
   it('groups presence signals into separated blocker, finding, and state primitives', async () => {

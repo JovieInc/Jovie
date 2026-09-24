@@ -112,7 +112,7 @@ export function getConnectionStatus(
   if (row.qualificationStatus === 'conflicting') {
     return {
       label: 'Needs Review',
-      tone: 'error',
+      tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
       nextAction:

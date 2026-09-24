@@ -99,6 +99,7 @@ describe('connections workspace helpers', () => {
       sortProfileWorkspaceRows([active, locked, conflicting]).map(row => row.id)
     ).toEqual(['conflicting', 'locked', 'spotify']);
     expect(getConnectionStatus(conflicting).label).toBe('Needs Review');
+    expect(getConnectionStatus(conflicting).tone).toBe('warning');
     expect(getConnectionStatus(locked).label).toBe('Limit Reached');
   });
 

@@ -741,8 +741,10 @@ const CANONICAL_SOURCE_DRILLS: ReadonlyArray<{
   readonly searchPath: string;
 }> = [
   { label: 'Genius', searchPath: 'https://genius.com/search?q=' },
+  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Official brand spelling.
   { label: 'Last.fm', searchPath: 'https://www.last.fm/search?q=' },
   {
+    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Official brand spelling.
     label: 'MusicBrainz',
     searchPath: 'https://musicbrainz.org/search?type=artist&query=',
   },
@@ -849,12 +851,6 @@ function PresenceOutcomeStrip({
       href: publicProfileHref,
     },
     {
-      label: 'Audience Quality',
-      value: 'Engagement Scored',
-      detail: 'Filter fans by source, segment, and activity',
-      href: APP_ROUTES.CONTACTS,
-    },
-    {
       label: 'Monitored Pages',
       value: monitoredPages,
       detail: 'Profiles and pages tracked for changes',
@@ -865,7 +861,7 @@ function PresenceOutcomeStrip({
     <section
       aria-label='Artist Presence Outcomes'
       data-testid='presence-outcomes'
-      className='grid shrink-0 grid-cols-2 border-b border-subtle lg:grid-cols-4'
+      className='grid shrink-0 grid-cols-2 border-b border-subtle lg:grid-cols-3'
     >
       {outcomes.map(outcome => {
         const content = (
@@ -1402,6 +1398,7 @@ export function ProfilesWorkspace({
         meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
+          const status = getConnectionStatus(row);
           return (
             <div className='flex min-w-0 items-center gap-2.5'>
               <ConnectionBrandIcon
@@ -1412,6 +1409,18 @@ export function ProfilesWorkspace({
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
                   {row.label}
+                </div>
+                <div className='truncate text-xs text-secondary-token sm:hidden'>
+                  {kindLabel(row)} ·{' '}
+                  <span
+                    className={cn(
+                      status.tone === 'warning' && 'text-warning',
+                      status.tone === 'error' && 'text-error',
+                      status.tone === 'success' && 'text-success'
+                    )}
+                  >
+                    {status.label}
+                  </span>
                 </div>
                 <ConnectionUrlDisplay
                   row={row}
@@ -1426,14 +1435,14 @@ export function ProfilesWorkspace({
         id: 'type',
         header: () => <span className='sr-only'>Type</span>,
         size: 48,
-        meta: { className: 'px-3' },
+        meta: { className: 'px-3 max-sm:hidden' },
         cell: context => <TypeCell row={context.row.original} />,
       }),
       columnHelper.accessor(row => getConnectionStatus(row).label, {
         id: 'status',
         header: () => <span className='sr-only'>Status / Issue</span>,
         size: 48,
-        meta: { className: 'px-3' },
+        meta: { className: 'px-3 max-sm:hidden' },
         cell: context => <StatusCell row={context.row.original} />,
       }),
       columnHelper.display({
