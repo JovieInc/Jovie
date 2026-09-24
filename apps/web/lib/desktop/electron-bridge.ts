@@ -345,12 +345,14 @@ function reportInstallFailure(error: unknown): void {
   openManualDownload();
 }
 
-function handleInstallResult(result: InstallUpdateResult): void {
+function handleInstallResult(result: InstallUpdateResult): boolean {
   if (result && result.ok === false) {
     reportInstallFailure(
       new Error(result.reason ?? 'installUpdateAndRestart returned ok=false')
     );
+    return false;
   }
+  return true;
 }
 
 /**
@@ -359,25 +361,22 @@ function handleInstallResult(result: InstallUpdateResult): void {
  * the latest signed build — the fix for the chicken-and-egg where unsigned
  * stale binaries can't auto-update themselves.
  */
-function safeInstallUpdateAndRestart(): void {
+async function safeInstallUpdateAndRestart(): Promise<boolean> {
   const api = getRawElectronAPI();
 
   if (api && typeof api.installUpdateAndRestart === 'function') {
     try {
-      const result = api.installUpdateAndRestart();
-      if (result && typeof result.then === 'function') {
-        void result.then(handleInstallResult).catch(reportInstallFailure);
-      }
-      return;
+      return handleInstallResult(await api.installUpdateAndRestart());
     } catch (error) {
       reportInstallFailure(error);
-      return;
+      return false;
     }
   } else if (api) {
     reportMissingBridgeMethod('installUpdateAndRestart');
   }
 
   openManualDownload();
+  return false;
 }
 
 export function isElectronRuntime(): boolean {
@@ -439,8 +438,8 @@ export interface DesktopUpdateState {
   readonly available: boolean;
   /** True once the update download completes (ready to install). */
   readonly downloaded: boolean;
-  /** Trigger quit-and-install, or fall back to opening the download page. */
-  readonly install: () => void;
+  /** True when quit-and-install starts; false after the manual-download fallback. */
+  readonly install: () => Promise<boolean>;
 }
 
 /**
