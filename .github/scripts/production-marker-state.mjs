@@ -636,14 +636,12 @@ export function classifyProductionMarkerEvidence(evidence) {
 }
 
 /**
- * A controller attempt that coalesced into a newer main head intentionally
- * completes success without any production mutation and without preserving a
- * marker: the release boundary proved main had advanced, promotion and the
- * centralized rollback stayed skipped, and Production Verified still proved
- * the incumbent generation healthy. Such a run has no installable
- * production-proven revision, so its activation is a no-op — never a marker
- * gate failure. Any deviation from the exact coalesced job shape fails
- * closed.
+ * Coalescence supplies skip-only evidence, never an installable revision.
+ * Early release-wave coalescence skips the entire release and verification;
+ * late coalescence proves main advanced at the release boundary, skips
+ * promotion/rollback, and verifies the incumbent generation. Recognize each
+ * shape separately without requiring a newer-head successor for the early
+ * no-op. Actual activation still requires an exact verified marker.
  */
 export function classifyProducerCoalescence(run, jobs) {
   if (
@@ -665,6 +663,25 @@ export function classifyProducerCoalescence(run, jobs) {
         job.status === 'completed' &&
         job.conclusion === conclusion
     ).length === 1;
+  // Early release-wave coalescence skips the reusable release as a whole,
+  // so it has no expanded promotion/rollback jobs or verified marker. This
+  // exact no-op shape only supplies skip evidence; it never verifies a deploy.
+  const earlyCoalescence = [
+    ['Coalesce release wave', 'success'],
+    ['Authorize fleet deployment state', 'skipped'],
+    ['Authorize exact main CI evidence', 'skipped'],
+    ['Production Release', 'skipped'],
+    ['Post-Deploy Smoke (Production)', 'skipped'],
+    ['Lighthouse CI (Production)', 'skipped'],
+    ['Post-Deploy Auth Smoke (Production)', 'skipped'],
+    [CONTROLLER_VERIFIED_JOB, 'skipped'],
+  ];
+  if (
+    jobs.length === earlyCoalescence.length &&
+    earlyCoalescence.every(([name, conclusion]) => exactlyOne(name, conclusion))
+  ) {
+    return true;
+  }
   const rollback = jobs.filter(
     job =>
       typeof job?.name === 'string' &&
