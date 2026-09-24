@@ -54,8 +54,8 @@ The example binding is deliberately unapproved with null effective/workflow hash
 Unknown fields, missing approval, changed configuration and stale observations fail.
 It reads no environment-file contents or process environment and claims neither.
 This observer does not publish legacy health, approve admission or install anything.
-The dependent activation-workflow change consumes this separate result to preserve
-accepted upstream without reaching legacy mutators. Current configuration approval
+Current admission consumers still read the legacy receipt, so this separate result
+is non-actionable and does not admit useful work. Current configuration approval
 and runtime-owner review remain separate from this source-only fixture proof.
 
 The emitter also supports an explicit upstream preservation CLI mode. Supply both
@@ -65,8 +65,41 @@ atomically publishes `state/symphony-upstream-preservation.json` under the
 existing writer lock. That separate receipt retains `activation:not-activated`
 and `admission:unverified`; it never overwrites or upgrades
 `state/gem-service-attestation.json`. Mixed upstream/legacy inputs and missing
-approval fail closed. The installed timer and unit remain on the legacy mode
-until a separately reviewed installer/consumer cutover and current host approval.
+approval fail closed. The source installer and existing unit support explicit
+preservation mode, but this does not extend Summer's consumers or change an
+installed host. The installed timer and unit stay on legacy mode until an operator
+separately approves and performs installation; preservation remains non-actionable
+until a separately reviewed consumer change exists.
+
+For an operator-approved source cutover, the existing
+`~/.config/symphony/runner-source.env` must select one mode. Preservation mode
+requires only the binding path and independently approved digest (no legacy
+provenance, source-root, revision, or profile fields):
+
+```text
+GEM_SERVICE_ATTESTATION_MODE=upstream-preservation
+SYMPHONY_UPSTREAM_BINDING=/absolute/path/to/reviewed-binding.json
+SYMPHONY_UPSTREAM_BINDING_SHA256=<independently-approved-sha256>
+```
+
+The installer receives the same binding and digest explicitly and rejects a
+missing or mismatched value before writing. Review and verify the source with the
+existing observer check first; a successful check is only observation evidence,
+not admission or activation:
+
+```bash
+APPROVED_BINDING="/absolute/path/to/reviewed-binding.json"
+APPROVED_SHA256="<independently-approved-sha256>"
+GEM_SERVICE_ATTESTATION_VERIFY_ONLY=true \
+  bash scripts/symphony/install-gem-service-attestation.sh \
+    --mode upstream-preservation \
+    --upstream-binding "$APPROVED_BINDING" \
+    --upstream-binding-sha256 "$APPROVED_SHA256"
+```
+
+An authorized runtime owner must separately review actual binding inputs, install
+the reviewed artifact through the approved route, and confirm runtime readback.
+No command here installs, activates, or admits preservation by itself.
 
 ## Legacy publisher
 
@@ -107,9 +140,10 @@ GEM_WORKSPACE="$HOME/gem-workspace" bash scripts/symphony/install-gem-service-at
 
 Manual equivalent: install `emit_gem_service_attestation.py` at the existing
 `~/gem-workspace/scripts/emit-gem-service-attestation.py` path along with its
-`symphony_proof_context.py` and `gem_gate_contract.py` dependencies. Install the
-checked-in `systemd/gem-service-attestation.service` over that same existing user
-unit. Activation verifies `configurationSourceRevision` against the Jovie
+`symphony_proof_context.py`, `gem_gate_contract.py`, `symphony_official_runtime.py`,
+and `verify_upstream_burrito_payload.py` dependencies. Install the checked-in
+`systemd/gem-service-attestation.service` over that same existing user unit.
+Legacy activation verifies `configurationSourceRevision` against the Jovie
 production tip; `sourceRevision` is the Symphony release SHA.
 
 Its required `~/.config/symphony/runner-source.env` contains these nonsecret,

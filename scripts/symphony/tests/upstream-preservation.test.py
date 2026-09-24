@@ -115,11 +115,29 @@ class UpstreamPreservationTests(unittest.TestCase):
             self.assertEqual(E.main(), 0)
             verify.assert_called_once_with(self.binding_path, approved)
         self.assertFalse((state / "symphony-upstream-preservation.json").exists())
+        destination = state / "symphony-upstream-preservation.json"
+        atomic_replace = os.replace
+        replacements = []
+
+        def verify_atomic_publish(source, target):
+            source = Path(source)
+            target = Path(target)
+            self.assertEqual(target, destination)
+            self.assertEqual(source.parent, destination.parent)
+            self.assertTrue(source.is_file())
+            self.assertEqual(json.loads(source.read_text()), observed)
+            self.assertFalse(json.loads(legacy.read_text())["healthy"])
+            replacements.append((source, target))
+            atomic_replace(source, target)
+
         with mock.patch.object(E, "observe_upstream_preservation", return_value=observed) as verify, \
-             mock.patch.object(sys, "argv", args), mock.patch("builtins.print"):
+             mock.patch.object(sys, "argv", args), mock.patch("builtins.print"), \
+             mock.patch.object(E.os, "replace", side_effect=verify_atomic_publish):
             self.assertEqual(E.main(), 0)
             verify.assert_called_once_with(self.binding_path, approved)
-        saved = json.loads((state / "symphony-upstream-preservation.json").read_text())
+        self.assertEqual(len(replacements), 1)
+        self.assertFalse(list(state.glob(".service-attestation-*")))
+        saved = json.loads(destination.read_text())
         self.assertEqual(saved, observed)
         self.assertNotIn("healthy", saved)
         self.assertFalse(json.loads(legacy.read_text())["healthy"])
