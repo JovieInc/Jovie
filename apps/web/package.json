@@ -309,7 +309,7 @@
     "web-vitals": "^6.2.2",
     "workflow": "4.8.9",
     "ws": "^8.21.3",
-    "zod": "^4.3.6"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
