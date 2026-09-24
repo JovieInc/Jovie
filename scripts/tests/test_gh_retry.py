@@ -5477,8 +5477,8 @@ JSON
     def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
-        assert 'gh_retry pr list' in content
-        assert "--limit 200" in content
+        assert "inventory_native_queue_state()" in content
+        assert "node scripts/merge-queue-backend.mjs list-state" in content
         assert "statusCheckRollup" not in content
         assert "gh pr checks" in content
         assert "--json name,bucket,state,workflow,description,startedAt,completedAt" in content
