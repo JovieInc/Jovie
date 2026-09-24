@@ -429,6 +429,9 @@ def _write_native_receipt_fakes(
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
+              if [[ -n "${{NATIVE_RECEIPT_TEST_TRACE:-}}" && "$*" == *"--json state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"* ]]; then
+                printf 'read\\n' >>"$NATIVE_RECEIPT_TEST_TRACE"
+              fi
               echo '{{"state":"OPEN","isDraft":{draft_json},"mergeable":"{mergeable}","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
               exit 0
             fi
@@ -446,6 +449,44 @@ def _write_native_receipt_fakes(
         encoding="utf-8",
     )
     fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+
+def _install_native_receipt_test_trace(tmp_path: Path) -> Path:
+    trace = tmp_path / "native-receipt-test-trace"
+    trace.write_text("", encoding="utf-8")
+    fake_sleep = tmp_path / "sleep"
+    fake_sleep.write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf 'sleep %s\\n' "$*" >>"${NATIVE_RECEIPT_TEST_TRACE:?}"
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_sleep.chmod(fake_sleep.stat().st_mode | stat.S_IXUSR)
+    return trace
+
+
+def _assert_native_receipt_recheck_trace(
+    result: subprocess.CompletedProcess[str], trace: Path, head: str
+) -> None:
+    expected_events: list[str] = []
+    for attempt in range(1, 7):
+        expected_events.append("read")
+        if attempt < 6:
+            expected_events.append("sleep 2")
+    assert trace.read_text(encoding="utf-8").splitlines() == expected_events
+    rechecks = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if "bounded live reread" in line
+    ]
+    assert rechecks == [
+        f"~ mergeable=UNKNOWN for #16068 at {head}; bounded live reread {attempt}/6"
+        for attempt in range(1, 6)
+    ]
 
 
 _TRUSTED_BOT_AVATAR = "https://avatars.githubusercontent.com/in/2934433?v=4"
@@ -2154,12 +2195,18 @@ class TestExactHeadQueueReceipt:
                 "explanation": {"ok": True, "reason": "queued"},
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2167,6 +2214,7 @@ class TestExactHeadQueueReceipt:
         assert "delayed native receipt at " + head in result.stdout
         assert "state QUEUED, position 1" in result.stdout
         assert "queue-noop" not in result.stderr
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
     def test_selector_noop_fails_with_the_exact_reason(self, tmp_path: Path) -> None:
         head = "6" * 40
@@ -2197,12 +2245,18 @@ class TestExactHeadQueueReceipt:
                 },
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2213,6 +2267,7 @@ class TestExactHeadQueueReceipt:
             + " (mergeable=UNKNOWN)"
             in result.stderr
         )
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
     def test_missing_receipt_does_not_treat_auto_merge_as_membership(
         self, tmp_path: Path
@@ -2294,12 +2349,18 @@ class TestExactHeadQueueReceipt:
                 "explanation": {"ok": False, "reason": "held-by=queue-deferred"},
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2310,6 +2371,7 @@ class TestExactHeadQueueReceipt:
         )
         assert "held-by=queue-deferred" in result.stderr
         assert "delayed native receipt" not in result.stdout
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
 
 class TestGhRetryHelper:
