@@ -2125,9 +2125,10 @@ jobs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.ci-path-changes.outputs.run_drizzle == 'true'
         with:
           fetch-depth: 0
-          # Tags are unused by the guard/skip path and can exhaust the 3m job
+          # Tags are unused by the guard and can exhaust the 3m job
           # budget on this large repo (hundreds of release tags).
           fetch-tags: false
       - name: Check for relevant changes
