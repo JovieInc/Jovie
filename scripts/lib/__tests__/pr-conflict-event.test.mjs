@@ -286,7 +286,7 @@ function createApplyClient({
   statusByPr = {},
   issueHistory = [[]],
   currentPrByNumber = {},
-  queueForCall = () => queueResponse(),
+  queueForCall = (_callNumber = 0) => queueResponse(),
 }) {
   const calls = [];
   const readTokens = [];
@@ -678,7 +678,7 @@ describe('single configured conflict canary boundary', () => {
               let rebaseCalls = 0;
               const rebaseImpl = async () => {
                 rebaseCalls += 1;
-                return { ok: true, action: 'request_github_rebase' };
+                throw new Error('capacity rejection must not invoke rebase');
               };
 
               if (scenario === 'observer-pending') {
@@ -769,20 +769,23 @@ describe('single configured conflict canary boundary', () => {
                     : []
                 ),
             });
-            let boundary = null;
+            const boundaries = [];
             let mutationAttempted = false;
             const rebaseImpl = async options => {
-              boundary = await options.preMutationCheckImpl({
+              const boundary = await options.preMutationCheckImpl({
                 prNumber: 42,
                 expectedBaseRefName: 'main',
                 expectedBaseOid: BASE,
                 expectedHeadOid: HEAD,
                 timeoutMs: 1000,
               });
+              boundaries.push(boundary);
               if (boundary.ok) mutationAttempted = true;
               return {
                 ok: boundary.ok,
                 mutationAttempted,
+                mutationApplied: mutationAttempted,
+                conflict: false,
                 category: boundary.category,
                 reason: boundary.reason,
                 action: 'request_github_rebase',
@@ -798,6 +801,8 @@ describe('single configured conflict canary boundary', () => {
                 'conflict-controller mutations failed closed'
               );
             const plan = JSON.parse(readFileSync(planPath, 'utf8'));
+            expect(boundaries).toHaveLength(1);
+            const [boundary] = boundaries;
             expect(plan.items).toMatchObject([
               {
                 number: 42,
