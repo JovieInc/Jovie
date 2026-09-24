@@ -82,6 +82,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     vi.clearAllMocks();
     vi.resetModules();
     vi.stubEnv('CRON_SECRET', 'test-secret');
+    vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', 'secret-for-test');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-29T00:00:00.000Z'));
 
@@ -282,6 +283,25 @@ describe('GET /api/cron/daily-maintenance', () => {
       error: 'LogYourBody MRR source unavailable',
     });
     expect(data.results.cleanupSmsIntents.success).toBe(true);
+  });
+
+  it('skips the unbound MRR feed without failing existing maintenance', async () => {
+    vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', undefined);
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.results.lybDailyMrr).toMatchObject({
+      success: true,
+      skipped: true,
+      data: { state: 'unavailable', mrrCents: null },
+    });
+    expect(mockGetLybDailyMrr).not.toHaveBeenCalled();
   });
 
   it('reports quarantined founder-review leases as a maintenance failure', async () => {

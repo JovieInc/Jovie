@@ -2,7 +2,9 @@
 
 The existing `/api/cron/daily-maintenance` schedule performs one LogYourBody MRR
 measurement at 00:00 UTC daily using two RevenueCat Charts reads. Its `lybDailyMrr` receipt contains the product record
-when fresh; an unavailable, stale, or unreconciled measurement makes that
+when fresh. Without a configured provider key, the sub-job is skipped with an
+explicit unavailable state and leaves existing maintenance healthy. Once the
+key is configured, an unavailable, stale, or unreconciled measurement makes that
 sub-job fail visibly while other maintenance jobs continue. A scheduled path
 in source is not evidence that a deployed invocation ran.
 

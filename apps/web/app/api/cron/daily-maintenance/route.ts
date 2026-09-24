@@ -28,6 +28,7 @@ import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
@@ -107,15 +108,21 @@ export async function GET(request: Request) {
     }
   );
 
-  // One provider read per day. A missing or stale source must remain visible
-  // as a failed measurement, never be promoted to a measured zero.
-  results.lybDailyMrr = await runSubJob('lybDailyMrr', async () => {
-    const record = await getLybDailyMrr();
-    if (record.state !== 'fresh') {
-      throw new Error(`LogYourBody MRR source ${record.state}`);
-    }
-    return record;
-  });
+  // A missing binding leaves the feed disabled; an activated feed fails visibly
+  // when its provider measurement is unavailable, stale, or unreconciled.
+  results.lybDailyMrr = env.REVENUECAT_LYB_SECRET_API_KEY?.trim()
+    ? await runSubJob('lybDailyMrr', async () => {
+        const record = await getLybDailyMrr();
+        if (record.state !== 'fresh') {
+          throw new Error(`LogYourBody MRR source ${record.state}`);
+        }
+        return record;
+      })
+    : {
+        success: true,
+        skipped: true,
+        data: { state: 'unavailable', mrrCents: null },
+      };
 
   // 4. Cleanup SMS subscribe intents (folded from standalone cron per JOV-1901)
   results.cleanupSmsIntents = await runSubJob(
