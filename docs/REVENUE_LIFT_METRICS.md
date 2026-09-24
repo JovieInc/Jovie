@@ -26,6 +26,10 @@ revenue_lift = gmv_delta
              + (fan_capture_ltv_weight × new_fans_delta)
 ```
 
+IRPAA is a blended composite. Verified money, attributed engagement, and causal
+lift are separate claims and must not be read off this formula. See the
+[creator outcomes measurement contract](product/creator-outcomes-measurement-contract.md).
+
 `revenue_lift` is **already computed per automation** and persisted — `gmv_delta`,
 `dsp_click_delta`, and `new_fans_delta` are raw columns on `workflow_run_outcomes`
 (see map below). The two `_weight` coefficients (dollarizing clicks and captured fans) and
