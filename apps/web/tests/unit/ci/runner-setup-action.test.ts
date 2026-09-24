@@ -233,6 +233,7 @@ describe('baked runner prerequisite contract', () => {
     repoRoot,
     '.github/runner-image/build-context.sh'
   );
+  const runnerBuildContext = readFileSync(runnerBuildContextScript, 'utf8');
   const createInstalledTreeScript = resolve(
     repoRoot,
     '.github/runner-image/create-installed-tree.mjs'
@@ -424,6 +425,8 @@ describe('baked runner prerequisite contract', () => {
   });
 
   it('builds a deterministic filtered context before a streamed Docker build', () => {
+    expect(runnerBuildContext).toContain('git cat-file --batch-check');
+    expect(runnerBuildContext).not.toContain('git cat-file -e');
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
@@ -469,6 +472,40 @@ describe('baked runner prerequisite contract', () => {
       expect(listedPaths).toContain(patchPath);
     }
   }, 15_000);
+
+  it('fails closed when a required filtered-context entry is missing', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
+    temporaryDirectories.push(directory);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    execFileSync('git', ['rm', '--cached', '--quiet', '.npmrc'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    const missingTree = execFileSync('git', ['write-tree'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: environment,
+    }).trim();
+
+    const result = spawnSync(
+      'bash',
+      [runnerBuildContextScript, missingTree, '--list'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'runner build context contains a missing tree entry:'
+    );
+    expect(result.stderr).toContain('.npmrc');
+  });
 
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);
