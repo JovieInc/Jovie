@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { buildAffectedTestPlan } from '../run-affected-tests.mjs';
+import {
+  MIN_CHANGED_LINE_COVERAGE,
+  planChangedLineCoverage,
+  runChangedLineCoverageCheck,
+} from './changed-test-coverage.mjs';
 import { validateFxExecutorIdentity } from './fx-remediation-lane.mjs';
 import {
   parseRollingCiState,
@@ -50,13 +62,15 @@ export const HOSTED_TERMINAL_RECEIPT_SCHEMA =
 // Eight native GitHub prepare-job concurrency shards bound aggregate FX runs.
 export const HOSTED_REPAIR_MAX_CONCURRENT = 8;
 export const HOSTED_REPAIR_MAX_FILES = 8;
+const HOSTED_REPAIR_MAX_TEST_COMPANIONS = 8;
 export const HOSTED_REPAIR_MAX_PATCH_BYTES = 512 * 1024;
 export const HOSTED_ACCEPTANCE_TTL_MS = 45 * 60 * 1000;
 
 const HOSTED_REPAIR_TEST_COMMANDS = Object.freeze([
   'pnpm biome check <changed-files>',
   'pnpm run typecheck',
-  'node scripts/run-affected-tests.mjs --base <expected-head>',
+  'pnpm --filter @jovie/web exec vitest run <trusted-selected-unit-tests> --reporter=json',
+  'pnpm --filter @jovie/web test:coverage --changed <authenticated-base> --bail 1 (when applicable)',
 ]);
 const HOSTED_ALLOWED_PATH_RE = Object.freeze([
   /^apps\/web\/(?:app|components|hooks|lib|types)\/.+\.(?:[cm]?[jt]sx?)$/,
@@ -133,6 +147,7 @@ function assertHostedRepairPlan(plan) {
     throw new Error('checkSuiteId must be numeric');
   }
   assertExactSha(plan.expectedHeadOid, 'expectedHeadOid');
+  assertExactSha(plan.baseSha, 'baseSha');
   assertSafeHeadRef(plan.headRefName);
   if (
     !Array.isArray(plan.allowedPaths) ||
@@ -142,6 +157,48 @@ function assertHostedRepairPlan(plan) {
     plan.allowedPaths.some(path => !validateHostedRepairPath(path).allowed)
   ) {
     throw new Error('hosted repair plan requires bounded source paths');
+  }
+  if (
+    !Array.isArray(plan.diffFiles) ||
+    plan.diffFiles.length >
+      HOSTED_REPAIR_MAX_FILES + HOSTED_REPAIR_MAX_TEST_COMPANIONS
+  ) {
+    throw new Error(
+      'hosted repair plan requires a bounded immutable test inventory'
+    );
+  }
+  const sourcePaths = new Set(plan.allowedPaths);
+  const companionFiles = plan.diffFiles.filter(
+    file => validateHostedTestCompanion(file?.path).allowed
+  );
+  if (companionFiles.length > HOSTED_REPAIR_MAX_TEST_COMPANIONS) {
+    throw new Error('hosted repair plan exceeds the test companion limit');
+  }
+  const inventoryPaths = new Set();
+  for (const file of plan.diffFiles) {
+    const isSource = sourcePaths.has(file?.path);
+    const isCompanion = validateHostedTestCompanion(file?.path).allowed;
+    if (
+      (!isSource && !isCompanion) ||
+      inventoryPaths.has(file.path) ||
+      (isSource
+        ? file?.status !== 'modified'
+        : !['added', 'modified'].includes(file?.status)) ||
+      file?.mode !== '100644' ||
+      !/^[0-9a-f]{40}$/.test(file?.blobSha ?? '')
+    ) {
+      throw new Error(
+        'hosted repair plan contains an invalid PR file inventory'
+      );
+    }
+    inventoryPaths.add(file.path);
+  }
+  if (
+    [...sourcePaths, ...companionFiles.map(file => file.path)].some(
+      path => !inventoryPaths.has(path)
+    )
+  ) {
+    throw new Error('hosted repair plan test inventory identity mismatch');
   }
   const expectedKey = `${plan.repository}:pr-${plan.prNumber}:${plan.expectedHeadOid}:${plan.fingerprint}:${plan.policyVersion}`;
   if (plan.idempotencyKey !== expectedKey) {
@@ -165,18 +222,40 @@ export function buildHostedRepairPlan(input = {}) {
   ) {
     throw new Error('dispatch does not authorize a hosted repair');
   }
+  assertExactSha(input.baseSha, 'baseSha');
   if (
     !Array.isArray(input.changedFiles) ||
     input.changedFiles.length < 1 ||
-    input.changedFiles.length > 99 ||
+    input.changedFiles.length >
+      HOSTED_REPAIR_MAX_FILES + HOSTED_REPAIR_MAX_TEST_COMPANIONS
+  ) {
+    throw new Error(
+      'entire PR diff must contain a bounded admitted source and test inventory'
+    );
+  }
+  const sourceFiles = input.changedFiles.filter(
+    file => validateHostedRepairPath(file?.filename).allowed
+  );
+  const testCompanionFiles = input.changedFiles.filter(
+    file => validateHostedTestCompanion(file?.filename).allowed
+  );
+  if (
+    sourceFiles.length < 1 ||
+    sourceFiles.length > HOSTED_REPAIR_MAX_FILES ||
+    testCompanionFiles.length > HOSTED_REPAIR_MAX_TEST_COMPANIONS ||
+    sourceFiles.length + testCompanionFiles.length !==
+      input.changedFiles.length ||
+    sourceFiles.some(file => file.status !== 'modified') ||
+    testCompanionFiles.some(
+      file => !['added', 'modified'].includes(file.status)
+    ) ||
     input.changedFiles.some(
       file =>
-        file?.status !== 'modified' ||
-        !validateHostedRepairPath(file?.filename).allowed
+        file.mode !== '100644' || !/^[0-9a-f]{40}$/.test(file?.blobSha ?? '')
     )
   ) {
     throw new Error(
-      'entire PR diff must contain only admitted modified source paths'
+      'entire PR diff must contain only admitted modified sources and ordinary unit-test companions'
     );
   }
   const plan = {
@@ -185,6 +264,7 @@ export function buildHostedRepairPlan(input = {}) {
     repository: event.repository,
     prNumber: event.pr,
     expectedHeadOid: event.head,
+    baseSha: input.baseSha,
     headRefName: assertSafeHeadRef(input.headRefName),
     producerEvent: event.source?.producerEvent,
     workflowRunId: event.workflowRunId,
@@ -195,7 +275,15 @@ export function buildHostedRepairPlan(input = {}) {
       check: candidate.check,
       failedSteps: [...(candidate.failedSteps ?? [])],
     })),
-    allowedPaths: input.changedFiles.map(file => file.filename).sort(),
+    allowedPaths: sourceFiles.map(file => file.filename).sort(),
+    diffFiles: input.changedFiles
+      .map(file => ({
+        path: file.filename,
+        status: file.status,
+        mode: file.mode,
+        blobSha: file.blobSha,
+      }))
+      .sort((left, right) => left.path.localeCompare(right.path)),
     idempotencyKey: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
     maxConcurrent: HOSTED_REPAIR_MAX_CONCURRENT,
   };
@@ -245,6 +333,33 @@ export function validateHostedRepairPath(path) {
   return { allowed: true, path: normalized };
 }
 
+export function validateHostedTestCompanion(path) {
+  const raw = String(path ?? '');
+  const normalized = raw.replaceAll('\\', '/');
+  const segments = normalized.split('/');
+  const filename = segments.at(-1) ?? '';
+  const allowed =
+    raw === normalized &&
+    /^apps\/web\/tests\/unit\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(
+      normalized
+    ) &&
+    !segments.some(
+      segment => !segment || segment === '.' || segment === '..'
+    ) &&
+    !segments.some(segment =>
+      /^(?:__)?(?:helpers?|snapshots?|fixtures?|e2e|performance|setup|utils?)(?:__)?$/i.test(
+        segment
+      )
+    ) &&
+    !/^(?:setup|vitest\.setup|test-setup)(?:\.[^/]*)?$/i.test(filename) &&
+    !/(?:^|[-_.])(?:helper|util)s?\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(
+      filename
+    );
+  return allowed
+    ? { allowed: true, path: normalized }
+    : { allowed: false, reason: 'path-outside-hosted-test-companion-policy' };
+}
+
 function validateHostedChanges(changes) {
   if (
     !Array.isArray(changes) ||
@@ -275,11 +390,452 @@ function validateHostedChanges(changes) {
   );
 }
 
+function gitOutput(repository, args) {
+  return execFileSync('git', args, {
+    cwd: repository,
+    encoding: 'utf8',
+  }).trim();
+}
+
+function gitTreeInventory(repository, revision, paths) {
+  const output = execFileSync(
+    'git',
+    ['ls-tree', '-r', '-z', revision, '--', ...paths],
+    { cwd: repository }
+  ).toString('utf8');
+  return new Map(
+    output
+      .split('\0')
+      .filter(Boolean)
+      .map(record => {
+        const [metadata, path] = record.split('\t');
+        const [mode, type, blobSha] = metadata.split(' ');
+        return [path, { mode, type, blobSha }];
+      })
+  );
+}
+
+function assertHostedCandidateTree({
+  plan,
+  repository,
+  testCommitOid,
+  changes,
+}) {
+  assertHostedRepairPlan(plan);
+  assertExactSha(testCommitOid, 'testCommitOid');
+  const head = gitOutput(repository, ['rev-parse', 'HEAD']);
+  const parent = gitOutput(repository, [
+    'show',
+    '-s',
+    '--format=%P',
+    testCommitOid,
+  ]);
+  if (head !== testCommitOid || parent !== plan.expectedHeadOid) {
+    throw new Error(
+      'test tree is not one exact patch commit on the authenticated PR head'
+    );
+  }
+  if (
+    gitOutput(repository, ['status', '--porcelain=v1', '--untracked-files=all'])
+  ) {
+    throw new Error(
+      'candidate working tree changed outside the exact patch commit'
+    );
+  }
+  const paths = gitOutput(repository, [
+    'diff',
+    '--name-only',
+    '-z',
+    '--no-renames',
+    '--diff-filter=ACMR',
+    `${plan.baseSha}...${testCommitOid}`,
+  ])
+    .split('\0')
+    .filter(Boolean)
+    .sort();
+  const expectedPaths = plan.diffFiles.map(file => file.path).sort();
+  if (JSON.stringify(paths) !== JSON.stringify(expectedPaths)) {
+    throw new Error('test tree paths do not match the authenticated PR diff');
+  }
+  const headInventory = gitTreeInventory(
+    repository,
+    plan.expectedHeadOid,
+    plan.diffFiles.map(file => file.path)
+  );
+  const testInventory = gitTreeInventory(
+    repository,
+    testCommitOid,
+    plan.diffFiles.map(file => file.path)
+  );
+  for (const file of plan.diffFiles) {
+    const actual = headInventory.get(file.path);
+    if (
+      actual?.type !== 'blob' ||
+      actual.mode !== file.mode ||
+      actual.blobSha !== file.blobSha
+    ) {
+      throw new Error(`${file.path}: authenticated PR tree identity mismatch`);
+    }
+    const pathStat = lstatSync(join(repository, file.path));
+    if (!pathStat.isFile() || pathStat.isSymbolicLink()) {
+      throw new Error(`${file.path}: non-regular PR file is not allowed`);
+    }
+    const testedFile = testInventory.get(file.path);
+    if (testedFile?.type !== 'blob' || testedFile.mode !== file.mode) {
+      throw new Error(
+        `${file.path}: tested PR file mode differs from its authenticated identity`
+      );
+    }
+    if (
+      validateHostedTestCompanion(file.path).allowed &&
+      testedFile.blobSha !== file.blobSha
+    ) {
+      throw new Error(
+        `${file.path}: tested companion differs from the authenticated PR blob`
+      );
+    }
+  }
+  const repairChanges = validateHostedChanges(changes);
+  if (repairChanges.some(change => !plan.allowedPaths.includes(change.path))) {
+    throw new Error(
+      'repair changed a path outside the source-only permission set'
+    );
+  }
+  for (const change of repairChanges) {
+    const bytes = readFileSync(join(repository, change.path));
+    if (bytes.length !== change.bytes || sha256(bytes) !== change.sha256) {
+      throw new Error(
+        `${change.path}: tested source bytes differ from the immutable patch artifact`
+      );
+    }
+  }
+  const treeSha = gitOutput(repository, [
+    'rev-parse',
+    `${testCommitOid}^{tree}`,
+  ]);
+  return { testCommitOid, testTreeSha: treeSha };
+}
+
+function assertHostedTestSelection(plan, repository) {
+  const selection = buildAffectedTestPlan(
+    plan.diffFiles.map(file => file.path),
+    {
+      isFileAvailable(path) {
+        try {
+          const stat = lstatSync(join(repository, path));
+          return stat.isFile() && !stat.isSymbolicLink();
+        } catch {
+          return false;
+        }
+      },
+    }
+  );
+  const unsupported = [
+    selection.rootVitestTests,
+    selection.pythonTests,
+    selection.pythonUnittestTests,
+    selection.scriptVitestTests,
+    selection.nodeTests,
+  ].some(files => (files ?? []).length > 0);
+  const selectedTests = [...(selection.selectedTests ?? [])].sort();
+  if (
+    selection.mode !== 'selected' ||
+    unsupported ||
+    selectedTests.length < 1 ||
+    selectedTests.some(path => {
+      if (!validateHostedTestCompanion(path).allowed) return true;
+      try {
+        const stat = lstatSync(join(repository, path));
+        return !stat.isFile() || stat.isSymbolicLink();
+      } catch {
+        return true;
+      }
+    }) ||
+    plan.diffFiles.some(
+      file =>
+        validateHostedTestCompanion(file.path).allowed &&
+        !selectedTests.includes(file.path)
+    )
+  ) {
+    throw new Error(
+      'trusted affected-test selector did not produce a bounded unit-test plan'
+    );
+  }
+  return { mode: selection.mode, selectedTests };
+}
+
+/** Build a trusted, exact-tree test plan from the authenticated PR and patch. */
+export function buildHostedTestPlan({
+  plan,
+  patchBytes,
+  changes,
+  repository,
+  testCommitOid,
+}) {
+  const patch = Buffer.from(patchBytes ?? '');
+  if (patch.length < 1 || patch.length > HOSTED_REPAIR_MAX_PATCH_BYTES) {
+    throw new Error('hosted repair patch is empty or exceeds the byte limit');
+  }
+  const tree = assertHostedCandidateTree({
+    plan,
+    repository,
+    testCommitOid,
+    changes,
+  });
+  const selection = assertHostedTestSelection(plan, repository);
+  const coverage = planChangedLineCoverage({
+    base: plan.baseSha,
+    head: testCommitOid,
+    repoRoot: repository,
+  });
+  return {
+    repository: plan.repository,
+    prNumber: plan.prNumber,
+    baseSha: plan.baseSha,
+    expectedHeadOid: plan.expectedHeadOid,
+    testCommitOid: tree.testCommitOid,
+    testTreeSha: tree.testTreeSha,
+    patchSha256: sha256(patch),
+    selectorMode: selection.mode,
+    selectedTests: selection.selectedTests,
+    coveragePlan: coverage,
+  };
+}
+
+function validateHostedVitestReport(report, selectedTests, repository) {
+  const expected = [...selectedTests].sort();
+  const results = report?.testResults;
+  const assertionCount = Array.isArray(results)
+    ? results.reduce(
+        (total, result) => total + (result.assertionResults?.length ?? 0),
+        0
+      )
+    : 0;
+  if (
+    !Array.isArray(results) ||
+    report.success !== true ||
+    (report.unhandledErrors !== undefined &&
+      report.unhandledErrors !== null &&
+      (!Array.isArray(report.unhandledErrors) ||
+        report.unhandledErrors.length > 0)) ||
+    results.length !== expected.length ||
+    (report.numTotalTestSuites !== undefined &&
+      report.numPassedTestSuites !== report.numTotalTestSuites) ||
+    (report.numPassedTestSuites !== undefined &&
+      !Number.isInteger(report.numPassedTestSuites)) ||
+    (report.numFailedTestSuites ?? 0) !== 0 ||
+    (report.numPendingTestSuites ?? 0) !== 0 ||
+    !Number.isInteger(report.numTotalTests) ||
+    report.numTotalTests < 1 ||
+    !Number.isInteger(report.numPassedTests) ||
+    report.numPassedTests < 1 ||
+    report.numPassedTests !== report.numTotalTests ||
+    report.numTotalTests !== assertionCount ||
+    (report.numFailedTests ?? 0) !== 0 ||
+    (report.numPendingTests ?? 0) !== 0 ||
+    (report.numSkippedTests ?? 0) !== 0 ||
+    (report.numTodoTests ?? 0) !== 0
+  ) {
+    throw new Error(
+      'Vitest report is empty, incomplete, or contains failed/skipped tests'
+    );
+  }
+  const actual = results
+    .map(result => {
+      const name = String(result?.name ?? '').replaceAll('\\', '/');
+      const marker = 'apps/web/tests/unit/';
+      const index = name.lastIndexOf(marker);
+      if (index >= 0) return name.slice(index);
+      if (name.startsWith('tests/unit/')) return `apps/web/${name}`;
+      return name.startsWith(`${repository}/`)
+        ? relative(repository, name).replaceAll('\\', '/')
+        : name;
+    })
+    .sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(
+      'Vitest report is missing required tests or includes unrelated tests'
+    );
+  }
+  for (const result of results) {
+    if (
+      result.status !== 'passed' ||
+      !Array.isArray(result.assertionResults) ||
+      result.assertionResults.length < 1 ||
+      result.assertionResults.some(assertion => assertion.status !== 'passed')
+    ) {
+      throw new Error(
+        `Vitest did not pass every required assertion in ${result.name}`
+      );
+    }
+  }
+}
+
+function validateHostedCoverageMaps(coverageBytes) {
+  const coverage = JSON.parse(Buffer.from(coverageBytes).toString('utf8'));
+  if (!coverage || typeof coverage !== 'object' || Array.isArray(coverage)) {
+    throw new Error('changed-line coverage report is not a file map');
+  }
+  for (const [path, file] of Object.entries(coverage)) {
+    const statementMap = file?.statementMap;
+    const statementCounts = file?.s;
+    if (
+      !path ||
+      [file, statementMap, statementCounts].some(
+        value => !value || typeof value !== 'object' || Array.isArray(value)
+      ) ||
+      JSON.stringify(Object.keys(statementMap).sort()) !==
+        JSON.stringify(Object.keys(statementCounts).sort())
+    ) {
+      throw new Error(`changed-line coverage maps are invalid for ${path}`);
+    }
+    for (const [id, location] of Object.entries(statementMap)) {
+      const { start, end } = location ?? {};
+      if (
+        !Number.isSafeInteger(start?.line) ||
+        start.line < 1 ||
+        !Number.isSafeInteger(start?.column) ||
+        start.column < 0 ||
+        !Number.isSafeInteger(end?.line) ||
+        end.line < start.line ||
+        !Number.isSafeInteger(end?.column) ||
+        end.column < 0 ||
+        (end.line === start.line && end.column < start.column) ||
+        typeof statementCounts[id] !== 'number' ||
+        !Number.isFinite(statementCounts[id]) ||
+        statementCounts[id] < 0
+      ) {
+        throw new Error(
+          `changed-line coverage statement is invalid for ${path}`
+        );
+      }
+    }
+  }
+}
+
+function validateHostedCoverageResult(coveragePlan, coverageResult) {
+  if (!coveragePlan?.applicable) {
+    if (coverageResult?.applicable === true) {
+      throw new Error(
+        'coverage receipt unexpectedly differs from its exact-tree plan'
+      );
+    }
+    return;
+  }
+  if (
+    coverageResult?.applicable !== true ||
+    coverageResult.ok !== true ||
+    coverageResult.minimum !== MIN_CHANGED_LINE_COVERAGE ||
+    (coverageResult.percentage !== null &&
+      coverageResult.percentage < coverageResult.minimum) ||
+    !Array.isArray(coverageResult.missingFiles) ||
+    coverageResult.missingFiles.length > 0 ||
+    !Array.isArray(coverageResult.files)
+  ) {
+    throw new Error(
+      'exact-head changed-line coverage is missing, stale, or below its floor'
+    );
+  }
+  const actualPaths = coverageResult.files.map(file => file.path).sort();
+  const expectedPaths = coveragePlan.files.slice().sort();
+  if (JSON.stringify(actualPaths) !== JSON.stringify(expectedPaths)) {
+    throw new Error(
+      'changed-line coverage report does not match the exact changed source paths'
+    );
+  }
+}
+
+export function validateHostedTestReports({
+  plan,
+  trustedTestPlan,
+  patchBytes,
+  reportBytes,
+  coverageBytes,
+  expectedTestCommitOid,
+  expectedTestTreeSha,
+  coverageResult,
+  repository = process.cwd(),
+}) {
+  try {
+    assertHostedRepairPlan(plan);
+    const reportBuffer = Buffer.from(reportBytes ?? '');
+    const coverageBuffer =
+      coverageBytes == null ? null : Buffer.from(coverageBytes);
+    if (
+      reportBuffer.length < 1 ||
+      trustedTestPlan?.repository !== plan.repository ||
+      trustedTestPlan?.prNumber !== plan.prNumber ||
+      trustedTestPlan?.baseSha !== plan.baseSha ||
+      trustedTestPlan?.expectedHeadOid !== plan.expectedHeadOid ||
+      trustedTestPlan?.testCommitOid !== expectedTestCommitOid ||
+      trustedTestPlan?.testTreeSha !== expectedTestTreeSha ||
+      trustedTestPlan?.patchSha256 !== sha256(Buffer.from(patchBytes ?? ''))
+    ) {
+      return { accepted: false, reason: 'test-report-identity-mismatch' };
+    }
+    const report = JSON.parse(reportBuffer.toString('utf8'));
+    assertExactSha(trustedTestPlan.testCommitOid, 'testCommitOid');
+    assertExactSha(expectedTestTreeSha, 'testTreeSha');
+    if (
+      trustedTestPlan.selectorMode !== 'selected' ||
+      !Array.isArray(trustedTestPlan.selectedTests) ||
+      trustedTestPlan.selectedTests.length < 1 ||
+      new Set(trustedTestPlan.selectedTests).size !==
+        trustedTestPlan.selectedTests.length ||
+      trustedTestPlan.selectedTests.some(
+        path => !validateHostedTestCompanion(path).allowed
+      ) ||
+      plan.diffFiles.some(
+        file =>
+          validateHostedTestCompanion(file.path).allowed &&
+          !trustedTestPlan.selectedTests.includes(file.path)
+      )
+    ) {
+      return { accepted: false, reason: 'test-selection-identity-mismatch' };
+    }
+    validateHostedVitestReport(
+      report,
+      trustedTestPlan.selectedTests,
+      repository
+    );
+    const applicable = trustedTestPlan.coveragePlan?.applicable === true;
+    if (
+      applicable !== (coverageBuffer !== null) ||
+      (coverageBuffer !== null && coverageBuffer.length < 1)
+    ) {
+      return { accepted: false, reason: 'coverage-artifact-mismatch' };
+    }
+    if (coverageBuffer) validateHostedCoverageMaps(coverageBuffer);
+    validateHostedCoverageResult(trustedTestPlan.coveragePlan, coverageResult);
+    return {
+      accepted: true,
+      testReportSha256: sha256(reportBuffer),
+      coverageSha256: coverageBuffer ? sha256(coverageBuffer) : null,
+    };
+  } catch (error) {
+    return {
+      accepted: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export function buildHostedAcceptanceReceipt({
   plan,
   patchBytes,
   changes,
   executor,
+  trustedTestPlan,
+  testReportBytes,
+  coverageBytes,
+  workflowRunId,
+  workflowRunAttempt,
+  patchArtifactId,
+  testArtifactId,
+  expectedTestCommitOid,
+  expectedTestTreeSha,
+  coverageResult,
+  repository = process.cwd(),
   now = new Date(),
 }) {
   assertHostedRepairPlan(plan);
@@ -296,6 +852,28 @@ export function buildHostedAcceptanceReceipt({
   if (!validateFxExecutorIdentity(executor)) {
     throw new Error('executor identity is missing or malformed');
   }
+  if (
+    !/^\d+$/.test(String(workflowRunId ?? '')) ||
+    !/^\d+$/.test(String(patchArtifactId ?? '')) ||
+    !/^\d+$/.test(String(testArtifactId ?? ''))
+  ) {
+    throw new Error('workflow and evidence artifact identities are required');
+  }
+  assertPositiveInteger(Number(workflowRunAttempt), 'workflowRunAttempt');
+  assertExactSha(expectedTestCommitOid, 'testCommitOid');
+  assertExactSha(expectedTestTreeSha, 'testTreeSha');
+  const verification = validateHostedTestReports({
+    plan,
+    trustedTestPlan,
+    patchBytes: patch,
+    reportBytes: testReportBytes,
+    coverageBytes,
+    expectedTestCommitOid,
+    expectedTestTreeSha,
+    coverageResult,
+    repository,
+  });
+  if (!verification.accepted) throw new Error(verification.reason);
   return {
     schema: HOSTED_ACCEPTANCE_RECEIPT_SCHEMA,
     policyVersion: plan.policyVersion,
@@ -304,6 +882,7 @@ export function buildHostedAcceptanceReceipt({
     terminal: false,
     repository: plan.repository,
     prNumber: plan.prNumber,
+    baseSha: plan.baseSha,
     expectedHeadOid: plan.expectedHeadOid,
     fingerprint: plan.fingerprint,
     idempotencyKey: plan.idempotencyKey,
@@ -311,6 +890,15 @@ export function buildHostedAcceptanceReceipt({
     executor,
     patchSha256: sha256(patch),
     changedFiles: acceptedChanges,
+    testCommitOid: expectedTestCommitOid,
+    testTreeSha: expectedTestTreeSha,
+    testReportSha256: verification.testReportSha256,
+    coverageApplicable: trustedTestPlan.coveragePlan.applicable,
+    coverageSha256: verification.coverageSha256,
+    workflowRunId: String(workflowRunId),
+    workflowRunAttempt: Number(workflowRunAttempt),
+    patchArtifactId: String(patchArtifactId),
+    testArtifactId: String(testArtifactId),
     testsPassed: true,
     testCommands: [...HOSTED_REPAIR_TEST_COMMANDS],
     observedAt: new Date(now).toISOString(),
@@ -330,6 +918,19 @@ export function validateHostedAcceptance({ plan, acceptance, patchBytes }) {
       acceptance.idempotencyKey !== plan.idempotencyKey ||
       acceptance.maxConcurrent !== HOSTED_REPAIR_MAX_CONCURRENT ||
       acceptance.testsPassed !== true ||
+      !/^[0-9a-f]{40}$/.test(acceptance.testCommitOid ?? '') ||
+      !/^[0-9a-f]{40}$/.test(acceptance.testTreeSha ?? '') ||
+      !/^[0-9a-f]{64}$/.test(acceptance.testReportSha256 ?? '') ||
+      typeof acceptance.coverageApplicable !== 'boolean' ||
+      acceptance.coverageApplicable !== (acceptance.coverageSha256 !== null) ||
+      (acceptance.coverageSha256 !== null &&
+        !/^[0-9a-f]{64}$/.test(acceptance.coverageSha256 ?? '')) ||
+      acceptance.baseSha !== plan.baseSha ||
+      !/^\d+$/.test(String(acceptance.workflowRunId ?? '')) ||
+      !Number.isInteger(acceptance.workflowRunAttempt) ||
+      acceptance.workflowRunAttempt < 1 ||
+      !/^\d+$/.test(String(acceptance.patchArtifactId ?? '')) ||
+      !/^\d+$/.test(String(acceptance.testArtifactId ?? '')) ||
       acceptance.patchSha256 !== sha256(Buffer.from(patchBytes ?? '')) ||
       !validateFxExecutorIdentity(acceptance.executor) ||
       JSON.stringify(acceptance.testCommands) !==
@@ -1314,10 +1915,23 @@ function hostedPlanCommand(args) {
   const plan = buildHostedRepairPlan({
     dispatch: input.dispatch,
     headRefName: input.headRefName,
+    baseSha: input.baseSha,
     changedFiles: input.changedFiles,
   });
   writeJson(args.output, plan);
   process.stdout.write(`${JSON.stringify(plan)}\n`);
+}
+
+function hostedTestPlanCommand(args) {
+  const result = buildHostedTestPlan({
+    plan: readJson(args.plan),
+    patchBytes: readFileSync(args.patch),
+    changes: readJson(args.changes),
+    repository: args.repository,
+    testCommitOid: args['test-commit'],
+  });
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
 function hostedPrelaunchCommand(args) {
@@ -1396,11 +2010,50 @@ function hostedStageCommand(args) {
 }
 
 function hostedAcceptanceCommand(args) {
+  const plan = readJson(args.plan);
+  const patchBytes = readFileSync(args.patch);
+  const changes = readJson(args.changes);
+  const repository = args.repository;
+  const trustedTestPlan = buildHostedTestPlan({
+    plan,
+    patchBytes,
+    changes,
+    repository,
+    testCommitOid: args['verification-commit'],
+  });
+  if (trustedTestPlan.testTreeSha !== args['test-tree']) {
+    throw new Error('recreated candidate tree differs from the tested tree');
+  }
+  const testReportBytes = readFileSync(args['test-report']);
+  let coverageBytes = null;
+  let coverageResult = { applicable: false, ok: true };
+  if (trustedTestPlan.coveragePlan.applicable) {
+    coverageBytes = readFileSync(args.coverage);
+    coverageResult = runChangedLineCoverageCheck({
+      base: plan.baseSha,
+      head: args['verification-commit'],
+      coveragePath: args.coverage,
+      repoRoot: repository,
+    });
+  } else if (existsSync(args.coverage)) {
+    throw new Error('coverage report is unexpected for this exact tree');
+  }
   const receipt = buildHostedAcceptanceReceipt({
-    plan: readJson(args.plan),
-    patchBytes: readFileSync(args.patch),
-    changes: readJson(args.changes),
+    plan,
+    patchBytes,
+    changes,
     executor: readJson(args.executor),
+    trustedTestPlan,
+    testReportBytes,
+    coverageBytes,
+    workflowRunId: args['run-id'],
+    workflowRunAttempt: Number(args['run-attempt']),
+    patchArtifactId: args['patch-artifact-id'],
+    testArtifactId: args['test-artifact-id'],
+    expectedTestCommitOid: args['test-commit'],
+    expectedTestTreeSha: args['test-tree'],
+    coverageResult,
+    repository,
   });
   writeJson(args.output, receipt);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
@@ -1457,6 +2110,7 @@ async function main() {
   if (command?.startsWith('hosted-')) {
     const args = cliArgs(process.argv.slice(3));
     if (command === 'hosted-plan') return hostedPlanCommand(args);
+    if (command === 'hosted-test-plan') return hostedTestPlanCommand(args);
     if (command === 'hosted-prelaunch') return hostedPrelaunchCommand(args);
     if (command === 'hosted-stage') return hostedStageCommand(args);
     if (command === 'hosted-live-canary') return hostedLiveCanaryCommand(args);

@@ -1,7 +1,16 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { MIN_CHANGED_LINE_COVERAGE } from '../changed-test-coverage.mjs';
 import { FX_EXECUTOR_POLICY } from '../fx-remediation-lane.mjs';
 import {
   normalizeFailureEvents,
@@ -17,6 +26,7 @@ import {
   buildHostedPrelaunchReceipt,
   buildHostedRepairPlan,
   buildHostedTerminalReceipt,
+  buildHostedTestPlan,
   classifyHostedReceiptLiveness,
   classifyRunnerFailure,
   commitHostedRepair,
@@ -33,6 +43,8 @@ import {
   resolveWebhookRemediationRoute,
   revalidateHostedCanaryState,
   validateHostedRepairPath,
+  validateHostedTestCompanion,
+  validateHostedTestReports,
 } from '../rolling-ci-fx.mjs';
 import {
   FX_ADAPTER_NAME,
@@ -43,6 +55,11 @@ import {
 } from '../rolling-ci-handoff.mjs';
 
 const head = 'a'.repeat(40);
+const base = 'b'.repeat(40);
+const sourceBlob = 'c'.repeat(40);
+const companionBlob = 'd'.repeat(40);
+const companionPath =
+  'apps/web/tests/unit/product-screenshots/source-provenance.test.ts';
 const CLI = resolve(import.meta.dirname, '..', 'rolling-ci-fx.mjs');
 const trustedSource = {
   eventName: 'workflow_run',
@@ -90,12 +107,83 @@ function dispatch(overrides = {}) {
   });
 }
 
+function prFile(
+  filename,
+  status = 'modified',
+  blobSha = sourceBlob,
+  mode = '100644'
+) {
+  return { filename, status, blobSha, mode };
+}
+
+function hostedVitestReport(name = resolve(companionPath), overrides = {}) {
+  // Matches Vitest 5 CLI JSON for source-provenance.test.ts: 3 nested suites,
+  // one file, and 6 passed assertions.
+  return {
+    success: true,
+    numTotalTestSuites: 3,
+    numPassedTestSuites: 3,
+    numFailedTestSuites: 0,
+    numPendingTestSuites: 0,
+    numTotalTests: 6,
+    numPassedTests: 6,
+    numFailedTests: 0,
+    numPendingTests: 0,
+    testResults: [
+      {
+        name,
+        status: 'passed',
+        assertionResults: Array.from({ length: 6 }, () => ({
+          status: 'passed',
+        })),
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function hostedOneTestReport(
+  status = 'passed',
+  overrides = {},
+  name = resolve('apps/web/tests/unit/ci/repair.test.ts')
+) {
+  return hostedVitestReport(name, {
+    numTotalTestSuites: 1,
+    numPassedTestSuites: 1,
+    numTotalTests: 1,
+    numPassedTests: status === 'passed' ? 1 : 0,
+    numPendingTests: status === 'skipped' ? 1 : 0,
+    testResults: [{ name, status: 'passed', assertionResults: [{ status }] }],
+    ...overrides,
+  });
+}
+
+const reportBytes = (...args) =>
+  Buffer.from(JSON.stringify(hostedVitestReport(...args)));
+const oneTestReportBytes = (...args) =>
+  Buffer.from(JSON.stringify(hostedOneTestReport(...args)));
+
+function hostedCoverageBytes(
+  statementMap = {
+    0: { start: { line: 1, column: 0 }, end: { line: 1, column: 20 } },
+  },
+  s = { 0: 1 }
+) {
+  return Buffer.from(
+    JSON.stringify({ 'apps/web/lib/proof.ts': { statementMap, s } })
+  );
+}
+
 function hostedFixture() {
   const dispatchResult = dispatch({ writer: 'fx-hosted' });
   const plan = buildHostedRepairPlan({
     dispatch: dispatchResult,
     headRefName: 'codex/repair-proof',
-    changedFiles: [{ filename: 'apps/web/lib/proof.ts', status: 'modified' }],
+    baseSha: base,
+    changedFiles: [
+      prFile('apps/web/lib/proof.ts'),
+      prFile(companionPath, 'added', companionBlob),
+    ],
   });
   const patchBytes = Buffer.from(
     'diff --git a/apps/web/lib/proof.ts b/apps/web/lib/proof.ts\n'
@@ -110,10 +198,49 @@ function hostedFixture() {
       sha256: createHash('sha256').update(fileBytes).digest('hex'),
     },
   ];
+  const testPlan = {
+    repository: plan.repository,
+    prNumber: plan.prNumber,
+    baseSha: plan.baseSha,
+    expectedHeadOid: plan.expectedHeadOid,
+    testCommitOid: 'e'.repeat(40),
+    testTreeSha: 'f'.repeat(40),
+    patchSha256: createHash('sha256').update(patchBytes).digest('hex'),
+    selectorMode: 'selected',
+    selectedTests: [companionPath],
+    coveragePlan: {
+      applicable: true,
+      files: ['apps/web/lib/proof.ts'],
+      coverageInclude: ['lib/proof.ts'],
+    },
+  };
+  const testReportBytes = reportBytes();
+  const coverageBytes = hostedCoverageBytes();
+  const coverageResult = {
+    applicable: true,
+    ok: true,
+    minimum: MIN_CHANGED_LINE_COVERAGE,
+    percentage: 100,
+    missingFiles: [],
+    files: [
+      { path: 'apps/web/lib/proof.ts', coveredLines: 1, coverableLines: 1 },
+    ],
+  };
   const acceptance = buildHostedAcceptanceReceipt({
     plan,
     patchBytes,
     changes,
+    trustedTestPlan: testPlan,
+    testReportBytes,
+    coverageBytes,
+    workflowRunId: '7001',
+    workflowRunAttempt: 1,
+    patchArtifactId: '6001',
+    testArtifactId: '7002',
+    expectedTestCommitOid: testPlan.testCommitOid,
+    expectedTestTreeSha: testPlan.testTreeSha,
+    coverageResult,
+    repository: process.cwd(),
     executor: {
       ...FX_EXECUTOR_POLICY,
       observedModel: FX_EXECUTOR_POLICY.expectedModel,
@@ -121,7 +248,17 @@ function hostedFixture() {
     },
     now: new Date('2026-08-29T20:01:00.000Z'),
   });
-  return { plan, patchBytes, fileBytes, changes, acceptance };
+  return {
+    plan,
+    patchBytes,
+    fileBytes,
+    changes,
+    acceptance,
+    testPlan,
+    testReportBytes,
+    coverageBytes,
+    coverageResult,
+  };
 }
 
 function hostedCiRun(overrides = {}) {
@@ -186,9 +323,8 @@ describe('hosted rolling CI repair policy', () => {
       buildHostedRepairPlan({
         dispatch: dispatch(),
         headRefName: 'gh-readonly-queue/main/pr-17-deadbeef',
-        changedFiles: [
-          { filename: 'apps/web/lib/proof.ts', status: 'modified' },
-        ],
+        baseSha: base,
+        changedFiles: [prFile('apps/web/lib/proof.ts')],
       })
     ).toThrow('main, synthetic, or not a safe branch ref');
   });
@@ -221,30 +357,485 @@ describe('hosted rolling CI repair policy', () => {
     }
   });
 
-  it('limits the model patch to modified source files in the authenticated PR diff', () => {
-    const { plan, patchBytes, changes, acceptance } = hostedFixture();
+  it('keeps ordinary PR unit-test companions separate from source permissions', () => {
+    const companion = 'apps/web/tests/unit/profile/repair-behavior.test.ts';
+    const plan = buildHostedRepairPlan({
+      dispatch: dispatch({ writer: 'fx-hosted' }),
+      headRefName: 'codex/repair-proof',
+      baseSha: base,
+      changedFiles: [
+        prFile('apps/web/lib/proof.ts'),
+        prFile(companion, 'added', companionBlob),
+      ],
+    });
+    expect(plan.allowedPaths).toEqual(['apps/web/lib/proof.ts']);
+    expect(plan.diffFiles.find(file => file.path === companion)).toEqual({
+      path: companion,
+      status: 'added',
+      mode: '100644',
+      blobSha: companionBlob,
+    });
+    expect(plan.diffFiles.map(file => file.path)).toEqual([
+      'apps/web/lib/proof.ts',
+      companion,
+    ]);
+    expect(() =>
+      buildHostedPrelaunchReceipt({
+        plan: {
+          ...plan,
+          diffFiles: plan.diffFiles.map(file =>
+            file.path === companion ? { ...file, mode: '120000' } : file
+          ),
+        },
+      })
+    ).toThrow('hosted repair plan contains an invalid PR file inventory');
+    for (const path of [
+      'apps/web/tests/unit/helpers/repair.test.ts',
+      'apps/web/tests/unit/__helpers__/repair.test.ts',
+      'apps/web/tests/unit/ci/vitest.setup.test.ts',
+      'apps/web/tests/unit/e2e/auth.test.ts',
+      'apps/web/tests/unit/profile/__snapshots__/repair.test.ts',
+      'apps/web/tests/unit/../../../../.github/workflows/repair.test.ts',
+      'apps/web/tests/unit//profile/repair.test.ts',
+    ]) {
+      expect(validateHostedTestCompanion(path).allowed, path).toBe(false);
+    }
+    for (const file of [
+      prFile(companion, 'renamed', companionBlob),
+      prFile(companion, 'modified', companionBlob, '120000'),
+    ]) {
+      expect(() =>
+        buildHostedRepairPlan({
+          dispatch: dispatch({ writer: 'fx-hosted' }),
+          headRefName: 'codex/repair-proof',
+          baseSha: base,
+          changedFiles: [prFile('apps/web/lib/proof.ts'), file],
+        })
+      ).toThrow('admitted modified sources and ordinary unit-test companions');
+    }
     expect(() =>
       buildHostedRepairPlan({
         dispatch: dispatch({ writer: 'fx-hosted' }),
         headRefName: 'codex/repair-proof',
+        baseSha: base,
         changedFiles: [
-          { filename: '.github/workflows/ci.yml', status: 'modified' },
+          prFile('apps/web/lib/proof.ts'),
+          prFile('.github/workflows/rolling-ci-dispatch.yml'),
         ],
       })
+    ).toThrow('admitted modified sources and ordinary unit-test companions');
+  });
+
+  it('accepts nested Vitest suites and rejects incomplete or stale evidence', () => {
+    const {
+      plan,
+      patchBytes,
+      testPlan,
+      coverageResult,
+      testReportBytes,
+      coverageBytes,
+    } = hostedFixture();
+    const validReports = {
+      plan,
+      trustedTestPlan: testPlan,
+      patchBytes,
+      reportBytes: testReportBytes,
+      coverageBytes,
+      coverageResult,
+      expectedTestCommitOid: testPlan.testCommitOid,
+      expectedTestTreeSha: testPlan.testTreeSha,
+      repository: process.cwd(),
+    };
+    expect(validateHostedTestReports(validReports)).toMatchObject({
+      accepted: true,
+      testReportSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      coverageSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+
+    const location = {
+      start: { line: 1, column: 0 },
+      end: { line: 1, column: 1 },
+    };
+    const malformedCoverage = [
+      Buffer.from('{"apps/web/lib/proof.ts":{}}'),
+      hostedCoverageBytes({ 0: location }, { 1: 1 }),
+      hostedCoverageBytes({ 0: location }, { 0: -1 }),
+      hostedCoverageBytes(
+        { 0: { ...location, start: { line: 1, column: 2 } } },
+        { 0: 1 }
+      ),
+      Buffer.from(
+        '{"apps/web/lib/proof.ts":{"statementMap":{"0":{"start":{"line":1,"column":0},"end":{"line":1,"column":1}}},"s":{"0":1e999}}'
+      ),
+    ];
+    for (const coverageBytes of malformedCoverage) {
+      expect(
+        validateHostedTestReports({ ...validReports, coverageBytes }).accepted
+      ).toBe(false);
+    }
+    expect(
+      validateHostedTestReports({
+        ...validReports,
+        coverageBytes: hostedCoverageBytes({}, {}),
+        coverageResult: {
+          ...coverageResult,
+          percentage: null,
+          coveredLines: 0,
+          coverableLines: 0,
+          files: [
+            {
+              path: 'apps/web/lib/proof.ts',
+              coveredLines: 0,
+              coverableLines: 0,
+            },
+          ],
+        },
+      }).accepted
+    ).toBe(true);
+
+    for (const field of [
+      'baseSha',
+      'testCommitOid',
+      'testTreeSha',
+      'patchSha256',
+    ]) {
+      expect(
+        validateHostedTestReports({
+          ...validReports,
+          trustedTestPlan: {
+            ...testPlan,
+            [field]: field === 'baseSha' ? head : '9'.repeat(40),
+          },
+        }).accepted
+      ).toBe(false);
+    }
+    expect(
+      validateHostedTestReports({
+        ...validReports,
+        coverageBytes: null,
+        coverageResult: { applicable: false, ok: true },
+      }).accepted
+    ).toBe(false);
+    expect(
+      validateHostedTestReports({
+        ...validReports,
+        reportBytes: reportBytes(
+          resolve('apps/web/tests/unit/unrelated.test.ts')
+        ),
+      }).accepted
+    ).toBe(false);
+    for (const invalidReportBytes of [
+      reportBytes(undefined, {
+        numTotalTests: 0,
+        numPassedTests: 0,
+        testResults: [],
+      }),
+      oneTestReportBytes('skipped', { success: false }),
+      oneTestReportBytes('passed', {
+        unhandledErrors: [{ message: 'unhandled runner error' }],
+      }),
+    ]) {
+      expect(
+        validateHostedTestReports({
+          ...validReports,
+          reportBytes: invalidReportBytes,
+        }).accepted
+      ).toBe(false);
+    }
+    expect(
+      validateHostedTestReports({
+        ...validReports,
+        coverageResult: { ...coverageResult, percentage: 59 },
+      }).accepted
+    ).toBe(false);
+  });
+
+  it('binds the trusted test selector and coverage plan to the exact PR and patch tree', () => {
+    const repository = mkdtempSync(join(tmpdir(), 'jovie-hosted-test-plan-'));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+    try {
+      git('init', '-q');
+      const sourcePath = 'apps/web/components/foo/Hello.tsx';
+      const companionPath = 'apps/web/tests/unit/foo/hello.test.ts';
+      const selectorTests = [
+        'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+        'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+      ];
+      for (const path of [sourcePath, companionPath, ...selectorTests]) {
+        mkdirSync(dirname(join(repository, path)), { recursive: true });
+        writeFileSync(join(repository, path), `// ${path}\n`);
+      }
+      git('add', '.');
+      git(
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '-qm',
+        'base'
+      );
+      const baseSha = git('rev-parse', 'HEAD');
+      writeFileSync(join(repository, sourcePath), 'export const hello = 2;\n');
+      writeFileSync(join(repository, companionPath), 'expect(2).toBe(2);\n');
+      git('add', sourcePath, companionPath);
+      git(
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '-qm',
+        'PR'
+      );
+      const expectedHeadOid = git('rev-parse', 'HEAD');
+      const dispatchResult = dispatch({
+        headSha: expectedHeadOid,
+        liveHead: expectedHeadOid,
+        checks: [
+          {
+            name: 'ci-fast',
+            conclusion: 'failure',
+            headSha: expectedHeadOid,
+            checkSuiteId: 44,
+          },
+        ],
+      });
+      const plan = buildHostedRepairPlan({
+        dispatch: dispatchResult,
+        headRefName: 'codex/repair-proof',
+        baseSha,
+        changedFiles: [sourcePath, companionPath].map(filename => ({
+          filename,
+          status: 'modified',
+          mode: '100644',
+          blobSha: git('rev-parse', `${expectedHeadOid}:${filename}`),
+        })),
+      });
+      const patchBytes = Buffer.from('exact repair patch');
+      const sourceBytes = Buffer.from('export const hello = 3;\n');
+      writeFileSync(join(repository, sourcePath), sourceBytes);
+      git('add', sourcePath);
+      const treeSha = git('write-tree');
+      const testCommitOid = execFileSync(
+        'git',
+        ['commit-tree', treeSha, '-p', expectedHeadOid],
+        {
+          cwd: repository,
+          input: 'hosted test tree\n',
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: 'Jovie CI',
+            GIT_AUTHOR_EMAIL: 'ci@jovie.com',
+            GIT_COMMITTER_NAME: 'Jovie CI',
+            GIT_COMMITTER_EMAIL: 'ci@jovie.com',
+          },
+        }
+      ).trim();
+      git(
+        '-c',
+        'advice.detachedHead=false',
+        'checkout',
+        '--detach',
+        testCommitOid
+      );
+      const testPlan = buildHostedTestPlan({
+        plan,
+        patchBytes,
+        changes: [
+          {
+            path: sourcePath,
+            status: 'M',
+            symlink: false,
+            bytes: sourceBytes.length,
+            sha256: createHash('sha256').update(sourceBytes).digest('hex'),
+          },
+        ],
+        repository,
+        testCommitOid,
+      });
+      expect(testPlan).toMatchObject({
+        baseSha,
+        expectedHeadOid,
+        testCommitOid,
+        testTreeSha: treeSha,
+        selectorMode: 'selected',
+        selectedTests: expect.arrayContaining([companionPath]),
+        coveragePlan: {
+          applicable: true,
+          files: [sourcePath],
+        },
+      });
+      writeFileSync(join(repository, companionPath), 'expect(9).toBe(9);\n');
+      git('add', companionPath);
+      const alteredTree = git('write-tree');
+      const alteredCommit = execFileSync(
+        'git',
+        ['commit-tree', alteredTree, '-p', expectedHeadOid],
+        {
+          cwd: repository,
+          input: 'altered test companion\n',
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: 'Jovie CI',
+            GIT_AUTHOR_EMAIL: 'ci@jovie.com',
+            GIT_COMMITTER_NAME: 'Jovie CI',
+            GIT_COMMITTER_EMAIL: 'ci@jovie.com',
+          },
+        }
+      ).trim();
+      git(
+        '-c',
+        'advice.detachedHead=false',
+        'checkout',
+        '--detach',
+        alteredCommit
+      );
+      expect(() =>
+        buildHostedTestPlan({
+          plan,
+          patchBytes,
+          changes: [
+            {
+              path: sourcePath,
+              status: 'M',
+              symlink: false,
+              bytes: sourceBytes.length,
+              sha256: createHash('sha256').update(sourceBytes).digest('hex'),
+            },
+          ],
+          repository,
+          testCommitOid: alteredCommit,
+        })
+      ).toThrow('tested companion differs from the authenticated PR blob');
+      git(
+        '-c',
+        'advice.detachedHead=false',
+        'checkout',
+        '--detach',
+        testCommitOid
+      );
+      writeFileSync(join(repository, companionPath), 'expect(3).toBe(3);\n');
+      expect(() =>
+        buildHostedTestPlan({
+          plan,
+          patchBytes,
+          changes: [
+            {
+              path: sourcePath,
+              status: 'M',
+              symlink: false,
+              bytes: sourceBytes.length,
+              sha256: createHash('sha256').update(sourceBytes).digest('hex'),
+            },
+          ],
+          repository,
+          testCommitOid,
+        })
+      ).toThrow(
+        'candidate working tree changed outside the exact patch commit'
+      );
+    } finally {
+      rmSync(repository, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('keeps the write-free test job free of writer secrets', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/rolling-ci-dispatch.yml'
+      ),
+      'utf8'
+    );
+    const testJob =
+      workflow.split('\n  test:\n')[1]?.split('\n  commit:\n')[0] ?? '';
+    expect(testJob).toContain('hosted-test-plan');
+    expect(testJob).toContain(
+      'Run trusted selected unit tests with a structured report'
+    );
+    expect(testJob).not.toContain('hosted-test-evidence');
+    expect(testJob).toContain(
+      'unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY'
+    );
+    expect(testJob).not.toMatch(
+      /(?:GH_TOKEN|GITHUB_TOKEN|AI_GATEWAY_API_KEY|CURSOR_API_KEY):\s*\$\{\{\s*secrets\./
+    );
+    const testProofDir = '$RUNNER_TEMP/hosted-repair/test-proof';
+    const proofFiles = ['coverage-final.json', 'test-report.json'];
+    for (const file of proofFiles) {
+      expect(testJob).toContain(`${testProofDir}/${file}`);
+    }
+    const stagedFiles = [
+      ...testJob.matchAll(
+        /\$RUNNER_TEMP\/hosted-repair\/test-proof\/([\w.-]+\.json)/g
+      ),
+    ].map(match => match[1]);
+    expect([...new Set(stagedFiles)].sort()).toEqual(proofFiles);
+    const upload =
+      testJob.split('name: Upload raw test report and coverage')[1] ?? '';
+    expect(upload).toContain(
+      'path: ${{ runner.temp }}/hosted-repair/test-proof/*.json'
+    );
+    expect(upload).not.toContain('test-plan.json');
+
+    const commitJob = workflow.split('\n  commit:\n')[1] ?? '';
+    const download =
+      commitJob.split(
+        'name: Download raw test report and coverage artifact'
+      )[1] ?? '';
+    expect(download).toContain(
+      'path: ${{ runner.temp }}/hosted-repair/test-proof'
+    );
+    expect(
+      commitJob.indexOf('name: Create typed acceptance receipt')
+    ).toBeLessThan(
+      commitJob.indexOf('name: Generate Jovie-only short-lived writer token')
+    );
+    expect(commitJob).toContain('--verification-commit "$VERIFY_COMMIT"');
+    for (const job of [testJob, commitJob]) {
+      expect(job).toContain('hosted remediation verification tree');
+      expect(job).toContain("GIT_AUTHOR_DATE='@0 +0000'");
+      expect(job).toContain("GIT_COMMITTER_DATE='@0 +0000'");
+    }
+  });
+
+  it('limits the model patch to modified source files in the authenticated PR diff', () => {
+    const {
+      plan,
+      patchBytes,
+      changes,
+      acceptance,
+      testPlan,
+      coverageResult,
+      testReportBytes,
+      coverageBytes,
+    } = hostedFixture();
+    expect(() =>
+      buildHostedRepairPlan({
+        dispatch: dispatch({ writer: 'fx-hosted' }),
+        headRefName: 'codex/repair-proof',
+        baseSha: base,
+        changedFiles: [prFile('.github/workflows/ci.yml')],
+      })
     ).toThrow(
-      'entire PR diff must contain only admitted modified source paths'
+      'entire PR diff must contain only admitted modified sources and ordinary unit-test companions'
     );
     expect(() =>
       buildHostedRepairPlan({
         dispatch: dispatch({ writer: 'fx-hosted' }),
         headRefName: 'codex/repair-proof',
+        baseSha: base,
         changedFiles: [
-          { filename: 'apps/web/lib/proof.ts', status: 'modified' },
-          { filename: 'scripts/run-affected-tests.mjs', status: 'modified' },
+          prFile('apps/web/lib/proof.ts'),
+          prFile('scripts/run-affected-tests.mjs'),
         ],
       })
     ).toThrow(
-      'entire PR diff must contain only admitted modified source paths'
+      'entire PR diff must contain only admitted modified sources and ordinary unit-test companions'
     );
     expect(() =>
       buildHostedAcceptanceReceipt({
@@ -252,6 +843,16 @@ describe('hosted rolling CI repair policy', () => {
         patchBytes,
         changes: [{ ...changes[0], path: 'apps/web/lib/unrelated.ts' }],
         executor: acceptance.executor,
+        trustedTestPlan: testPlan,
+        testReportBytes,
+        coverageBytes,
+        workflowRunId: '7001',
+        workflowRunAttempt: 1,
+        patchArtifactId: '6001',
+        testArtifactId: '7002',
+        expectedTestCommitOid: testPlan.testCommitOid,
+        expectedTestTreeSha: testPlan.testTreeSha,
+        coverageResult,
         now: new Date('2026-08-29T20:01:00.000Z'),
       })
     ).toThrow('outside the exact PR diff');
@@ -259,6 +860,13 @@ describe('hosted rolling CI repair policy', () => {
 
   it('binds tested artifact bytes to an atomic expected-head update', () => {
     const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+    expect(acceptance).toMatchObject({
+      baseSha: base,
+      expectedHeadOid: head,
+      testCommitOid: 'e'.repeat(40),
+      testTreeSha: 'f'.repeat(40),
+      coverageApplicable: true,
+    });
     const variables = buildHostedCommitVariables({
       plan,
       acceptance,
@@ -288,6 +896,14 @@ describe('hosted rolling CI repair policy', () => {
         },
       })
     ).toThrow('immutable artifact hash mismatch');
+    expect(() =>
+      buildHostedCommitVariables({
+        plan,
+        acceptance: { ...acceptance, baseSha: head },
+        patchBytes,
+        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+      })
+    ).toThrow('acceptance-identity-mismatch');
   });
 
   it('performs one real failed-CI to atomic-repair transition', async () => {
