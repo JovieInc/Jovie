@@ -11,6 +11,18 @@ const OTHER_SHA = 'b'.repeat(40);
 const EVENT_PATH = '/runner/_work/_temp/event.json';
 const OUTPUT_PATH = '/runner/_work/_temp/output';
 
+/** @typedef {{full_name: string}} RepositoryFixture */
+/** @typedef {{id: number, workflow_id: number, name: string, event: string, conclusion: string, head_sha: string, repository: RepositoryFixture, head_repository: RepositoryFixture, pull_requests: unknown[]}} WorkflowRunFixture */
+/** @typedef {{action: string, repository: RepositoryFixture, sender: {login: string}, workflow_run: WorkflowRunFixture}} PayloadFixture */
+/** @typedef {{number: number, html_url: string, state: string, draft: boolean, user: {login: string}, base: {ref: string, repo: RepositoryFixture}, head: {sha: string, ref: string, repo: RepositoryFixture}, labels: Array<{name: string}>}} PullRequestFixture */
+/** @typedef {Partial<Omit<PullRequestFixture, 'labels'>> & {labels?: PullRequestFixture['labels'] | null}} PullRequestOverrides */
+/** @typedef {{id: number, name: string, path: string, state: string}} WorkflowFixture */
+/** @typedef {{payload?: PayloadFixture, rawPayload?: string, associated?: PullRequestFixture[] | null, associationLink?: string | null, workflow?: WorkflowFixture, workflowError?: boolean, associationError?: boolean, readError?: boolean, writeError?: boolean}} HarnessOptions */
+
+/**
+ * @param {Partial<PayloadFixture>} [overrides]
+ * @returns {PayloadFixture}
+ */
 function makePayload(overrides = {}) {
   return {
     action: 'completed',
@@ -31,6 +43,10 @@ function makePayload(overrides = {}) {
   };
 }
 
+/**
+ * @param {PullRequestOverrides} [overrides]
+ * @returns {PullRequestFixture}
+ */
 function makePullRequest(overrides = {}) {
   return {
     number: 42,
@@ -49,6 +65,7 @@ function makePullRequest(overrides = {}) {
   };
 }
 
+/** @param {HarnessOptions} [options] */
 function harness({
   payload = makePayload(),
   rawPayload,
@@ -107,6 +124,7 @@ function harness({
   return { resultPromise, writes, outputs, requests };
 }
 
+/** @param {HarnessOptions} options @param {string} reason */
 async function assertRejected(options, reason) {
   const h = harness(options);
   const result = await h.resultPromise;
@@ -165,12 +183,14 @@ test('rejects a same-name run from a different workflow ID before API reads', as
 });
 
 test('rejects another workflow name and non-success or non-pull-request events', async t => {
-  for (const [name, run] of [
+  /** @type {Array<[string, Partial<WorkflowRunFixture>]>} */
+  const changes = [
     ['wrong name', { name: 'CI Copy' }],
     ['failed CI', { conclusion: 'failure' }],
     ['push CI', { event: 'push' }],
     ['wrong SHA', { head_sha: OTHER_SHA }],
-  ]) {
+  ];
+  for (const [name, run] of changes) {
     await t.test(name, async () => {
       const payload = makePayload({
         workflow_run: { ...makePayload().workflow_run, ...run },
@@ -181,7 +201,8 @@ test('rejects another workflow name and non-success or non-pull-request events',
 });
 
 test('rejects events from another repository or a forked run head', async t => {
-  for (const [name, change, reason] of [
+  /** @type {Array<[string, Partial<PayloadFixture>, string]>} */
+  const cases = [
     [
       'foreign event repository',
       { repository: { full_name: 'someone/else' } },
@@ -207,7 +228,8 @@ test('rejects events from another repository or a forked run head', async t => {
       },
       'workflow-run-repository-mismatch',
     ],
-  ]) {
+  ];
+  for (const [name, change, reason] of cases) {
     await t.test(name, async () => {
       await assertRejected({ payload: makePayload(change) }, reason);
     });
@@ -215,7 +237,8 @@ test('rejects events from another repository or a forked run head', async t => {
 });
 
 test('verifies canonical CI workflow ID, name, path, and active state by API', async t => {
-  for (const workflow of [
+  /** @type {WorkflowFixture[]} */
+  const workflows = [
     { id: 1, name: 'CI', path: '.github/workflows/ci.yml', state: 'active' },
     {
       id: 178737329,
@@ -235,7 +258,8 @@ test('verifies canonical CI workflow ID, name, path, and active state by API', a
       path: '.github/workflows/ci.yml',
       state: 'disabled_manually',
     },
-  ]) {
+  ];
+  for (const workflow of workflows) {
     await t.test(JSON.stringify(workflow), async () => {
       const h = await assertRejected(
         { workflow },
@@ -252,6 +276,7 @@ test('verifies canonical CI workflow ID, name, path, and active state by API', a
 });
 
 test('rejects unavailable, incomplete, empty, or ambiguous PR associations', async t => {
+  /** @type {Array<[string, HarnessOptions, string]>} */
   const cases = [
     [
       'API unavailable',
@@ -276,11 +301,14 @@ test('rejects unavailable, incomplete, empty, or ambiguous PR associations', asy
     ],
   ];
   for (const [name, options, reason] of cases) {
-    await t.test(name, async () => assertRejected(options, reason));
+    await t.test(name, async () => {
+      await assertRejected(options, reason);
+    });
   }
 });
 
 test('requires the current open Dependabot main-branch head in the same repository', async t => {
+  /** @type {Array<[string, PullRequestOverrides, string]>} */
   const cases = [
     ['invalid PR number', { number: 0 }, 'pull-request-identity-invalid'],
     [
@@ -353,20 +381,27 @@ test('fails closed for malformed input, unavailable payload, and scratch-file er
       },
     ]);
   });
-  await t.test('unavailable event', async () =>
-    assertRejected({ readError: true }, 'workflow-run-payload-unavailable')
-  );
-  await t.test('invalid event JSON', async () =>
-    assertRejected({ rawPayload: '{' }, 'workflow-run-payload-unavailable')
-  );
-  await t.test('scratch event write', async () =>
-    assertRejected({ writeError: true }, 'event-adaptation-write-failed')
-  );
+  await t.test('unavailable event', async () => {
+    await assertRejected(
+      { readError: true },
+      'workflow-run-payload-unavailable'
+    );
+  });
+  await t.test('invalid event JSON', async () => {
+    await assertRejected(
+      { rawPayload: '{' },
+      'workflow-run-payload-unavailable'
+    );
+  });
+  await t.test('scratch event write', async () => {
+    await assertRejected({ writeError: true }, 'event-adaptation-write-failed');
+  });
 });
 
 test('uses the authenticated GitHub REST client when no request seam is supplied', async () => {
   const originalFetch = globalThis.fetch;
   const originalApiUrl = process.env.GITHUB_API_URL;
+  /** @type {Array<{url: string, init?: RequestInit}>} */
   const calls = [];
   const responses = [
     {
@@ -378,16 +413,9 @@ test('uses the authenticated GitHub REST client when no request seam is supplied
     [makePullRequest()],
   ];
   globalThis.fetch = async (url, init) => {
-    calls.push({ url, init });
+    calls.push({ url: String(url), init });
     const data = responses.shift();
-    return {
-      ok: true,
-      status: 200,
-      headers: { get: () => null },
-      async text() {
-        return JSON.stringify(data);
-      },
-    };
+    return new Response(JSON.stringify(data), { status: 200 });
   };
   process.env.GITHUB_API_URL = 'https://api.github.test/';
   try {
@@ -416,8 +444,14 @@ test('uses the authenticated GitHub REST client when no request seam is supplied
       calls[1].url,
       `https://api.github.test/repos/jovie/jovie/commits/${SHA}/pulls?per_page=100`
     );
-    assert.equal(calls[0].init.headers.Authorization, 'Bearer app-token');
-    assert.equal(calls[1].init.headers['X-GitHub-Api-Version'], '2022-11-28');
+    assert.equal(
+      new Headers(calls[0].init?.headers).get('Authorization'),
+      'Bearer app-token'
+    );
+    assert.equal(
+      new Headers(calls[1].init?.headers).get('X-GitHub-Api-Version'),
+      '2022-11-28'
+    );
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiUrl === undefined) delete process.env.GITHUB_API_URL;
@@ -430,24 +464,12 @@ test('fails closed when the authenticated REST client returns invalid JSON, HTTP
   const originalApiUrl = process.env.GITHUB_API_URL;
   process.env.GITHUB_API_URL = 'https://api.github.test';
   try {
-    for (const [name, fetchImpl] of [
-      [
-        'invalid JSON',
-        async () => ({
-          ok: true,
-          status: 200,
-          headers: { get: () => null },
-          text: async () => '{',
-        }),
-      ],
+    /** @type {Array<[string, typeof fetch]>} */
+    const failingFetches = [
+      ['invalid JSON', async () => new Response('{', { status: 200 })],
       [
         'HTTP error',
-        async () => ({
-          ok: false,
-          status: 403,
-          headers: { get: () => null },
-          text: async () => '{"message":"forbidden"}',
-        }),
+        async () => new Response('{"message":"forbidden"}', { status: 403 }),
       ],
       [
         'network error',
@@ -455,7 +477,8 @@ test('fails closed when the authenticated REST client returns invalid JSON, HTTP
           throw new Error('network unavailable');
         },
       ],
-    ]) {
+    ];
+    for (const [name, fetchImpl] of failingFetches) {
       await t.test(name, async () => {
         globalThis.fetch = fetchImpl;
         const outputs = [];

@@ -8,6 +8,10 @@ const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const CI_WORKFLOW_ID = 178737329;
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 
+/**
+ * @param {string} path
+ * @param {{token?: string, fetchImpl?: typeof fetch}} [options]
+ */
 async function githubRequest(path, { token, fetchImpl = fetch } = {}) {
   const apiUrl = (
     process.env.GITHUB_API_URL || 'https://api.github.com'
@@ -52,8 +56,9 @@ function writeResult(outputPath, appendFile, result) {
  * runner-only event file is rewritten; no PR code or artifacts are consumed.
  * @param {{eventPath?: string, repository?: string, expectedHead?: string,
  *   token?: string, outputPath?: string}} [options]
- * @param {{readFile?: typeof readFileSync, writeFile?: typeof writeFileSync,
- *   appendFile?: typeof appendFileSync,
+ * @param {{readFile?: (path: string, encoding: 'utf8') => string,
+ *   writeFile?: (path: string, data: string, encoding: 'utf8') => void,
+ *   appendFile?: (path: string, data: string, encoding: 'utf8') => void,
  *   request?: (path: string, options: {token: string}) => Promise<{data: unknown, link?: string|null}>}} [dependencies]
  */
 export async function adaptDependabotWorkflowRunEvent(
