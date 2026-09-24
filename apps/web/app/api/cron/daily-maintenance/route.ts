@@ -8,6 +8,7 @@
  * - Cleanup orphaned photos: every day
  * - Cleanup expired idempotency keys: every day
  * - Billing reconciliation: every day (safety net for webhooks)
+ * - LogYourBody MRR source read: every day (RevenueCat provider receipt)
  * - Cleanup SMS subscribe intents: every day (folded from standalone cron per JOV-1901)
  * - Waitlist auto-accept: every day when enabled
  * - Onboarding script self-improvement: every day (JOV-3806)
@@ -30,6 +31,7 @@ import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
+import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
@@ -104,6 +106,16 @@ export async function GET(request: Request) {
       };
     }
   );
+
+  // One provider read per day. A missing or stale source must remain visible
+  // as a failed measurement, never be promoted to a measured zero.
+  results.lybDailyMrr = await runSubJob('lybDailyMrr', async () => {
+    const record = await getLybDailyMrr();
+    if (record.state !== 'fresh') {
+      throw new Error(`LogYourBody MRR source ${record.state}`);
+    }
+    return record;
+  });
 
   // 4. Cleanup SMS subscribe intents (folded from standalone cron per JOV-1901)
   results.cleanupSmsIntents = await runSubJob(
