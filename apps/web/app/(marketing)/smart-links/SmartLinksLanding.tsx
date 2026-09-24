@@ -47,7 +47,10 @@ export function SmartLinksLanding() {
                   </Link>
                 </Button>
                 <Button asChild variant='secondary' size='md'>
-                  <Link href='/tim/never-say-a-word?noredirect=1'>
+                  <Link
+                    href='/tim/never-say-a-word?noredirect=1'
+                    prefetch={false}
+                  >
                     Open the live example
                   </Link>
                 </Button>
