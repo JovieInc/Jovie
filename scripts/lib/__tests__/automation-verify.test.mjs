@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAffectedTestPlan,
   buildCompanyRegistryTestCommand,
+  buildControlCoverageCommands,
   buildFullSuiteCommands,
   buildProjectCreationTestCommand,
   buildSelectedTestCommands,
@@ -1555,6 +1556,61 @@ describe('automation-verify affected scope', () => {
       'scripts/tests/test_gh_retry.py',
     ]);
     expect(plan.selectedTests).toEqual([]);
+  });
+
+  it('covers ownerless recovery policy and sweep behavior in that controller suite', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lib/ownerless-recovery-policy.mjs',
+    ]);
+    const commands = buildSelectedTestCommands(plan, '1');
+
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs'
+    );
+    expect(plan.scriptVitestCoverageArgs).toEqual([
+      '--coverage.enabled',
+      '--coverage.provider=v8',
+      '--coverage.include=lib/ownerless-recovery-policy.mjs',
+      '--coverage.include=ownerless-recovery-sweeper.mjs',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.statements=60',
+      '--coverage.thresholds.lines=65',
+      '--coverage.thresholds.branches=60',
+      '--coverage.thresholds.functions=50',
+    ]);
+    expect(commands).toHaveLength(2);
+    expect(commands[0][0]).toBe('pnpm');
+    expect(commands[0][1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=ownerless-recovery-sweeper.mjs',
+        '--coverage.include=lib/ownerless-recovery-policy.mjs',
+        '--coverage.thresholds.functions=50',
+      ])
+    );
+
+    const [nativeControl, ownerlessControl] = buildControlCoverageCommands();
+    const ownerlessTest = 'lib/__tests__/ownerless-recovery-policy.test.mjs';
+    expect(
+      [nativeControl, ownerlessControl]
+        .flatMap(([, args]) => args)
+        .filter(argument => argument === ownerlessTest)
+    ).toHaveLength(1);
+    expect(nativeControl[1]).not.toContain(ownerlessTest);
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+        '--coverage.include=run-affected-tests.mjs',
+      ])
+    );
+    expect(ownerlessControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/ownerless-recovery-policy.mjs',
+        '--coverage.include=ownerless-recovery-sweeper.mjs',
+        '--coverage.thresholds.statements=60',
+      ])
+    );
   });
 
   it('keeps the merge-group admission diff on its runtime and workflow contracts', () => {

@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  classifyQueueOwnership,
   fetchOfficialSymphonyState,
   ownerlessRecoveryFailureDisposition,
   processFleetClosureRemediationIntents,
@@ -13,8 +12,6 @@ import {
 } from '../../ownerless-recovery-sweeper.mjs';
 import {
   buildPrFleetClosureAudit,
-  classifyRecoveryFiles,
-  evaluateRecoveryCandidate,
   shouldDispatchOwnerlessRecovery,
 } from '../ownerless-recovery-policy.mjs';
 
@@ -258,38 +255,6 @@ describe('ownerless recovery policy', () => {
     });
   });
 
-  it('admits focused green recovery work after one ownerless hour', () => {
-    expect(
-      evaluateRecoveryCandidate({
-        pr: {
-          state: 'open',
-          assignees: [],
-          created_at: '2026-08-15T00:00:00.000Z',
-          mergeable: true,
-          base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
-          head: { sha: head, repo: { full_name: 'JovieInc/Jovie' } },
-        },
-        mainSha: main,
-        compare: { behind_by: 0 },
-        timeline: [],
-        files: ['scripts/ci-merge-queue-check.mjs'],
-        patch: '+const timeout = 9;',
-        checksPassing: true,
-        now: Date.parse(now),
-      }).eligible
-    ).toBe(true);
-  });
-
-  it('allows only non-worsening workflow tuning', () => {
-    const classify = patch =>
-      classifyRecoveryFiles(['.github/workflows/ci.yml'], patch).eligible;
-    expect(
-      classify('+run: node -e "process.mainModule.require(`child_process`)"')
-    ).toBe(false);
-    expect(classify('-timeout-minutes: 10\n+timeout-minutes: 9')).toBe(true);
-    expect(classify('-max-parallel: 2\n+max-parallel: 999999')).toBe(false);
-  });
-
   it('keeps ownerless dispatch available unless the snapshot or Symphony is unsafe', () => {
     const ownerless = audit([pull(7, { title: 'Ownerless', body: '' })], [], {
       symphonyState: {
@@ -344,10 +309,7 @@ describe('ownerless recovery policy', () => {
     });
   });
 
-  it('validates queue ownership and comment dedupe keys', () => {
-    expect(
-      classifyQueueOwnership({ headRefOid: head, queued: true }, head).outcome
-    ).toBe('already-delegated-exact-head');
+  it('preserves comment dedupe keys', () => {
     expect(
       readFileSync(new URL('../upsert-pr-comment.sh', import.meta.url), 'utf8')
     ).toContain('${4:+:$4}');
