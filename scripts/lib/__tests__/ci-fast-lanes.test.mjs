@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LANE_COMMANDS,
@@ -7,6 +11,50 @@ import {
 
 const SCREENSHOT_CATALOG_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+describe('CI control selector', () => {
+  it('includes the structural execution regressions in the actual control command', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-ci-control-selector-'));
+    const capture = join(directory, 'commands');
+    try {
+      writeFileSync(join(directory, 'node'), '#!/bin/sh\nexit 0\n', {
+        mode: 0o755,
+      });
+      writeFileSync(
+        join(directory, 'pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$JOVIE_CI_CAPTURE"\n',
+        { mode: 0o755 }
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [join(REPO_ROOT, 'scripts/run-affected-tests.mjs'), '--control'],
+        {
+          cwd: REPO_ROOT,
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            JOVIE_CI_CAPTURE: capture,
+          },
+          encoding: 'utf8',
+          timeout: 10_000,
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const scriptCommand = readFileSync(capture, 'utf8')
+        .split('\n')
+        .find(command => command.startsWith('exec vitest --root scripts '));
+      expect(scriptCommand).toBeDefined();
+      expect(scriptCommand.split(' ')).toContain(
+        'lib/__tests__/ci-fast-lanes.test.mjs'
+      );
+      expect(scriptCommand).toContain('--coverage');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('runDesignConformance', () => {
   const originalEventName = process.env.GITHUB_EVENT_NAME;
