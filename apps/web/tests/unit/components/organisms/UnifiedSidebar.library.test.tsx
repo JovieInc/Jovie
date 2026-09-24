@@ -233,7 +233,7 @@ describe('UnifiedSidebar library route', () => {
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
     // Runtime updates moved from the sidebar to the central Inbox
-    // (RuntimeUpdateProvider + SidebarInboxButton); the notification region
+    // (RuntimeUpdateProvider + the DashboardNav Inbox bell); the notification region
     // and its pill are gone from the sidebar content.
     electronRuntimeMock.isElectronRuntime = false;
     renderUnifiedSidebar({

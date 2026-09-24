@@ -6,8 +6,9 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
+import { APP_ROUTES } from '@/constants/routes';
+import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
 import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
-import { SidebarInboxButton } from './SidebarInboxButton';
 
 const state = vi.hoisted(() => ({
   desktop: true,
@@ -33,7 +34,6 @@ vi.mock('@/lib/hooks/useVersionMonitor', () => ({
 function Surface({ inbox = true }: { inbox?: boolean }) {
   return (
     <RuntimeUpdateProvider>
-      <SidebarInboxButton availability={{ state: 'empty', pendingCount: 0 }} />
       {inbox ? <InboxRuntimeNotification /> : null}
     </RuntimeUpdateProvider>
   );
@@ -49,6 +49,19 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe('updates in the central Inbox', () => {
+  it('shows runtime attention on the canonical shell Inbox bell', () => {
+    state.available = true;
+    state.downloaded = true;
+    const { getByRole } = renderDashboardNav({
+      renderFn: ui =>
+        render(<RuntimeUpdateProvider>{ui}</RuntimeUpdateProvider>),
+      overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
+    });
+    expect(
+      getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+  });
+
   it('does not show a notification without a real update', () => {
     render(<Surface />);
     expect(
@@ -59,9 +72,6 @@ describe('updates in the central Inbox', () => {
     state.available = true;
     state.downloaded = true;
     const { rerender } = render(<Surface inbox={false} />);
-    expect(
-      screen.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', '/app');
     rerender(<Surface />);
     expect(state.install).not.toHaveBeenCalled();
     fireEvent.click(
@@ -104,9 +114,6 @@ describe('updates in the central Inbox', () => {
     ).toHaveAccessibleDescription(
       'New Version Available (v26.9.1). Reload when ready.'
     );
-    expect(
-      screen.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', '/app');
   });
   it('reloads a browser update only after its explicit action', () => {
     const reload = vi.fn();
