@@ -273,6 +273,7 @@ export async function hydrateOpenPrStatusContexts({
   request,
   includeStatuses = _pr => true,
   batchSize = 40,
+  requireStatusContexts = false,
 }) {
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 50) {
     throw new Error('status hydration batchSize must be between 1 and 50');
@@ -299,6 +300,13 @@ export async function hydrateOpenPrStatusContexts({
       .join(' ');
     const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`;
     const response = await request({ owner, name, query });
+    if (
+      requireStatusContexts &&
+      response?.errors !== undefined &&
+      (!Array.isArray(response.errors) || response.errors.length > 0)
+    ) {
+      throw new Error('GraphQL statuses omitted complete capacity evidence');
+    }
     const repository = response?.data?.repository;
     if (!repository || typeof repository !== 'object') {
       throw new Error('GraphQL commit-status batch omitted repository data');
@@ -308,6 +316,15 @@ export async function hydrateOpenPrStatusContexts({
       if (!commit || commit.oid !== pr.headRefOid) {
         throw new Error(
           `GraphQL statuses for PR #${pr.number} omitted the exact head`
+        );
+      }
+      if (
+        requireStatusContexts &&
+        (!Object.hasOwn(commit, 'status') ||
+          (commit.status !== null && !Array.isArray(commit.status?.contexts)))
+      ) {
+        throw new Error(
+          `GraphQL statuses for PR #${pr.number} omitted complete capacity evidence`
         );
       }
       const contexts = commit.status?.contexts ?? [];

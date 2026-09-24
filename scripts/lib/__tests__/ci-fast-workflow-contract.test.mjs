@@ -1144,6 +1144,32 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('selects the existing control lane for conflict event entrypoint and proof edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .join('');
+    for (const path of [
+      'scripts/pr-conflict-handler.mjs',
+      'scripts/lib/pr-conflict-handler.mjs',
+      'scripts/lib/pr-conflict-event.mjs',
+      'scripts/lib/github-open-prs-rest.mjs',
+      'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+      'scripts/lib/__tests__/pr-conflict-event.test.mjs',
+      'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+  });
+
   it('runs native queue delivery regressions with coverage for executor changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

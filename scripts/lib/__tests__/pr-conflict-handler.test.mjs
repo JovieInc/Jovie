@@ -1738,8 +1738,10 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     );
   });
 
-  it('preserves native auto-merge without a ready-for-review or dequeue side flight', () => {
-    expect(WORKFLOW).not.toMatch(/types:\s*\[[^\]]*ready_for_review[^\]]*\]/u);
+  it('preserves native auto-merge without a ready mutation or dequeue side flight', () => {
+    expect(WORKFLOW).toMatch(
+      /pull_request_target:\s+types: \[opened, reopened, synchronize\]/u
+    );
     expect(WORKFLOW).not.toMatch(/\bgh\s+pr\s+ready\b/u);
     expect(WORKFLOW).not.toContain('dequeuePullRequest');
     expect(WORKFLOW).not.toContain('disablePullRequestAutoMerge');
@@ -1756,6 +1758,6 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     ).toHaveLength(4);
     expect(
       WORKFLOW.match(/GH_TOKEN="\$GH_QUEUE_TOKEN" gh api graphql/gu)
-    ).toHaveLength(6);
+    ).toHaveLength(7); // Includes the exact-PR queue read before an FX claim.
   });
 });

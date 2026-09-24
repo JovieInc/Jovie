@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
   annotateNativeMergeQueue,
@@ -10,8 +11,14 @@ import {
   fetchCompleteOpenPrSummariesRest,
   hydrateOpenPrGraphqlMetadata,
   hydrateOpenPrStatusContexts,
+  normalizeRestPullRequest,
 } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
+import {
+  matchesHydratedConflictPr,
+  matchesRawConflictPr,
+  parseConflictEvent,
+} from './lib/pr-conflict-event.mjs';
 import {
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
@@ -39,6 +46,7 @@ function parseArgs(argv) {
     queuedCi: 0,
     cohortId: process.env.GITHUB_RUN_ID ?? 'local',
     planFile: '',
+    eventPayloadFile: '',
     historyIssue: 16794,
   };
 
@@ -69,6 +77,15 @@ function parseArgs(argv) {
         break;
       case '--plan-file':
         options.planFile = argv[++index];
+        break;
+      case '--event-payload-file':
+        options.eventPayloadFile = argv[++index];
+        if (
+          !options.eventPayloadFile ||
+          options.eventPayloadFile.startsWith('--')
+        ) {
+          throw new Error('--event-payload-file requires a path');
+        }
         break;
       case '--history-issue':
         options.historyIssue = Number.parseInt(argv[++index], 10);
@@ -145,6 +162,7 @@ Options:
   --queued-ci N                Current queued Actions runs (default: 0)
   --cohort-id ID               Durable cohort identifier (default: GITHUB_RUN_ID)
   --plan-file PATH             Write the machine-readable plan to PATH
+  --event-payload-file PATH    Scope this run to one authenticated PR event
   --history-issue N            Durable cohort ledger issue (default: 16794)
   --required-checks a,b,c      Required aggregate checks to use for BLOCKED classification
   --blocked-label NAME         Label for failing required checks (default: needs-ci-fix)
@@ -214,9 +232,12 @@ async function ghJson(args, { retries = 3, token } = {}) {
   throw new Error('unreachable');
 }
 
-async function fetchOpenPrs(options) {
+async function fetchOpenPrs(
+  options,
+  { ghRequest = ghJson, forCapacity = false } = {}
+) {
   const request = ({ owner, name, query }) =>
-    ghJson([
+    ghRequest([
       'api',
       'graphql',
       '-f',
@@ -226,7 +247,8 @@ async function fetchOpenPrs(options) {
       '-F',
       `name=${name}`,
     ]);
-  const restRequest = endpoint => ghJson(['api', '--method', 'GET', endpoint]);
+  const restRequest = endpoint =>
+    ghRequest(['api', '--method', 'GET', endpoint]);
   // Enumerate with REST so fleet size and large PR bodies cannot turn one
   // generated `gh pr list` GraphQL connection into a controller-wide 502.
   // REST omits mergeability and diff totals, so hydrate those exact-identity
@@ -242,15 +264,23 @@ async function fetchOpenPrs(options) {
     request,
     batchSize: 25,
   });
-  const [owner, name] = options.repo.split('/');
   const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
     prs: liveMetadata,
     request,
     includeStatuses: pr =>
-      pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY',
+      forCapacity ||
+      pr.mergeable === 'CONFLICTING' ||
+      pr.mergeStateStatus === 'DIRTY',
     batchSize: 40,
+    requireStatusContexts: forCapacity,
   });
+  if (!forCapacity) await annotateQueue(prs, options, ghRequest);
+  return { prs, degradedChecks: true };
+}
+
+async function annotateQueue(prs, options, request = ghJson) {
+  const [owner, name] = options.repo.split('/');
   const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
   const queuePositions = await fetchNativeMergeQueue({
     branches: prs.map(pr => pr.baseRefName),
@@ -270,15 +300,84 @@ async function fetchOpenPrs(options) {
         `first=${pageSize}`,
       ];
       if (cursor !== null) args.push('-F', `cursor=${cursor}`);
-      return ghJson(args, { token: queueToken });
+      return request(args, { token: queueToken });
     },
   });
   annotateNativeMergeQueue(prs, queuePositions);
-  return { prs, degradedChecks: true };
 }
 
-async function fetchCohortHistory(options) {
-  const pages = await ghJson([
+async function fetchEventPr(options, scope, request = ghJson) {
+  const restRequest = endpoint => request(['api', '--method', 'GET', endpoint]);
+  const graphqlRequest = ({ owner, name, query }) =>
+    request([
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${owner}`,
+      '-F',
+      `name=${name}`,
+    ]);
+  let detail;
+  // GitHub can initially report UNKNOWN mergeability. Only reread this exact
+  // PR; a still-unknown result is a typed nonaction, never a fleet fallback.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    detail = await restRequest(`repos/${options.repo}/pulls/${scope.number}`);
+    if (!matchesRawConflictPr(scope, detail)) {
+      return { prs: [], nonAction: 'event_live_identity_or_hold_changed' };
+    }
+    if (
+      typeof detail.mergeable === 'boolean' &&
+      typeof detail.mergeable_state === 'string' &&
+      detail.mergeable_state.toLowerCase() !== 'unknown'
+    )
+      break;
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  if (
+    typeof detail.mergeable !== 'boolean' ||
+    typeof detail.mergeable_state !== 'string' ||
+    detail.mergeable_state.toLowerCase() === 'unknown'
+  ) {
+    return { prs: [], nonAction: 'mergeability_unknown_after_exact_reread' };
+  }
+  const normalized = normalizeRestPullRequest(detail, []);
+  const [hydrated] = await hydrateOpenPrGraphqlMetadata({
+    repo: options.repo,
+    prs: [normalized],
+    request: graphqlRequest,
+  });
+  if (!matchesHydratedConflictPr(scope, hydrated)) {
+    return { prs: [], nonAction: 'hydrated_event_identity_or_hold_changed' };
+  }
+  if (
+    hydrated.mergeable !== 'CONFLICTING' &&
+    hydrated.mergeStateStatus !== 'DIRTY'
+  ) {
+    return { prs: [], nonAction: 'event_pr_not_dirty' };
+  }
+  const [pr] = await hydrateOpenPrStatusContexts({
+    repo: options.repo,
+    prs: [hydrated],
+    request: graphqlRequest,
+  });
+  if (!matchesHydratedConflictPr(scope, pr)) {
+    return { prs: [], nonAction: 'status_event_identity_or_hold_changed' };
+  }
+  await annotateQueue([pr], options, request);
+  if (pr.isInMergeQueue !== false) {
+    return { prs: [], nonAction: 'event_pr_in_native_queue' };
+  }
+  return { prs: [pr], nonAction: null };
+}
+
+async function fetchCohortHistory(
+  options,
+  request = ghJson,
+  requireComplete = false
+) {
+  const pages = await request([
     'api',
     '--method',
     'GET',
@@ -286,6 +385,16 @@ async function fetchCohortHistory(options) {
     '--slurp',
     `repos/${options.repo}/issues/${options.historyIssue}/comments?per_page=100`,
   ]);
+  if (
+    requireComplete &&
+    (!Array.isArray(pages) ||
+      pages.length === 0 ||
+      pages.some(page => !Array.isArray(page)))
+  ) {
+    throw new Error(
+      'cohort history pagination omitted complete capacity evidence'
+    );
+  }
   const comments = Array.isArray(pages) ? pages.flat() : [];
   return parseConflictFxCohortComments(comments);
 }
@@ -313,6 +422,9 @@ async function executePlan(plan, options) {
   const mutableItems = plan.items.filter(
     item => item.action === 'request_github_rebase'
   );
+  if (options.eventPayloadFile && mutableItems.length > 0) {
+    throw new Error('exact-PR event runs cannot request a GitHub rebase');
+  }
   if (mutableItems.length === 0) return [];
 
   return withMutationToken(async () => {
@@ -350,13 +462,76 @@ async function executePlan(plan, options) {
   });
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const [{ prs, degradedChecks }, cohortHistory] = await Promise.all([
-    fetchOpenPrs(options),
-    fetchCohortHistory(options),
-  ]);
-  options.cohortHistory = cohortHistory;
+export async function main(
+  argv = process.argv.slice(2),
+  { request = ghJson } = {}
+) {
+  const options = parseArgs(argv);
+  if (
+    process.env.GITHUB_EVENT_NAME === 'pull_request_target' &&
+    !options.eventPayloadFile
+  ) {
+    throw new Error('pull_request_target requires --event-payload-file');
+  }
+  let prs;
+  let degradedChecks = false;
+  let nonAction = null;
+  let eventScope = null;
+  if (options.eventPayloadFile) {
+    let payload;
+    try {
+      payload = JSON.parse(readFileSync(options.eventPayloadFile, 'utf8'));
+    } catch {
+      payload = null;
+    }
+    eventScope = parseConflictEvent(payload, options.repo);
+    if (eventScope) {
+      ({ prs, nonAction } = await fetchEventPr(options, eventScope, request));
+      degradedChecks = true;
+      if (prs.length === 1) {
+        const [inventory, history] = await Promise.all([
+          fetchOpenPrs(options, { ghRequest: request, forCapacity: true }),
+          fetchCohortHistory(options, request, true),
+        ]);
+        const observedTarget = inventory.prs.find(
+          pr => pr.number === eventScope.number
+        );
+        if (!matchesHydratedConflictPr(eventScope, observedTarget)) {
+          prs = [];
+          nonAction = 'capacity_inventory_event_identity_changed';
+        } else if (
+          observedTarget.mergeable !== 'CONFLICTING' &&
+          observedTarget.mergeStateStatus !== 'DIRTY'
+        ) {
+          prs = [];
+          nonAction = 'capacity_inventory_event_not_dirty';
+        } else {
+          await annotateQueue([observedTarget], options, request);
+          if (observedTarget.isInMergeQueue !== false) {
+            prs = [];
+            nonAction = 'capacity_inventory_event_in_native_queue';
+          } else {
+            prs = [observedTarget];
+          }
+        }
+        options.capacityPrs = inventory.prs.filter(
+          pr => pr.number !== eventScope.number
+        );
+        options.cohortHistory = history;
+      }
+    } else {
+      prs = [];
+      nonAction = 'invalid_or_unsupported_event';
+    }
+    options.cohortHistory ??= [];
+  } else {
+    const [inventory, cohortHistory] = await Promise.all([
+      fetchOpenPrs(options),
+      fetchCohortHistory(options),
+    ]);
+    ({ prs, degradedChecks } = inventory);
+    options.cohortHistory = cohortHistory;
+  }
   if (degradedChecks) {
     // Without check rollups, "required check missing" is indistinguishable
     // from "not fetched" — drop required-check-based BLOCKED classification
@@ -367,6 +542,33 @@ async function main() {
     );
   }
   const plan = buildPlan(prs, options);
+  if (options.eventPayloadFile) {
+    plan.eventNonAction = nonAction;
+    plan.eventScope = eventScope;
+    const matrices = [...plan.fxMatrix, ...plan.exceptionMatrix];
+    if (
+      plan.items.length > 1 ||
+      plan.items.some(
+        item =>
+          item.state !== 'DIRTY' ||
+          item.number !== eventScope?.number ||
+          item.pr.headRefOid !== eventScope.head ||
+          item.pr.baseRefOid !== eventScope.base ||
+          item.pr.headRefName !== eventScope.headRef ||
+          item.pr.baseRefName !== eventScope.baseRef
+      ) ||
+      matrices.some(
+        item =>
+          item.prNumber !== eventScope?.number ||
+          item.headRefOid !== eventScope.head ||
+          item.baseRefOid !== eventScope.base ||
+          item.headRefName !== eventScope.headRef ||
+          item.baseRefName !== eventScope.baseRef
+      )
+    ) {
+      throw new Error('exact-PR event plan escaped its DIRTY identity scope');
+    }
+  }
 
   if (options.planFile) {
     writeFileSync(options.planFile, `${JSON.stringify(plan, null, 2)}\n`, {
@@ -388,13 +590,15 @@ async function main() {
   requireSuccessfulMutationResults(results);
 }
 
-main().catch(error => {
-  console.error(error);
-  // Surface subprocess stderr — `console.error(error)` alone hides the gh
-  // CLI's actual failure reason, which made the 100%-failing-runs incident
-  // (#13347) undiagnosable from the Actions UI.
-  if (error?.stderr) {
-    console.error(`stderr: ${String(error.stderr).slice(0, 4000)}`);
-  }
-  process.exitCode = 1;
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    console.error(error);
+    // Surface subprocess stderr — `console.error(error)` alone hides the gh
+    // CLI's actual failure reason, which made the 100%-failing-runs incident
+    // (#13347) undiagnosable from the Actions UI.
+    if (error?.stderr) {
+      console.error(`stderr: ${String(error.stderr).slice(0, 4000)}`);
+    }
+    process.exitCode = 1;
+  });
+}

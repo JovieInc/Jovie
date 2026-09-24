@@ -7,12 +7,56 @@ import {
   buildAffectedTestPlan,
   buildCompanyRegistryTestCommand,
   buildControlCoverageCommands,
+  buildControlTestCommands,
   buildFullSuiteCommands,
   buildProjectCreationTestCommand,
   buildSelectedTestCommands,
   buildVerificationEnv,
   runCommandStatus,
+  runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+
+describe('structural control stage execution', () => {
+  it('runs registry, project, native and ownerless coverage, CLI coverage, and web sequentially', async () => {
+    const stages = buildControlTestCommands();
+    expect(stages).toHaveLength(6);
+    expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
+    expect(stages[1]).toEqual(buildProjectCreationTestCommand());
+    expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
+    expect(stages[2][1]).toContain(
+      '--coverage.include=lib/pr-conflict-event.mjs'
+    );
+    expect(stages[3][1]).toContain(
+      '--coverage.include=lib/ownerless-recovery-policy.mjs'
+    );
+    expect(stages[4][1]).toContain(
+      '--coverage.include=pr-conflict-handler.mjs'
+    );
+    expect(stages[5][1]).toContain('@jovie/web');
+    const visited = [];
+    expect(
+      await runControlTestCommands(async (command, args) => {
+        visited.push([command, args]);
+        return 0;
+      })
+    ).toBe(0);
+    expect(visited).toEqual(stages);
+  });
+
+  it('propagates each failed stage and never starts its successor', async () => {
+    for (const failedStage of [0, 1, 2, 3, 4, 5]) {
+      const visited = [];
+      const status = await runControlTestCommands(async (command, args) => {
+        visited.push([command, args]);
+        return visited.length - 1 === failedStage ? 7 : 0;
+      });
+      expect(status).toBe(7);
+      expect(visited).toEqual(
+        buildControlTestCommands().slice(0, failedStage + 1)
+      );
+    }
+  });
+});
 
 const runner = readFileSync(
   resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
@@ -91,12 +135,10 @@ describe('Summer commissioning affected-test lane', () => {
         'scripts/summer-commissioning/company-registry.test.mjs',
       ],
     ]);
-    expect(runner).toMatch(
-      /const companyStatus = await runCommandStatus\(\s*\.\.\.buildCompanyRegistryTestCommand\(\)\s*\);/
+    expect(buildControlTestCommands()[0]).toEqual(
+      buildCompanyRegistryTestCommand()
     );
-    expect(runner).toContain(
-      'if (companyStatus !== 0) process.exit(companyStatus);'
-    );
+    expect(runner).toContain('process.exit(await runControlTestCommands());');
   });
 
   it('fails closed to the full suite when commissioning changes mix scopes', () => {
@@ -132,12 +174,10 @@ describe('Summer commissioning affected-test lane', () => {
       expect(commands[2][1]).not.toContain(
         'scripts/summer-commissioning/project-creation-policy.test.mjs'
       );
-      expect(runner).toMatch(
-        /const projectStatus = await runCommandStatus\(\s*\.\.\.buildProjectCreationTestCommand\(\)\s*\);/
+      expect(buildControlTestCommands()[1]).toEqual(
+        buildProjectCreationTestCommand()
       );
-      expect(runner).toContain(
-        'if (projectStatus !== 0) process.exit(projectStatus);'
-      );
+      expect(runner).toContain('process.exit(await runControlTestCommands());');
     }
   );
 });
@@ -783,6 +823,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+        'scripts/lib/__tests__/pr-conflict-event.test.mjs',
         'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
         'scripts/lib/__tests__/github-merge-queue.test.mjs',
         'scripts/lib/__tests__/ci-fast-lanes.test.mjs',

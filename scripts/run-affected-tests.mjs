@@ -313,6 +313,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/pr-conflict-event.test.mjs',
   'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
   'scripts/lib/__tests__/github-merge-queue.test.mjs',
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
@@ -2504,6 +2505,9 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/github-open-prs-rest.mjs',
+    '--coverage.include=lib/pr-conflict-event.mjs',
+    '--coverage.include=lib/pr-conflict-handler.mjs',
     '--coverage.thresholds.perFile=true',
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',
@@ -2692,31 +2696,60 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   ];
 }
 
+export function buildControlTestCommands() {
+  return [
+    buildCompanyRegistryTestCommand(),
+    buildProjectCreationTestCommand(),
+    ...buildControlCoverageCommands(),
+    // The event test also executes the CLI entrypoint in-process. Its broad
+    // manual fleet path predates this slice, so enforce the measured CLI
+    // subset separately from the new event validator's per-file 85/75/82 gate.
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/pr-conflict-event.test.mjs',
+        '--coverage',
+        '--coverage.include=pr-conflict-handler.mjs',
+        '--coverage.thresholds.lines=55',
+        '--coverage.thresholds.branches=60',
+        '--coverage.thresholds.functions=65',
+      ],
+    ],
+    [
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
+        '--maxWorkers',
+        '1',
+      ],
+    ],
+  ];
+}
+
+export async function runControlTestCommands(execute = runCommandStatus) {
+  for (const [command, args] of buildControlTestCommands()) {
+    const status = await execute(command, args);
+    if (status !== 0) return status;
+  }
+  return 0;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
-    const companyStatus = await runCommandStatus(
-      ...buildCompanyRegistryTestCommand()
-    );
-    if (companyStatus !== 0) process.exit(companyStatus);
-    const projectStatus = await runCommandStatus(
-      ...buildProjectCreationTestCommand()
-    );
-    if (projectStatus !== 0) process.exit(projectStatus);
-    const [nativeCoverage, ownerlessCoverage] = buildControlCoverageCommands();
-    const nativeCoverageStatus = await runCommandStatus(...nativeCoverage);
-    if (nativeCoverageStatus !== 0) process.exit(nativeCoverageStatus);
-    await runCommand(...ownerlessCoverage);
-    await runCommand('pnpm', [
-      '--filter',
-      '@jovie/web',
-      'exec',
-      'vitest',
-      'run',
-      ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
-      '--maxWorkers',
-      '1',
-    ]);
+    process.exit(await runControlTestCommands());
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
