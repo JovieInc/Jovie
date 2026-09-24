@@ -15,6 +15,12 @@ describe('Summer immutable deployment origin', () => {
   it('keeps an unconfigured integration optional', () => {
     expect(schema.parse(undefined)).toBeUndefined();
   });
+  it('keeps the eve-shadow bypass secret optional and distinct from the origin', () => {
+    const secret =
+      ServerEnvSchema.shape.OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET;
+    expect(secret.parse(undefined)).toBeUndefined();
+    expect(secret.parse('eve-shadow-secret')).toBe('eve-shadow-secret');
+  });
   it.each([
     'http://summer-operations-abc123-jovie.vercel.app',
     'https://summer-operations-abc123-other.vercel.app',

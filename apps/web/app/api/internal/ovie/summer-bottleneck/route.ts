@@ -8,7 +8,11 @@ import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
 import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
-import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
+import {
+  eveShadowTransportHeaders,
+  getEveShadowOrigin,
+  InvalidEveProtectionBypassSecretError,
+} from '@/lib/ovie/summer-shadow-client';
 import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
 import { logger } from '@/lib/utils/logger';
 
@@ -377,14 +381,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
   }
 
+  let transportHeaders: Record<string, string>;
+  try {
+    transportHeaders = eveShadowTransportHeaders(oidcToken);
+  } catch (error) {
+    if (error instanceof InvalidEveProtectionBypassSecretError) {
+      logger.error(
+        '[ovie-summer-bottleneck] Eve protection bypass secret is invalid'
+      );
+      return json({ ok: false, code: 'eve_protection_bypass_invalid' }, 503);
+    }
+    throw error;
+  }
+
   let upstream: Response;
   try {
     // No retry: an uncertain submission is resolved by Eve's immutable event ID.
     upstream = await boundedFetch(destination, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${oidcToken}`,
-        'x-vercel-trusted-oidc-idp-token': oidcToken,
+        ...transportHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),

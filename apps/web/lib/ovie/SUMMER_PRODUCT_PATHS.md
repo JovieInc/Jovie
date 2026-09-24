@@ -10,7 +10,13 @@ The bridge reuses `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` through
 `getEveShadowOrigin`, including the existing exact-deployment allowlist. Missing
 or invalid configuration fails before signing or obtaining OIDC credentials.
 The request includes both the bearer token and
-`x-vercel-trusted-oidc-idp-token`, disallows redirects, and makes one attempt.
+`x-vercel-trusted-oidc-idp-token`. When
+`OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET` is set, that value is also sent
+as `x-vercel-protection-bypass` to the same immutable origin. The secret
+belongs to the eve-shadow Vercel project, not Jovie's
+`VERCEL_AUTOMATION_BYPASS_SECRET`. The bridge does not set
+`x-vercel-set-bypass-cookie` and does not place the secret in the URL. It
+disallows redirects and makes one attempt.
 An uncertain network result does not establish delivery and is never retried
 inside this bridge.
 

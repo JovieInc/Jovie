@@ -2,7 +2,11 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
+import {
+  eveShadowTransportHeaders,
+  getEveShadowOrigin,
+  InvalidEveProtectionBypassSecretError,
+} from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -35,6 +39,12 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
     status,
     headers: NO_STORE_HEADERS,
   });
+}
+
+function protectionBypassRejection(error: unknown): NextResponse | null {
+  if (!(error instanceof InvalidEveProtectionBypassSecretError)) return null;
+  logger.error('[ovie-summer-shadow] Eve protection bypass secret is invalid');
+  return json({ ok: false, code: 'eve_protection_bypass_invalid' }, 503);
 }
 
 async function readInput(request: Request): Promise<unknown> {
@@ -87,6 +97,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
 
+  let transportHeaders: Record<string, string>;
+  try {
+    transportHeaders = eveShadowTransportHeaders(oidcToken);
+  } catch (error) {
+    const rejection = protectionBypassRejection(error);
+    if (rejection) return rejection;
+    throw error;
+  }
+
   let upstream: Response;
   try {
     // Do not retry an uncertain submission. The caller can inspect the Eve
@@ -96,7 +115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       {
         method: 'POST',
         headers: {
-          authorization: `Bearer ${oidcToken}`,
+          ...transportHeaders,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
@@ -188,6 +207,15 @@ export async function GET(request: Request): Promise<Response> {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
 
+  let transportHeaders: Record<string, string>;
+  try {
+    transportHeaders = eveShadowTransportHeaders(oidcToken);
+  } catch (error) {
+    const rejection = protectionBypassRejection(error);
+    if (rejection) return rejection;
+    throw error;
+  }
+
   let upstream: Response;
   try {
     const upstreamUrl = new URL(
@@ -201,7 +229,7 @@ export async function GET(request: Request): Promise<Response> {
       upstreamUrl.searchParams.set('startIndex', String(startIndex));
     }
     upstream = await fetch(upstreamUrl, {
-      headers: { authorization: `Bearer ${oidcToken}` },
+      headers: transportHeaders,
       signal: AbortSignal.timeout(20_000),
     });
   } catch {

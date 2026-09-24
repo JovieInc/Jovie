@@ -113,9 +113,12 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       method: 'POST',
       headers: {
         authorization: 'Bearer test-vercel-oidc-token',
+        'x-vercel-trusted-oidc-idp-token': 'test-vercel-oidc-token',
         'content-type': 'application/json',
       },
     });
+    expect(init?.headers).not.toHaveProperty('x-vercel-protection-bypass');
+    expect(init?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
     expect(JSON.parse(String(init?.body))).toMatchObject({
       schema: 'jovie.ovie-summer-shadow.event/v1',
       eventId: validEvent.eventId,
@@ -125,6 +128,69 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       message: validEvent.message,
       evidence: [],
     });
+  });
+
+  it('attaches the eve-shadow bypass secret on POST and GET without a cookie', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'eve-shadow-secret');
+    vi.stubEnv('VERCEL_AUTOMATION_BYPASS_SECRET', 'jovie-project-secret');
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ ok: true, eventId: validEvent.eventId, sessionId: 'ses' })
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    expect((await POST(request(validEvent))).status).toBe(202);
+    const [postUrl, postInit] = fetch.mock.calls[0] as Parameters<
+      typeof globalThis.fetch
+    >;
+    expect(String(postUrl)).not.toContain('eve-shadow-secret');
+    expect(postInit?.headers).toMatchObject({
+      'x-vercel-protection-bypass': 'eve-shadow-secret',
+      'x-vercel-trusted-oidc-idp-token': 'test-vercel-oidc-token',
+    });
+    expect(postInit?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
+    expect(JSON.stringify(postInit?.headers)).not.toContain(
+      'jovie-project-secret'
+    );
+
+    fetch.mockResolvedValueOnce(
+      new Response('{"ok":true}\n', {
+        headers: { 'content-type': 'application/x-ndjson' },
+      })
+    );
+    const getResponse = await GET(
+      new Request(
+        'https://jov.ie/api/internal/ovie/summer-shadow?sessionId=ses_shadow_1&conversationId=conv_shadow_1&startIndex=0',
+        {
+          headers: {
+            authorization: 'Bearer test-cron-secret',
+            'x-forwarded-host': 'jov.ie',
+          },
+        }
+      )
+    );
+    expect(getResponse.status).toBe(200);
+    const [, getInit] = fetch.mock.calls[1] as Parameters<
+      typeof globalThis.fetch
+    >;
+    expect(getInit?.headers).toMatchObject({
+      'x-vercel-protection-bypass': 'eve-shadow-secret',
+      'x-vercel-trusted-oidc-idp-token': 'test-vercel-oidc-token',
+    });
+    expect(getInit?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
+  });
+
+  it('rejects a header-unsafe eve bypass secret before the shadow fetch', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'bad\nsecret');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validEvent));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'eve_protection_bypass_invalid',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('propagates Eve replay rejection without a second successful dispatch', async () => {
@@ -189,19 +255,22 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       'invalid_event',
     ],
     ['oversized body', 'x'.repeat(32 * 1024 + 1), 413, 'body_too_large'],
-  ])('rejects %s before obtaining a Function token', async (_name, body, status, code) => {
-    const response = await POST(
-      new Request('https://jov.ie/api/internal/ovie/summer-shadow', {
-        method: 'POST',
-        headers: { authorization: 'Bearer test-cron-secret' },
-        body,
-      })
-    );
+  ])(
+    'rejects %s before obtaining a Function token',
+    async (_name, body, status, code) => {
+      const response = await POST(
+        new Request('https://jov.ie/api/internal/ovie/summer-shadow', {
+          method: 'POST',
+          headers: { authorization: 'Bearer test-cron-secret' },
+          body,
+        })
+      );
 
-    expect(response.status).toBe(status);
-    await expect(response.json()).resolves.toMatchObject({ code });
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({ code });
+      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    }
+  );
 
   it('proxies a signed, read-only durable stream from an exact cursor', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(
@@ -240,8 +309,17 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
     );
     expect(streamInit).toMatchObject({
-      headers: { authorization: 'Bearer test-vercel-oidc-token' },
+      headers: {
+        authorization: 'Bearer test-vercel-oidc-token',
+        'x-vercel-trusted-oidc-idp-token': 'test-vercel-oidc-token',
+      },
     });
+    expect(streamInit?.headers).not.toHaveProperty(
+      'x-vercel-protection-bypass'
+    );
+    expect(streamInit?.headers).not.toHaveProperty(
+      'x-vercel-set-bypass-cookie'
+    );
   });
 
   it('forwards a bounded commercial snapshot without asserting its facts are verified', async () => {

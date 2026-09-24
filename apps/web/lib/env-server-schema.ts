@@ -145,6 +145,12 @@ export const ServerEnvSchema = z.object({
     .string()
     .regex(/^dpl_[A-Za-z0-9]+$/u)
     .optional(),
+  /**
+   * Protection Bypass for Automation secret from the jovie-eve-shadow
+   * project. Sent only as `x-vercel-protection-bypass` to the immutable
+   * deployment origin. This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
+   */
+  OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET: z.string().optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -508,6 +514,7 @@ export const ENV_KEYS = [
   'OVIE_SUMMER_FOUNDER_APP_USER_ID',
   'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
   'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID',
+  'OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
