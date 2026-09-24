@@ -41,7 +41,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           resolvedSource: row.resolvedSource,
           state: row.admission.state,
           decisionEvidenceDigest: row.admission.decisionEvidenceDigest,
-          reviewReady: row.admission.tasteInboxCard !== null,
+          tasteCardAvailable: row.admission.tasteInboxCard !== null,
           blockers: row.admission.blockers,
           updatedAt: row.updatedAt,
         })),
