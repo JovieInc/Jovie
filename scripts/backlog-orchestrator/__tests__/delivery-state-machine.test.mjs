@@ -26,6 +26,120 @@ import {
 
 const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
+
+describe('failed deployment event ingress', () => {
+  const failedDeploy = (attempt = 1) => ({
+    action: 'completed',
+    repository: { full_name: REPO },
+    workflow_run: {
+      id: 35923560063,
+      run_attempt: attempt,
+      name: `Production Controller ${HEAD} from CI 35923443093 attempt 1`,
+      path: '.github/workflows/production-controller.yml',
+      head_sha: HEAD,
+      head_branch: 'main',
+      status: 'completed',
+      conclusion: 'failure',
+      html_url: 'https://github.com/JovieInc/Jovie/actions/runs/35923560063',
+    },
+  });
+
+  it('routes a failed release by workflow path rather than its dynamic run title', () => {
+    const receipt = buildDeliveryReceipt(failedDeploy());
+    assert.equal(receipt.event.failure, 'production-controller-failed');
+    assert.equal(receipt.event.workflow, 'Production Controller');
+    assert.equal(receipt.stage, 'repair-pending');
+    assert.equal(receipt.next.owner, 'gem');
+    assert.equal(
+      receipt.next.action,
+      'investigate-failed-production-controller'
+    );
+    assert.equal(receipt.event.evidence.workflowRun.id, 35923560063);
+    assert.equal(receipt.event.evidence.workflowRun.attempt, 1);
+    assert.notEqual(
+      receipt.receiptKey,
+      buildDeliveryReceipt(failedDeploy(2)).receiptKey
+    );
+    assert.equal(
+      receipt.receiptKey,
+      buildDeliveryReceipt(failedDeploy()).receiptKey
+    );
+  });
+
+  it('rejects incomplete release identities and does not turn success into repair', () => {
+    for (const invalid of [
+      { id: 0 },
+      { run_attempt: 0 },
+      { head_sha: 'short' },
+      { head_branch: 'feature' },
+      { status: 'in_progress' },
+    ]) {
+      const event = failedDeploy();
+      Object.assign(event.workflow_run, invalid);
+      assert.throws(
+        () => buildDeliveryReceipt(event),
+        /exact completed main run attempt/
+      );
+    }
+    const success = failedDeploy();
+    success.workflow_run.conclusion = 'success';
+    assert.equal(buildDeliveryReceipt(success).stage, 'received');
+    const timeout = failedDeploy();
+    timeout.workflow_run.conclusion = 'timed_out';
+    assert.equal(
+      buildDeliveryReceipt(timeout).event.failure,
+      'production-controller-failed'
+    );
+    const cancelled = failedDeploy();
+    cancelled.workflow_run.conclusion = 'cancelled';
+    assert.equal(
+      buildDeliveryReceipt(cancelled).event.failure,
+      'dropped-controller-event'
+    );
+  });
+
+  it('persists a replay-safe repair receipt through the real event CLI', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'delivery-linked-'));
+    try {
+      const entrypoint = new URL(
+        '../delivery-state-machine.mjs',
+        import.meta.url
+      ).pathname;
+      const input = join(directory, 'event.json');
+      await writeFile(input, JSON.stringify(failedDeploy()));
+      const args = [
+        entrypoint,
+        `--event-file=${input}`,
+        `--state-dir=${directory}`,
+      ];
+      const first = spawnSync(process.execPath, args, { encoding: 'utf8' });
+      assert.equal(first.status, 0, first.stderr);
+      assert.notEqual(
+        first.stdout.trim(),
+        '',
+        'successful ingress must emit its persisted receipt'
+      );
+      const result = JSON.parse(first.stdout);
+      assert.equal(
+        result.task.action,
+        'investigate-failed-production-controller'
+      );
+      assert.equal(result.task.evidence.workflowRun.id, 35923560063);
+      const replay = spawnSync(process.execPath, args, { encoding: 'utf8' });
+      assert.equal(replay.status, 0, replay.stderr);
+      assert.equal(JSON.parse(replay.stdout).task.taskKey, result.task.taskKey);
+      assert.equal((await readdir(join(directory, 'repair-tasks'))).length, 1);
+      const bad = spawnSync(
+        process.execPath,
+        [entrypoint, '--event-file=/missing-event.json'],
+        { encoding: 'utf8' }
+      );
+      assert.equal(bad.status, 1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
 const LYB_REPO = 'JovieInc/LogYourBody';
 const CROSS_RUNTIME_LIFECYCLE_KEY =
   '5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52';

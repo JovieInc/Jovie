@@ -79,3 +79,8 @@ cleanup_old_branches*.sh
 !apps/web/lib/e2e/**
 !apps/web/lib/submission-agent/artifacts/
 !apps/web/lib/submission-agent/artifacts/**
+
+# The HUD reads this at runtime; allow only the ledger, not test artifacts.
+!apps/web/tests/
+apps/web/tests/*
+!apps/web/tests/quarantine.json

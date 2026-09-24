@@ -41,9 +41,11 @@ included in delivery receipts so a runtime can reject a mismatched contract.
 
 ## 1. Unit of work: one small PR → `main`
 
-- **Default: a small, focused PR targeting `main`.** ≤ 800 lines / 40 files
-  (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`; mechanical codemods
-  use `big-pr`). Independent changes are **sibling PRs off `main`** — parallel,
+- **Default: a small, focused PR targeting `main`.** ≤ 1500 lines / 75 files
+  (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`, verified live
+  2026-09-20 — the workflow's built-in defaults are 800/40 when the vars are
+  unset; mechanical codemods use `big-pr`). Independent changes are
+  **sibling PRs off `main`** — parallel,
   never based on each other.
 - **Dependent work → a native GitHub stacked-PR sequence.** Push each layer
   normally and open it against its immediate parent. After the parent lands,
@@ -98,30 +100,17 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Source qualification is separate from production certification.** A pending,
-  missing, or failed release checkpoint by itself does not make an otherwise
-  qualified source PR ineligible. Exact-head source checks, explicit scoped
-  incident holds, and required native merge-group correctness, provenance, and
-  ancestry checks remain enforced. Admission receipts say `source-qualified`;
-  they never certify production.
+- **Source qualification is separate from production certification.** An agent
+  requests GitHub's normal Merge when ready for the exact checked head. GitHub
+  enforces required source checks and the native merge queue validates the
+  combined head. The merge-group helper checks live membership, the exact queue
+  ref and source head, and required synthetic-head checks. GitHub's current queue
+  entry is authoritative for membership; historical timeline events are not an
+  admission prerequisite. Native User and Bot enqueue requests use this same path
+  without an Auto-Enroll receipt.
   The production controller owns deployment serialization and exact runtime
-  certification. When main and production are healthy, exact-main review is
-  current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: clean exact-head PRs may enter the native queue
-  while new implementation and deployment stay held, subject to the separate
-  release-wave pause below.
-  A separate active release-wave lease pauses only new native queue enrollment
-  and re-entry while a Production Controller run is queued, concurrency-pending
-  (GitHub status `pending`), or in progress. The workflow fixes each run's deadline
-  at 30 minutes from `created_at`. Terminal completion releases that run's hold
-  sooner; another queued, pending, or in-progress run can keep the pause active
-  against its own deadline. Repeated observations do
-  not restart a run's deadline. Already-admitted native entries remain in the
-  queue, subject to ordinary safety-dequeue checks, throughout the pause.
-  Unavailable or malformed controller state fails closed before enrollment.
-  Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An existing incident
-  hold is cleared only by its own evidence.
+  certification after merge. A pending or failed release checkpoint is not a
+  source-merge prerequisite. The legacy Auto-Enroll workflow is retired.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -154,23 +143,10 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic, exact-head, and bounded.**
-  `merge-queue-autoenroll` first revalidates the PR associated with the
-  triggering PR/CI event at that event's exact published head. Because GitHub's
-  shared concurrency group retains only one pending run, every surviving pass
-  may also recover a deterministic cohort whose source-required checks are
-  freshly green. The event target, native re-entry, and missed-event recovery
-  share one admission path bounded only by native queue depth (a positive
-  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
-  uncapped), the App-backed controller remains
-  the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue
-  only. The `merge-queue` label is retired and must not be added, read, or
-  retained. You don't merge by hand.
-  Each proven native enrollment emits a `pull_request: enqueued` continuation.
-  Its already-queued exact-head target is an idempotent no-op while the surviving
-  pass advances the next bounded cohort; when no eligible remainder exists, no
-  new enrollment event is created and the chain converges.
+- **The writer requests GitHub Merge when ready for the checked PR head.**
+  GitHub enforces required checks, queue admission, merge-group checks, and the
+  final merge. Do not use a direct merge or the retired `merge-queue` label.
+  The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -183,13 +159,31 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ### Native build capacity (JOV-6107)
 
-**Ship now:** use two concurrent native speculative groups after this policy
-lands. The 2026-09-08 Team-plan readback and
+**Ship now:** two concurrent native speculative groups. The
+`max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
+2026-09-20 live readback shows `max_entries_to_build=2`, with the then 20-minute
+budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
+1/5 with wait zero preserved. The separate pending source cohort minimum/wait
+cutover is not part of this apply and remains pending. Roll back only the
+build count to one if runner waits or speculative invalidation outweigh the
+measured throughput gain.
+
+On 2026-09-23 the 20-minute response deadline proved shorter than required
+CI paths configured for 30 and 40 minutes. The source target is 60 minutes;
+the exact old 20-minute live value remains accepted during the source-first
+cutover so native enrollment continues. Apply the live timeout only after this
+guard lands, then verify live ruleset 10512119, fresh queue attempts, and
+removal reasons. This changes waiting time, not required checks or ALLGREEN.
+
+Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
-give 60 standard hosted jobs and five macOS jobs across the organization.
+give 60 standard hosted jobs and five macOS jobs across the organization,
+while the repo's operative planning figure is the `HOSTED_RUNNER_CAPACITY=120`
+repository variable (`ci.yml` assumes ~120 concurrent hosted jobs).
 CI run 34282800645 peaked at 19 hosted jobs for one combined head; the
 22:00:25 UTC organization snapshot observed at least seven other hosted jobs.
-Two groups plus that background need 45 jobs; three would need 64. A group
+Two groups plus that background need 45 jobs; three would need 64 — feasible
+under the operative 120 figure, not under the conservative 60 readback. A group
 selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
 groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
@@ -197,12 +191,7 @@ hosted product lanes.
 Source preflight accepts integer build counts from one through the reviewed
 ceiling of two and records the actual count and any difference from the target.
 This permits source-first rollout and a one-field rollback without blocking
-normal admission. Apply only `max_entries_to_build: 1 → 2` to live ruleset
-10512119 after the source lands; preserve the live 20-minute budget, ALLGREEN,
-all required checks, empty bypass actors, min/max merge 1/5 and wait zero.
-The separate pending source cohort minimum/wait values are not part of this
-apply. Roll back only the build count to one if runner waits or speculative
-invalidation outweigh the measured throughput gain.
+normal admission.
 
 **Re-evaluate when:** a complete simultaneous-group window supplies job waits,
 peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
@@ -383,7 +372,8 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   20-minute merge-queue check budget. Non-web heads emit an explicit
+   current merge-queue check budget (20 minutes until the 60-minute ruleset
+   cutover). Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
@@ -395,9 +385,15 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
-   events for `pull_request` and `merge_group`, then launches Cursor-direct
-   exact-head repair when the implementer lease is not live. It must not
+   `Rolling CI Dispatch` is currently `disabled_manually` (since 2026-09-02,
+   verified 2026-09-20), and its source gate accepts only `pull_request`
+   producers. While it is disabled there is no automated dispatcher: failed
+   exact-head runs, including merge-group batches, are repaired by the
+   implementer lease or by hand. Re-enabling it, and widening its gate to
+   `merge_group` producers, is a founder/fleet decision. When active, it
+   subscribes only to completed `CI` `workflow_run` events and launches
+   Cursor-direct exact-head repair when the implementer lease is not live.
+   It must not
    subscribe to generic `check_suite` or `check_run` events because its own
    completed checks can recursively re-enter the dispatcher. It does not
    check out PR code.
@@ -425,8 +421,8 @@ Before you open a PR:
    on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
    `needs-human`.
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
-   CI, then qualify the final exact, current head before ready. Don't hand-merge;
-   the queue does it.
+   CI, then qualify the final exact, current head before ready. Request normal
+   GitHub Merge when ready; the queue performs the final merge.
 5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
    admission. What's New is written after land/runtime proof. Linear is SoR.
 6. If a PR's base branch was deleted, **retarget to `main`** before debugging a

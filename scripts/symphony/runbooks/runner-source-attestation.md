@@ -58,6 +58,16 @@ The dependent activation-workflow change consumes this separate result to preser
 accepted upstream without reaching legacy mutators. Current configuration approval
 and runtime-owner review remain separate from this source-only fixture proof.
 
+The emitter also supports an explicit upstream preservation CLI mode. Supply both
+`--upstream-binding` and its independently approved
+`--upstream-binding-sha256`; `--check` only observes. Without `--check`, it
+atomically publishes `state/symphony-upstream-preservation.json` under the
+existing writer lock. That separate receipt retains `activation:not-activated`
+and `admission:unverified`; it never overwrites or upgrades
+`state/gem-service-attestation.json`. Mixed upstream/legacy inputs and missing
+approval fail closed. The installed timer and unit remain on the legacy mode
+until a separately reviewed installer/consumer cutover and current host approval.
+
 ## Legacy publisher
 
 JOV-6163 is the runner-source prerequisite for JOV-5853. This replaces the

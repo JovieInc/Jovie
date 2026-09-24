@@ -1,4 +1,4 @@
-// @coverage-via apps/web/tests/unit/onboarding/onboarding-interview-modal-system-b-style-guard.test.ts
+// @coverage-via apps/web/components/onboarding/OnboardingInterviewModal.test.tsx
 'use client';
 
 import { Button, Textarea } from '@jovie/ui';
@@ -54,10 +54,15 @@ export function OnboardingInterviewModal({
   const pathname = usePathname();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const submissionInFlightRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftEntry[]>(initDraft);
   const [current, setCurrent] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
+  const [retryTranscript, setRetryTranscript] = useState<ReturnType<
+    typeof toTranscript
+  > | null>(null);
 
   // Open once per mount when the param is present and we haven't already
   // submitted in this tab. Immediately strip the param so refresh/back
@@ -84,83 +89,114 @@ export function OnboardingInterviewModal({
     if (open && !dialog.open) dialog.showModal();
   }, [open]);
 
-  const submit = useCallback(async (final: DraftEntry[]) => {
-    const transcript = toTranscript(final);
-    if (transcript.length === 0) {
+  const submit = useCallback(
+    async (transcript: ReturnType<typeof toTranscript>) => {
+      if (transcript.length === 0) {
+        setOpen(false);
+        return;
+      }
+      if (submissionInFlightRef.current) return;
+
+      submissionInFlightRef.current = true;
+      setRetryTranscript(transcript);
+      setSubmitError(false);
+      setSubmitting(true);
+      try {
+        const response = await fetch('/api/user-interviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'onboarding',
+            transcript,
+            metadata: {
+              locale:
+                typeof navigator === 'undefined' ? null : navigator.language,
+              userAgent:
+                typeof navigator === 'undefined'
+                  ? null
+                  : navigator.userAgent.slice(0, 512),
+            },
+          }),
+        });
+        if (!response.ok) {
+          setSubmitError(true);
+          return;
+        }
+
+        if (globalThis.window !== undefined) {
+          globalThis.sessionStorage.setItem(SESSION_KEY, '1');
+        }
+        setRetryTranscript(null);
+        setOpen(false);
+      } catch {
+        setSubmitError(true);
+      } finally {
+        submissionInFlightRef.current = false;
+        setSubmitting(false);
+      }
+    },
+    []
+  );
+
+  const advance = useCallback(
+    (skip: boolean) => {
+      if (submitting || submitError || submissionInFlightRef.current) return;
+
+      const next = draft.map((entry, idx) =>
+        idx === current
+          ? { ...entry, skipped: skip, timestamp: new Date().toISOString() }
+          : entry
+      );
+      setDraft(next);
+
+      if (current === next.length - 1) {
+        void submit(toTranscript(next));
+      } else {
+        setCurrent(current + 1);
+      }
+    },
+    [current, draft, submit, submitError, submitting]
+  );
+
+  const endInterview = useCallback(() => {
+    if (submitting || submissionInFlightRef.current) return;
+    if (submitError) {
       setOpen(false);
       return;
     }
 
-    setSubmitting(true);
-    try {
-      await fetch('/api/user-interviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source: 'onboarding',
-          transcript,
-          metadata: {
-            locale:
-              typeof navigator === 'undefined' ? null : navigator.language,
-            userAgent:
-              typeof navigator === 'undefined'
-                ? null
-                : navigator.userAgent.slice(0, 512),
-          },
-        }),
-      });
-    } catch {
-      // Silent failure — this is a research feature, not a paywall.
-      // Loss of one transcript is acceptable.
-    } finally {
-      if (globalThis.window !== undefined) {
-        globalThis.sessionStorage.setItem(SESSION_KEY, '1');
-      }
-      setSubmitting(false);
+    const next = draft.map((entry, idx) =>
+      idx === current &&
+      entry.answer.trim().length > 0 &&
+      entry.timestamp === null
+        ? { ...entry, skipped: false, timestamp: new Date().toISOString() }
+        : entry
+    );
+    setDraft(next);
+
+    if (hasAnyAnswer(next)) {
+      void submit(toTranscript(next));
+    } else {
       setOpen(false);
     }
-  }, []);
-
-  const advance = useCallback(
-    (skip: boolean) => {
-      setDraft(prev => {
-        const next = prev.map((entry, idx) =>
-          idx === current
-            ? { ...entry, skipped: skip, timestamp: new Date().toISOString() }
-            : entry
-        );
-
-        if (current === prev.length - 1) {
-          submit(next);
-        } else {
-          setCurrent(current + 1);
-        }
-        return next;
-      });
-    },
-    [current, submit]
-  );
-
-  const endInterview = useCallback(() => {
-    setDraft(prev => {
-      const next = [...prev];
-      if (hasAnyAnswer(next)) {
-        submit(next);
-      } else {
-        setOpen(false);
-      }
-      return next;
-    });
-  }, [submit]);
+  }, [current, draft, submit, submitError, submitting]);
 
   if (!open) return null;
 
   const entry = draft[current];
   const progressLabel = `Question ${current + 1} of ${draft.length}`;
-  const canSubmit = !submitting;
+  const canSubmit = submitError
+    ? retryTranscript !== null
+    : entry.answer.trim().length > 0;
+  const canAdvance = !submitting && !submitError;
   const isLastQuestion = current === draft.length - 1;
-  let submitLabel = 'Next';
-  if (isLastQuestion) submitLabel = submitting ? 'Sending...' : 'Send';
+  const submitLabel = submitting
+    ? 'Sending...'
+    : submitError
+      ? 'Retry'
+      : isLastQuestion
+        ? 'Send'
+        : 'Next';
 
   return (
     <dialog
@@ -186,10 +222,10 @@ export function OnboardingInterviewModal({
         <button
           type='button'
           onClick={endInterview}
-          disabled={submitting}
-          className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline disabled:opacity-50'
+          aria-disabled={submitting}
+          className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
         >
-          End Interview
+          {submitError ? 'Exit without sending' : 'End Interview'}
         </button>
       </div>
 
@@ -215,24 +251,46 @@ export function OnboardingInterviewModal({
         }
         placeholder={entry.question.placeholder ?? ''}
         rows={4}
-        disabled={submitting}
+        disabled={submitting || submitError}
         resizable={false}
         textareaSize='lg'
       />
 
+      <div
+        aria-atomic='true'
+        aria-live='assertive'
+        className='mt-3 min-h-10 text-2xs text-secondary-token'
+        role={submitError ? 'alert' : undefined}
+      >
+        {submitError
+          ? "We couldn't send your answers. They're still here. Retry or exit."
+          : null}
+      </div>
+
       <div className='mt-4 flex items-center justify-between gap-3'>
         <button
           type='button'
-          onClick={() => advance(true)}
-          disabled={!canSubmit}
-          className='text-app text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline disabled:opacity-50'
+          onClick={() => {
+            if (canAdvance) advance(true);
+          }}
+          aria-disabled={!canAdvance}
+          className='text-app text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
         >
           Skip
         </button>
         <Button
           variant='primary'
-          onClick={() => advance(false)}
-          disabled={!canSubmit || entry.answer.trim().length === 0}
+          onClick={() => {
+            if (submitting || submissionInFlightRef.current) return;
+            if (submitError) {
+              if (retryTranscript) void submit(retryTranscript);
+              return;
+            }
+            advance(false);
+          }}
+          aria-label={submitError ? 'Retry interview submission' : undefined}
+          aria-disabled={!canSubmit || submitting}
+          disabled={!canSubmit && !submitting}
           className='px-4 py-2 text-sm'
         >
           {submitLabel}

@@ -172,15 +172,33 @@ jobs:
             printf 'GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1\n'
           } >> "${GITHUB_ENV}"
       - name: Install and attest the exact controller configuration
+        id: activation
         if: steps.marker.outputs.superseded != 'true'
         env:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
+          GEM_UPSTREAM_PRESERVATION_BINDING: ${{ vars.GEM_UPSTREAM_PRESERVATION_BINDING }}
+          GEM_UPSTREAM_PRESERVATION_BINDING_SHA256: ${{ vars.GEM_UPSTREAM_PRESERVATION_BINDING_SHA256 }}
         run: |
           set -euo pipefail
           # Preserve the managed provider generation boundary. The next installer
           # owns the exact workflow/service-unit overlay, and the explicit installs
           # below own the adaptive controller; provider-only is not the whole activation.
-          # Refuse unsupported effective ownership before any runtime mutation.
+          # Binding path and digest are independently reviewed operator inputs.
+          classification="$(python3 -B scripts/symphony/symphony_official_runtime.py activation-classify \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --upstream-binding "${GEM_UPSTREAM_PRESERVATION_BINDING:-}" \
+            --upstream-binding-sha256 "${GEM_UPSTREAM_PRESERVATION_BINDING_SHA256:-}")" || {
+            status=$?; printf '%s\n' "$classification"; exit "$status"
+          }
+          mode="$(printf '%s' "$classification" | jq -er '.mode')"
+          printf 'mode=%s\n' "$mode" >> "$GITHUB_OUTPUT"
+          if [[ "$mode" == upstream-preserved ]]; then
+            printf '%s\n' "$classification"
+            printf '::notice::Accepted upstream identity preserved; legacy controllers not activated; admission unverified.\n'
+            exit 0
+          fi
+          test "$mode" = canonical-managed
+          # Recheck canonical ownership immediately before legacy mutations.
           python3 -B scripts/symphony/symphony_official_runtime.py activation-preflight --repo-root "$GITHUB_WORKSPACE"
           bash scripts/symphony/symphony-elixir-safe-restart --prepare-stop-guard
           bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
@@ -203,7 +221,7 @@ jobs:
           systemctl --user reset-failed gem-disk-reclaim.service || true
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
-        if: steps.marker.outputs.superseded != 'true'
+        if: steps.marker.outputs.superseded != 'true' && steps.activation.outputs.mode == 'canonical-managed'
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
           PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}

@@ -991,12 +991,10 @@ class RenderTests(unittest.TestCase):
         }
         state["delivery"]["workflow_counts"] = {
             "Production Controller": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
-            "Queue-Deferred Release": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
             "Delivery Control Receipts": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
         }
         state["delivery"]["workflow_counts_complete"] = {
             "Production Controller": False,
-            "Queue-Deferred Release": False,
             "Delivery Control Receipts": False,
         }
 

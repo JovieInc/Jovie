@@ -20,11 +20,7 @@ vi.mock('@/features/home/HomeHeroPhoneComposition', () => ({
 }));
 
 vi.mock('@/features/home/HomeTrustSection', () => ({
-  HomeTrustSection: () => (
-    <section data-testid='homepage-trust'>
-      Trusted by artists and teams releasing on
-    </section>
-  ),
+  HomeTrustSection: () => <section data-testid='homepage-trust' />,
 }));
 
 vi.mock('next/navigation', async importOriginal => {
@@ -108,8 +104,8 @@ describe('HomeAdaptiveProfileStory', () => {
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
-    ).toBeInTheDocument();
+      screen.queryByText('Trusted by artists and teams releasing on')
+    ).not.toBeInTheDocument();
   });
 
   it('renders the trust logo strip when sections are enabled', () => {

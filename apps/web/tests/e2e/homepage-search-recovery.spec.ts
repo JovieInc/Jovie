@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
   assertExactNavigationUrl,
   primeVercelBypassCookie,
@@ -181,6 +182,10 @@ async function expectDirectStartHandoff(
 }
 
 test.describe('Homepage artist-search recovery (JOV-6034)', () => {
+  test.skip(
+    FEATURE_FLAGS.WAITLIST_ENABLED,
+    'Search recovery applies to the waitlist-off build; homepage.spec covers gated actions.'
+  );
   test.beforeEach(async ({ page }) => {
     await gotoHomepage(page);
   });

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
-  it('renders named comparison tables and toggles annual billing', () => {
+  it('renders named comparison tables from monthly-only public offer truth', () => {
     render(<PricingComparisonChart />);
 
     const desktopTable = screen.getByRole('table', {
@@ -20,33 +20,20 @@ describe('PricingComparisonChart', () => {
       screen.getByText('All limits subject to fair-use guardrails.')
     ).toBeInTheDocument();
 
-    const billingSwitch = screen.getByRole('switch', {
-      name: 'Toggle Annual Billing',
+    expect(
+      screen.queryByRole('switch', { name: 'Toggle Annual Billing' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Save ~20%')).not.toBeInTheDocument();
+    expect(within(desktopTable).getByText('$199')).toBeInTheDocument();
+    expect(within(desktopTable).getByText('/mo')).toBeInTheDocument();
+    expect(screen.queryByText('Max')).not.toBeInTheDocument();
+    expect(screen.queryByText('Automated follow-ups')).not.toBeInTheDocument();
+
+    const selector = screen.getByRole('combobox', {
+      name: 'Select Plan To Compare',
     });
-    expect(billingSwitch).toHaveAttribute('aria-checked', 'false');
-
-    fireEvent.click(billingSwitch);
-
-    expect(billingSwitch).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Annual', { exact: false })).toHaveAttribute(
-      'data-active',
-      'true'
-    );
-  });
-
-  it('drives the system-b switch styling from Radix data-state', () => {
-    render(<PricingComparisonChart />);
-
-    const root = screen.getByRole('switch', {
-      name: 'Toggle Annual Billing',
-    }) as HTMLElement;
-    expect(root).toHaveAttribute('data-state', 'unchecked');
-    expect(root).toHaveClass('h-4', 'w-7');
-    const thumb = root.firstElementChild;
-    expect(thumb).toHaveClass('h-3', 'w-3');
-
-    fireEvent.click(root);
-
-    expect(root).toHaveAttribute('data-state', 'checked');
+    fireEvent.change(selector, { target: { value: 'free' } });
+    expect(selector).toHaveValue('free');
+    expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
   });
 });

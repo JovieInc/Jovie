@@ -75,7 +75,6 @@ export function DemoReleaseLandingSurface() {
             title: RELEASE.title,
             artworkUrl: RELEASE.artworkUrl ?? null,
             releaseDate: RELEASE.releaseDate ?? null,
-            previewUrl: RELEASE.previewUrl ?? null,
           }}
           artist={{
             name: ARTIST.displayName,

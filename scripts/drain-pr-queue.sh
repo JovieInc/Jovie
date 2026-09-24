@@ -2792,15 +2792,12 @@ fi
 # --- DEQUEUE: starved merge groups (PR #16420, 2026-09-03) ---
 # An AWAITING_CHECKS native entry whose merge group never produced a ci.yml
 # run is the 'missing evidence' gap the non-progressing pass above cannot
-# close: there is no failure receipt and there never will be one, so the entry
-# sits forever and silently blocks every follower. Recover only on proven
-# evidence: the already-fetched merge_group run inventory has NO run on this
-# PR's group branch, AND the PR's latest added_to_merge_queue timeline event
-# is older than DRAIN_GROUP_STARVED_MINUTES. Any failed read skips the entry —
-# never mutate on unproven evidence. Dequeue only; the normal ENROLL path
-# re-admits the still-green head, and the fresh group's checks_requested
-# refires CI. Capped at 2 per run so a timeline-API anomaly cannot clear the
-# whole queue in one pass.
+# close. The general churn inventory is bounded to one page and cannot prove
+# absence. Query the exact entry lifetime with pagination and a frozen upper
+# bound. Unknown, capped, malformed, or incomplete inventory leaves it queued.
+# The final mutation carries the observed PR head to native revalidation.
+# Dequeue only; normal ENROLL re-admits the still-green head and the fresh
+# group's checks_requested refires CI. Capped at 2 per pass.
 if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
   && { waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; }; then
   echo "=== DEQUEUE (starved group: AWAITING_CHECKS with no merge-group CI run) ==="
@@ -2811,30 +2808,90 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
       break
     fi
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
-    if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" '
-      any(.[]; (.headBranch // "") | startswith($prefix))
-    ' <<<"$MERGE_GROUP_RUNS_JSON" >/dev/null; then
-      continue
-    fi
+    expected_head="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    snapshot_queued_at="$(jq -r '.qa // ""' <<<"$pr")"
     if ! timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
       echo "  #$n  $t  ~ timeline read failed; leaving queued"
       continue
     fi
-    queued_at="$(jq -r '
-      [ .[][]? | select(.event == "added_to_merge_queue") | .created_at ]
-      | sort | last // empty
-    ' <<<"$timeline_json" 2>/dev/null || true)"
+    queued_at="$(jq -r '[ .[][]? | select(.event == "added_to_merge_queue") | .created_at ] | sort | last // empty' <<<"$timeline_json" 2>/dev/null || true)"
     queued_epoch="$(jq -rn --arg d "$queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
-    if [[ ! "$queued_epoch" =~ ^[0-9]+$ ]]; then
-      echo "  #$n  $t  ~ no readable added_to_merge_queue event; leaving queued"
+    snapshot_queued_epoch="$(jq -rn --arg d "$snapshot_queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$queued_epoch" =~ ^[0-9]+$ || ! "$snapshot_queued_epoch" =~ ^[0-9]+$ ]] \
+      || [[ "$queued_epoch" != "$snapshot_queued_epoch" ]]; then
+      echo "  #$n  $t  ~ queue add time does not match the native snapshot; leaving queued"
       continue
     fi
     age_seconds=$(( $(date -u +%s) - queued_epoch ))
     if (( age_seconds < DRAIN_GROUP_STARVED_MINUTES * 60 )); then
       continue
     fi
-    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with no merge-group CI run"
-    if ! dequeue_strict "$n"; then
+    if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "  #$n  $t  ~ current PR head is unreadable; leaving queued"
+      continue
+    fi
+
+    inventory_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    inventory_started_epoch="$(jq -rn --arg d "$inventory_started_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$inventory_started_epoch" =~ ^[0-9]+$ ]] || (( inventory_started_epoch < queued_epoch )); then
+      echo "  #$n  $t  ~ invalid merge-group inventory time window; leaving queued"
+      continue
+    fi
+    if ! group_runs_json="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs" \
+      -X GET -F event=merge_group -F per_page=100 \
+      -F "created=${queued_at}..${inventory_started_at}" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ merge-group run inventory read failed; leaving queued"
+      continue
+    fi
+    if ! jq -e --argjson start "$queued_epoch" --argjson finish "$inventory_started_epoch" '
+      . as $pages
+      | (type == "array" and length > 0)
+      and all($pages[]; (type == "object")
+        and (.total_count | type == "number" and floor == . and . >= 0)
+        and (.workflow_runs | type == "array"))
+      and ($pages[0].total_count as $total
+        | ($total < 1000)
+        and all($pages[]; .total_count == $total)
+        and ([$pages[].workflow_runs[]] | length == $total)
+        and all($pages[].workflow_runs[];
+          . as $run
+          | ($run.id | type == "number" and . > 0)
+          and ($run.head_branch | type == "string" and test("^gh-readonly-queue/main/pr-[1-9][0-9]*-[0-9a-fA-F]{40}$"))
+          and ($run.head_sha | type == "string" and test("^[0-9a-fA-F]{40}$"))
+          and ($run.status | IN("queued", "in_progress", "completed"))
+          and (($run.conclusion == null) or ($run.conclusion | type == "string"))
+          and ($run.created_at | type == "string"
+            and ((try fromdateiso8601 catch -1) >= $start)
+            and ((try fromdateiso8601 catch -1) <= $finish))
+        )
+      )
+    ' <<<"$group_runs_json" >/dev/null 2>&1; then
+      echo "  #$n  $t  ~ merge-group run inventory is incomplete, capped, or malformed; leaving queued"
+      continue
+    fi
+    if jq -e --arg pr "$n" '
+      any(.[].workflow_runs[];
+        (.head_branch | test("^gh-readonly-queue/main/pr-" + $pr + "-[0-9a-fA-F]{40}$")))
+    ' <<<"$group_runs_json" >/dev/null; then
+      echo "  #$n  $t  ~ exact merge-group branch has CI run evidence; leaving queued"
+      continue
+    fi
+
+    # Re-read timeline after the paginated scan. A replacement entry has not
+    # been proven starved, even when its source head is unchanged.
+    if ! confirm_timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ queue timeline confirmation failed; leaving queued"
+      continue
+    fi
+    confirmed_queued_at="$(jq -r '[ .[][]? | select(.event == "added_to_merge_queue") | .created_at ] | sort | last // empty' <<<"$confirm_timeline_json" 2>/dev/null || true)"
+    confirmed_queued_epoch="$(jq -rn --arg d "$confirmed_queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$confirmed_queued_epoch" =~ ^[0-9]+$ ]] || [[ "$confirmed_queued_epoch" != "$queued_epoch" ]]; then
+      echo "  #$n  $t  ~ queue entry changed during run inventory; leaving queued"
+      continue
+    fi
+
+    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with complete merge-group inventory and no matching run"
+    if ! dequeue_strict "$n" "$expected_head"; then
       echo "::error::Failed to prove starved-group PR #$n is outside native merge queue" >&2
       exit 1
     fi

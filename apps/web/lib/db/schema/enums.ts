@@ -41,8 +41,28 @@ export const merchDesignLaneEnum = pgEnum('merch_design_lane', [
 
 export const merchDesignOptionStatusEnum = pgEnum(
   'merch_design_option_status',
-  ['candidate', 'selected', 'rejected']
+  ['candidate', 'selected', 'rejected', 'quarantined']
 );
+
+export const merchQaVerdictEnum = pgEnum('merch_qa_verdict', [
+  'pass',
+  'fail',
+  'borderline',
+]);
+
+export const merchQaSeverityEnum = pgEnum('merch_qa_severity', [
+  'info',
+  'warning',
+  'blocker',
+]);
+
+export const merchQaDispositionEnum = pgEnum('merch_qa_disposition', [
+  'pending',
+  'cleared',
+  'quarantined',
+  'escalated',
+  'superseded',
+]);
 
 export const merchCardStatusEnum = pgEnum('merch_card_status', [
   'draft',

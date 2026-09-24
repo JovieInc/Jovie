@@ -1542,6 +1542,14 @@ jobs:
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
 
+          # Evidence collection changes must execute the existing native-queue
+          # behavioral tests and per-file coverage, including test-only edits.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
+
+          # FX remediation policy and dispatcher source must run their real
+          # per-file coverage suite when the implementation or tests change.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.test\.mjs$'
+
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
           STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-no-native-dialogs|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
@@ -1635,6 +1643,7 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
         run: |
           set -euo pipefail
@@ -1681,6 +1690,7 @@ jobs:
           if-no-files-found: error
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -2369,7 +2379,9 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -2377,6 +2389,7 @@ jobs:
         with:
           name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
       - name: Upload input Storybook evidence
         if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
@@ -4133,7 +4146,7 @@ jobs:
     # head. Docs-only heads keep an explicit green no-code receipt without
     # spending a runner on an empty coverage pass.
     # Job timeout must fail before GitHub merge-queue
-    # check_response_timeout_minutes=20 (policy-locked in merge-queue-guard).
+    # check_response_timeout_minutes=60 after source-first ruleset cutover.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&

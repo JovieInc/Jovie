@@ -68,7 +68,6 @@ describe('Node runtime contract', () => {
     const setupFiles = [
       '.github/actions/setup-node-pnpm/action.yml',
       '.github/workflows/agent-pipeline.yml',
-      '.github/workflows/merge-queue-autoenroll.yml',
       '.github/workflows/pr-conflict-handler.yml',
     ];
 

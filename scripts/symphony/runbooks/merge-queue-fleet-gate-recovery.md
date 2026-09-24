@@ -5,10 +5,8 @@
 `scripts/symphony/fleet_admission_receipt.py` +
 `.github/workflows/fleet-gate-refresh.yml` +
 `.github/workflows/merge-queue-autoenroll.yml` +
-`.github/workflows/queue-deferred-release.yml` +
 `.github/actions/evaluate-fleet-gate/action.yml` +
-`scripts/drain-pr-queue.sh` +
-`scripts/lib/queue-deferred-release-admission.mjs`
+`scripts/drain-pr-queue.sh`
 
 **Severity:** P0 when the fleet gate blocks promotion or the native merge queue
 stops admitting clean PRs, because autonomous shipping stalls.
@@ -29,7 +27,6 @@ Enter this runbook when any of the following are true:
 - The `Fleet Gate Refresh` or `Merge Queue Auto-Enroll` workflow is failing or
   looping.
 - `scripts/drain-pr-queue.sh` logs repeated `queue-noop` or terminal failures.
-- `queue-deferred` PRs are older than the 12-minute alarm threshold.
 - The production release checkpoint is unavailable and no new admissions are
   allowed.
 
@@ -41,7 +38,7 @@ Do not leave the runbook until all of the following are true for at least
 - The fleet gate receipt shows `state: "GREEN"` and `promotionMode: "normal"`.
 - The native merge queue is admitting eligible clean PRs, or the queue is empty
   with no eligible PRs.
-- `queue-deferred` PRs are either released or have a fresh reason.
+- PRs being admitted have an exact current head, passing required checks, and no explicit human `hold`, `gated`, or `incident` hold.
 - The `Fleet Gate Refresh` and `Merge Queue Auto-Enroll` workflows are not
   failing or looping.
 - Any recovery action is confirmed idempotent (re-running the fleet gate does
@@ -104,13 +101,14 @@ gh run list --workflow=fleet-gate-refresh.yml --limit 5
 gh run view <run-id> --log
 gh run list --workflow=merge-queue-autoenroll.yml --limit 5
 gh run view <run-id> --log
-gh run list --workflow=queue-deferred-release.yml --limit 5
 ```
 
-Check the native merge queue and deferred PRs:
+Check the native merge queue and explicit human holds:
 
 ```bash
-gh pr list --repo JovieInc/Jovie --search "is:open label:queue-deferred" --limit 50
+gh pr list --repo JovieInc/Jovie --search "is:open label:hold" --limit 50
+gh pr list --repo JovieInc/Jovie --search "is:open label:gated" --limit 50
+gh pr list --repo JovieInc/Jovie --search "is:open label:incident" --limit 50
 gh pr list --repo JovieInc/Jovie --search "is:open is:queued" --limit 50
 ```
 
@@ -142,8 +140,13 @@ frozen.
 During recovery:
 
 - Do **not** force-merge PRs or bypass the native merge queue.
-- Do **not** manually add or remove `queue-deferred` labels; the
-  `queue-deferred-release` controller owns those transitions.
+- After verifying the exact current PR head, required checks, and absence of
+  explicit human `hold`, `gated`, or `incident` labels, the finishing agent
+  requests GitHub's normal `Merge when ready` action. GitHub owns queue
+  enrollment, admission, and merge.
+- `queue-deferred` and `needs-conflict-resolution` are retired machine
+  annotations ignored by native admission; shared deferral receipt helpers do
+  not grant queue authority.
 - Do **not** hand-edit the fleet gate receipt or the Gem host snapshots.
 - Do **not** use the recovery lane to bypass credential, security, migration,
   or consent gates.
@@ -175,13 +178,6 @@ After the fleet gate is GREEN, re-run the merge-queue autoenroll controller:
 
 ```bash
 gh workflow run merge-queue-autoenroll.yml --ref main
-```
-
-If a PR is stuck with `queue-deferred` but the fleet gate is `normal`, run the
-queue-deferred release controller:
-
-```bash
-gh workflow run queue-deferred-release.yml --ref main
 ```
 
 To inspect the drain path in dry-run mode without mutating the queue:
@@ -259,7 +255,6 @@ Confirm all of the following:
   without terminal failures.
 - The native merge queue admits a clean PR within 5 minutes, or no eligible
   PRs are waiting.
-- No `queue-deferred` PR is older than 12 minutes.
 
 ## 8. Communicate affected-user scope
 
@@ -308,9 +303,7 @@ When you change the following files, update this runbook before merging:
 - `scripts/symphony/fleet_admission_receipt.py`
 - `.github/workflows/fleet-gate-refresh.yml`
 - `.github/workflows/merge-queue-autoenroll.yml`
-- `.github/workflows/queue-deferred-release.yml`
 - `.github/actions/evaluate-fleet-gate/action.yml`
 - `scripts/drain-pr-queue.sh`
-- `scripts/lib/queue-deferred-release-admission.mjs`
 - `scripts/symphony/launchd/README.md`
 - `docs/ON_CALL_PROCESS.md`

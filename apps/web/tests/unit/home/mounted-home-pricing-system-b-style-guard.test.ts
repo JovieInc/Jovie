@@ -89,6 +89,19 @@ describe('mounted homepage pricing System B source contract', () => {
     }
   });
 
+  it('derives the mounted pricing copy from the typed offer-truth module', () => {
+    const source = extractPricingComponentSource(
+      readFileSync(path.join(webRoot, pricingComponentPath), 'utf8')
+    );
+
+    // The mounted homepage pricing body resolves the public Pro claim through
+    // the typed offer-truth module rather than restating hard-coded copy.
+    expect(source).toContain("getPublicPriceClaim('pro')");
+    expect(source).toContain('proClaim.priceLabel');
+    expect(source).not.toContain('release tools');
+    expect(source).toContain('with limited access');
+  });
+
   it('keeps mounted homepage CTA headings explicitly clamped', () => {
     const source = readFileSync(
       path.join(webRoot, pricingComponentPath),
@@ -103,6 +116,14 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(source).toContain('homepage-story-heading line-clamp-2');
     // The mounted final CTA heading renders through MarketingTerminalCta.
     expect(terminalCtaSource).toContain('line-clamp-2');
+    // Terminal CTA containers import the canonical owner directly instead of
+    // cycling through the marketing barrel.
+    expect(terminalCtaSource).toContain(
+      "import { MarketingContainer } from '@/components/marketing/MarketingContainer';"
+    );
+    expect(terminalCtaSource).not.toMatch(
+      /import \{ MarketingContainer \} from '@\/components\/marketing';/
+    );
   });
 
   it('keeps mounted pricing CSS tokenized and stable', () => {

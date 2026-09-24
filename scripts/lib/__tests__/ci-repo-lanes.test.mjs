@@ -100,6 +100,9 @@ describe('JOV-5288 CI repo lanes', () => {
   it('selects the product typecheck only for exact TypeScript graph inputs', () => {
     for (const path of [
       'apps/web/app/page.tsx',
+      'apps/ovie/proxy.ts',
+      'apps/ovie/package.json',
+      'apps/ovie/scripts/routes.mjs',
       'packages/ui/src/index.ts',
       'packages/ui/tsconfig.build.json',
       'apps/web/package.json',
@@ -125,6 +128,12 @@ describe('JOV-5288 CI repo lanes', () => {
     ).toBe(false);
     expect(
       classifyCiRepoLanes(['apps/web/app/page.tsx']).runJovieTypecheck
+    ).toBe(true);
+    expect(classifyCiRepoLanes(['apps/ovie/proxy.ts']).runJovieTypecheck).toBe(
+      true
+    );
+    expect(
+      classifyCiRepoLanes(['apps/ovie/scripts/routes.mjs']).runJovieTypecheck
     ).toBe(true);
     expect(classifyCiRepoLanes(['README.md']).runJovieTypecheck).toBe(false);
   });

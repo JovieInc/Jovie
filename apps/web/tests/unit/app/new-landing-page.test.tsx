@@ -75,10 +75,9 @@ describe('NewLandingPage', () => {
       '/pricing'
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
 
     render(<NewLandingPage />);
 

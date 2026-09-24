@@ -1,18 +1,29 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
+import {
   type ComparisonFeature,
-  ENTITLEMENT_REGISTRY,
   PRICING_COMPARISON,
 } from '@/lib/entitlements/registry';
-import { publicEnv } from '@/lib/env-public';
 
-const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
+const PUBLIC_PRICING_FEATURE_NAMES = new Set([
+  'Public artist profile page',
+  'Contact / subscriber capture',
+]);
 
-type PlanColumn = 'free' | 'pro' | 'max';
+const PUBLIC_PRICING_COMPARISON = PRICING_COMPARISON.map(category => ({
+  ...category,
+  features: category.features.filter(feature =>
+    PUBLIC_PRICING_FEATURE_NAMES.has(feature.name)
+  ),
+})).filter(category => category.features.length > 0);
+
+type PlanColumn = 'free' | 'pro';
 
 function CellValue({
   value,
@@ -106,74 +117,33 @@ function DesktopFeatureRow({
           comingSoon={feature.comingSoon && feature.pro !== false}
         />
       </td>
-      {maxPlanEnabled ? (
-        <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
-          <CellValue value={feature.max} comingSoon={feature.comingSoon} />
-        </td>
-      ) : null}
     </tr>
   );
 }
 
 export function PricingComparisonChart() {
-  const [isAnnual, setIsAnnual] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
-  const free = ENTITLEMENT_REGISTRY.free;
-  const pro = ENTITLEMENT_REGISTRY.pro;
-  const max = ENTITLEMENT_REGISTRY.max;
-
-  const proPrice =
-    isAnnual && pro.marketing.price?.yearly
-      ? Math.round(pro.marketing.price.yearly / 12)
-      : (pro.marketing.price?.monthly ?? 0);
-
-  const maxPrice =
-    isAnnual && max.marketing.price?.yearly
-      ? Math.round(max.marketing.price.yearly / 12)
-      : (max.marketing.price?.monthly ?? 0);
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
 
   const planOptions: { id: PlanColumn; name: string; price: string }[] = [
-    { id: 'free', name: free.marketing.displayName, price: '$0' },
-    { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
-    ...(maxPlanEnabled
-      ? [
-          {
-            id: 'max' as PlanColumn,
-            name: max.marketing.displayName,
-            price: `$${maxPrice}/mo`,
-          },
-        ]
-      : []),
+    {
+      id: 'free',
+      name: freeClaim.displayName,
+      price: formatPublicPriceDisplay(freeClaim),
+    },
+    {
+      id: 'pro',
+      name: proClaim.displayName,
+      price: formatPublicPriceDisplay(proClaim),
+    },
   ];
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
   return (
     <div className='system-b-pricing-chart'>
-      <div className='system-b-pricing-billing'>
-        <span
-          className='system-b-pricing-billing-label'
-          data-active={isAnnual ? undefined : 'true'}
-        >
-          Monthly
-        </span>
-        <Switch
-          checked={isAnnual}
-          onCheckedChange={setIsAnnual}
-          aria-label='Toggle Annual Billing'
-        />
-        <span
-          className='system-b-pricing-billing-label'
-          data-active={isAnnual ? 'true' : undefined}
-        >
-          Annual
-          <span className='system-b-pricing-chart-badge' data-tone='success'>
-            Save ~20%
-          </span>
-        </span>
-      </div>
-
       <div className='system-b-pricing-mobile-selector'>
         <select
           aria-label='Select Plan To Compare'
@@ -202,67 +172,32 @@ export function PricingComparisonChart() {
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                 <div className='system-b-pricing-plan-name'>
-                  {free.marketing.displayName}
+                  {freeClaim.displayName}
                 </div>
-                <div className='system-b-pricing-plan-price'>$0</div>
+                <div className='system-b-pricing-plan-price'>
+                  {formatPublicPriceDisplay(freeClaim)}
+                </div>
               </th>
               <th
                 className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
                 data-selected='true'
               >
                 <div className='system-b-pricing-plan-name'>
-                  {pro.marketing.displayName}
+                  {proClaim.displayName}
                 </div>
                 <div className='system-b-pricing-plan-price'>
-                  ${proPrice}
-                  <span>/mo</span>
-                </div>
-                <div
-                  aria-hidden={isAnnual ? undefined : true}
-                  className='system-b-pricing-plan-annual'
-                  data-visible={isAnnual ? 'true' : undefined}
-                >
-                  {pro.marketing.price?.yearly
-                    ? `$${pro.marketing.price.yearly}/yr`
-                    : null}
+                  {proClaim.priceLabel}
+                  {proClaim.cadence ? <span>{proClaim.cadence}</span> : null}
                 </div>
               </th>
-              {maxPlanEnabled ? (
-                <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
-                  <div className='system-b-pricing-plan-label'>
-                    <span className='system-b-pricing-plan-name'>
-                      {max.marketing.displayName}
-                    </span>
-                    <span className='system-b-pricing-chart-badge'>
-                      Early Access
-                    </span>
-                  </div>
-                  <div className='system-b-pricing-plan-price'>
-                    ${maxPrice}
-                    <span>/mo</span>
-                  </div>
-                  <div
-                    aria-hidden={isAnnual ? undefined : true}
-                    className='system-b-pricing-plan-annual'
-                    data-visible={isAnnual ? 'true' : undefined}
-                  >
-                    {max.marketing.price?.yearly
-                      ? `$${max.marketing.price.yearly}/yr`
-                      : null}
-                  </div>
-                </th>
-              ) : null}
             </tr>
           </thead>
 
           <tbody>
-            {PRICING_COMPARISON.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`cat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
-                  <td
-                    colSpan={maxPlanEnabled ? 4 : 3}
-                    className='system-b-pricing-category-cell'
-                  >
+                  <td colSpan={3} className='system-b-pricing-category-cell'>
                     {category.category}
                   </td>
                 </tr>
@@ -301,7 +236,7 @@ export function PricingComparisonChart() {
           </thead>
 
           <tbody>
-            {PRICING_COMPARISON.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`mcat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={2} className='system-b-pricing-category-cell'>

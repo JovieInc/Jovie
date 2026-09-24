@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Centered, image-free homepage front door with a quiet abstract light field, one headline, one support line, and the name search as the only conversion control.',
+          'Centered, image-free homepage front door with a quiet abstract light field, one headline, one support line, and Request access while gated, or name search when open.',
       },
     },
   },

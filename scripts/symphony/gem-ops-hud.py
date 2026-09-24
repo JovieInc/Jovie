@@ -93,7 +93,6 @@ WORKFLOWS = {
     "Production Controller",
     "Fleet Gate Refresh",
     "Merge Queue Auto-Enroll",
-    "Queue-Deferred Release",
     "Delivery Control Receipts",
 }
 LINEAR_API = "https://api.linear.app/graphql"
@@ -2900,7 +2899,7 @@ def _lifecycle_matrix_rows(state: dict[str, Any], width: int) -> list[str]:
     ci_counts = _run_lifecycle_counts(delivery, {"CI"})
     production_counts = _run_lifecycle_counts(
         delivery,
-        {"Production Controller", "Queue-Deferred Release", "Delivery Control Receipts"},
+        {"Production Controller", "Delivery Control Receipts"},
     )
 
     def count_int(value: Any) -> int | None:

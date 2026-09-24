@@ -147,6 +147,7 @@ export const APP_ROUTES = {
   ALTERNATIVES: '/alternatives',
   ARTIST_NOTIFICATIONS: '/artist-notifications',
   ARTIST_PROFILES: '/artist-profiles',
+  SMART_LINKS: '/smart-links',
   ARTIST_PROFILE_LEGACY: '/artist-profile',
   ARTISTS: '/artists',
   BLOG: '/blog',

@@ -148,10 +148,9 @@ describe('MarketingHeader', () => {
       '/signin'
     );
     // The shared public CTA follows the waitlist-on front-door contract on /signup.
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
   });
 
   it('shows canonical desktop links instead of flyout menu triggers', () => {
@@ -222,10 +221,9 @@ describe('MarketingHeader', () => {
       'href',
       '/artists'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
   });
 
   it('applies and cleans up homepage-style scroll treatment', () => {

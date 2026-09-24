@@ -64,6 +64,61 @@ describe('checkout validates billable price before session creation', () => {
       mocks.create.mock.invocationCallOrder[0]
     );
   });
+  it('persists optional correlation IDs on session and subscription metadata', async () => {
+    await createCheckoutSession({
+      ...args,
+      correlation: {
+        claimId: 'claim_abc',
+        runId: 'run_def',
+        candidateId: 'candidate_ghi',
+        offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+        firstTouch: 'claim_invite',
+      },
+    });
+
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          clerk_user_id: 'user_test',
+          plan: 'pro',
+          claim_id: 'claim_abc',
+          run_id: 'run_def',
+          candidate_id: 'candidate_ghi',
+          offer_version: 'launch-acquisition:premade-artist-profile:v1',
+          first_touch: 'claim_invite',
+        }),
+        subscription_data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            clerk_user_id: 'user_test',
+            plan: 'pro',
+            claim_id: 'claim_abc',
+            run_id: 'run_def',
+            candidate_id: 'candidate_ghi',
+            offer_version: 'launch-acquisition:premade-artist-profile:v1',
+            first_touch: 'claim_invite',
+          }),
+        }),
+      }),
+      undefined
+    );
+  });
+
+  it('omits correlation keys for legacy callers with no optional fields', async () => {
+    await createCheckoutSession(args);
+    const created = mocks.create.mock.calls[0][0] as {
+      metadata: Record<string, string>;
+      subscription_data: { metadata: Record<string, string> };
+    };
+    expect(created.metadata).toEqual({
+      clerk_user_id: 'user_test',
+      plan: 'pro',
+    });
+    expect(created.subscription_data.metadata).toEqual({
+      clerk_user_id: 'user_test',
+      plan: 'pro',
+    });
+  });
+
   it('never creates a session for an old $39 price', async () => {
     mocks.retrieve.mockResolvedValue({
       id: 'price_visibility',

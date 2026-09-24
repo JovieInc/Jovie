@@ -5,19 +5,17 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
-import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  getPublicPriceClaim,
+  type PublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 
 const STORY_CARDS = [
   {
     label: 'Profile',
-    headline: 'Artist profiles built to convert',
-    body: 'One public fan path for streaming, tickets, support, and capture.',
-  },
-  {
-    label: 'Fan',
-    headline: 'Capture fans once. Bring them back automatically.',
-    body: 'Turn profile visits and QR scans into an audience for every drop.',
+    headline: 'Public artist profile and audience capture',
+    body: 'Claim profile same day.',
   },
 ] as const;
 
@@ -39,6 +37,10 @@ function PricingStoryCard({
   );
 }
 
+function formatMonthlyPrice(claim: PublicPriceClaim): string {
+  return `${claim.priceLabel}/month`;
+}
+
 interface PricingRecipeBodyProps {
   readonly requestAccessCopy: string;
   readonly plans: ReactNode;
@@ -52,6 +54,11 @@ export function PricingRecipeBody({
   comparisonChart,
   structuredData,
 }: Readonly<PricingRecipeBodyProps>) {
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
+  const enterpriseClaim = getPublicPriceClaim('enterprise');
+  const proMonthlyPrice = formatMonthlyPrice(proClaim);
+
   return (
     <MarketingPageShell className='system-b-pricing-page'>
       {structuredData}
@@ -60,10 +67,10 @@ export function PricingRecipeBody({
         className='system-b-pricing-hero'
         headingId='pricing-hero-heading'
         headline='Pricing'
-        subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
+        subtitle={`Artist profiles are free forever. Artist Visibility Pro is ${proMonthlyPrice} with limited access.`}
         primaryCta={{
-          label: 'Claim Your Profile',
-          href: `${APP_ROUTES.SIGNUP}?plan=free`,
+          label: freeClaim.ctaLabel,
+          href: freeClaim.ctaHref,
         }}
         secondaryCta={{
           label: 'Explore Artist Profiles',
@@ -103,8 +110,7 @@ export function PricingRecipeBody({
                 Compare All Features
               </h2>
               <p className='system-b-pricing-section-body'>
-                See the plan matrix for notifications, analytics, contacts,
-                smart links, and release workspace capabilities.
+                Public artist profile and audience capture.
               </p>
             </div>
             <div className='system-b-pricing-chart-wrap'>{comparisonChart}</div>
@@ -127,24 +133,24 @@ export function PricingRecipeBody({
             <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
             <div className='system-b-pricing-actions system-b-pricing-actions--center'>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                href={freeClaim.ctaHref}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Claim your profile
+                {freeClaim.ctaLabel}
               </Link>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
+                href={proClaim.ctaHref}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Start Pro trial
+                {proClaim.ctaLabel}
               </Link>
               <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+                href={enterpriseClaim.ctaHref}
                 className='system-b-pricing-secondary-link'
               >
-                Contact sales
+                {enterpriseClaim.ctaLabel}
               </a>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const MIN_CHANGED_LINE_COVERAGE = 60;
-/** Must fail before GitHub merge-queue check_response_timeout_minutes=20. */
+/** Must fail before GitHub merge-queue check_response_timeout_minutes=60. */
 export const EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES = 18;
 /** Must stay in lockstep with ci.yml Exact-head Coverage `timeout --kill-after=20s`. */
 export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '17m';

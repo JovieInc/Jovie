@@ -42,6 +42,18 @@ describe('filesystem-paths', () => {
     );
   });
 
+  it('resolves shared content from the independently deployed Ovie workspace', () => {
+    const cwd = '/workspace/jovie/apps/ovie';
+    const existingPaths = new Set([
+      '/workspace/jovie/turbo.json',
+      '/workspace/jovie/apps/web/package.json',
+      '/workspace/jovie/apps/web/content',
+    ]);
+    const exists = (candidatePath: string) => existingPaths.has(candidatePath);
+    expect(resolveAppWebRoot(cwd, exists)).toBe('/workspace/jovie/apps/web');
+    expect(resolveMonorepoRoot(cwd, exists)).toBe('/workspace/jovie');
+  });
+
   it('falls back safely when existsSync is unavailable', () => {
     expect(resolveAppWebRoot('/workspace/jovie', undefined)).toMatch(
       /apps\/web$/

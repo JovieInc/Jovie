@@ -26,8 +26,10 @@ const h = vi.hoisted(() => ({
   messages: [],
   store: vi.fn(),
   session: vi.fn(),
+  admin: vi.fn(),
 }));
 vi.mock('@/lib/auth/session', () => ({ getSessionContext: h.session }));
+vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.admin }));
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: h.store,
 }));
@@ -61,7 +63,7 @@ function Transcript({
   readonly conversationId?: string;
 }) {
   const chat = useJovieChat({
-    profileId: 'founder-profile',
+    profileId: chatMode === 'ov' ? undefined : 'founder-profile',
     chatMode,
     conversationId,
   });
@@ -92,6 +94,7 @@ describe('Summer history restoration', () => {
     store = new MemoryOperatingStore();
     h.store.mockReturnValue(store);
     h.session.mockResolvedValue({ user: { id: 'founder' } });
+    h.admin.mockResolvedValue(true);
     await appendSummerTurn(store, {
       clientTurnId: 'original-turn',
       userText: 'Remember the shipping decision',
@@ -174,6 +177,17 @@ describe('Summer history restoration', () => {
     const { client } = mount('ov');
     await screen.findByText('Keep the existing owner.');
     h.session.mockResolvedValue({ user: { id: 'customer' } });
+    await act(() => client.invalidateQueries({ queryKey: ['summer-history'] }));
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Keep the existing owner.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('hides previously loaded history when the founder admin role is revoked', async () => {
+    const { client } = mount('ov');
+    await screen.findByText('Keep the existing owner.');
+    h.admin.mockResolvedValue(false);
     await act(() => client.invalidateQueries({ queryKey: ['summer-history'] }));
     await screen.findByRole('alert');
     expect(screen.queryByText('Keep the existing owner.')).toBeNull();

@@ -1,5 +1,6 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,7 +26,6 @@ import {
   fastTrackPolicy,
   frontItemChurnDecision,
   isAutonomousBranch,
-  MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   mapGraphqlCheckResponseTimeoutToMinutes,
   mergeNativeQueuePolicyObservations,
@@ -44,7 +44,6 @@ import {
   unmergeableReenqueueDecision,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
-  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
   validateNativeDrainQueueLabelIsolation,
 } from '../merge-queue-guard.mjs';
@@ -245,7 +244,7 @@ describe('fast-track policy', () => {
   it('permits generated UI fast-track when labels, files, screenshots, checks, and audit trail are present', () => {
     const policy = fastTrackPolicy({
       headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'fast' }, { name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'fast' }, { name: 'ui' }],
       title: 'fix(ui): reduce oversized title token',
       changedFiles: [
         'apps/web/components/features/profile/ProfileHeader.tsx',
@@ -283,21 +282,26 @@ describe('fast-track policy', () => {
       { why: false },
       'missing fast-track UI eligibility audit trail in PR body',
     ],
-  ])('denies UI fast-track when %s is missing', (_name, bodyOptions, blocker) => {
-    const policy = uiFastTrackPolicy({
-      headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
-      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
-      body: buildUiFastTrackBody(bodyOptions),
-    });
+  ])(
+    'denies UI fast-track when %s is missing',
+    (_name, bodyOptions, blocker) => {
+      const policy = uiFastTrackPolicy({
+        headRefName: 'codex/jov-3894-text-token-fix',
+        labels: [{ name: 'ui' }, { name: 'fast' }],
+        changedFiles: [
+          'apps/web/components/features/profile/ProfileHeader.tsx',
+        ],
+        body: buildUiFastTrackBody(bodyOptions),
+      });
 
-    expect(policy.eligible).toBe(false);
-    expect(policy.blockers).toContain(blocker);
-  });
+      expect(policy.eligible).toBe(false);
+      expect(policy.blockers).toContain(blocker);
+    }
+  );
 
   it('ignores negated evidence claims in the fast-track UI section', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: [
         '## Fast-track UI eligibility',
@@ -319,7 +323,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track when changed files are unavailable', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome; affected component test.',
       }),
@@ -333,7 +337,7 @@ describe('fast-track policy', () => {
 
   it('warns but does not block when affected test evidence is absent', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome.',
@@ -348,7 +352,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track for API, auth, billing, DB, security, infra, and routing paths', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: [
         'apps/web/app/api/profile/route.ts',
         'apps/web/lib/entitlements/server.ts',
@@ -500,21 +504,14 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
-    const autoenrollYaml = readFileSync(
-      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
-      'utf8'
-    );
-    const enrollBlock = extractWorkflowJobBlock(autoenrollYaml, 'enroll');
-
-    expect(enrollBlock).toMatch(/drain-pr-queue\.sh/);
-    for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
-      expect(rule.pattern.test(enrollBlock), rule.id).toBe(false);
-    }
-
-    const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
-    expect(result.ok).toBe(true);
-    expect(result.errors).toEqual([]);
+  it('retires custom source admission and its automatic wake paths', () => {
+    expect(existsSync(resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow))).toBe(false);
+    const heartbeat = readFileSync(resolve(REPO_ROOT, '.github/workflows/runner-heartbeat.yml'), 'utf8');
+    const ownerless = readFileSync(resolve(REPO_ROOT, 'scripts/ownerless-recovery-sweeper.mjs'), 'utf8');
+    const loop = readFileSync(resolve(REPO_ROOT, 'scripts/loop-orchestrator.sh'), 'utf8');
+    expect(heartbeat).not.toContain('gh workflow run merge-queue-autoenroll.yml');
+    expect(ownerless).not.toContain('ownerless-recovery-admission');
+    expect(loop).not.toContain('run_logged drain.log');
   });
 
   it('isolates the legacy label from native drain enrollment and dequeue', () => {
@@ -2356,13 +2353,13 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
       checkResponseTimeout: 1200,
     });
     expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
-    expect(secondsReadback.drift).not.toContain(
+    expect(secondsReadback.drift).toContain(
       'check_response_timeout_minutes'
     );
     const liveGraphql = validateLiveMergeQueueRuleset(
@@ -2533,18 +2530,18 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     },
   ];
 
-  it.each(stampCases)('evaluates a recognized stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(
-      changelogGroupCollisionDecision({
-        candidateFiles: ['CHANGELOG.md', 'package.json'],
-        queuedMemberFiles: members,
-        branch: stampBranch,
-      })
-    ).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'evaluates a recognized stamp with $name',
+    ({ members, expected }) => {
+      expect(
+        changelogGroupCollisionDecision({
+          candidateFiles: ['CHANGELOG.md', 'package.json'],
+          queuedMemberFiles: members,
+          branch: stampBranch,
+        })
+      ).toEqual(expected);
+    }
+  );
 
   it('does not claim a clear queue from missing or malformed stamp evidence', () => {
     for (const members of [
@@ -2708,14 +2705,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     }
   }
 
-  it.each(
-    stampCases
-  )('runs the canonical shell and CLI for a stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(runDrainChangelogDecision({ members })).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'runs the canonical shell and CLI for a stamp with $name',
+    ({ members, expected }) => {
+      expect(runDrainChangelogDecision({ members })).toEqual(expected);
+    }
+  );
 
   it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
     expect(

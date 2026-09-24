@@ -24,14 +24,18 @@ const FULL_CATALOG_STORIES = [
 ] as const;
 
 export function storybookAddonsForEnvironment(
-  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1',
+  hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
   return [
     '@storybook/addon-docs',
-    // The live cert runs its own pinned, fail-closed axe pass in the preview
-    // iframe. Keep Storybook's automatic scan for normal and scheduled builds,
-    // but omit it from this dedicated build so the two axe runs cannot race.
-    ...(isLiveStorybookCert ? [] : ['@storybook/addon-a11y']),
+    // The live cert and the surface matrix run their own pinned, fail-closed
+    // axe passes in the preview iframe. Keep Storybook's automatic scan for
+    // normal and scheduled builds, but omit it from those manual suites so the
+    // two axe runs cannot race.
+    ...(isLiveStorybookCert || hasManualAxeSuite
+      ? []
+      : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
     '@storybook/addon-mcp',

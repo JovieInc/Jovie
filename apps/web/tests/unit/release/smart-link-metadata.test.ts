@@ -99,7 +99,7 @@ describe('smart-link metadata', () => {
     });
   });
 
-  it('uses the nested canonical URL for tracks that belong to a release', async () => {
+  it('uses the nested canonical URL without publishing preview audio', async () => {
     getContentBySlugMock.mockResolvedValue({
       id: 'track-1',
       type: 'track',
@@ -110,7 +110,7 @@ describe('smart-link metadata', () => {
       artworkSizes: null,
       releaseDate: new Date('2024-01-01T00:00:00Z'),
       providerLinks: [{ providerId: 'spotify', url: 'https://spotify.test' }],
-      previewUrl: null,
+      previewUrl: 'https://example.com/preview.mp3',
     });
 
     const { generateMetadata } = await import('@/app/[username]/[slug]/page');
@@ -124,6 +124,7 @@ describe('smart-link metadata', () => {
     expect(metadata.openGraph?.url).toBe(
       'https://jov.ie/dualipa/future-nostalgia/neon-skyline'
     );
+    expect(metadata.openGraph?.audio).toBeUndefined();
   });
 
   it('keeps the short canonical URL for standalone releases', async () => {

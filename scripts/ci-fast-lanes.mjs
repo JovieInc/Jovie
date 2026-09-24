@@ -28,7 +28,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -36,6 +37,19 @@ import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+
+export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/backlog-orchestrator/delivery-state-machine.mjs',
+  '--test-coverage-include=scripts/backlog-orchestrator/no-unattended-red.mjs',
+  '--test-coverage-lines=89',
+  '--test-coverage-branches=78',
+  '--test-coverage-functions=95',
+  'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+]);
+export const DELIVERY_CONTROLLER_COVERAGE_COMMAND = `node ${DELIVERY_CONTROLLER_COVERAGE_ARGS.join(' ')}`;
 
 export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
@@ -48,7 +62,12 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
 export const NODE_RUNTIME_CONTRACT_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --reporter=json --outputFile="$CI_FAST_NODE_RUNTIME_REPORT" tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const NODE_RUNTIME_CONTRACT_TEST_FILES = Object.freeze([
+  'tests/unit/ci/node-runtime-policy.test.ts',
+  'tests/unit/ci/node-runtime-contract.test.ts',
+  'tests/unit/ci/runner-setup-action.test.ts',
+]);
 export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   '.nvmrc',
   '.node-version',
@@ -299,13 +318,14 @@ function shell(command, opts = {}) {
   };
 }
 
-function changedFiles(patterns) {
+/** @param {readonly string[]} patterns */
+export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   let diffBase = 'HEAD^1';
   if (event === 'pull_request') {
     const base = process.env.GITHUB_BASE_REF || 'main';
     // Prefer origin/<base> when available (fetch done by workflow).
-    const probe = shell(`git rev-parse --verify origin/${base}`);
+    const probe = shell(`git rev-parse --verify origin/${base}`, { cwd });
     diffBase =
       probe.code === 0
         ? `origin/${base}`
@@ -314,9 +334,14 @@ function changedFiles(patterns) {
     diffBase = process.env.TURBO_SCM_BASE;
   }
 
+  // A PR diff starts at its merge base; main-only updates are not PR changes.
+  // Combined-head and push checks retain their exact two-tree comparison.
+  const range =
+    event === 'pull_request' ? `${diffBase}...HEAD` : `${diffBase} HEAD`;
   const pathspecs = patterns.map(p => `'${p}'`).join(' ');
   const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD -- ${pathspecs}`
+    `git diff --diff-filter=ACDMRT --name-only ${range} -- ${pathspecs}`,
+    { cwd }
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).
@@ -418,6 +443,59 @@ export function selectNodeRuntimeContractCommands({ event, runtimeFiles }) {
   return [];
 }
 
+/**
+ * @param {{
+ *   commandResult: { code: number, output: string },
+ *   reportText?: string,
+ *   reportReadError?: Error,
+ * }} options
+ */
+export function evaluateNodeRuntimeContractResult({
+  commandResult,
+  reportText,
+  reportReadError,
+}) {
+  let report;
+  try {
+    if (reportReadError) throw reportReadError;
+    report = JSON.parse(reportText);
+  } catch (error) {
+    return {
+      code: commandResult.code === 0 ? 1 : commandResult.code,
+      output: `${commandResult.output}\nNode runtime Vitest JSON report was missing or invalid: ${error.message}\n`,
+    };
+  }
+
+  const testResults = Array.isArray(report.testResults)
+    ? report.testResults
+    : [];
+  const actualTestFiles = testResults
+    .map(testResult =>
+      String(testResult?.name || '')
+        .replaceAll('\\', '/')
+        .split('/apps/web/')
+        .at(-1)
+    )
+    .sort();
+  const expectedTestFiles = [...NODE_RUNTIME_CONTRACT_TEST_FILES].sort();
+  const reportPassed =
+    report.success === true &&
+    testResults.length === expectedTestFiles.length &&
+    testResults.every(testResult => testResult?.status === 'passed') &&
+    report.numFailedTests === 0 &&
+    report.numTotalTests > 0 &&
+    report.numPassedTests === report.numTotalTests &&
+    JSON.stringify(actualTestFiles) === JSON.stringify(expectedTestFiles);
+  const summary = `Node runtime contracts: ${testResults.length}/${expectedTestFiles.length} target files ran; ${report.numPassedTests}/${report.numTotalTests} tests passed.`;
+
+  return {
+    code:
+      commandResult.code === 0 && reportPassed ? 0 : commandResult.code || 1,
+    output: `${commandResult.output}\n${summary}\n`,
+    report,
+  };
+}
+
 function runNodeRuntimeContracts() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   const runtimeFiles =
@@ -435,31 +513,37 @@ function runNodeRuntimeContracts() {
     };
   }
 
-  const result = shell(commands[0]);
-  return { code: result.code, output: result.output };
+  const reportPath = resolve(
+    process.env.RUNNER_TEMP || tmpdir(),
+    `jovie-node-runtime-contracts-${process.pid}.json`
+  );
+  rmSync(reportPath, { force: true });
+  const result = shell(commands[0], {
+    env: {
+      ...process.env,
+      CI_FAST_NODE_RUNTIME_REPORT: reportPath,
+    },
+  });
+
+  let reportText;
+  let reportReadError;
+  try {
+    reportText = readFileSync(reportPath, 'utf8');
+  } catch (error) {
+    reportReadError = error;
+  } finally {
+    rmSync(reportPath, { force: true });
+  }
+
+  return evaluateNodeRuntimeContractResult({
+    commandResult: result,
+    reportText,
+    reportReadError,
+  });
 }
 
-function listAllChangedFiles() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  let diffBase = 'HEAD^1';
-  if (event === 'pull_request') {
-    const base = process.env.GITHUB_BASE_REF || 'main';
-    const probe = shell(`git rev-parse --verify origin/${base}`);
-    diffBase =
-      probe.code === 0
-        ? `origin/${base}`
-        : process.env.TURBO_SCM_BASE || diffBase;
-  } else if (process.env.TURBO_SCM_BASE) {
-    diffBase = process.env.TURBO_SCM_BASE;
-  }
-  const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD`
-  );
-  if (result.code !== 0) return null;
-  return result.output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+export function listAllChangedFiles(cwd = REPO_ROOT) {
+  return changedFiles([], cwd);
 }
 
 let cachedRepoLanes = null;
@@ -805,6 +889,7 @@ function runStructural() {
 
   const selected = selectedProductLanes();
   const operationsParts = [
+    DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
@@ -856,7 +941,7 @@ function runStructural() {
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [

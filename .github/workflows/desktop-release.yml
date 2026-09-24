@@ -13,6 +13,8 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 # - Manual dispatch publishes a signed staging prerelease from exact green
 #   current main, or rebuilds production after the same Production Verified
 #   proof.
+# - Daily staging reconciliation publishes only when desktop source changed
+#   since the last signed staging release and current main has exact green CI.
 #
 # Signing & notarization:
 # - Requires GH secrets: MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD,
@@ -32,6 +34,8 @@ on:
     workflows: [Production Controller]
     types: [completed]
     branches: [main]
+  schedule:
+    - cron: '17 10 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -57,7 +61,7 @@ jobs:
   authorize-release:
     name: Authorize verified desktop release
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
       (
         github.event_name == 'workflow_run' &&
         github.event.workflow_run.conclusion == 'success'
@@ -71,6 +75,7 @@ jobs:
       release_sha: ${{ steps.authorize.outputs.release_sha }}
       environment: ${{ steps.authorize.outputs.environment }}
       baseline_sha: ${{ steps.authorize.outputs.baseline_sha }}
+      staging_auto: ${{ steps.authorize.outputs.staging_auto }}
       should_release: ${{ steps.select.outputs.should_release }}
       should_stamp: ${{ steps.select.outputs.should_stamp }}
     steps:
@@ -104,6 +109,7 @@ jobs:
             echo "baseline_sha="
             echo "authorized=false"
             echo "manual=false"
+            echo "staging_auto=false"
             echo "already_released=false"
           } >> "$GITHUB_OUTPUT"
 
@@ -139,6 +145,14 @@ jobs:
             if [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; then
               echo "manual=true" >> "$GITHUB_OUTPUT"
             fi
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            [[ "$MANUAL_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Scheduled staging dispatch did not resolve a full commit SHA."
+              exit 1
+            }
+            release_sha="$MANUAL_SHA"
+            environment="staging"
+            echo "staging_auto=true" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Unsupported desktop release event: $EVENT_NAME"
             exit 1
@@ -160,6 +174,8 @@ jobs:
               echo "::error::Production Controller workflow identity was not proven."
               exit 1
             }
+            # jq variables are supplied with --arg; shell interpolation is intentionally disabled.
+            # shellcheck disable=SC2016
             controller_generation_selector='
               if (
                 type == "object" and
@@ -208,7 +224,10 @@ jobs:
             echo "::error::Could not resolve exact current main for desktop authorization."
             exit 1
           }
-          if [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
+          if [ "$EVENT_NAME" = "schedule" ] && [ "$current_main_sha" != "$release_sha" ]; then
+            echo "::notice::Scheduled staging generation $release_sha was superseded by $current_main_sha."
+            exit 0
+          elif [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
             mainline_compare="$(gh api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
@@ -891,14 +910,56 @@ jobs:
           AUTHORIZED: ${{ steps.authorize.outputs.authorized }}
           ALREADY_RELEASED: ${{ steps.authorize.outputs.already_released }}
           MANUAL: ${{ steps.authorize.outputs.manual }}
+          STAGING_AUTO: ${{ steps.authorize.outputs.staging_auto }}
           RELEASE_SHA: ${{ steps.authorize.outputs.release_sha }}
           BASELINE_SHA: ${{ steps.authorize.outputs.baseline_sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           echo "should_release=false" >> "$GITHUB_OUTPUT"
           echo "should_stamp=false" >> "$GITHUB_OUTPUT"
           if [ "$AUTHORIZED" != "true" ] || [ "$ALREADY_RELEASED" = "true" ]; then
+            exit 0
+          fi
+          if [ "${STAGING_AUTO:-false}" = "true" ]; then
+            staging_release="$(gh api "repos/$REPOSITORY/releases/tags/desktop-staging")" || {
+              echo "::error::Signed staging baseline is unavailable; use the explicit manual bootstrap path."
+              exit 1
+            }
+            staging_baseline="$(jq -er '
+              select(type == "object" and .tag_name == "desktop-staging")
+              | .target_commitish
+              | select(type == "string" and test("^[0-9a-f]{40}$"))
+            ' <<<"$staging_release")" || {
+              echo "::error::Signed staging baseline has no exact source revision."
+              exit 1
+            }
+            [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Scheduled staging source revision is malformed."
+              exit 1
+            }
+            git cat-file -e "${staging_baseline}^{commit}"
+            git cat-file -e "${RELEASE_SHA}^{commit}"
+            git merge-base --is-ancestor "$staging_baseline" "$RELEASE_SHA" || {
+              echo "::error::Signed staging baseline is not an ancestor of current main."
+              exit 1
+            }
+            desktop_changes="$(git diff --name-status --find-renames \
+              "$staging_baseline" "$RELEASE_SHA" -- \
+              .github/workflows/desktop-release.yml \
+              apps/desktop/build apps/desktop/electron-builder.yml \
+              apps/desktop/electron-builder.staging.yml apps/desktop/package.json \
+              apps/desktop/scripts apps/desktop/src pnpm-lock.yaml \
+              scripts/desktop-release-assets.mjs)"
+            if [ -n "$desktop_changes" ]; then
+              printf '%s\n' "$desktop_changes"
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+              echo "Verified main contains unpublished staging desktop changes."
+            else
+              echo "Signed staging already contains the current desktop source."
+            fi
             exit 0
           fi
           if [ "$MANUAL" = "true" ]; then

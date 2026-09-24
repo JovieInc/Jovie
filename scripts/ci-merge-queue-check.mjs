@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   changelogGroupCollisionDecision,
@@ -10,7 +10,6 @@ import {
   unmergeableEjectDecision,
   unmergeableReenqueueDecision,
   validateLiveMergeQueueRuleset,
-  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
   validateNativeDrainQueueLabelIsolation,
 } from './lib/merge-queue-guard.mjs';
@@ -71,8 +70,8 @@ function runValidate({ checkLive = false } = {}) {
     MERGE_QUEUE_REPO_PATHS.branchProtection
   );
   const ciWorkflowYaml = readRepoFile(MERGE_QUEUE_REPO_PATHS.ciWorkflow);
-  const autoenrollWorkflowYaml = readRepoFile(
-    MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
+  const autoenrollExists = existsSync(
+    resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow)
   );
   const drainScript = readRepoFile(MERGE_QUEUE_REPO_PATHS.drainScript);
   const repoValidation = validateMergeQueueRepoConfig({
@@ -80,7 +79,6 @@ function runValidate({ checkLive = false } = {}) {
     branchProtectionYaml,
     ciWorkflowYaml,
   });
-  const enrollHotPath = validateMergeQueueEnrollHotPath(autoenrollWorkflowYaml);
   const drainLabelIsolation =
     validateNativeDrainQueueLabelIsolation(drainScript);
 
@@ -91,18 +89,15 @@ function runValidate({ checkLive = false } = {}) {
     }
   }
 
-  if (!repoValidation.ok || !enrollHotPath.ok || !drainLabelIsolation.ok) {
+  if (!repoValidation.ok || autoenrollExists || !drainLabelIsolation.ok) {
     if (!repoValidation.ok) {
       console.error('Merge queue repo-config validation failed:');
       for (const error of repoValidation.errors) {
         console.error(`- ${error}`);
       }
     }
-    if (!enrollHotPath.ok) {
-      console.error('Merge queue enroll hot-path validation failed:');
-      for (const error of enrollHotPath.errors) {
-        console.error(`- ${error}`);
-      }
+    if (autoenrollExists) {
+      console.error('Retired Auto-Enroll workflow must stay absent');
     }
     if (!drainLabelIsolation.ok) {
       console.error('Native drain label-isolation validation failed:');
@@ -117,7 +112,7 @@ function runValidate({ checkLive = false } = {}) {
   console.log(
     `Repo config OK — required aggregates: ${repoValidation.contexts.join(', ')}`
   );
-  console.log('Enroll hot path OK — no test-only dependency bootstrap');
+  console.log('Retired Auto-Enroll workflow absent');
   console.log('Native drain OK — no legacy merge-queue label dependency');
 
   if (!checkLive) {

@@ -1344,7 +1344,7 @@ describe('deploy workflow Vercel env resolution', () => {
       resolve(repoRoot, 'node_modules/vercel/dist/commands/deploy/index.js'),
       'utf8'
     );
-    expect(packageJson.devDependencies.vercel).toBe('59.16.0');
+    expect(packageJson.devDependencies.vercel).toBe('59.23.2');
     expect(vercelEntry).toContain(
       'process.env.VERCEL_TOKEN&&(explicitToken=process.env.VERCEL_TOKEN,tokenSource="env")'
     );

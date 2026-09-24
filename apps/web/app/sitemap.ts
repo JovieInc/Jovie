@@ -53,6 +53,7 @@ type SitemapCatalog = {
   tracks: Array<{
     username: string;
     slug: string;
+    releaseSlug: string;
     updatedAt: Date | null;
   }>;
   playlists: Array<{
@@ -114,6 +115,7 @@ const getSitemapCatalog = unstable_cache(
           .select({
             username: creatorProfiles.usernameNormalized,
             slug: discogRecordings.slug,
+            releaseSlug: discogReleases.slug,
             updatedAt: discogRecordings.updatedAt,
           })
           .from(discogRecordings)
@@ -129,6 +131,9 @@ const getSitemapCatalog = unstable_cache(
             creatorProfiles,
             eq(discogRecordings.creatorProfileId, creatorProfiles.id)
           )
+          // Keep the same earliest-release choice used by the track page when
+          // a recording appears on multiple eligible releases.
+          .orderBy(discogReleases.releaseDate)
           .where(
             and(
               eq(creatorProfiles.isPublic, true),
@@ -186,7 +191,7 @@ const getSitemapCatalog = unstable_cache(
       return EMPTY_CATALOG;
     }
   },
-  ['sitemap-catalog-v5'],
+  ['sitemap-catalog-v6'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 
@@ -344,17 +349,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
   );
 
-  const releaseUrls = new Set(releasePages.map(release => release.url));
-  const trackPages: MetadataRoute.Sitemap = catalog.tracks
-    .filter(
-      track => !releaseUrls.has(absoluteUrl(`/${track.username}/${track.slug}`))
-    )
-    .map(track =>
+  const seenTrackKeys = new Set<string>();
+  const trackPages: MetadataRoute.Sitemap = catalog.tracks.flatMap(track => {
+    const trackKey = `${track.username}/${track.slug}`;
+    if (seenTrackKeys.has(trackKey)) return [];
+    seenTrackKeys.add(trackKey);
+
+    return [
       sitemapEntry(
-        `/${track.username}/${track.slug}`,
+        `/${track.username}/${track.releaseSlug}/${track.slug}`,
         toContentRevisionDate(track.updatedAt)
-      )
-    );
+      ),
+    ];
+  });
 
   const playlistPages: MetadataRoute.Sitemap = catalog.playlists.map(playlist =>
     sitemapEntry(

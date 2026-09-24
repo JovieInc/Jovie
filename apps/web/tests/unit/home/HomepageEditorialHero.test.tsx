@@ -1,11 +1,23 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
+
+const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
+vi.mock('@/components/homepage/homepage-analytics', () => ({
+  trackHomepageEvent: trackAction,
+}));
+
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
+beforeEach(() => {
+  gate.WAITLIST_ENABLED = false;
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -32,6 +44,43 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
+  it('attributes a standalone closing access action to its caller', () => {
+    gate.WAITLIST_ENABLED = true;
+    render(
+      <HomepagePrimaryAction
+        submitTestId='closing-access'
+        submitAnalytics={{
+          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+          properties: { placement: 'close' },
+        }}
+      />
+    );
+    const action = screen.getByRole('link', { name: 'Request access' });
+    action.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(action);
+    expect(action).toHaveAttribute('href', '/signup');
+    expect(action).toHaveAttribute('data-testid', 'closing-access');
+    expect(trackAction).toHaveBeenLastCalledWith(
+      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
+      { placement: 'close' }
+    );
+  });
+  it('routes waitlist-on visitors to access with no name-search control', () => {
+    gate.WAITLIST_ENABLED = true;
+    renderHero();
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    const action = screen.getByRole('link', { name: 'Request access' });
+    action.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(action);
+    expect(trackAction).toHaveBeenCalledWith(
+      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
+      expect.objectContaining({ placement: 'hero' })
+    );
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
 

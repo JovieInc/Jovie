@@ -2311,6 +2311,20 @@ def activation_ownership_preflight(repo_root: pathlib.Path, *, home: pathlib.Pat
     return {"allowed": True, "reason": "canonical-managed-ownership-observed"}
 
 
+def activation_classification(repo_root: pathlib.Path, binding: str | None,
+                              binding_digest: str | None) -> dict[str, Any]:
+    legacy = activation_ownership_preflight(repo_root)
+    if legacy["allowed"]:
+        return {"schema": "symphony-activation-classification/v1", "mode": "canonical-managed"}
+    if not binding or not binding_digest:
+        return {"mode": "held", "reason": "upstream-configuration-approval-missing"}
+    try:
+        from emit_gem_service_attestation import observe_upstream_preservation
+        return observe_upstream_preservation(pathlib.Path(binding), binding_digest)
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        return {"mode": "held", "reason": "upstream-preservation-unverified"}
+
+
 def _print_result(result: dict[str, Any], *, json_output: bool) -> None:
     if json_output:
         print(json.dumps(result, sort_keys=True))
@@ -2348,6 +2362,10 @@ def main(argv: list[str] | None = None) -> int:
 
     ownership_parser = sub.add_parser("activation-preflight")
     ownership_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
+    classification_parser = sub.add_parser("activation-classify")
+    classification_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
+    classification_parser.add_argument("--upstream-binding")
+    classification_parser.add_argument("--upstream-binding-sha256")
 
     budget_parser = sub.add_parser("budget-check")
     budget_parser.add_argument("--active-issues", type=int, default=MEASURED_ACTIVE_ISSUES)
@@ -2434,6 +2452,10 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
+    if args.command == "activation-classify":
+        result = activation_classification(args.repo_root, args.upstream_binding, args.upstream_binding_sha256)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["mode"] in {"canonical-managed", "upstream-preserved"} else CLOSURE_HOLD_EXIT_CODE
     if args.command == "activation-preflight":
         result = activation_ownership_preflight(args.repo_root)
         print(json.dumps(result, sort_keys=True))

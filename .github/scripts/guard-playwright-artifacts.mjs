@@ -706,6 +706,7 @@ function report(findings) {
 }
 
 function maskValues(values) {
+  if (process.env.GITHUB_ACTIONS !== 'true') return;
   for (const value of values) {
     const escaped = value
       .replaceAll('%', '%25')

@@ -58,6 +58,21 @@ function job(
   };
 }
 
+function earlyCoalescedJobs() {
+  return [
+    job('Coalesce release wave', 1, 'completed', 'success'),
+    ...[
+      'Authorize fleet deployment state',
+      'Authorize exact main CI evidence',
+      'Production Release',
+      'Post-Deploy Smoke (Production)',
+      'Lighthouse CI (Production)',
+      'Post-Deploy Auth Smoke (Production)',
+      'Production Verified',
+    ].map(name => job(name, 1, 'completed', 'skipped')),
+  ];
+}
+
 function primaryMarker(
   status: string,
   conclusion: string | null,
@@ -1252,6 +1267,49 @@ describe('producer coalescence classification', () => {
     ).toBe(true);
   });
 
+  it('recognizes the exact early release-wave no-op shape', () => {
+    expect(
+      classifyProducerCoalescence(
+        run(1, 'completed', 'success'),
+        earlyCoalescedJobs()
+      )
+    ).toBe(true);
+  });
+
+  it('rejects missing, duplicate, extra, active, or executed early-coalescence jobs', () => {
+    const jobs = earlyCoalescedJobs();
+    const malformed = [
+      jobs.slice(1),
+      [...jobs, jobs[0]],
+      [...jobs, job('Unexpected job', 1, 'completed', 'skipped')],
+      [jobs[0], jobs[0], ...jobs.slice(2)],
+      ...jobs.map((_, index) =>
+        jobs.map((entry, current) =>
+          current === index
+            ? { ...entry, status: 'in_progress', conclusion: null }
+            : entry
+        )
+      ),
+      ...jobs.map((_, index) =>
+        jobs.map((entry, current) =>
+          current === index
+            ? { ...entry, conclusion: index === 0 ? 'skipped' : 'success' }
+            : entry
+        )
+      ),
+      ...jobs.map((_, index) =>
+        jobs.map((entry, current) =>
+          current === index ? { ...entry, conclusion: 'failure' } : entry
+        )
+      ),
+    ];
+    for (const evidence of malformed) {
+      expect(
+        classifyProducerCoalescence(run(1, 'completed', 'success'), evidence)
+      ).toBe(false);
+    }
+  });
+
   it('refuses a producer that actually promoted', () => {
     const jobs = coalescedJobs();
     jobs[1] = job(
@@ -1458,7 +1516,11 @@ describe('producer activation evidence CLI', () => {
     ),
   ];
 
-  async function runCliWithProducerEvidence(supersede: boolean) {
+  async function runCliWithProducerEvidence(
+    supersede: boolean,
+    producerJobs = coalescedJobs,
+    successorSha = 'b'.repeat(40)
+  ) {
     const calls: string[] = [];
     processRunner.mockImplementation((command: string, args: string[]) => {
       const endpoint = args[1];
@@ -1479,8 +1541,8 @@ describe('producer activation evidence CLI', () => {
           `repos/${repo}/actions/runs/${controllerRun}/attempts/1/jobs?per_page=100`
         ) {
           output = JSON.stringify({
-            total_count: coalescedJobs.length,
-            jobs: coalescedJobs,
+            total_count: producerJobs.length,
+            jobs: producerJobs,
           });
         } else if (
           endpoint ===
@@ -1493,7 +1555,7 @@ describe('producer activation evidence CLI', () => {
                   {
                     ...run(1, 'in_progress', null),
                     id: 789,
-                    head_sha: 'b'.repeat(40),
+                    head_sha: successorSha,
                     created_at: '2026-09-10T02:23:47Z',
                   },
                 ]
@@ -1543,6 +1605,31 @@ describe('producer activation evidence CLI', () => {
       processRunner.mockReset();
     }
   }
+
+  it('keeps an early no-op unverified even with a same-SHA successor', async () => {
+    const { result } = await runCliWithProducerEvidence(
+      true,
+      earlyCoalescedJobs(),
+      sha
+    );
+    expect(result).toMatchObject({
+      state: 'none',
+      reason: 'no_marker',
+      coalesced: true,
+    });
+    expect(result.supersededBy).toBeUndefined();
+    expect(result.deploymentId).toBeUndefined();
+  });
+
+  it('does not classify an early producer with jobs from another attempt', async () => {
+    const jobs = earlyCoalescedJobs().map(entry => ({
+      ...entry,
+      run_attempt: 2,
+    }));
+    const { result } = await runCliWithProducerEvidence(false, jobs);
+    expect(result).toMatchObject({ state: 'none', reason: 'no_marker' });
+    expect(result.coalesced).toBeUndefined();
+  });
 
   it('marks a coalesced producer superseded by a newer in-flight run', async () => {
     const { result } = await runCliWithProducerEvidence(true);
