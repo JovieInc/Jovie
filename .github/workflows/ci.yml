@@ -1542,6 +1542,10 @@ jobs:
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
 
+          # Evidence collection changes must execute the existing native-queue
+          # behavioral tests and per-file coverage, including test-only edits.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
+
           # FX remediation policy and dispatcher source must run their real
           # per-file coverage suite when the implementation or tests change.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx)\.test\.mjs$'

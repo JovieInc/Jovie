@@ -1110,6 +1110,39 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
   });
 
+  it('selects structural coverage for native queue evidence and collector edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .join('');
+    for (const path of [
+      'scripts/native-queue-eval.mjs',
+      'scripts/lib/native-queue-eval.mjs',
+      'scripts/lib/native-queue-group-evidence.mjs',
+      'scripts/lib/native-queue-policy-evidence.mjs',
+      'scripts/lib/__tests__/native-queue-collector.test.mjs',
+      'scripts/lib/__tests__/native-queue-eval.test.mjs',
+      'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+      'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    for (const path of ['README.md', 'docs/native-queue-eval.mjs']) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(1);
+    }
+  });
+
   it('runs native queue delivery regressions with coverage for executor changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

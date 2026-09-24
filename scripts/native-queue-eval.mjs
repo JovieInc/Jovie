@@ -238,6 +238,15 @@ export function main(
         }
         s.prs.push(p);
       }
+      // Close the live inventory observation before refreshing historical merge proof.
+      s.readback = connection(
+        graphql(`query InventoryReadback {repository(owner:"JovieInc",name:"Jovie") {pullRequests(first:100,states:OPEN) {
+        nodes {number headRefOid isInMergeQueue mergeQueueEntry {id headCommit {oid} baseCommit {oid}}} pageInfo {hasNextPage}}}}`)
+          .pullRequests
+      );
+      s.readbackAt = new Date().toISOString();
+      if (inventoryIdentity(s.prs) !== inventoryIdentity(s.readback))
+        throw new Error('Inventory changed during collection');
       const tracked = new Map(
         bundle.snapshots
           .flatMap(snap => snap.prs ?? [])
@@ -281,14 +290,6 @@ export function main(
         bundle.merges = bundle.merges.filter(m => m.number !== number);
         bundle.merges.push(receipt);
       }
-      s.readback = connection(
-        graphql(`query InventoryReadback {repository(owner:"JovieInc",name:"Jovie") {pullRequests(first:100,states:OPEN) {
-        nodes {number headRefOid isInMergeQueue mergeQueueEntry {id headCommit {oid} baseCommit {oid}}} pageInfo {hasNextPage}}}}`)
-          .pullRequests
-      );
-      s.readbackAt = new Date().toISOString();
-      if (inventoryIdentity(s.prs) !== inventoryIdentity(s.readback))
-        throw new Error('Inventory changed during collection');
       if (bundle.evaluatorSha) {
         const run = api(
           `actions/workflows/ci.yml/runs?head_sha=${bundle.evaluatorSha}&per_page=100`
