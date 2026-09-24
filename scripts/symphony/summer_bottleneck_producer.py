@@ -401,6 +401,33 @@ def read_upstream_sources() -> tuple[dict, dict, dict]:
     return fleet, runtime, LiveUpstreamObservation(evidence)
 
 
+def shipping_runtime_observation(runtime: dict, attestation: dict, now: datetime) -> dict:
+    """Project a fresh existing observation; this cannot activate or accept work."""
+    revision = upstream_runtime_revision(attestation, runtime, now)
+    if not isinstance(attestation, LiveUpstreamObservation) or revision is None:
+        raise ValueError("shipping runtime requires verified live observation")
+    counts = record(runtime.get("counts"), "runtime counts")
+    queues = {}
+    for name in ("running", "retrying", "blocked"):
+        rows = runtime.get(name)
+        if not isinstance(rows, list) or count(counts.get(name), name) != len(rows):
+            raise ValueError("shipping runtime queue shape mismatch")
+        projected = []
+        for row in rows:
+            item = record(row, "runtime issue")
+            if (not isinstance(item.get("issue_id"), str) or not item["issue_id"]
+                    or not isinstance(item.get("issue_identifier"), str) or not item["issue_identifier"]):
+                raise ValueError("shipping runtime issue identity missing")
+            projected.append({"issueId": item["issue_id"], "identifier": item["issue_identifier"],
+                              "sessionId": item.get("session_id"), "startedAt": item.get("started_at")})
+        queues[name] = projected
+    observed = attestation["after"]
+    return {"schema": "symphony-shipping-runtime-observation/v1", "sourceRevision": revision,
+            "generation": observed["runtimeGeneration"], "invocationId": observed["invocationId"],
+            "observedAt": observed["observedAt"], "generatedAt": runtime["generated_at"],
+            "stateDigest": attestation["stateDigest"], **queues}
+
+
 def attested_runtime_revision(
     signals: dict[str, Any],
     runtime: dict[str, Any],
@@ -736,10 +763,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-bundle")
     parser.add_argument("--submit", action="store_true")
+    parser.add_argument("--observe-shipping-runtime", action="store_true")
     args = parser.parse_args()
     mode = os.environ.get("GEM_SERVICE_ATTESTATION_MODE", "legacy")
     if mode not in ("legacy", "upstream-preservation"):
         raise ValueError("unknown attestation mode")
+    if args.observe_shipping_runtime and (mode != "upstream-preservation" or args.submit or args.source_bundle):
+        raise ValueError("shipping runtime observation requires live read-only upstream mode")
     if mode == "upstream-preservation":
         if args.source_bundle:
             raise ValueError("upstream observation requires a live state read")
@@ -747,6 +777,10 @@ def main() -> int:
     else:
         fleet, runtime = read_sources(args.source_bundle)
         attestation = load_service_attestation()
+    if args.observe_shipping_runtime:
+        result = shipping_runtime_observation(runtime, attestation, datetime.now(timezone.utc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
     concurrency = None if args.source_bundle else load_concurrency_observation()
     existing_repair = None if args.source_bundle else load_existing_repair_reference()
     now = datetime.now(timezone.utc)

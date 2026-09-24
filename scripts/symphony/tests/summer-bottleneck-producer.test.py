@@ -10,7 +10,7 @@ import tempfile
 import sys
 import subprocess
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -633,6 +633,67 @@ class ProducerTests(unittest.TestCase):
 
 
 class UpstreamObservationTests(unittest.TestCase):
+    def shipping_evidence(self):
+        fleet, runtime, evidence = self.evidence()
+        runtime.update(counts={"running": 1, "retrying": 0, "blocked": 0},
+                       running=[{"issue_id": "issue-1", "issue_identifier": "JOV-6586",
+                                 "session_id": "session-1", "started_at": "2026-09-05T19:29:20Z",
+                                 "last_message": "private worker content"}], retrying=[], blocked=[])
+        evidence["stateDigest"] = MODULE.digest(runtime)
+        return fleet, runtime, evidence
+
+    def test_shipping_projection_keeps_identity_without_worker_content_or_authority(self):
+        _, runtime, evidence = self.shipping_evidence()
+        result = MODULE.shipping_runtime_observation(runtime, evidence, NOW)
+        self.assertEqual(result["generation"], "f" * 64)
+        self.assertEqual(result["invocationId"], "e" * 32)
+        self.assertEqual(result["sourceRevision"], RUNTIME_SHA)
+        self.assertEqual(result["stateDigest"], MODULE.digest(runtime))
+        self.assertEqual(result["running"], [{"issueId": "issue-1", "identifier": "JOV-6586",
+                                             "sessionId": "session-1", "startedAt": "2026-09-05T19:29:20Z"}])
+        self.assertNotIn("private worker content", json.dumps(result))
+        self.assertNotIn("acceptance", result)
+        self.assertNotIn("terminal", result)
+
+    def test_shipping_projection_rejects_fixtures_stale_proof_and_unknown_queue_shapes(self):
+        _, runtime, evidence = self.shipping_evidence()
+        for proof in [dict(evidence), {}, {**evidence, "stateDigest": "a" * 64}]:
+            with self.assertRaises(ValueError): MODULE.shipping_runtime_observation(runtime, proof, NOW)
+        with self.assertRaises(ValueError):
+            MODULE.shipping_runtime_observation(runtime, evidence, NOW + timedelta(minutes=20))
+        for change in [{"counts": {}}, {"running": None}, {"counts": {"running": 0}},
+                       {"running": [{}]}, {"running": [{"issue_id": "id", "issue_identifier": ""}]}]:
+            changed = {**runtime, **change}
+            bound = copy.deepcopy(evidence)
+            bound["stateDigest"] = MODULE.digest(changed)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                MODULE.shipping_runtime_observation(changed, bound, NOW)
+
+    def test_shipping_cli_only_reads_existing_live_observer(self):
+        values = self.shipping_evidence()
+        with mock.patch.dict(MODULE.os.environ, {"GEM_SERVICE_ATTESTATION_MODE": "upstream-preservation"}, clear=True), \
+             mock.patch.object(sys, "argv", ["producer", "--observe-shipping-runtime"]), \
+             mock.patch.object(MODULE, "read_upstream_sources", return_value=values) as live, \
+             mock.patch.object(MODULE, "submit") as submit, \
+             mock.patch.object(MODULE, "load_existing_repair_reference") as repair, \
+             mock.patch.object(MODULE, "datetime", wraps=datetime) as clock, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            clock.now.return_value = NOW
+            self.assertEqual(MODULE.main(), 0)
+            self.assertEqual(json.loads(output.getvalue())["schema"], "symphony-shipping-runtime-observation/v1")
+            live.assert_called_once_with()
+            submit.assert_not_called()
+            repair.assert_not_called()
+
+    def test_shipping_cli_rejects_submit_bundle_and_legacy_combinations_before_reads(self):
+        for mode, options in [("legacy", []), ("upstream-preservation", ["--submit"]),
+                              ("upstream-preservation", ["--source-bundle", "fixture.json"])]:
+            with mock.patch.dict(MODULE.os.environ, {"GEM_SERVICE_ATTESTATION_MODE": mode}, clear=True), \
+                 mock.patch.object(sys, "argv", ["producer", "--observe-shipping-runtime", *options]), \
+                 mock.patch.object(MODULE, "read_upstream_sources") as live:
+                with self.assertRaisesRegex(ValueError, "read-only"): MODULE.main()
+                live.assert_not_called()
+
     def evidence(self):
         fleet, runtime = sources()
         runtime["generated_at"] = "2026-09-05T19:29:31Z"
