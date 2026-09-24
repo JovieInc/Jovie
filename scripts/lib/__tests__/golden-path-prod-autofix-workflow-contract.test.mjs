@@ -7,6 +7,14 @@ const WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/golden-path-prod-autofix.yml'),
   'utf8'
 );
+const SCRIPT = readFileSync(
+  resolve(REPO_ROOT, 'scripts/golden-path-lock.mjs'),
+  'utf8'
+);
+const LOCK_HELPER = readFileSync(
+  resolve(REPO_ROOT, 'scripts/lib/golden-path-lock.mjs'),
+  'utf8'
+);
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
@@ -47,6 +55,65 @@ describe('Golden Path prod autofix workflow contract', () => {
     expect(receiptGuard).toBeGreaterThan(-1);
     expect(successGuard).toBeGreaterThan(receiptGuard);
     expect(cursorGuard).toBeGreaterThan(successGuard);
+  });
+
+  it('fails visibly without autofix when chat verification stops at Turnstile', () => {
+    const inconclusiveGuard = WORKFLOW.indexOf(
+      '.inconclusive == true and ([.checks[] | select(.ok == false and .inconclusive != true)] | length == 0)'
+    );
+    const cursorGuard = WORKFLOW.indexOf(
+      'if [[ -z "${CURSOR_API_KEY:-}" ]]; then'
+    );
+    const autofixCall = WORKFLOW.indexOf(
+      'node scripts/golden-path-lock.mjs autofix'
+    );
+
+    expect(inconclusiveGuard).toBeGreaterThan(-1);
+    expect(cursorGuard).toBeGreaterThan(inconclusiveGuard);
+    expect(autofixCall).toBeGreaterThan(inconclusiveGuard);
+    expect(WORKFLOW).toContain('no autofix was attempted');
+    expect(WORKFLOW).toContain(
+      'The post-challenge first-message path was not exercised'
+    );
+  });
+
+  it('probes the anonymous UIMessage stream and reports only a completed stream as pass', () => {
+    expect(SCRIPT).toContain(
+      'body: JSON.stringify(buildProdProbeChatPayload())'
+    );
+    expect(SCRIPT).toContain("Accept: 'text/event-stream'");
+    expect(WORKFLOW).toContain(
+      'the first-message stream reached a clean finish event'
+    );
+    expect(WORKFLOW).not.toContain('real first-message response');
+  });
+
+  it('runs behavior and workflow tests with V8 coverage in the required merge gate', () => {
+    expect(LOCK_HELPER).toContain(
+      'GOLDEN_PATH_LOCK_SELF_TEST_FILES = Object.freeze(['
+    );
+    expect(LOCK_HELPER).toContain("'lib/__tests__/golden-path-lock.test.mjs'");
+    expect(LOCK_HELPER).toContain(
+      "'lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs'"
+    );
+    expect(SCRIPT).toContain('runVitest(GOLDEN_PATH_LOCK_SELF_TEST_FILES,');
+    expect(SCRIPT).toMatch(
+      /runVitest\(GOLDEN_PATH_LOCK_SELF_TEST_FILES,\s*\{\s*filterWeb: false,\s*coverage: true,\s*\}\)/
+    );
+    expect(SCRIPT).toContain('--coverage.provider=v8');
+    expect(SCRIPT).toContain('--coverage.include=lib/golden-path-lock.mjs');
+    expect(SCRIPT).toContain('--coverage.reporter=json-summary');
+    expect(SCRIPT).toContain(
+      'process.env.RUNNER_TEMP}/golden-path-lock-coverage'
+    );
+    expect(SCRIPT).toContain('`/tmp/golden-path-lock-coverage-${process.pid}`');
+    expect(CI_WORKFLOW).toContain('name: golden-path-lock-coverage');
+    expect(CI_WORKFLOW).toContain(
+      '${{ runner.temp }}/golden-path-lock-coverage/coverage-summary.json'
+    );
+    expect(CI_WORKFLOW).toContain(
+      '${{ runner.temp }}/golden-path-lock-coverage/coverage-final.json'
+    );
   });
 
   it('does not live inside the read-only post-deploy probe workflow', () => {

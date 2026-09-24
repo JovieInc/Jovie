@@ -13,13 +13,14 @@ import { createGoldenPathLinearIssue } from './lib/golden-path-intake.mjs';
 import {
   buildAutofixPrompt,
   buildMergeGateReceipt,
+  buildProdProbeChatPayload,
   buildProdProbeReceipt,
   CURSOR_AGENTS_URL,
   classifyChangedPaths,
   cursorAuthHeader,
   evaluateProdProbe,
   findOwnedAgents,
-  GOLDEN_PATH_LOCK_SELF_TEST,
+  GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   GOLDEN_PATH_PROD_ORIGIN,
   MERGE_GATE_TEST_FILES,
   planAutofix,
@@ -111,7 +112,21 @@ function toWebVitestFiles(files) {
   );
 }
 
-function runVitest(files, { filterWeb }) {
+function runVitest(files, { filterWeb, coverage = false }) {
+  const coverageReportDirectory = process.env.RUNNER_TEMP
+    ? `${process.env.RUNNER_TEMP}/golden-path-lock-coverage`
+    : `/tmp/golden-path-lock-coverage-${process.pid}`;
+  const coverageArgs = coverage
+    ? [
+        '--coverage.enabled',
+        '--coverage.provider=v8',
+        '--coverage.include=lib/golden-path-lock.mjs',
+        `--coverage.reportsDirectory=${coverageReportDirectory}`,
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        '--coverage.reporter=json',
+      ]
+    : [];
   const command = filterWeb
     ? [
         'pnpm',
@@ -132,6 +147,7 @@ function runVitest(files, { filterWeb }) {
         'vitest.config.mts',
         'run',
         ...files,
+        ...coverageArgs,
       ];
   const result = spawnSync(command[0], command.slice(1), {
     encoding: 'utf8',
@@ -168,7 +184,10 @@ async function runMergeGate(args) {
     readChangedFiles(args.changedFiles)
   );
   const product = runVitest(MERGE_GATE_TEST_FILES, { filterWeb: true });
-  const self = runVitest([GOLDEN_PATH_LOCK_SELF_TEST], { filterWeb: false });
+  const self = runVitest(GOLDEN_PATH_LOCK_SELF_TEST_FILES, {
+    filterWeb: false,
+    coverage: true,
+  });
   const checks = [
     {
       id: 'merge-gate-product-tests',
@@ -222,10 +241,12 @@ async function runProdProbe(args) {
   try {
     const chat = await fetch(`${origin}/api/chat`, {
       method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: 'hi' }],
-      }),
+      headers: {
+        ...headers,
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(buildProdProbeChatPayload()),
     });
     chatStatus = chat.status;
     const parsed = await fetchJsonSafe(chat);
@@ -309,6 +330,14 @@ async function runProdProbe(args) {
     origin,
   });
   writeReceipt(receipt, args.receipt);
+  const hasActionableFailure = evaluated.checks.some(
+    check => !check.ok && check.inconclusive !== true
+  );
+  if (receipt.inconclusive && !hasActionableFailure) {
+    fail(
+      'Golden-path prod probe is inconclusive: Turnstile was reached without a valid token; the first-message path was not tested, so no pass or autofix is claimed.'
+    );
+  }
   if (!receipt.ok) {
     fail('Golden-path prod probe failed closed.');
   }
@@ -358,6 +387,15 @@ async function runAutofix(args) {
       null
     );
     return;
+  }
+
+  const hasActionableFailure = receipt.checks.some(
+    check => !check.ok && check.inconclusive !== true
+  );
+  if (receipt.inconclusive === true && !hasActionableFailure) {
+    fail(
+      'Golden-path prod probe is inconclusive: Turnstile was reached without a valid token; no autofix was attempted.'
+    );
   }
 
   const apiKey = process.env.CURSOR_API_KEY ?? '';
