@@ -12,8 +12,6 @@
  * first-touch source fields.
  */
 
-import { createHash } from 'node:crypto';
-
 export const CHECKOUT_CORRELATION_FIELDS = [
   'claimId',
   'runId',
@@ -182,14 +180,4 @@ export function toCheckoutCorrelationReceiptFields(
     }
   }
   return receipt;
-}
-
-export function checkoutCorrelationIdempotencyPart(
-  correlation: CheckoutCorrelation | null | undefined
-): string | undefined {
-  if (!hasCheckoutCorrelation(correlation)) return undefined;
-  const stable = JSON.stringify(
-    CHECKOUT_CORRELATION_FIELDS.map(field => [field, correlation[field] ?? ''])
-  );
-  return createHash('sha256').update(stable).digest('hex').slice(0, 16);
 }

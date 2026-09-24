@@ -17,10 +17,10 @@ import {
 } from '@/lib/referrals/config';
 import {
   CheckoutCorrelationValidationError,
-  checkoutCorrelationIdempotencyPart,
   hasCheckoutCorrelation,
   parseCheckoutCorrelation,
 } from '@/lib/stripe/checkout-correlation';
+import { checkoutCorrelationIdempotencyPart } from '@/lib/stripe/checkout-correlation.server';
 import {
   checkExistingPlanSubscription,
   getCheckoutErrorResponse,

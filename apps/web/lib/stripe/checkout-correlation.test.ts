@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   CHECKOUT_CORRELATION_MAX_LENGTH,
   CheckoutCorrelationValidationError,
-  checkoutCorrelationIdempotencyPart,
   extractCheckoutCorrelation,
   hasCheckoutCorrelation,
   mergeCheckoutCorrelation,
@@ -10,6 +9,7 @@ import {
   toCheckoutCorrelationReceiptFields,
   toStripeCheckoutCorrelationMetadata,
 } from './checkout-correlation';
+import { checkoutCorrelationIdempotencyPart } from './checkout-correlation.server';
 
 const correlation = {
   claimId: 'claim_abc',
