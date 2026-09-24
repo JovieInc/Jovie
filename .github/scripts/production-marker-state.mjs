@@ -665,6 +665,25 @@ export function classifyProducerCoalescence(run, jobs) {
         job.status === 'completed' &&
         job.conclusion === conclusion
     ).length === 1;
+  // Early release-wave coalescence skips the reusable release as a whole,
+  // so it has no expanded promotion/rollback jobs or verified marker. This
+  // exact no-op shape only supplies skip evidence; it never verifies a deploy.
+  const earlyCoalescence = [
+    ['Coalesce release wave', 'success'],
+    ['Authorize fleet deployment state', 'skipped'],
+    ['Authorize exact main CI evidence', 'skipped'],
+    ['Production Release', 'skipped'],
+    ['Post-Deploy Smoke (Production)', 'skipped'],
+    ['Lighthouse CI (Production)', 'skipped'],
+    ['Post-Deploy Auth Smoke (Production)', 'skipped'],
+    [CONTROLLER_VERIFIED_JOB, 'skipped'],
+  ];
+  if (
+    jobs.length === earlyCoalescence.length &&
+    earlyCoalescence.every(([name, conclusion]) => exactlyOne(name, conclusion))
+  ) {
+    return true;
+  }
   const rollback = jobs.filter(
     job =>
       typeof job?.name === 'string' &&
