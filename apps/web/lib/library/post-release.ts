@@ -101,14 +101,12 @@ export function transitionPresenceFinding(
     ) {
       return { ok: false, reason: 'draft_missing' };
     }
+    let status = finding.status;
+    if (finding.actionMode === 'draft_request') status = 'drafted';
+    else if (finding.actionMode === 'direct_update') status = 'resolved';
     return {
       ok: true,
-      status:
-        finding.actionMode === 'draft_request'
-          ? 'drafted'
-          : finding.actionMode === 'direct_update'
-            ? 'resolved'
-            : finding.status,
+      status,
       collisionDisposition: null,
     };
   }

@@ -121,11 +121,9 @@ export function formatSignupOnboardingReadinessReport(
   }
 
   for (const key of result.required) {
-    const state = result.missing.includes(key)
-      ? 'MISSING'
-      : result.invalid.includes(key)
-        ? 'INVALID'
-        : 'SET';
+    let state = 'SET';
+    if (result.missing.includes(key)) state = 'MISSING';
+    else if (result.invalid.includes(key)) state = 'INVALID';
     lines.push(`${key}: ${state}`);
   }
 
