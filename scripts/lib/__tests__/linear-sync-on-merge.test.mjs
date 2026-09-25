@@ -37,7 +37,8 @@ const JOV_6586_STACK = [
   }),
   stackPull({
     number: 18277,
-    title: 'feat(symphony): bind shipping admission to verified runtime (JOV-6586)',
+    title:
+      'feat(symphony): bind shipping admission to verified runtime (JOV-6586)',
     headRef: 'codex/jov-6586-shipping-runtime',
   }),
   stackPull({
@@ -213,7 +214,9 @@ describe('linear sync on merge', () => {
 
     expect(decision.action).toBe('skip');
     expect(decision.blockingNumbers).toEqual([]);
-    expect(decision.comment).toContain('JOV-5853 is a commissioning or parent issue');
+    expect(decision.comment).toContain(
+      'JOV-5853 is a commissioning or parent issue'
+    );
     expect(decision.comment).toContain('allowlist');
     expect(decision.comment).toContain('Did not mark JOV-5853 Done');
   });
@@ -295,7 +298,10 @@ describe('linear sync on merge', () => {
       fetchImpl: async (url, init) => {
         const body = String(init?.body ?? '');
         calls.push({ url: String(url), body });
-        if (String(url).includes('api.linear.app') && body.includes('IssueDoneState')) {
+        if (
+          String(url).includes('api.linear.app') &&
+          body.includes('IssueDoneState')
+        ) {
           return {
             ok: true,
             json: async () => ({
@@ -307,7 +313,9 @@ describe('linear sync on merge', () => {
                   children: { nodes: [] },
                   team: {
                     states: {
-                      nodes: [{ id: 'done-state', name: 'Done', type: 'completed' }],
+                      nodes: [
+                        { id: 'done-state', name: 'Done', type: 'completed' },
+                      ],
                     },
                   },
                 },
@@ -320,14 +328,16 @@ describe('linear sync on merge', () => {
             ok: true,
             headers: { get: () => '' },
             json: async () =>
-              JOV_6586_STACK.filter(pull => pull.state === 'open').map(pull => ({
-                number: pull.number,
-                title: pull.title,
-                body: pull.body,
-                state: pull.state,
-                draft: pull.draft,
-                head: { ref: pull.headRef },
-              })),
+              JOV_6586_STACK.filter(pull => pull.state === 'open').map(
+                pull => ({
+                  number: pull.number,
+                  title: pull.title,
+                  body: pull.body,
+                  state: pull.state,
+                  draft: pull.draft,
+                  head: { ref: pull.headRef },
+                })
+              ),
           };
         }
         return {
@@ -362,7 +372,10 @@ describe('linear sync on merge', () => {
       fetchImpl: async (url, init) => {
         const body = String(init?.body ?? '');
         calls.push(body);
-        if (String(url).includes('api.linear.app') && body.includes('IssueDoneState')) {
+        if (
+          String(url).includes('api.linear.app') &&
+          body.includes('IssueDoneState')
+        ) {
           return {
             ok: true,
             json: async () => ({
@@ -374,7 +387,9 @@ describe('linear sync on merge', () => {
                   children: { nodes: [{ identifier: 'JOV-6586' }] },
                   team: {
                     states: {
-                      nodes: [{ id: 'done-state', name: 'Done', type: 'completed' }],
+                      nodes: [
+                        { id: 'done-state', name: 'Done', type: 'completed' },
+                      ],
                     },
                   },
                 },

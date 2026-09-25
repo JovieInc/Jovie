@@ -173,9 +173,7 @@ export function readIssueSnapshot(issue) {
     ? record.labels
     : record.labels &&
         typeof record.labels === 'object' &&
-        Array.isArray(
-          /** @type {{ nodes?: unknown }} */ (record.labels).nodes
-        )
+        Array.isArray(/** @type {{ nodes?: unknown }} */ (record.labels).nodes)
       ? /** @type {{ nodes: unknown[] }} */ (record.labels).nodes
       : [];
   const childNodes = Array.isArray(record.children)
@@ -254,8 +252,7 @@ function formatBlockingPulls(pulls) {
   const shown = pulls
     .slice(0, 20)
     .map(pull => `#${pull.number}${pull.draft ? ' (draft)' : ''}`);
-  const extra =
-    pulls.length > 20 ? ` and ${pulls.length - 20} more` : '';
+  const extra = pulls.length > 20 ? ` and ${pulls.length - 20} more` : '';
   return `Linked pull requests still open or draft: ${shown.join(', ')}${extra}.`;
 }
 
