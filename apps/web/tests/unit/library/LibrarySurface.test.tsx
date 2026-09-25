@@ -285,6 +285,38 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('disables YouTube import when the creator profile is unavailable', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeImportDisabled: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Connect YouTube' });
+    expect(item).toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).not.toHaveBeenCalled();
+  });
+
+  it('keeps YouTube import available for a real creator profile', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeConnected: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Import YouTube' });
+    expect(item).not.toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).toHaveBeenCalledOnce();
+  });
+
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,

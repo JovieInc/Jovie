@@ -132,6 +132,7 @@ export function LibraryPageClient({
   };
 
   const handleYouTubeImport = () => {
+    if (creatorProfileId === 'unavailable') return;
     if (!youtubeConnected) {
       const returnTo =
         stage === 'all' ? pathname : `${pathname}?stage=${stage}`;
@@ -266,6 +267,7 @@ export function LibraryPageClient({
             postReleaseBundle={postReleaseBundle}
             youtubeConnected={youtubeConnected}
             isImportingYouTube={isImportingYouTube}
+            youtubeImportDisabled={creatorProfileId === 'unavailable'}
             onImportYouTube={handleYouTubeImport}
           />
         </div>

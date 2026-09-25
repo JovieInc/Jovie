@@ -52,6 +52,7 @@ interface ReleaseCatalogPageClientProps {
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
   readonly youtubeConnected?: boolean;
   readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
   readonly onImportYouTube?: () => void;
 }
 
@@ -92,6 +93,7 @@ export function ReleaseCatalogPageClient({
   postReleaseBundle,
   youtubeConnected = false,
   isImportingYouTube = false,
+  youtubeImportDisabled = false,
   onImportYouTube,
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
@@ -171,6 +173,7 @@ export function ReleaseCatalogPageClient({
         canSyncSpotify={spotifyConnected}
         youtubeConnected={youtubeConnected}
         isImportingYouTube={isImportingYouTube}
+        youtubeImportDisabled={youtubeImportDisabled}
         onImportYouTube={onImportYouTube}
         merchProducts={
           merchProducts.length > 0
