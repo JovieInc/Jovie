@@ -21,7 +21,7 @@ test.describe('Kbd Storybook browser proof', () => {
       for (const [story, labels, variant] of [
         ['default', ['⌘K'], 'default'],
         ['tooltip-variant', ['Esc'], 'tooltip'],
-        ['shortcut-sequence', ['⌘', '⇧', 'P'], 'default'],
+        ['shortcut-sequence', ['⌘', 'Shift', 'P'], 'default'],
       ] as const) {
         await page.goto(
           `/iframe.html?id=ui-atoms-kbd--${story}&viewMode=story`,
