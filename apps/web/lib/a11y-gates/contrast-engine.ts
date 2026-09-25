@@ -248,7 +248,7 @@ export function parseColor(value: string): ParsedColor | null {
   const rgb = v.match(/^rgba?\(([^)]+)\)$/);
   if (rgb) {
     const parts = rgb[1]
-      .replace(/\//g, ' ')
+      .replaceAll('/', ' ')
       .split(/[\s,]+/)
       .filter(Boolean);
     if (parts.length < 3) return null;

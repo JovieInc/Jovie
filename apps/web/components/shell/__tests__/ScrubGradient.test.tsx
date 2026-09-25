@@ -54,5 +54,7 @@ describe('ScrubGradient', () => {
     );
     expect(grads.length).toBe(2);
     expect(grads[0].getAttribute('id')).not.toBe(grads[1].getAttribute('id'));
+    expect(grads[0].getAttribute('id')).not.toContain(':');
+    expect(grads[1].getAttribute('id')).not.toContain(':');
   });
 });
