@@ -81,7 +81,7 @@ canonical tokens and generated files as sensitive implementation surfaces.
 
 Use the real runner and test selector for changed behavior. Add meaningful
 regression/failure-path tests and current coverage evidence for executable changes.
-Documentation-only changes use policy, link, generation, and context evals; they
+Docs use [parity](docs/DOCUMENTATION.md), policy, link and context evals; they
 must not be presented as live model or UI proof. UI changes require state coverage
 and layout stability checks; see DESIGN.md for bounded disclosure exceptions.
 
@@ -91,9 +91,3 @@ Report changes, exact checks, failures, and limitations. Distinguish local sourc
 hosted CI, native merge queue, deployed build, and observed runtime. Never infer
 one from another. Preserve the original objective and user corrections across
 compaction; resume from the next unfinished step, not from the beginning.
-
-## Repository documentation
-
-See [source parity](docs/DOCUMENTATION.md) and the generated
-[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
-manifest, build, test and release instructions remain owned by this repository.
