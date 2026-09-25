@@ -55,6 +55,11 @@ OPTIONAL_SECRETS=(
   AGENTCOOKIE_ENCRYPT_KEY
   AGENTCOOKIE_AIR_IP
   AGENTCOOKIE_PORT
+  DATABASE_URL
+  SENTRY_AUTH_TOKEN
+  SENTRY_ORG_SLUG
+  DEVIN_API_KEY
+  HYPERAGENT_MCP_TOKEN
 )
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
