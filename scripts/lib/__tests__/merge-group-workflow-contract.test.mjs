@@ -2661,3 +2661,21 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
     ).toThrow(/is not a valid tree/);
   });
 });
+
+describe('merge-group Playwright artifact guard', () => {
+  it('lets every guarded layout and Storybook Playwright step keep error-context.md', () => {
+    // A test that fails once and passes on retry leaves error-context.md; the
+    // guard must scan it (redacted) instead of failing the passed step.
+    const guardedSteps = CI_WORKFLOW.split(/\n {6}- name: /u).filter(step =>
+      /^(Run deterministic layout behavior guard|Run surface elevation matrix \(Storybook\))/u.test(
+        step
+      )
+    );
+    // Combined-head layout + Storybook, and the manual layout guard job.
+    expect(guardedSteps).toHaveLength(3);
+    for (const step of guardedSteps) {
+      expect(step).toContain('guard-playwright-artifacts.mjs" --run --');
+      expect(step).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/u);
+    }
+  });
+});
