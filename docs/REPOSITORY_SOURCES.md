@@ -456,7 +456,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0b558b81b877092fd268eb5f944737ab9e93f911494c1e978b666d8eea3a54f8`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b66dd0cac51fac132e88d56d9017e65500037ce0f35582053c8b3eb3e61e6b51`)
 
 ### `apps/web/package.json`: engines
 
@@ -684,7 +684,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "@ai-sdk/gateway": "^4.0.90",
   "@ai-sdk/react": "^4.0.116",
-  "@ai-sdk/xai": "^5.0.6",
+  "@ai-sdk/xai": "^5.0.7",
   "@better-auth/oauth-provider": "1.7.5",
   "@dnd-kit/core": "^6.3.1",
   "@dnd-kit/sortable": "^10.0.0",
