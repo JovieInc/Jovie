@@ -808,7 +808,11 @@ describe('HeroSpotifySearch', () => {
       const user = userEvent.setup();
       await user.type(getInput(), 'Phoebe');
 
-      expect(screen.queryByTestId('listing-badge')).not.toBeInTheDocument();
+      const row = screen.getByText('Phoebe Bridgers').closest('button');
+      expect(row).not.toBeNull();
+      expect(
+        row?.querySelector('[data-testid="listing-badge"]')
+      ).not.toBeInTheDocument();
     });
   });
 });
