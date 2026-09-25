@@ -43,14 +43,14 @@
   },
   {
     "file": ".claude/rules/hermes-air.md",
-    "paths": ["scripts/hermes/**", "docs/hermes/**"],
+    "paths": ["scripts/symphony/**", "docs/hermes/**"],
     "bodySha256": "a8e1c32a2b612b5c3757357e063442b173513929642771fb228cab8796fbceb6"
   },
   {
     "file": ".claude/rules/infra.md",
     "paths": [
       ".github/**",
-      "scripts/hermes/**",
+      "scripts/symphony/**",
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
@@ -65,7 +65,7 @@
     "file": ".claude/rules/linear.md",
     "paths": [
       "scripts/backlog-orchestrator/**",
-      "scripts/hermes/**",
+      "scripts/symphony/**",
       "docs/PR_FLOW.md"
     ],
     "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
@@ -121,7 +121,7 @@
   {
     "file": ".claude/rules/swarm.md",
     "paths": [
-      "scripts/hermes/**",
+      "scripts/symphony/**",
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
