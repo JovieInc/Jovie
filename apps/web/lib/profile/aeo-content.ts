@@ -522,8 +522,6 @@ function buildFacts(
   }
   if (based && based !== hometown) {
     facts.push({ label: 'Based In', value: based });
-  } else if (!hometown && based) {
-    facts.push({ label: 'Based In', value: based });
   }
 
   return facts;

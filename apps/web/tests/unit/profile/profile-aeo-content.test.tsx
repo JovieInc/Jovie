@@ -447,6 +447,18 @@ describe('Profile AEO content', () => {
     });
     expect(content.facts.some(fact => fact.label === 'Hometown')).toBe(false);
 
+    const samePlace = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: 'Austin, TX',
+        location: 'Austin, TX',
+      },
+      now,
+    });
+    expect(samePlace.facts.filter(fact => fact.label === 'Based In')).toEqual(
+      []
+    );
+
     const withHometown = buildProfileAeoContent({ artist: baseArtist, now });
     expect(withHometown.facts).toContainEqual({
       label: 'Hometown',
