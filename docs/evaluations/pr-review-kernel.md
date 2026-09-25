@@ -74,24 +74,53 @@ Contract: [`scripts/lib/pr-review-contracts.mjs`](../../scripts/lib/pr-review-co
 of the relevant subscription cost.
 **Then:** move verification to subscription pools through Symphony admission.
 
-## Models
+## Models: chosen by the canonical router
 
-| Role | Default | Allowed alternatives (replay only) |
-|---|---|---|
-| Discovery | `deepseek/deepseek-v4.1-flash` | `deepseek/deepseek-v4-flash`, `z-ai/glm-5.3-flash` |
-| Verification | `z-ai/glm-5.3` | `z-ai/glm-5.3-flash` |
+The kernel does not hardcode models. `scripts/pr-review/models.mjs` asks
+`scripts/symphony/model-router.py rank` for Gateway models twice:
 
-- Verification decides what gets posted, so it gets the stronger model. Its calls
-  are short, which keeps that cheap.
-- Discovery and verification must be different families; `assertRoutes` refuses
-  otherwise.
-- Prices come from the Symphony registry. DeepSeek V4.1 Flash is not in the
-  registry yet, so `REVIEW_MODEL_OVERRIDES` in `scripts/pr-review/models.mjs`
-  prices it at the published peak rate. A registry entry replaces the override
-  automatically. The Gateway model id is unverified until the first live run.
-- Replays switch models with `PR_REVIEW_DISCOVERY_MODEL` and
-  `PR_REVIEW_VERIFICATION_MODEL`, limited to the allowlist above.
-- Per-PR budget: $0.50 (`DEFAULT_RUN_LIMITS.budgetUsd`).
+- `review` for discovery, costed on a full-diff job.
+- `review-verify` for verification, costed on a short call, with a quality floor
+  of 75 (`routing_policy.min_quality`), because verification decides what gets
+  posted.
+
+It then takes the pair with the lowest combined expected cost per success. The
+verifier must be a different family from the discoverer and at least as strong.
+
+**Expected cost per success** (router, all callers):
+
+1. Start from list price, or the `promo` price while `promo.until` is in the
+   future.
+2. Apply `effective_price_multiplier` for prepaid credits.
+3. For subscription models, divide by `sub_included_multiplier` to reflect the
+   subsidy.
+4. Cost of one attempt = tokens × price, plus minutes × `minute_value_usd`
+   (0 for now).
+5. Divide by the success rate. The success rate is a Beta-smoothed blend of
+   observed outcomes and the registry `quality` prior. Observed token and minute
+   averages replace the job estimates once there are 5 samples (`min_samples`).
+
+With no outcomes recorded yet, the pick is DeepSeek V4 Flash for discovery and
+GLM 5.3 for verification. DeepSeek V4.1 Flash is ranked, but at its peak
+$0.30/$1.20 price and a provisional quality equal to V4 Flash it costs about twice
+as much per success. Recorded replay outcomes, or a quality update, can change
+that. Its Gateway model id is unverified until the first live run.
+
+Outcomes: `node scripts/pr-review/replay.mjs <seed.json> --record-outcomes`
+writes one outcome per case to the router state with `model-router.py
+record-outcome`. A case succeeds when every labelled defect is found and no
+verified finding is a false alarm. The CI shadow job starts from priors, because
+router state is not shared with hosted runners yet.
+
+`PR_REVIEW_DISCOVERY_MODEL` / `PR_REVIEW_VERIFICATION_MODEL` may pin a model, but
+only one the router ranked. Per-PR budget is $0.50
+(`DEFAULT_RUN_LIMITS.budgetUsd`).
+
+Not modeled yet:
+- time-of-day pricing, such as DeepSeek off-peak rates;
+- free external agents without a headless, credentialed channel, such as Devin
+  SWE2. When one exists, add it as a registry entry with a `promo` price of 0
+  until its end date.
 
 ## Enabling the shadow run
 

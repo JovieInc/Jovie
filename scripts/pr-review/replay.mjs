@@ -3,9 +3,17 @@
 //   [{ "id": "...", "receipt": "<path to pr-review-receipt.json>",
 //      "clean": false, "expected": [{ "path": "apps/...", "line": 42 }] }]
 // Receipts are produced by running cli.mjs against each base/head pair.
+// --record-outcomes feeds each case into the canonical router so model choice
+// follows measured cost per successful review.
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROUTER = fileURLToPath(
+  new URL('../symphony/model-router.py', import.meta.url)
+);
 
 const LINE_TOLERANCE = 15;
 
@@ -60,6 +68,59 @@ export function scoreReplay(cases) {
   };
 }
 
+/**
+ * One router outcome per model per completed case. A case succeeds when every
+ * labelled defect was found and no verified finding is a false alarm. Stale or
+ * incomplete receipts are skipped so provider outages do not count as misses.
+ */
+export function outcomesFromCases(cases) {
+  const outcomes = [];
+  for (const entry of cases) {
+    const { receipt } = entry;
+    if (receipt.status !== 'complete' || !receipt.routing) continue;
+    const posted = receipt.findings.filter(f => f.state === 'verified');
+    const expected = entry.clean ? [] : (entry.expected ?? []);
+    const found = expected.every(e => posted.some(f => matches(f, e)));
+    const noFalseAlarm = posted.every(f => expected.some(e => matches(f, e)));
+    const success = found && noFalseAlarm;
+    const roles = Object.entries(receipt.routing);
+    for (const [roleName, role] of roles) {
+      const usage = receipt.stats?.usage?.[role.model] ?? {};
+      outcomes.push({
+        modelId: role.routerId,
+        capability: roleName === 'verification' ? 'review-verify' : 'review',
+        success,
+        tokensIn: usage.inputTokens ?? 0,
+        tokensOut: usage.outputTokens ?? 0,
+        minutes: (receipt.stats?.minutes ?? 0) / roles.length,
+      });
+    }
+  }
+  return outcomes;
+}
+
+export function recordOutcomes(outcomes, run = execFileSync) {
+  for (const o of outcomes) {
+    run('python3', [
+      ROUTER,
+      'record-outcome',
+      '--model-id',
+      o.modelId,
+      '--capability',
+      o.capability,
+      '--success',
+      o.success ? '1' : '0',
+      '--tokens-in',
+      String(o.tokensIn),
+      '--tokens-out',
+      String(o.tokensOut),
+      '--minutes',
+      String(o.minutes),
+    ]);
+  }
+  return outcomes.length;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const seedPath = process.argv[2];
   if (!seedPath) {
@@ -72,5 +133,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     ...entry,
     receipt: JSON.parse(readFileSync(resolve(base, entry.receipt), 'utf8')),
   }));
-  process.stdout.write(`${JSON.stringify(scoreReplay(cases), null, 2)}\n`);
+  const score = scoreReplay(cases);
+  if (process.argv.includes('--record-outcomes')) {
+    score.recordedOutcomes = recordOutcomes(outcomesFromCases(cases));
+  }
+  process.stdout.write(`${JSON.stringify(score, null, 2)}\n`);
 }

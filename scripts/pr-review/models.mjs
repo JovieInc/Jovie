@@ -1,94 +1,126 @@
-// Gateway transport for the review kernel. Models and prices come from the
-// Symphony model registry; this module never picks a model outside it.
+// Model selection and Gateway transport for the review kernel. Models come
+// from the canonical Symphony router (`model-router.py rank`), which ranks by
+// expected cost per successful review: effective price after promos and
+// credits, divided by observed or prior success rate. This module never picks
+// a model the router did not rank.
 
-import { readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { createGateway, generateText } from 'ai-evaluation';
 
-const REGISTRY_URL = new URL(
-  '../symphony/config/model-registry.json',
-  import.meta.url
+const execFileAsync = promisify(execFile);
+const ROUTER = fileURLToPath(
+  new URL('../symphony/model-router.py', import.meta.url)
 );
 
-/**
- * Discovery and verification use different model families so the verifier
- * does not share the discoverer's blind spots.
- */
-export const REVIEW_ROUTES = Object.freeze({
-  discovery: 'deepseek/deepseek-v4.1-flash',
-  verification: 'z-ai/glm-5.3',
+export const REVIEW_CAPABILITIES = Object.freeze({
+  discovery: 'review',
+  verification: 'review-verify',
 });
+export const REVIEW_PROVIDER = 'vercel-ai-gateway';
 
-/**
- * Models the review may use that the Symphony registry does not list yet.
- * Kept here, not in the registry, so adding them cannot change Symphony
- * routing. Prices are the published peak rates (USD per 1M tokens) so the
- * budget errs high. Registry entries win when both exist.
- */
-export const REVIEW_MODEL_OVERRIDES = Object.freeze({
-  'deepseek/deepseek-v4.1-flash': {
-    family: 'deepseek',
-    inPerMillion: 0.3,
-    outPerMillion: 1.2,
-  },
-});
-
-/** Per-role allowlist; replay runs may swap within it via env. */
-export const ROUTE_OPTIONS = Object.freeze({
-  discovery: [
-    'deepseek/deepseek-v4.1-flash',
-    'deepseek/deepseek-v4-flash',
-    'z-ai/glm-5.3-flash',
-  ],
-  verification: ['z-ai/glm-5.3', 'z-ai/glm-5.3-flash'],
-});
-
-/** Resolve routes from env overrides, refusing anything off the allowlist. */
-export function resolveRoutes(env = {}) {
-  const discovery = env.PR_REVIEW_DISCOVERY_MODEL || REVIEW_ROUTES.discovery;
-  const verification =
-    env.PR_REVIEW_VERIFICATION_MODEL || REVIEW_ROUTES.verification;
-  if (!ROUTE_OPTIONS.discovery.includes(discovery)) {
-    throw new Error(`discovery model not allowed: ${discovery}`);
+/** Ask the canonical router for Gateway models, cheapest per success first. */
+export async function fetchRanking(capability, { run = execFileAsync } = {}) {
+  const { stdout } = await run('python3', [
+    ROUTER,
+    'rank',
+    '--capability',
+    capability,
+    '--provider',
+    REVIEW_PROVIDER,
+  ]);
+  const ranking = JSON.parse(stdout);
+  if (!Array.isArray(ranking?.ranked)) {
+    throw new Error('router rank output invalid');
   }
-  if (!ROUTE_OPTIONS.verification.includes(verification)) {
-    throw new Error(`verification model not allowed: ${verification}`);
-  }
-  return Object.freeze({ discovery, verification });
+  return ranking;
 }
 
-export function loadModelPrices(registry = null) {
-  const source = registry ?? JSON.parse(readFileSync(REGISTRY_URL, 'utf8'));
-  const prices = { ...REVIEW_MODEL_OVERRIDES };
-  for (const model of Object.keys(prices)) {
-    if (source.models?.some(entry => entry.model === model)) {
-      delete prices[model];
-    }
-  }
-  for (const entry of source.models ?? []) {
-    if (
-      typeof entry.model === 'string' &&
-      Number.isFinite(entry.list_price_in) &&
-      Number.isFinite(entry.list_price_out) &&
-      !(entry.model in prices)
-    ) {
-      prices[entry.model] = {
-        family: entry.family,
-        inPerMillion: entry.list_price_in,
-        outPerMillion: entry.list_price_out,
-      };
-    }
-  }
-  return prices;
+/** Both role rankings, each scored by the router for its own job size. */
+export async function fetchRankings(options) {
+  return {
+    discovery: await fetchRanking(REVIEW_CAPABILITIES.discovery, options),
+    verification: await fetchRanking(REVIEW_CAPABILITIES.verification, options),
+  };
 }
 
-/** Validate that both routes are priced and come from different families. */
-export function assertRoutes(prices, routes = REVIEW_ROUTES) {
-  for (const model of Object.values(routes)) {
-    if (!prices[model]) throw new Error(`model not in registry: ${model}`);
+function pinnedRow(rows, env, key) {
+  const model = env[key];
+  if (!model) return null;
+  const row = rows.find(candidate => candidate.model === model);
+  if (!row) throw new Error(`${key} is not a router-ranked model: ${model}`);
+  return row;
+}
+
+/**
+ * Choose the discovery/verification pair with the lowest combined expected
+ * cost per success. The verifier must be a different family and at least as
+ * strong as the discoverer; the router already applies the verification
+ * quality floor. Env overrides must name models the router ranked.
+ */
+export function selectRoutes(rankings, env = {}) {
+  const pinnedDiscovery = pinnedRow(
+    rankings.discovery.ranked,
+    env,
+    'PR_REVIEW_DISCOVERY_MODEL'
+  );
+  const pinnedVerification = pinnedRow(
+    rankings.verification.ranked,
+    env,
+    'PR_REVIEW_VERIFICATION_MODEL'
+  );
+  const discoveries = pinnedDiscovery
+    ? [pinnedDiscovery]
+    : rankings.discovery.ranked;
+  const verifiers = pinnedVerification
+    ? [pinnedVerification]
+    : rankings.verification.ranked;
+
+  let best = null;
+  for (const discovery of discoveries) {
+    for (const verification of verifiers) {
+      if (verification.family === discovery.family) continue;
+      if (verification.quality < discovery.quality) continue;
+      const cost =
+        discovery.expected_cost_per_success_usd +
+        verification.expected_cost_per_success_usd;
+      if (!best || cost < best.cost) best = { discovery, verification, cost };
+    }
   }
-  if (prices[routes.discovery].family === prices[routes.verification].family) {
-    throw new Error('discovery and verification must use different families');
+  if (!best) {
+    throw new Error(
+      'no different-family review pair with verifier quality >= discoverer'
+    );
   }
+  const { discovery, verification } = best;
+  const prices = {};
+  for (const row of [discovery, verification]) {
+    prices[row.model] = {
+      family: row.family,
+      inPerMillion: row.list_price_in,
+      outPerMillion: row.list_price_out,
+    };
+  }
+  const summarize = row => ({
+    routerId: row.id,
+    model: row.model,
+    family: row.family,
+    expectedCostPerSuccessUsd: row.expected_cost_per_success_usd,
+    pSuccess: row.p_success,
+    priceBasis: row.price_basis,
+  });
+  return {
+    routes: Object.freeze({
+      discovery: discovery.model,
+      verification: verification.model,
+    }),
+    prices,
+    routing: {
+      discovery: summarize(discovery),
+      verification: summarize(verification),
+    },
+  };
 }
 
 export function costUsd(prices, model, usage) {

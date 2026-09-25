@@ -87,6 +87,29 @@ class ResearchAndEvalTests(unittest.TestCase):
             )
             self.assertEqual(out["rejected"][0]["reason"], "unknown_model")
 
+    def test_research_applies_promos_and_rejects_invalid_economics(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            registry_path = root / "model-registry.json"
+            registry_path.write_text(CONFIG.read_text())
+            snapshot = {
+                "schema": "model-research/v1",
+                "source": "test",
+                "updates": [
+                    {"id": "gateway-glm-5.3-flash", "promo": {"price_in": 0, "price_out": 0, "until": "2026-10-09T00:00:00Z"}},
+                    {"id": "gateway-glm-5.3", "effective_price_multiplier": 0.5},
+                ],
+            }
+            snap_path = root / "promo.json"
+            snap_path.write_text(json.dumps(snapshot))
+            out = json.loads(
+                self.run_py(
+                    RESEARCH, "apply", "--snapshot", str(snap_path), "--config", str(registry_path), "--write",
+                ).stdout
+            )
+            self.assertEqual(out["applied"], [{"id": "gateway-glm-5.3-flash", "changes": ["promo"]}])
+            self.assertEqual(out["rejected"], [{"id": "gateway-glm-5.3", "reason": "invalid_economics"}])
+
     def test_eval_cases_match_research_backed_choices(self):
         cases = json.loads(EVALS.read_text())["cases"]
         with tempfile.TemporaryDirectory() as td:
