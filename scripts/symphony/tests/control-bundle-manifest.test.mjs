@@ -358,7 +358,15 @@ test('release attests and verifies both subjects before publication', async () =
   );
   assert.match(
     packageJson.scripts['ci:control:test'],
-    /control-bundle-manifest\.test\.mjs/
+    /run-affected-tests\.mjs --control/
+  );
+  const controlRunner = await readFile(
+    join(REPO_ROOT, 'scripts', 'run-affected-tests.mjs'),
+    'utf8'
+  );
+  assert.match(
+    controlRunner,
+    /'scripts\/symphony\/tests\/control-bundle-manifest\.test\.mjs'/
   );
   const ciWorkflow = await readFile(
     join(REPO_ROOT, '.github', 'workflows', 'ci.yml'),
