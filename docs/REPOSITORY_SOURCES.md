@@ -143,21 +143,21 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/pr-conflict-handler.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `02713c559c7433b9a4aa0bfced2938ad2eb5042ef8fe789f80b91764a0b55c32`)
 - `.github/workflows/pr-preparation-canary.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d3ea4f4eecbca3e62555830b9b805014febef04842621b1ab349757a6c765265`)
 - `.github/workflows/pr-size-guard-label-override.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d95818f870484104d828edc6de3f28158777d86e1991ebbefb670cf67276bbe7`)
-- `.github/workflows/pr-size-guard.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `58d85b9d0f5350919b9c1546b2f1fb93c08ca466f413c3859fe068e39125b2b4`)
+- `.github/workflows/pr-size-guard.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2309be6e8a1724ef206d1f5fac0f4148ced05fc6c38840e9080c82dde44c010c`)
 - `.github/workflows/pr-targets-main.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8fa73b7d8f8a35c41fe5d7bec176acb3fc720d756c5ef00912c4b1a649850a57`)
 - `.github/workflows/pr-visual-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ba7a32f9c8784e53bc07d479bb18d60c98569746cfa0913a3d82e2e67e994d47`)
 - `.github/workflows/production-continuity.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `10c318607f5bb63e2132f3e7a63bba259b41083814176e91f76596324c91cd70`)
 - `.github/workflows/production-controller-health.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `eca3e62c48daa7a38d26066a13fd01a4cf9c977c8e86c6b85a1d1cbb73a714fc`)
 - `.github/workflows/production-controller.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `64ca50e7d538b54a98b18025c10159fc43d3d99da2ecc48f5d19725a11877c0c`)
 - `.github/workflows/production-marker-recovery.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `94181a74204ab56850977a637dc674a2efaac33a04f2d3702da23c393df52771`)
-- `.github/workflows/production-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8ab456a2dfd973a3634f1916699ca25e54bf43111d6b4b8e018ec3fa286cc74d`)
+- `.github/workflows/production-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `210f921097f88aa9a7b8d63c1a8fc172ddf9c402cb1b08d01a1c0dbc1d7a1c1c`)
 - `.github/workflows/reusable-ci-lint.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `c5a2654ad2aa43d36647a822b231233cba37c55972e19b61085bca609f452d30`)
 - `.github/workflows/rolling-ci-dispatch.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bfc552deed22c382555db6588a6293c08f5ae3321937fab7dc462bb35af41c8e`)
 - `.github/workflows/runner-autoscaler-canary.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fed98a20bbd3bb8046359596e71da1fd48ff5fb88bca2063381c6a777e0e883e`)
 - `.github/workflows/runner-health-monitor.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b2f7db619ff3de1cce6582a983c2c8df410a649d15144f89f67bfc61608efbb6`)
 - `.github/workflows/runner-heartbeat.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e6b27209791904ad2c01f9e2835d426cd83cb739cdcd1510b4b1a69adc90bf0f`)
 - `.github/workflows/runner-isolation-smoke.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0f8c24e02174734f912f8149f0f98710a89c790d2a12aa270d9ff458da1dc310`)
-- `.github/workflows/safe-pr-remediation.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1b88777fea963be38a956087434b1ce478a1d8cc6eaf1f9088bdb2a5ce181a18`)
+- `.github/workflows/safe-pr-remediation.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `82a3ceba33f176f264cb680a56badb48f789e7da1065bb9d81fc059dbb795717`)
 - `.github/workflows/screenshots.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `40c75acee333c01e8dcceb2b7db3371cdf120819c6440dafa7e83226b85af0fe`)
 - `.github/workflows/security-suppression-audit.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2fcdcbb5e5fd635d1c2ab3eb0fc99984c00937d56a6a599ff566d6e22a9f5054`)
 - `.github/workflows/security.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e25fbd035ae35d2c6ce9b5c2888236d12460a9d0f563068b03090d12e7eeac8d`)
@@ -554,7 +554,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0b558b81b877092fd268eb5f944737ab9e93f911494c1e978b666d8eea3a54f8`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `3c599a4605300279e10925d0101ec17330b49a0fc0b5dca6e964793d0371e25c`)
 
 ### `apps/web/package.json`: engines
 
@@ -780,9 +780,9 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@ai-sdk/gateway": "^4.0.90",
+  "@ai-sdk/gateway": "^4.0.91",
   "@ai-sdk/react": "^4.0.116",
-  "@ai-sdk/xai": "^5.0.6",
+  "@ai-sdk/xai": "^5.0.7",
   "@better-auth/oauth-provider": "1.7.5",
   "@dnd-kit/core": "^6.3.1",
   "@dnd-kit/sortable": "^10.0.0",
@@ -839,7 +839,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "cmdk": "^1.1.1",
   "date-fns": "^4.3.0",
   "dompurify": "^3.4.16",
-  "dotenv": "^17.4.2",
+  "dotenv": "^18.0.0",
   "drizzle-orm": "0.45.3",
   "exceljs": "4.4.0",
   "flags": "^4.3.1",
@@ -1416,7 +1416,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
+- `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `649ef9b255f6dee6b4d0e8a63c93a8a3020ef8c12305007fae710d3071710919`)
 - `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5`)
 - `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120`)
 - `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61`)
