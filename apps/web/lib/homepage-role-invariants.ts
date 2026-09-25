@@ -90,7 +90,6 @@ const LAYER_RANK: Record<HomepageShippingLayer, number> = {
 
 const DEMO_DESTINATION_PATTERN = /^\/demo(?:\/|\?|#|$)/;
 const START_DESTINATION_PATTERN = /^\/start(?:\?|#|$)/;
-const HASH_DESTINATION_PATTERN = /^#/;
 
 function pushFinding(
   findings: HomepageRoleFinding[],
@@ -138,10 +137,7 @@ export function presenceOnlyHomepageMountsPass(
 }
 
 function isAllowedPublicDestination(href: string): boolean {
-  if (
-    HASH_DESTINATION_PATTERN.test(href) ||
-    START_DESTINATION_PATTERN.test(href)
-  ) {
+  if (href.startsWith('#') || START_DESTINATION_PATTERN.test(href)) {
     return true;
   }
 

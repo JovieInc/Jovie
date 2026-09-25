@@ -67,7 +67,6 @@ export function getPublicProfileIndexingExclusionReason(
  * never looks like `tmoc` + ~15 chars of base36, and real display names do not
  * end in the `+clerk test` suffix. Revisit only if a genuine collision appears.
  */
-const QA_CLERK_TEST_DISPLAY_NAME_PATTERN = /\+clerk test$/;
 const JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
 const CLERK_TEST_EMAIL_LOCAL_PART_PATTERN = /\+clerk_test(?:\+|$)/;
 
@@ -78,9 +77,7 @@ function getQaMachineHandleIndexingExclusionReason(
 }
 
 function matchesQaClerkTestDisplayName(displayName: string): boolean {
-  return QA_CLERK_TEST_DISPLAY_NAME_PATTERN.test(
-    displayName.trim().toLowerCase()
-  );
+  return displayName.trim().toLowerCase().endsWith('+clerk test');
 }
 
 function isPlaceholderIdentity(handle: string, displayName: string): boolean {
