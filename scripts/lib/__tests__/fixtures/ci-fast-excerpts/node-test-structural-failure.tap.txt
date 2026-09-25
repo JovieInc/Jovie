@@ -1,0 +1,603 @@
+TAP version 13
+# Subtest: verifies the new signed contract without inheriting repair authority
+not ok 1 - verifies the new signed contract without inheriting repair authority
+  ---
+  duration_ms: 22.954803
+  type: 'test'
+  location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.test.mjs:132:1'
+  failureType: 'testCodeFailure'
+  error: 'shipping-lead-task-invalid'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    validateShippingTask (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.mjs:112:11)
+    TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.test.mjs:135:3)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: rejects LYB before owner dispatch
+ok 2 - rejects LYB before owner dispatch
+  ---
+  duration_ms: 1.10045
+  type: 'test'
+  ...
+# Subtest: rejects non-Triage before owner dispatch
+ok 3 - rejects non-Triage before owner dispatch
+  ---
+  duration_ms: 0.272764
+  type: 'test'
+  ...
+# Subtest: rejects different repository before owner dispatch
+ok 4 - rejects different repository before owner dispatch
+  ---
+  duration_ms: 0.199372
+  type: 'test'
+  ...
+# Subtest: rejects fourth slot before owner dispatch
+ok 5 - rejects fourth slot before owner dispatch
+  ---
+  duration_ms: 0.153547
+  type: 'test'
+  ...
+# Subtest: rejects unbounded lifetime before owner dispatch
+ok 6 - rejects unbounded lifetime before owner dispatch
+  ---
+  duration_ms: 0.258115
+  type: 'test'
+  ...
+# Subtest: rejects negative lifetime before owner dispatch
+ok 7 - rejects negative lifetime before owner dispatch
+  ---
+  duration_ms: 0.360509
+  type: 'test'
+  ...
+# Subtest: rejects invalid timestamp before owner dispatch
+ok 8 - rejects invalid timestamp before owner dispatch
+  ---
+  duration_ms: 0.268989
+  type: 'test'
+  ...
+# Subtest: rejects source mismatch before owner dispatch
+ok 9 - rejects source mismatch before owner dispatch
+  ---
+  duration_ms: 0.25025
+  type: 'test'
+  ...
+# Subtest: rejects target mismatch before owner dispatch
+ok 10 - rejects target mismatch before owner dispatch
+  ---
+  duration_ms: 0.271781
+  type: 'test'
+  ...
+# Subtest: rejects missing runtime before owner dispatch
+ok 11 - rejects missing runtime before owner dispatch
+  ---
+  duration_ms: 0.164747
+  type: 'test'
+  ...
+# Subtest: rejects extra authority before owner dispatch
+ok 12 - rejects extra authority before owner dispatch
+  ---
+  duration_ms: 0.140541
+  type: 'test'
+  ...
+# Subtest: retains the journal and requests no execution without a canonical admitter
+ok 13 - retains the journal and requests no execution without a canonical admitter
+  ---
+  duration_ms: 1.677374
+  type: 'test'
+  ...
+# Subtest: holds owner/budget waits without turning them into terminal outcomes
+ok 14 - holds owner/budget waits without turning them into terminal outcomes
+  ---
+  duration_ms: 0.86343
+  type: 'test'
+  ...
+# Subtest: never admits an expired task or releases its slot without terminal proof
+ok 15 - never admits an expired task or releases its slot without terminal proof
+  ---
+  duration_ms: 2.499338
+  type: 'test'
+  ...
+# Subtest: clears expired work only after canonical terminal evidence is delivered
+ok 16 - clears expired work only after canonical terminal evidence is delivered
+  ---
+  duration_ms: 2.937853
+  type: 'test'
+  ...
+# Subtest: delivers only signed terminal evidence and clears the exact journal
+ok 17 - delivers only signed terminal evidence and clears the exact journal
+  ---
+  duration_ms: 1.831636
+  type: 'test'
+  ...
+# Subtest: retries a lost outcome acknowledgement without executing again
+ok 18 - retries a lost outcome acknowledgement without executing again
+  ---
+  duration_ms: 4.096863
+  type: 'test'
+  ...
+# Subtest: never signs acceptance as successful terminal execution
+ok 19 - never signs acceptance as successful terminal execution
+  ---
+  duration_ms: 1.283155
+  type: 'test'
+  ...
+# Subtest: completion requires owner acceptance, even with a valid signer
+ok 20 - completion requires owner acceptance, even with a valid signer
+  ---
+  duration_ms: 0.580738
+  type: 'test'
+  ...
+# Subtest: signs accepted, completed work bound to its task digest
+ok 21 - signs accepted, completed work bound to its task digest
+  ---
+  duration_ms: 1.011737
+  type: 'test'
+  ...
+# Subtest: rejects wrong issue in a signed outcome
+ok 22 - rejects wrong issue in a signed outcome
+  ---
+  duration_ms: 1.01485
+  type: 'test'
+  ...
+# Subtest: rejects wrong task in a signed outcome
+ok 23 - rejects wrong task in a signed outcome
+  ---
+  duration_ms: 0.931579
+  type: 'test'
+  ...
+# Subtest: rejects future result in a signed outcome
+ok 24 - rejects future result in a signed outcome
+  ---
+  duration_ms: 1.657298
+  type: 'test'
+  ...
+# Subtest: rejects running execution in a signed outcome
+ok 25 - rejects running execution in a signed outcome
+  ---
+  duration_ms: 0.742774
+  type: 'test'
+  ...
+# Subtest: rejects empty terminal proof in a signed outcome
+ok 26 - rejects empty terminal proof in a signed outcome
+  ---
+  duration_ms: 0.83265
+  type: 'test'
+  ...
+# Subtest: rejects an outcome signed by Summer rather than the host
+ok 27 - rejects an outcome signed by Summer rather than the host
+  ---
+  duration_ms: 0.996781
+  type: 'test'
+  ...
+# Subtest: refuses unsigned extra result fields and missing host signing configuration
+ok 28 - refuses unsigned extra result fields and missing host signing configuration
+  ---
+  duration_ms: 0.817239
+  type: 'test'
+  ...
+# Subtest: Summer Symphony authenticated transport
+    # Subtest: matches the fixed Summer-owned canonical and signature vector
+    ok 1 - matches the fixed Summer-owned canonical and signature vector
+      ---
+      duration_ms: 13.301248
+      type: 'test'
+      ...
+    # Subtest: signs the exact path and escaped query target with the host key
+    ok 2 - signs the exact path and escaped query target with the host key
+      ---
+      duration_ms: 1.657683
+      type: 'test'
+      ...
+    # Subtest: transmits the once-encoded cursor and never sends proof material in the URL
+    ok 3 - transmits the once-encoded cursor and never sends proof material in the URL
+      ---
+      duration_ms: 60.73032
+      type: 'test'
+      ...
+    1..3
+ok 29 - Summer Symphony authenticated transport
+  ---
+  duration_ms: 77.456315
+  type: 'suite'
+  ...
+# Subtest: Summer outbox record authority
+    # Subtest: accepts the current signed wire record
+    not ok 1 - accepts the current signed wire record
+      ---
+      duration_ms: 3.681447
+      type: 'test'
+      location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:255:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        + actual - expected
+
+        + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        - 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-drift'
+
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-drift'
+      actual: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:256:12)
+        Test.runInAsyncScope (node:async_hooks:214:14)
+        Test.run (node:internal/test_runner/test:1047:25)
+        Test.start (node:internal/test_runner/test:944:17)
+        node:internal/test_runner/test:1440:71
+        node:internal/per_context/primordials:466:82
+        new Promise (<anonymous>)
+        new SafePromise (node:internal/per_context/primordials:435:3)
+        node:internal/per_context/primordials:466:9
+        Array.map (<anonymous>)
+      ...
+    # Subtest: rejects old wire, foreign signing authority, and same-key tampering
+    ok 2 - rejects old wire, foreign signing authority, and same-key tampering
+      ---
+      duration_ms: 2.507562
+      type: 'test'
+      ...
+    # Subtest: accepts the native-queue-starvation repair task bound to its action
+    ok 3 - accepts the native-queue-starvation repair task bound to its action
+      ---
+      duration_ms: 2.458504
+      type: 'test'
+      ...
+    # Subtest: accepts the closure-health-red repair task bound to its action
+    ok 4 - accepts the closure-health-red repair task bound to its action
+      ---
+      duration_ms: 1.564211
+      type: 'test'
+      ...
+    # Subtest: accepts the runner-capacity-starvation repair task bound to its action
+    ok 5 - accepts the runner-capacity-starvation repair task bound to its action
+      ---
+      duration_ms: 3.759646
+      type: 'test'
+      ...
+    # Subtest: rejects cross-source, cross-action, cross-task, and extra-field records
+    ok 6 - rejects cross-source, cross-action, cross-task, and extra-field records
+      ---
+      duration_ms: 1.540872
+      type: 'test'
+      ...
+    # Subtest: rejects non-wire timestamps and non-Ed25519 or private verification keys
+    ok 7 - rejects non-wire timestamps and non-Ed25519 or private verification keys
+      ---
+      duration_ms: 102.838958
+      type: 'test'
+      ...
+    # Subtest: accepts strict v2 projection authority and rejects v1 or projection reinterpretation
+    ok 8 - accepts strict v2 projection authority and rejects v1 or projection reinterpretation
+      ---
+      duration_ms: 1.884964
+      type: 'test'
+      ...
+    1..8
+not ok 30 - Summer outbox record authority
+  ---
+  duration_ms: 120.898866
+  type: 'suite'
+  location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:254:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: bounded discovery and durable WIP=1 hold
+    # Subtest: continues past an empty corrupt-only page when hasMore is true
+    ok 1 - continues past an empty corrupt-only page when hasMore is true
+      ---
+      duration_ms: 2.351608
+      type: 'test'
+      ...
+    # Subtest: rejects empty hasMore pagination with a missing, repeated, or over-budget cursor
+    ok 2 - rejects empty hasMore pagination with a missing, repeated, or over-budget cursor
+      ---
+      duration_ms: 0.813565
+      type: 'test'
+      ...
+    # Subtest: rejects a cursor beyond the signed-target bound
+    ok 3 - rejects a cursor beyond the signed-target bound
+      ---
+      duration_ms: 0.417877
+      type: 'test'
+      ...
+    # Subtest: rejects conflicting same-key records and returns idle at the terminal page
+    ok 4 - rejects conflicting same-key records and returns idle at the terminal page
+      ---
+      duration_ms: 1.874621
+      type: 'test'
+      ...
+    # Subtest: journals once, replays after restart, and never interprets JOV-5853 as write authority
+    ok 5 - journals once, replays after restart, and never interprets JOV-5853 as write authority
+      ---
+      duration_ms: 10.081351
+      type: 'test'
+      ...
+    # Subtest: serializes concurrent journals so only one immutable WIP winner is discovered
+    ok 6 - serializes concurrent journals so only one immutable WIP winner is discovered
+      ---
+      duration_ms: 12.09427
+      type: 'test'
+      ...
+    # Subtest: projects one strict v2 child and persists exact outcome bytes before acknowledgement
+    ok 7 - projects one strict v2 child and persists exact outcome bytes before acknowledgement
+      ---
+      duration_ms: 3.618788
+      type: 'test'
+      ...
+    # Subtest: holds projection without acknowledging when the open-child budget is exceeded
+    ok 8 - holds projection without acknowledging when the open-child budget is exceeded
+      ---
+      duration_ms: 1.765911
+      type: 'test'
+      ...
+    # Subtest: replays byte-identical pending outcomes without a second Linear projection
+    ok 9 - replays byte-identical pending outcomes without a second Linear projection
+      ---
+      duration_ms: 2.403655
+      type: 'test'
+      ...
+    # Subtest: clears an acknowledged file-journal claim so the next distinct task can publish
+    ok 10 - clears an acknowledged file-journal claim so the next distinct task can publish
+      ---
+      duration_ms: 17.769678
+      type: 'test'
+      ...
+    # Subtest: persists bounded discovery progress across restart and reaches a task beyond the page budget
+    ok 11 - persists bounded discovery progress across restart and reaches a task beyond the page budget
+      ---
+      duration_ms: 11.211688
+      type: 'test'
+      ...
+    # Subtest: rejects symlinked state directories and world-readable state files
+    ok 12 - rejects symlinked state directories and world-readable state files
+      ---
+      duration_ms: 5.399768
+      type: 'test'
+      ...
+    # Subtest: fails closed on tampered durable state and recovers safely after local-state loss
+    ok 13 - fails closed on tampered durable state and recovers safely after local-state loss
+      ---
+      duration_ms: 2.818527
+      type: 'test'
+      ...
+    # Subtest: rejects malformed journal envelopes and invalid persisted JSON
+    ok 14 - rejects malformed journal envelopes and invalid persisted JSON
+      ---
+      duration_ms: 3.606666
+      type: 'test'
+      ...
+    1..14
+ok 31 - bounded discovery and durable WIP=1 hold
+  ---
+  duration_ms: 77.398253
+  type: 'suite'
+  ...
+# Subtest: configuration boundaries
+    # Subtest: requires HTTPS, absolute GEM_WORKSPACE, and the dedicated Linear writer only
+    ok 1 - requires HTTPS, absolute GEM_WORKSPACE, and the dedicated Linear writer only
+      ---
+      duration_ms: 10.692766
+      type: 'test'
+      ...
+    # Subtest: fails closed on HTTP and JSON errors without printing secrets
+    ok 2 - fails closed on HTTP and JSON errors without printing secrets
+      ---
+      duration_ms: 3.670481
+      type: 'test'
+      ...
+    # Subtest: forbids redirects and sets a bounded request signal
+    ok 3 - forbids redirects and sets a bounded request signal
+      ---
+      duration_ms: 1.1512
+      type: 'test'
+      ...
+    # Subtest: posts the signed v3 execution outcome to the dedicated HTTP endpoint
+    ok 4 - posts the signed v3 execution outcome to the dedicated HTTP endpoint
+      ---
+      duration_ms: 1.567345
+      type: 'test'
+      ...
+    # Subtest: deduplicates the exact Linear projection and creates only when absent
+    ok 5 - deduplicates the exact Linear projection and creates only when absent
+      ---
+      duration_ms: 3.273744
+      type: 'test'
+      ...
+    # Subtest: counts open summer-task children and refuses new creates past the budget
+    ok 6 - counts open summer-task children and refuses new creates past the budget
+      ---
+      duration_ms: 1.028246
+      type: 'test'
+      ...
+    # Subtest: checks later child pages and never creates from incomplete budget evidence
+    ok 7 - checks later child pages and never creates from incomplete budget evidence
+      ---
+      duration_ms: 5.394209
+      type: 'test'
+      ...
+    # Subtest: entrypoint exits with a typed configuration rejection
+    ok 8 - entrypoint exits with a typed configuration rejection
+      ---
+      duration_ms: 83.73826
+      type: 'test'
+      ...
+    1..8
+ok 32 - configuration boundaries
+  ---
+  duration_ms: 111.198685
+  type: 'suite'
+  ...
+# Subtest: existing owned repair transport
+    # Subtest: strictly binds signed v3 and rejects widened or native-only authority
+    ok 1 - strictly binds signed v3 and rejects widened or native-only authority
+      ---
+      duration_ms: 2.728758
+      type: 'test'
+      ...
+    # Subtest: keeps unqualified execution held without Linear projection or an outcome
+    ok 2 - keeps unqualified execution held without Linear projection or an outcome
+      ---
+      duration_ms: 1.797086
+      type: 'test'
+      ...
+    # Subtest: durably retries the identical signed terminal outcome without a second execution
+    ok 3 - durably retries the identical signed terminal outcome without a second execution
+      ---
+      duration_ms: 20.56485
+      type: 'test'
+      ...
+    # Subtest: rejects cross-bound execution, source, signature, and premature terminal records
+    ok 4 - rejects cross-bound execution, source, signature, and premature terminal records
+      ---
+      duration_ms: 2.765665
+      type: 'test'
+      ...
+    # Subtest: uses the existing controller command and retains unsupported live execution explicitly
+    ok 5 - uses the existing controller command and retains unsupported live execution explicitly
+      ---
+      duration_ms: 4.503357
+      type: 'test'
+      ...
+    # Subtest: rejects terminal evidence that is cross-bound, head-frozen on success, or wrongly signed
+    ok 6 - rejects terminal evidence that is cross-bound, head-frozen on success, or wrongly signed
+      ---
+      duration_ms: 3.426509
+      type: 'test'
+      ...
+    # Subtest: holds when the controller package is missing or malformed and rejects process failures
+    ok 7 - holds when the controller package is missing or malformed and rejects process failures
+      ---
+      duration_ms: 4.86648
+      type: 'test'
+      ...
+    # Subtest: bounds controller output and rejects failed, invalid, or unreadable controller streams
+    ok 8 - bounds controller output and rejects failed, invalid, or unreadable controller streams
+      ---
+      duration_ms: 4.817885
+      type: 'test'
+      ...
+    1..8
+ok 33 - existing owned repair transport
+  ---
+  duration_ms: 46.271696
+  type: 'suite'
+  ...
+# Subtest: authenticated retained task records
+    # Subtest: returns original signed native success/failure and missing records unchanged
+    ok 1 - returns original signed native success/failure and missing records unchanged
+      ---
+      duration_ms: 11.501261
+      type: 'test'
+      ...
+    # Subtest: rejects scope, envelope, projection, host and state substitutions
+    ok 2 - rejects scope, envelope, projection, host and state substitutions
+      ---
+      duration_ms: 8.338958
+      type: 'test'
+      ...
+    # Subtest: rejects signed execution records with cross-bound or malformed evidence
+    ok 3 - rejects signed execution records with cross-bound or malformed evidence
+      ---
+      duration_ms: 37.886954
+      type: 'test'
+      ...
+    # Subtest: signs only exact selectors, makes bounded GETs and never writes during repeat reads
+    ok 4 - signs only exact selectors, makes bounded GETs and never writes during repeat reads
+      ---
+      duration_ms: 7.71923
+      type: 'test'
+      ...
+    # Subtest: retains the projection before dispatch and resumes a missed launch without another child
+    ok 5 - retains the projection before dispatch and resumes a missed launch without another child
+      ---
+      duration_ms: 20.912696
+      type: 'test'
+      ...
+    # Subtest: replays identical signed delivery after restart without authorizing execution twice
+    ok 6 - replays identical signed delivery after restart without authorizing execution twice
+      ---
+      duration_ms: 67.534128
+      type: 'test'
+      ...
+    # Subtest: bounds missing acknowledgment retries and reconciles only the retained identical receipt
+    ok 7 - bounds missing acknowledgment retries and reconciles only the retained identical receipt
+      ---
+      duration_ms: 77.047421
+      type: 'test'
+      ...
+    # Subtest: recovers an ambiguous start only when the authenticated server already retained the result
+    ok 8 - recovers an ambiguous start only when the authenticated server already retained the result
+      ---
+      duration_ms: 23.013531
+      type: 'test'
+      ...
+    1..8
+ok 34 - authenticated retained task records
+  ---
+  duration_ms: 254.712359
+  type: 'suite'
+  ...
+# Subtest: Summer Symphony consumer contract foundation
+    # Subtest: accepts only the exact signed v2 projection authority
+    ok 1 - accepts only the exact signed v2 projection authority
+      ---
+      duration_ms: 24.034496
+      type: 'test'
+      ...
+    # Subtest: rejects old wire
+    ok 2 - rejects old wire
+      ---
+      duration_ms: 1.186611
+      type: 'test'
+      ...
+    # Subtest: keeps each discovery call bounded while returning its safe resume cursor
+    ok 3 - keeps each discovery call bounded while returning its safe resume cursor
+      ---
+      duration_ms: 0.797435
+      type: 'test'
+      ...
+    # Subtest: sends the Vercel protection bypass only as a request header
+    ok 4 - sends the Vercel protection bypass only as a request header
+      ---
+      duration_ms: 60.420272
+      type: 'test'
+      ...
+    # Subtest: persists cursor, projection, and exact outcome across real journal restarts
+    ok 5 - persists cursor, projection, and exact outcome across real journal restarts
+      ---
+      duration_ms: 28.445465
+      type: 'test'
+      ...
+    1..5
+ok 35 - Summer Symphony consumer contract foundation
+  ---
+  duration_ms: 121.187059
+  type: 'suite'
+  ...
+1..35
+# tests 82
+# suites 7
+# pass 80
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 922.766942
+# start of coverage report
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# file                                  | line % | branch % | funcs % | uncovered lines
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# scripts                               |        |          |         |
+#  symphony                             |        |          |         |
+#   summer-shipping-lead-contract.mjs   | 100.00 |    84.44 |  100.00 |
+#   summer-symphony-outbox-consumer.mjs |  97.83 |    90.24 |   97.73 | 611-612 850-851 954-955 1031-1032 1069-1070 1129-1130 1137-1138 1178-1179 1196-1197 1320-1321 1341-1342 1355-1356 1612-1613 1774-1776 1816-1817 1843-1844 1923-1924 1975-1976 1979-1980 2012-2013 2224-2225 2279-2280 2326-2331
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# all files                             |  98.02 |    89.59 |   97.92 |
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# end of coverage report
