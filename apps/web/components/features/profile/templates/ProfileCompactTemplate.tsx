@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
@@ -62,20 +61,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import {
-  ProfileDesktopLoadingPlaceholder,
-  PublicProfileLayoutShell,
-} from './PublicProfileLayoutShell';
-
-const ProfileDesktopSurface = dynamic(
-  () =>
-    import('./ProfileDesktopSurface').then(
-      module => module.ProfileDesktopSurface
-    ),
-  {
-    loading: () => <ProfileDesktopLoadingPlaceholder />,
-  }
-);
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
+import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
