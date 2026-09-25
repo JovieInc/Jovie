@@ -456,7 +456,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0b558b81b877092fd268eb5f944737ab9e93f911494c1e978b666d8eea3a54f8`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `3c599a4605300279e10925d0101ec17330b49a0fc0b5dca6e964793d0371e25c`)
 
 ### `apps/web/package.json`: engines
 
@@ -682,9 +682,9 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@ai-sdk/gateway": "^4.0.90",
+  "@ai-sdk/gateway": "^4.0.91",
   "@ai-sdk/react": "^4.0.116",
-  "@ai-sdk/xai": "^5.0.6",
+  "@ai-sdk/xai": "^5.0.7",
   "@better-auth/oauth-provider": "1.7.5",
   "@dnd-kit/core": "^6.3.1",
   "@dnd-kit/sortable": "^10.0.0",
@@ -741,7 +741,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "cmdk": "^1.1.1",
   "date-fns": "^4.3.0",
   "dompurify": "^3.4.16",
-  "dotenv": "^17.4.2",
+  "dotenv": "^18.0.0",
   "drizzle-orm": "0.45.3",
   "exceljs": "4.4.0",
   "flags": "^4.3.1",

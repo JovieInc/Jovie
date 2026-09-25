@@ -246,10 +246,6 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', SOURCE);
     vi.stubEnv(
-      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
-    );
-    vi.stubEnv(
       'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
       PRODUCER_PRIVATE_KEY
     );
@@ -620,22 +616,12 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    undefined,
-    '',
-    'https://evil.test',
-    'http://jovie-eve-shadow-abc123-jovie.vercel.app',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app.evil.test',
-    `https://${['user', 'secret'].join(':')}@jovie-eve-shadow-abc123-jovie.vercel.app`,
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app/path',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app?token=secret',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app#fragment',
-    'https://jovie-eve-shadow.vercel.app',
-  ])(
-    'posts to the production alias when the configured origin is %#',
+  it.each([undefined, '', 'https://evil.test', 'legacy-ignored'])(
+    'posts to the production domain when a deprecated origin is %#',
     async origin => {
       if (origin !== undefined) {
         vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', origin);
+        vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'legacy-ignored');
       }
       const fetch = vi.fn<typeof globalThis.fetch>(async () =>
         Response.json(
@@ -655,11 +641,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       expect(String(fetch.mock.calls[0]?.[0])).toBe(
         'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
       );
-      if (origin === 'https://evil.test') {
-        expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith(
-          expect.objectContaining({ pinnedOrigin: origin })
-        );
-      }
+      expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith();
     }
   );
 
@@ -1330,9 +1312,10 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(
       new SummerPinInvalidError(
         {
+          origin: 'https://summer.jov.ie',
           projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',
           environment: 'production',
-          deploymentId: 'dpl_expected',
+          status: 'source-bound',
         },
         { status: 404 }
       )

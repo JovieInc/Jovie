@@ -1,18 +1,25 @@
 import { z } from 'zod';
 import { SUMMER_PRODUCTION } from './summer-production-identity';
 
-/** Immutable deployment URL. Same object as `ServerEnvSchema`. */
-export const ovieSummerEveDeploymentOriginSchema = z
-  .string()
-  .url()
-  .regex(
-    /^https:\/\/(?:jovie-eve-shadow|summer-operations)-[a-z0-9]+-jovie\.vercel\.app$/u,
-    `Must be an immutable Summer deployment URL for ${SUMMER_PRODUCTION.projectId}`
-  )
-  .optional();
+/**
+ * Production Summer origin. The deprecated env parses when set to this
+ * value. The caller does not read the env. Admission is
+ * `GET /runtime/v1/identity` on this origin. The previous regex accepted
+ * only an immutable `jovie-eve-shadow-<hash>` host and rejected this domain.
+ */
+export const SUMMER_ORIGIN_ENV_ACCEPTED = SUMMER_PRODUCTION.productionOrigin;
 
-/** Expected `dpl_` id. Same object as `ServerEnvSchema`. */
-export const ovieSummerEveExpectedDeploymentIdSchema = z
-  .string()
-  .regex(/^dpl_[A-Za-z0-9]+$/u)
-  .optional();
+/**
+ * Deprecated and ignored, whether set or unset.
+ * `https://summer.jov.ie` parses. A leftover per-deployment URL also parses
+ * so production boot does not fail before the variable is deleted. Neither
+ * value selects the caller.
+ */
+export const ovieSummerEveDeploymentOriginSchema = z.string().optional();
+
+/**
+ * Deprecated and ignored, whether set or unset. Exact deployment-id
+ * equality is not a Summer gate. Delete
+ * `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` from Vercel production.
+ */
+export const ovieSummerEveExpectedDeploymentIdSchema = z.string().optional();

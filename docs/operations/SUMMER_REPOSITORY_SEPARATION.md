@@ -90,7 +90,7 @@ root `apps/summer`, production branch `main`. `jovie-eve-shadow`
 is a legacy name from the pre-cutover pilot. Its production alias is
 summer.jov.ie. Runtime commit
 `f9cad8528000000c4f196e1ccbf6a8aaf386b0f7` deployed as
-`dpl_CnnoQexMQB46zwBNURMJSsAZrRAp`; the public Photon alias served that build.
+`dpl_CnnoQexMQB46zwBNURMJSsAZrRAp` <!-- summer-pin-historical: 2026-09-05 cutover receipt -->; the public Photon alias served that build.
 A real founder iMessage at 20:50:42.610Z reached the signed production webhook
 with HTTP 200, created one immutable admission, and received one Summer reply
 at 20:50:56.976Z. The obsolete parallel webhook was retired with sole-replacement
@@ -104,18 +104,67 @@ here; historical Summer extraction fixtures are verification-only pending
 final source cleanup. Transport delivery does not certify governor execution,
 Ovie web/mobile continuity, or revenue lift.
 
-## Production Summer identity and the Jovie pin
+## Production Summer reference
 
-EVENT: Production Summer is project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`.
-Display name is not identity. The caller targets `https://summer.jov.ie`.
-Alias identity must be `company.summer`, that project, and production; a bad
-alias is uncached `503` `summer_pin_invalid`. The two `OVIE_SUMMER_EVE_*` pin
-variables stay advisory. `pnpm check:summer-eve-pin` still requires both and
-warns on drift. A stale pin logs `fallback: production_alias` and the call
-still uses the alias. Do not clear them. No Jovie env change is required
-after this build. The schedule skips until `SUMMER_PIN_CHECK_VERCEL_TOKEN`
-exists.
+EVENT: Jovie addresses production Summer only at `https://summer.jov.ie`.
+Admission requires `GET /runtime/v1/identity` to report project
+`prj_LaVQva346cjp5XfrbAIIQUln7tPH` (`jovie-eve-shadow`, display name is not
+identity), environment `production`, and status `source-bound`, with a
+`sourceRevision` and deployment identity. A deployment id is observed from
+that response. It is never a pin. A mismatch or transport error is uncached
+`503` `summer_pin_invalid`. There is no second origin.
 
-Ship now: call summer.jov.ie and log a stale pin while still using the alias.
-Re-evaluate when the advisory pin is unused. Then remove the two pin
-variables and the exact-id CI check.
+`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
+`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` are deprecated and ignored, whether
+set or unset. Delete both from the Jovie production environment after this
+build. `pnpm check:summer-eve-pin` reads `https://summer.jov.ie/runtime/v1/identity`
+and, when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present, confirms that reported
+deployment is a READY production deployment of the same project. It does not
+compare a configured deployment id. The tokenless path still fails closed
+when identity is missing or not source-bound.
+
+Ship now: call `https://summer.jov.ie` and admit only source-bound production
+Summer. Re-evaluate when the two deprecated variables are gone from Vercel
+production. Then remove their schema keys.
+
+The env schema accepts `https://summer.jov.ie`. That string is not the
+admission check. Admission is `GET /runtime/v1/identity` on that origin,
+fail closed unless the responder is source-bound production Summer.
+
+## Production has not called the domain yet
+
+The Jovie production deployment serving `jov.ie` on 2026-09-25 is a redeploy
+of `eb15ae0bfd06ec178b8fad4e341a2cd9f4fac049`. That build's
+`getEveShadowOrigin` returns only `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN`, and
+its schema accepts only an immutable `jovie-eve-shadow-<hash>` URL. It
+rejects `https://summer.jov.ie`. After the Summer production alias moved at
+2026-09-25T05:42Z, bottleneck events were served by an older production
+deployment. The deployment `summer.jov.ie` resolved to received identity
+reads and no bottleneck events in that window. This change is the first
+Jovie bridge that calls the domain. It is not proof that production has
+done so. Do not treat a public identity GET from CI as that proof.
+
+## Trusted Sources follow-up
+
+Vercel Trusted Sources, not this repository, decides which Jovie environment
+may reach a protected Summer deployment. Adding another project defaults to
+matching environments: production calls production, preview calls preview. A
+custom rule can map Jovie production only onto Eve preview. JOV-6121 is that
+suspected rule. It is not in this repo. Linear was not readable from this
+session, and `JovieInc/summer-config` was not readable. A project read of
+`jovie-eve-shadow` showed SSO, password protection, and Trusted IPs
+disabled, and did not return a `trustedSources` allowlist.
+
+Eve application code in this repo accepts only
+`owner:jovie:project:jovie:environment:production` and rejects preview. The
+live Summer process is the private `summer-config` runtime. Confirm that
+copy matches.
+
+Post-merge, on project `jovie-eve-shadow`
+(`prj_LaVQva346cjp5XfrbAIIQUln7tPH`), Settings, Deployment Protection,
+Trusted Sources: confirm project `jovie`
+(`prj_HPZm5iGtARQ2qef6g2xtjgFIGDVY`) production may call this project's
+production environment, which is `https://summer.jov.ie`. If JOV-6121 allows
+only preview, add production-to-production. Do not leave Jovie production
+able to call only preview deployments. This pull request does not change
+that setting.

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { env } from '@/lib/env-server';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
@@ -116,22 +115,10 @@ export function createEveSummerSpeaker(
       try {
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
         if (!input.principalHash) throw new Error('founder_principal_required');
-        const pinnedOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
-        const pinnedDeploymentId =
-          env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
-        const target = await resolveSummerEveCallerOrigin({
-          pinnedOrigin,
-          pinnedDeploymentId,
-        });
+        const target = await resolveSummerEveCallerOrigin();
         let deploymentId = target.deploymentId;
         const refreshDeploymentId = async () =>
-          (
-            await resolveSummerEveCallerOrigin({
-              pinnedOrigin,
-              pinnedDeploymentId,
-              refresh: true,
-            })
-          ).deploymentId;
+          (await resolveSummerEveCallerOrigin({ refresh: true })).deploymentId;
         const rawBody = JSON.stringify({
           eventId,
           conversationId: 'summer-session-current',
