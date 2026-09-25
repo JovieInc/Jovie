@@ -8,11 +8,19 @@ import {
   ROUTE_PREP_COVERAGE_COMMAND,
   runDesignConformance,
   runStructural,
+  webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
-const WEB_CI_CONTRACT_TESTS_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
+const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
+  resolve(
+    import.meta.dirname,
+    '..',
+    '..',
+    '..',
+    'apps/web/tests/quarantine.json'
+  )
+);
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
@@ -522,4 +530,43 @@ exit 0
       }
     }
   );
+});
+
+describe('webCiContractTestsCommand', () => {
+  it('honors the quarantine ledger and keeps browser-heavy receipts out', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-contract-ledger-'));
+    const ledger = join(dir, 'quarantine.json');
+    try {
+      writeFileSync(
+        ledger,
+        JSON.stringify({
+          entries: [
+            { kind: 'unit', path: 'tests/unit/ci/deploy-workflow.test.ts' },
+            { kind: 'unit', path: 'tests/unit/inbox/webhook-handler.test.ts' },
+            { kind: 'e2e', path: 'tests/unit/ci/not-a-unit.spec.ts' },
+          ],
+        })
+      );
+      const command = webCiContractTestsCommand(ledger);
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+      );
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/playwright-artifact-secrets.test.ts'
+      );
+      expect(command).not.toContain('webhook-handler');
+      expect(command).not.toContain('not-a-unit');
+      expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes the live ledger deploy-workflow quarantine', () => {
+    expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(
+      '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+    );
+  });
 });

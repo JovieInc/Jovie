@@ -28,7 +28,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -69,8 +69,38 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // contract inputs. Those paths select only the operations lane, which skips
 // the web Unit Tests shards, so run the whole directory here (#18222 landed a
 // workflow-only diff that turned main red because only Unit Tests ran it).
-const WEB_CI_CONTRACT_TESTS_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
+// Excluded here because the web Unit Tests job owns them: the browser-heavy
+// Playwright artifact receipt, plus every unit test in the quarantine ledger
+// (Unit Tests reruns those with retries under continue-on-error).
+const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
+  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+]);
+export function webCiContractTestsCommand(
+  ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json')
+) {
+  // An unreadable ledger fails closed onto running every contract test.
+  let quarantined = [];
+  try {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    quarantined = (Array.isArray(ledger?.entries) ? ledger.entries : [])
+      .filter(
+        entry =>
+          entry?.kind === 'unit' &&
+          typeof entry.path === 'string' &&
+          entry.path.startsWith('tests/unit/ci/')
+      )
+      .map(entry => entry.path);
+  } catch {
+    quarantined = [];
+  }
+  const excludes = [
+    ...new Set([...WEB_CI_CONTRACT_ALWAYS_EXCLUDED, ...quarantined]),
+  ]
+    .sort()
+    .map(path => ` --exclude=${path}`)
+    .join('');
+  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
+}
 export const ROUTE_PREP_COVERAGE_COMMAND =
   'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
@@ -870,7 +900,7 @@ export function runStructural(opts = {}) {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
-          WEB_CI_CONTRACT_TESTS_COMMAND,
+          webCiContractTestsCommand(),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
