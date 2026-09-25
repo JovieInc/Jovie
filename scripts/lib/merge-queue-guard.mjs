@@ -2060,10 +2060,21 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  // Without the head commit time, failures of earlier heads cannot be told
+  // apart from the current head's, and counting all of them could mark an
+  // untested head retry-exhausted. Missing evidence is non-authoritative.
   const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
+  if (!Number.isFinite(headMs)) {
+    return {
+      action: 'unknown',
+      reason:
+        'head commit time unavailable; cannot attribute merge-group failures to the current head',
+      evidence: null,
+    };
+  }
+  const failuresForCurrentHead = allFailedFrontedRuns.filter(
+    run => Date.parse(run.createdAt) >= headMs
+  );
   const latestActiveForCurrentHead = mergeGroupRuns
     .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
     .filter(

@@ -1780,6 +1780,26 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(parseMergeQueueFrontBranch(null)).toBeNull();
   });
 
+  it('returns unknown instead of blocking when the head commit time is missing', () => {
+    // An empty or failed commit-date lookup must not count earlier heads'
+    // failures against a new, untested head (Sentry on #18341).
+    for (const headCommittedAt of ['', null, 'not-a-date']) {
+      const decision = frontItemChurnDecision({
+        prNumber: 15849,
+        currentBaseSha: BASE,
+        headCommittedAt,
+        observedAt: '2026-08-13T01:53:00.000Z',
+        mergeGroupRuns: [
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:31:17.000Z'),
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:11:17.000Z'),
+        ],
+      });
+      expect(decision.action).toBe('unknown');
+      expect(decision.evidence).toBeNull();
+    }
+  });
+
   it('suppresses an unchanged source head after repeated unit-test failures', () => {
     // Incident regression: #15849 fronted repeated failed group attempts on
     // base 9bd3fade9 while its head b499576 stayed unchanged.
