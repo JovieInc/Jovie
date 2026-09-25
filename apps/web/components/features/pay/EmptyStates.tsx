@@ -3,6 +3,7 @@
 import { motion, type Variants } from 'motion/react';
 import Image from 'next/image';
 import { useMemo } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 type EmptyStateType = 'no-venmo' | 'pending-metrics';
@@ -20,14 +21,14 @@ interface TippingSkeletonProps {
 
 const EMPTY_STATE_CONFIG = {
   'no-venmo': {
-    title: 'No Venmo Account Connected',
+    heading: 'No Venmo Account Connected',
     description:
       'Connect your Venmo account to start receiving payments from your fans.',
     illustration: '/images/tipping/empty-venmo.svg',
     altText: 'Illustration of a disconnected Venmo account',
   },
   'pending-metrics': {
-    title: 'Payment Metrics Coming Soon',
+    heading: 'Payment Metrics Coming Soon',
     description:
       'Your payment metrics will appear here once you receive your first payment.',
     illustration: '/images/tipping/empty-metrics.svg',
@@ -36,8 +37,10 @@ const EMPTY_STATE_CONFIG = {
 } as const;
 
 /**
- * Empty state component for tipping-related features
- * Shows appropriate illustration and message based on the type
+ * Empty state component for tipping-related features.
+ * Composes the canonical EmptyState molecule (GH-12638): the molecule owns the
+ * hierarchy (illustration/icon, heading, description); this surface adds the
+ * tipping illustration and its mount animation.
  */
 export function TippingEmptyState({
   type,
@@ -46,58 +49,56 @@ export function TippingEmptyState({
 }: Readonly<TippingEmptyStateProps>) {
   const config = EMPTY_STATE_CONFIG[type];
 
-  const containerVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: [0.16, 1, 0.3, 1], // Apple-style easing
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const childVariants: Variants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
-    },
-  };
-
   const content = (
     <div
       className={`bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl shadow-black/5 text-center ${className}`}
     >
-      <div className='flex flex-col items-center justify-center space-y-6'>
-        {/* Illustration */}
-        <div className='relative w-48 h-48 mb-2'>
-          <Image
-            src={config.illustration}
-            alt={config.altText}
-            fill
-            sizes='(max-width: 768px) 100vw, 192px'
-            className='object-contain'
-            aria-hidden='true'
-          />
-        </div>
-
-        {/* Text content */}
-        <div className='space-y-2'>
-          <h3 className='text-sm font-medium text-secondary-token'>
-            {config.title}
-          </h3>
-          <p className='text-secondary-token max-w-md'>{config.description}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon={
+          <div className='relative h-24 w-24'>
+            <Image
+              src={config.illustration}
+              alt={config.altText}
+              fill
+              sizes='(max-width: 768px) 100vw, 192px'
+              className='object-contain'
+              aria-hidden='true'
+            />
+          </div>
+        }
+        heading={config.heading}
+        description={config.description}
+        size='default'
+        testId='tipping-empty-state'
+        className='px-0 py-0'
+      />
     </div>
   );
 
   // Return animated or static version based on the animate prop
   if (animate) {
+    const containerVariants: Variants = {
+      hidden: { opacity: 0, y: 20 },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+          duration: 0.5,
+          ease: [0.16, 1, 0.3, 1], // Apple-style easing
+          staggerChildren: 0.1,
+        },
+      },
+    };
+
+    const childVariants: Variants = {
+      hidden: { opacity: 0, y: 10 },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+      },
+    };
+
     return (
       <motion.div
         variants={containerVariants}
