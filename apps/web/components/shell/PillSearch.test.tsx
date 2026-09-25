@@ -62,6 +62,17 @@ describe('PillSearch', () => {
     expect(screen.getByPlaceholderText('and…')).toBeInTheDocument();
   });
 
+  it('ranks slash fields by match score', () => {
+    setup();
+    fireEvent.change(screen.getByLabelText('Filter tracks'), {
+      target: { value: '/s' },
+    });
+
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveTextContent('Status');
+    expect(options[1]).toHaveTextContent('Artist');
+  });
+
   it('opens suggestions and commits a fuzzy artist match on Enter', () => {
     const { onPillsChange } = setup();
     const input = screen.getByLabelText('Filter tracks');
