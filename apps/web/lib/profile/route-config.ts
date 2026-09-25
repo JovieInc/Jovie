@@ -111,7 +111,7 @@ export interface PublicProfileNavigationDestination {
     | 'mode-listen'
     | 'mode-tour'
     | 'mode-about';
-  readonly label: 'Home' | 'Music' | 'Shows' | 'About';
+  readonly label: 'Home' | 'Music' | 'Events' | 'About';
   readonly availability: PublicProfileNavigationAvailability;
   readonly audience: 'public';
   readonly badge: null;
@@ -172,7 +172,7 @@ export const PUBLIC_PROFILE_NAVIGATION = [
   {
     id: 'tour',
     routeKey: 'mode-tour',
-    label: 'Shows',
+    label: 'Events',
     availability: 'always',
     audience: 'public',
     badge: null,
@@ -279,7 +279,7 @@ export function validatePublicProfileNavigation(
   if (
     destinations.some(destination => {
       const label: string = destination.label;
-      return label === 'Events' || label === 'Alerts';
+      return label === 'Shows' || label === 'Alerts';
     })
   ) {
     issues.push('legacy-nav-label');
@@ -574,7 +574,7 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
     'mode-tour': {
       key: 'mode-tour',
       category: 'top-level',
-      label: 'Shows',
+      label: 'Events',
       buildPath: username => `/${username}?mode=tour`,
       showBottomTabBar: true,
       activeTab: 'tour',
@@ -994,7 +994,7 @@ export const REDIRECT_SINK_ROUTE_KEYS: readonly ProfileRouteKey[] = [
 
 /**
  * Resolve the active destination for a given mode.
- * Shows stays active without dates. Get updates falls back to Home.
+ * Events stays active without dates. Get updates falls back to Home.
  */
 export function resolveActiveTab(
   mode: string | null | undefined,

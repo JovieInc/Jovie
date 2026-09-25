@@ -265,6 +265,7 @@ describe('ProfileDesktopSurface', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
   it('renders the desktop shell and primary navigation', () => {
+    const onModeSelect = vi.fn();
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -274,7 +275,7 @@ describe('ProfileDesktopSurface', () => {
         drawerOpen={false}
         drawerView='menu'
         activeMode='profile'
-        onModeSelect={vi.fn()}
+        onModeSelect={onModeSelect}
         onDrawerOpenChange={vi.fn()}
         onDrawerViewChange={vi.fn()}
         onOpenMenu={vi.fn()}
@@ -302,13 +303,13 @@ describe('ProfileDesktopSurface', () => {
       within(navigation).getByRole('button', { name: 'Music' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).getByRole('button', { name: 'Shows' })
+      within(navigation).getByRole('button', { name: 'Events' })
     ).toBeInTheDocument();
     expect(
       within(navigation).getByRole('button', { name: 'About' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).queryByRole('button', { name: 'Events' })
+      within(navigation).queryByRole('button', { name: 'Shows' })
     ).not.toBeInTheDocument();
     expect(
       within(navigation).queryByRole('button', { name: 'Alerts' })
@@ -316,6 +317,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
+
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Events' }));
+    expect(onModeSelect).toHaveBeenCalledWith('tour');
+
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-auto', 'min-h-7');
     expect(listenCta).toHaveClass(

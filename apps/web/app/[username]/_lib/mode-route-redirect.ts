@@ -41,8 +41,8 @@ export const LEGACY_PROFILE_MODE_BY_SLUG: Readonly<
   subscribe: 'subscribe',
   tip: 'pay',
   tour: 'tour',
-  // IA destinations (JOV-6196). Nav labels Shows today; Events is the
-  // approved rename. Both deep-link paths must resolve to tour mode.
+  // IA destinations (JOV-6196). The nav label is Events. Both deep-link
+  // paths must resolve to tour mode.
   shows: 'tour',
   events: 'tour',
 };

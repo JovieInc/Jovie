@@ -14,7 +14,7 @@
  * Destinations (JOV-6198 shared contract):
  *   1. Home   (mode: profile) — House icon
  *   2. Music  (mode: listen)  — Music2 icon
- *   3. Shows  (mode: tour)    — CalendarDays icon
+ *   3. Events (mode: tour)    — CalendarDays icon
  *   4. About  (mode: about)   — UserRound icon
  * Get updates is an action, not a destination. Presentation owns icons only.
  */
@@ -53,7 +53,7 @@ export interface BottomTabBarProps {
   readonly activeTab: ProfilePrimaryTab;
 
   /**
-   * Retained for API compatibility. Shows stays visible so Wave 1 can own
+   * Retained for API compatibility. Events stays visible so Wave 1 can own
    * empty-vs-no-surface copy without compact hiding the destination.
    */
   readonly hasTourDates: boolean;
