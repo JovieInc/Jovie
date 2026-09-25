@@ -217,7 +217,7 @@ export function PillSearch({
           acc.push({ kind: 'field', field: f, score });
         }
       }
-      return acc.toSorted((a, b) => b.score - a.score).slice(0, 8);
+      return acc.sort((a, b) => b.score - a.score).slice(0, 8);
     }
 
     if (slash?.kind === 'scoped') {
@@ -240,7 +240,7 @@ export function PillSearch({
           score: fuzzy(q, v),
         }))
         .filter(s => s.score > 0)
-        .toSorted((a, b) => b.score - a.score)
+        .sort((a, b) => b.score - a.score)
         .slice(0, 8);
     }
 
@@ -288,7 +288,8 @@ export function PillSearch({
           out.push({ kind: 'value', field: 'has', value: v, score: s });
       });
     }
-    return out.toSorted((a, b) => b.score - a.score).slice(0, 8);
+    out.sort((a, b) => b.score - a.score);
+    return out.slice(0, 8);
   }, [
     allowedFieldSet,
     artistOptions,
