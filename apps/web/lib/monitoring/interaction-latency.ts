@@ -55,10 +55,16 @@ function canUsePerformanceMarks() {
 }
 
 function createInteractionId(name: string) {
-  const suffix =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${(fallbackInteractionIdCounter += 1)}`;
+  let suffix: string;
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    suffix = crypto.randomUUID();
+  } else {
+    fallbackInteractionIdCounter += 1;
+    suffix = `${Date.now()}-${fallbackInteractionIdCounter}`;
+  }
 
   return `${name}:${suffix}`;
 }
