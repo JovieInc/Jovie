@@ -443,6 +443,7 @@ describe('merge_group workflow contract', () => {
       'ci-ios',
       'ci-macos',
       'ci-cross-product-integration',
+      'ci-product-lane-receipt',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {

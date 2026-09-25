@@ -2726,6 +2726,7 @@ jobs:
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
+      needs.ci-merge-group-admission.result == 'success' &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
