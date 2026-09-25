@@ -2533,7 +2533,8 @@ jobs:
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
-                  --config=playwright.config.storybook.ts --project=chromium --reporter=line
+                  --config=playwright.config.storybook.ts --project=chromium --reporter=line \
+                  --workers=2
               exit 0
             fi
             sleep 2
