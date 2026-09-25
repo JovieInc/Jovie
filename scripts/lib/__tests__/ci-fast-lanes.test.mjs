@@ -263,7 +263,10 @@ describe('Summer bridge structural coverage selection', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
     vi.stubEnv('CI_PRODUCT_LANES', lanes);
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    const execute = vi.fn(() => ({ code: 0, output: 'passed\n' }));
+    const execute = vi.fn((_command = '') => ({
+      code: 0,
+      output: 'passed\n',
+    }));
 
     const result = runStructural({ changedFileList: [changedFile], execute });
 
