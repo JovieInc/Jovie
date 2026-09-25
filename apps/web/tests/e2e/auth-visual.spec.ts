@@ -19,7 +19,6 @@
  */
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { waitForHydration } from './utils/smoke-test-utils';
 
 // Visual tests use no stored auth state
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -80,19 +79,15 @@ async function openInterceptedAuthModal(
   page: import('@playwright/test').Page,
   mode: 'signin' | 'signup'
 ) {
-  await page.goto(mode === 'signin' ? APP_ROUTES.HOME : APP_ROUTES.BRAND, {
+  await page.goto('/', {
     waitUntil: 'domcontentloaded',
     timeout: NAV_TIMEOUT,
   });
-  await waitForHydration(page, { timeout: NAV_TIMEOUT });
 
   if (mode === 'signin') {
     await page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`).first().click();
   } else {
-    await page
-      .getByRole('link', { name: /start free trial/i })
-      .first()
-      .click();
+    await page.locator('[data-cta-sign-up="true"]').first().click();
   }
 
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {

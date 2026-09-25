@@ -437,7 +437,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     headline: 'The link your music deserves.',
     subhead:
       'One profile that puts the right action first—from release alerts and release day to nearby shows, support, and fan follow-up.',
-    ctaLabel: 'Get started',
+    ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
     phoneCaption: 'One profile.',
@@ -1210,7 +1210,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   finalCta: {
     headline: 'Claim your profile.',
     subhead: 'One adaptive profile for every release, show, and fan action.',
-    ctaLabel: 'Get started',
+    ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
   },
 } as const;
