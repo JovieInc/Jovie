@@ -1045,7 +1045,7 @@ export function runCommandPool(commands, opts) {
         onError(error);
         return;
       }
-      if (typeof result?.then === 'function') {
+      if (result instanceof Promise) {
         result.then(value => finish(index, startedAt, value), onError);
       } else {
         finish(index, startedAt, result);
