@@ -255,9 +255,12 @@ export const ServerEnvSchema = z.object({
   MERCURY_CHECKING_ACCOUNT_ID: z.string().optional(),
   MERCURY_ACCOUNT_ID: z.string().optional(),
 
-  // Upstash Redis
+  // Upstash Redis (production). Non-production ignores these unless
+  // JOVIE_ALLOW_PRODUCTION_UPSTASH=1. REDIS_URL is optional loopback Redis.
   UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
+  REDIS_URL: z.string().trim().optional(),
+  JOVIE_ALLOW_PRODUCTION_UPSTASH: z.string().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
@@ -569,6 +572,8 @@ export const ENV_KEYS = [
   'MERCURY_ACCOUNT_ID',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
+  'REDIS_URL',
+  'JOVIE_ALLOW_PRODUCTION_UPSTASH',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_PROD_SIGNUP_EMAIL_BASE',

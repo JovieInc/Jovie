@@ -62,6 +62,7 @@ describe('enforceOnboardingRateLimit — Redis unavailable (fail-closed)', () =>
   beforeEach(() => {
     clearStore();
     vi.resetModules();
+    vi.stubEnv('VERCEL_ENV', 'production');
     mockCreateRedisRateLimiter.mockReset();
     mockCreateRedisRateLimiter.mockReturnValue(null);
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -135,6 +136,7 @@ describe('enforceOnboardingRateLimit — working redis/mock backend (IP threshol
   beforeEach(() => {
     clearStore();
     vi.resetModules();
+    vi.stubEnv('VERCEL_ENV', 'production');
     mockCreateRedisRateLimiter.mockReset();
     mockCreateRedisRateLimiter.mockImplementation((config: RateLimitConfig) =>
       createCountingRedisBackend(config)
@@ -245,5 +247,30 @@ describe('enforceOnboardingRateLimit — working redis/mock backend (IP threshol
         checkIP: false,
       })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('enforceOnboardingRateLimit — non-production in-memory store', () => {
+  beforeEach(() => {
+    clearStore();
+    vi.resetModules();
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('NODE_ENV', 'test');
+    mockCreateRedisRateLimiter.mockReset();
+    mockCreateRedisRateLimiter.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    clearStore();
+    vi.unstubAllEnvs();
+  });
+
+  it('allows the first requireRedis attempt instead of failing closed', async () => {
+    const { enforceOnboardingRateLimit } = await loadOnboardingRateLimit();
+
+    await expect(
+      enforceOnboardingRateLimit({ userId: 'dev-user', ip: '203.0.113.50' })
+    ).resolves.toBeUndefined();
+    expect(mockCreateRedisRateLimiter).not.toHaveBeenCalled();
   });
 });

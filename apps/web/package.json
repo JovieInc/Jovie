@@ -293,6 +293,7 @@
     "react-dom": "19.2.8",
     "react-error-boundary": "^6.1.6",
     "recharts": "3.10.1",
+    "redis": "5.12.1",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
     "remark-html": "^16.0.1",

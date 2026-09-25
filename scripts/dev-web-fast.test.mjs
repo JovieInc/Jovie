@@ -104,6 +104,8 @@ test('dev-web-fast starts when eval unset args are populated', async () => {
         JOVIE_DEV_READY_TIMEOUT: '5',
         JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS: '1',
         JOVIE_DISABLE_REDIS_FOR_EVALS: '1',
+        JOVIE_ALLOW_PRODUCTION_UPSTASH: '',
+        REDIS_URL: '',
         JOVIE_FAKE_DOPPLER_CAPTURE: capturePath,
       },
       timeout: 10_000,
@@ -125,7 +127,7 @@ test('dev-web-fast starts when eval unset args are populated', async () => {
   }
 });
 
-test('dev-web-fast starts when optional env unset args are empty', async () => {
+test('dev-web-fast unsets production Upstash by default', async () => {
   const tmp = mkdtempSync(path.join(tmpdir(), 'jovie-dev-web-fast-test-'));
   const binDir = path.join(tmp, 'bin');
   const capturePath = path.join(tmp, 'doppler-args.txt');
@@ -147,6 +149,8 @@ test('dev-web-fast starts when optional env unset args are empty', async () => {
         JOVIE_DEV_READY_TIMEOUT: '5',
         JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS: '0',
         JOVIE_DISABLE_REDIS_FOR_EVALS: '0',
+        JOVIE_ALLOW_PRODUCTION_UPSTASH: '',
+        REDIS_URL: '',
         JOVIE_FAKE_DOPPLER_CAPTURE: capturePath,
       },
       timeout: 10_000,
@@ -154,11 +158,57 @@ test('dev-web-fast starts when optional env unset args are empty', async () => {
 
     const output = `${result.stdout}\n${result.stderr}`;
     assert.equal(result.status, 0, output);
+    assert.match(output, /in-memory rate limiter and cache/);
     assert.doesNotMatch(output, /ENV_UNSET_ARGS/);
 
     const dopplerArgs = readFileSync(capturePath, 'utf8').trim().split('\n');
+    assert.ok(dopplerArgs.includes('-u'));
+    assert.ok(dopplerArgs.includes('UPSTASH_REDIS_REST_URL'));
+    assert.ok(dopplerArgs.includes('UPSTASH_REDIS_REST_TOKEN'));
+    assert.ok(!dopplerArgs.includes('AI_GATEWAY_API_KEY'));
     assert.ok(dopplerArgs.includes('E2E_USE_TEST_AUTH_BYPASS=1'));
     assert.ok(dopplerArgs.includes('NEXT_PUBLIC_CLERK_MOCK=1'));
+    assert.ok(dopplerArgs.includes('pnpm'));
+  } finally {
+    rmSync(tmp, { force: true, recursive: true });
+  }
+});
+
+test('dev-web-fast can opt in to production Upstash', async () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'jovie-dev-web-fast-test-'));
+  const binDir = path.join(tmp, 'bin');
+  const capturePath = path.join(tmp, 'doppler-args.txt');
+
+  try {
+    mkdirSync(binDir, { recursive: true });
+    makeFakeDoppler(binDir);
+
+    const port = await getAvailablePort();
+    const result = spawnSync('bash', [devWebFastScript], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ''}`,
+        PORT: String(port),
+        TMPDIR: tmp,
+        JOVIE_DEV_WARM_ROUTES: '',
+        JOVIE_DEV_READY_TIMEOUT: '5',
+        JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS: '0',
+        JOVIE_DISABLE_REDIS_FOR_EVALS: '0',
+        JOVIE_ALLOW_PRODUCTION_UPSTASH: '1',
+        REDIS_URL: '',
+        JOVIE_FAKE_DOPPLER_CAPTURE: capturePath,
+      },
+      timeout: 10_000,
+    });
+
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.equal(result.status, 0, output);
+    assert.match(output, /JOVIE_ALLOW_PRODUCTION_UPSTASH is set/);
+
+    const dopplerArgs = readFileSync(capturePath, 'utf8').trim().split('\n');
+    assert.ok(!dopplerArgs.includes('UPSTASH_REDIS_REST_URL'));
     assert.ok(dopplerArgs.includes('pnpm'));
   } finally {
     rmSync(tmp, { force: true, recursive: true });

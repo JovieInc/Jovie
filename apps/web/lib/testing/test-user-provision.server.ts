@@ -7,6 +7,7 @@ import { users } from '@/lib/db/schema/auth';
 import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { productionUpstashCredentials } from '@/lib/redis-store';
 import { normalizeEmail } from '@/lib/utils/email';
 
 export { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
@@ -752,16 +753,14 @@ export async function invalidateTestUserCaches(
     }
   }
 
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-
-  if (!url || !token) {
+  const credentials = productionUpstashCredentials();
+  if (!credentials) {
     return;
   }
 
   let redis: Redis;
   try {
-    redis = new Redis({ url, token });
+    redis = new Redis(credentials);
   } catch {
     // Upstash throws on non-https/malformed URLs; admin cache invalidation is
     // best-effort, so unparseable config is treated as "not configured".

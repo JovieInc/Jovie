@@ -52,10 +52,36 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Capture loopback REDIS_URL before Doppler replaces the shell environment.
+LOCAL_REDIS_URL="$(node -e '
+const raw = process.env.REDIS_URL || "";
+try {
+  const parsed = new URL(raw);
+  const host = parsed.hostname.replace(/^\[|\]$/g, "");
+  const local =
+    (parsed.protocol === "redis:" || parsed.protocol === "rediss:") &&
+    (host === "localhost" || host === "127.0.0.1" || host === "::1");
+  if (local) process.stdout.write(raw);
+} catch {}
+')"
+
 ENV_UNSET_ARGS=()
-if [ "${JOVIE_DISABLE_REDIS_FOR_EVALS:-0}" = "1" ]; then
+ALLOW_PROD_UPSTASH=0
+case "${JOVIE_ALLOW_PRODUCTION_UPSTASH:-}" in
+  1|true) ALLOW_PROD_UPSTASH=1 ;;
+esac
+
+if [ "$ALLOW_PROD_UPSTASH" != "1" ] || [ "${JOVIE_DISABLE_REDIS_FOR_EVALS:-0}" = "1" ]; then
   ENV_UNSET_ARGS+=(-u UPSTASH_REDIS_REST_URL -u UPSTASH_REDIS_REST_TOKEN)
-  echo "Starting dev server with Redis env disabled for isolated evals" >&2
+  if [ "${JOVIE_DISABLE_REDIS_FOR_EVALS:-0}" = "1" ]; then
+    echo "Starting dev server with Redis env disabled for isolated evals" >&2
+  elif [ -n "$LOCAL_REDIS_URL" ]; then
+    echo "Starting dev server with loopback Redis. Production Upstash credentials are unset." >&2
+  else
+    echo "Starting dev server with the in-memory rate limiter and cache. Production Upstash credentials are unset." >&2
+  fi
+else
+  echo "JOVIE_ALLOW_PRODUCTION_UPSTASH is set. Dev server may use production Upstash." >&2
 fi
 if [ "${JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS:-0}" = "1" ]; then
   ENV_UNSET_ARGS+=(
@@ -68,7 +94,11 @@ if [ "${JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS:-0}" = "1" ]; then
   echo "Starting dev server with model provider env disabled for isolated evals" >&2
 fi
 
-DEV_ENV_ARGS=(
+DEV_ENV_ARGS=()
+if [ -n "$LOCAL_REDIS_URL" ]; then
+  DEV_ENV_ARGS+=(REDIS_URL="$LOCAL_REDIS_URL")
+fi
+DEV_ENV_ARGS+=(
   E2E_USE_TEST_AUTH_BYPASS="${E2E_USE_TEST_AUTH_BYPASS:-1}"
   NEXT_PUBLIC_CLERK_MOCK="${NEXT_PUBLIC_CLERK_MOCK:-1}"
   NEXT_PUBLIC_CLERK_PROXY_DISABLED="${NEXT_PUBLIC_CLERK_PROXY_DISABLED:-1}"
@@ -79,8 +109,8 @@ DEV_ENV_ARGS=(
 )
 
 # JOV-2741: macOS ships Bash 3.2; with `set -u`, expanding an empty ENV_UNSET_ARGS
-# array makes `env` fail on fresh worktrees before the dev server starts. Only pass
-# -u flags when eval isolation opts in.
+# array makes `env` fail before the dev server starts. Only pass -u flags when
+# the array is non-empty.
 if [ "${#ENV_UNSET_ARGS[@]}" -gt 0 ]; then
   doppler run --project jovie-web --config dev -- env \
     "${ENV_UNSET_ARGS[@]}" \
