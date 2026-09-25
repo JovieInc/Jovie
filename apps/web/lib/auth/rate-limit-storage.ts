@@ -13,13 +13,35 @@ import { logger } from '@/lib/utils/logger';
  * counter Better Auth used to run through `secondaryStorage.increment`. It
  * does not get, set, or delete session records.
  *
- * Failures degrade open: a Redis outage must not block sign-in. The window
- * matches the previous secondary-storage increment (500ms timeout, EXPIRE
- * only when the counter is created).
+ * Failures degrade open: a Redis outage must not block sign-in. The counter
+ * and its TTL are one Redis script. A separate INCR then EXPIRE can leave a
+ * key with no TTL, and later counts never reset.
  */
 
 const OP_TIMEOUT_MS = 500;
 const KEY_PREFIX = 'ba:rl:';
+
+/**
+ * Returns the window count, or -1 when the key could not be given a TTL.
+ * -1 deletes the key before returning so a failed EXPIRE cannot lock the
+ * caller out for the life of the Redis database.
+ */
+export const AUTH_RATE_LIMIT_CONSUME_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  local ok = redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+  if ok ~= 1 then
+    redis.call('DEL', KEYS[1])
+    return -1
+  end
+end
+local ttl = redis.call('TTL', KEYS[1])
+if ttl < 0 then
+  redis.call('DEL', KEYS[1])
+  return -1
+end
+return count
+`;
 
 type AuthRateLimitStorage = NonNullable<
   NonNullable<BetterAuthOptions['rateLimit']>['customStorage']
@@ -38,15 +60,20 @@ export const authRateLimitStorage = {
 
     try {
       const redisKey = `${KEY_PREFIX}${key}`;
-      const count = await withTimeout(redis.incr(redisKey), {
-        timeoutMs: OP_TIMEOUT_MS,
-        context: 'auth-rate-limit-incr',
-      });
-      if (count === 1 && rule.window > 0) {
-        await withTimeout(redis.expire(redisKey, rule.window), {
+      const raw = await withTimeout(
+        redis.eval<string[], number>(
+          AUTH_RATE_LIMIT_CONSUME_SCRIPT,
+          [redisKey],
+          [String(rule.window)]
+        ),
+        {
           timeoutMs: OP_TIMEOUT_MS,
-          context: 'auth-rate-limit-expire',
-        });
+          context: 'auth-rate-limit-consume',
+        }
+      );
+      const count = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isFinite(count) || count < 0) {
+        return { allowed: true, retryAfter: null };
       }
       if (count <= rule.max) {
         return { allowed: true, retryAfter: null };
