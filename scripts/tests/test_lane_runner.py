@@ -102,13 +102,14 @@ class GateTest(unittest.TestCase):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
         self.assertEqual([(c.path, c.added, c.deleted) for c in changes], [("a.ts", 3, 1), ("img.png", 0, 0)])
 
-    def test_check_commands_target_only_changed_sources(self):
-        commands = lane.check_commands(["apps/web/lib/a.ts", "apps/web/drizzle/migrations/meta/x.json",
-                                        "docs/readme.md"])
-        self.assertEqual(commands[0][-1], "apps/web/lib/a.ts")
-        self.assertNotIn("apps/web/drizzle/migrations/meta/x.json", commands[0])
-        self.assertEqual(commands[1][-1], "lib/a.ts")
+    def test_code_changes_run_the_one_canonical_gate(self):
+        self.assertEqual(lane.check_commands(["apps/web/lib/a.ts", "docs/readme.md"]), [lane.CANONICAL_GATE])
         self.assertEqual(lane.check_commands(["docs/readme.md"]), [])
+
+    @unittest.skipUnless((ROOT / "scripts/automation-verify.sh").exists(), "release copy has no repo gates")
+    def test_canonical_gate_carries_the_ci_component_contract(self):
+        self.assertIn("affected)", (ROOT / lane.CANONICAL_GATE[1]).read_text())
+        self.assertIn("component-ship-gate", (ROOT / "scripts/automation-verify.sh").read_text())
 
 
 class FakeShell:
@@ -153,7 +154,7 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertIn(["gh", "pr", "merge", "7", "--repo", lane.REPO_SLUG, "--auto"], fake.calls)
 
     def test_failing_check_holds_the_pr_as_draft(self):
-        fake = FakeShell([self.pr], failing=("vitest",))
+        fake = FakeShell([self.pr], failing=("scripts/hooks/pre-push-gate.sh",))
         result = self.run_gate(fake)
         self.assertEqual(result["verdict"], "held")
         self.assertTrue(any(r.startswith("check-failed") for r in result["reasons"]))
@@ -462,9 +463,6 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
             self.assertIn("fix-red", (host.state / "runs/ledger.jsonl").read_text())
 
-    def test_component_changes_add_the_ship_gate(self):
-        commands = lane.check_commands(["apps/web/components/a/B.tsx"])
-        self.assertIn("component-ship-gate", commands[-1])
 
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")

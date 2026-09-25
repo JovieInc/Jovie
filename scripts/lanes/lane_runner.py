@@ -192,23 +192,17 @@ def parse_numstat(text: str) -> list[Change]:
     return changes
 
 
+# One gate definition for every implementer: the repo's own pre-push qualification (affected
+# typecheck, lint, tests, CI-harness and component contracts) — the same entry point humans'
+# hooks and the no-mistakes pipeline use. A product joins the lanes by providing it.
+CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
+
+
 def check_commands(paths: list[str]) -> list[list[str]]:
-    """Fast local checks for the changed files; CI stays the full authority."""
-    lintable = [p for p in paths if re.search(r"\.(ts|tsx|js|mjs|jsx|json|css)$", p)
-                and not GENERATED.search(p)]
-    web = [p[len("apps/web/"):] for p in paths
-           if p.startswith("apps/web/") and re.search(r"\.(ts|tsx)$", p) and not GENERATED.search(p)]
-    commands = []
-    if lintable:
-        commands.append(["pnpm", "exec", "biome", "check", "--no-errors-on-unmatched", *lintable])
-    if web:
-        commands.append(["pnpm", "--filter", "@jovie/web", "exec", "vitest", "related", "--run",
-                         "--passWithNoTests", *web])
-    if any(p.startswith("apps/web/components/") for p in paths):
-        # CI's component-ship-gate (tests + stories); server-backed certification stays in CI.
-        commands.append(["pnpm", "component-ship-gate", "--diff-base=origin/main",
-                         "--skip-live-storybook", "--skip-rendered-cert"])
-    return commands
+    """Code changes run the canonical gate; docs-only changes need nothing locally."""
+    if any(not DOC_FILE.search(p) for p in paths):
+        return [CANONICAL_GATE]
+    return []
 
 
 # ---------------------------------------------------------------- plumbing
