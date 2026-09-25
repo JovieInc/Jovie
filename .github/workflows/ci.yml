@@ -2403,6 +2403,12 @@ jobs:
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          # A failed first attempt that passes on retry leaves Playwright's
+          # error-context.md behind. Without this the artifact guard counts it
+          # as an unknown binary and fails the step although every test passed
+          # (merge-group run 36109792017). Markdown is still redacted and
+          # scanned for credentials.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -3027,6 +3033,8 @@ jobs:
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # Same retry-leaves-error-context.md case as the combined-head guard.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
