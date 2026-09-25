@@ -145,7 +145,7 @@ export function isAiVisibilityMetricKey(
 ): value is AiVisibilityMetricKey {
   return (
     typeof value === 'string' &&
-    Object.prototype.hasOwnProperty.call(AI_VISIBILITY_METRIC_CATALOG, value)
+    Object.hasOwn(AI_VISIBILITY_METRIC_CATALOG, value)
   );
 }
 
