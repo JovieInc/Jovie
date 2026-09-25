@@ -660,6 +660,12 @@ describe('sitemap publication inventory fixtures (JOV-6263)', () => {
     ).toContain('QA identity included: /tmoc0g1x9dwmk71');
     expect(
       collectSitemapInventoryViolations(
+        [...hubs, { url: 'https://jov.ie/tmoc0g1x9dwmk71/nested' }],
+        { manifest }
+      )
+    ).toContain('QA identity included: /tmoc0g1x9dwmk71/nested');
+    expect(
+      collectSitemapInventoryViolations(
         [{ ...hubs[0], lastModified: generatedAt }, hubs[1]],
         { generatedAt, manifest }
       )

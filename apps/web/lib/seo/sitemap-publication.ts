@@ -176,7 +176,7 @@ export function collectSitemapInventoryViolations(
     ) {
       violations.push(`request-time lastmod on unchanged page: ${path}`);
     }
-    const handle = path.split('/').filter(Boolean)[0];
+    const handle = path.split('/').find(segment => segment.length > 0);
     if (handle && isOpaqueInternalProfileHandle(handle)) {
       violations.push(`QA identity included: ${path}`);
     }
