@@ -382,7 +382,10 @@ describe('structural failure diagnostics', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    const execute = vi.fn(() => ({ code: 31, output: 'unknown failure\n' }));
+    const execute = vi.fn((/** @type {string} */ _command) => ({
+      code: 31,
+      output: 'unknown failure\n',
+    }));
     const result = runStructural({ execute });
     expect(result.code).toBe(31);
     expect(execute).toHaveBeenCalledTimes(1);
@@ -391,7 +394,8 @@ describe('structural failure diagnostics', () => {
     );
     const label = result.output.split('\n')[0].split(' Command: ')[1];
     expect(label.length).toBeLessThanOrEqual(80);
-    expect(execute.mock.calls[0][0].replace(/\s+/gu, ' ')).toContain(
+    const firstCommand = execute.mock.calls[0]?.[0] ?? '';
+    expect(firstCommand.replace(/\s+/gu, ' ')).toContain(
       label.replace(/…$/u, '')
     );
   });
