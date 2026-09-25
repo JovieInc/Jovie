@@ -15,14 +15,14 @@ importers:
         specifier: 2.8.0
         version: 2.8.0
       ai:
-        specifier: 7.0.107
-        version: 7.0.107(zod@4.6.5)
+        specifier: 7.0.112
+        version: 7.0.112(zod@4.6.5)
       braintrust:
         specifier: 3.34.0
         version: 3.34.0(zod@4.6.5)
       eve:
         specifier: 0.63.0
-        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2)
+        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -51,20 +51,20 @@ importers:
 
 packages:
 
-  '@ai-sdk/gateway@4.0.87':
-    resolution: {integrity: sha512-6wJmX/D5OO7tvDJbtFdXdBuRt8AkCnW+FLK+W35UHe/tHgolAa4hclXtJcMSYnlTDy/t5DNRgdesVaoMXtwzow==}
+  '@ai-sdk/gateway@4.0.90':
+    resolution: {integrity: sha512-mtmiicpMapQU8K0ynNXCRcO55GVyBv6kjbwsD15RMxJKZUUPR99HfQ7/BsdRLdjSQcL7YcCauMLbguw6J+JFjQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@5.0.45':
-    resolution: {integrity: sha512-gLuaCups8OCIRz3eO6WWz5op7VLYNNtFzyH0sWUr0FE9v7cTxR0qxDpQdrKnGcql+9WWttobjnZsJVsuEbsPQQ==}
+  '@ai-sdk/provider-utils@5.0.46':
+    resolution: {integrity: sha512-XYpiJbd3jW12HC4yzqNmUuPbZ7ooKXVxQjnXCC3O/VzzV2OvRWD6lDFUYYPLs/ZJgTcWWUkmHL/vIyvnxyplVA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider@4.0.17':
-    resolution: {integrity: sha512-VYMBxIQdcHqbIf1j+YZlI9Ati6LZ4wJe0GGd4z4a5H/KxTggjeOiyaVYTnfF7LHZK5jMQ+rofmzz4QPqf++NUw==}
+  '@ai-sdk/provider@4.0.18':
+    resolution: {integrity: sha512-+GZJIgz1jk86pwEbb3f1BD2bdoSKyWE4Jg4YUc7NMnMozbWemSKYZcw2F4nMaO5qwsL5A8RmioAKW81YktRpIQ==}
     engines: {node: '>=22'}
 
   '@babel/helper-string-parser@7.29.7':
@@ -1510,8 +1510,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@7.0.107:
-    resolution: {integrity: sha512-PVYQ3W9kR8oYiGQxbg4aFIlhQzKskZm8UV+4E0zB2uKOzFr8ju3bXQncOOZtLsOgJY8vdpgyu3cXtomsfcdQYg==}
+  ai@7.0.112:
+    resolution: {integrity: sha512-JDIaxfynFQoV/MPh8AUeHIpuFAUjA2uPBXd6Aa8oZBHtiQ58gJ+Q3NHsQUgavIHsA734oCIr3y9QWkhlgCEA0g==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3249,23 +3249,23 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.87(zod@4.6.5)':
+  '@ai-sdk/gateway@4.0.90(zod@4.6.5)':
     dependencies:
-      '@ai-sdk/provider': 4.0.17
-      '@ai-sdk/provider-utils': 5.0.45(zod@4.6.5)
+      '@ai-sdk/provider': 4.0.18
+      '@ai-sdk/provider-utils': 5.0.46(zod@4.6.5)
       '@vercel/oidc': 3.2.0
       zod: 4.6.5
 
-  '@ai-sdk/provider-utils@5.0.45(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.46(zod@4.6.5)':
     dependencies:
-      '@ai-sdk/provider': 4.0.17
+      '@ai-sdk/provider': 4.0.18
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
       undici: 7.29.0
       zod: 4.6.5
 
-  '@ai-sdk/provider@4.0.17':
+  '@ai-sdk/provider@4.0.18':
     dependencies:
       json-schema: 0.4.0
 
@@ -4476,11 +4476,11 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.107(zod@4.6.5):
+  ai@7.0.112(zod@4.6.5):
     dependencies:
-      '@ai-sdk/gateway': 4.0.87(zod@4.6.5)
-      '@ai-sdk/provider': 4.0.17
-      '@ai-sdk/provider-utils': 5.0.45(zod@4.6.5)
+      '@ai-sdk/gateway': 4.0.90(zod@4.6.5)
+      '@ai-sdk/provider': 4.0.18
+      '@ai-sdk/provider-utils': 5.0.46(zod@4.6.5)
       zod: 4.6.5
 
   ajv@8.20.0:
@@ -4865,9 +4865,9 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2):
+  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2):
     dependencies:
-      ai: 7.0.107(zod@4.6.5)
+      ai: 7.0.112(zod@4.6.5)
       nitro: 3.0.260903-beta
       undici: 8.9.0
     optionalDependencies:
