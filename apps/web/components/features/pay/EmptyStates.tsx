@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/tipping/EmptyStates.test.tsx
+
 import { motion, type Variants } from 'motion/react';
 import Image from 'next/image';
 import { useMemo } from 'react';
