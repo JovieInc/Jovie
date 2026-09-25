@@ -1,5 +1,9 @@
 defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
-  @moduledoc false
+  @moduledoc """
+  Runs the pinned Symphony checkout `dae31f823850c9ef2dea121433e5b60f09af26fa`.
+  It does not execute the host's installed openai/symphony `1c0fb6c8` binary.
+  Protected issues are omitted only while they lack `agent-ready`.
+  """
   use SymphonyElixir.TestSupport
 
   alias SymphonyElixir.Linear.Adapter
@@ -12,6 +16,8 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
   @billing_labels ["billing", "blocked:payments", "stripe"]
   @infra_labels ["infra", "area:infra", "infrastructure", "vercel"]
   @active_states ["Todo", "In Progress", "Rework", "Merging"]
+  @pinned_scheduler "dae31f823850c9ef2dea121433e5b60f09af26fa"
+  @installed_host_scheduler "1c0fb6c8e8ef9031a2c861e62af5f9e66cee39cb"
 
   setup do
     previous = System.get_env("LINEAR_API_KEY")
@@ -142,7 +148,15 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
     assert Config.settings!().agent.max_concurrent_agents == 5
   end
 
-  test "does not dispatch JOV-5914, JOV-6519, PR #17453, or PR #17156" do
+  test "runs pinned scheduler dae31f8 and not the installed 1c0 build" do
+    sha = System.fetch_env!("SYMPHONY_SELECTOR_SHA")
+    host = System.fetch_env!("SYMPHONY_HOST_INSTALLED_SHA")
+    assert sha == @pinned_scheduler
+    assert host == @installed_host_scheduler
+    refute sha == host
+  end
+
+  test "excludes JOV-5914, JOV-6519, PR #17453, and PR #17156 only while they lack agent-ready" do
     {:ok, issues} =
       Client.fetch_issues_by_states_for_test(@active_states, {:team, "JOV"}, fn _query, variables ->
         assert variables.teamKey == "JOV"
@@ -164,6 +178,10 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
              )
 
       refute Orchestrator.should_dispatch_issue_for_test(issue, state)
+
+      labeled = %{issue | labels: Enum.uniq(issue.labels ++ ["agent-ready"])}
+      assert "agent-ready" in labeled.labels
+      assert Orchestrator.should_dispatch_issue_for_test(labeled, state)
     end
   end
 

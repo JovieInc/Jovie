@@ -352,9 +352,9 @@ exit 0
             '    api_key: $LINEAR_API_KEY\n'
             '  required_labels:\n'
             '    - agent-ready\n'
-            '  # Scheduler filters are labels and states only. Do not dispatch or continue\n'
-            '  # work tied to GitHub PRs #17453 or #17156, including JOV-5914, JOV-6519,\n'
-            '  # and any issue whose subject is those pulls. Those issues are not agent-ready.\n'
+            '  # Scheduler filters are labels and states only. There is no identifier or\n'
+            '  # pull-number denylist. JOV-5914, JOV-6519, #17453, and #17156 stay out only\n'
+            '  # while they lack agent-ready. Adding agent-ready with no excluded label admits them.\n'
             '  excluded_labels:\n'
             '    - no-symphony\n'
             '    - billing\n'
@@ -380,8 +380,9 @@ exit 0
         ).replace(
             "Only the mechanical `no-symphony` dead-letter label excludes dispatch; "
             "legacy human-review labels never do.",
-            "Do not dispatch or continue work tied to GitHub PRs #17453 or #17156, including "
-            "JOV-5914, JOV-6519, and any issue whose subject is those pulls. "
+            "JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 are not excluded by "
+            "identifier. They stay outside intake only while they lack `agent-ready`. "
+            "Adding `agent-ready` with no excluded label selects them. "
             "Deploy, permissions, billing, and spend work is excluded by `vercel`, `infra`, "
             "`area:infra`, `infrastructure`, `blocked:auth`, `auth`, `area:auth`, `billing`, "
             "`blocked:payments`, `stripe`, and `cost-monitoring`, in addition to the mechanical "

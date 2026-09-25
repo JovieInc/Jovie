@@ -66,7 +66,13 @@ fi
 test "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$PIN"
 cp "$TEST_SOURCE" "$CHECKOUT/elixir/test/symphony_elixir/governor_bounded_codex_intake_test.exs"
 
+# openai/symphony v0.0.3. This runner does not execute that installed binary.
+HOST_INSTALLED_SHA="1c0fb6c8e8ef9031a2c861e62af5f9e66cee39cb"
+echo "selector-under-test=${PIN} host-installed-not-under-test=${HOST_INSTALLED_SHA}"
+
 export JOVIE_CODEX_WORKFLOW="$WORKFLOW"
+export SYMPHONY_SELECTOR_SHA="$PIN"
+export SYMPHONY_HOST_INSTALLED_SHA="$HOST_INSTALLED_SHA"
 export MIX_ENV=test
 export LINEAR_API_KEY="${LINEAR_API_KEY:-fixture-token}"
 cd "$CHECKOUT/elixir"

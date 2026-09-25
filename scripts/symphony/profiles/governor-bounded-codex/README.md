@@ -26,9 +26,10 @@ stay `Todo`, `In Progress`, `Rework`, and `Merging`.
 `excluded_labels` keeps `no-symphony` and adds the existing deploy, permissions,
 billing, and spend labels: `vercel`, `infra`, `area:infra`, `infrastructure`,
 `blocked:auth`, `auth`, `area:auth`, `billing`, `blocked:payments`, `stripe`, and
-`cost-monitoring`. Linear has no pull-number label. Work tied to GitHub PRs #17453
-and #17156, including JOV-5914 and JOV-6519, is named in the workflow and stays
-outside intake because those issues are not `agent-ready`. Legacy human-review
+`cost-monitoring`. Linear has no pull-number label, and the scheduler has no
+identifier denylist. JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 stay
+outside intake only while those issues lack `agent-ready`. Adding `agent-ready`
+without an excluded label selects them. Legacy human-review
 labels are not exclusions. The one-retry ceiling, hooks, workspace, sandbox, and
 service port stay as they are.
 
