@@ -4,10 +4,16 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+  extractDiagnosticLines,
+  failureAnnotationMessage,
   LANE_COMMANDS,
+  laneFailureExcerpt,
   ROUTE_PREP_COVERAGE_COMMAND,
   runDesignConformance,
   runStructural,
+  stripGitFetchNoise,
 } from '../../ci-fast-lanes.mjs';
 
 const SCREENSHOT_CATALOG_COMMAND =
@@ -204,7 +210,9 @@ describe('runStructural screenshot contract discovery', () => {
 
     expect(runStructural({ execute })).toMatchObject({
       code: 17,
-      output: expect.stringContaining('failed (exit 17).\n\nfixture drift'),
+      output: expect.stringMatching(
+        /failed \(exit 17\)\. Command: [^\n]+\n\nfixture drift/u
+      ),
     });
     expect(execute).toHaveBeenCalledExactlyOnceWith(SCREENSHOT_CATALOG_COMMAND);
   });
@@ -220,8 +228,8 @@ describe('runStructural screenshot contract discovery', () => {
 
     expect(runStructural({ execute })).toMatchObject({
       code: 19,
-      output: expect.stringContaining(
-        'failed (exit 19).\n\ncoverage floor failed'
+      output: expect.stringMatching(
+        /failed \(exit 19\)\. Command: [^\n]+\ncoverage floor failed\n\ncoverage floor failed$/u
       ),
     });
     expect(execute.mock.calls.map(([command]) => command)).toEqual([
@@ -379,8 +387,45 @@ describe('structural failure diagnostics', () => {
     expect(result.code).toBe(31);
     expect(execute).toHaveBeenCalledTimes(1);
     expect(result.output).toMatch(
-      /^Structural command 1\/\d+ failed \(exit 31\)\.\n\nunknown failure$/u
+      /^Structural command 1\/\d+ failed \(exit 31\)\. Command: \S[^\n]*\n\nunknown failure$/u
     );
+    const label = result.output.split('\n')[0].split(' Command: ')[1];
+    expect(label.length).toBeLessThanOrEqual(80);
+    expect(execute.mock.calls[0][0].replace(/\s+/gu, ' ')).toContain(
+      label.replace(/…$/u, '')
+    );
+  });
+
+  it('surfaces the coverage ERROR line and drops git fetch noise when no identity exists', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const coverageError =
+      'ERROR: Coverage for lines (99.13%) does not meet "app/api/internal/ovie/summer-bottleneck/route.ts" threshold (100%)';
+    const output = [
+      ' * [new branch]            feature/a -> origin/feature/a',
+      '   1a2b3c4..5d6e7f8  main       -> origin/main',
+      coverageError,
+      ...Array.from(
+        { length: 4000 },
+        (_, index) =>
+          ` * [new branch]      noise-${index} -> origin/noise-${index}`
+      ),
+    ].join('\n');
+    const execute = vi.fn(() => ({ code: 1, output }));
+    const result = runStructural({ execute });
+    expect(result.code).toBe(1);
+    const [header, body] = result.output.split('\n\n');
+    expect(header.split('\n')).toEqual([
+      expect.stringMatching(
+        /^Structural command 1\/\d+ failed \(exit 1\)\. Command: /u
+      ),
+      coverageError,
+    ]);
+    expect(result.output).not.toContain('[new branch]');
+    expect(result.output).not.toContain('1a2b3c4..5d6e7f8');
+    expect(body).toBe(coverageError);
+    expect(result.output.length).toBeLessThanOrEqual(1200);
   });
 
   it.each(['noisy', 'long-header', 'other-lane'])(
@@ -490,4 +535,87 @@ exit 0
       }
     }
   );
+});
+
+describe('failure annotation helpers', () => {
+  it('strips git fetch ref-update noise but keeps real lines', () => {
+    expect(
+      stripGitFetchNoise(
+        [
+          ' * [new branch]      a -> origin/a',
+          ' * [new tag]         v1 -> v1',
+          '   0abc..1def  main -> origin/main',
+          'real line',
+        ].join('\n')
+      )
+    ).toBe('real line');
+  });
+
+  it('keeps the last bounded, de-duplicated diagnostic lines without ANSI codes', () => {
+    const esc = String.fromCharCode(27);
+    const text = [
+      'Error: first',
+      'ok line',
+      `${esc}[31m FAIL ${esc}[39m tests/a.test.ts > case`,
+      'TypeError: boom',
+      'AssertionError: expected 1 to be 2',
+      'TypeError: boom',
+      `ERROR: ${'x'.repeat(300)}`,
+      '1 failed, 3 passed',
+      'failure without keyword match',
+    ].join('\n');
+    const lines = extractDiagnosticLines(text);
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toBe('FAIL  tests/a.test.ts > case');
+    expect(lines).toContain('TypeError: boom');
+    expect(lines).toContain('AssertionError: expected 1 to be 2');
+    expect(lines.at(-1)).toBe('1 failed, 3 passed');
+    expect(lines.every(line => line.length <= 200)).toBe(true);
+    expect(lines).not.toContain('Error: first');
+    expect(extractDiagnosticLines('all good\n')).toEqual([]);
+    expect(extractDiagnosticLines(undefined)).toEqual([]);
+  });
+
+  it('escapes workflow-command messages and properties', () => {
+    expect(escapeAnnotationMessage('99.13% a\r\nb')).toBe('99.13%25 a%0D%0Ab');
+    expect(escapeAnnotationProperty('Lane: a, b')).toBe('Lane%3A a%2C b');
+  });
+
+  it('puts diagnostics first in a non-structural lane excerpt and annotation', () => {
+    const output = [
+      ' * [new branch]  x -> origin/x',
+      'Error: Coverage 99.5% below 100%',
+      ...Array.from({ length: 50 }, (_, index) => `tail ${index}`),
+    ].join('\n');
+    const excerpt = laneFailureExcerpt('typecheck', output);
+    expect(excerpt.startsWith('Diagnostics:\nError: Coverage 99.5%')).toBe(
+      true
+    );
+    expect(excerpt).not.toContain('[new branch]');
+    expect(excerpt.length).toBeLessThanOrEqual(1200);
+    const annotation = failureAnnotationMessage({ id: 'typecheck' }, excerpt);
+    expect(annotation).toBe(
+      'Diagnostics: | Error: Coverage 99.5%25 below 100%25'
+    );
+    expect(annotation).not.toMatch(/[\r\n]/u);
+  });
+
+  it('falls back to the output tail when no diagnostic line exists', () => {
+    const output = Array.from({ length: 12 }, (_, i) => `line ${i}`).join('\n');
+    expect(laneFailureExcerpt('typecheck', output)).toBe(output);
+    expect(failureAnnotationMessage({ id: 'typecheck' }, output)).toBe(
+      Array.from({ length: 8 }, (_, i) => `line ${i + 4}`).join(' | ')
+    );
+    expect(failureAnnotationMessage({ id: 'typecheck' }, '')).toBe('');
+  });
+
+  it('keeps the structural header as the annotation for structural failures', () => {
+    const excerpt = laneFailureExcerpt(
+      'structural',
+      'Structural command 2/9 failed (exit 1). Command: pnpm x\nERROR: 50%\n\ntail'
+    );
+    expect(failureAnnotationMessage({ id: 'structural' }, excerpt)).toBe(
+      'Structural command 2/9 failed (exit 1). Command: pnpm x | ERROR: 50%25'
+    );
+  });
 });
