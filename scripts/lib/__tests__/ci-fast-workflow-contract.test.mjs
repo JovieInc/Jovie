@@ -1974,6 +1974,10 @@ it('runs the pinned Symphony selector for governor-bounded-codex intake edits', 
   for (const path of [
     'scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
     'scripts/symphony/tests/governor_bounded_codex_intake_test.exs',
+    'scripts/symphony/profiles/governor-bounded-codex/WORKFLOW.md',
+    'scripts/symphony/profiles/governor-bounded-codex/protected-items.json',
+    'scripts/symphony/profiles/governor-bounded-codex/protected-intake-check.py',
+    'scripts/symphony/tests/protected-intake-check.test.py',
   ]) {
     const selected = spawnSync('grep', ['-qE', pattern], {
       input: `${path}\n`,
@@ -1982,6 +1986,9 @@ it('runs the pinned Symphony selector for governor-bounded-codex intake edits', 
   }
   expect(CI_FAST_SOURCE).toContain(
     'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh'
+  );
+  expect(CI_FAST_SOURCE).toContain(
+    'python3 scripts/symphony/tests/protected-intake-check.test.py'
   );
 });
 
