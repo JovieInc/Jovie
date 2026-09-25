@@ -43,9 +43,24 @@ describe('JOV-INV-026 performance invariant factory', () => {
       .split(',');
     const [adminAssertions] = config.ci.assert.assertMatrix;
     const matcher = new RegExp(adminAssertions.matchingUrlPattern);
+    const finalUrls = [
+      '/app/ov/growth',
+      '/app/ov/people?view=creators',
+      '/app/ov/people?view=users',
+      '/app/ov/people?view=releases',
+    ];
 
-    assert.equal(urls?.length, 4);
-    for (const url of urls) assert.equal(matcher.test(url), true, url);
+    assert.deepEqual(urls, finalUrls);
+    for (const url of finalUrls) {
+      assert.equal(matcher.test('https://jov.ie' + url), true, url);
+    }
+    for (const redirectingUrl of [
+      '/app/ov/creators',
+      '/app/ov/users',
+      '/app/ov/releases',
+    ]) {
+      assert.equal(matcher.test('https://jov.ie' + redirectingUrl), false);
+    }
     assert.equal(
       routeFromPattern(adminAssertions.matchingUrlPattern),
       '/app/admin/*'

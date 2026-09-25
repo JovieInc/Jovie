@@ -27,7 +27,7 @@
     "apps/web/.lighthouserc.dashboard.pr.json": "sha256:3ca4e7ea268479b1fced0154550c9a1d95d4542e7e60747c4f2e6b09eec81238",
     "apps/web/.lighthouserc.chat.pr.json": "sha256:835168d9b34b51989efc3cd101d2cb1abf2850b4ca3e2bdc4c481c4c91747bbd",
     "apps/web/.lighthouserc.onboarding.pr.json": "sha256:917a41679fc0ef0e3a5420866dcf69c3f664f874503064351749f51e3ddd11cf",
-    "apps/web/.lighthouserc.admin.pr.json": "sha256:80710564d7ecbb351581f3bdfb418392cb550696a0024057da62426365e4eeac",
+    "apps/web/.lighthouserc.admin.pr.json": "sha256:2a7005e95160aac1fd25246e167ab5b50c304588bdd48b69cd2540b8eec5d17d",
     "apps/web/.lighthouserc.public-launch.json": "sha256:e90313e4d493b49363dc8fe32c3037037576029ca9c635a4b96cf9d166c9b63c",
     "apps/web/.lighthouserc.build.json": "sha256:5e7077deac09a048ee7620ea8fac550f3c34ad52563bb5e854a261e7ca92322b",
     "apps/web/scripts/performance-route-manifest.ts": "sha256:5bb1085090512dbb3290a0bc0b9186a823149614e35f10364763e7cbc85e5d60"
@@ -3020,5 +3020,5 @@
       ]
     }
   ],
-  "fingerprint": "sha256:2e23cc3a87142b404bbb56c8ed07221c7f1bab93a6ee367b6dae45d2eb6d98a2"
+  "fingerprint": "sha256:4ef53619e2ef480b19847086a68205d02ca2076ac524797009b9c4114174175c"
 }
