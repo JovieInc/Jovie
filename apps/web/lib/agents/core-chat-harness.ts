@@ -23,7 +23,7 @@ export type CoreChatHarnessReason =
   | 'harness_error'
   | 'completed';
 
-const CORE_CHAT_HARNESS_REASONS: readonly CoreChatHarnessReason[] = [
+const CORE_CHAT_HARNESS_REASONS = new Set<CoreChatHarnessReason>([
   'feature_disabled',
   'prompt_disclosure_blocked',
   'missing_endpoint',
@@ -37,7 +37,7 @@ const CORE_CHAT_HARNESS_REASONS: readonly CoreChatHarnessReason[] = [
   'stream_error',
   'harness_error',
   'completed',
-];
+]);
 
 const DISABLED_REASONS = new Set<
   Extract<
@@ -106,9 +106,7 @@ export function isCoreChatHarnessTrace(
     trace.provider !== 'eve' ||
     !['disabled', 'invoked', 'fallback'].includes(String(status)) ||
     typeof available !== 'boolean' ||
-    !CORE_CHAT_HARNESS_REASONS.includes(
-      trace.reason as CoreChatHarnessReason
-    ) ||
+    !CORE_CHAT_HARNESS_REASONS.has(trace.reason as CoreChatHarnessReason) ||
     typeof trace.requestId !== 'string' ||
     !Array.isArray(eventTypes) ||
     !eventTypes.every(eventType => typeof eventType === 'string') ||
