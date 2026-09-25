@@ -27,6 +27,7 @@ export function LibrarySharePassphraseGate({
     if (!ok) {
       setError('Incorrect passphrase. Try again.');
       setLoading(false);
+      return;
     }
   }
 
