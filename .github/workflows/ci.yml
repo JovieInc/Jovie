@@ -4222,6 +4222,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Retried-then-passed tests (scripts/lib/vitest-retry-reporter.mjs) for
+      # the nightly Test Flakiness Report. Observability only.
+      - name: Preserve retried-then-passed unit tests
+        if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-flaky-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.flaky.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
         if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
