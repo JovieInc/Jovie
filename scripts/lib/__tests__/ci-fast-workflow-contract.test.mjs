@@ -25,6 +25,7 @@ import {
   LANE_GROUPS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
@@ -72,11 +73,10 @@ describe('ci-fast bounded parallel workflow', () => {
     { ci: 'true', available: true, suiteExit: 0, expected: 0 },
     { ci: 'true', available: true, suiteExit: 37, expected: 37 },
   ])('executes structural Python dependency policy %j', scenario => {
-    const command = CI_FAST_SOURCE.match(
-      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
-    )?.[1];
-    expect(command).toBeTruthy();
-    if (!command) throw new Error('missing structural Python command');
+    const pytestCommands = STRUCTURAL_PYTHON_REGRESSION_COMMANDS.filter(
+      command => command.includes('python3 -m pytest ')
+    );
+    expect(pytestCommands.length).toBeGreaterThan(1);
     const root = mkdtempSync(join(tmpdir(), 'structural-python-policy-'));
     const calls = join(root, 'calls');
     try {
@@ -93,42 +93,38 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(shim, 0o755);
-      const result = spawnSync('/bin/sh', ['-c', command], {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          CI: scenario.ci,
-          PATH: `${root}:${process.env.PATH}`,
-          POLICY_CALLS: calls,
-          POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
-          POLICY_SUITE_EXIT: String(scenario.suiteExit),
-        },
-      });
-      expect(result.status, result.stderr).toBe(scenario.expected);
-      const invoked = readFileSync(calls, 'utf8');
-      if (scenario.available) {
-        expect(invoked).toContain('-m coverage run --branch');
-        const pytestInvocation = invoked
-          .split('\n')
-          .find(call => call.startsWith('-m pytest '));
-        expect(pytestInvocation).toBe(
-          [
-            '-m pytest --durations=20',
-            'scripts/tests/test_gh_retry.py',
-            'scripts/tests/test_vercel_prebuilt_deploy.py',
-            'scripts/tests/test_brand_scrub.py',
-            'scripts/tests/test_agent_workflow_hygiene.py',
-            'scripts/tests/test_runner_routing.py',
-            'scripts/tests/test_symphony_ui_pilot_runtime.py',
-            'scripts/tests/test_symphony_reconciler_runtime.py -v',
-          ].join(' ')
+      for (const command of STRUCTURAL_PYTHON_REGRESSION_COMMANDS) {
+        rmSync(calls, { force: true });
+        const result = spawnSync('/bin/sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI: scenario.ci,
+            PATH: `${root}:${process.env.PATH}`,
+            POLICY_CALLS: calls,
+            POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
+            POLICY_SUITE_EXIT: String(scenario.suiteExit),
+          },
+        });
+        const runsPytest = pytestCommands.includes(command);
+        expect(result.status, result.stderr).toBe(
+          runsPytest || !scenario.available ? scenario.expected : 0
         );
-      } else {
-        expect(invoked.trim()).toBe('-c import coverage, pytest');
-        if (scenario.ci === 'true') {
-          expect(result.stderr).toContain('::error::pytest/coverage missing');
+        const invoked = readFileSync(calls, 'utf8');
+        if (scenario.available) {
+          expect(
+            invoked.split('\n').some(call => call.startsWith('-m pytest ')),
+            command
+          ).toBe(runsPytest);
         } else {
-          expect(result.stdout).toContain('skip local structural regressions');
+          expect(invoked.trim()).toBe('-c import coverage, pytest');
+          if (scenario.ci === 'true') {
+            expect(result.stderr).toContain('::error::pytest/coverage missing');
+          } else {
+            expect(result.stdout).toContain(
+              'skip local structural regressions'
+            );
+          }
         }
       }
     } finally {

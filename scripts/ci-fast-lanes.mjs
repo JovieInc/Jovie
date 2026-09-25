@@ -903,6 +903,55 @@ const STRUCTURAL_LONG_POLES = Object.freeze([
   'run-governor-bounded-codex-selector.sh',
 ]);
 
+/** Hosted CI must have the Python deps; local runs without them skip loudly. */
+function requirePythonModules(body) {
+  return `if python3 -c "import coverage, pytest" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi`;
+}
+const GH_RETRY_TEST = 'scripts/tests/test_gh_retry.py';
+/**
+ * test_gh_retry.py alone took ~187s of the ~224s single pytest command, so it
+ * is split by class (the last bucket is the complement, so no test can fall
+ * out) and the other files run as two buckets. `-p no:cacheprovider` keeps the
+ * buckets from sharing .pytest_cache so the structural pool can overlap them.
+ */
+const GH_RETRY_HEAVY_CLASSES = Object.freeze([
+  ['TestDrainPrQueueWiring'],
+  [
+    'TestNativeAdmissionReceiptReconciliation',
+    'TestCanonicalAdmissionProducer',
+  ],
+]);
+const PYTEST_BUCKETS = Object.freeze([
+  ...GH_RETRY_HEAVY_CLASSES.map(classes => [
+    GH_RETRY_TEST,
+    `-k "${classes.join(' or ')}"`,
+  ]),
+  [GH_RETRY_TEST, `-k "not (${GH_RETRY_HEAVY_CLASSES.flat().join(' or ')})"`],
+  [
+    'scripts/tests/test_symphony_ui_pilot_runtime.py',
+    'scripts/tests/test_symphony_reconciler_runtime.py',
+  ],
+  [
+    'scripts/tests/test_vercel_prebuilt_deploy.py',
+    'scripts/tests/test_brand_scrub.py',
+    'scripts/tests/test_agent_workflow_hygiene.py',
+    'scripts/tests/test_runner_routing.py',
+  ],
+]);
+export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
+  requirePythonModules(
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
+  ),
+  requirePythonModules(
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90'
+  ),
+  ...PYTEST_BUCKETS.map(args =>
+    requirePythonModules(
+      `python3 -m pytest -p no:cacheprovider --durations=10 ${args.join(' ')} -v`
+    )
+  ),
+]);
+
 const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
 /** Entry points whose child commands are invisible in package.json text. */
 const OPAQUE_ENTRY_LOCKS = Object.freeze([
@@ -976,7 +1025,11 @@ export function structuralLocks(command) {
     for (const match of segment.matchAll(/COVERAGE_FILE=("[^"]+"|\S+)/gu)) {
       locks.add(`pycoverage:${match[1].replaceAll('"', '')}`);
     }
-    if (/python3 -m pytest\b/u.test(segment)) locks.add('pytest-cache');
+    if (
+      /python3 -m pytest\b/u.test(segment) &&
+      !/-p no:cacheprovider\b/u.test(segment)
+    )
+      locks.add('pytest-cache');
   }
   return [...locks].sort();
 }
@@ -1180,7 +1233,7 @@ export async function runStructural(opts = {}) {
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
+    ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [

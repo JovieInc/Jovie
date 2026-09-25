@@ -19,6 +19,7 @@ import {
   runDesignConformance,
   runStructural,
   STRUCTURAL_DEFAULT_CONCURRENCY,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -368,15 +369,20 @@ describe('structural failure diagnostics', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations,web');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    // Only the bucket that owns test_agent_workflow_hygiene.py fails, so
+    // identities registered to other buckets (test_gh_retry.py) must drop out.
+    const failing = command =>
+      command.includes('python3 -m pytest ') &&
+      command.includes('scripts/tests/test_agent_workflow_hygiene.py');
     const execute = vi.fn(command => ({
-      code: command.includes('python3 -m pytest ') ? 23 : 0,
-      output: command.includes('python3 -m pytest ')
+      code: failing(command) ? 23 : 0,
+      output: failing(command)
         ? noisyFailure
         : `FAILED ${failureNode}_successful_command\n`,
     }));
     const result = await runStructural({ execute });
     expect(result.code).toBe(23);
-    expect(execute.mock.calls.at(-1)[0]).toContain('python3 -m pytest ');
+    expect(failing(execute.mock.calls.at(-1)[0])).toBe(true);
     expect(
       execute.mock.calls.some(([command]) =>
         command.includes('YoutubeThumbnailsLanding')
@@ -390,10 +396,9 @@ describe('structural failure diagnostics', () => {
     expect(header.split('\n').slice(1)).toEqual([
       `FAILED ${failureNode}`,
       'FAILED scripts/tests/test_agent_workflow_hygiene.py::TestGroup::test_second',
-      'FAILED scripts/tests/test_gh_retry.py::test_third',
     ]);
     expect(result.output).not.toMatch(
-      /private-|test_fake|test_fourth|successful_command|token-like/u
+      /private-|test_fake|test_gh_retry|successful_command|token-like/u
     );
     expect(result.output).toContain('1 failed, 402 passed');
   });
@@ -491,7 +496,7 @@ describe('structural failure diagnostics', () => {
           join(directory, 'python3'),
           `#!/bin/sh
 case "$*" in
-  *"-m pytest "*) cat "$JOVIE_FAILURE_FIXTURE"; printf 'later unittest stderr passed\\n' >&2; exit 23 ;;
+  *"-m pytest "*"$JOVIE_FAILING_PYTEST"*) cat "$JOVIE_FAILURE_FIXTURE"; printf 'later unittest stderr passed\\n' >&2; exit 23 ;;
 esac
 exit 0
 `,
@@ -514,6 +519,10 @@ exit 0
               CI_FAST_LANES_OUT: output,
               GITHUB_STEP_SUMMARY: summary,
               JOVIE_FAILURE_FIXTURE: fixture,
+              JOVIE_FAILING_PYTEST:
+                scenario === 'long-header'
+                  ? 'scripts/tests/test_gh_retry.py'
+                  : 'scripts/tests/test_agent_workflow_hygiene.py',
             },
             encoding: 'utf8',
             timeout: 10000,
@@ -982,6 +991,58 @@ describe('failure annotation helpers', () => {
     );
     expect(failureAnnotationMessage({ id: 'structural' }, excerpt)).toBe(
       'Structural command 2/9 failed (exit 1). Command: pnpm x | ERROR: 50%25'
+    );
+  });
+});
+
+describe('structural Python regression buckets', () => {
+  const pytestCommands = STRUCTURAL_PYTHON_REGRESSION_COMMANDS.filter(command =>
+    command.includes('python3 -m pytest ')
+  );
+
+  it('still runs every regression file the single pytest command ran', () => {
+    for (const file of [
+      'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_vercel_prebuilt_deploy.py',
+      'scripts/tests/test_brand_scrub.py',
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_symphony_ui_pilot_runtime.py',
+      'scripts/tests/test_symphony_reconciler_runtime.py',
+    ]) {
+      expect(
+        pytestCommands.some(command => command.includes(` ${file} `)),
+        file
+      ).toBe(true);
+    }
+  });
+
+  it('splits test_gh_retry.py with a complement bucket so no test drops out', () => {
+    const selections = pytestCommands
+      .filter(command => command.includes('scripts/tests/test_gh_retry.py'))
+      .map(command => /-k "([^"]+)"/u.exec(command)?.[1]);
+    expect(selections.every(Boolean)).toBe(true);
+    const heavy = selections.filter(k => !k.startsWith('not ('));
+    const complement = selections.filter(k => k.startsWith('not ('));
+    expect(complement).toHaveLength(1);
+    for (const selection of heavy) {
+      for (const name of selection.split(' or ')) {
+        expect(complement[0]).toContain(name);
+      }
+    }
+  });
+
+  it('lets the pool overlap the buckets and the recovery coverage runs', () => {
+    for (const command of pytestCommands) {
+      expect(command).toContain('-p no:cacheprovider');
+      expect(structuralLocks(command)).not.toContain('pytest-cache');
+    }
+    const coverageLocks = STRUCTURAL_PYTHON_REGRESSION_COMMANDS.flatMap(
+      command => structuralLocks(command)
+    ).filter(lock => lock.startsWith('pycoverage:'));
+    expect(new Set(coverageLocks).size).toBe(coverageLocks.length);
+    expect(structuralLocks('python3 -m pytest scripts/tests/x.py')).toContain(
+      'pytest-cache'
     );
   });
 });
