@@ -13,13 +13,15 @@ const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 const MAX_RETRY_ATTEMPTS = 3;
 const DEDUP_LOCK_TTL_SECONDS = 20;
 const DEDUP_RESULT_TTL_SECONDS = 20;
+/** Cross-instance wait. Five GETs, not an 80-iteration 250ms poll. */
+const DEDUP_WAIT_BACKOFF_MS = [500, 1000, 2000, 4000, 8000] as const;
 
 const requestRateLimiter = createRateLimiter({
   name: 'musicfetch',
   limit: 6,
   window: '1 m',
   prefix: 'rl:musicfetch',
-  analytics: true,
+  analytics: false,
   algorithm: 'sliding-window',
   trafficClass: 'internal',
 });
@@ -110,12 +112,11 @@ async function withRedisDedup<T>(
     }
   }
 
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < DEDUP_LOCK_TTL_SECONDS * 1000) {
-    await delay(250);
+  for (const waitMs of DEDUP_WAIT_BACKOFF_MS) {
+    await delay(waitMs);
     const result = await redis.get<string>(resultKey);
     if (result) {
-      return JSON.parse(result) as T;
+      return (typeof result === 'string' ? JSON.parse(result) : result) as T;
     }
   }
 

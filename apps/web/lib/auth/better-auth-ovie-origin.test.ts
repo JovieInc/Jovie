@@ -70,8 +70,10 @@ vi.mock('@/lib/auth/rate-limit-rules', () => ({
   AUTH_RATE_LIMIT_RULES: {},
   isDeterministicTestOtpEmail: () => false,
 }));
-vi.mock('@/lib/auth/secondary-storage', () => ({
-  secondaryStorage: {},
+vi.mock('@/lib/auth/rate-limit-storage', () => ({
+  authRateLimitStorage: {
+    consume: async () => ({ allowed: true, retryAfter: null }),
+  },
 }));
 
 describe('Better Auth independent Ovie origin integration', () => {

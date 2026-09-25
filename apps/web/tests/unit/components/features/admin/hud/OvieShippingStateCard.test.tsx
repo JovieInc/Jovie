@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
+import { resetHudShippingStateForTests } from '@/components/features/admin/hud/useHudShippingStateQuery';
 import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
 
 const fetchMock = vi.fn();
@@ -75,6 +77,7 @@ const LABELS = [
 
 describe('OvieShippingStateCard', () => {
   afterEach(() => {
+    resetHudShippingStateForTests();
     fetchMock.mockReset();
   });
 
@@ -237,5 +240,26 @@ describe('OvieShippingStateCard', () => {
       expect(panel()).toHaveAttribute('data-revision', 'rev-token-b-race');
     });
     expect(panel()).toHaveAttribute('data-correlation', 'corr-token-b-race');
+  });
+
+  it('shares one shipping-state poll with the operational task panel', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, projection));
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard kioskToken='shared' />
+        <OperationalTasksPanel kioskToken='shared' />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
+        'data-revision',
+        'rev-4'
+      );
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/api/hud/shipping-state'
+    );
   });
 });

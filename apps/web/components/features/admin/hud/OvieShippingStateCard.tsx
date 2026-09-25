@@ -1,24 +1,15 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
-import { useQuery } from '@tanstack/react-query';
 import { Ship } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  applyShippingStateRead,
-  createEmptyShippingStateView,
-  createShippingMachine,
-  expireShippingStateIfNeeded,
-  SHIPPING_STATE_CACHE_GC_MS,
-  SHIPPING_STATE_POLL_INTERVAL_MS,
-  type ShippingMachineState,
-  type ShippingMeaningView,
-  type ShippingStateView,
-  shippingStateReadFromHttp,
+import type {
+  ShippingMeaningView,
+  ShippingStateView,
 } from '@/lib/ovie/shipping-state-client';
-import { REALTIME_CACHE } from '@/lib/queries/cache-strategies';
+import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   fresh: 'Fresh',
@@ -54,69 +45,7 @@ function compactMetaValue(value: string | null): string | null {
 }
 
 function useOvieShippingStateQuery(kioskToken: string | null) {
-  const machineRef = useRef<ShippingMachineState>(createShippingMachine());
-  const tokenRef = useRef<string | null>(kioskToken);
-  if (tokenRef.current !== kioskToken) {
-    tokenRef.current = kioskToken;
-    machineRef.current = createShippingMachine();
-  }
-  const query = useQuery({
-    queryKey: ['hud', 'ovie-shipping-state', kioskToken],
-    queryFn: async ({ signal }) => {
-      const requestToken = kioskToken;
-      const url = new URL(
-        '/api/hud/shipping-state',
-        globalThis.location.origin
-      );
-      if (kioskToken) url.searchParams.set('kiosk', kioskToken);
-      let response: Response;
-      try {
-        response = await fetch(url, { signal, cache: 'no-store' });
-      } catch {
-        if (signal.aborted || tokenRef.current !== requestToken) {
-          throw new DOMException('Aborted', 'AbortError');
-        }
-        const now = Date.now();
-        machineRef.current = expireShippingStateIfNeeded(
-          applyShippingStateRead(
-            machineRef.current,
-            { kind: 'disconnected' },
-            now
-          ),
-          now
-        );
-        return machineRef.current.view;
-      }
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        payload = null;
-      }
-      if (signal.aborted || tokenRef.current !== requestToken) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      const now = Date.now();
-      machineRef.current = expireShippingStateIfNeeded(
-        applyShippingStateRead(
-          machineRef.current,
-          shippingStateReadFromHttp(response.status, payload),
-          now
-        ),
-        now
-      );
-      return machineRef.current.view;
-    },
-    ...REALTIME_CACHE,
-    staleTime: 0,
-    gcTime: SHIPPING_STATE_CACHE_GC_MS,
-    refetchInterval: SHIPPING_STATE_POLL_INTERVAL_MS,
-    refetchIntervalInBackground: false,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: false,
-  });
+  const query = useHudShippingStateQuery(kioskToken);
   const refetch = query.refetch;
   useEffect(() => {
     function onResume(event: Event) {
@@ -138,8 +67,8 @@ function useOvieShippingStateQuery(kioskToken: string | null) {
     };
   }, [refetch]);
   return {
-    view: query.data ?? createEmptyShippingStateView(),
-    isPending: query.isPending && !query.data,
+    view: query.view,
+    isPending: query.isPending,
   };
 }
 

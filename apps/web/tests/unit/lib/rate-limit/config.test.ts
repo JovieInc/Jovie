@@ -230,9 +230,12 @@ describe('Rate Limit Config', () => {
     });
 
     describe('analytics configuration', () => {
-      it('should enable analytics for critical operations', () => {
-        expect(RATE_LIMITERS.paymentIntent.analytics).toBe(true);
-        expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(true);
+      it('does not enable Upstash analytics; nothing reads it', () => {
+        expect(RATE_LIMITERS.paymentIntent.analytics).toBe(false);
+        expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(false);
+        for (const limiter of Object.values(RATE_LIMITERS)) {
+          expect(limiter.analytics).toBe(false);
+        }
       });
 
       it('should preserve ordinary navigation telemetry fanout', () => {

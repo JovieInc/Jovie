@@ -232,4 +232,43 @@ describe('musicfetch resilient client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(2);
   });
+
+  it('waits for another instance with a few backoff GETs', async () => {
+    vi.useFakeTimers();
+    try {
+      const payload = { result: { id: 'from-peer' } };
+      let resultGets = 0;
+      const redis = {
+        get: vi.fn(async (key: string) => {
+          if (!String(key).startsWith('musicfetch:result:')) return null;
+          resultGets += 1;
+          if (resultGets < 4) return null;
+          return JSON.stringify(payload);
+        }),
+        set: vi.fn(async () => null),
+        del: vi.fn(async () => 1),
+      };
+      mockGetRedis.mockReturnValue(redis);
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { musicfetchRequest } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      const pending = musicfetchRequest<{ result: { id: string } }>(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        { timeoutMs: 2000 }
+      );
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(result.result.id).toBe('from-peer');
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(resultGets).toBeLessThanOrEqual(6);
+      expect(resultGets).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -135,13 +135,17 @@ const mockContact = {
 };
 
 describe('Profile Service Queries', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockGetRedis.mockImplementation(() => ({
       get: mockRedisGet,
       set: mockRedisSet,
       del: mockRedisDel,
     }));
+    const { clearMissingUsernameMemoryCacheForTests } = await import(
+      '@/lib/services/profile/queries'
+    );
+    clearMissingUsernameMemoryCacheForTests();
   });
 
   afterEach(() => {
@@ -413,6 +417,55 @@ describe('Profile Service Queries', () => {
       const result = await getProfileWithLinks('nobody');
 
       expect(result).toBeNull();
+    });
+
+    it('remembers a confirmed missing username without another Redis GET', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      createSelectChain([]);
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      await expect(getProfileWithLinks('nobody')).resolves.toBeNull();
+      expect(mockRedisGet).toHaveBeenCalledTimes(1);
+
+      mockDbSelect.mockClear();
+      await expect(getProfileWithLinks('nobody')).resolves.toBeNull();
+      expect(mockRedisGet).toHaveBeenCalledTimes(1);
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it('does not remember a failed lookup as a missing username', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      mockDbSelect.mockImplementation(() => {
+        throw new Error('database unavailable');
+      });
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      await expect(getProfileWithLinks('flaky')).resolves.toBeNull();
+      expect(mockRedisGet).toHaveBeenCalledTimes(1);
+
+      mockRedisGet.mockClear();
+      await expect(getProfileWithLinks('flaky')).resolves.toBeNull();
+      expect(mockRedisGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('looks up again after the missing-username memory entry is invalidated', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      createSelectChain([]);
+
+      const { getProfileWithLinks, invalidateProfileEdgeCache } = await import(
+        '@/lib/services/profile/queries'
+      );
+      await getProfileWithLinks('nobody');
+      await invalidateProfileEdgeCache('nobody');
+
+      mockRedisGet.mockClear();
+      createSelectChain([]);
+      await expect(getProfileWithLinks('nobody')).resolves.toBeNull();
+      expect(mockRedisGet).toHaveBeenCalledTimes(1);
     });
 
     it('skips Redis cache when skipCache option is set', async () => {

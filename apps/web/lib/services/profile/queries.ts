@@ -154,6 +154,37 @@ async function getDirectoryProfileContacts(
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
 const PROFILE_EDGE_CACHE_TIMEOUT_MS = 1500;
+const MISSING_USERNAME_TTL_MS = 30_000;
+const MISSING_USERNAME_MAX_ENTRIES = 2000;
+
+/** Confirmed database misses. Checked before Redis so probes skip a GET. */
+const missingUsernames = new Map<string, number>();
+
+function rememberMissingUsername(username: string): void {
+  if (
+    !missingUsernames.has(username) &&
+    missingUsernames.size >= MISSING_USERNAME_MAX_ENTRIES
+  ) {
+    const oldest = missingUsernames.keys().next().value;
+    if (oldest !== undefined) missingUsernames.delete(oldest);
+  }
+  missingUsernames.set(username, Date.now() + MISSING_USERNAME_TTL_MS);
+}
+
+function isRememberedMissingUsername(username: string): boolean {
+  const expiresAt = missingUsernames.get(username);
+  if (expiresAt === undefined) return false;
+  if (Date.now() >= expiresAt) {
+    missingUsernames.delete(username);
+    return false;
+  }
+  return true;
+}
+
+/** Test-only: this map lives for the isolate, so tests must clear it. */
+export function clearMissingUsernameMemoryCacheForTests(): void {
+  missingUsernames.clear();
+}
 const KNOWN_PROBE_USERNAMES = new Set([
   '.env',
   'phpmyadmin',
@@ -348,8 +379,11 @@ export async function getProfileWithLinks(
     return null;
   }
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
-  const shouldUseRedis = !options?.skipCache;
-  const redis = shouldUseRedis ? getRedis() : null;
+  const shouldUseCache = !options?.skipCache;
+  if (shouldUseCache && isRememberedMissingUsername(normalizedUsername)) {
+    return null;
+  }
+  const redis = shouldUseCache ? getRedis() : null;
 
   // Try Redis cache first (unless explicitly skipped)
   if (redis) {
@@ -388,6 +422,14 @@ export async function getProfileWithLinks(
       'profile-service'
     );
     return null;
+  }
+
+  if (result) {
+    missingUsernames.delete(normalizedUsername);
+  } else if (shouldUseCache) {
+    // Confirmed absence only. Timeouts and query errors return above and
+    // must not stick as a not-found.
+    rememberMissingUsername(normalizedUsername);
   }
 
   // Cache the result in Redis (fire-and-forget)
@@ -627,6 +669,7 @@ async function fetchProfileFromDatabase(
 export async function invalidateProfileEdgeCache(
   usernameNormalized: string
 ): Promise<void> {
+  missingUsernames.delete(usernameNormalized.toLowerCase());
   const redis = getRedis({
     signal: AbortSignal.timeout(PROFILE_EDGE_CACHE_TIMEOUT_MS),
   });
