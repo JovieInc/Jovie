@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
+import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
   buildHarnessReceipt,
   validateHarnessContract,
@@ -14,6 +15,8 @@ import { validateQualityRatchet } from './quality-ratchet.mjs';
 // JOV-INV-031 is composed here so every CI invariant run checks thread-blocking.
 // JOV-INV-032 is composed here so every CI invariant run checks iOS web scroll jank.
 // JOV-INV-033 is composed here so every CI invariant run rescans Done-sprint sources.
+// JOV-INV-034 is composed here so the required Structural Contract proves
+// representative defects block certification and promotion.
 
 import {
   readInvariantRegistry,
@@ -48,6 +51,7 @@ const doneSprintErrors = await validateDoneSprintInvariants({
   registry,
   mode: 'source',
 });
+const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),
@@ -57,6 +61,7 @@ const errors = [
   ...latencyErrors.map(error => `latency-sensitive: ${error}`),
   ...iosScrollErrors.map(error => `ios-web-no-scroll-jank: ${error}`),
   ...doneSprintErrors.map(error => `done-sprint: ${error}`),
+  ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
 ];
 
 const ok = errors.length === 0 && result.blockers.length === 0;
