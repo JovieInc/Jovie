@@ -33,7 +33,7 @@ export type SocialParseResult = SocialParseSuccess | SocialParseFailure;
 
 const INSTAGRAM_HANDLE_PATTERN = /^[A-Za-z0-9._]{1,30}$/;
 const TIKTOK_HANDLE_PATTERN = /^[A-Za-z0-9._]{2,24}$/;
-const X_HANDLE_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
+const X_HANDLE_PATTERN = /^\w{1,15}$/;
 
 const INSTAGRAM_RESERVED = new Set([
   'p',

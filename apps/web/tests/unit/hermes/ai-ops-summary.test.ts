@@ -79,4 +79,50 @@ describe('getHudAiOpsSummary', () => {
     expect(summary.sources.ci.availability).toBe('error');
     expect(summary.mergeQueue.openAgentPrs).toBe(1);
   });
+
+  it('counts numeric jov branches and ignores non-numeric ones', async () => {
+    mockServerFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              number: 15,
+              title: 'Numeric agent',
+              html_url: 'https://github.com/JovieInc/Jovie/pull/15',
+              updated_at: '2026-05-07T11:00:00.000Z',
+              draft: false,
+              labels: [{ name: 'hold' }],
+              user: { login: 'bot' },
+              head: { ref: 'feature/jov-15' },
+            },
+            {
+              number: 16,
+              title: 'Letter agent',
+              html_url: 'https://github.com/JovieInc/Jovie/pull/16',
+              updated_at: '2026-05-07T11:00:00.000Z',
+              draft: false,
+              labels: [],
+              user: { login: 'bot' },
+              head: { ref: 'feature/jov-abc' },
+            },
+          ]),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'not found' }), { status: 404 })
+      );
+
+    const summary = await getHudAiOpsSummary(
+      new Date('2026-05-07T12:00:00.000Z')
+    );
+
+    expect(summary.mergeQueue.openAgentPrs).toBe(1);
+    expect(summary.blockers.some(item => item.summary.includes('#15'))).toBe(
+      true
+    );
+    expect(summary.blockers.some(item => item.summary.includes('#16'))).toBe(
+      false
+    );
+  });
 });
