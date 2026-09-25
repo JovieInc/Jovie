@@ -318,9 +318,15 @@ test.describe('public profile browser admission', () => {
       await expect(page.getByTestId('profile-compact-shell')).toHaveCount(
         fixture.layout === 'compact' ? 1 : 0
       );
-      await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
-        fixture.layout === 'desktop' ? 1 : 0
-      );
+      const desktopSurface = page.getByTestId('profile-desktop-surface');
+      if (fixture.layout === 'desktop') {
+        await expect(desktopSurface).toHaveCount(1);
+      } else {
+        // JOV-6452: the desktop surface is server-rendered inside the
+        // display:none desktop shell so a cold desktop paint never morphs —
+        // on compact it must stay mounted but hidden.
+        await expect(desktopSurface).toBeHidden();
+      }
       if (fixture.layout === 'desktop') {
         await expect(
           page.getByRole('button', { name: 'Alerts', exact: true })

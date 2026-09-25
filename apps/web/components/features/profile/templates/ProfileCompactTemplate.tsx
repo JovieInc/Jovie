@@ -349,9 +349,6 @@ export function ProfileCompactTemplate({
     const syncPresentation = () => {
       const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
       setIsDesktopLayout(ownsDesktopLayout);
-      if (!ownsDesktopLayout) {
-        setDesktopSurfaceReady(false);
-      }
       setDrawerPresentation(
         ownsDesktopLayout
           ? 'modal'
