@@ -192,7 +192,7 @@ export class AnalyticsInvariantError extends Error {
 type NumericReading = Extract<
   MetricReading,
   { state: 'measured' } | { state: 'partial' }
->;
+> & { readonly allowsNegative?: boolean };
 
 function asNumeric(reading: MetricReading | undefined): NumericReading | null {
   if (!reading) return null;
