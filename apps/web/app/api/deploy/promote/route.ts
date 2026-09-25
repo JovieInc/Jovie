@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
@@ -22,7 +22,7 @@ function isLimiterUnavailable(reason: string | undefined): boolean {
  * Rate limit: 1 per 60 seconds (Redis-backed in production)
  */
 export async function POST() {
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
 
   const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;

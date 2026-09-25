@@ -12,7 +12,7 @@ import {
   setPlaylistSpotifyClerkUserId,
 } from '@/lib/admin/platform-connections';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -45,7 +45,7 @@ function actionErrorMessage(error: unknown, fallback: string): string {
 }
 
 async function requireAdminUserId(): Promise<string> {
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
   }

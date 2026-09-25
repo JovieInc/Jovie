@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { cancelSubscription } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
@@ -26,7 +26,7 @@ export async function POST() {
 
   try {
     // Check authentication
-    ({ userId } = await getFreshAuth());
+    ({ userId } = await getCachedAuth({ session: 'fresh' }));
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

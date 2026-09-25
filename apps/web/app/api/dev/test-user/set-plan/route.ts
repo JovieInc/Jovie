@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     return developmentOnlyForbiddenJson();
   }
 
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

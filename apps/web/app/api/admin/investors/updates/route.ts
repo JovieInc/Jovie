@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import {
   InvestorUpdateWorkflowError,
   investorUpdateDecisionSchema,
@@ -61,7 +61,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }

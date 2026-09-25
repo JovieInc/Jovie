@@ -6,7 +6,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -67,7 +67,7 @@ function validateAvatarUrl(url: string): string {
 }
 
 async function requireAdmin(): Promise<string> {
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
 
   if (!userId) {
     throw new AdminUnauthorizedError();

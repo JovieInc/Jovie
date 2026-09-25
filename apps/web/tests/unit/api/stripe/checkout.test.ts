@@ -16,7 +16,6 @@ const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
-  getFreshAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/error-tracking', async () => {

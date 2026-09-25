@@ -9,7 +9,6 @@ const mockSelect = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/admin/middleware', () => ({ requireAdmin: mockRequireAdmin }));
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockAuth,
-  getFreshAuth: mockAuth,
   getOptionalAuth: mockAuth,
   getCachedSessionTokenAuth: mockAuth,
 }));

@@ -9,7 +9,7 @@ import {
   isImpersonationEnabled,
   startImpersonation,
 } from '@/lib/admin/impersonation';
-import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
   adminImpersonateLimiter,
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await getFreshAuth();
+  const { userId: adminClerkId } = await getCachedAuth({ session: 'fresh' });
   const clientIp = getClientIP(request);
   const rateLimitKey = adminClerkId ?? `ip:${clientIp}`;
   const rateLimitResult = await adminImpersonateLimiter.limit(rateLimitKey);
@@ -212,7 +212,7 @@ export async function DELETE() {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await getFreshAuth();
+  const { userId: adminClerkId } = await getCachedAuth({ session: 'fresh' });
   if (!adminClerkId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }

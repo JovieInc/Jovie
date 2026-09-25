@@ -15,7 +15,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { writeFlagOverride } from '@/lib/flags/write-override.server';
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
-  const { userId } = await getFreshAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

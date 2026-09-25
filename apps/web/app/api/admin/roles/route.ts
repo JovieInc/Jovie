@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
@@ -59,7 +59,9 @@ export async function POST(request: Request) {
     invalidateAdminCache(targetUserId);
 
     // Get current admin user ID for logging
-    const { userId: currentAdminId } = await getFreshAuth();
+    const { userId: currentAdminId } = await getCachedAuth({
+      session: 'fresh',
+    });
 
     logger.info(
       `[admin/roles] Admin role granted to user ${targetUserId} by ${currentAdminId}`
@@ -111,7 +113,9 @@ export async function DELETE(request: Request) {
     }
 
     const { userId: targetUserId } = validation.data;
-    const { userId: currentAdminId } = await getFreshAuth();
+    const { userId: currentAdminId } = await getCachedAuth({
+      session: 'fresh',
+    });
 
     // Prevent self-revocation
     if (targetUserId === currentAdminId) {

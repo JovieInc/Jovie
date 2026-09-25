@@ -9,7 +9,6 @@ const mockLoggerInfo = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockAuth,
-  getFreshAuth: mockAuth,
   getOptionalAuth: mockAuth,
   getCachedSessionTokenAuth: mockAuth,
 }));

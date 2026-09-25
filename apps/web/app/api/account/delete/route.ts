@@ -1,7 +1,7 @@
 import { del } from '@vercel/blob';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
@@ -74,7 +74,7 @@ async function deleteFounderReviewBlobs(
  * must filter by the resolved `user.id` — never rely on RLS alone.
  */
 export async function POST(request: Request) {
-  const { userId: clerkUserId } = await getFreshAuth();
+  const { userId: clerkUserId } = await getCachedAuth({ session: 'fresh' });
   if (!clerkUserId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

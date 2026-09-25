@@ -5,7 +5,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -138,7 +138,7 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getFreshAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
 
     const parsedBody = await parseJsonBody<{

@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
-import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { createBillingPortalSession } from '@/lib/stripe/client';
@@ -19,7 +19,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export async function POST() {
   try {
     // Check authentication
-    const { userId } = await getFreshAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

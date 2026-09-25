@@ -27,7 +27,6 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
-  getFreshAuth: hoisted.getCachedAuthMock,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
