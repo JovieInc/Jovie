@@ -1274,7 +1274,8 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('--build-env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).toContain('--env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).not.toMatch(/--(?:build-)?env\s+[^\s]+=/);
-    expect(deployScript).not.toContain('--token');
+    // Log redaction names the flag. Deploy commands still must not pass it.
+    expect(deployScript.replace(/\(--token\(\?:/, '')).not.toContain('--token');
   });
 
   it('skips catalog mutation only for the manual PR preview build', () => {
