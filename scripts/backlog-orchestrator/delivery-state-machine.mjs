@@ -349,8 +349,12 @@ async function loadLifecycleActions(stateDir) {
   return records;
 }
 
-async function persistLifecycleAction(action, { stateDir, dryRun }) {
-  const records = dryRun ? [] : await loadLifecycleActions(stateDir);
+/**
+ * `records` is the snapshot's single directory load. Re-reading the whole
+ * receipt directory per action made the summer-queue lock hold O(actions x
+ * receipts) and starved Delivery Control Receipts past its 30s lock timeout.
+ */
+async function persistLifecycleAction(action, { stateDir, dryRun, records }) {
   const previous = records
     .filter(record => record.lifecycleKey === action.lifecycleKey)
     .sort((left, right) => {
@@ -407,6 +411,7 @@ async function persistLifecycleAction(action, { stateDir, dryRun }) {
   ) {
     throw new Error('PR lifecycle action key collision');
   }
+  if (persisted.status === 'created') records.push(persisted.value);
   return {
     status: persisted.status,
     receipt: persisted.value,
@@ -1057,6 +1062,10 @@ export async function persistClosureHealthActions(
       );
     }
     const lifecycle = [];
+    const lifecycleRecords =
+      dryRun || boundedLifecycleRows.every(row => row.error)
+        ? []
+        : await loadLifecycleActions(stateDir).catch(error => error);
     for (const row of boundedLifecycleRows) {
       if (row.error) {
         lifecycle.push({
@@ -1067,9 +1076,11 @@ export async function persistClosureHealthActions(
         continue;
       }
       try {
+        if (lifecycleRecords instanceof Error) throw lifecycleRecords;
         const persisted = await persistLifecycleAction(row.action, {
           stateDir,
           dryRun,
+          records: lifecycleRecords,
         });
         lifecycle.push({
           status: persisted.status,

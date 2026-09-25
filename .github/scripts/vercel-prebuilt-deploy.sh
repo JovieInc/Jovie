@@ -61,6 +61,85 @@ count_prebuilt_files() {
   find .vercel/output -type f | wc -l | tr -d ' '
 }
 
+# Vercel CLI >= 59 applies the repo .vercelignore to prebuilt functions'
+# `.vc-config.json` filePathMap entries and drops every match from the upload
+# (PREBUILT_FILEPATHMAP_IGNORED, "excludes at least 20 files the prebuilt
+# functions need"). CLI 56.x uploaded the full traced closure. Since the
+# 56.3.2 -> 59.16.0 bump every staging deploy has been created, then failed
+# server-side after "Extracting deployment files" with "Unexpected error".
+# The prebuilt file walk ignores everything outside .vercel/output regardless
+# of .vercelignore, so that file only shapes source uploads. For prebuilt
+# uploads it only removes files `vercel build` traced (CHANGELOG.md,
+# docs/FEATURE_REGISTRY.md, tests/quarantine.json, ...). The dropped set
+# depends on the trace and the CLI truncates it at 20, so no fixed re-include
+# list can cover it. Hide the file for the prebuilt CLI call only; source
+# deploys keep it. assert_prebuilt_upload_has_no_secrets bounds what the
+# upload set may contain.
+HIDDEN_VERCELIGNORE=""
+
+restore_vercelignore() {
+  if [ -n "$HIDDEN_VERCELIGNORE" ]; then
+    mv -f -- "$HIDDEN_VERCELIGNORE" .vercelignore
+    HIDDEN_VERCELIGNORE=""
+  fi
+}
+
+trap restore_vercelignore EXIT
+
+run_prebuilt_cli() {
+  local cli_status=0
+  if [ -f .vercelignore ]; then
+    HIDDEN_VERCELIGNORE="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-vercelignore.XXXXXX")"
+    mv -f -- .vercelignore "$HIDDEN_VERCELIGNORE"
+  fi
+  "$@" || cli_status=$?
+  restore_vercelignore
+  return "$cli_status"
+}
+
+# A prebuilt upload is .vercel/output plus every filePathMap target of its
+# .vc-config.json files. Fail closed before upload if either names a
+# credential-bearing file.
+assert_prebuilt_upload_has_no_secrets() {
+  node - <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.cwd();
+const outputDir = path.join(root, '.vercel', 'output');
+const forbidden = rel => {
+  const posix = rel.split(path.sep).join('/');
+  const base = path.posix.basename(posix);
+  return (/^\.env(\..+)?$/.test(base) && base !== '.env.example')
+    || /\.(pem|key|p12|pfx)$/i.test(base)
+    || /^\.(npmrc|netrc)$/.test(base)
+    || base === 'credentials.json'
+    || (posix.startsWith('.vercel/') && !posix.startsWith('.vercel/output/'));
+};
+const offenders = new Set();
+const walk = dir => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(abs); continue; }
+    const rel = path.relative(root, abs);
+    if (forbidden(rel)) offenders.add(rel);
+    if (entry.name !== '.vc-config.json') continue;
+    let config;
+    try { config = JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { continue; }
+    for (const target of Object.values(config.filePathMap || {})) {
+      const targetRel = path.relative(root, path.join(root, String(target)));
+      if (forbidden(targetRel)) offenders.add(targetRel);
+    }
+  }
+};
+if (fs.existsSync(outputDir)) walk(outputDir);
+if (offenders.size > 0) {
+  process.stderr.write('Deploy failed: prebuilt upload would include credential-bearing files:\n');
+  for (const offender of [...offenders].sort()) process.stderr.write(`  ${offender}\n`);
+  process.exit(1);
+}
+NODE
+}
+
 run_deploy() {
   local mode="$1"
   shift
@@ -76,17 +155,17 @@ run_deploy() {
   local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
 
   if [ "$mode" = "tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
@@ -282,6 +361,9 @@ fi
 if [ "${#deploy_modes[@]}" -eq 0 ]; then
   echo "Deploy failed: no prebuilt output is available and source fallback is disabled." >&2
   exit 1
+fi
+if [ "$has_prebuilt_output" = true ] && [ "$force_source_deploy" != "true" ]; then
+  assert_prebuilt_upload_has_no_secrets
 fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0

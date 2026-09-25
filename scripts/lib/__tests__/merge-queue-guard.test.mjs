@@ -614,6 +614,30 @@ describe('aggregate required checks', () => {
       );
     }
 
+    // GitHub omits bypass_actors for a workflow GITHUB_TOKEN; the read-only
+    // observer opts in explicitly and must still reject malformed/non-empty.
+    const { bypass_actors: _omitted, ...tokenView } = {
+      bypass_actors: [],
+      rules: nativeRules,
+    };
+    const unavailable = validateLiveMergeQueueRuleset(tokenView, {
+      backend: 'native',
+      allowUnavailableBypassActors: true,
+    });
+    expect(unavailable).toMatchObject({
+      ok: true,
+      errors: [],
+      bypassActorsVisible: false,
+    });
+    expect(result.bypassActorsVisible).toBe(true);
+    for (const bypass_actors of [{}, [{ actor_id: 158384 }]]) {
+      const stillUnsafe = validateLiveMergeQueueRuleset(
+        { bypass_actors, rules: nativeRules },
+        { backend: 'native', allowUnavailableBypassActors: true }
+      );
+      expect(stillUnsafe.ok).toBe(false);
+    }
+
     for (const actor_id of [158384, 2934433]) {
       const unsafeBypass = validateLiveMergeQueueRuleset(
         {

@@ -64,7 +64,10 @@ function printPolicySummary() {
   }
 }
 
-function runValidate({ checkLive = false } = {}) {
+function runValidate({
+  checkLive = false,
+  allowUnavailableBypassActors = false,
+} = {}) {
   const backend = configuredBackend();
   const branchProtectionYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.branchProtection
@@ -126,7 +129,10 @@ function runValidate({ checkLive = false } = {}) {
     return;
   }
 
-  const liveValidation = validateLiveMergeQueueRuleset(live, { backend });
+  const liveValidation = validateLiveMergeQueueRuleset(live, {
+    backend,
+    allowUnavailableBypassActors,
+  });
   if (!liveValidation.ok) {
     console.error('Live GitHub ruleset validation failed:');
     for (const error of liveValidation.errors) {
@@ -134,6 +140,12 @@ function runValidate({ checkLive = false } = {}) {
     }
     process.exitCode = 1;
     return;
+  }
+
+  if (!liveValidation.bypassActorsVisible) {
+    console.log(
+      '::warning title=Ruleset bypass actors unverified::GitHub omitted bypass_actors for this token (needs ruleset edit access); bypass-actor parity was not checked'
+    );
   }
 
   console.log(
@@ -149,7 +161,12 @@ async function main() {
       runValidate({ checkLive: false });
       break;
     case 'verify':
-      runValidate({ checkLive: true });
+      runValidate({
+        checkLive: true,
+        allowUnavailableBypassActors: process.argv
+          .slice(3)
+          .includes('--allow-unavailable-bypass-actors'),
+      });
       break;
     case 'policy':
       printPolicySummary();

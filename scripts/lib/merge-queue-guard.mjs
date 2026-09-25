@@ -1435,7 +1435,14 @@ export function validateMergeQueueRepoConfig(input) {
  * @param {{
  *   backend?: 'native',
  *   liveQueueConfiguration?: Record<string, unknown> | null,
+ *   allowUnavailableBypassActors?: boolean,
  * }} [options]
+ *
+ * GitHub omits `bypass_actors` from the ruleset response unless the caller can
+ * edit the ruleset; a workflow `GITHUB_TOKEN` never can. Absent stays fail
+ * closed by default; `allowUnavailableBypassActors` is an explicit opt-in for
+ * read-only observers that reports `bypassActorsVisible: false` instead. A
+ * present-but-malformed or non-empty `bypass_actors` still fails either way.
  */
 export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   const errors = [];
@@ -1508,8 +1515,11 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   }
 
   const hasValidBypassActors = Array.isArray(ruleset?.bypass_actors);
+  const bypassActorsVisible = ruleset?.bypass_actors !== undefined;
   const bypassActors = hasValidBypassActors ? ruleset.bypass_actors : [];
-  if (!hasValidBypassActors) {
+  const unavailableBypassActorsAllowed =
+    options.allowUnavailableBypassActors === true && !bypassActorsVisible;
+  if (!hasValidBypassActors && !unavailableBypassActorsAllowed) {
     errors.push('live ruleset bypass_actors must be an array');
   }
   if (bypassActors.length > 0) {
@@ -1522,6 +1532,7 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
     contexts,
     checks,
     hasBypassActors: bypassActors.length > 0,
+    bypassActorsVisible,
     hasNativeMergeQueue: Boolean(mergeQueueRule),
   };
 }
