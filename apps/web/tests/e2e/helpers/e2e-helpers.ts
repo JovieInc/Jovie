@@ -7,6 +7,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page } from '@playwright/test';
+import { productionUpstashCredentials } from '@/lib/redis-store';
 import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
 import {
   smokeNavigateWithRetry,
@@ -904,13 +905,13 @@ export async function purgeStaleClerkTestUsers() {
 }
 
 /**
- * Clear onboarding rate limits from Upstash Redis.
- * Repeated test runs exhaust the "3 per hour per IP" limit.
+ * Clear onboarding rate limits from production Upstash.
+ * Non-production runs use the in-memory limiter, which resets with the process.
  */
 export async function clearOnboardingRateLimits() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return;
+  const credentials = productionUpstashCredentials();
+  if (!credentials) return;
+  const { url, token } = credentials;
 
   try {
     const collectKeys = async (pattern: string) => {
@@ -937,9 +938,9 @@ export async function clearOnboardingRateLimits() {
 }
 
 async function clearCachedUserState(clerkUserId: string) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return;
+  const credentials = productionUpstashCredentials();
+  if (!credentials) return;
+  const { url, token } = credentials;
 
   try {
     await fetch(

@@ -15,6 +15,7 @@ import { and, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
+import { productionUpstashCredentials } from '@/lib/redis-store';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   E2E_PREBUILT_CLAIM_TOKEN,
@@ -413,8 +414,6 @@ function getSeedEnv() {
     DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT?.trim(),
     E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
-    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
-    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
   } as const;
 }
 
@@ -1984,14 +1983,10 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             await seedReleasesForProfile(db, profileId);
             await seedTourDatesForProfile(db, profileId);
 
-            const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
-              getSeedEnv();
-            if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+            const upstash = productionUpstashCredentials();
+            if (upstash) {
               try {
-                const redis = new Redis({
-                  url: UPSTASH_REDIS_REST_URL,
-                  token: UPSTASH_REDIS_REST_TOKEN,
-                });
+                const redis = new Redis(upstash);
                 const clerkIdsToInvalidate = [
                   previousClerkId,
                   E2E_CLERK_USER_ID,
@@ -2262,16 +2257,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           );
         }
 
-        // Invalidate Redis cache for this profile to ensure fresh data
-        // Only attempt if Redis credentials are available
-        const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
-          getSeedEnv();
-        if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+        // Production Upstash only. Non-production seeds stay on the in-memory cache.
+        const upstash = productionUpstashCredentials();
+        if (upstash) {
           try {
-            const redis = new Redis({
-              url: UPSTASH_REDIS_REST_URL,
-              token: UPSTASH_REDIS_REST_TOKEN,
-            });
+            const redis = new Redis(upstash);
             const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
 
             // Verify cache exists before deletion

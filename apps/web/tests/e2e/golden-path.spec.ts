@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { productionUpstashCredentials } from '@/lib/redis-store';
 import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
@@ -59,13 +60,13 @@ function hasRealEnv(): boolean {
 }
 
 /**
- * Clear onboarding rate limits from Upstash Redis.
- * Repeated test runs exhaust the "3 per hour per IP" limit.
+ * Clear onboarding rate limits from production Upstash.
+ * Non-production runs use the in-memory limiter, which resets with the process.
  */
 async function clearOnboardingRateLimits() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return; // No Redis — rate limiting uses in-memory fallback
+  const credentials = productionUpstashCredentials();
+  if (!credentials) return;
+  const { url, token } = credentials;
 
   try {
     // Find all onboarding IP rate limit keys

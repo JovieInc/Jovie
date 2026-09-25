@@ -116,9 +116,6 @@ jobs:
           else
             pnpm --filter=@jovie/web run test
           fi
-        env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload coverage report
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.coverage == 'true' }}

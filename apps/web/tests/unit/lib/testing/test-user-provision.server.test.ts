@@ -661,8 +661,10 @@ describe('test-user-provision.server', () => {
     expect(updateValues).toHaveLength(0);
   });
 
-  it('clears proxy-state and dashboard caches for reprovisioned test users', async () => {
-    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+  it('clears proxy-state and dashboard caches without calling production Upstash', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://real-kiwi-157253.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
 
     const { invalidateTestUserCaches } = await import(
@@ -681,12 +683,28 @@ describe('test-user-provision.server', () => {
       'user_456'
     );
     expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
+    expect(mockRedisDel).not.toHaveBeenCalled();
+  });
+
+  it('clears admin role keys in production Upstash', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+
+    const { invalidateTestUserCaches } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await invalidateTestUserCaches(['user_123', 'user_456']);
+
     expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_123');
     expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_456');
   });
 
   it('ignores missing Next cache context during plain Node test seeding', async () => {
-    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://real-kiwi-157253.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
     mockRevalidateTag.mockImplementation(() => {
       throw new Error(
@@ -703,7 +721,7 @@ describe('test-user-provision.server', () => {
     ).resolves.toBeUndefined();
 
     expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith('user_123');
-    expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_123');
+    expect(mockRedisDel).not.toHaveBeenCalled();
   });
 
   it('rethrows unexpected cache invalidation failures', async () => {

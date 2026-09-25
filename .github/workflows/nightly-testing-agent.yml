@@ -100,8 +100,6 @@ jobs:
         run: pnpm --filter=@jovie/web run test
         env:
           CI: 'true'
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Normalize unit telemetry
         if: always()
@@ -111,9 +109,6 @@ jobs:
           --junit apps/web/test-report.junit.xml
           --out apps/web/test-results/nightly-agent/deterministic
           --name normalized-results.json
-        env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload deterministic telemetry
         if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/deterministic/normalized-results.json') != '' }}

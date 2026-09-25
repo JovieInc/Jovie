@@ -1495,10 +1495,10 @@ ${fixtureCheckout}
     expect(normalizeTelemetry).toContain(
       'node .github/scripts/guard-playwright-artifacts.mjs --run --'
     );
-    expect(normalizeTelemetry).toContain(
+    expect(normalizeTelemetry).not.toContain(
       'UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}'
     );
-    expect(normalizeTelemetry).toContain(
+    expect(normalizeTelemetry).not.toContain(
       'UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}'
     );
     expect(normalizeTelemetry).toContain(

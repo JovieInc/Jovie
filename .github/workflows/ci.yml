@@ -4777,8 +4777,8 @@ jobs:
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
           export CHAT_LLM_FAILURE_INJECTION=1
           # GHA sets HOSTNAME to the runner machine name; Next standalone uses it for
@@ -4818,8 +4818,6 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -4985,12 +4983,10 @@ jobs:
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
-          # UPSTASH_REDIS_* MUST stay set in this lane: the anonymous onboarding
-          # chat limiters are requireRedis and fail CLOSED (429) without Redis.
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           # The loopback-IP shared-bucket OTP race is handled app-side instead —
           # deterministic +e2e test emails are exempt from the OTP send limit.
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
 
           PORT=3250 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
@@ -5027,8 +5023,6 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
@@ -5383,14 +5377,13 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           # Anonymous onboarding chat needs the same arming as the smoke/golden
           # lanes: SESSION_SECRET mints the onboarding session cookie (503
-          # SESSION_SECRET_NOT_CONFIGURED without it), UPSTASH_REDIS_* keep the
-          # requireRedis limiters from failing closed (429), E2E_TEST_MODE skips
-          # the loopback-shared-bucket anonymous limiter deterministically, and
+          # SESSION_SECRET_NOT_CONFIGURED without it). The in-memory rate limiter
+          # and cache are selected because NODE_ENV=test, CI, and E2E_TEST_MODE
+          # are set. Do not inject UPSTASH_REDIS_REST_*. E2E_TEST_MODE skips the
+          # loopback-shared-bucket anonymous limiter deterministically, and
           # CHAT_LLM_FAILURE_INJECTION honors the header-gated LLM-failure
           # fallback (inert unless a request carries x-jovie-e2e-llm-failure).
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
         run: |
@@ -5415,14 +5408,12 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           # Same anonymous-onboarding arming as the smoke/golden lanes and the
           # E2E Full step above (JOV-4179): without SESSION_SECRET the first
-          # onboarding message 503s (SESSION_SECRET_NOT_CONFIGURED), without
-          # UPSTASH_REDIS_* + E2E_TEST_MODE the requireRedis limiters fail
-          # closed (429), and without CHAT_LLM_FAILURE_INJECTION the
+          # onboarding message 503s (SESSION_SECRET_NOT_CONFIGURED). The
+          # in-memory rate limiter and cache are selected for this lane. Do not
+          # inject UPSTASH_REDIS_REST_*. Without CHAT_LLM_FAILURE_INJECTION the
           # x-jovie-e2e-llm-failure header is inert so no deterministic
           # fallback is served.
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -6414,8 +6405,8 @@ jobs:
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           export NEXT_PUBLIC_E2E_MODE=1
           export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
@@ -6468,8 +6459,6 @@ jobs:
           TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_DISABLE_TOOLBAR: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'

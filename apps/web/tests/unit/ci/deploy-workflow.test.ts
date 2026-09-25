@@ -3826,12 +3826,9 @@ describe('CI E2E smoke workflow', () => {
 
     for (const { step } of [standaloneSteps[0], standaloneSteps[2]]) {
       expect(step).toContain('export E2E_TEST_MODE=1');
-      expect(step).toContain(
-        'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
-      );
-      expect(step).toContain(
-        'export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"'
-      );
+      expect(step).toContain('In-memory rate limiter and cache');
+      expect(step).not.toContain('secrets.UPSTASH_REDIS_REST_URL');
+      expect(step).not.toContain('secrets.UPSTASH_REDIS_REST_TOKEN');
     }
   });
 });

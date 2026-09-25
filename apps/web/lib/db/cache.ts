@@ -116,6 +116,8 @@ export interface CacheOptions {
  * Returns null if Redis is unavailable or read fails.
  */
 async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
+  // Non-production getRedis() is null unless REDIS_URL is loopback Redis,
+  // so this layer stays on the in-memory LRU and does not call Upstash.
   const redis = getRedis();
   if (!redis) return null;
 

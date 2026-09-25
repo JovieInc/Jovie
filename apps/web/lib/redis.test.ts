@@ -4,9 +4,15 @@ const { mockRequest, mockConstructor, mockEnv } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
   mockConstructor: vi.fn(),
   mockEnv: {
-    NODE_ENV: 'test' as string,
+    NODE_ENV: 'production' as string,
+    VERCEL_ENV: 'production' as string | undefined,
+    CI: undefined as string | undefined,
+    E2E_TEST_MODE: undefined as string | undefined,
+    VITEST: undefined as string | undefined,
     UPSTASH_REDIS_REST_URL: 'https://example.upstash.io' as string | undefined,
     UPSTASH_REDIS_REST_TOKEN: 'token' as string | undefined,
+    REDIS_URL: undefined as string | undefined,
+    JOVIE_ALLOW_PRODUCTION_UPSTASH: undefined as string | undefined,
   },
 }));
 
@@ -40,9 +46,15 @@ import {
 } from './redis';
 
 function resetEnv(): void {
-  mockEnv.NODE_ENV = 'test';
+  mockEnv.NODE_ENV = 'production';
+  mockEnv.VERCEL_ENV = 'production';
+  mockEnv.CI = undefined;
+  mockEnv.E2E_TEST_MODE = undefined;
+  mockEnv.VITEST = undefined;
   mockEnv.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
   mockEnv.UPSTASH_REDIS_REST_TOKEN = 'token';
+  mockEnv.REDIS_URL = undefined;
+  mockEnv.JOVIE_ALLOW_PRODUCTION_UPSTASH = undefined;
 }
 
 beforeEach(() => {
@@ -111,6 +123,51 @@ describe('Upstash URL validation', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('non-production store selection', () => {
+  it('refuses the production Upstash host and does not construct a client', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockEnv.NODE_ENV = 'development';
+    mockEnv.VERCEL_ENV = undefined;
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+
+    expect(getRedis()).toBeNull();
+    expect(mockConstructor).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('real-kiwi-157253.upstash.io')
+    );
+    expect(warn.mock.calls[0]?.[0]).not.toContain('token');
+  });
+
+  it('uses loopback Redis instead of Upstash when REDIS_URL is local', () => {
+    mockEnv.NODE_ENV = 'test';
+    mockEnv.VERCEL_ENV = 'preview';
+    mockEnv.CI = 'true';
+    mockEnv.REDIS_URL = 'redis://127.0.0.1:6379';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+
+    expect(getRedis()).not.toBeNull();
+    expect(mockConstructor).not.toHaveBeenCalled();
+  });
+
+  it('allows the production host only when the debug override is set', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockEnv.NODE_ENV = 'development';
+    mockEnv.VERCEL_ENV = undefined;
+    mockEnv.JOVIE_ALLOW_PRODUCTION_UPSTASH = '1';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+
+    expect(getRedis()).not.toBeNull();
+    expect(mockConstructor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://real-kiwi-157253.upstash.io',
+      })
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('JOVIE_ALLOW_PRODUCTION_UPSTASH')
+    );
   });
 });
 

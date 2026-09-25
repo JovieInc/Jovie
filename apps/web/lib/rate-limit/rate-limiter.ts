@@ -15,6 +15,12 @@ import {
   noteRedisCommandFailure,
 } from '@/lib/redis';
 import { classifyRedisFailure } from '@/lib/redis-operability';
+import {
+  type RedisStoreKind,
+  redisStoreEnvFrom,
+  selectRedisStore,
+  warnRedisStoreDecision,
+} from '@/lib/redis-store';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { parseWindowToMs } from './config';
 import { MemoryRateLimiter } from './memory-limiter';
@@ -100,6 +106,12 @@ export class RateLimiter {
   private readonly redisLimiter: Ratelimit | null;
   private readonly memoryLimiter: MemoryRateLimiter;
   private readonly options: Required<RateLimiterOptions>;
+  private readonly storeKind: RedisStoreKind;
+  /**
+   * requireRedis fail-closed applies only when the selected store is Upstash.
+   * Non-production intentionally selects the in-memory limiter instead.
+   */
+  private readonly failClosed: boolean;
 
   constructor(config: RateLimitConfig, options: RateLimiterOptions = {}) {
     this.config = config;
@@ -117,10 +129,16 @@ export class RateLimiter {
           })),
     };
 
-    // Initialize both backends
-    this.redisLimiter = this.options.preferRedis
-      ? createRedisRateLimiter(config)
-      : null;
+    const decision = selectRedisStore(redisStoreEnvFrom(env));
+    warnRedisStoreDecision(decision);
+    this.storeKind = decision.kind;
+    this.failClosed = this.options.requireRedis && this.storeKind === 'upstash';
+
+    // Memory is the selected store outside production, not a degraded fallback.
+    this.redisLimiter =
+      this.options.preferRedis && this.storeKind !== 'memory'
+        ? createRedisRateLimiter(config)
+        : null;
     this.memoryLimiter = new MemoryRateLimiter(config);
 
     // Warn loudly if falling back to in-memory in production — rate limits
@@ -128,6 +146,7 @@ export class RateLimiter {
     // across instances, making them effectively useless in production.
     // Mandatory limiters never take that path; do not claim they do.
     if (
+      this.storeKind === 'upstash' &&
       this.options.preferRedis &&
       !this.redisLimiter &&
       this.options.warnOnFallback &&
@@ -144,6 +163,11 @@ export class RateLimiter {
    * Returns a consistent result regardless of backend
    */
   async limit(identifier: string): Promise<RateLimitResult> {
+    if (this.storeKind === 'memory') {
+      const memoryResult = await this.memoryLimiter.limit(identifier);
+      return { ...memoryResult, backend: 'memory' };
+    }
+
     // Try Redis first if available and the shared failure circuit is closed
     if (this.redisLimiter && !isRedisCircuitOpen()) {
       try {
@@ -192,7 +216,7 @@ export class RateLimiter {
           failure_kind: failureKind,
           limiter: this.config.prefix,
         });
-        if (!this.options.requireRedis) {
+        if (!this.failClosed) {
           const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
           console.error(message);
           this.options.logger(message);
@@ -204,7 +228,7 @@ export class RateLimiter {
       }
     }
 
-    if (this.options.requireRedis) {
+    if (this.failClosed) {
       return {
         success: false,
         limit: this.config.limit,
