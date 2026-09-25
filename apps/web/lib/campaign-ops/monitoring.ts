@@ -48,12 +48,9 @@ function healthStatus(
 ): CampaignHealthStatus {
   if (paused) return 'paused';
 
-  const anyChannelOff = Object.values(counters.channelStatuses).some(
-    s => s === 'off'
-  );
-  const anyDegraded = Object.values(counters.channelStatuses).some(
-    s => s === 'degraded'
-  );
+  const channelStatuses = Object.values(counters.channelStatuses);
+  const anyChannelOff = channelStatuses.includes('off');
+  const anyDegraded = channelStatuses.includes('degraded');
 
   if (
     anyChannelOff ||
