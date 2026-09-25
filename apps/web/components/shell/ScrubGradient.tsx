@@ -110,7 +110,7 @@ export function ScrubGradient({
 }) {
   // useId() yields a per-instance prefix so multiple <ScrubGradient/>
   // instances don't share DOM-global SVG paint-server / clip-path IDs.
-  const uid = useId().replaceAll(':', '-');
+  const uid = useId().replace(/:/g, '-');
   const gradId = `scrub-grad-${uid}`;
   const edgeFadeId = `scrub-edge-fade-${uid}`;
   const fadeMaskId = `scrub-fade-mask-${uid}`;
