@@ -65,6 +65,10 @@ function htmlResponse(status: number, body: string, url?: string): Response {
   } as ResponseInit);
 }
 
+function headerValue(headers: Headers | null, name: string): string | null {
+  return headers?.get(name) ?? null;
+}
+
 describe('M2 revenue-path canary contract', () => {
   it('is the $199 Artist Visibility Pro path, not generic uptime', () => {
     expect(M2_REVENUE_PATH_CANARY).toBe('m2-revenue-path');
@@ -351,8 +355,10 @@ describe('runM2RevenuePathCanary', () => {
       },
     });
 
-    expect(capturedHeaders?.get('accept')).toContain('text/html');
-    expect(capturedHeaders?.get('user-agent')).toBeTruthy();
+    const accept = headerValue(capturedHeaders, 'accept');
+    const userAgent = headerValue(capturedHeaders, 'user-agent');
+    expect(accept).toContain('text/html');
+    expect(userAgent).toBeTruthy();
     expect(receipt.pass).toBe(true);
     expect(receipt.issue).toBe('JOV-6439');
     expect(receipt.distinctFrom).toBe('generic-uptime');
