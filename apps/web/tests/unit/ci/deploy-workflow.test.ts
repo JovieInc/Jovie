@@ -4321,14 +4321,24 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
 describe('ci-fast critical deploy contract', () => {
   it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
-    const command =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts';
+    // The deploy contract runs by name (it sits in the quarantine ledger, so
+    // the tests/unit/ci directory run excludes it); setup-doppler-action and
+    // the rest of tests/unit/ci run in the directory command.
+    const byName =
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}';
+    const directory =
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
 
-    expect(ciFastLanes).toContain(command);
-    expect(command).toContain('tests/unit/ci/setup-doppler-action.test.ts');
-    expect(command).not.toContain('turbo');
-    expect(command).not.toContain('--affected');
-    expect(command).not.toContain('--passWithNoTests');
+    expect(ciFastLanes).toContain(
+      "const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';"
+    );
+    expect(ciFastLanes).toContain(byName);
+    expect(ciFastLanes).toContain(directory);
+    for (const command of [byName, directory]) {
+      expect(command).not.toContain('turbo');
+      expect(command).not.toContain('--affected');
+      expect(command).not.toContain('--passWithNoTests');
+    }
   });
 });
 
