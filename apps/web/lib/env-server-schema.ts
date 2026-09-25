@@ -133,6 +133,11 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
+  /**
+   * Must be a READY production-target deployment of the production Summer
+   * project prj_LaVQva346cjp5XfrbAIIQUln7tPH (named jovie-eve-shadow; legacy
+   * name) and should equal the deployment currently aliased to summer.jov.ie.
+   */
   OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: z
     .string()
     .url()
@@ -147,8 +152,9 @@ export const ServerEnvSchema = z.object({
     .optional(),
   /**
    * Protection Bypass for Automation secret from the jovie-eve-shadow
-   * project. Sent only as `x-vercel-protection-bypass` to the immutable
-   * deployment origin. This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
+   * project (the production Summer project). Sent only as
+   * `x-vercel-protection-bypass` to the immutable deployment origin. This
+   * is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
    */
   OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET: z.string().optional(),
 

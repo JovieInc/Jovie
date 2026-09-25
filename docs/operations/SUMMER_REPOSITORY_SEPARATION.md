@@ -38,9 +38,10 @@ Each generated application has one fixed identity and rejects attempts to bind
 the other identity or its channels. Summer has no generic Eve session endpoint
 and no default model tools. Jovie retains its existing authenticated core-chat
 adapter and read-only product capability manifest. Photon remains contained.
-Summer Blob calls require an explicit `SUMMER_BLOB_READ_WRITE_TOKEN`; ambient
-`BLOB_READ_WRITE_TOKEN` cannot be used. Product credential names are rejected in
-Summer and company credential names are rejected in Jovie.
+Summer Blob uses Vercel OIDC with `BLOB_STORE_ID` from the dedicated store
+connection, and static Blob read-write tokens are denied (summer-config #61).
+Product credential names are rejected in Summer and company credential names
+are rejected in Jovie.
 
 These guards detect accidental injection. They cannot prove that a provider
 credential has a narrow grant. Provider-side project/store/session isolation,
@@ -83,6 +84,11 @@ until an authorized promotion; neither environment is commissioned by this PR.
 
 ## Production cutover receipt (2026-09-05)
 
+`jovie-eve-shadow` (`prj_LaVQva346cjp5XfrbAIIQUln7tPH`) is the production
+Summer project. "shadow" is a legacy name from the pre-2026-09-05 Eve shadow
+pilot and does not mean staging. Its production alias is
+https://summer.jov.ie. Identify Summer by projectId, never by display name.
+
 Private `JovieInc/summer-config` owns the Git-linked `jovie-eve-shadow` project,
 root `apps/summer`, production branch `main`. Runtime commit
 `f9cad8528000000c4f196e1ccbf6a8aaf386b0f7` deployed as
@@ -99,3 +105,35 @@ mixed monorepo build onto the company alias. Product Eve materialization remains
 here; historical Summer extraction fixtures are verification-only pending
 final source cleanup. Transport delivery does not certify governor execution,
 Ovie web/mobile continuity, or revenue lift.
+
+## Repointing the Jovie bridge
+
+The Jovie production bridge is pinned to one immutable deployment of the
+production Summer project. `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
+`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` on the Vercel project `jovie`
+(Production) must name that deployment. The schema rejects `summer.jov.ie`
+itself; the origin is the immutable deployment URL.
+
+Re-pin after every summer-config production promotion. On 2026-09-24 the pin
+was still the pre-OIDC deployment `dpl_EL6b3e4tji7A1mbAzscvDDMmJPea`, which
+returned 503 after the static Blob token was revoked. Jovie surfaced that as
+502. Read the live alias again before applying a new pin; do not reuse a
+deployment id from this note.
+
+1. Read the deployment currently aliased to summer.jov.ie:
+   `GET https://summer.jov.ie/runtime/v1/identity` and take `deploymentId`.
+2. Confirm in Vercel that it is `READY`, `target=production`,
+   `projectId` `prj_LaVQva346cjp5XfrbAIIQUln7tPH`, and `blobAuth` `oidc`.
+3. On `jovie` Production, set
+   `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN=https://<that deployment url>` and
+   `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID=<dpl id>`.
+4. Env changes need a new Jovie production build before they take effect.
+5. Verify with 2 consecutive 202s on
+   `POST /ovie/v1/summer-bottleneck/events` and 2xx on
+   `/api/internal/ovie/summer-bottleneck`.
+
+Before revoking any Summer credential, list the deployments that still use
+it, including the Jovie pin.
+
+The intended enforcement is `pnpm check:summer-eve-pin`. A separate PR adds
+that guardrail.

@@ -13,7 +13,8 @@ The request includes both the bearer token and
 `x-vercel-trusted-oidc-idp-token`. When
 `OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET` is set, that value is also sent
 as `x-vercel-protection-bypass` to the same immutable origin. The secret
-belongs to the eve-shadow Vercel project, not Jovie's
+belongs to the eve-shadow Vercel project (the production Summer project,
+prj_LaVQva346cjp5XfrbAIIQUln7tPH), not Jovie's
 `VERCEL_AUTOMATION_BYPASS_SECRET`. The bridge does not set
 `x-vercel-set-bypass-cookie` and does not place the secret in the URL. It
 disallows redirects and makes one attempt.

@@ -28,6 +28,7 @@ export class InvalidEveProtectionBypassSecretError extends Error {
  * Trusted Sources reads `x-vercel-trusted-oidc-idp-token`. The optional
  * bypass header is the eve-shadow project's automation secret, never a
  * cookie and never Jovie's own `VERCEL_AUTOMATION_BYPASS_SECRET`.
+ * eve-shadow is the production Summer project (legacy name).
  */
 export function eveShadowTransportHeaders(
   oidcToken: string
@@ -45,7 +46,11 @@ export function eveShadowTransportHeaders(
   return headers;
 }
 
-/** Existing production Jovie OIDC boundary, shared by cron observations and founder conversation. */
+/**
+ * Existing production Jovie OIDC boundary, shared by cron observations and
+ * founder conversation. eve-shadow is the production Summer project (legacy
+ * name).
+ */
 export function getEveShadowOrigin(): string {
   const deploymentOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
   if (!deploymentOrigin) throw new Error('exact_eve_deployment_required');
