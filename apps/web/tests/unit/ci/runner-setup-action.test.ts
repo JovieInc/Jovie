@@ -342,6 +342,7 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
     ) as {
       readonly packageManager: string;
+      readonly engines: { readonly pnpm: string };
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(22);
@@ -350,6 +351,8 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
     expect(`pnpm@${requirements.pnpmVersion}`).toBe(packageJson.packageManager);
+    // JOV-6603: Vercel resolves a newer pnpm 9.15 patch than an exact engines pin.
+    expect(packageJson.engines.pnpm).toBe('>=9.15.4 <10');
     expect(requirements.playwrightVersion).toBe(
       packageJson.devDependencies.playwright
     );

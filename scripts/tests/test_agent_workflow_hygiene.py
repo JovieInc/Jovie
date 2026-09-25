@@ -459,7 +459,7 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     )
 
     assert "npm install -g pnpm@" not in script
-    assert "corepack prepare pnpm@9.15.4 --activate" in script
+    assert "corepack prepare pnpm@9.15.9 --activate" in script
     assert "pnpm install --frozen-lockfile --ignore-scripts" in script
     assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
     assert ".headOwner == $repo_owner" in script

@@ -30,7 +30,7 @@ export const CONTROL_BUNDLE_POLICY = Object.freeze({
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SOURCE_SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const NODE_22_PATTERN = /^v?22\.\d+\.\d+$/;
-const PNPM_PATTERN = /^9\.15\.4$/;
+const PNPM_PATTERN = /^9\.15\.9$/;
 
 async function filesBelow(root) {
   const info = await lstat(root);

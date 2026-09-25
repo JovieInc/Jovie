@@ -44,7 +44,7 @@ function writeExecutable(filePath, contents) {
 
 function makeToolStubs({
   nodeVersion = 'v22.23.2',
-  pnpmVersion = '9.15.4',
+  pnpmVersion = '9.15.9',
 } = {}) {
   const bin = makeTempDir('jovie-setup-health-bin-');
   writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
