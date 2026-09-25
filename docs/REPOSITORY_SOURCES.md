@@ -94,7 +94,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/canary-health-gate.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2fa2573a068ff9417f44b9c411fa2aa7108ebee4767b9ab4c7aba339b072c2cf`)
 - `.github/workflows/ci-duration-ratchet.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `6f64012b41f283ad4a2590bc7940dbe437ddc8801bda909fde38c95fe18c88bf`)
 - `.github/workflows/ci-shard-contract-canary.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4c90ef068f3dc9ab64409e8efd3c205fbd70f048503c674c7b05ad2240d9f43e`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `02c664f380ba2e154deef098314937186c583c46c582773943e79361d3eaac1d`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d231682c04ab1037a92011df979d25bec568d62ad6ca74d6f7a630990081197a`)
 - `.github/workflows/claude-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f1f135723f00a69124e7e6b2963ac5228f1b8a5a8f4ed7d69908ae48c79784b9`)
 - `.github/workflows/claude.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bd45f27892b0df484dbdd0093affe753bda3d4f4268a21ceb2cb4735d8e94ee8`)
 - `.github/workflows/codeql.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `08ec59de790de6e33e4a6761d28c910bb1d6ab796d6dcfb437615deb6af522c6`)
