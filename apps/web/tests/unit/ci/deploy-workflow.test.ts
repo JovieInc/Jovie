@@ -334,6 +334,8 @@ describe('source PR path-output reachability contract', () => {
       'ci-drizzle-check',
       'ci-integration-ready',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
       'ci-layout-guard',
@@ -1209,6 +1211,13 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(readinessJob).toContain('QUEUE_PROVEN');
     expect(readinessJob).toContain('Web Unit Tests:$RUN_WEB:$UNIT_RESULT');
     expect(readinessJob).toContain('Build + Layout');
+    expect(readinessJob).toContain(
+      'Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT'
+    );
+    expect(readinessJob).toContain(
+      'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');

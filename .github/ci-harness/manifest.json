@@ -43,7 +43,7 @@
     {
       "id": "combined-integration",
       "name": "Combined Integration",
-      "purpose": "Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
+      "purpose": "Affected unit, parallel hosted build-plus-layout, Ovie build, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
     },
     {
       "id": "main-deploy",
@@ -151,6 +151,24 @@
       "gateStage": "merge-group",
       "nextLocalCommand": "pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium",
       "remediation": "Repair the exact combined-head build or deterministic layout regression; build and layout intentionally share one hosted workspace without artifact transport."
+    },
+    {
+      "id": "ci-build-ovie",
+      "name": "Ovie Build (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/ovie typecheck && pnpm --filter @jovie/ovie build",
+      "remediation": "Repair the independent Ovie typecheck or standalone build on the exact combined head; it runs in parallel with Build + Layout and is required by the same aggregates."
+    },
+    {
+      "id": "ci-storybook-surfaces",
+      "name": "Storybook Surface Matrix (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium",
+      "remediation": "Repair the changed-component Storybook certification or surface/geometry regression on the exact combined head; it runs in parallel with Build + Layout and is required by the same aggregates."
     },
     {
       "id": "ci-ios",

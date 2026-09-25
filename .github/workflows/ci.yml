@@ -2299,6 +2299,11 @@ jobs:
 
   # Queue and admin-fallback integration evidence stays in one hosted
   # workspace. No Actions artifact upload/download sits on the critical path.
+  # The combined web gate runs as three parallel hosted jobs with identical
+  # gating: web build + layout (this job, keeps the required check name), the
+  # independent Ovie build, and the Storybook surface matrix. Every aggregate
+  # that consumes ci-build-layout must also consume ci-build-ovie and
+  # ci-storybook-surfaces so the split stays fail-closed.
   ci-build-layout:
     name: Build + Layout (combined)
     needs: [ci-path-changes, ci-merge-group-admission]
@@ -2330,26 +2335,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The effective coalesced-head diff base may be older than the direct
-          # queue parent; the changed-component gate must have its full ancestry.
-          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
-      # This guard permits the trusted-classifier prerequisite to land before
-      # the app. Once present, Ovie must independently build and typecheck.
-      - name: Build independent Ovie app
-        if: hashFiles('apps/ovie/package.json') != ''
-        run: |
-          pnpm --filter @jovie/ovie typecheck
-          pnpm --filter @jovie/ovie build
-          test -f apps/ovie/.next/BUILD_ID
-          test -f apps/ovie/.next/standalone/apps/ovie/server.js
-          test ! -d apps/ovie/.next/standalone/apps/docs/app
-        env:
-          NEXT_PUBLIC_APP_URL: http://localhost:3105
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -2414,6 +2403,101 @@ jobs:
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+      - name: Upload combined layout failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          allow-markdown: 'true'
+          retention-days: 3
+
+  ci-build-ovie:
+    name: Ovie Build (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      ) &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        if: hashFiles('apps/ovie/package.json') != ''
+      # This guard permits the trusted-classifier prerequisite to land before
+      # the app. Once present, Ovie must independently build and typecheck.
+      - name: Build independent Ovie app
+        if: hashFiles('apps/ovie/package.json') != ''
+        run: |
+          pnpm --filter @jovie/ovie typecheck
+          pnpm --filter @jovie/ovie build
+          test -f apps/ovie/.next/BUILD_ID
+          test -f apps/ovie/.next/standalone/apps/ovie/server.js
+          test ! -d apps/ovie/.next/standalone/apps/docs/app
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3105
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+
+  ci-storybook-surfaces:
+    name: Storybook Surface Matrix (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      ) &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The effective coalesced-head diff base may be older than the direct
+          # queue parent; the changed-component gate must have its full ancestry.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
       # surface nesting combination from .claude/rules/ui.md against Storybook
       # in light + dark mode. Secret-free (Storybook aliases mock Clerk/auth);
@@ -2457,12 +2541,12 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
-      - name: Upload combined layout failure evidence
+      - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           allow-markdown: 'true'
           retention-days: 3
@@ -2588,7 +2672,7 @@ jobs:
   ci-cross-product-integration:
     name: Cross-Product Integration (combined)
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-ios, ci-macos]
+      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -2615,11 +2699,13 @@ jobs:
           RUN_IOS: ${{ needs.ci-path-changes.outputs.run_ios }}
           WEB_UNITS: ${{ needs.ci-unit-tests.result }}
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          WEB_OVIE: ${{ needs.ci-build-ovie.result }}
+          WEB_STORYBOOK: ${{ needs.ci-storybook-surfaces.result }}
           MAC_RESULT: ${{ needs.ci-macos.result }}
           IOS_RESULT: ${{ needs.ci-ios.result }}
         run: |
           set -euo pipefail
-          [ "$RUN_WEB" != 'true' ] || { [ "$WEB_UNITS" = 'success' ] && [ "$WEB_BUILD" = 'success' ]; }
+          [ "$RUN_WEB" != 'true' ] || { [ "$WEB_UNITS" = 'success' ] && [ "$WEB_BUILD" = 'success' ] && [ "$WEB_OVIE" = 'success' ] && [ "$WEB_STORYBOOK" = 'success' ]; }
           [ "$RUN_MAC" != 'true' ] || [ "$MAC_RESULT" = 'success' ]
           [ "$RUN_IOS" != 'true' ] || [ "$IOS_RESULT" = 'success' ]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2635,7 +2721,7 @@ jobs:
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -2657,6 +2743,8 @@ jobs:
           FAST: ${{ needs.ci-fast.result }}
           WEB_UNIT: ${{ needs.ci-unit-tests.result }}
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          WEB_OVIE: ${{ needs.ci-build-ovie.result }}
+          WEB_STORYBOOK: ${{ needs.ci-storybook-surfaces.result }}
           IOS: ${{ needs.ci-ios.result }}
           MAC: ${{ needs.ci-macos.result }}
           CROSS: ${{ needs.ci-cross-product-integration.result }}
@@ -2672,7 +2760,7 @@ jobs:
           jq -n \
             --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
             --argjson mac "[\"$(lane_result "$RUN_MAC" "$MAC")\",\"$(lane_result "$RUN_MAC" "$FAST")\"]" \
-            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
+            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_STORYBOOK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
             --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
@@ -5766,6 +5854,8 @@ jobs:
         ci-unit-tests,
         ci-exact-head-coverage,
         ci-build-layout,
+        ci-build-ovie,
+        ci-storybook-surfaces,
         ci-ios,
         ci-macos,
         ci-cross-product-integration,
@@ -5798,6 +5888,8 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"
+          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           MACOS_RESULT="${{ needs.ci-macos.result }}"
           CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
@@ -5840,7 +5932,9 @@ jobs:
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Exact-head Coverage | $COVERAGE_RESULT |"
-            echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
+            echo "| Build + Layout | $BUILD_LAYOUT_RESULT |"
+            echo "| Ovie Build | $OVIE_BUILD_RESULT |"
+            echo "| Storybook Surface Matrix | $STORYBOOK_SURFACES_RESULT |"
             echo "| iOS Fast Unit + Coverage | $IOS_RESULT |"
             echo "| Mac Build + Test | $MACOS_RESULT |"
             echo "| Cross-Product Integration | $CROSS_PRODUCT_RESULT |"
@@ -5892,6 +5986,8 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT" \
+            "Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT" \
             "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
@@ -6555,6 +6651,8 @@ jobs:
         drizzle-migration-guard,
         ci-unit-tests,
         ci-build-layout,
+        ci-build-ovie,
+        ci-storybook-surfaces,
         ci-ios,
         ci-macos,
         ci-cross-product-integration,
@@ -6600,6 +6698,8 @@ jobs:
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"
+          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           MACOS_RESULT="${{ needs.ci-macos.result }}"
           CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
@@ -6623,6 +6723,8 @@ jobs:
               "Migration Guard:$MIGRATION_RESULT" \
               "Unit Tests:$UNIT_RESULT" \
               "Build + Layout:$BUILD_LAYOUT_RESULT" \
+              "Ovie Build:$OVIE_BUILD_RESULT" \
+              "Storybook Surface Matrix:$STORYBOOK_SURFACES_RESULT" \
               "iOS Fast Unit + Coverage:$IOS_RESULT" \
               "Mac Build + Test:$MACOS_RESULT" \
               "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
@@ -6663,6 +6765,8 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT" \
+            "Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT" \
             "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
