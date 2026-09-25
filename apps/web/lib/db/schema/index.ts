@@ -1100,6 +1100,21 @@ export {
   selectPromoDownloadEventSchema,
   selectPromoDownloadSchema,
 } from './promo-downloads';
+// Recipient preferences (quiet hours, channels, marketing consent) — JOV-6141
+export {
+  BRIEFING_BEHAVIORS,
+  DEFAULT_QUIET_HOURS_END,
+  DEFAULT_QUIET_HOURS_START,
+  MARKETING_CONSENT_VERSION,
+  type NewRecipientPreference,
+  RECIPIENT_CHANNELS,
+  RECIPIENT_KINDS,
+  RECIPIENT_PREFERENCES_VERSION,
+  type RecipientPreference,
+  recipientPreferences,
+  TIM_DEFAULT_TIMEZONE,
+  WEEKEND_BEHAVIORS,
+} from './recipient-preferences';
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,
