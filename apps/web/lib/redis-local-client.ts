@@ -39,7 +39,9 @@ async function getClient(url: string): Promise<RedisClientType> {
   if (clientPromise && clientUrl === url) return clientPromise;
 
   clientUrl = url;
-  const { createClient } = (await import('redis')) as LocalRedisModule;
+  const { createClient } = (await import(
+    'redis'
+  )) as unknown as LocalRedisModule;
   const client = createClient({ url });
   client.on('error', error => {
     console.warn(
