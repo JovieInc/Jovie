@@ -69,8 +69,11 @@ export function RecentlyShippedSection() {
   const changelogPath = resolveMonorepoPath('CHANGELOG.md');
 
   let markdown = '';
-  if (fs.existsSync(changelogPath)) {
-    markdown = fs.readFileSync(changelogPath, 'utf8');
+  if (fs.existsSync(/* turbopackIgnore: true */ changelogPath)) {
+    markdown = fs.readFileSync(
+      /* turbopackIgnore: true */ changelogPath,
+      'utf8'
+    );
   }
 
   const releases = parseRecentReleases(markdown, 3);
