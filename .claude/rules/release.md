@@ -242,14 +242,22 @@ gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --paginate \
 
 For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 
-1. **Outdated** — `position` is null (code was force-pushed past it) → skip
-2. **Addressed** — another comment exists with `in_reply_to_id` equal to this comment's `id`, from a non-bot author → skip
-3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
-4. **Unaddressed** — none of the above → **BLOCKER**
+1. **Stale** — `position` is null (code moved past it) → skip
+2. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → skip in the report
+3. **Open** — none of the above → list it as advisory
+
+A reply, from a human or an agent, is not evidence of a fix. Close a finding only
+with evidence on the current head: `fixed-and-reverified` (a regression test or
+re-review on the new head) or `dismissed-with-evidence` (code or test shows the
+claim is false). The Jovie review kernel uses the same states
+(`candidate | verified | fixed-and-reverified | dismissed-with-evidence | stale |
+not-assessed`); see [pr-review-kernel](../../docs/evaluations/pr-review-kernel.md).
+The author fixes verified findings on the same PR before requesting merge; none of
+these states is a merge gate.
 
 ### When flagged
 
-- List each unaddressed comment: `file:line` — first 80 chars of body — permalink
+- List each open comment: `file:line` — first 80 chars of body — permalink
 - Recommend: "Run `/review` to triage bot comments, or reply to each comment on GitHub"
 - These are **advisory** — they do not block merge
 
@@ -257,8 +265,8 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 
 ```
 BOT REVIEWS
-├─ CodeRabbit:   N unaddressed (advisory)
-└─ Greptile:     N unaddressed (advisory)
+├─ CodeRabbit:   N open (advisory)
+└─ Greptile:     N open (advisory)
 ```
 
 ## Deploy Configuration
