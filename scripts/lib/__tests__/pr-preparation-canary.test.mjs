@@ -184,14 +184,17 @@ describe('PR preparation eligibility parity', () => {
   it('treats every canonical queue hold, including fast, as a hard stop', () => {
     expect(HOLD_LABELS).toEqual(
       expect.arrayContaining([
-        'needs-human',
         'hold',
         'gated',
+        'incident',
         'queue-deferred',
         'needs-conflict-resolution',
+        'needs-manual-rebase',
         'fast',
       ])
     );
+    // #17263 made the legacy human-hold label inert; it must not stop the canary.
+    expect(HOLD_LABELS).not.toContain('needs-human');
     for (const label of HOLD_LABELS) {
       const decision = evaluateEligibility({
         entry: entry(),
