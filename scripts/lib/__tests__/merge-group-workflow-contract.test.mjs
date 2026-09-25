@@ -2120,8 +2120,14 @@ ${selectedGateScript}`,
     expect(sourceSizeGuard).toContain('persist-credentials: false');
     expect(sourceSizeGuard).toContain('fetch-depth: 0');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
+    // The event base SHA goes stale on long-lived PRs; judge the PR against
+    // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
+    expect(sourceSizeGuard).not.toContain('github.event.pull_request.base.sha');
     expect(sourceSizeGuard).toContain(
-      'PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'
+      'PR_BASE_REF: ${{ github.event.pull_request.base.ref }}'
+    );
+    expect(sourceSizeGuard).toContain(
+      'PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}'
     );
     expect(sourceSizeGuard).toContain(
       'PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}'
@@ -2459,7 +2465,7 @@ describe('PR Size Guard merge-base comparison', () => {
     const mergeBaseOutput = join(root, 'merge-base-output');
     const env = {
       ...process.env,
-      PR_BASE_SHA: eventBase,
+      PR_BASE_REF: 'main',
       PR_HEAD_SHA: head,
       GITHUB_OUTPUT: mergeBaseOutput,
     };
@@ -2473,7 +2479,9 @@ describe('PR Size Guard merge-base comparison', () => {
       }
     );
     expect(resolved.status, resolved.stderr || resolved.stdout).toBe(0);
-    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(`sha=${ancestor}\n`);
+    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(
+      `base_tip=${eventBase}\nsha=${ancestor}\n`
+    );
 
     const shallowWork = join(root, 'shallow-work');
     git(root, [
@@ -2545,7 +2553,8 @@ describe('PR Size Guard merge-base comparison', () => {
     expect(readFileSync(screenshotOutput, 'utf8')).toBe('');
 
     for (const badEnv of [
-      { PR_BASE_SHA: 'invalid' },
+      { PR_BASE_REF: 'main;true' },
+      { PR_BASE_REF: 'no-such-base' },
       { PR_HEAD_SHA: ancestor },
     ]) {
       writeFileSync(mergeBaseOutput, '');
