@@ -307,8 +307,10 @@ class RunIssueTest(unittest.TestCase):
 class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-                      lane.fix_red_pr)
-        lane.claim_red_pr = lambda host, name: None
+                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr)
+        lane.claim_red_pr = lambda host, name, prs=None: None
+        lane.claim_adoptable_pr = lambda host, name, prs: None
+        lane.lane_prs = lambda name: []
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         self.linear = FakeLinear([issue("JOV-3")])
@@ -319,7 +321,7 @@ class WorkerTest(unittest.TestCase):
 
     def tearDown(self):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-         lane.fix_red_pr) = self.saved
+         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -356,11 +358,18 @@ class WorkerTest(unittest.TestCase):
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
         fixed = []
-        lane.claim_red_pr = lambda host, name: {"number": 5}
+        lane.claim_red_pr = lambda host, name, prs=None: {"number": 5}
         lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
         lane.worker(self.host, "devin")
         self.assertEqual((fixed, self.linear.moves), ([5], []))
         self.assertEqual(len(self.execs), 1)
+
+    def test_late_remote_drafts_are_adopted_and_gated(self):
+        adopted = []
+        lane.claim_adoptable_pr = lambda host, name, prs: {"number": 8}
+        lane.adopt_pr = lambda host, name, pr: adopted.append(pr["number"])
+        lane.worker(self.host, "devin")
+        self.assertEqual((adopted, self.linear.moves), ([8], []))
 
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
@@ -442,6 +451,28 @@ class FixRedTest(unittest.TestCase):
                 lane.sh = real
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
                              {"5": {"sha": "h1", "count": 1}})
+
+    def test_unverified_drafts_are_adopted_once_per_head(self):
+        draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}
+        ready = {**self.pr(number=9), "isDraft": False}
+        self.assertEqual(lane.unverified_pr([ready, draft], {})["number"], 5)
+        self.assertIsNone(lane.unverified_pr([draft], {"5": "h1"}))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            self.assertEqual(lane.claim_adoptable_pr(host, "hyperagent", [draft])["number"], 5)
+            self.assertIsNone(lane.claim_adoptable_pr(host, "hyperagent", [draft]))
+
+    def test_adopt_gates_the_pr_head_and_leaves_a_receipt(self):
+        real_sh, real_gate = lane.sh, lane.gate_pr
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.gate_pr = lambda host, pr, worktree, log: {"verdict": "landing", "pr": pr["number"], "reasons": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.adopt_pr(host, "hyperagent", self.pr())
+            finally:
+                lane.sh, lane.gate_pr = real_sh, real_gate
+            self.assertEqual((receipt["kind"], receipt["verdict"]), ("adopt", "landing"))
 
     def test_fix_run_reports_a_pushed_head_and_leaves_a_receipt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt

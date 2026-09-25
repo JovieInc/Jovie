@@ -348,7 +348,11 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
             "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True)
-    pr = max(prs, key=lambda item: item["createdAt"])
+    return gate_pr(host, max(prs, key=lambda item: item["createdAt"]), worktree, log)
+
+
+def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
+    """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
     sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
@@ -358,7 +362,7 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         for command in check_commands([change.path for change in changes]):
             if sh(command, cwd=worktree, timeout=host.gate_timeout, log=log).returncode != 0:
                 reasons.append(f"check-failed:{' '.join(command[:6])}")
-    result = {"pr": pr["number"], "prUrl": pr["url"], "headSha": pr["headRefOid"],
+    result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
     if reasons:
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body",
@@ -452,13 +456,58 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     return receipt
 
 
-def claim_red_pr(host: Host, name: str) -> dict | None:
-    """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
+def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
+    """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
+    for pr in sorted(prs, key=lambda item: item["number"]):
+        if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
+            return pr
+    return None
+
+
+def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-adopt-{uuid.uuid4().hex[:6]}"
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    worktree = host.state / "worktrees" / run_id
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "adopt",
+               "pr": pr["number"], "startedAt": now_iso()}
+    with open(runs / f"{run_id}.log", "w") as log:
+        try:
+            sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
+            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
+            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            receipt.update(gate_pr(host, pr, worktree, log))
+        except Exception as error:
+            receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
+        finally:
+            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    receipt["endedAt"] = now_iso()
+    with open(runs / "ledger.jsonl", "a") as ledger:
+        ledger.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
+def lane_prs(name: str) -> list[dict]:
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
-                 "--json", "number,title,headRefName,headRefOid,statusCheckRollup"])
+                 "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup"])
     # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
     own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
-    prs = [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+    return [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+
+
+def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
+    path = host.state / "verified.json"
+    verified = json.loads(path.read_text()) if path.exists() else {}
+    pr = unverified_pr(prs, verified)
+    if pr:
+        verified[str(pr["number"])] = pr["headRefOid"]
+        path.write_text(json.dumps(verified))
+    return pr
+
+
+def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
+    """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
+    prs = lane_prs(name) if prs is None else prs
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     pr = red_pr(prs, attempts)
@@ -488,18 +537,23 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        # Finish before starting: this lane's red PRs come before new issues.
-        red = claim_red_pr(host, name)
+        # Finish before starting: red PRs, then ungated drafts, then new issues.
+        prs = lane_prs(name)
+        red = claim_red_pr(host, name, prs)
+        adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
-        if red is None:
+        if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures)
             if issue:
                 linear.move(issue.id, "In Progress")
     finally:
         claim.release()
-    if red is not None:
-        fix_red_pr(host, name, spec, red)
+    if red is not None or adopt is not None:
+        if red is not None:
+            fix_red_pr(host, name, spec, red)
+        else:
+            adopt_pr(host, name, adopt)
         slot.release()
         return reexec(host, name)
     if issue is None:
