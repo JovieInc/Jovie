@@ -131,7 +131,11 @@ from pathlib import Path
 if sys.argv and sys.argv[0] in ("", "-"):
     counts = {}
     def _trace(frame, event, arg):
-        if event == "line" and frame.f_code.co_filename in ("<stdin>", "<string>"):
+        # Only heredoc frames can own a covered line; skipping every other
+        # frame (stdlib, site) avoids per-line Python callbacks there.
+        if frame.f_code.co_filename not in ("<stdin>", "<string>"):
+            return None
+        if event == "line":
             code = frame.f_code
             material = b"\\0".join((code.co_code, str(code.co_firstlineno).encode(), code.co_name.encode()))
             code_id = hashlib.sha256(material).hexdigest()[:16]
@@ -156,27 +160,36 @@ if sys.argv and sys.argv[0] in ("", "-"):
     return site, py_dir, bash_dir
 
 
-def run_suite(suite, env):
-    result = subprocess.run(
+def start_suite(suite, env):
+    return subprocess.Popen(
         [sys.executable, str(suite)],
         cwd=ROOT,
         env=env,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=600,
-        check=False,
     )
-    output = f"{result.stdout}{result.stderr}"
+
+
+def finish_suite(suite, process):
+    try:
+        stdout, stderr = process.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        stdout, stderr = process.communicate()
+        stderr += f"\nROUTE_PREP_SUITE {suite.name} timed out after 600s\n"
+        process.returncode = process.returncode or 1
+    output = f"{stdout}{stderr}"
     sys.stdout.write(output)
     if not output.endswith("\n"):
         sys.stdout.write("\n")
     match = re.search(r"^Ran (\d+) tests\b", output, re.M)
     count = int(match.group(1)) if match else 0
     print(
-        f"ROUTE_PREP_SUITE {suite.name} Ran {count} tests exit={result.returncode}",
+        f"ROUTE_PREP_SUITE {suite.name} Ran {count} tests exit={process.returncode}",
         flush=True,
     )
-    return count, result.returncode
+    return count, process.returncode
 
 
 def python_records(py_dir):
@@ -271,8 +284,12 @@ def main():
         env.pop("PYTHONNOUSERSITE", None)
 
         status = 0
-        for suite in (PROBE_SUITE, ROUTER_SUITE):
-            count, code = run_suite(suite, env)
+        # The suites share no state (each test owns a temp dir; traces are
+        # per-pid files), so run them concurrently and report in order.
+        suites = (PROBE_SUITE, ROUTER_SUITE)
+        running = [(suite, start_suite(suite, env)) for suite in suites]
+        for suite, process in running:
+            count, code = finish_suite(suite, process)
             if count < MIN_TESTS[suite.name] or code != 0:
                 status = code or 1
         if status != 0:
