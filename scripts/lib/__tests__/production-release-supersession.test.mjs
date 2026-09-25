@@ -655,7 +655,8 @@ describe('required structural release regression dispatch', () => {
     const target = 'production-release-supersession.test.mjs';
     vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      const child = new EventEmitter();
+      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
+      const child = /** @type {any} */ (new EventEmitter());
       child.stdout = child.stderr = new EventEmitter();
       const code = command.includes(target) ? exitCode : 0;
       setImmediate(() => child.emit('close', code));
