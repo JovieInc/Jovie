@@ -1663,6 +1663,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
       - name: Install pytest (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
@@ -2729,6 +2731,20 @@ jobs:
         # but do not register setup-node's post-job cache save for this lane.
         with:
           package_cache: 'false'
+      # Electron and electron-builder re-download the universal runtimes on
+      # every cold macOS VM. Restore only those immutable download caches,
+      # never build output. Save only from main pushes so a cold save cannot
+      # spend the merge-queue deadline (same reason as package_cache above).
+      - name: Restore Electron downloads
+        id: electron-downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-downloads-
       - name: Bind staging package identity to the exact CI attempt
         id: desktop-staging-identity
         shell: bash
@@ -2748,6 +2764,17 @@ jobs:
             DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}" \
             JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA" \
             pnpm --filter @jovie/desktop run package:staging
+      - name: Save Electron downloads
+        if: >-
+          github.event_name == 'push' &&
+          steps.electron-downloads.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ steps.electron-downloads.outputs.cache-primary-key }}
       - name: Verify exact Mac artifact set
         run: |
           set -euo pipefail
