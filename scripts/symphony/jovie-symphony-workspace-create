@@ -16,7 +16,7 @@ issue="$(basename "$logical")"
 
 export PATH="$node_bin:/usr/local/bin:/usr/bin:/bin"
 [[ "$(node --version)" == "v22.23.2" ]] || { echo "Node runtime mismatch: $(node --version)" >&2; exit 69; }
-[[ "$(pnpm --version)" == "9.15.4" ]] || { echo "pnpm runtime mismatch: $(pnpm --version)" >&2; exit 69; }
+[[ "$(pnpm --version)" == "9.15.9" ]] || { echo "pnpm runtime mismatch: $(pnpm --version)" >&2; exit 69; }
 
 sudo -n "$helper" prepare "$logical"
 cleanup_on_error() {
