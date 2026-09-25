@@ -6,11 +6,11 @@
   },
   "conservative": {
     "armed": true,
-    "count": 739,
+    "count": 738,
     "perFamily": {
       "marketing": 113,
       "web-shell": 296,
-      "web-other": 319,
+      "web-other": 318,
       "packages/ui": 11
     },
     "perUtility": {
@@ -35,7 +35,7 @@
       "px-3.5": 47,
       "py-2.5": 131,
       "py-3.5": 34,
-      "space-y-2.5": 35,
+      "space-y-2.5": 34,
       "space-y-3.5": 3
     }
   },
