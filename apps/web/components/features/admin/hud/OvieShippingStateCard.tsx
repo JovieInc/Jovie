@@ -130,7 +130,6 @@ export function OvieShippingStateCard({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='min-h-40 space-y-3 p-3'
       data-testid='hud-shipper-status-panel'
       data-ovie-shipping-state='true'
       data-truth={view.truth}
@@ -144,18 +143,23 @@ export function OvieShippingStateCard({
       aria-live='polite'
       aria-label='Ubuntu Shipping State'
     >
-      <div className='flex min-h-5 items-center justify-between gap-3'>
-        <div className='flex items-center gap-2'>
-          <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
-          <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
-            Delivery
-          </p>
+      <div
+        className='min-h-40 space-y-3 p-3'
+        data-testid='hud-shipper-status-geometry'
+      >
+        <div className='flex min-h-5 items-center justify-between gap-3'>
+          <div className='flex items-center gap-2'>
+            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+            <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
+              Delivery
+            </p>
+          </div>
+          <span className='text-2xs font-medium text-secondary-token'>
+            {isPending ? 'Unknown' : truthLabel(view)}
+          </span>
         </div>
-        <span className='text-2xs font-medium text-secondary-token'>
-          {isPending ? 'Unknown' : truthLabel(view)}
-        </span>
+        <ShippingStateBody view={view} />
       </div>
-      <ShippingStateBody view={view} />
     </ContentSurfaceCard>
   );
 }

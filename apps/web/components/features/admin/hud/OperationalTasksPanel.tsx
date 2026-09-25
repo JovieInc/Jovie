@@ -110,7 +110,7 @@ export function OperationalTasksPanelView({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='overflow-hidden p-0'
+      className='overflow-hidden'
       data-testid='ovie-operational-tasks'
     >
       <div className='flex min-h-16 items-center justify-between gap-3 border-b border-subtle px-3 py-2'>

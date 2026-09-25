@@ -92,7 +92,9 @@ describe('OvieShippingStateCard', () => {
 
     expect(panel()).toHaveAttribute('data-truth', 'unknown');
     expect(panel()).toHaveAttribute('aria-label', 'Ubuntu Shipping State');
-    expect(panel().className).toContain('min-h-40');
+    expect(
+      screen.getByTestId('hud-shipper-status-geometry').className
+    ).toContain('min-h-40');
     for (const label of LABELS) {
       expect(screen.getByText(label)).toBeTruthy();
     }

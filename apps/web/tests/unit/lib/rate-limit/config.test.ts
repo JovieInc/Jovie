@@ -251,6 +251,10 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.publicProfile.analytics).toBe(false);
         expect(RATE_LIMITERS.publicClick.analytics).toBe(false);
         expect(RATE_LIMITERS.health.analytics).toBe(false);
+        // /api/v1/:username fail-closes on this bucket. Analytics was already
+        // off and the algorithm stays fixed-window (estimator upper bound 3).
+        expect(RATE_LIMITERS.publicArtistApi.analytics).toBe(false);
+        expect(RATE_LIMITERS.publicArtistApi.algorithm).toBe('fixed-window');
       });
 
       it('keeps high-volume authenticated shells on the 3-command fixed-window diet', () => {
