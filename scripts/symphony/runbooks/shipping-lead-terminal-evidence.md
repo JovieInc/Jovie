@@ -1,8 +1,9 @@
 # Shipping Lead terminal evidence — JOV-6586
 
-Status: source preparation only. The current worker candidate projector is not
-connected to the installed launcher, consumer, signer or capacity release. No
-runtime promotion, restart or commissioning is implied.
+Status: source preparation only. The local candidate projector and private-file
+adapter are connected to the checked-in launcher and versioned provider bundle.
+They are not installed on Gem or connected to consumer terminal reconciliation,
+signing or capacity release. No runtime promotion, restart or commissioning is implied.
 
 ## Adopt-first decision (2026-09-25)
 
@@ -57,3 +58,26 @@ binding one admitted Summer task to the actual native session and its Git result
 Remaining implementation and deployment work stays in JOV-6586; runtime
 attestation remains JOV-6531. The pending approval for restoring the previously
 approved workflow does not authorize installing or enabling this candidate.
+
+## Local capture boundary
+
+The native app-server branch of `codex-rotate` passes stdout through the adjacent
+projector before its existing tee/classifier. Non-app-server work and old bundles
+without the companion retain their original capture path. Provider generation v3
+binds both Python modules in its existing hash manifest; old v1/v2 generations
+remain readable and valid rollback candidates. No global launcher is replaced
+by this source change. The approved stock workflow must receive an independently
+qualified launcher binding before this can produce live evidence.
+
+The adapter reads the existing consumer's private journal, matches the actual
+service invocation and issue workspace, records Git directly, and rechecks the
+task and producer bytes before immutable publication under
+`state/summer-symphony-consumer/worker-evidence`. Signature authority remains with
+the consumer; private ownership and a candidate digest do not replace signed
+task validation. Missing admission simply preserves native stdout without proof.
+No prompts, tool output, account identity or credentials enter the candidate.
+
+The candidate still records `executionTerminated: false`. Consumer correlation
+across native continuation turns, positive process-stop proof, exact commit/CI/
+merge/production verification, durable terminal reconciliation and signed
+reservation release remain part of JOV-6586.

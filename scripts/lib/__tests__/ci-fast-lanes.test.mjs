@@ -192,16 +192,21 @@ describe('runStructural screenshot contract discovery', () => {
   });
 
   it.each([
+    'scripts/symphony/shipping_worker_capture.py',
+    'scripts/symphony/tests/shipping-worker-capture.test.py',
     'scripts/symphony/shipping_lead_worker_evidence.py',
     'scripts/symphony/tests/shipping-lead-worker-evidence.test.py',
   ])('enforces worker evidence coverage for an isolated change to %s', path => {
     process.env.GITHUB_EVENT_NAME = 'pull_request';
     process.env.CI_PRODUCT_LANES = 'operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const captureAdapter =
+      path.includes('worker_capture') || path.includes('worker-capture');
+    const coverageFile = captureAdapter
+      ? 'jovie-shipping-worker-capture.coverage'
+      : 'jovie-shipping-worker-evidence.coverage';
     const execute = vi.fn(command => ({
-      code: command.includes('jovie-shipping-worker-evidence.coverage')
-        ? 19
-        : 0,
+      code: command.includes(coverageFile) ? 19 : 0,
       output: 'worker coverage regression\n',
     }));
     const result = runStructural({ changedFileList: [path], execute });
@@ -209,13 +214,15 @@ describe('runStructural screenshot contract discovery', () => {
     expect(result.skipped).toBeUndefined();
     const commands = execute.mock.calls.map(([command]) => command);
     expect(
-      commands.filter(command =>
-        command.includes('jovie-shipping-worker-evidence.coverage')
-      )
+      commands.filter(command => command.includes(coverageFile))
     ).toHaveLength(1);
-    expect(commands.at(-1)).toContain('--fail-under=100');
     expect(commands.at(-1)).toContain(
-      'coverage run --branch scripts/symphony/tests/shipping-lead-worker-evidence.test.py'
+      captureAdapter ? '--fail-under=95' : '--fail-under=100'
+    );
+    expect(commands.at(-1)).toContain(
+      captureAdapter
+        ? 'coverage run --branch scripts/symphony/tests/shipping-worker-capture.test.py'
+        : 'coverage run --branch scripts/symphony/tests/shipping-lead-worker-evidence.test.py'
     );
     expect(result.output).toContain('worker coverage regression');
   });

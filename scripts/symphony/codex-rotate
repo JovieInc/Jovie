@@ -1268,9 +1268,18 @@ set +e
 # Keep the streams separate: Codex CLI owns stderr errors, while app-server owns
 # structured stdout events. Mixing them lets arbitrary JSON-RPC values or tool
 # text impersonate a provider failure.
-"$REAL_CODEX" "$@" \
-  > >(tee -a "$tmp_out") \
-  2> >(tee -a "$tmp_err" >&2)
+# Only the immutable provider bundle supplies this optional projector. Other
+# launchers and non-app-server work retain their existing stream capture.
+worker_capture="$(dirname -- "${BASH_SOURCE[0]}")/shipping_worker_capture.py"
+if [[ "$app_server_mode" == "1" && -f "$worker_capture" ]]; then
+  "$REAL_CODEX" "$@" \
+    > >(python3 "$worker_capture" | tee -a "$tmp_out") \
+    2> >(tee -a "$tmp_err" >&2)
+else
+  "$REAL_CODEX" "$@" \
+    > >(tee -a "$tmp_out") \
+    2> >(tee -a "$tmp_err" >&2)
+fi
 rc=$?
 set -e
 # Bash does not guarantee that process substitutions finish before the next

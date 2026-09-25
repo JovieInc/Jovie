@@ -47,6 +47,8 @@ class PromotionTests(unittest.TestCase):
         self.write(self.bin / "symphony-codex-entry", (self.bin / "symphony-agent-router").read_text())
         shutil.copytree(ROOT / "scripts/symphony/codex-cli", self.source / "codex-cli")
         self.write(self.source / "codex-rotate", '#!/bin/sh\nexec "$CODEX_REAL_BIN" "$@"\n')
+        for name in ("shipping_worker_capture.py", "shipping_lead_worker_evidence.py"):
+            shutil.copyfile(ROOT / "scripts/symphony" / name, self.source / name)
         from provider_cli_fixtures import install_fake_npm
         self.npm_fixture, self.npm = install_fake_npm(self.root)
         self.env_patch = patch.dict(os.environ, {"PATH": str(self.npm.parent) + os.pathsep + os.environ["PATH"]})
@@ -122,6 +124,35 @@ class PromotionTests(unittest.TestCase):
         self.assertIn("native-qualified fixture-work", result.stdout)
         self.assertNotIn("unqualified-shared", result.stdout)
         self.assertEqual(before, {path: path.read_bytes() for path in protected})
+
+    def test_native_evidence_producer_is_part_of_verified_immutable_generation(self):
+        self.assertEqual(self.run_helper()[0], 0)
+        current = (self.store / "current").resolve()
+        receipt = json.loads((current / "manifest.json").read_text())
+        self.assertEqual(receipt["schema"], "symphony-provider-generation/v3")
+        for name in ("shipping_worker_capture.py", "shipping_lead_worker_evidence.py"):
+            path = current / name
+            original = path.read_bytes()
+            self.assertEqual(original, (self.source / name).read_bytes())
+            self.assertEqual(hashlib.sha256(original).hexdigest(), receipt["sha256"][name])
+            path.write_bytes(b"changed")
+            self.assertEqual(self.run_helper(check=1)[0], 10)
+            path.write_bytes(original)
+        self.assertEqual(self.run_helper(check=1)[0], 0)
+
+    def test_legacy_v2_generation_remains_readable_without_evidence_modules(self):
+        self.assertEqual(self.run_helper()[0], 0)
+        old = (self.store / "current").resolve()
+        receipt = json.loads((old / "manifest.json").read_text())
+        receipt["schema"] = "symphony-provider-generation/v2"
+        for name in ("shipping_worker_capture.py", "shipping_lead_worker_evidence.py"):
+            del receipt["sha256"][name]
+            (old / name).unlink()
+        (old / "manifest.json").write_text(json.dumps(receipt))
+        self.assertEqual(self.run_helper()[0], 0)
+        self.assertNotEqual((self.store / "current").resolve(), old)
+        self.assertEqual(self.run_helper(rollback=1)[0], 0)
+        self.assertEqual((self.store / "current").resolve(), old)
 
     def test_pin_update_is_qualified_and_rollback_restores_exact_old_binary(self):
         self.assertEqual(self.run_helper()[0], 0)
