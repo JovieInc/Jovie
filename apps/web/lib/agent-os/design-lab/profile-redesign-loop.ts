@@ -307,7 +307,7 @@ export async function runProfileRedesignProposalLoop(
 ): Promise<ProfileRedesignLoopResult> {
   const now = params.createdAt ? new Date(params.createdAt) : new Date();
   if (Number.isNaN(now.getTime())) {
-    throw new Error(`Invalid createdAt: ${params.createdAt}`);
+    throw new TypeError(`Invalid createdAt: ${params.createdAt}`);
   }
 
   const dayBucket = params.dayBucket ?? utcDayBucket(now);
