@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { artists } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { ensureUnclaimedArtistProfileForEntity } from '@/lib/discography/collaborator-profile-reconciliation';
+import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,7 +29,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   let [resolved] = await db
-    .select({ username: creatorProfiles.usernameNormalized })
+    .select({
+      username: creatorProfiles.usernameNormalized,
+      displayName: creatorProfiles.displayName,
+    })
     .from(artists)
     .innerJoin(
       creatorProfiles,
@@ -44,7 +48,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // release-credit edge; it never creates a name-reserved profile.
     await ensureUnclaimedArtistProfileForEntity(artistId);
     [resolved] = await db
-      .select({ username: creatorProfiles.usernameNormalized })
+      .select({
+        username: creatorProfiles.usernameNormalized,
+        displayName: creatorProfiles.displayName,
+      })
       .from(artists)
       .innerJoin(
         creatorProfiles,
@@ -54,7 +61,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .limit(1);
   }
 
-  if (!resolved?.username) {
+  // Shared discovery-eligibility predicate (JOV-6260): test, synthetic, and
+  // otherwise ineligible identities fail closed even when the bound profile
+  // row is public and claimed.
+  if (
+    !resolved?.username ||
+    !isPublicProfileIndexable(resolved.username, resolved.displayName)
+  ) {
     return new Response(null, { status: 404, headers: NO_STORE_HEADERS });
   }
 
