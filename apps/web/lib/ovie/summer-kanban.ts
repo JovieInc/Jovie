@@ -227,7 +227,7 @@ function terminalEvidenceOf(
   const evidence = [...initiative.evidence].reverse();
   const receiptHandle = initiative.receipts
     .map(receipt => receipt.destinationHandle?.trim())
-    .find(handle => handle);
+    .find(Boolean);
   // Only landing artifacts count: a receipt-kind ref is the destination
   // name, not terminal evidence.
   const ref =
