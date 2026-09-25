@@ -17,6 +17,16 @@ describe('inspector tab keyboard', () => {
       nextInspectorTabValue(LIBRARY_INSPECTOR_TABS, 'details', 'End')
     ).toBe('rights');
     expect(
+      nextInspectorTabValue(
+        [
+          { value: 'details', label: 'Details' },
+          { value: 'rights', label: 'Rights' },
+        ],
+        'details',
+        'End'
+      )
+    ).toBe('rights');
+    expect(
       nextInspectorTabValue(LIBRARY_INSPECTOR_TABS, 'details', 'Enter')
     ).toBeNull();
   });
