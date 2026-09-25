@@ -1,0 +1,70 @@
+name: Summer Eve pin check
+
+# Confirms the Jovie production pin is a READY production deployment of
+# production Summer and reports drift from https://summer.jov.ie.
+# clock-class: upstream-advisory
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+  pull_request:
+    paths:
+      - .github/workflows/summer-eve-pin.yml
+      - scripts/check-summer-eve-pin.ts
+      - apps/web/lib/env-server-schema.ts
+      - apps/web/lib/ovie/summer-eve-pin-check.ts
+      - apps/web/lib/ovie/summer-eve-pin-schema.ts
+      - apps/web/lib/ovie/summer-production-identity.ts
+      - apps/web/lib/ovie/summer-production-pin.ts
+      - apps/web/lib/ovie/summer-shadow-client.ts
+      - apps/web/app/api/internal/ovie/summer-bottleneck/route.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: summer-eve-pin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check production Summer pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Skip when SUMMER_PIN_CHECK_VERCEL_TOKEN is absent
+        id: token
+        env:
+          SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+        run: |
+          if [ -z "${SUMMER_PIN_CHECK_VERCEL_TOKEN}" ]; then
+            echo "::notice::SUMMER_PIN_CHECK_VERCEL_TOKEN is absent; skipping the Summer Eve pin check."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.token.outputs.skip != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        if: steps.token.outputs.skip != 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Pull the production pin and check it
+        if: steps.token.outputs.skip != 'true'
+        env:
+          SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+          PIN_ENV_FILE: ${{ runner.temp }}/summer-pin.env
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          printf '%s\n' '{"orgId":"team_bpNDbti6srVLYPKdmQLu4UgT","projectId":"prj_HPZm5iGtARQ2qef6g2xtjgFIGDVY"}' > .vercel/project.json
+          pnpm exec vercel env pull "$PIN_ENV_FILE" --environment=production --yes
+          pnpm check:summer-eve-pin -- --env-file "$PIN_ENV_FILE"
+          rm -f "$PIN_ENV_FILE"

@@ -6,10 +6,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getVercelOidcToken: vi.fn(),
   verifyCronRequest: vi.fn(),
+  assertSummerProductionPin: vi.fn(async () => undefined),
 }));
 
 vi.mock('@vercel/oidc', () => ({
   getVercelOidcToken: mocks.getVercelOidcToken,
+}));
+
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  assertSummerProductionPin: mocks.assertSummerProductionPin,
+  logSummerBridgeEvent: (entry: Readonly<Record<string, unknown>>) => {
+    console.error(entry);
+  },
+  SummerPinInvalidError: class SummerPinInvalidError extends Error {
+    readonly code = 'summer_pin_invalid';
+  },
 }));
 
 vi.mock('@/lib/cron/auth', () => ({
@@ -24,6 +35,7 @@ import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
 import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
+import { SummerPinInvalidError } from '@/lib/ovie/summer-production-pin';
 import * as summerShadowClient from '@/lib/ovie/summer-shadow-client';
 import { POST } from './route';
 
@@ -241,6 +253,8 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', PRODUCER_KEY_ID);
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue(oidcToken());
+    mocks.assertSummerProductionPin.mockReset();
+    mocks.assertSummerProductionPin.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -1274,6 +1288,109 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
+
+  it('propagates unexpected pin checker failures before OIDC or delivery', async () => {
+    const failure = new Error('pin checker crashed');
+    mocks.assertSummerProductionPin.mockRejectedValueOnce(failure);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(POST(request(validSnapshot()))).rejects.toBe(failure);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('maps an invalid Summer pin to 503 before OIDC or delivery', async () => {
+    mocks.assertSummerProductionPin.mockRejectedValueOnce(
+      new SummerPinInvalidError(
+        {
+          projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',
+          environment: 'production',
+          deploymentId: 'dpl_expected',
+        },
+        { status: 404 }
+      )
+    );
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const response = await POST(request(validSnapshot()));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'summer_pin_invalid',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'bottleneck_runtime_unavailable',
+    'bottleneck_processing_failed',
+  ] as const)(
+    'logs Eve error code %s without the response body',
+    async code => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json({ code, detail: 'secret-blob-token' }, { status: 503 })
+        )
+      );
+      const response = await POST(request(validSnapshot()));
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        code: 'eve_bottleneck_rejected',
+      });
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).toContain(code);
+      expect(logged).not.toContain('secret-blob-token');
+      errorSpy.mockRestore();
+    }
+  );
+
+  it.each([
+    ['unreadable', new Response('{', { status: 500 })],
+    ['non-object', Response.json(['nope'], { status: 500 })],
+    [
+      'declared oversized',
+      new Response('{}', {
+        status: 500,
+        headers: { 'content-length': '5000' },
+      }),
+    ],
+    [
+      'streamed oversized',
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(4097));
+            controller.close();
+          },
+        }),
+        { status: 500 }
+      ),
+    ],
+  ])(
+    'logs Eve status without a code for a %s error body',
+    async (_name, body) => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => body)
+      );
+      const response = await POST(request(validSnapshot()));
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        code: 'eve_bottleneck_rejected',
+      });
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).toContain('eve_bottleneck_error');
+      expect(logged).not.toContain('"code"');
+      errorSpy.mockRestore();
+    }
+  );
 
   it('maps replay without retrying or exposing Eve response details', async () => {
     const fetch = vi.fn(async () =>

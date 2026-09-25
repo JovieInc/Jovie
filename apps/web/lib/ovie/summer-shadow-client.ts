@@ -3,6 +3,10 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import { env } from '@/lib/env-server';
 import { ServerEnvSchema } from '@/lib/env-server-schema';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
+import {
+  assertSummerProductionPin,
+  SummerPinInvalidError,
+} from '@/lib/ovie/summer-production-pin';
 
 const EVE_PROTECTION_BYPASS_HEADER = 'x-vercel-protection-bypass';
 const BYPASS_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
@@ -26,7 +30,8 @@ export class InvalidEveProtectionBypassSecretError extends Error {
 /**
  * Deployment Protection headers for the immutable Eve origin.
  * Trusted Sources reads `x-vercel-trusted-oidc-idp-token`. The optional
- * bypass header is the eve-shadow project's automation secret, never a
+ * bypass header is the eve-shadow project's automation secret
+ * (eve-shadow = production Summer project, legacy name), never a
  * cookie and never Jovie's own `VERCEL_AUTOMATION_BYPASS_SECRET`.
  */
 export function eveShadowTransportHeaders(
@@ -45,7 +50,10 @@ export function eveShadowTransportHeaders(
   return headers;
 }
 
-/** Existing production Jovie OIDC boundary, shared by cron observations and founder conversation. */
+/**
+ * Production Summer origin (legacy name: eve-shadow), shared by cron
+ * observations and founder conversation.
+ */
 export function getEveShadowOrigin(): string {
   const deploymentOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
   if (!deploymentOrigin) throw new Error('exact_eve_deployment_required');
@@ -66,6 +74,21 @@ export async function fetchSummerShadow(
     throw new Error('production_origin_required');
   if (!path.startsWith('/ovie/v1/summer-shadow/'))
     throw new Error('invalid_shadow_path');
+  const origin = getEveShadowOrigin();
+  try {
+    await assertSummerProductionPin({
+      origin,
+      deploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
+    });
+  } catch (error) {
+    if (error instanceof SummerPinInvalidError) {
+      return Response.json(
+        { ok: false, code: 'summer_pin_invalid' },
+        { status: 503 }
+      );
+    }
+    throw error;
+  }
   const token = await getVercelOidcToken();
   const headers: Record<string, string> = {
     ...headerRecord(init.headers),
@@ -73,7 +96,7 @@ export async function fetchSummerShadow(
     'content-type': 'application/json',
   };
   delete headers[BYPASS_COOKIE_HEADER];
-  return boundedFetch(new URL(path, getEveShadowOrigin()), {
+  return boundedFetch(new URL(path, origin), {
     ...init,
     headers,
     redirect: 'error',

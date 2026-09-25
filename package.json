@@ -122,6 +122,7 @@
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
     "auth:redirect-uris": "tsx scripts/auth-redirect-uris.ts",
+    "check:summer-eve-pin": "tsx scripts/check-summer-eve-pin.ts",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",
     "design:tokens:export": "node scripts/generate-design-tokens-export.mjs",
     "design:tokens:export:check": "node scripts/generate-design-tokens-export.mjs --check",

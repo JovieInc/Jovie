@@ -38,8 +38,9 @@ Each generated application has one fixed identity and rejects attempts to bind
 the other identity or its channels. Summer has no generic Eve session endpoint
 and no default model tools. Jovie retains its existing authenticated core-chat
 adapter and read-only product capability manifest. Photon remains contained.
-Summer Blob calls require an explicit `SUMMER_BLOB_READ_WRITE_TOKEN`; ambient
-`BLOB_READ_WRITE_TOKEN` cannot be used. Product credential names are rejected in
+Summer Blob uses Vercel OIDC with `BLOB_STORE_ID` from the dedicated store
+connection; static Blob read-write tokens are denied (summer-config #61).
+Product credential names are rejected in
 Summer and company credential names are rejected in Jovie.
 
 These guards detect accidental injection. They cannot prove that a provider
@@ -84,7 +85,10 @@ until an authorized promotion; neither environment is commissioned by this PR.
 ## Production cutover receipt (2026-09-05)
 
 Private `JovieInc/summer-config` owns the Git-linked `jovie-eve-shadow` project,
-root `apps/summer`, production branch `main`. Runtime commit
+root `apps/summer`, production branch `main`. `jovie-eve-shadow`
+(prj_LaVQva346cjp5XfrbAIIQUln7tPH) is the production Summer project; "shadow"
+is a legacy name from the pre-cutover pilot. Its production alias is
+summer.jov.ie. Runtime commit
 `f9cad8528000000c4f196e1ccbf6a8aaf386b0f7` deployed as
 `dpl_CnnoQexMQB46zwBNURMJSsAZrRAp`; the public Photon alias served that build.
 A real founder iMessage at 20:50:42.610Z reached the signed production webhook
@@ -99,3 +103,45 @@ mixed monorepo build onto the company alias. Product Eve materialization remains
 here; historical Summer extraction fixtures are verification-only pending
 final source cleanup. Transport delivery does not certify governor execution,
 Ovie web/mobile continuity, or revenue lift.
+
+## Production Summer identity and the Jovie pin
+
+EVENT: Production Summer is project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`. The
+display name is not identity.
+
+Identify Summer by that project id (`SUMMER_PRODUCTION` in
+`apps/web/lib/ovie/summer-production-identity.ts`), never by the Vercel display
+name. "shadow" in Summer names does not mean non-production.
+
+Every summer-config production promotion needs a re-pin of
+`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
+`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID`, or the drift warning from
+`pnpm check:summer-eve-pin` must be acknowledged. `--strict` makes drift fatal.
+The Summer owner loop checks the `summer.jov.ie` identity `deploymentId`
+against the Jovie pin each pass.
+
+The pin check and the bridge runtime assertion require a READY
+production-target deployment of that project. Public
+`GET /runtime/v1/identity` must report `company.summer`,
+`environment=production`, the pinned deployment id, and `blobAuth=oidc`.
+A 404 (a pre-OIDC build) is a hard failure. The runtime responds `503` with
+`summer_pin_invalid` and does not map that failure to a generic 502.
+
+Before revoking any Summer credential, list the deployments that still use it,
+including the Jovie production pin.
+
+## Repointing the Jovie bridge
+
+1. `GET https://summer.jov.ie/runtime/v1/identity` and confirm `projectId`,
+   `environment=production`, and `blobAuth=oidc`.
+2. Set Jovie production `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` to that
+   deployment's immutable `https://<deployment>.vercel.app` URL and
+   `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` to its `deploymentId`.
+3. Run `pnpm check:summer-eve-pin` with a read-only
+   `SUMMER_PIN_CHECK_VERCEL_TOKEN`, or let the scheduled workflow do it.
+4. Ship a Jovie production build. Env changes do not affect an already built
+   deployment.
+
+Ship now: fail closed on an invalid pin, and warn on drift from
+summer.jov.ie. Re-evaluate when manual re-pins are the bottleneck. Then
+resolve the target through summer.jov.ie while still asserting `deploymentId`.
