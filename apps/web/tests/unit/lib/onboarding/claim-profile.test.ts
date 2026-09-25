@@ -7,7 +7,6 @@ const {
   mockFetchArtistBySpotifyUrl,
   mockReserveOnboardingHandle,
   mockDeriveClaimedOnboardingStateFromMessageRows,
-  mockInvalidateProfileEdgeCache,
 } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
@@ -15,11 +14,6 @@ const {
   mockFetchArtistBySpotifyUrl: vi.fn(),
   mockReserveOnboardingHandle: vi.fn(),
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
-  mockInvalidateProfileEdgeCache: vi.fn(async () => undefined),
-}));
-
-vi.mock('@/lib/services/profile/queries', () => ({
-  invalidateProfileEdgeCache: mockInvalidateProfileEdgeCache,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -311,7 +305,6 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
-    expect(mockInvalidateProfileEdgeCache).toHaveBeenCalledWith('coolartist');
   });
 
   it('imports Spotify image and MusicFetch bio while creating the live profile', async () => {

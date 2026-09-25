@@ -25,7 +25,6 @@ import {
   requireVerifiedOwnerForReservation,
 } from '@/lib/onboarding/ownership-gate';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
-import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -459,14 +458,6 @@ export async function materializeClaimedOnboardingProfile({
     ipAddress,
     userAgent,
   });
-
-  await invalidateProfileEdgeCache(handle);
-  if (
-    existingProfile?.usernameNormalized &&
-    existingProfile.usernameNormalized !== handle
-  ) {
-    await invalidateProfileEdgeCache(existingProfile.usernameNormalized);
-  }
 
   return { profileId, handle, status };
 }
