@@ -668,6 +668,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/tests/jovie-symphony-workspace.test.py',
   'scripts/symphony/tests/test_gem_workspace_migrate.py',
   'scripts/symphony/tests/gem-pr-drain.test.py',
+  'scripts/symphony/tests/useful-turn-proof.test.py',
   'scripts/symphony/tests/gem-ops-hud.test.py',
   'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/symphony/tests/gem-priority-gate.test.py',
