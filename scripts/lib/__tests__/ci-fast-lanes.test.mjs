@@ -13,6 +13,8 @@ const SCREENSHOT_CATALOG_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+const SUMMER_BRIDGE_COVERAGE_COMMAND =
+  'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 describe('CI control selector', () => {
@@ -243,6 +245,58 @@ describe('runStructural screenshot contract discovery', () => {
     expect(runStructural({ execute })).toMatchObject({ code: 0 });
     expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
     expect(execute.mock.calls[1][0]).toBe(STRUCTURAL_RUNNER_COVERAGE_COMMAND);
+  });
+});
+
+describe('Summer bridge structural coverage selection', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.ts'],
+    ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts'],
+    ['operations', 'scripts/symphony/summer_bottleneck_producer.py'],
+    [
+      'web,operations',
+      'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
+    ],
+  ])('enforces coverage once for %s changes to %s', (lanes, changedFile) => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+    vi.stubEnv('CI_PRODUCT_LANES', lanes);
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn(() => ({ code: 0, output: 'passed\n' }));
+
+    const result = runStructural({ changedFileList: [changedFile], execute });
+
+    expect(result.code).toBe(0);
+    expect(
+      execute.mock.calls.filter(
+        ([command]) => command === SUMMER_BRIDGE_COVERAGE_COMMAND
+      )
+    ).toHaveLength(1);
+  });
+
+  it('stops the web lane when the route coverage floor fails', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn(command =>
+      command === SUMMER_BRIDGE_COVERAGE_COMMAND
+        ? { code: 17, output: 'route coverage floor failed\n' }
+        : { code: 0, output: 'passed\n' }
+    );
+
+    expect(
+      runStructural({
+        changedFileList: [
+          'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
+        ],
+        execute,
+      })
+    ).toMatchObject({
+      code: 17,
+      output: expect.stringContaining('route coverage floor failed'),
+    });
+    expect(execute.mock.calls.at(-1)[0]).toBe(SUMMER_BRIDGE_COVERAGE_COMMAND);
   });
 });
 
