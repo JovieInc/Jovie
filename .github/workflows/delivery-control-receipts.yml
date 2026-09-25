@@ -7,7 +7,7 @@ name: Delivery Control Receipts
 # is the next causal CI/queue/production completion or dispatch, not a clock.
 on:
   repository_dispatch:
-    types: [delivery-control-failure]
+    types: [delivery-control-failure, delivery-investigation-result]
   workflow_run:
     workflows:
       - PR Size Guard
@@ -44,8 +44,10 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Persist a classified terminal receipt and repair task
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
             --event-file="$GITHUB_EVENT_PATH" | \
-            jq -e '{status, receipt, task, loop: (.loop | {loopKey, state, owner, action, dispatchState, outcome}), queuePath}'
+            jq -e '{status, receipt, task, investigation, resultPath, loop: (.loop | {loopKey, state, owner, action, dispatchState, outcome}), queuePath}'

@@ -10,6 +10,7 @@
  * existing guarded controllers.
  */
 
+import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   link,
@@ -21,6 +22,7 @@ import {
   unlink,
 } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   policyDigest,
   readPrLifecycleContract,
@@ -30,8 +32,10 @@ import {
   fxBackstopRoute,
 } from '../lib/rolling-ci-handoff.mjs';
 import {
+  advanceAttempt,
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
+  loadLoopRecords,
   persistDraftStackResolutions,
   persistLoopOutcome,
   readSummerQueue,
@@ -1318,7 +1322,608 @@ export function reconcileDeliveryHeartbeat(
   );
 }
 
+export const INVESTIGATION_SCHEMA = 'jovie-deployment-investigation/v1';
+const RETOUCH_REPAIR_PATH =
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx';
+
+function investigationAssert(condition, reason) {
+  if (!condition) throw new Error(`deployment-investigation:${reason}`);
+}
+
+function readInvestigationText(command, args) {
+  try {
+    return execFileSync(command, args, {
+      encoding: 'utf8',
+      timeout: 30000,
+      maxBuffer: 2 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch {
+    // Provider stderr and request environments may contain credentials.
+    throw new Error('deployment-investigation:read-unavailable');
+  }
+}
+
+function readInvestigationJson(command, args) {
+  try {
+    return JSON.parse(readInvestigationText(command, args));
+  } catch {
+    throw new Error('deployment-investigation:read-unavailable');
+  }
+}
+function readInvestigationStepLogs(input, entries) {
+  try {
+    const archive = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/JovieInc/Jovie/actions/runs/${input.run}/attempts/${input.attempt}/logs`,
+      ],
+      {
+        timeout: 30000,
+        maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    // Python is already part of the fixed runner toolchain. Read exact members
+    // in memory; never extract an archive path or print raw log/error output.
+    return JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          '-c',
+          `
+import io,json,sys,zipfile
+archive=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
+paths=json.loads(sys.argv[1])
+result={}
+for key,path in paths.items():
+    entries=[entry for entry in archive.infolist() if entry.filename==path]
+    if len(entries)!=1 or entries[0].file_size>2*1024*1024: raise ValueError('step mapping unavailable')
+    result[key]=archive.read(entries[0]).decode('utf-8')
+print(json.dumps(result))
+`,
+          JSON.stringify(entries),
+        ],
+        {
+          input: archive,
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 8 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }
+      )
+    );
+  } catch {
+    throw new Error('deployment-investigation:step-logs-unavailable');
+  }
+}
+
+function readInvestigationGithub(endpoint) {
+  return readInvestigationJson('gh', ['api', endpoint]);
+}
+
+function readInvestigationRepair(pr) {
+  const query = `query { repository(owner:"JovieInc",name:"Jovie") { pullRequest(number:${pr}) { number state isDraft headRefOid baseRefName url mergeCommit { oid } mergeQueueEntry { id } } } }`;
+  return readInvestigationJson('gh', ['api', 'graphql', '-f', `query=${query}`])
+    ?.data?.repository?.pullRequest;
+}
+
+function validateInvestigationIdentity(input) {
+  investigationAssert(
+    input?.repository === 'JovieInc/Jovie',
+    'repository-invalid'
+  );
+  for (const key of ['run', 'attempt', 'repairPr']) {
+    investigationAssert(
+      Number.isSafeInteger(input[key]) && input[key] > 0,
+      `${key}-invalid`
+    );
+  }
+  investigationAssert(
+    /^[0-9a-f]{40}$/.test(input.repairHead ?? ''),
+    'repair-head-invalid'
+  );
+  investigationAssert(
+    /^https:\/\/jovie-[a-z0-9]+-jovie\.vercel\.app$/.test(
+      input.deploymentUrl ?? ''
+    ),
+    'deployment-url-invalid'
+  );
+}
+
+async function observeInvestigationBindings(input, { readGithub, readRepair }) {
+  validateInvestigationIdentity(input);
+  const run = await readGithub(
+    `repos/JovieInc/Jovie/actions/runs/${input.run}/attempts/${input.attempt}`
+  );
+  investigationAssert(
+    run?.id === input.run &&
+      run.run_attempt === input.attempt &&
+      run.path === '.github/workflows/production-controller.yml' &&
+      run.head_branch === 'main' &&
+      run.status === 'completed' &&
+      run.conclusion === 'failure' &&
+      run.repository?.full_name === 'JovieInc/Jovie' &&
+      /^[0-9a-f]{40}$/.test(run.head_sha ?? ''),
+    'controller-binding-invalid'
+  );
+  const pr = await readRepair(input.repairPr);
+  investigationAssert(
+    pr?.number === input.repairPr &&
+      pr.headRefOid === input.repairHead &&
+      pr.baseRefName === 'main' &&
+      !pr.isDraft &&
+      ((pr.state === 'OPEN' &&
+        typeof pr.mergeQueueEntry?.id === 'string' &&
+        pr.mergeQueueEntry.id) ||
+        (pr.state === 'MERGED' &&
+          /^[0-9a-f]{40}$/.test(pr.mergeCommit?.oid ?? ''))),
+    'repair-not-queued-or-merged-at-exact-head'
+  );
+  const file = await readGithub(
+    `repos/JovieInc/Jovie/contents/${RETOUCH_REPAIR_PATH}?ref=${input.repairHead}`
+  );
+  investigationAssert(
+    file?.encoding === 'base64' &&
+      typeof file.content === 'string' &&
+      file.content.length < 128000,
+    'repair-source-unavailable'
+  );
+  const source = Buffer.from(file.content, 'base64').toString('utf8');
+  investigationAssert(
+    source.includes("from '@/lib/services/retouching/style-prompt'") &&
+      source.includes('WHITE_SPACE_STYLE_PROMPT') &&
+      !/node:fs|readFile/.test(source),
+    'repair-source-does-not-cover-asset'
+  );
+  return { run, pr };
+}
+
+/** Read only authenticated records emitted by the existing deploy wrapper. */
+export async function collectDeploymentInvestigation(
+  input,
+  {
+    readGithub = readInvestigationGithub,
+    readRepair = readInvestigationRepair,
+    readStepLogs = readInvestigationStepLogs,
+    now = new Date().toISOString(),
+  } = {}
+) {
+  const { run } = await observeInvestigationBindings(input, {
+    readGithub,
+    readRepair,
+  });
+  const jobs = await readGithub(
+    `repos/JovieInc/Jovie/actions/runs/${input.run}/attempts/${input.attempt}/jobs?per_page=100`
+  );
+  const staging = jobs?.jobs?.filter(
+    job => job.name === 'Production Release / deploy-staging'
+  );
+  investigationAssert(
+    staging?.length === 1 &&
+      staging[0].run_id === input.run &&
+      staging[0].run_attempt === input.attempt &&
+      staging[0].status === 'completed' &&
+      staging[0].conclusion === 'failure' &&
+      Number.isSafeInteger(staging[0].id),
+    'staging-attempt-binding-invalid'
+  );
+  const job = staging[0];
+  const selectStep = (selectedJob, predicate, conclusion) => {
+    const matches = selectedJob.steps?.filter(predicate);
+    investigationAssert(
+      matches?.length === 1 &&
+        matches[0].status === 'completed' &&
+        matches[0].conclusion === conclusion &&
+        Number.isSafeInteger(matches[0].number),
+      'staging-step-binding-invalid'
+    );
+    return matches[0];
+  };
+  const checkout = selectStep(
+    job,
+    step => /^Run actions\/checkout@[0-9a-f]{40}$/.test(step.name),
+    'success'
+  );
+  const deploy = selectStep(
+    job,
+    step => step.name === 'Deploy (staging preview, prebuilt)',
+    'failure'
+  );
+  const authorizers = jobs.jobs.filter(
+    candidate => candidate.name === 'Authorize exact main CI evidence'
+  );
+  investigationAssert(
+    authorizers.length === 1 &&
+      authorizers[0].run_id === input.run &&
+      authorizers[0].run_attempt === input.attempt &&
+      authorizers[0].status === 'completed' &&
+      authorizers[0].conclusion === 'success',
+    'source-authorization-job-invalid'
+  );
+  const authorize = selectStep(
+    authorizers[0],
+    step => step.name === 'Cross-prove exact successful push CI',
+    'success'
+  );
+  const stepPath = (name, step) =>
+    `${name.replaceAll('/', '_')}/${step.number}_${step.name.replaceAll('/', '_')}.txt`;
+  const logs = await readStepLogs(input, {
+    checkout: stepPath(job.name, checkout),
+    deploy: stepPath(job.name, deploy),
+    authorize: stepPath(authorizers[0].name, authorize),
+  });
+  const lines = key => {
+    investigationAssert(
+      typeof logs?.[key] === 'string' && logs[key].length > 0,
+      'staging-log-unavailable'
+    );
+    return logs[key]
+      .split('\n')
+      .map(line =>
+        line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z /, '')
+      );
+  };
+  const authLines = lines('authorize');
+  const expected = [
+    ...new Set(
+      authLines.flatMap(
+        line => /^  EXPECTED_SHA: ([0-9a-f]{40})$/.exec(line)?.slice(1) || []
+      )
+    ),
+  ];
+  const receipts = authLines.flatMap(line => {
+    const match =
+      /^Authorized production from exact CI run ([1-9][0-9]*) attempt ([1-9][0-9]*) over deployed range [0-9a-f]{40}\.\.([0-9a-f]{40}) \(Web=true bind=[a-z_]+\)\.$/.exec(
+        line
+      );
+    return match
+      ? [{ run: Number(match[1]), attempt: Number(match[2]), sha: match[3] }]
+      : [];
+  });
+  investigationAssert(
+    expected.length === 1 &&
+      receipts.length === 1 &&
+      receipts[0].sha === expected[0],
+    'authorized-source-receipt-invalid'
+  );
+  const sourceCi = await readGithub(
+    `repos/JovieInc/Jovie/actions/runs/${receipts[0].run}/attempts/${receipts[0].attempt}`
+  );
+  investigationAssert(
+    sourceCi?.id === receipts[0].run &&
+      sourceCi.run_attempt === receipts[0].attempt &&
+      sourceCi.head_sha === expected[0] &&
+      sourceCi.path === '.github/workflows/ci.yml' &&
+      sourceCi.head_branch === 'main' &&
+      sourceCi.event === 'push' &&
+      sourceCi.status === 'completed' &&
+      sourceCi.conclusion === 'success' &&
+      sourceCi.repository?.full_name === input.repository,
+    'authorized-source-ci-invalid'
+  );
+  const checkoutHeads = new Set(
+    lines('checkout').filter(line => /^[0-9a-f]{40}$/.test(line))
+  );
+  const deployLines = lines('deploy');
+  const deployHeads = new Set(
+    deployLines.flatMap(
+      line =>
+        /^  VERCEL_GIT_COMMIT_SHA: ([0-9a-f]{40})$/.exec(line)?.slice(1) || []
+    )
+  );
+  investigationAssert(
+    checkoutHeads.size === 1 &&
+      deployHeads.size === 1 &&
+      checkoutHeads.has(expected[0]) &&
+      deployHeads.has(expected[0]),
+    'deployed-source-binding-invalid'
+  );
+  const records = new Map();
+  for (const line of deployLines) {
+    if (!line.startsWith('Deploy failure diagnostic: ')) continue;
+    let diagnostic;
+    try {
+      diagnostic = JSON.parse(line.slice('Deploy failure diagnostic: '.length));
+    } catch {
+      throw new Error('deployment-investigation:diagnostic-malformed');
+    }
+    investigationAssert(
+      diagnostic &&
+        Object.keys(diagnostic).sort().join(',') ===
+          [
+            'schema',
+            'mode',
+            'attempt',
+            'exitStatus',
+            'errorCode',
+            'asset',
+            'deploymentUrl',
+          ]
+            .sort()
+            .join(',') &&
+        diagnostic.schema === 'jovie-vercel-deploy-failure/v1' &&
+        ['tgz', 'split-tgz', 'plain', 'source'].includes(diagnostic.mode) &&
+        Number.isSafeInteger(diagnostic.attempt) &&
+        diagnostic.attempt > 0 &&
+        Number.isSafeInteger(diagnostic.exitStatus) &&
+        diagnostic.exitStatus > 0 &&
+        diagnostic.exitStatus <= 255,
+      'diagnostic-invalid'
+    );
+    if (diagnostic.deploymentUrl !== input.deploymentUrl) continue;
+    records.set(digest(diagnostic), diagnostic);
+  }
+  investigationAssert(records.size === 1, 'diagnostic-missing-or-conflicting');
+  const diagnostic = [...records.values()][0];
+  investigationAssert(
+    diagnostic.errorCode === 'ENOENT' &&
+      diagnostic.asset === 'retouch-style-prompt',
+    'diagnosis-not-covered'
+  );
+  // This proves the wrapper's observed failure, not the provider's current state.
+  return {
+    schema: INVESTIGATION_SCHEMA,
+    repository: input.repository,
+    run: input.run,
+    attempt: input.attempt,
+    controllerHead: run.head_sha,
+    sourceHead: expected[0],
+    sourceCiRun: sourceCi.id,
+    sourceCiAttempt: sourceCi.run_attempt,
+    deploymentUrl: input.deploymentUrl,
+    repairPr: input.repairPr,
+    repairHead: input.repairHead,
+    diagnosis: 'retouch-style-prompt-missing',
+    errorCode: 'ENOENT',
+    capability: 'read-only-investigation',
+    observedAt: now,
+    jobId: job.id,
+    stepNumber: deploy.number,
+    diagnosticDigest: digest(diagnostic),
+  };
+}
+
+/** Accept diagnosis only; source repair/deployment/closure remain separate. */
+export async function persistDeploymentInvestigation(
+  input,
+  {
+    stateDir = DEFAULT_DELIVERY_STATE_DIR,
+    dryRun = false,
+    readGithub = readInvestigationGithub,
+    readRepair = readInvestigationRepair,
+    readStepLogs = readInvestigationStepLogs,
+    now = new Date().toISOString(),
+  } = {}
+) {
+  investigationAssert(
+    input &&
+      Object.keys(input).sort().join(',') ===
+        [
+          'schema',
+          'repository',
+          'run',
+          'attempt',
+          'sourceHead',
+          'controllerHead',
+          'sourceCiRun',
+          'sourceCiAttempt',
+          'deploymentUrl',
+          'jobId',
+          'stepNumber',
+          'diagnosticDigest',
+          'repairPr',
+          'repairHead',
+          'diagnosis',
+          'errorCode',
+          'capability',
+          'observedAt',
+        ]
+          .sort()
+          .join(','),
+    'result-shape-invalid'
+  );
+  investigationAssert(
+    input.schema === INVESTIGATION_SCHEMA &&
+      input.capability === 'read-only-investigation' &&
+      input.diagnosis === 'retouch-style-prompt-missing' &&
+      input.errorCode === 'ENOENT',
+    'result-capability-invalid'
+  );
+  const { run, pr } = await observeInvestigationBindings(input, {
+    readGithub,
+    readRepair,
+  });
+  investigationAssert(
+    run.head_sha === input.controllerHead,
+    'source-head-mismatch'
+  );
+  const expected = buildDeliveryReceipt({
+    action: 'completed',
+    repository: { full_name: input.repository },
+    workflow_run: run,
+  });
+  const receipt = JSON.parse(
+    await readFile(receiptPath(stateDir, expected), 'utf8')
+  );
+  investigationAssert(
+    receipt.receiptKey === expected.receiptKey &&
+      receipt.event.headSha === input.controllerHead &&
+      receipt.event.evidence?.workflowRun?.attempt === input.attempt &&
+      receipt.event.evidence.workflowRun.id === input.run &&
+      receipt.event.failure === 'production-controller-failed',
+    'persisted-receipt-mismatch'
+  );
+  const task = repairTaskForReceipt(receipt);
+  const storedTask = JSON.parse(
+    await readFile(
+      join(stateDir, 'repair-tasks', `${task.taskKey}.json`),
+      'utf8'
+    )
+  );
+  investigationAssert(
+    isDeepStrictEqual(storedTask, task),
+    'persisted-task-mismatch'
+  );
+  const resultKey = digest({
+    taskKey: task.taskKey,
+    sourceHead: input.sourceHead,
+    deploymentUrl: input.deploymentUrl,
+    repairPr: input.repairPr,
+    repairHead: input.repairHead,
+    diagnosis: input.diagnosis,
+  });
+  const resultPath = join(
+    stateDir,
+    'investigation-results',
+    `${resultKey}.json`
+  );
+  let existing = null;
+  try {
+    existing = JSON.parse(await readFile(resultPath, 'utf8'));
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  if (existing) {
+    investigationAssert(
+      Object.keys(input).every(key =>
+        isDeepStrictEqual(existing[key], input[key])
+      ),
+      'accepted-result-payload-mismatch'
+    );
+  } else {
+    const age = Date.parse(now) - Date.parse(input.observedAt);
+    investigationAssert(
+      Number.isFinite(age) && age >= 0 && age <= 15 * 60 * 1000,
+      'result-stale-or-future'
+    );
+    // Dispatch asks for an investigation; authenticated wrapper logs supply truth.
+    const observed = await collectDeploymentInvestigation(input, {
+      readGithub,
+      readRepair,
+      readStepLogs,
+      now: input.observedAt,
+    });
+    investigationAssert(
+      isDeepStrictEqual(observed, input),
+      'result-does-not-match-observed-diagnostic'
+    );
+  }
+  const original = classifyAndOpenFromDelivery(receipt.event, {
+    now: receipt.observedAt,
+  });
+  const persist = async () => {
+    const records = (await loadLoopRecords(stateDir)).filter(
+      record => record.rootLoopKey === original.rootLoopKey
+    );
+    const latest = records.sort(
+      (a, b) =>
+        b.generation - a.generation ||
+        Date.parse(b.observedAt) - Date.parse(a.observedAt)
+    )[0];
+    investigationAssert(latest, 'persisted-loop-missing');
+    if (latest.terminal || latest.outcome !== 'open')
+      return { status: 'already-terminal', loop: latest };
+    if (dryRun)
+      return {
+        status: 'dry-run',
+        resultKey,
+        taskKey: task.taskKey,
+        repairState: pr.state,
+      };
+    // Validate the transition before recording acceptance. Replays use the
+    // original base and time, including recovery after an interrupted write.
+    let previous = null;
+    try {
+      previous = JSON.parse(await readFile(resultPath, 'utf8'));
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    const candidate = previous || {
+      ...input,
+      resultKey,
+      taskKey: task.taskKey,
+      acceptedAt: now,
+      baseLoopKey: latest.loopKey,
+      repairState: pr.state,
+      externalMutations: 0,
+    };
+    investigationAssert(
+      candidate.resultKey === resultKey && candidate.taskKey === task.taskKey,
+      'accepted-result-mismatch'
+    );
+    const base = records.find(
+      record => record.loopKey === candidate.baseLoopKey
+    );
+    investigationAssert(base, 'accepted-base-loop-missing');
+    const next = advanceAttempt(
+      { ...base, investigationResultKey: resultKey },
+      {
+        phase: 'repair-verifying',
+        healthy: false,
+        reason: `read-only-diagnosis:covered-by-pr:${input.repairPr}@${input.repairHead}`,
+        proofTransition: `read-only-investigation:${resultKey}`,
+      },
+      { now: candidate.acceptedAt }
+    );
+    investigationAssert(
+      next.state === 'repair-verifying' &&
+        next.outcome === 'open' &&
+        !next.terminal,
+      'investigation-transition-not-permitted'
+    );
+    const accepted = await atomicPersist(resultPath, candidate);
+    const persisted = await persistLoopOutcome(next, {
+      stateDir,
+      queueLockHeld: true,
+    });
+    return {
+      status: accepted.status,
+      investigation: accepted.value,
+      resultPath,
+      loop: persisted.record,
+    };
+  };
+  // Existing queue lock and projector own the only state mutation.
+  const result = await withSummerQueueLock(stateDir, persist);
+  if (result.loop && !dryRun) {
+    const projected = await persistLoopOutcome(result.loop, { stateDir });
+    return {
+      ...result,
+      queue: projected.queue,
+      queuePath: projected.queuePath,
+    };
+  }
+  return result;
+}
+
 async function main() {
+  const option = name =>
+    process.argv
+      .find(arg => arg.startsWith(`${name}=`))
+      ?.slice(name.length + 1);
+  if (option('--investigate-controller-run')) {
+    investigationAssert(
+      ![
+        '--event-file',
+        '--closure-health-file',
+        '--heartbeat-file',
+        '--state-dir',
+      ].some(option) && !process.argv.includes('--reconcile'),
+      'input-modes-conflict'
+    );
+    const result = await collectDeploymentInvestigation({
+      repository: 'JovieInc/Jovie',
+      run: Number(option('--investigate-controller-run')),
+      attempt: Number(option('--attempt')),
+      repairPr: Number(option('--repair-pr')),
+      repairHead: option('--repair-head'),
+      deploymentUrl: option('--deployment-url'),
+    });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
   const eventFile = process.argv
     .find(arg => arg.startsWith('--event-file='))
     ?.slice('--event-file='.length);
@@ -1361,9 +1966,24 @@ async function main() {
       if (error?.code !== 'ENOENT') throw error;
     }
   }
+  const event = eventFile
+    ? JSON.parse(await readFile(eventFile, 'utf8'))
+    : null;
+  if (event?.action === 'delivery-investigation-result') {
+    investigationAssert(
+      event.repository?.full_name === 'JovieInc/Jovie',
+      'dispatch-repository-invalid'
+    );
+    const result = await persistDeploymentInvestigation(
+      event.client_payload?.investigation,
+      { stateDir, dryRun: process.argv.includes('--dry-run') }
+    );
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
   const receipt = reconcile
     ? reconcileDeliveryHeartbeat(heartbeat)
-    : buildDeliveryReceipt(JSON.parse(await readFile(eventFile, 'utf8')));
+    : buildDeliveryReceipt(event);
   process.stdout.write(
     `${JSON.stringify(await persistDeliveryOutcome(receipt, { stateDir, dryRun: process.argv.includes('--dry-run') }))}\n`
   );
