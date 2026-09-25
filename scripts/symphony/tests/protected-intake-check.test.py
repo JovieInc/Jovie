@@ -7,10 +7,14 @@ import importlib.util
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -246,7 +250,9 @@ class ProtectedIntakeCheckTests(unittest.TestCase):
             return subprocess.CompletedProcess(
                 args=["gh"],
                 returncode=0,
-                stdout=json.dumps({"total_count": 21, "items": []}),
+                stdout=json.dumps(
+                {"total_count": 21, "incomplete_results": False, "items": []}
+            ),
                 stderr="",
             )
 
@@ -255,6 +261,116 @@ class ProtectedIntakeCheckTests(unittest.TestCase):
                 module.github_pulls("JOV-7201", None)
         self.assertEqual(calls["n"], 1)
         self.assertIn("github linkage truncated", str(raised.exception))
+
+    def test_complete_empty_github_search_resolves(self) -> None:
+        module = load_check()
+        payload = {"total_count": 0, "incomplete_results": False, "items": []}
+        with mock.patch.object(module.subprocess, "run", self._gh_payload(payload)):
+            self.assertEqual(module.github_pulls("JOV-7201", None), [])
+
+    def test_incomplete_or_partial_github_search_is_unresolved(self) -> None:
+        module = load_check()
+        rejected = [
+            {"total_count": 0, "incomplete_results": True, "items": []},
+            {"total_count": 0, "items": []},
+            {"total_count": 0, "incomplete_results": None, "items": []},
+            {"total_count": 0, "incomplete_results": "false", "items": []},
+            {"incomplete_results": False, "items": []},
+            {"total_count": "0", "incomplete_results": False, "items": []},
+            {"total_count": 1, "incomplete_results": False, "items": []},
+        ]
+        for payload in rejected:
+            with self.subTest(payload=payload):
+                with mock.patch.object(module.subprocess, "run", self._gh_payload(payload)):
+                    with self.assertRaises(module.LinkageUnresolved):
+                        module.github_pulls("JOV-7201", None)
+
+    def test_github_search_uses_get_query_params(self) -> None:
+        module = load_check()
+        seen: list[tuple[str, str]] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                seen.append((self.command, self.path))
+                body = json.dumps(
+                    {"total_count": 0, "incomplete_results": False, "items": []}
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length") or 0)
+                self.rfile.read(length)
+                seen.append((self.command, self.path))
+                self.send_response(405)
+                self.end_headers()
+
+            def log_message(self, _format: str, *_args: object) -> None:
+                return
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        real_gh = shutil.which("gh")
+        self.assertIsNotNone(real_gh)
+        shim_dir = self.root / "bin"
+        shim_dir.mkdir()
+        port = server.server_address[1]
+        shim = shim_dir / "gh"
+        shim.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, sys\n"
+            f"real = {real_gh!r}\n"
+            "argv = []\n"
+            "for arg in sys.argv[1:]:\n"
+            "    if arg == 'search/issues':\n"
+            f"        argv.append('http://127.0.0.1:{port}/search/issues')\n"
+            "    else:\n"
+            "        argv.append(arg)\n"
+            "os.execv(real, [real, *argv])\n",
+            encoding="utf-8",
+        )
+        shim.chmod(0o755)
+        os.environ["PATH"] = str(shim_dir) + os.pathsep + os.environ.get("PATH", "")
+        os.environ["GH_TOKEN"] = "fixture-token"
+        try:
+            numbers = module.github_pulls("JOV-7201", "fixture/not-protected")
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(numbers, [])
+        self.assertEqual(len(seen), 2)
+        queries = []
+        for method, path in seen:
+            self.assertEqual(method, "GET")
+            parsed = urllib.parse.urlparse(path)
+            self.assertEqual(parsed.path, "/search/issues")
+            params = urllib.parse.parse_qs(parsed.query)
+            self.assertEqual(params.get("per_page"), ["20"])
+            self.assertEqual(len(params.get("q", [])), 1)
+            queries.append(params["q"][0])
+        self.assertEqual(
+            queries,
+            [
+                "repo:JovieInc/Jovie is:pr JOV-7201",
+                "repo:JovieInc/Jovie is:pr head:fixture/not-protected",
+            ],
+        )
+
+    @staticmethod
+    def _gh_payload(payload: object):
+        def run(*_args, **_kwargs):
+            return subprocess.CompletedProcess(
+                args=["gh"],
+                returncode=0,
+                stdout=json.dumps(payload),
+                stderr="",
+            )
+
+        return run
 
 
 if __name__ == "__main__":

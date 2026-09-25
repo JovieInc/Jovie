@@ -264,6 +264,27 @@ def linear_issue(identifier: str) -> dict[str, object]:
     }
 
 
+def github_search_numbers(payload: object) -> list[int]:
+    """Fail closed unless the search page is a complete, fully returned result."""
+    if not isinstance(payload, dict):
+        raise LinkageUnresolved("github linkage unparseable")
+    incomplete = payload.get("incomplete_results")
+    if type(incomplete) is not bool or incomplete:
+        raise LinkageUnresolved("github linkage incomplete")
+    items = payload.get("items")
+    total = payload.get("total_count")
+    if not isinstance(items, list) or type(total) is not int or total > len(items):
+        raise LinkageUnresolved("github linkage truncated")
+    numbers: list[int] = []
+    for item in items:
+        if not isinstance(item, dict) or type(item.get("number")) is not int:
+            raise LinkageUnresolved("github linkage unparseable")
+        if "pull_request" not in item:
+            continue
+        numbers.append(item["number"])
+    return numbers
+
+
 def github_pulls(identifier: str, branch: str | None) -> list[int]:
     queries = [f"repo:JovieInc/Jovie is:pr {identifier}"]
     if branch:
@@ -271,10 +292,14 @@ def github_pulls(identifier: str, branch: str | None) -> list[int]:
     numbers: list[int] = []
     for query in queries:
         try:
+            # gh defaults to POST when -f fields are present. Search must be GET
+            # so q and per_page are query parameters; a 405 would latch the fleet.
             completed = subprocess.run(
                 [
                     "gh",
                     "api",
+                    "--method",
+                    "GET",
                     "-H",
                     "Accept: application/vnd.github+json",
                     "search/issues",
@@ -296,16 +321,7 @@ def github_pulls(identifier: str, branch: str | None) -> list[int]:
             payload = json.loads(completed.stdout)
         except json.JSONDecodeError as exc:
             raise LinkageUnresolved("github linkage unparseable") from exc
-        items = payload.get("items") if isinstance(payload, dict) else None
-        total = payload.get("total_count") if isinstance(payload, dict) else None
-        if not isinstance(items, list) or type(total) is not int or total > len(items):
-            raise LinkageUnresolved("github linkage truncated")
-        for item in items:
-            if not isinstance(item, dict) or type(item.get("number")) is not int:
-                raise LinkageUnresolved("github linkage unparseable")
-            if "pull_request" not in item:
-                continue
-            numbers.append(item["number"])
+        numbers.extend(github_search_numbers(payload))
     return numbers
 
 
