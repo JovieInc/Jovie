@@ -5,26 +5,29 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { checkSummerEvePin, main } from './summer-eve-pin-check';
 import { SUMMER_PRODUCTION } from './summer-production-identity';
 
-const ORIGIN = 'https://jovie-eve-shadow-abc123-jovie.vercel.app';
-const HOST = 'jovie-eve-shadow-abc123-jovie.vercel.app';
-const ID = 'dpl_pinned123';
+const ID = 'dpl_live';
 const TOKEN = 'read-only-token';
+const SOURCE_REVISION = 'b'.repeat(40);
 
 function identity(overrides: Record<string, unknown> = {}) {
   return {
+    schema: SUMMER_PRODUCTION.identitySchema,
     id: SUMMER_PRODUCTION.serviceId,
     projectId: SUMMER_PRODUCTION.projectId,
+    teamId: SUMMER_PRODUCTION.teamId,
     environment: 'production',
     deploymentId: ID,
     blobAuth: 'oidc',
+    status: SUMMER_PRODUCTION.sourceBoundStatus,
+    sourceRevision: SOURCE_REVISION,
+    productionOrigin: SUMMER_PRODUCTION.productionOrigin,
     ...overrides,
   };
 }
 
 function mockFetch(
   deployment: Record<string, unknown> = {},
-  pinned: { status?: number; body?: unknown } = {},
-  live: unknown = identity()
+  live: { status?: number; body?: unknown } = {}
 ) {
   const calls: string[] = [];
   const inits: Array<RequestInit | undefined> = [];
@@ -38,17 +41,13 @@ function mockFetch(
           projectId: SUMMER_PRODUCTION.projectId,
           target: 'production',
           readyState: 'READY',
-          url: HOST,
           ...deployment,
         });
       }
-      if (url === `${ORIGIN}/runtime/v1/identity`) {
-        return Response.json(pinned.body ?? identity(), {
-          status: pinned.status ?? 200,
-        });
-      }
       if (url === `${SUMMER_PRODUCTION.productionOrigin}/runtime/v1/identity`) {
-        return Response.json(live);
+        return Response.json(live.body ?? identity(), {
+          status: live.status ?? 200,
+        });
       }
       throw new Error(`unexpected ${url}`);
     }
@@ -62,16 +61,12 @@ async function run(
 ) {
   const lines = {
     log: [] as string[],
-    warn: [] as string[],
     error: [] as string[],
   };
   const code = await checkSummerEvePin({
-    origin: ORIGIN,
-    deploymentId: ID,
     token: TOKEN,
     fetchImpl: fetch.fetchImpl,
     log: line => lines.log.push(line),
-    warn: line => lines.warn.push(line),
     error: line => lines.error.push(line),
     ...overrides,
   });
@@ -81,79 +76,96 @@ async function run(
 describe('checkSummerEvePin', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('skips without a token and accepts a matching READY pin', async () => {
+  it('checks source-bound production identity and ignores a stale deployment pin', async () => {
+    const ok = await run({
+      deprecatedOrigin: 'legacy-ignored',
+      deprecatedDeploymentId: 'stale-pin',
+    });
+    expect(ok.code).toBe(0);
+    expect(ok.lines.error).toEqual([]);
+    expect(ok.lines.log.join('\n')).toContain('deprecated and ignored');
+    expect(ok.calls).toEqual([
+      `${SUMMER_PRODUCTION.productionOrigin}/runtime/v1/identity`,
+      expect.stringContaining(`/v13/deployments/${encodeURIComponent(ID)}`),
+    ]);
+    expect(ok.calls.join('\n')).not.toContain('stale-pin');
+    expect(ok.calls.join('\n')).not.toContain('legacy-ignored');
+    expect(new Headers(ok.inits[1]?.headers).get('authorization')).toBe(
+      `Bearer ${TOKEN}`
+    );
+  });
+
+  it('still requires identity when the Vercel token is absent', async () => {
     const skipped = await run({ token: '  ' });
     expect(skipped.code).toBe(0);
     expect(skipped.lines.log.join('\n')).toContain(
       '::notice::SUMMER_PIN_CHECK_VERCEL_TOKEN is absent'
     );
-    expect(skipped.calls).toEqual([]);
-    const ok = await run();
-    expect(ok.code).toBe(0);
-    expect(ok.lines.error).toEqual([]);
-    expect(ok.calls).toHaveLength(3);
-    expect(new Headers(ok.inits[0]?.headers).get('authorization')).toBe(
-      `Bearer ${TOKEN}`
+    expect(skipped.calls).toEqual([
+      `${SUMMER_PRODUCTION.productionOrigin}/runtime/v1/identity`,
+    ]);
+    const bad = await run(
+      { token: '' },
+      mockFetch({}, { body: identity({ status: 'configured-unverified' }) })
     );
+    expect(bad.code).toBe(1);
+    expect(bad.calls).toHaveLength(1);
+    expect(bad.text).toContain('source-bound');
   });
 
-  it('fails schema, deployment, and identity checks before treating drift as success', async () => {
-    expect((await run({ origin: 'https://summer.jov.ie' })).calls).toEqual([]);
-    expect((await run({ deploymentId: 'deployment_123' })).text).toContain(
-      'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID'
+  it('fails closed on identity and deployment mismatches', async () => {
+    const unreachable = await run(
+      {},
+      {
+        fetchImpl: vi.fn(async () => {
+          throw new Error('offline');
+        }),
+        calls: [],
+        inits: [],
+      }
     );
+    expect(unreachable.code).toBe(1);
+    expect(unreachable.text).toContain('unreachable');
+
+    for (const body of [
+      identity({ projectId: 'prj_other' }),
+      identity({ environment: 'preview' }),
+      identity({ target: 'preview' }),
+      identity({ blobAuth: 'static' }),
+      identity({ id: 'company.other' }),
+      identity({ sourceRevision: 'HEAD' }),
+    ]) {
+      const result = await run({}, mockFetch({}, { body }));
+      expect(result.code).toBe(1);
+      expect(result.calls.some(url => url.includes('api.vercel.com'))).toBe(
+        false
+      );
+      expect(result.text).not.toContain(TOKEN);
+    }
+
+    const missing = await run({}, mockFetch({}, { status: 404, body: {} }));
+    expect(missing.code).toBe(1);
+    expect(missing.text).toContain('404');
+
     for (const deployment of [
       { projectId: 'prj_other' },
       { target: 'preview' },
       { readyState: 'ERROR' },
-      { url: 'jovie-eve-shadow-other-jovie.vercel.app' },
     ]) {
       const result = await run({}, mockFetch(deployment));
       expect(result.code).toBe(1);
+      expect(result.text).toContain(SUMMER_PRODUCTION.projectId);
       expect(result.text).not.toContain(TOKEN);
     }
-    const otherProject = await run({}, mockFetch({ projectId: 'prj_other' }));
-    expect(
-      otherProject.calls.some(url => url.includes('/runtime/v1/identity'))
-    ).toBe(false);
-    const missing = await run({}, mockFetch({}, { status: 404, body: {} }));
-    expect(missing.text).toContain('404');
-    expect(
-      missing.calls.some(url =>
-        url.startsWith(SUMMER_PRODUCTION.productionOrigin)
-      )
-    ).toBe(false);
-    expect(
-      (await run({}, mockFetch({}, { body: identity({ blobAuth: 'static' }) })))
-        .text
-    ).toContain('oidc');
-    expect(
-      (
-        await run(
-          {},
-          mockFetch({}, { body: identity({ id: 'company.other' }) })
-        )
-      ).code
-    ).toBe(1);
-    const drifted = identity({ deploymentId: 'dpl_live999' });
-    const warning = await run({}, mockFetch({}, {}, drifted));
-    expect(warning.code).toBe(0);
-    expect(warning.lines.warn.join('\n')).toContain(
-      '::warning::Summer pin drift: pinned'
-    );
-    expect(warning.lines.warn.join('\n')).toContain('dpl_live999');
-    const strict = await run({ strict: true }, mockFetch({}, {}, drifted));
-    expect(strict.code).toBe(1);
-    expect(strict.text).toContain('::warning::');
   });
 
-  it('reads only pin keys from an env file and lets flags override env', async () => {
+  it('reads deprecated pin keys only to ignore them', async () => {
     const path = join(mkdtempSync(join(tmpdir(), 'summer-pin-')), 'pin.env');
     writeFileSync(
       path,
       [
-        `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN="${ORIGIN}"`,
-        `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID="${ID}"`,
+        'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN="https://evil.test"',
+        'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID="stale-pin"',
         'SUMMER_BLOB_READ_WRITE_TOKEN="super-secret-token"',
       ].join('\n')
     );
@@ -163,26 +175,20 @@ describe('checkSummerEvePin', () => {
       NODE_ENV: 'test',
       SUMMER_PIN_CHECK_VERCEL_TOKEN: TOKEN,
     } as NodeJS.ProcessEnv;
+    const fetch = mockFetch();
     expect(
-      await main(['--env-file', path], env, mockFetch().fetchImpl, file =>
+      await main(['--env-file', path], env, fetch.fetchImpl, file =>
         readFileSync(file, 'utf8')
       )
     ).toBe(0);
     expect(JSON.stringify([log.mock.calls, error.mock.calls])).not.toContain(
       'super-secret-token'
     );
-    const flagged = mockFetch();
-    expect(
-      await main(
-        ['--origin', ORIGIN, '--id', ID, '--strict'],
-        {
-          ...env,
-          OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: 'https://summer.jov.ie',
-          OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: 'not-a-deployment',
-        },
-        flagged.fetchImpl
-      )
-    ).toBe(0);
-    expect(flagged.calls[0]).toContain(encodeURIComponent(ID));
+    expect(log.mock.calls.join('\n')).toContain('deprecated and ignored');
+    expect(fetch.calls.join('\n')).not.toContain('evil.test');
+    expect(fetch.calls.join('\n')).not.toContain('stale-pin');
+    await expect(main(['--id', ID], env, fetch.fetchImpl)).rejects.toThrow(
+      'Unknown argument'
+    );
   });
 });

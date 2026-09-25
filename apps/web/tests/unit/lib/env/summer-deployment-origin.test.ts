@@ -1,42 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { ServerEnvSchema } from '@/lib/env-server-schema';
+import { SUMMER_ORIGIN_ENV_ACCEPTED } from '@/lib/ovie/summer-eve-pin-schema';
 
-const schema = ServerEnvSchema.shape.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN;
+const origin = ServerEnvSchema.shape.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN;
+const deploymentId =
+  ServerEnvSchema.shape.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID;
 
-describe('Summer immutable deployment origin', () => {
-  it.each(['jovie-eve-shadow', 'summer-operations'])(
-    'accepts %s immutable deployments in the existing team',
-    prefix => {
-      expect(schema.parse(`https://${prefix}-abc123-jovie.vercel.app`)).toBe(
-        `https://${prefix}-abc123-jovie.vercel.app`
-      );
-    }
-  );
-  it('keeps an unconfigured integration optional', () => {
-    expect(schema.parse(undefined)).toBeUndefined();
+describe('deprecated Summer deployment pin env', () => {
+  it('keeps both pins optional so a leftover value does not fail boot', () => {
+    expect(origin.parse(undefined)).toBeUndefined();
+    expect(deploymentId.parse(undefined)).toBeUndefined();
+    expect(origin.parse('')).toBe('');
+    expect(deploymentId.parse('')).toBe('');
+    expect(origin.parse('legacy-ignored')).toBe('legacy-ignored');
+    expect(deploymentId.parse('legacy-ignored')).toBe('legacy-ignored');
   });
+
+  it('accepts https://summer.jov.ie, which the immutable-deployment regex rejected', () => {
+    expect(SUMMER_ORIGIN_ENV_ACCEPTED).toBe('https://summer.jov.ie');
+    expect(origin.parse('https://summer.jov.ie')).toBe('https://summer.jov.ie');
+    expect(origin.parse(SUMMER_ORIGIN_ENV_ACCEPTED)).toBe(
+      'https://summer.jov.ie'
+    );
+  });
+
   it('keeps the eve-shadow bypass secret optional and distinct from the origin', () => {
     const secret =
       ServerEnvSchema.shape.OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET;
     expect(secret.parse(undefined)).toBeUndefined();
     expect(secret.parse('eve-shadow-secret')).toBe('eve-shadow-secret');
-  });
-  it.each([
-    'http://summer-operations-abc123-jovie.vercel.app',
-    'https://summer-operations-abc123-other.vercel.app',
-    'https://summer-operations-abc123-jovie.vercel.app.evil.test',
-    'https://summer-operations-abc123-jovie.vercel.app/path',
-    'https://summer-operations-abc123-jovie.vercel.app/',
-    'https://summer-operations-abc123-jovie.vercel.app?token=example',
-    'https://summer-operations-abc123-jovie.vercel.app#fragment',
-    'https://user@example-summer-operations-abc123-jovie.vercel.app',
-    `https://${['user', 'password'].join(':')}@summer-operations-abc123-jovie.vercel.app`,
-    'https://summer-operations.vercel.app',
-    'https://summer-operations-git-main-jovie.vercel.app',
-    'https://summer.jov.ie',
-    'https://other-abc123-jovie.vercel.app',
-    '',
-  ])('rejects mutable, untrusted or non-origin URL %s', value => {
-    expect(schema.safeParse(value).success).toBe(false);
   });
 });

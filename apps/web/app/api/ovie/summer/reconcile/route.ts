@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
-import { env } from '@/lib/env-server';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import {
   authorizeFounderSummerUser,
@@ -111,10 +110,7 @@ export async function GET(): Promise<NextResponse> {
 
   let expectedEveDeployment: string;
   try {
-    const target = await resolveSummerEveCallerOrigin({
-      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
-      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
-    });
+    const target = await resolveSummerEveCallerOrigin();
     expectedEveDeployment = target.deploymentId;
   } catch (error) {
     if (error instanceof SummerPinInvalidError) {
