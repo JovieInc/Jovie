@@ -8,6 +8,8 @@ import os
 import pathlib
 import shutil
 import signal
+import select
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -540,6 +542,98 @@ class CodexRotateTests(unittest.TestCase):
         self.assertGreaterEqual(cooldown, before + 60)
         self.assertLessEqual(cooldown, int(time.time()) + 60)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
+
+    def test_app_server_capture_binds_real_worker_commit_without_changing_protocol_or_exit(self):
+        workspace = (self.root / "JOV-6586").resolve()
+        workspace.mkdir()
+        def git(*args):
+            return subprocess.check_output(["git", "-C", str(workspace), *args], stderr=subprocess.DEVNULL)
+        git("init", "-q")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "base")
+        base = git("rev-parse", "HEAD").decode().strip()
+        gem = (self.root / "gem").resolve()
+        private = gem / "state/summer-symphony-consumer"
+        private.mkdir(parents=True, mode=0o700)
+        task = {"schema": "jovie-symphony-shipping-lead-task/v1", "taskKey": "a" * 64,
+                "issue": {"id": "00000000-0000-4000-8000-000000006586", "identifier": "JOV-6586", "repository": "JovieInc/Jovie"},
+                "runtime": {"invocationId": "b" * 32, "generation": "c" * 64}}
+        task_digest = hashlib.sha256(json.dumps(task, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        journal = {"schema": "jovie.summer-symphony-consumer-state/v1", "active": {
+            "phase": "discovered", "taskKey": task["taskKey"], "record": {"task": task},
+            "admissionProgress": {"schema": "symphony-shipping-lead-admission-progress/v1",
+                                  "taskDigest": task_digest, "mutationCount": 1}}}
+        journal_path = private / "state.json"
+        journal_path.write_text(json.dumps(journal)); journal_path.chmod(0o600)
+        worker = self.root / "protocol-worker"
+        worker.write_text("#!" + sys.executable + "\n" +
+            'import json, os, subprocess, sys, time\n'
+            'def send(value): print(json.dumps(value), flush=True)\n'
+            'send({"method":"thread/started","params":{"thread":{"id":"thread-1","cwd":os.getcwd()}}})\n'
+            'assert sys.stdin.readline().strip() == "continue"\n'
+            'send({"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"inProgress"}}})\n'
+            'assert sys.stdin.readline().strip() == "continue"\n'
+            'open("result.txt", "w").write("worker output")\n'
+            'subprocess.run(["git","add","result.txt"],check=True)\n'
+            'subprocess.run(["git","-c","user.name=Fixture","-c","user.email=fixture@example.invalid","commit","-qm","result"],check=True)\n'
+            'send({"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed"}}})\n'
+            'print("separate stderr",file=sys.stderr,flush=True)\n'
+            'os.close(1); os.close(2)\n'
+            'deadline = time.monotonic() + 10\n'
+            'while not os.path.exists(os.environ["EXIT_RELEASE_FILE"]):\n'
+            '    assert time.monotonic() < deadline\n'
+            '    time.sleep(0.01)\n')
+        worker.chmod(0o755)
+        release = self.root / "release-worker-exit"
+        process = subprocess.Popen([str(LAUNCHER), "app-server"], cwd=workspace, bufsize=0,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=self.env(CODEX_REAL_BIN=worker, GEM_WORKSPACE=gem, INVOCATION_ID="b" * 32,
+                         CODEX_REDEEM_RESET_CREDITS=0, EXIT_RELEASE_FILE=release))
+        try:
+            for method in ("thread/started", "turn/started"):
+                deadline = time.monotonic() + 10
+                while True:
+                    ready, _, _ = select.select([process.stdout], [], [], max(0, deadline - time.monotonic()))
+                    self.assertTrue(ready, "native lifecycle output was not forwarded")
+                    line = process.stdout.readline()
+                    self.assertTrue(line, "native worker closed stdout before lifecycle notification")
+                    observed = json.loads(line)["method"]
+                    if observed != "codex-rotate/account-wait":
+                        break
+                self.assertEqual(observed, method)
+                process.stdin.write(b"continue\n"); process.stdin.flush()
+            ready, _, _ = select.select([process.stdout], [], [], 10)
+            self.assertTrue(ready)
+            self.assertEqual(json.loads(process.stdout.readline())["method"], "turn/completed")
+            evidence_root = private / "worker-evidence"
+            # Bash may retain a copy of the output pipe until its child returns.
+            # Whether capture has seen EOF or not, no exit receipt may exist yet.
+            self.assertEqual(list(evidence_root.rglob("exit-*.json")), [])
+            self.assertIsNone(process.poll(), "completed turn/closed stdout cannot prove child exit")
+            release.touch()
+            output, errors = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, errors.decode())
+            self.assertEqual(output, b"")
+            self.assertEqual(errors, b"separate stderr\n")
+        finally:
+            if process.poll() is None:
+                process.kill(); process.communicate()
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close()
+        files = [path for path in (private / "worker-evidence").rglob("*.json") if not path.name.startswith("exit-")]
+        self.assertEqual(len(files), 1)
+        candidate = json.loads(files[0].read_text())
+        self.assertEqual(candidate["taskDigest"], task_digest)
+        self.assertEqual(candidate["executionBaseHead"], base)
+        self.assertEqual(candidate["executionFinalHead"], git("rev-parse", "HEAD").decode().strip())
+        self.assertFalse(candidate["executionTerminated"])
+        exits = list((private / "worker-evidence").rglob("exit-*.json"))
+        self.assertEqual(len(exits), 1)
+        receipt = json.loads(exits[0].read_text())
+        self.assertEqual(receipt["candidateDigest"], candidate["digest"])
+        self.assertEqual((receipt["processExitCode"], receipt["launcherExitCode"]), (0, 0))
+        self.assertTrue(receipt["workerProcessExited"])
+        self.assertFalse(receipt["taskTerminal"])
+        self.assertEqual(json.loads((self.accounts / "state.json").read_text())["cooldowns"], {})
 
     def test_app_server_stdout_limit_quarantines_zero_exit_account(self):
         limited = self.root / "limited-app-server"

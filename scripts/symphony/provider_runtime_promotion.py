@@ -56,10 +56,12 @@ def verify(generation):
         raise ValueError("generation is outside the provider store")
     receipt = json.loads((generation / "manifest.json").read_text())
     schema = receipt["schema"]
-    if schema not in ["symphony-provider-generation/v1", "symphony-provider-generation/v2"]:
+    if schema not in ["symphony-provider-generation/v1", "symphony-provider-generation/v2", "symphony-provider-generation/v3"]:
         raise ValueError("unknown provider generation schema")
-    managed_cli = schema.endswith("/v2")
+    managed_cli = schema in {"symphony-provider-generation/v2", "symphony-provider-generation/v3"}
     bundled = [*names, "entry", *(["codex-rotate", "codex"] if managed_cli else [])]
+    if schema.endswith("/v3"):
+        bundled += ["shipping_worker_capture.py", "shipping_lead_worker_evidence.py"]
     for name in bundled:
         path = generation / name
         if path.is_symlink() or not os.access(path, os.X_OK) or digest(path) != receipt["sha256"][name]:
@@ -90,7 +92,7 @@ def stage(sources, prefix, pin=None):
         # Embed the immutable directory, never a moving current/global path.
         (generation / "entry").write_text(launcher_text(generation, bool(pin)))
         (generation / "entry").chmod(0o755)
-        receipt = {"schema": "symphony-provider-generation/v2" if pin else "symphony-provider-generation/v1",
+        receipt = {"schema": "symphony-provider-generation/v3" if pin else "symphony-provider-generation/v1",
                    "sha256": {name: digest(generation / name) for name in
                               [*sources, "entry", *(["codex"] if pin else [])]}}
         if artifact:
@@ -113,10 +115,12 @@ try:
     if not rollback:
         pin = cli.read_pin(repo / "scripts/symphony/codex-cli")
         sources["codex-rotate"] = repo / "scripts/symphony/codex-rotate"
+        for name in ("shipping_worker_capture.py", "shipping_lead_worker_evidence.py"):
+            sources[name] = repo / "scripts/symphony" / name
         for name, source in sources.items():
             if not source.is_file():
                 raise ValueError(f"missing provider source: {name}")
-            if name == "cursor-adapter":
+            if name == "cursor-adapter" or name.endswith(".py"):
                 compile(source.read_bytes(), str(source), "exec")
             else:
                 subprocess.run(["bash", "-n", str(source)], check=True)
