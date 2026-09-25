@@ -8,10 +8,11 @@
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
  * browser admission job.
  *
- * Fail-fast: the first failed lane skips later lanes in the same group so
- * biome/typecheck red does not pay for structural Playwright. Skipped-later
- * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
- * historical run-every-lane report. Local callers may omit the selector to
+ * Fail-fast: the first failed lane skips the expensive structural lane so
+ * biome/typecheck red does not pay for structural Playwright. Cheap lanes
+ * always run so one CI cycle reports every cheap failure instead of hiding
+ * later lanes behind the first red one. Skipped lanes still emit a receipt.
+ * Set CI_FAST_FAIL_FAST=false to run structural even after a failure. Local callers may omit the selector to
  * retain the all-lanes default.
  *
  * Usage:
@@ -977,6 +978,9 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+/** Lanes worth skipping after an earlier failure; every other lane is cheap. */
+export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
+
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
@@ -1000,7 +1004,7 @@ function main() {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
 
-      if (failedFast) {
+      if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
         console.log(`[ci-fast] ${lane.id}: skipped`);
         console.log(logExcerpt);
