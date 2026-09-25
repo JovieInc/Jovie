@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       { ok: true, receipt },
       { status: 201, headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
-    return workflowCaptureErrorResponse(caught, '/api/workflow-captures');
+  } catch (error_) {
+    return workflowCaptureErrorResponse(error_, '/api/workflow-captures');
   }
 }
