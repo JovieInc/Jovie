@@ -7,6 +7,10 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import {
+  resolveSummerEveCallerOrigin,
+  SummerPinInvalidError,
+} from '@/lib/ovie/summer-production-pin';
 import { appendSummerTurnWithOutcome } from '@/lib/ovie/summer-session';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
@@ -105,10 +109,18 @@ export async function GET(): Promise<NextResponse> {
     return json({ ok: false, code: 'production_origin_required' }, 503);
   }
 
-  const expectedEveDeployment =
-    env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
-  if (!expectedEveDeployment) {
-    return json({ ok: false, code: 'eve_deployment_unconfigured' }, 503);
+  let expectedEveDeployment: string;
+  try {
+    const target = await resolveSummerEveCallerOrigin({
+      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
+      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
+    });
+    expectedEveDeployment = target.deploymentId;
+  } catch (error) {
+    if (error instanceof SummerPinInvalidError) {
+      return json({ ok: false, code: 'summer_pin_invalid' }, 503);
+    }
+    throw error;
   }
   const principalHash = founderPrincipalHash(userId);
 

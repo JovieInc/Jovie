@@ -1,10 +1,10 @@
 import 'server-only';
 import { getVercelOidcToken } from '@vercel/oidc';
 import { env } from '@/lib/env-server';
-import { ServerEnvSchema } from '@/lib/env-server-schema';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
+import { SUMMER_PRODUCTION } from '@/lib/ovie/summer-production-identity';
 import {
-  assertSummerProductionPin,
+  resolveSummerEveCallerOrigin,
   SummerPinInvalidError,
 } from '@/lib/ovie/summer-production-pin';
 
@@ -51,19 +51,11 @@ export function eveShadowTransportHeaders(
 }
 
 /**
- * Production Summer origin (legacy name: eve-shadow), shared by cron
- * observations and founder conversation.
+ * Stable production Summer alias. Exact deployment pins are not the caller
+ * target; `resolveSummerEveCallerOrigin` checks them and falls back here.
  */
 export function getEveShadowOrigin(): string {
-  const deploymentOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
-  if (!deploymentOrigin) throw new Error('exact_eve_deployment_required');
-  const parsed =
-    ServerEnvSchema.shape.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN.safeParse(
-      deploymentOrigin
-    );
-  if (!parsed.success || !parsed.data)
-    throw new Error('invalid_eve_deployment_origin');
-  return parsed.data;
+  return SUMMER_PRODUCTION.productionOrigin;
 }
 
 export async function fetchSummerShadow(
@@ -74,12 +66,13 @@ export async function fetchSummerShadow(
     throw new Error('production_origin_required');
   if (!path.startsWith('/ovie/v1/summer-shadow/'))
     throw new Error('invalid_shadow_path');
-  const origin = getEveShadowOrigin();
+  let origin: string;
   try {
-    await assertSummerProductionPin({
-      origin,
-      deploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
+    const target = await resolveSummerEveCallerOrigin({
+      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
+      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
     });
+    origin = target.origin;
   } catch (error) {
     if (error instanceof SummerPinInvalidError) {
       return Response.json(

@@ -138,11 +138,9 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
   /**
-   * Immutable origin of a READY production-target deployment of production
-   * Summer (`SUMMER_PRODUCTION.projectId`, display name jovie-eve-shadow;
-   * legacy name). It should be the deployment currently aliased to
-   * summer.jov.ie. Enforced by `check:summer-eve-pin` and the runtime
-   * pin assertion.
+   * Optional advisory pin for `check:summer-eve-pin`. The runtime caller
+   * targets `https://summer.jov.ie` and compares this id with the alias
+   * identity. A stale pin is logged; it is not the request URL.
    */
   OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: ovieSummerEveDeploymentOriginSchema,
   OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID:
@@ -150,7 +148,7 @@ export const ServerEnvSchema = z.object({
   /**
    * Protection Bypass for Automation secret from the jovie-eve-shadow
    * project (the production Summer project). Sent only as
-   * `x-vercel-protection-bypass` to the immutable deployment origin.
+   * `x-vercel-protection-bypass` to `https://summer.jov.ie`.
    * This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
    */
   OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET: z.string().optional(),

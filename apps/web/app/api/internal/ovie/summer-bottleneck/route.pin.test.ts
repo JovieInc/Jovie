@@ -140,10 +140,10 @@ function runtimeIdentity(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function installFetch(identity: Response) {
+function installFetch(identity: () => Response) {
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.endsWith('/runtime/v1/identity')) return identity;
+    if (url.endsWith('/runtime/v1/identity')) return identity();
     return Response.json(
       {
         ok: true,
@@ -186,8 +186,8 @@ describe('POST /api/internal/ovie/summer-bottleneck pin', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns 503 summer_pin_invalid when the project mismatches', async () => {
-    const fetch = installFetch(
+  it('returns 503 summer_pin_invalid when the alias project mismatches', async () => {
+    const fetch = installFetch(() =>
       Response.json(runtimeIdentity({ projectId: 'prj_other' }))
     );
     const response = await POST(request(validSnapshot()));
@@ -196,6 +196,9 @@ describe('POST /api/internal/ovie/summer-bottleneck pin', () => {
       ok: false,
       code: 'summer_pin_invalid',
     });
+    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+      'https://summer.jov.ie/runtime/v1/identity'
+    );
     expect(
       fetch.mock.calls.some(call =>
         String(call[0]).includes('summer-bottleneck')
@@ -204,9 +207,9 @@ describe('POST /api/internal/ovie/summer-bottleneck pin', () => {
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
-  it('returns 503 summer_pin_invalid when identity is 404', async () => {
+  it('returns 503 summer_pin_invalid when alias identity is 404', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const fetch = installFetch(new Response(null, { status: 404 }));
+    const fetch = installFetch(() => new Response(null, { status: 404 }));
     const response = await POST(request(validSnapshot()));
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
@@ -222,14 +225,49 @@ describe('POST /api/internal/ovie/summer-bottleneck pin', () => {
     expect(logged.observed?.status).toBe(404);
   });
 
-  it('delivers the snapshot when the pinned identity matches', async () => {
-    const fetch = installFetch(Response.json(runtimeIdentity()));
+  it('delivers to the alias when the pinned identity matches', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetch = installFetch(() => Response.json(runtimeIdentity()));
     const response = await POST(request(validSnapshot()));
     expect(response.status).toBe(202);
-    expect(
-      fetch.mock.calls.some(call =>
-        String(call[0]).endsWith('/ovie/v1/summer-bottleneck/events')
-      )
-    ).toBe(true);
+    expect(fetch.mock.calls.map(call => String(call[0]))).toEqual([
+      'https://summer.jov.ie/runtime/v1/identity',
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events',
+    ]);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('delivers to the alias and logs when the pinned deployment is stale', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetch = installFetch(() =>
+      Response.json(runtimeIdentity({ deploymentId: 'dpl_promoted' }))
+    );
+    const response = await POST(request(validSnapshot()));
+    expect(response.status).toBe(202);
+    expect(String(fetch.mock.calls[1]?.[0])).toBe(
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
+    );
+    expect(String(fetch.mock.calls[0]?.[0])).not.toContain(ORIGIN.slice(8));
+    const logged = errorSpy.mock.calls[0]?.[0] as {
+      event?: string;
+      observed?: { fallback?: string };
+    };
+    expect(logged.event).toBe('summer_pin_invalid');
+    expect(logged.observed?.fallback).toBe('production_alias');
+  });
+
+  it('delivers to the alias without a pin log when no pin is configured', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', '');
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', '');
+    const fetch = installFetch(() =>
+      Response.json(runtimeIdentity({ deploymentId: 'dpl_promoted' }))
+    );
+    const response = await POST(request(validSnapshot()));
+    expect(response.status).toBe(202);
+    expect(String(fetch.mock.calls[1]?.[0])).toBe(
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

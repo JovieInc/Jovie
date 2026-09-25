@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getVercelOidcToken: vi.fn(),
   verifyCronRequest: vi.fn(),
-  assertSummerProductionPin: vi.fn(async () => undefined),
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_live',
+  })),
 }));
 
 vi.mock('@vercel/oidc', () => ({
@@ -14,7 +17,7 @@ vi.mock('@vercel/oidc', () => ({
 }));
 
 vi.mock('@/lib/ovie/summer-production-pin', () => ({
-  assertSummerProductionPin: mocks.assertSummerProductionPin,
+  resolveSummerEveCallerOrigin: mocks.resolveSummerEveCallerOrigin,
   logSummerBridgeEvent: (entry: Readonly<Record<string, unknown>>) => {
     console.error(entry);
   },
@@ -253,8 +256,11 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', PRODUCER_KEY_ID);
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue(oidcToken());
-    mocks.assertSummerProductionPin.mockReset();
-    mocks.assertSummerProductionPin.mockResolvedValue(undefined);
+    mocks.resolveSummerEveCallerOrigin.mockReset();
+    mocks.resolveSummerEveCallerOrigin.mockResolvedValue({
+      origin: 'https://summer.jov.ie',
+      deploymentId: 'dpl_live',
+    });
   });
 
   afterEach(() => {
@@ -607,19 +613,33 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     'https://jovie-eve-shadow-abc123-jovie.vercel.app?token=secret',
     'https://jovie-eve-shadow-abc123-jovie.vercel.app#fragment',
     'https://jovie-eve-shadow.vercel.app',
-  ])('fails closed for missing or malicious destination %#', async origin => {
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', origin);
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-    const response = await POST(request(validSnapshot()));
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({
-      ok: false,
-      code: 'eve_destination_unavailable',
-    });
-    expect(fetch).not.toHaveBeenCalled();
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-  });
+  ])(
+    'posts to the production alias when the configured origin is %#',
+    async origin => {
+      if (origin !== undefined) {
+        vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', origin);
+      }
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: {
+              eventId: validSnapshot().eventId,
+              decision: 'accepted',
+            },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      const response = await POST(request(validSnapshot()));
+      expect(response.status).toBe(202);
+      expect(String(fetch.mock.calls[0]?.[0])).toBe(
+        'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
+      );
+      expect(String(fetch.mock.calls[0]?.[0])).not.toContain('evil');
+    }
+  );
 
   it.each([302, 307, 308])(
     'rejects an upstream %i redirect without retry or second destination',
@@ -977,7 +997,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
     expect(String(url)).toBe(
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-bottleneck/events'
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
     );
     expect(init).toMatchObject({
       method: 'POST',
@@ -1190,20 +1210,28 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     }
   );
 
-  it('fails closed when the Eve destination is missing or outside the allowlist', async () => {
+  it('does not request a malicious configured Eve origin', async () => {
     vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://evil.example.com');
-    const fetch = vi.fn();
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        {
+          ok: true,
+          receipt: { eventId: validSnapshot().eventId, decision: 'accepted' },
+        },
+        { status: 202 }
+      )
+    );
     vi.stubGlobal('fetch', fetch);
 
     const response = await POST(request(validSnapshot()));
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      code: 'eve_destination_unavailable',
-    });
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(202);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
+    );
+    expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith(
+      expect.objectContaining({ pinnedOrigin: 'https://evil.example.com' })
+    );
   });
 
   it('rejects an all-zero source SHA before signing', async () => {
@@ -1291,7 +1319,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
 
   it('propagates unexpected pin checker failures before OIDC or delivery', async () => {
     const failure = new Error('pin checker crashed');
-    mocks.assertSummerProductionPin.mockRejectedValueOnce(failure);
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(failure);
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
 
@@ -1301,7 +1329,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
   });
 
   it('maps an invalid Summer pin to 503 before OIDC or delivery', async () => {
-    mocks.assertSummerProductionPin.mockRejectedValueOnce(
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(
       new SummerPinInvalidError(
         {
           projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',

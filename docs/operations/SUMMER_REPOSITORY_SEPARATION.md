@@ -113,35 +113,49 @@ Identify Summer by that project id (`SUMMER_PRODUCTION` in
 `apps/web/lib/ovie/summer-production-identity.ts`), never by the Vercel display
 name. "shadow" in Summer names does not mean non-production.
 
-Every summer-config production promotion needs a re-pin of
-`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
-`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID`, or the drift warning from
-`pnpm check:summer-eve-pin` must be acknowledged. `--strict` makes drift fatal.
-The Summer owner loop checks the `summer.jov.ie` identity `deploymentId`
-against the Jovie pin each pass.
+The Jovie caller targets `https://summer.jov.ie`. It does not use
+`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` as the request URL. A summer-config
+promotion that moves the production alias does not require an env edit or a
+new exact deployment id in Jovie.
 
-The pin check and the bridge runtime assertion require a READY
-production-target deployment of that project. Public
-`GET /runtime/v1/identity` must report `company.summer`,
-`environment=production`, the pinned deployment id, and `blobAuth=oidc`.
-A 404 (a pre-OIDC build) is a hard failure. The runtime responds `503` with
-`summer_pin_invalid` and does not map that failure to a generic 502.
+`resolveSummerEveCallerOrigin` reads `GET /runtime/v1/identity` on that alias.
+The alias must be `company.summer`, project
+`prj_LaVQva346cjp5XfrbAIIQUln7tPH`, and `environment=production`. The live
+`deploymentId` is what response headers are checked against. A 404, an
+unreachable alias, or any other identity is `503` `summer_pin_invalid`. That
+failure is not cached and is not mapped to a generic 502.
+
+`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
+`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` stay optional advisory pins.
+`pnpm check:summer-eve-pin` still requires both. When they are set and the
+alias `deploymentId` differs, the runtime logs `summer_pin_invalid` with
+`fallback: production_alias` and still calls summer.jov.ie. The scheduled
+check warns and exits 0; `--strict` makes that drift fatal. Do not clear the
+two pin variables to silence the log: the CI check fails its schema without
+them. Leave them in place so the schedule can see drift, or update them when
+convenient. They are not on the request path.
+
+`check:summer-eve-pin` still requires a READY production-target deployment of
+that project, and `blobAuth=oidc` on both the pinned deployment and the
+alias. A 404 from either identity read fails the script.
 
 Before revoking any Summer credential, list the deployments that still use it,
-including the Jovie production pin.
+including whatever deployment summer.jov.ie currently serves.
 
 ## Repointing the Jovie bridge
 
 1. `GET https://summer.jov.ie/runtime/v1/identity` and confirm `projectId`,
    `environment=production`, and `blobAuth=oidc`.
-2. Set Jovie production `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` to that
-   deployment's immutable `https://<deployment>.vercel.app` URL and
-   `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` to its `deploymentId`.
-3. Run `pnpm check:summer-eve-pin` with a read-only
-   `SUMMER_PIN_CHECK_VERCEL_TOKEN`, or let the scheduled workflow do it.
-4. Ship a Jovie production build. Env changes do not affect an already built
-   deployment.
+2. Ship a Jovie production build of the alias caller. No Jovie env change is
+   required for the heartbeat to follow the alias.
+3. Keep `OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET` as the eve-shadow automation
+   secret. It is sent to the alias, not to a hard-coded deployment host.
+4. Optional: refresh the two advisory pin variables to the current immutable
+   URL and `deploymentId`, then run `pnpm check:summer-eve-pin` with a
+   read-only `SUMMER_PIN_CHECK_VERCEL_TOKEN`. The schedule skips until that
+   token exists.
 
-Ship now: fail closed on an invalid pin, and warn on drift from
-summer.jov.ie. Re-evaluate when manual re-pins are the bottleneck. Then
-resolve the target through summer.jov.ie while still asserting `deploymentId`.
+Ship now: call summer.jov.ie, fail closed only when that alias is not
+production Summer, and log a stale exact pin while still using the alias.
+Re-evaluate when the advisory pin is unused. Then remove the two pin
+variables and the exact-id CI check.
