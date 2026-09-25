@@ -27,8 +27,8 @@ export const SHELL_FALLBACK_CSP = MINIMUM_SHELL_CSP_DIRECTIVES.join('; ');
 // interceptor's hot path; the in-listener guards below stay as
 // defense-in-depth (cheap no-ops for filtered-in traffic).
 function buildCspWatchdogRequestFilter(appOrigin: string): {
-  readonly urls: readonly string[];
-  readonly types: readonly string[];
+  urls: string[];
+  types: Array<'mainFrame'>;
 } {
   const origin = new URL(appOrigin).origin;
 
