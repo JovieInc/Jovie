@@ -106,13 +106,10 @@ export const subscribeSchema = z
     source_context: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((data, ctx) => {
-    const capturePath =
-      data.channel === 'email'
-        ? 'email'
-        : data.country_code?.toUpperCase() !== 'US' &&
-            data.country_code?.toUpperCase() !== 'CA'
-          ? 'country_code'
-          : 'phone';
+    const country = data.country_code?.toUpperCase();
+    let capturePath: 'email' | 'country_code' | 'phone' = 'phone';
+    if (data.channel === 'email') capturePath = 'email';
+    else if (country !== 'US' && country !== 'CA') capturePath = 'country_code';
     const contactError = getNotificationCaptureError({
       channel: data.channel,
       value: data.channel === 'email' ? (data.email ?? '') : (data.phone ?? ''),
