@@ -11,7 +11,7 @@ Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Done]
 
 - **In Progress** — the agent marks the issue before editing files. Dispatched work (via `linear-ai-orchestrator.yml`) sets this automatically; ad-hoc work is the agent's responsibility. See `AGENTS.md` → "Linear Ownership Contract".
 - **In Review** — `.github/workflows/linear-ai-orchestrator.yml` (`sync_linear_in_review` job) sets this when the PR is opened.
-- **Done** — `.github/workflows/linear-sync-on-merge.yml` sets this when the PR merges.
+- **Done** — `.github/workflows/linear-sync-on-merge.yml` sets this when the PR merges and no linked PR is still open or draft, and the issue is not a commissioning or parent issue. Otherwise the issue stays open and the workflow comments with the reason.
 
 **Troubleshooting**: if the auto-transitions don't fire, the issue→PR link is broken. Verify:
 
