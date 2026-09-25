@@ -456,6 +456,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'biome',
       'design-conformance',
       'design-exception-registry',
+      'design-governance-enforcement',
       'design-system-source-ratchet',
       'eslint-server-boundaries',
       'guardrails',
@@ -803,6 +804,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'guardrails',
       'design-system-source-ratchet',
       'design-exception-registry',
+      'design-governance-enforcement',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -832,6 +834,8 @@ describe('ci-fast bounded parallel workflow', () => {
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
+      'design-governance-enforcement':
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
