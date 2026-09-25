@@ -2951,3 +2951,31 @@ describe('deployment repair qualification regressions', () => {
     }
   });
 });
+
+describe('linear sync on merge selection', () => {
+  const lane = [
+    '.github/workflows/linear-sync-on-merge.yml',
+    'scripts/lib/linear-sync-on-merge.mjs',
+    'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+    'docs/REPOSITORY_SOURCES.md',
+    'scripts/run-affected-tests.mjs',
+  ];
+
+  it('runs the JOV-6586 and JOV-5853 regressions for the merge sync lane', () => {
+    const plan = buildAffectedTestPlan(lane);
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('falls back to the full suite when the merge sync proof is missing or an unknown peer is included', () => {
+    expect(
+      buildAffectedTestPlan(lane, { isFileAvailable: () => false }).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan([...lane, 'scripts/unrelated-peer.mjs']).mode
+    ).toBe('full');
+  });
+});

@@ -1190,6 +1190,22 @@ const VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR = new Set([
   ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
+  '.github/workflows/linear-sync-on-merge.yml',
+  'scripts/lib/linear-sync-on-merge.mjs',
+  'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+]);
+const LINEAR_SYNC_ON_MERGE_LANE = new Set([
+  ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.claude/rules/linear.md',
+  '.github/MERGE_QUEUE.md',
+  '.github/workflows/README.md',
+  'docs/AUTOMATION_AUDIT.md',
+  'docs/PR_WORKFLOW_GUIDE.md',
+  'docs/REPOSITORY_SOURCES.md',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
 
 export function buildAffectedTestPlan(
   changedFiles,
@@ -1198,6 +1214,30 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isLinearSyncOnMerge =
+    files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
+    files.every(file => LINEAR_SYNC_ON_MERGE_LANE.has(file));
+  if (isLinearSyncOnMerge) {
+    if (
+      !isFileAvailable('scripts/lib/__tests__/linear-sync-on-merge.test.mjs')
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      nodeTests: [],
+    };
   }
   // The shell wrapper's behavior is exercised by the existing Python CI
   // suite. Admit only the complete pair, optionally with the complete local
