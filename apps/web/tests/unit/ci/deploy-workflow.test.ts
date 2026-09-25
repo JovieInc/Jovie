@@ -1366,11 +1366,9 @@ describe('deploy workflow Vercel env resolution', () => {
       resolve(repoRoot, 'node_modules/vercel/dist/commands/deploy/index.js'),
       'utf8'
     );
-    expect(packageJson.devDependencies.vercel).toBe('59.23.2');
-    expect(vercelEntry).toContain(
-      'process.env.VERCEL_TOKEN&&(explicitToken=process.env.VERCEL_TOKEN,tokenSource="env")'
-    );
-    expect(vercelDeploy).toContain('val=process.env[key]');
+    expect(packageJson.devDependencies.vercel).toBe('56.3.2');
+    expect(vercelEntry).toContain('else if (process.env.VERCEL_TOKEN)');
+    expect(vercelDeploy).toContain('val = process.env[key]');
     expect(vercelDeploy).toContain('Reading ${import_chalk.default.bold(');
 
     const fixtureRoot = mkdtempSync(
@@ -1549,6 +1547,34 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(deployScript).toContain('.vercel/jovie-generated-public-files');
     expect(deployScript).toContain('rm -f -- "$generated_file"');
     expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+  });
+
+  it('pins the last Vercel CLI whose prebuilt tgz archives extract server-side', () => {
+    // Every staging `deploy --prebuilt --archive=tgz` since the 56.3.2 ->
+    // 59.16.0 bump (#18080) was created, then failed at "Extracting
+    // deployment files" with "Unexpected error". Last green deploy-staging
+    // ran CLI 56.3.2 (job 106502335969); the first red one ran 59.16.0 on the
+    // same 6861-file output (job 106515900378). The CLI also runs the
+    // `vercel build` step, so the pin covers the bundled @vercel/next too.
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+    ) as { devDependencies: Record<string, string> };
+    const lockfile = readFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), 'utf8');
+    const dependabot = readFileSync(
+      resolve(repoRoot, '.github/dependabot.yml'),
+      'utf8'
+    );
+    // The root importer runs from `  .:` to the next two-space importer key.
+    const rootImporter =
+      /\n {2}\.:\n([\s\S]*?)(?=\n {2}\S|\npackages:)/.exec(lockfile)?.[1] ?? '';
+
+    expect(packageJson.devDependencies.vercel).toBe('56.3.2');
+    expect(rootImporter).toMatch(
+      /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
+    );
+    expect(dependabot).toMatch(
+      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+    );
   });
 
   it('builds the staging prebuilt in-job and refuses source-cache substitution', () => {

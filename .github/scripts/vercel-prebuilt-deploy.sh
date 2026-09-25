@@ -64,10 +64,10 @@ count_prebuilt_files() {
 # Vercel CLI >= 59 applies the repo .vercelignore to prebuilt functions'
 # `.vc-config.json` filePathMap entries and drops every match from the upload
 # (PREBUILT_FILEPATHMAP_IGNORED, "excludes at least 20 files the prebuilt
-# functions need"). CLI 56.x uploaded the full traced closure. Since the
-# 56.3.2 -> 59.16.0 bump every staging deploy has been created, then failed
-# server-side after "Extracting deployment files" with "Unexpected error".
-# The prebuilt file walk ignores everything outside .vercel/output regardless
+# functions need"). CLI 56.x uploaded the full traced closure. (Restoring
+# that closure did not fix the 59.x "Extracting deployment files ...
+# Unexpected error" failures; the CLI is pinned to 56.3.2 for that, see
+# .github/dependabot.yml.) The prebuilt file walk ignores everything outside .vercel/output regardless
 # of .vercelignore, so that file only shapes source uploads. For prebuilt
 # uploads it only removes files `vercel build` traced (CHANGELOG.md,
 # docs/FEATURE_REGISTRY.md, tests/quarantine.json, ...). The dropped set

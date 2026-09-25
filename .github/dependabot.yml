@@ -51,6 +51,16 @@ updates:
       # `pnpm --filter @jovie/web run evals:validate` against 0.123.x.
       - dependency-name: 'promptfoo'
         versions: ['>=0.122']
+      # Pinned at 56.3.2 (2026-09-25): every staging `vercel deploy
+      # --prebuilt --archive=tgz` since the 56.3.2 -> 59.16.0 bump (#18080)
+      # is created, then fails server-side at "Extracting deployment files"
+      # with "Unexpected error". Last green deploy-staging: job 106502335969
+      # (CLI 56.3.2, 6861 files); first red: job 106515900378 (CLI 59.16.0,
+      # same 6861 files). Ship now: stay on 56.3.2. Re-evaluate when a CLI
+      # >=57 prebuilt tgz deploy of this repo reaches READY (manual preview
+      # dispatch). Then drop this ignore and re-pin in deploy-workflow.test.ts.
+      - dependency-name: 'vercel'
+        versions: ['>=57']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
