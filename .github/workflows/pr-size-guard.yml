@@ -152,7 +152,17 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_MERGE_BASE: ${{ steps.pr-merge-base.outputs.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/lib/projected-tree-budget.mjs
+        # Run the budget policy from the base tip, not the PR head: a PR cut
+        # before this script landed has no copy of it (MODULE_NOT_FOUND on
+        # every older open PR), and a PR must not be able to weaken the policy
+        # that judges it. The script and its imports all live in scripts/lib.
+        run: |
+          set -euo pipefail
+          policy_dir="$RUNNER_TEMP/size-policy"
+          rm -rf "$policy_dir"
+          mkdir -p "$policy_dir"
+          git archive "$PR_BASE_SHA" scripts/lib | tar -x -C "$policy_dir"
+          node "$policy_dir/scripts/lib/projected-tree-budget.mjs"
 
       - name: Enforce repository hygiene
         env:
