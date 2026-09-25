@@ -781,6 +781,35 @@ describe('merge_group workflow contract', () => {
     expect(coverage).not.toContain('timeout-minutes: 60');
   });
 
+  it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
+    for (const jobId of [
+      'ci-fast-remaining',
+      'ci-profile-admission-browser',
+      'ci-exact-head-coverage',
+    ]) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      // fetch-depth: 0 fetches every branch and tag; diff bases only need
+      // HEAD's full ancestry plus origin/<base>.
+      expect(job, jobId).not.toContain('fetch-depth: 0');
+      expect(job, jobId).toContain('fetch-depth: 1');
+      expect(job, jobId).toContain('persist-credentials: false');
+      expect(job, jobId).not.toContain('filter: blob:none');
+      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      expect(fetchScript, jobId).toContain(
+        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+      );
+      expect(job, jobId).toContain(
+        "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
+      );
+      expect(
+        job.indexOf('name: Fetch base-branch history'),
+        jobId
+      ).toBeLessThan(
+        job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
+      );
+    }
+  });
+
   it('requires one diff-scoped secret scan on source and combined heads', () => {
     const secret = getJobBlock(CI_WORKFLOW, 'ci-secret-scan');
     const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');

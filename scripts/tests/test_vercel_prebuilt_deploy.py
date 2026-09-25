@@ -1455,3 +1455,50 @@ def test_failed_deploy_emits_bounded_allowlisted_diagnostics_without_secrets(
     assert receipt == {"schema": "jovie-vercel-deploy-failure/v1", "mode": "tgz", "attempt": 1,
                        "exitStatus": 23, "errorCode": code, "asset": asset, "deploymentUrl": url}
     assert not list(tmp_path.glob("jovie-vercel-deploy.*"))
+
+
+def test_failed_deploy_emits_redacted_cli_tail_and_error_annotation(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "vercel"
+    fake.write_text(textwrap.dedent("""\
+        #!/usr/bin/env bash
+        for i in $(seq 1 60); do echo "upload progress line $i"; done
+        echo "Vercel CLI 48.0.0 --token synthetic-private-token" >&2
+        echo "Authorization: Bearer synthetic-bearer-value" >&2
+        echo "VERCEL_TOKEN=synthetic-env-value" >&2
+        echo "::add-mask::untrusted-provider-command" >&2
+        echo "Error: Response Error (400): Invalid filePathMap entry for synthetic-private-token" >&2
+        echo "Retrying in 0s" >&2
+        exit 1
+        """))
+    fake.chmod(0o755)
+    output = tmp_path / ".vercel/output"
+    output.mkdir(parents=True)
+    (output / "config.json").write_text("{}")
+    env = os.environ.copy()
+    env.update(PATH=f"{bin_dir}:{env['PATH']}", VERCEL_TOKEN="synthetic-private-token",
+               VERCEL_ORG_ID="test-org", VERCEL_ENABLE_SOURCE_FALLBACK="false",
+               VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK="false", RUNNER_TEMP=str(tmp_path))
+    result = subprocess.run(["bash", str(DEPLOY_SCRIPT), "url", "--yes"], cwd=tmp_path,
+                            env=env, capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    for secret in ("synthetic-private-token", "synthetic-bearer-value", "synthetic-env-value",
+                   "untrusted-provider-command"):
+        assert secret not in combined
+    assert '"errorCode":"PREBUILT_OUTPUT_INVALID"' in result.stderr
+    tail = [line for line in result.stderr.splitlines() if line.startswith("  | ")]
+    assert len(tail) == 40
+    assert "upload progress line 20\n" not in combined
+    assert "  | upload progress line 60" in tail
+    assert "  | Vercel CLI 48.0.0 --token [redacted]" in tail
+    assert "  | Authorization: Bearer [redacted]" in tail
+    assert "  | VERCEL_TOKEN=[redacted]" in tail
+    assert "  | [workflow command line removed]" in tail
+    annotations = [line for line in result.stdout.splitlines() if line.startswith("::")]
+    assert annotations == [
+        "::error title=Vercel deploy failed::Vercel tgz deploy attempt 1 failed (exit 1, "
+        "PREBUILT_OUTPUT_INVALID): Error: Response Error (400): Invalid filePathMap entry "
+        "for [redacted]"
+    ]

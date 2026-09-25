@@ -143,6 +143,17 @@ jobs:
           [[ "$merge_bases" =~ ^[0-9a-f]{40}$ ]] || exit 1
           echo "sha=$merge_bases" >> "$GITHUB_OUTPUT"
 
+      - name: Enforce projected combined-tree byte budget
+        # merge_group enforces maxTrackedBytes on base + members and ejects the
+        # whole group when it overflows. Project the same total (base tip + this
+        # PR's byte delta) here so an over-budget PR fails before admission, and
+        # warn when the projection is above 95% of the budget.
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_MERGE_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/lib/projected-tree-budget.mjs
+
       - name: Enforce repository hygiene
         env:
           PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}

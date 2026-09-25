@@ -1,6 +1,10 @@
 name: Safe PR Remediation
 
-# Credential-free deterministic repair for one proven repeatable failure class.
+# Credential-free deterministic repair for proven repeatable lockfile drift on
+# Dependabot PRs: the isolated Eve lockfile (Eve Pilot failures) and the root
+# workspace lockfile (CI ERR_PNPM_OUTDATED_LOCKFILE, e.g. PR #18250). An
+# ERR_PNPM_LOCKFILE_CONFIG_MISMATCH (pnpm.overrides drift, e.g. PR #18247) is
+# refused with an error: overrides are deliberate pins and are never rewritten.
 # Planning never executes PR code. The prepare job executes an allowlisted
 # Dependabot-only diff with a read-only token and no repository/model secrets.
 # The writer never executes PR code and commits one attested lockfile through
@@ -9,7 +13,7 @@ name: Safe PR Remediation
 
 on:
   workflow_run:
-    workflows: ['Eve Pilot']
+    workflows: ['Eve Pilot', 'CI']
     types: [completed]
 
 permissions: {}
@@ -33,6 +37,7 @@ jobs:
     outputs:
       candidate: ${{ steps.plan.outputs.candidate }}
       expected_head: ${{ steps.plan.outputs.expected_head }}
+      kind: ${{ steps.plan.outputs.kind }}
       plan_b64: ${{ steps.plan.outputs.plan_b64 }}
       pr_number: ${{ steps.plan.outputs.pr_number }}
     steps:
@@ -41,7 +46,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Classify allowlisted Eve lock drift
+      - name: Classify allowlisted lockfile drift
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -87,12 +92,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/safe-remediation"
           printf '%s' "$PLAN_B64" | base64 --decode > "$RUNNER_TEMP/safe-remediation-plan.json"
       - name: Regenerate only the isolated lockfile
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm install --ignore-workspace --lockfile-only --ignore-scripts --no-frozen-lockfile
       - name: Prove frozen install
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
       - name: Bind immutable artifact to the exact head
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         run: |
           node .safe-remediation-policy/scripts/lib/safe-pr-remediation.mjs receipt \
             --plan "$RUNNER_TEMP/safe-remediation-plan.json" \
@@ -101,6 +109,24 @@ jobs:
             --output "$RUNNER_TEMP/safe-remediation/receipt.json"
           install -m 0600 candidate/apps/eve-pilot/package.json "$RUNNER_TEMP/safe-remediation/package.json"
           install -m 0600 candidate/apps/eve-pilot/pnpm-lock.yaml "$RUNNER_TEMP/safe-remediation/pnpm-lock.yaml"
+      # Root lane: lockfile-only resolution with scripts and pnpmfile disabled.
+      # package.json and pnpm.overrides are inputs only; never rewritten.
+      - name: Regenerate only the root workspace lockfile
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        working-directory: candidate
+        run: pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile --no-frozen-lockfile
+      - name: Prove frozen root lockfile
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        working-directory: candidate
+        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --ignore-pnpmfile
+      - name: Bind immutable root artifact to the exact head
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        run: |
+          node .safe-remediation-policy/scripts/lib/safe-pr-remediation.mjs receipt \
+            --plan "$RUNNER_TEMP/safe-remediation-plan.json" \
+            --lockfile candidate/pnpm-lock.yaml \
+            --output "$RUNNER_TEMP/safe-remediation/receipt.json"
+          install -m 0600 candidate/pnpm-lock.yaml "$RUNNER_TEMP/safe-remediation/pnpm-lock.yaml"
       - name: Upload exact-head remediation artifact
         id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -131,6 +157,7 @@ jobs:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/safe-remediation
       - name: Install the exact generated lockfile under test
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         run: install -m 0600 "$RUNNER_TEMP/safe-remediation/pnpm-lock.yaml" candidate/apps/eve-pilot/pnpm-lock.yaml
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -143,17 +170,34 @@ jobs:
           cache: pnpm
           cache-dependency-path: candidate/apps/eve-pilot/pnpm-lock.yaml
       - name: Prove frozen install
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
       - name: Typecheck isolated Eve pilot
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm run typecheck
       - name: Test isolated Eve pilot
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm run test
       - name: Build isolated Eve pilot
+        if: needs.plan.outputs.kind == 'eve-isolated-lockfile'
         working-directory: candidate/apps/eve-pilot
         run: pnpm run build
+      # Root lane proof stays lockfile-scoped; the full CI suite reruns on the
+      # committed head, and that exact-head CI remains the admission gate.
+      - name: Install the exact generated root lockfile under test
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        run: install -m 0600 "$RUNNER_TEMP/safe-remediation/pnpm-lock.yaml" candidate/pnpm-lock.yaml
+      - name: Prove frozen root lockfile
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        working-directory: candidate
+        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --ignore-pnpmfile
+      - name: Compare workspace manifest and lockfile specifiers
+        if: needs.plan.outputs.kind == 'root-workspace-lockfile'
+        working-directory: candidate
+        run: node scripts/lockfile-specifier-preflight.mjs
 
   commit:
     name: Atomic expected-head writer
