@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isAnalyticsAllowed, isDNTEnabled, isGPCEnabled } from './consent';
-import { postJsonBeacon } from './json-beacon';
+import {
+  isAnalyticsAllowed,
+  isDNTEnabled,
+  isGPCEnabled,
+} from '@/lib/tracking/consent';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 /**
  * JOV-6585 fail-open interaction contract: browser telemetry must never break

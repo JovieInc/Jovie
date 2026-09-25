@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,8 +12,8 @@ import {
 } from '@/scripts/compare-chunks';
 
 function repoRoot(): string {
-  // tests/unit/performance/ -> apps/web -> repo root is three levels up.
-  return join(import.meta.dirname, '..', '..', '..');
+  // tests/unit/performance -> unit -> tests -> apps/web -> repo root.
+  return join(import.meta.dirname, '..', '..', '..', '..', '..');
 }
 
 function budgetPath(): string {
@@ -110,13 +111,9 @@ describe('telemetry budget gate (JOV-6585)', () => {
 
   it('fails when gzip alone exceeds its limit even when raw fits', () => {
     const budgets = loadTelemetryBudgets(budgetPath());
-    // High-entropy content compresses poorly: raw under the raw limit, gzip
-    // over the gzip limit.
-    const samples = Array.from(
-      { length: Math.floor(budgets.limits.raw_bytes / 1024) },
-      () => `k${Math.random().toString(36)}`
-    );
-    const highEntropy = Buffer.from(samples.join(''));
+    // Incompressible bytes sit between the gzip limit and the raw limit, so
+    // only the gzip gate can fail.
+    const highEntropy = randomBytes(budgets.limits.gzip_bytes + 1);
     const contribution = measureTelemetryContribution(
       ['static/chunks/lib_tracking_entropy_ts_1._.js'],
       () => highEntropy
