@@ -271,7 +271,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.3.0",
     "dompurify": "^3.4.16",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "drizzle-orm": "0.45.3",
     "exceljs": "4.4.0",
     "flags": "^4.3.1",
