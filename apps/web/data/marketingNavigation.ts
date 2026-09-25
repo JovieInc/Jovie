@@ -29,8 +29,8 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
 };
 
 export const MARKETING_NAV_LINKS = [
-  { href: APP_ROUTES.ARTISTS, label: 'Artists' },
-  { href: APP_ROUTES.PRODUCT, label: 'Product' },
+  { href: APP_ROUTES.ABOUT, label: 'About' },
+  { href: APP_ROUTES.PRODUCT, label: 'For Artists' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
 ] as const satisfies readonly MarketingNavLink[];
 

@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { SUPPORT_FAQ_ITEMS, SUPPORT_SEO_COPY } from './supportCopy';
 
-const webRoot = fileURLToPath(new URL('../', import.meta.url));
+const webRoot = resolve(import.meta.dirname, '..');
 const readSource = (path: string) =>
   readFileSync(resolve(webRoot, path), 'utf8');
 
