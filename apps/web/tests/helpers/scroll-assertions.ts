@@ -65,6 +65,11 @@ export async function assertScrollable(
 
   await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
 
+  // Client panels on data-heavy routes (e.g. /hud) resolve after `load` and
+  // reflow the page. Measure the precondition against settled layout rather
+  // than whatever frame happened to be current when navigation resolved.
+  await waitForStableScrollHeight(page, containerSelector);
+
   const before = await readScrollMetrics(page, containerSelector);
   expect(
     before.scrollHeight,
@@ -81,14 +86,100 @@ export async function assertScrollable(
     const target = page.locator(containerSelector);
     await target.hover();
   }
-  await page.mouse.wheel(0, wheelDelta);
-  await page.waitForTimeout(80);
 
-  const after = await readScrollMetrics(page, containerSelector);
-  expect(
-    after.scrollTop,
-    'real wheel scroll must change scrollTop (overflow:hidden traps the user even though scrollIntoView appears to work)'
-  ).toBeGreaterThan(before.scrollTop);
+  // A single wheel followed by a fixed 80ms read raced post-load work on the
+  // first, cold navigation of a CI run: the scroll position was sampled (or
+  // reset by a client re-render) before it settled, so `scrollTop` read 0 even
+  // though the page scrolls. Instead, send real wheel input and poll until it
+  // moves `scrollTop`, re-sending the wheel if an earlier one was lost.
+  // A genuine `overflow: hidden` trap never moves `scrollTop` no matter how
+  // many wheels land, so this still fails on the regression it guards.
+  let after = before;
+  try {
+    await expect(async () => {
+      await page.mouse.wheel(0, wheelDelta);
+      await expect
+        .poll(
+          async () => {
+            after = await readScrollMetrics(page, containerSelector);
+            return after.scrollTop;
+          },
+          { timeout: WHEEL_SETTLE_TIMEOUT_MS }
+        )
+        .toBeGreaterThan(before.scrollTop);
+    }).toPass({ timeout: WHEEL_SCROLL_TIMEOUT_MS });
+  } catch {
+    const diagnostics = await readScrollDiagnostics(page, containerSelector);
+    expect(
+      after.scrollTop,
+      `real wheel scroll must change scrollTop (overflow:hidden traps the user even though scrollIntoView appears to work); ${diagnostics}`
+    ).toBeGreaterThan(before.scrollTop);
+  }
+}
+
+/** Per-wheel window for the scroll position to update before re-sending. */
+const WHEEL_SETTLE_TIMEOUT_MS = 1_000;
+/** Total budget for real wheel input to move the scroll container. */
+const WHEEL_SCROLL_TIMEOUT_MS = 10_000;
+/** Budget for late client panels to stop reflowing before measuring. */
+const LAYOUT_SETTLE_TIMEOUT_MS = 5_000;
+const LAYOUT_SETTLE_SAMPLE_MS = 150;
+
+/**
+ * Waits (bounded) until the scroll container's `scrollHeight` is unchanged
+ * across two consecutive samples. Chatty routes that never fully settle fall
+ * through after the budget; the assertions that follow still decide the test.
+ */
+async function waitForStableScrollHeight(
+  page: Page,
+  containerSelector: string | null
+): Promise<void> {
+  let previous = -1;
+  await expect
+    .poll(
+      async () => {
+        const { scrollHeight } = await readScrollMetrics(
+          page,
+          containerSelector
+        );
+        const stable = scrollHeight === previous;
+        previous = scrollHeight;
+        return stable;
+      },
+      {
+        timeout: LAYOUT_SETTLE_TIMEOUT_MS,
+        intervals: [LAYOUT_SETTLE_SAMPLE_MS],
+      }
+    )
+    .toBe(true)
+    .catch(() => {});
+}
+
+/** Describes why a scroll container did not move, for the failure message. */
+async function readScrollDiagnostics(
+  page: Page,
+  containerSelector: string | null
+): Promise<string> {
+  return page
+    .evaluate(sel => {
+      const el = sel
+        ? (document.querySelector(sel) as HTMLElement | null)
+        : (document.scrollingElement as HTMLElement | null);
+      if (!el) return 'scroll container missing';
+      const describe = (node: Element) => {
+        const style = globalThis.getComputedStyle(node);
+        return `${node.tagName.toLowerCase()}{overflow-y:${style.overflowY};height:${style.height}}`;
+      };
+      return [
+        `container=${describe(el)}`,
+        `html=${describe(document.documentElement)}`,
+        `body=${describe(document.body)}`,
+        `scrollTop=${el.scrollTop}`,
+        `scrollHeight=${el.scrollHeight}`,
+        `clientHeight=${el.clientHeight}`,
+      ].join(' ');
+    }, containerSelector)
+    .catch(error => `diagnostics unavailable: ${String(error)}`);
 }
 
 /**
