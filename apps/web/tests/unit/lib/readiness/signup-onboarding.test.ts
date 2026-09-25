@@ -18,6 +18,24 @@ function readyEnv(authOrigin = 'https://jov.ie') {
 }
 
 describe('signup onboarding readiness', () => {
+  it('reports a local target as passed without production keys', () => {
+    const result = checkSignupOnboardingReadiness({
+      env: {},
+      target: 'local',
+      source: 'env',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.required).toEqual([]);
+    expect(formatSignupOnboardingReadinessReport(result)).toBe(
+      [
+        '[signup-readiness] target=local source=env',
+        '[signup-readiness] local target: no production signup keys required',
+        '[signup-readiness] status=passed',
+      ].join('\n')
+    );
+  });
+
   it('passes only when every required production signup env var is present', () => {
     const env = readyEnv();
 
