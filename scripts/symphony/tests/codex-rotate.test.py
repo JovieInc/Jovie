@@ -607,7 +607,7 @@ class CodexRotateTests(unittest.TestCase):
             evidence_root = private / "worker-evidence"
             # Bash may retain a copy of the output pipe until its child returns.
             # Whether capture has seen EOF or not, no exit receipt may exist yet.
-            self.assertEqual(list(evidence_root.glob("exit-*.json")), [])
+            self.assertEqual(list(evidence_root.rglob("exit-*.json")), [])
             self.assertIsNone(process.poll(), "completed turn/closed stdout cannot prove child exit")
             release.touch()
             output, errors = process.communicate(timeout=10)
@@ -619,14 +619,14 @@ class CodexRotateTests(unittest.TestCase):
                 process.kill(); process.communicate()
             for stream in (process.stdin, process.stdout, process.stderr):
                 stream.close()
-        files = [path for path in (private / "worker-evidence").glob("*.json") if not path.name.startswith("exit-")]
+        files = [path for path in (private / "worker-evidence").rglob("*.json") if not path.name.startswith("exit-")]
         self.assertEqual(len(files), 1)
         candidate = json.loads(files[0].read_text())
         self.assertEqual(candidate["taskDigest"], task_digest)
         self.assertEqual(candidate["executionBaseHead"], base)
         self.assertEqual(candidate["executionFinalHead"], git("rev-parse", "HEAD").decode().strip())
         self.assertFalse(candidate["executionTerminated"])
-        exits = list((private / "worker-evidence").glob("exit-*.json"))
+        exits = list((private / "worker-evidence").rglob("exit-*.json"))
         self.assertEqual(len(exits), 1)
         receipt = json.loads(exits[0].read_text())
         self.assertEqual(receipt["candidateDigest"], candidate["digest"])

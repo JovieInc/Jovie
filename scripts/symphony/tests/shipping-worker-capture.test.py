@@ -129,6 +129,7 @@ class CaptureTest(unittest.TestCase):
         self.assertEqual(json.loads(path.read_text()), candidate)
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(path.parent.name, capture.digest(self.task))
         self.assertEqual(capture.publish_candidate(self.private, candidate), path)
         self.assertEqual(list(path.parent.glob(".candidate-*")), [])
         path.write_text("{}")
@@ -136,6 +137,10 @@ class CaptureTest(unittest.TestCase):
             capture.publish_candidate(self.private, candidate)
         with self.assertRaisesRegex(ValueError, "digest invalid"):
             capture.publish_candidate(self.private, {**candidate, "digest": "a" * 64})
+        invalid = {**candidate, "taskDigest": "../wrong"}
+        invalid["digest"] = capture.digest({key: value for key, value in invalid.items() if key != "digest"})
+        with self.assertRaisesRegex(ValueError, "task directory invalid"):
+            capture.publish_candidate(self.private, invalid)
         with patch.object(capture, "LIMIT", 10):
             with self.assertRaisesRegex(ValueError, "candidate oversized"):
                 capture.publish_candidate(self.private, candidate)
@@ -172,9 +177,9 @@ class CaptureTest(unittest.TestCase):
                                         workspace=self.workspace, invocation_id="b" * 32,
                                         producer_directory=self.producer))
         self.assertEqual(destination.getvalue(), b"".join(rows))
-        files = list((self.private / "worker-evidence").glob("*.json"))
+        files = list((self.private / "worker-evidence" / capture.digest(self.task)).glob("*.json"))
         self.assertEqual(len(files), 1)
-        self.assertEqual(list((self.private / "worker-evidence").glob("exit-*.json")), [])
+        self.assertEqual(list((self.private / "worker-evidence" / capture.digest(self.task)).glob("exit-*.json")), [])
         result = json.loads(files[0].read_text())
         self.assertFalse(result["executionTerminated"])
         self.assertEqual(result["executionFinalHead"], self.git("rev-parse", "HEAD").decode().strip())
@@ -255,7 +260,7 @@ class CaptureTest(unittest.TestCase):
             capture.record_exit(pointer, 0, 0, **self.exit_context(), now=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc))
         with self.assertRaisesRegex(ValueError, "clock invalid"):
             capture.record_exit(pointer, 0, 0, **self.exit_context(), now=lambda: datetime(2026, 1, 1))
-        candidate_path = self.private / "worker-evidence" / (candidate["digest"] + ".json")
+        candidate_path = self.private / "worker-evidence" / capture.digest(self.task) / (candidate["digest"] + ".json")
         original = candidate_path.read_bytes()
         candidate_path.write_text(json.dumps({**candidate, "executionTerminated": True}))
         with self.assertRaisesRegex(ValueError, "candidate cross-bound"):
@@ -282,7 +287,7 @@ class CaptureTest(unittest.TestCase):
             capture.write_pointer(pointer, candidate["digest"])
         pointer.unlink(); pointer.symlink_to(self.private / "state.json")
         with self.assertRaises(OSError): capture.write_pointer(pointer, candidate["digest"])
-        value = {"schema": capture.EXIT_SCHEMA, "candidateDigest": "../unsafe"}
+        value = {"schema": capture.EXIT_SCHEMA, "candidateDigest": "../unsafe", "taskDigest": capture.digest(self.task)}
         value["digest"] = capture.digest(value)
         with self.assertRaisesRegex(ValueError, "exit reference invalid"):
             capture.publish_candidate(self.private, value)

@@ -72,7 +72,8 @@ qualified launcher binding before this can produce live evidence.
 The adapter reads the existing consumer's private journal, matches the actual
 service invocation and issue workspace, records Git directly, and rechecks the
 task and producer bytes before immutable publication under
-`state/summer-symphony-consumer/worker-evidence`. Signature authority remains with
+`state/summer-symphony-consumer/worker-evidence/<taskDigest>`. The signed task
+digest scopes reads to one admission instead of scanning historical tasks. Signature authority remains with
 the consumer; private ownership and a candidate digest do not replace signed
 task validation. Missing admission simply preserves native stdout without proof.
 No prompts, tool output, account identity or credentials enter the candidate.

@@ -131,6 +131,11 @@ def publish_candidate(private_root: Path, value: dict) -> Path:
     root = private_root / "worker-evidence"
     root.mkdir(mode=0o700, exist_ok=True)
     owned_directory(root, private=True)
+    if not isinstance(value.get("taskDigest"), str) or not DIGEST.fullmatch(value["taskDigest"]):
+        raise ValueError("worker evidence task directory invalid")
+    root = root / value["taskDigest"]
+    root.mkdir(mode=0o700, exist_ok=True)
+    owned_directory(root, private=True)
     data = (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
     if len(data) > LIMIT:
         raise ValueError("worker evidence candidate oversized")
@@ -217,6 +222,8 @@ def record_exit(pointer: Path, process_code: int, launcher_code: int, *, gem_wor
     if not DIGEST.fullmatch(reference):
         raise ValueError("worker evidence pointer invalid")
     root = private_root / "worker-evidence"
+    owned_directory(root, private=True)
+    root = root / binding["taskDigest"]
     owned_directory(root, private=True)
     candidate = json.loads(read_owned(root / (reference + ".json")))
     if (not isinstance(candidate, dict) or candidate.get("schema") != "symphony-shipping-worker-candidate/v1"
