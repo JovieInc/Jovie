@@ -254,8 +254,14 @@ describe('packaging intelligence', () => {
     for (const result of evaluateAllPackagingRuleCases()) {
       expect(result.passed, result.reason).toBe(true);
     }
-    expect(evaluatePackagingRuleCase('hook-text-on-face').passed).toBe(true);
-    expect(evaluatePackagingRuleCase('cover-with-hook-text').passed).toBe(true);
+    expect(evaluatePackagingRuleCase('hook-text-on-face')).toMatchObject({
+      passed: true,
+      reason: 'Hook text on a face is refused; off-face hook is allowed',
+    });
+    expect(evaluatePackagingRuleCase('cover-with-hook-text')).toMatchObject({
+      passed: true,
+      reason: 'Cover hooky text is refused; square contain is allowed',
+    });
     expect(evaluatePackagingRuleCase('no-image-unknown').passed).toBe(true);
     expect(evaluatePackagingRuleCase('cover-vs-thumb').passed).toBe(true);
   });
