@@ -238,6 +238,10 @@ jobs:
             cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
             printf '%s\n' 'apps/web/public/robots.txt' \
               > .vercel/jovie-generated-public-files
+            # CLI 59 omits ignored filePathMap refs from the archive but leaves
+            # them in .vc-config.json. Remote extract then dies in
+            # build-container-init. Drop those refs after the output tree is final.
+            node .github/scripts/prune-ignored-filepathmap.mjs
           }
           export -f staging_build
           doppler run --project jovie-web --config stg \
@@ -944,6 +948,9 @@ jobs:
           fi
           if ! node .github/scripts/materialize-vercel-static.mjs; then
             fail_stage "Production static asset materialization failed." production_artifact_failed
+          fi
+          if ! node .github/scripts/prune-ignored-filepathmap.mjs; then
+            fail_stage "Production prebuilt filePathMap prune failed." production_artifact_failed
           fi
 
           # Measure the exact cache subtree before a separate save action can
