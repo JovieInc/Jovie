@@ -43,6 +43,10 @@ except OSError:
 if REQUESTED_STATE.is_symlink() or requested_identity != STATE:
     raise SystemExit(76)
 if not STATE.is_file():
+    # Recover mode has nothing to clear. Refresh mode must not report success:
+    # the router treats exit 0 as a fresh capacity observation.
+    if os.environ.get("CODEX_ACCOUNT_PROBE_MODE", "recover") != "recover":
+        raise SystemExit(76)
     raise SystemExit(0)
 REAL_CODEX = os.environ["REAL_CODEX"]
 LOCKS = Path(os.environ["LOCKS_DIR"])

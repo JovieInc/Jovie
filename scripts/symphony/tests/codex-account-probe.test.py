@@ -539,6 +539,14 @@ class CodexAccountProbeTests(unittest.TestCase):
         self.assertEqual(state["cooldowns"]["account-a"], original)
         self.assertNotIn("capacityObservedAt", state)
 
+    def test_refresh_missing_state_does_not_exit_success_or_create_the_file(self):
+        state = self.accounts / "state.json"
+        self.assertFalse(state.exists())
+        result = self.run_probe(CODEX_ACCOUNT_PROBE_MODE="refresh-freshness")
+        self.assertEqual(result.returncode, 76, result.stderr)
+        self.assertFalse(state.exists())
+        self.assertEqual(result.stdout, "")
+
 
 HELPER = ROOT / "scripts/symphony/symphony-codex-account-control.py"
 
