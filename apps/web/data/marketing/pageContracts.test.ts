@@ -20,6 +20,8 @@ describe('marketing language context', () => {
     APP_ROUTES.SUPPORT,
     APP_ROUTES.DOWNLOAD,
     APP_ROUTES.WAITLIST,
+    APP_ROUTES.PRODUCT,
+    APP_ROUTES.CARD,
   ])('keeps shared language on %s', pathname => {
     expect(getMarketingPageContractForPathname(pathname)?.copyScope).toBe(
       'shared'
@@ -34,6 +36,7 @@ describe('marketing language context', () => {
     APP_ROUTES.PAY,
     APP_ROUTES.INSTANT_MERCH,
     APP_ROUTES.CLI,
+    APP_ROUTES.SMART_LINKS,
   ])('preserves music-specific language on %s', pathname => {
     expect(getMarketingPageContractForPathname(pathname)?.copyScope).toBe(
       'music'
@@ -71,36 +74,32 @@ describe('marketing language context', () => {
     }
   });
 
-  it.each([
-    'artist',
-    'founder',
-    'artist,founder',
-    'unknown',
-  ])('does not infer homepage identity from a %s query parameter', role => {
-    const contract = getMarketingPageContractForPathname(
-      `${APP_ROUTES.HOME}?role=${encodeURIComponent(role)}`
-    );
-    expect(contract?.copyScope).toBe('shared');
-    expect(contract).toBe(getMarketingPageContractForPathname(APP_ROUTES.HOME));
-  });
+  it.each(['artist', 'founder', 'artist,founder', 'unknown'])(
+    'does not infer homepage identity from a %s query parameter',
+    role => {
+      const contract = getMarketingPageContractForPathname(
+        `${APP_ROUTES.HOME}?role=${encodeURIComponent(role)}`
+      );
+      expect(contract?.copyScope).toBe('shared');
+      expect(contract).toBe(
+        getMarketingPageContractForPathname(APP_ROUTES.HOME)
+      );
+    }
+  );
 
-  it.each([
-    '__proto__',
-    'constructor',
-    'toString',
-    'missing/page.tsx',
-  ])('rejects an unregistered contract key: %s', key => {
-    expect(getMarketingPageContractForRouteGlob(key)).toBeNull();
-  });
+  it.each(['__proto__', 'constructor', 'toString', 'missing/page.tsx'])(
+    'rejects an unregistered contract key: %s',
+    key => {
+      expect(getMarketingPageContractForRouteGlob(key)).toBeNull();
+    }
+  );
 
-  it.each([
-    null,
-    undefined,
-    '',
-    '/unregistered-language-fixture',
-  ])('returns no invented contract for %s', pathname => {
-    expect(getMarketingPageContractForPathname(pathname)).toBeNull();
-  });
+  it.each([null, undefined, '', '/unregistered-language-fixture'])(
+    'returns no invented contract for %s',
+    pathname => {
+      expect(getMarketingPageContractForPathname(pathname)).toBeNull();
+    }
+  );
 
   it('requires every registered authoring contract to declare a scope', () => {
     for (const contract of Object.values(MARKETING_PAGE_CONTRACTS)) {

@@ -74,6 +74,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/smart-links/page.tsx': {
     routeGlob: '(marketing)/smart-links/page.tsx',
+    copyScope: 'music',
     url: APP_ROUTES.SMART_LINKS,
     job: 'show artists how one release link remembers a fan streaming choice',
     proof:
@@ -149,6 +150,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/product/page.tsx': {
     routeGlob: '(marketing)/product/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.PRODUCT,
     job: 'claim the public page that shows up when people search for you',
     proof: 'unclaimed jov.ie/you claim card with inset Claim action',
@@ -160,6 +162,7 @@ export const MARKETING_PAGE_CONTRACTS = {
   },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
+    copyScope: 'shared',
     url: APP_ROUTES.CARD,
     job: 'explain the planned in-person profile-sharing product and how to get access updates',
     proof:

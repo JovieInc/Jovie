@@ -46,9 +46,9 @@ export const MARKETING_FOR_FLYOUT_LINKS = [
     description: 'Release pages, audience capture, and fan reactivation.',
   },
   {
-    href: APP_ROUTES.ABOUT,
+    href: APP_ROUTES.PRODUCT,
     label: 'Founders',
-    description: 'A compact view of the company and operating principles.',
+    description: 'Show what you are building and give people a next step.',
   },
   {
     href: APP_ROUTES.ARTIST_PROFILES,
@@ -56,9 +56,9 @@ export const MARKETING_FOR_FLYOUT_LINKS = [
     description: 'Turn profile traffic into durable audience ownership.',
   },
   {
-    href: APP_ROUTES.BLOG,
+    href: APP_ROUTES.PRODUCT,
     label: 'Authors',
-    description: 'Editorial context for launches, profiles, and growth.',
+    description: 'A public page for the work, with a supported next step.',
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[];
 
@@ -86,7 +86,7 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = [
   {
     href: APP_ROUTES.CLI,
     label: 'CLI',
-    description: 'Use Jovie workflows from the command line.',
+    description: 'Read public artist data from the command line.',
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[];
 
@@ -94,17 +94,18 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.PRODUCT, label: 'Product' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
-      { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.PAY, label: 'Pay' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
   },
   {
-    title: 'Features',
+    title: 'Music',
     links: [
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
+      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
+      { href: APP_ROUTES.PAY, label: 'Pay' },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
         label: 'Fan Capture',
@@ -120,6 +121,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Company',
     links: [
+      { href: APP_ROUTES.ARTISTS, label: 'Artist Directory' },
       { href: APP_ROUTES.ABOUT, label: 'About' },
       { href: APP_ROUTES.BLOG, label: 'Blog' },
       { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
