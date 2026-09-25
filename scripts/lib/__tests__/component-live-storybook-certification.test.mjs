@@ -31,6 +31,7 @@ import {
   findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
+  mergeOwnedBrowserGroups,
   planOwnedBrowserSignals,
   reapStaleStorybookVitestLeases,
   STORYBOOK_VITEST_OWNER_ARG,
@@ -863,6 +864,61 @@ describe('live Storybook lifecycle', () => {
         tempRoot
       )
     ).toEqual({ ok: true, groupPids: [200], individualPids: [] });
+  });
+
+  it('refreshes a helper captured between fork and exec so it is still reaped after its leader dies', () => {
+    const token = randomUUID();
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-exec-')
+    );
+    temps.push(tempRoot);
+    const startedAt = 'Sun Aug 30 15:00:00 2026';
+    const leaderCommand = `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-exec`;
+    const helperCommand =
+      'chromium --type=renderer --field-trial-handle=owned-fixture';
+    const commandHash = command =>
+      createHash('sha256').update(command).digest('hex');
+    const receipt = (pid, command) => ({
+      pid,
+      pgid: 300,
+      startedAt,
+      commandHash: commandHash(command),
+    });
+    // Before exec, `ps` shows the forked helper with its parent's argv.
+    const forkCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, leaderCommand)],
+    };
+    const execCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, helperCommand)],
+    };
+
+    const merged = mergeOwnedBrowserGroups([forkCapture], [execCapture]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].members).toEqual(execCapture.members);
+    // The captures passed in are not mutated.
+    expect(forkCapture.members[1].commandHash).toBe(commandHash(leaderCommand));
+
+    // The leader exited on the group SIGTERM; the helper ignored it.
+    const helperRow = {
+      pid: 301,
+      pgid: 300,
+      startedAt,
+      command: helperCommand,
+    };
+    expect(
+      planOwnedBrowserSignals(merged, [helperRow], token, tempRoot)
+    ).toEqual({ ok: true, groupPids: [], individualPids: [301] });
+    // A different process that reused pid 301 is never targeted.
+    expect(
+      planOwnedBrowserSignals(
+        merged,
+        [{ ...helperRow, startedAt: 'Sun Aug 30 15:00:01 2026' }],
+        token,
+        tempRoot
+      )
+    ).toEqual({ ok: true, groupPids: [], individualPids: [] });
   });
 
   it('treats a defunct zombie process as gone', async () => {
