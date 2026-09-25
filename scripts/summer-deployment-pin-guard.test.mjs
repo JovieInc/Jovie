@@ -29,7 +29,7 @@ describe('summer deployment pin guard', () => {
     const findings = findSummerDeploymentPins(root).map(
       finding => finding.reason
     );
-    assert.deepEqual(findings.toSorted(), [
+    assert.deepEqual([...findings].sort(), [
       'Summer deployment id literal',
       'per-deployment Summer URL',
     ]);
