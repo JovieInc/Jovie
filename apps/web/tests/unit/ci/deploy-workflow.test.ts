@@ -2222,7 +2222,11 @@ describe('unit-test runner capacity', () => {
     );
     expect(unitJob).not.toContain('&& 5 || 3');
     expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
-    expect(unitJob).toContain('VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"');
+    // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
+    // the shard opts back in; without it one of the two CPUs sits idle.
+    expect(unitJob).toContain(
+      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=2 --fileParallelism"'
+    );
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
     );
