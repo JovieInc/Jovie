@@ -41,17 +41,15 @@ function SearchDropdownState({
       role={tone === 'error' ? 'alert' : undefined}
       aria-atomic='true'
     >
-      <DrawerSurfaceCard variant='card'>
-        <div className='system-b-spotify-connect-status-card px-2.5'>
-          <p
-            className={cn(
-              'system-b-spotify-connect-status-copy text-xs',
-              tone === 'error' ? 'text-error' : 'text-secondary-token'
-            )}
-          >
-            {message}
-          </p>
-        </div>
+      <DrawerSurfaceCard variant='card' data-spotify-connect-surface='status'>
+        <p
+          className={cn(
+            'system-b-spotify-connect-status-copy text-xs',
+            tone === 'error' ? 'text-error' : 'text-secondary-token'
+          )}
+        >
+          {message}
+        </p>
       </DrawerSurfaceCard>
     </output>
   );
@@ -66,15 +64,18 @@ function SearchResultsLoadingSkeleton() {
       aria-busy='true'
     >
       {LOADING_SKELETON_KEYS.map(key => (
-        <DrawerSurfaceCard key={key} variant='card' aria-hidden='true'>
-          <div className='system-b-spotify-connect-status-card gap-2.5 px-2.5'>
-            <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
-            <div className='min-w-0 flex-1 space-y-1.5'>
-              <div className='h-3.5 w-32 rounded skeleton' />
-              <div className='h-2.5 w-20 rounded skeleton' />
-            </div>
-            <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
+        <DrawerSurfaceCard
+          key={key}
+          variant='card'
+          data-spotify-connect-surface='status'
+          aria-hidden='true'
+        >
+          <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
+          <div className='min-w-0 flex-1 space-y-1.5'>
+            <div className='h-3.5 w-32 rounded skeleton' />
+            <div className='h-2.5 w-20 rounded skeleton' />
           </div>
+          <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
         </DrawerSurfaceCard>
       ))}
     </output>
@@ -458,277 +459,272 @@ export function SpotifyConnectDialog({
       </DialogDescription>
 
       <DialogBody className='space-y-3'>
-        <DrawerSurfaceCard variant='card'>
-          <div className='system-b-spotify-connect-card p-3.5'>
-            <div className='mb-2.5'>
-              <p className='text-2xs font-caption leading-none text-tertiary-token'>
-                Artist search
-              </p>
-              <p className='system-b-spotify-connect-helper-copy mt-1 text-xs text-secondary-token'>
-                Search by artist name or paste your Spotify artist URL to
-                connect instantly.
-              </p>
-            </div>
-            <div ref={containerRef} className='relative'>
-              <label htmlFor='spotify-connect-search' className='sr-only'>
-                Search Spotify artists or paste a link
-              </label>
-              <div
-                className={cn(
-                  'system-b-spotify-connect-input-shell',
-                  shouldShowDropdown
-                    ? 'system-b-spotify-connect-input-shell--active'
-                    : 'system-b-spotify-connect-input-shell--idle',
-                  isPending && 'opacity-60'
-                )}
-              >
-                <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-spotify-subtle'>
-                  <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
-                </div>
-                <input
-                  ref={inputRef}
-                  id='spotify-connect-search'
-                  type='text'
-                  value={formState.searchQuery}
-                  onChange={handleSearchInputChange}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => {
-                    if (
-                      formState.searchQuery.trim().length >= 1 &&
-                      !isSpotifyUrl(formState.searchQuery)
-                    ) {
-                      dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
-                    }
-                  }}
-                  onBlur={e => {
-                    if (containerRef.current?.contains(e.relatedTarget as Node))
-                      return;
-                    dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
-                    dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
-                  }}
-                  placeholder={DEFAULT_PLACEHOLDER}
-                  autoCapitalize='none'
-                  autoCorrect='off'
-                  autoComplete='off'
-                  disabled={isPending}
-                  className='min-w-0 flex-1 bg-transparent text-app text-primary-token focus-visible:outline-none'
-                  role='combobox'
-                  aria-expanded={shouldShowDropdown}
-                  aria-controls='spotify-connect-results'
-                  aria-activedescendant={
-                    formState.activeResultIndex >= 0
-                      ? `spotify-connect-result-${formState.activeResultIndex}`
-                      : undefined
-                  }
-                />
-                <SearchInputTrailing
-                  showClaimButton={showClaimButton}
-                  claimButtonDisabled={claimButtonDisabled}
-                  isLoading={isLoading}
-                  isPending={isPending}
-                  onClaimArtist={handleClaimArtist}
-                />
+        <DrawerSurfaceCard variant='card' data-spotify-connect-surface='card'>
+          <div className='mb-2.5'>
+            <p className='text-2xs font-caption leading-none text-tertiary-token'>
+              Artist search
+            </p>
+            <p className='system-b-spotify-connect-helper-copy mt-1 text-xs text-secondary-token'>
+              Search by artist name or paste your Spotify artist URL to connect
+              instantly.
+            </p>
+          </div>
+          <div ref={containerRef} className='relative'>
+            <label htmlFor='spotify-connect-search' className='sr-only'>
+              Search Spotify artists or paste a link
+            </label>
+            <div
+              className={cn(
+                'system-b-spotify-connect-input-shell',
+                shouldShowDropdown
+                  ? 'system-b-spotify-connect-input-shell--active'
+                  : 'system-b-spotify-connect-input-shell--idle',
+                isPending && 'opacity-60'
+              )}
+            >
+              <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-spotify-subtle'>
+                <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
               </div>
-
-              {formState.error && (
-                <p className='mt-1.5 text-app text-error' role='alert'>
-                  {formState.error}
-                </p>
-              )}
-
-              {shouldShowDropdown && (
-                <div className='system-b-spotify-connect-dropdown z-50 mt-1.5 w-full overflow-hidden'>
-                  <select
-                    id='spotify-connect-results'
-                    className='sr-only'
-                    size={Math.min(totalItems, 6)}
-                    aria-label='Spotify Artist Results'
-                    value={
-                      formState.activeResultIndex === pasteUrlIndex
-                        ? '__paste__'
-                        : (results[formState.activeResultIndex]?.id ?? '')
-                    }
-                    onChange={event => {
-                      if (event.target.value === '__paste__') {
-                        handlePasteUrlClick();
-                        return;
-                      }
-                      const selectedArtist = results.find(
-                        artist => artist.id === event.target.value
-                      );
-                      if (selectedArtist && canSelectArtist(selectedArtist)) {
-                        handleArtistSelect(selectedArtist);
-                      }
-                    }}
-                  >
-                    <option value='' disabled>
-                      Select an artist
-                    </option>
-                    {results.map((artist, index) => (
-                      <option
-                        key={artist.id}
-                        id={`spotify-connect-result-${index}`}
-                        value={artist.id}
-                        disabled={!canSelectArtist(artist)}
-                      >
-                        {artist.name}
-                        {artist.followers
-                          ? ` — ${formatFollowers(artist.followers)}`
-                          : ''}
-                      </option>
-                    ))}
-                    <option
-                      id={`spotify-connect-result-${pasteUrlIndex}`}
-                      value='__paste__'
-                    >
-                      Paste a Spotify URL instead
-                    </option>
-                  </select>
-
-                  {searchState === 'loading' && results.length === 0 && (
-                    <SearchResultsLoadingSkeleton />
-                  )}
-
-                  {searchState === 'empty' && (
-                    <SearchDropdownState message='No artists found' />
-                  )}
-
-                  {searchState === 'error' && (
-                    <SearchDropdownState
-                      message={searchError || 'Search failed. Try again.'}
-                      tone='error'
-                    />
-                  )}
-
-                  {results.length > 0 && (
-                    <div
-                      ref={resultsListRef}
-                      className='max-h-64 overflow-y-auto p-2'
-                      aria-hidden='true'
-                    >
-                      {results.map((artist, index) => (
-                        <button
-                          key={artist.id}
-                          type='button'
-                          tabIndex={canSelectArtist(artist) ? 0 : -1}
-                          disabled={!canSelectArtist(artist)}
-                          className={cn(
-                            'system-b-spotify-connect-result-row mb-1 flex w-full items-center gap-2.5 px-2.5 py-2 text-left last:mb-0 focus-visible:outline-none',
-                            index === formState.activeResultIndex &&
-                              canSelectArtist(artist) &&
-                              'system-b-spotify-connect-result-row--active',
-                            !canSelectArtist(artist)
-                              ? 'opacity-50 cursor-not-allowed'
-                              : 'system-b-spotify-connect-result-row--interactive cursor-pointer'
-                          )}
-                          onClick={() =>
-                            canSelectArtist(artist) &&
-                            handleArtistSelect(artist)
-                          }
-                          onKeyDown={event =>
-                            canSelectArtist(artist) &&
-                            handleActivationKeyDown(event, () =>
-                              handleArtistSelect(artist)
-                            )
-                          }
-                          onMouseEnter={() =>
-                            dispatch({
-                              type: 'SET_ACTIVE_RESULT_INDEX',
-                              payload: index,
-                            })
-                          }
-                        >
-                          <div className='system-b-spotify-connect-result-artwork relative h-10 w-10 shrink-0 overflow-hidden'>
-                            {artist.imageUrl ? (
-                              <Image
-                                src={artist.imageUrl}
-                                alt={artist.name}
-                                fill
-                                sizes='40px'
-                                className='object-cover'
-                                unoptimized
-                              />
-                            ) : (
-                              <div className='flex h-full w-full items-center justify-center'>
-                                <ProviderIcon
-                                  provider='spotify'
-                                  className='h-5 w-5'
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <div className='min-w-0 flex-1'>
-                            <div className='truncate text-app font-caption text-primary-token'>
-                              {artist.name}
-                            </div>
-                            {artist.isClaimed && (
-                              <div className='text-2xs text-tertiary-token'>
-                                {artist.isClaimedByCurrentUser
-                                  ? 'Already connected'
-                                  : 'Already claimed'}
-                              </div>
-                            )}
-                            {!artist.isClaimed && artist.followers && (
-                              <div className='text-2xs text-tertiary-token'>
-                                {formatFollowers(artist.followers)}
-                              </div>
-                            )}
-                          </div>
-                          {artist.verified && (
-                            <div
-                              className='shrink-0 text-brand-spotify'
-                              data-testid='verified-badge'
-                            >
-                              <BadgeCheck
-                                className='h-4 w-4'
-                                aria-hidden='true'
-                              />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    type='button'
-                    tabIndex={0}
-                    className={cn(
-                      'system-b-spotify-connect-paste-row m-2 mt-0 flex cursor-pointer items-center gap-2.5 px-3 py-2 text-left focus-visible:outline-none',
-                      formState.activeResultIndex === pasteUrlIndex &&
-                        'system-b-spotify-connect-paste-row--active'
-                    )}
-                    onClick={handlePasteUrlClick}
-                    onKeyDown={event =>
-                      handleActivationKeyDown(event, () =>
-                        handlePasteUrlClick()
-                      )
-                    }
-                    onMouseEnter={() =>
-                      dispatch({
-                        type: 'SET_ACTIVE_RESULT_INDEX',
-                        payload: pasteUrlIndex,
-                      })
-                    }
-                  >
-                    <div className='system-b-spotify-connect-paste-icon flex h-10 w-10 items-center justify-center'>
-                      <Link2
-                        className='h-5 w-5 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                    <div className='flex-1'>
-                      <div className='text-app font-caption text-primary-token'>
-                        Paste a Spotify URL instead
-                      </div>
-                      <div className='text-2xs text-tertiary-token'>
-                        open.spotify.com/artist/...
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              )}
+              <input
+                ref={inputRef}
+                id='spotify-connect-search'
+                type='text'
+                value={formState.searchQuery}
+                onChange={handleSearchInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (
+                    formState.searchQuery.trim().length >= 1 &&
+                    !isSpotifyUrl(formState.searchQuery)
+                  ) {
+                    dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
+                  }
+                }}
+                onBlur={e => {
+                  if (containerRef.current?.contains(e.relatedTarget as Node))
+                    return;
+                  dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
+                  dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
+                }}
+                placeholder={DEFAULT_PLACEHOLDER}
+                autoCapitalize='none'
+                autoCorrect='off'
+                autoComplete='off'
+                disabled={isPending}
+                className='min-w-0 flex-1 bg-transparent text-app text-primary-token focus-visible:outline-none'
+                role='combobox'
+                aria-expanded={shouldShowDropdown}
+                aria-controls='spotify-connect-results'
+                aria-activedescendant={
+                  formState.activeResultIndex >= 0
+                    ? `spotify-connect-result-${formState.activeResultIndex}`
+                    : undefined
+                }
+              />
+              <SearchInputTrailing
+                showClaimButton={showClaimButton}
+                claimButtonDisabled={claimButtonDisabled}
+                isLoading={isLoading}
+                isPending={isPending}
+                onClaimArtist={handleClaimArtist}
+              />
             </div>
+
+            {formState.error && (
+              <p className='mt-1.5 text-app text-error' role='alert'>
+                {formState.error}
+              </p>
+            )}
+
+            {shouldShowDropdown && (
+              <div className='system-b-spotify-connect-dropdown z-50 mt-1.5 w-full overflow-hidden'>
+                <select
+                  id='spotify-connect-results'
+                  className='sr-only'
+                  size={Math.min(totalItems, 6)}
+                  aria-label='Spotify Artist Results'
+                  value={
+                    formState.activeResultIndex === pasteUrlIndex
+                      ? '__paste__'
+                      : (results[formState.activeResultIndex]?.id ?? '')
+                  }
+                  onChange={event => {
+                    if (event.target.value === '__paste__') {
+                      handlePasteUrlClick();
+                      return;
+                    }
+                    const selectedArtist = results.find(
+                      artist => artist.id === event.target.value
+                    );
+                    if (selectedArtist && canSelectArtist(selectedArtist)) {
+                      handleArtistSelect(selectedArtist);
+                    }
+                  }}
+                >
+                  <option value='' disabled>
+                    Select an artist
+                  </option>
+                  {results.map((artist, index) => (
+                    <option
+                      key={artist.id}
+                      id={`spotify-connect-result-${index}`}
+                      value={artist.id}
+                      disabled={!canSelectArtist(artist)}
+                    >
+                      {artist.name}
+                      {artist.followers
+                        ? ` — ${formatFollowers(artist.followers)}`
+                        : ''}
+                    </option>
+                  ))}
+                  <option
+                    id={`spotify-connect-result-${pasteUrlIndex}`}
+                    value='__paste__'
+                  >
+                    Paste a Spotify URL instead
+                  </option>
+                </select>
+
+                {searchState === 'loading' && results.length === 0 && (
+                  <SearchResultsLoadingSkeleton />
+                )}
+
+                {searchState === 'empty' && (
+                  <SearchDropdownState message='No artists found' />
+                )}
+
+                {searchState === 'error' && (
+                  <SearchDropdownState
+                    message={searchError || 'Search failed. Try again.'}
+                    tone='error'
+                  />
+                )}
+
+                {results.length > 0 && (
+                  <div
+                    ref={resultsListRef}
+                    className='max-h-64 overflow-y-auto p-2'
+                    aria-hidden='true'
+                  >
+                    {results.map((artist, index) => (
+                      <button
+                        key={artist.id}
+                        type='button'
+                        tabIndex={canSelectArtist(artist) ? 0 : -1}
+                        disabled={!canSelectArtist(artist)}
+                        className={cn(
+                          'system-b-spotify-connect-result-row mb-1 flex w-full items-center gap-2.5 px-2.5 py-2 text-left last:mb-0 focus-visible:outline-none',
+                          index === formState.activeResultIndex &&
+                            canSelectArtist(artist) &&
+                            'system-b-spotify-connect-result-row--active',
+                          !canSelectArtist(artist)
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'system-b-spotify-connect-result-row--interactive cursor-pointer'
+                        )}
+                        onClick={() =>
+                          canSelectArtist(artist) && handleArtistSelect(artist)
+                        }
+                        onKeyDown={event =>
+                          canSelectArtist(artist) &&
+                          handleActivationKeyDown(event, () =>
+                            handleArtistSelect(artist)
+                          )
+                        }
+                        onMouseEnter={() =>
+                          dispatch({
+                            type: 'SET_ACTIVE_RESULT_INDEX',
+                            payload: index,
+                          })
+                        }
+                      >
+                        <div className='system-b-spotify-connect-result-artwork relative h-10 w-10 shrink-0 overflow-hidden'>
+                          {artist.imageUrl ? (
+                            <Image
+                              src={artist.imageUrl}
+                              alt={artist.name}
+                              fill
+                              sizes='40px'
+                              className='object-cover'
+                              unoptimized
+                            />
+                          ) : (
+                            <div className='flex h-full w-full items-center justify-center'>
+                              <ProviderIcon
+                                provider='spotify'
+                                className='h-5 w-5'
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <div className='truncate text-app font-caption text-primary-token'>
+                            {artist.name}
+                          </div>
+                          {artist.isClaimed && (
+                            <div className='text-2xs text-tertiary-token'>
+                              {artist.isClaimedByCurrentUser
+                                ? 'Already connected'
+                                : 'Already claimed'}
+                            </div>
+                          )}
+                          {!artist.isClaimed && artist.followers && (
+                            <div className='text-2xs text-tertiary-token'>
+                              {formatFollowers(artist.followers)}
+                            </div>
+                          )}
+                        </div>
+                        {artist.verified && (
+                          <div
+                            className='shrink-0 text-brand-spotify'
+                            data-testid='verified-badge'
+                          >
+                            <BadgeCheck
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type='button'
+                  tabIndex={0}
+                  className={cn(
+                    'system-b-spotify-connect-paste-row m-2 mt-0 flex cursor-pointer items-center gap-2.5 px-3 py-2 text-left focus-visible:outline-none',
+                    formState.activeResultIndex === pasteUrlIndex &&
+                      'system-b-spotify-connect-paste-row--active'
+                  )}
+                  onClick={handlePasteUrlClick}
+                  onKeyDown={event =>
+                    handleActivationKeyDown(event, () => handlePasteUrlClick())
+                  }
+                  onMouseEnter={() =>
+                    dispatch({
+                      type: 'SET_ACTIVE_RESULT_INDEX',
+                      payload: pasteUrlIndex,
+                    })
+                  }
+                >
+                  <div className='system-b-spotify-connect-paste-icon flex h-10 w-10 items-center justify-center'>
+                    <Link2
+                      className='h-5 w-5 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  </div>
+                  <div className='flex-1'>
+                    <div className='text-app font-caption text-primary-token'>
+                      Paste a Spotify URL instead
+                    </div>
+                    <div className='text-2xs text-tertiary-token'>
+                      open.spotify.com/artist/...
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
         </DrawerSurfaceCard>
       </DialogBody>
