@@ -50,7 +50,7 @@ export function eveShadowTransportHeaders(
   return headers;
 }
 
-/** Stable production Summer alias. Exact pins are checked, not requested. */
+/** Stable production Summer domain. Deployment pins are not requested. */
 export function getEveShadowOrigin(): string {
   return SUMMER_PRODUCTION.productionOrigin;
 }
@@ -65,10 +65,7 @@ export async function fetchSummerShadow(
     throw new Error('invalid_shadow_path');
   let origin: string;
   try {
-    const target = await resolveSummerEveCallerOrigin({
-      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
-      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
-    });
+    const target = await resolveSummerEveCallerOrigin();
     origin = target.origin;
   } catch (error) {
     if (error instanceof SummerPinInvalidError) {

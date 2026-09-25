@@ -90,7 +90,7 @@ root `apps/summer`, production branch `main`. `jovie-eve-shadow`
 is a legacy name from the pre-cutover pilot. Its production alias is
 summer.jov.ie. Runtime commit
 `f9cad8528000000c4f196e1ccbf6a8aaf386b0f7` deployed as
-`dpl_CnnoQexMQB46zwBNURMJSsAZrRAp`; the public Photon alias served that build.
+`dpl_CnnoQexMQB46zwBNURMJSsAZrRAp` <!-- summer-pin-historical: 2026-09-05 cutover receipt -->; the public Photon alias served that build.
 A real founder iMessage at 20:50:42.610Z reached the signed production webhook
 with HTTP 200, created one immutable admission, and received one Summer reply
 at 20:50:56.976Z. The obsolete parallel webhook was retired with sole-replacement
@@ -104,18 +104,25 @@ here; historical Summer extraction fixtures are verification-only pending
 final source cleanup. Transport delivery does not certify governor execution,
 Ovie web/mobile continuity, or revenue lift.
 
-## Production Summer identity and the Jovie pin
+## Production Summer reference
 
-EVENT: Production Summer is project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`.
-Display name is not identity. The caller targets `https://summer.jov.ie`.
-Alias identity must be `company.summer`, that project, and production; a bad
-alias is uncached `503` `summer_pin_invalid`. The two `OVIE_SUMMER_EVE_*` pin
-variables stay advisory. `pnpm check:summer-eve-pin` still requires both and
-warns on drift. A stale pin logs `fallback: production_alias` and the call
-still uses the alias. Do not clear them. No Jovie env change is required
-after this build. The schedule skips until `SUMMER_PIN_CHECK_VERCEL_TOKEN`
-exists.
+EVENT: Jovie addresses production Summer only at `https://summer.jov.ie`.
+Admission requires `GET /runtime/v1/identity` to report project
+`prj_LaVQva346cjp5XfrbAIIQUln7tPH` (`jovie-eve-shadow`, display name is not
+identity), environment `production`, and status `source-bound`, with a
+`sourceRevision` and deployment identity. A deployment id is observed from
+that response. It is never a pin. A mismatch or transport error is uncached
+`503` `summer_pin_invalid`. There is no second origin.
 
-Ship now: call summer.jov.ie and log a stale pin while still using the alias.
-Re-evaluate when the advisory pin is unused. Then remove the two pin
-variables and the exact-id CI check.
+`OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` and
+`OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` are deprecated and ignored, whether
+set or unset. Delete both from the Jovie production environment after this
+build. `pnpm check:summer-eve-pin` reads `https://summer.jov.ie/runtime/v1/identity`
+and, when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present, confirms that reported
+deployment is a READY production deployment of the same project. It does not
+compare a configured deployment id. The tokenless path still fails closed
+when identity is missing or not source-bound.
+
+Ship now: call `https://summer.jov.ie` and admit only source-bound production
+Summer. Re-evaluate when the two deprecated variables are gone from Vercel
+production. Then remove their schema keys.

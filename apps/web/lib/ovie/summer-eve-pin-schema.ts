@@ -1,18 +1,16 @@
 import { z } from 'zod';
-import { SUMMER_PRODUCTION } from './summer-production-identity';
 
-/** Immutable deployment URL. Same object as `ServerEnvSchema`. */
-export const ovieSummerEveDeploymentOriginSchema = z
-  .string()
-  .url()
-  .regex(
-    /^https:\/\/(?:jovie-eve-shadow|summer-operations)-[a-z0-9]+-jovie\.vercel\.app$/u,
-    `Must be an immutable Summer deployment URL for ${SUMMER_PRODUCTION.projectId}`
-  )
-  .optional();
+/**
+ * Deprecated and ignored. Production Summer is `https://summer.jov.ie`.
+ * Delete `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` from Vercel production.
+ * A leftover per-deployment URL must not choose the caller and must not
+ * fail boot.
+ */
+export const ovieSummerEveDeploymentOriginSchema = z.string().optional();
 
-/** Expected `dpl_` id. Same object as `ServerEnvSchema`. */
-export const ovieSummerEveExpectedDeploymentIdSchema = z
-  .string()
-  .regex(/^dpl_[A-Za-z0-9]+$/u)
-  .optional();
+/**
+ * Deprecated and ignored, whether set or unset. Exact deployment-id
+ * equality is not a Summer gate. Delete
+ * `OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID` from Vercel production.
+ */
+export const ovieSummerEveExpectedDeploymentIdSchema = z.string().optional();

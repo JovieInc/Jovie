@@ -137,8 +137,15 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
-  /** Advisory pin. Runtime calls `https://summer.jov.ie`, not this origin. */
+  /**
+   * Deprecated and ignored. Production Summer is `https://summer.jov.ie`.
+   * Delete this from Vercel production. A leftover value is not a caller origin.
+   */
   OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: ovieSummerEveDeploymentOriginSchema,
+  /**
+   * Deprecated and ignored, whether set or unset. Exact deployment-id
+   * equality is not a Summer gate. Delete this from Vercel production.
+   */
   OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID:
     ovieSummerEveExpectedDeploymentIdSchema,
   /**
