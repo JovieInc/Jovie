@@ -153,6 +153,25 @@ describe('runStructural screenshot contract discovery', () => {
     vi.clearAllMocks();
   });
 
+  it('never runs a tests/unit/ci file in two structural commands', () => {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    process.env.CI_PRODUCT_LANES = 'web,operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+    runStructural({ execute });
+    const explicitCiFiles = execute.mock.calls
+      .map(([command]) => String(command))
+      .filter(command => command !== WEB_CI_CONTRACT_TESTS_COMMAND)
+      .flatMap(
+        command => command.match(/tests\/unit\/ci\/[\w.-]+\.test\.ts/g) ?? []
+      );
+    // Anything named explicitly elsewhere must be excluded from the directory
+    // run, or it executes twice (Sentry on #18344).
+    for (const file of explicitCiFiles) {
+      expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(`--exclude=${file}`);
+    }
+  });
+
   it.each([
     ['web', true],
     ['operations', true],
@@ -557,7 +576,7 @@ describe('webCiContractTestsCommand', () => {
       expect(command).not.toContain('webhook-handler');
       expect(command).not.toContain('not-a-unit');
       expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts'
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });

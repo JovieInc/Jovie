@@ -69,11 +69,14 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // contract inputs. Those paths select only the operations lane, which skips
 // the web Unit Tests shards, so run the whole directory here (#18222 landed a
 // workflow-only diff that turned main red because only Unit Tests ran it).
-// Excluded here because the web Unit Tests job owns them: the browser-heavy
-// Playwright artifact receipt, plus every unit test in the quarantine ledger
-// (Unit Tests reruns those with retries under continue-on-error).
+// Excluded here because another job or command owns them, so nothing runs
+// twice: the browser-heavy Playwright artifact receipt (web Unit Tests), the
+// production-marker-state coverage gate (operations structural command), and
+// every unit test in the quarantine ledger (Unit Tests reruns those with
+// retries under continue-on-error).
 const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
   'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  'tests/unit/ci/production-marker-state.test.ts',
 ]);
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json')
@@ -883,8 +886,11 @@ export function runStructural(opts = {}) {
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
-    // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
+    // closed when the file cannot be resolved or contains no tests. The rest of
+    // tests/unit/ci (setup-doppler-action included) runs in
+    // webCiContractTestsCommand(); deploy-workflow stays here because that
+    // command excludes quarantine-ledger entries.
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
