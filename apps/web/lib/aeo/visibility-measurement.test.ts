@@ -109,6 +109,18 @@ describe('AI visibility measurement layers', () => {
     );
   });
 
+  it('marks readiness ready only when every measured flag is true', () => {
+    const measurement = buildAiVisibilityMeasurement({
+      readiness: {
+        profilePublished: true,
+        aiCrawlersAllowed: true,
+        brandIntegrityReady: true,
+      },
+    });
+
+    expect(summarizeAiVisibilityLayers(measurement).readiness).toBe('ready');
+  });
+
   it('keeps readiness flags out of observed and outcome buckets', () => {
     const measurement = buildAiVisibilityMeasurement({
       readiness: {
