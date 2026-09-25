@@ -1502,3 +1502,155 @@ def test_failed_deploy_emits_redacted_cli_tail_and_error_annotation(tmp_path: Pa
         "PREBUILT_OUTPUT_INVALID): Error: Response Error (400): Invalid filePathMap entry "
         "for [redacted]"
     ]
+
+
+def _write_ignore_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+if [ -f .vercelignore ]; then state=present; else state=hidden; fi
+printf '%s %s\\n' "$state" "$*" >> "${{VERCEL_CALL_LOG}}"
+if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "https://jovie-prebuilt-probe.vercel.app"
+  exit {prebuilt_exit}
+fi
+echo "https://jovie-source-probe.vercel.app"
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+
+def _prebuilt_fixture(tmp_path: Path) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    func_dir = tmp_path / ".vercel/output/functions/index.func"
+    func_dir.mkdir(parents=True)
+    (tmp_path / ".vercel/output/config.json").write_text("{}")
+    (func_dir / ".vc-config.json").write_text(
+        json.dumps({"filePathMap": {"CHANGELOG.md": "CHANGELOG.md"}})
+    )
+    (tmp_path / "CHANGELOG.md").write_text("# traced runtime file\n")
+    (tmp_path / ".vercelignore").write_text("*.md\n**/tests/\n")
+    return {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "VERCEL_TOKEN": "test-token",
+        "VERCEL_ORG_ID": "test-org",
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+        "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+        "RUNNER_TEMP": str(tmp_path),
+    }
+
+
+def _run_deploy(tmp_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bash", str(DEPLOY_SCRIPT), "deploy_url", "--yes"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+
+def test_prebuilt_upload_hides_vercelignore_so_traced_files_are_not_dropped(
+    tmp_path: Path,
+) -> None:
+    """Vercel CLI >= 59 drops .vercelignore-matched filePathMap entries from
+    prebuilt uploads; every staging deploy after the 56.3.2 -> 59.16.0 bump
+    then failed server-side. The prebuilt call must run without the file and
+    the file must be restored byte-for-byte afterwards."""
+
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert len(calls) == 1
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+    assert (tmp_path / ".vercelignore").read_text() == original
+    assert not list(tmp_path.glob("jovie-vercelignore.*"))
+
+
+def test_failed_prebuilt_restores_vercelignore_before_source_fallback(
+    tmp_path: Path,
+) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert len(calls) == 2
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+    assert calls[1].startswith("present deploy --yes")
+    assert (tmp_path / ".vercelignore").read_text() == original
+
+
+def test_failed_prebuilt_without_fallback_still_restores_vercelignore(
+    tmp_path: Path,
+) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert (tmp_path / ".vercelignore").read_text() == original
+
+
+@pytest.mark.parametrize(
+    ("kind", "secret_path"),
+    [
+        ("filePathMap", ".env.production"),
+        ("filePathMap", "apps/web/.env"),
+        ("filePathMap", "certs/signing.pem"),
+        ("filePathMap", ".vercel/project.json"),
+        ("filePathMap", ".npmrc"),
+        ("output", ".vercel/output/functions/index.func/.env.local"),
+        ("output", ".vercel/output/static/private.key"),
+    ],
+)
+def test_prebuilt_upload_fails_closed_on_credential_bearing_files(
+    tmp_path: Path, kind: str, secret_path: str
+) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    if kind == "filePathMap":
+        vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+        vc_config.write_text(
+            json.dumps(
+                {"filePathMap": {"CHANGELOG.md": "CHANGELOG.md", secret_path: secret_path}}
+            )
+        )
+    else:
+        (tmp_path / secret_path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / secret_path).write_text("fixture=never-uploaded\n")
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert "credential-bearing files" in result.stderr
+    assert secret_path in result.stderr
+    assert not (tmp_path / "vercel-calls").exists()
+    assert (tmp_path / ".vercelignore").exists()
+
+
+def test_env_example_in_trace_is_not_treated_as_a_credential(tmp_path: Path) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(json.dumps({"filePathMap": {".env.example": ".env.example"}}))
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
