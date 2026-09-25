@@ -103,6 +103,17 @@ describe('library saved views', () => {
     expect(countLibrarySavedViewMatches(assets, 'live-merch')).toBe(1);
   });
 
+  it('reads all and does not persist when window is missing', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(readPersistedLibrarySavedView()).toBe('all');
+      persistLibrarySavedView('needs-attention');
+      expect(readPersistedLibrarySavedView()).toBe('all');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('persists the selected smart filter in localStorage', () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('localStorage', {

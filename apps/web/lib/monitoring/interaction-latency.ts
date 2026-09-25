@@ -65,8 +65,7 @@ function createInteractionId(name: string) {
 
 function canUseLatencyStorage(): boolean {
   return (
-    typeof globalThis.window !== 'undefined' &&
-    typeof globalThis.localStorage !== 'undefined'
+    globalThis.window !== undefined && globalThis.localStorage !== undefined
   );
 }
 
@@ -205,7 +204,7 @@ export function getUxLatencySummaries(
 }
 
 export function subscribeUxLatency(listener: () => void): () => void {
-  if (typeof globalThis.window === 'undefined') return () => {};
+  if (globalThis.window === undefined) return () => {};
   const handleStorage = (event: StorageEvent) => {
     if (event.key === UX_LATENCY_STORAGE_KEY) listener();
   };
