@@ -546,6 +546,8 @@ def compose_snapshot(
     runner_value = {
         "capacityAvailable": available,
         "queuedWork": len(work_items) if runtime_revision is not None else None,
+        "running": len(running) if runtime_revision is not None else None,
+        "blocked": len(blocked) if runtime_revision is not None else None,
         "blockedSince": blocked_since,
         "capacitySource": capacity_source,
         "workSource": work_source,

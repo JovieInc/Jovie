@@ -117,6 +117,8 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(signals["queue"]["eligibleCleanPrs"], 4)
         self.assertEqual(signals["release"]["productionSha"], PRODUCTION_SHA)
         self.assertEqual(signals["runner"]["queuedWork"], 2)
+        self.assertEqual(signals["runner"]["running"], 1)
+        self.assertEqual(signals["runner"]["blocked"], 1)
         self.assertEqual(signals["closure"]["blockedSince"], "2026-09-05T19:29:00Z")
         self.assertEqual(signals["release"]["blockedSince"], "2026-09-05T19:29:00Z")
         self.assertEqual(
