@@ -27,6 +27,19 @@ def lines(code):
 sys.path.insert(0, str(SUITE.parent))
 sys.argv = [str(SUITE)]
 tracer = trace.Trace(count=True, trace=False)
+# Only target-file lines are reported, so skip line callbacks everywhere else
+# (the suite, stdlib); counts for the target files are unchanged.
+TARGET_FILES = {str(ROOT / "scripts/symphony" / name) for name in TARGETS}
+_count_lines = tracer.globaltrace
+
+
+def _trace_targets(frame, why, arg):
+    if frame.f_code.co_filename not in TARGET_FILES:
+        return None
+    return _count_lines(frame, why, arg)
+
+
+tracer.globaltrace = _trace_targets
 status = 0
 try:
     tracer.runfunc(runpy.run_path, str(SUITE), run_name="__main__")
