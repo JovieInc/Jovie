@@ -5871,6 +5871,7 @@ jobs:
             sleep 10
             if [ "$i" -eq 3 ]; then exit 1; fi
           done
+          node .github/scripts/materialize-vercel-static.mjs
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
