@@ -1025,7 +1025,6 @@ export function ProfileCompactTemplate({
                 : undefined
             }
           />
-
         }
       />
     </ProfileNotificationsContext.Provider>
