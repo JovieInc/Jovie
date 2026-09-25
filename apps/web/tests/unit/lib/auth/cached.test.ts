@@ -95,11 +95,25 @@ describe('cached auth utilities', () => {
         orgId: null,
       });
       expect(mockGetSession).toHaveBeenCalledTimes(1);
-      expect(mockGetSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: { disableCookieCache: true },
-        })
-      );
+      expect(mockGetSession.mock.calls[0]?.[0]?.query).toBeUndefined();
+    });
+
+    it('reuses a fresh session read later in the same request', async () => {
+      mockGetSession.mockResolvedValue({
+        user: { id: 'ba_user_fresh' },
+        session: { id: 'sess_fresh' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({ id: 'user_fresh' });
+
+      const { getCachedAuth, getFreshAuth } = await import('@/lib/auth/cached');
+      const fresh = await getFreshAuth();
+      const cached = await getCachedAuth();
+
+      expect(fresh).toEqual(cached);
+      expect(mockGetSession).toHaveBeenCalledTimes(1);
+      expect(mockGetSession.mock.calls[0]?.[0]?.query).toEqual({
+        disableCookieCache: true,
+      });
     });
 
     it('deduplicates multiple calls within the same request', async () => {
@@ -144,24 +158,27 @@ describe('cached auth utilities', () => {
       ['banned', null],
       ['suspended', null],
       ['active', new Date('2026-07-22T00:00:00Z')],
-    ])('fails closed for a %s app user even when Better Auth returns a cached session', async (userStatus, deletedAt) => {
-      mockGetSession.mockResolvedValue({
-        user: { id: 'ba_blocked' },
-        session: { id: 'sess_cached' },
-      });
-      mockGetAppUserByBetterAuthId.mockResolvedValue({
-        id: 'user_blocked',
-        userStatus,
-        deletedAt,
-      });
+    ])(
+      'fails closed for a %s app user even when Better Auth returns a cached session',
+      async (userStatus, deletedAt) => {
+        mockGetSession.mockResolvedValue({
+          user: { id: 'ba_blocked' },
+          session: { id: 'sess_cached' },
+        });
+        mockGetAppUserByBetterAuthId.mockResolvedValue({
+          id: 'user_blocked',
+          userStatus,
+          deletedAt,
+        });
 
-      const { getCachedAuth } = await import('@/lib/auth/cached');
-      await expect(getCachedAuth()).resolves.toEqual({
-        userId: null,
-        sessionId: null,
-        orgId: null,
-      });
-    });
+        const { getCachedAuth } = await import('@/lib/auth/cached');
+        await expect(getCachedAuth()).resolves.toEqual({
+          userId: null,
+          sessionId: null,
+          orgId: null,
+        });
+      }
+    );
   });
 
   describe('getOptionalAuth', () => {
@@ -186,6 +203,28 @@ describe('cached auth utilities', () => {
     });
   });
 
+  describe('getFreshAuth', () => {
+    it('bypasses the cookie cache', async () => {
+      mockGetSession.mockResolvedValue({
+        user: { id: 'ba_user_fresh' },
+        session: { id: 'sess_fresh' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({ id: 'user_fresh' });
+
+      const { getFreshAuth } = await import('@/lib/auth/cached');
+      await expect(getFreshAuth()).resolves.toEqual({
+        userId: 'user_fresh',
+        sessionId: 'sess_fresh',
+        orgId: null,
+      });
+      expect(mockGetSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { disableCookieCache: true },
+        })
+      );
+    });
+  });
+
   describe('getCachedCurrentUser', () => {
     it('returns a synthetic user in test bypass mode', async () => {
       mockGetCachedDevTestAuthSession.mockResolvedValue({
@@ -206,6 +245,32 @@ describe('cached auth utilities', () => {
       expect(user?.primaryEmailAddress?.emailAddress).toBe(
         'creator@example.com'
       );
+      expect(mockGetSession).not.toHaveBeenCalled();
+    });
+
+    it('reads the current user through the cookie cache', async () => {
+      mockGetSession.mockResolvedValue({
+        user: {
+          id: 'ba_user_1',
+          email: 'reader@example.com',
+          name: 'Reader',
+          image: null,
+        },
+        session: { id: 'sess_reader' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({
+        id: 'user_reader',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+
+      const { getCachedCurrentUser } = await import('@/lib/auth/cached');
+      const user = await getCachedCurrentUser();
+
+      expect(user?.primaryEmailAddress?.emailAddress).toBe(
+        'reader@example.com'
+      );
+      expect(mockGetSession.mock.calls[0]?.[0]?.query).toBeUndefined();
     });
   });
 });

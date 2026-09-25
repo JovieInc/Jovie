@@ -43,7 +43,7 @@ function wantsJsonResponse(request: NextRequest): boolean {
  * it never throws, returning free-tier defaults with admin status preserved.
  */
 async function resolveEntitlements() {
-  return getCurrentUserEntitlements();
+  return getCurrentUserEntitlements({ session: 'fresh' });
 }
 
 /**

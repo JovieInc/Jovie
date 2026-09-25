@@ -59,6 +59,7 @@ describe('Admin Roles API', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Unauthorized');
+      expect(mockRequireAdmin).toHaveBeenCalledWith({ session: 'fresh' });
     });
 
     it('grants admin role successfully', async () => {
@@ -124,6 +125,7 @@ describe('Admin Roles API', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Unauthorized');
+      expect(mockRequireAdmin).toHaveBeenCalledWith({ session: 'fresh' });
     });
 
     it('revokes admin role successfully', async () => {

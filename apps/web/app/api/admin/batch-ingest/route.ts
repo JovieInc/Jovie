@@ -141,7 +141,7 @@ async function ingestUrlEntry(entry: string): Promise<BatchIngestResult> {
 async function resolveAdminEntitlements(
   _route: string
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated) {
     return {

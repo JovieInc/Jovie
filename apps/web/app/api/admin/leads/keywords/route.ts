@@ -57,7 +57,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

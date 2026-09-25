@@ -138,7 +138,7 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
 
     const parsedBody = await parseJsonBody<{

@@ -74,7 +74,7 @@ async function deleteFounderReviewBlobs(
  * must filter by the resolved `user.id` — never rely on RLS alone.
  */
 export async function POST(request: Request) {
-  const { userId: clerkUserId } = await getCachedAuth();
+  const { userId: clerkUserId } = await getCachedAuth({ session: 'fresh' });
   if (!clerkUserId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

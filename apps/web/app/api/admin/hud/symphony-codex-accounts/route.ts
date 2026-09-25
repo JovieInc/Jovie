@@ -48,7 +48,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const denied = await requireAdminHudApiAccess();
+  const denied = await requireAdminHudApiAccess({ session: 'fresh' });
   if (denied) return denied;
   try {
     let body: unknown;
