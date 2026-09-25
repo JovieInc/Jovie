@@ -107,6 +107,9 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
       />
     );
 
+    const releases = screen.getByTestId('profile-primary-tab-releases');
+    expect(releases.className).toContain('-mx-(--page-pad)');
+    expect(releases.className).not.toContain('-mx-4');
     expect(screen.getByTestId('mock-releases-view')).toBeVisible();
     expect(screen.getByTestId('mock-releases-view')).toHaveAttribute(
       'data-artist-id',
@@ -135,6 +138,9 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
       />
     );
 
+    const listenPanel = screen.getByTestId('profile-primary-tab-listen');
+    expect(listenPanel.className).toContain('-mx-(--page-pad)');
+    expect(listenPanel.className).not.toContain('-mx-4');
     expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
     const heading = screen.getByText('No releases listed yet');
     expect(heading).toHaveClass('text-secondary-token');
