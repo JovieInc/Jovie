@@ -22,10 +22,10 @@ import {
   type AnalyticsWindowSnapshot,
   type ChannelPartition,
   type ConversionRateDeclaration,
-  type MetricEntry,
-  type MetricReading,
   findAnalyticsInvariantViolations,
   formatInvariantFinding,
+  type MetricEntry,
+  type MetricReading,
 } from './invariants';
 
 /** Dashboard payload shape consumed by the invariant check. */
@@ -105,24 +105,32 @@ export function evaluateDashboardAnalyticsInvariants(
       // Total page visits including repeats: additive event count over the
       // ranged window, one coverage basis shared with the click stream.
       grain: {
-        ...countGrain(metrics.total_clicks === undefined ? 'unknown' : 'complete'),
+        ...countGrain(
+          metrics.total_clicks === undefined ? 'unknown' : 'complete'
+        ),
         population: 'profile-views',
       },
     },
     {
       key: 'total_clicks',
       reading: readingFromValue(metrics.total_clicks),
-      grain: countGrain(metrics.total_clicks === undefined ? 'unknown' : 'complete'),
+      grain: countGrain(
+        metrics.total_clicks === undefined ? 'unknown' : 'complete'
+      ),
     },
     {
       key: 'listen_clicks',
       reading: readingFromValue(metrics.listen_clicks),
-      grain: countGrain(metrics.listen_clicks === undefined ? 'unknown' : 'complete'),
+      grain: countGrain(
+        metrics.listen_clicks === undefined ? 'unknown' : 'complete'
+      ),
     },
     {
       key: 'tip_link_visits',
       reading: readingFromValue(metrics.tip_link_visits),
-      grain: countGrain(metrics.tip_link_visits === undefined ? 'unknown' : 'complete'),
+      grain: countGrain(
+        metrics.tip_link_visits === undefined ? 'unknown' : 'complete'
+      ),
     },
     {
       key: 'unique_users',
