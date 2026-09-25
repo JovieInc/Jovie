@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import shlex
 import os
 import pathlib
 import subprocess
@@ -140,7 +142,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(root, source)
 
-    def _wrapper_fixture(self, cache_exit: int = 0) -> tuple[tempfile.TemporaryDirectory[str], pathlib.Path, pathlib.Path]:
+    def _wrapper_fixture(self, cache_exit: int = 0, pnpm_version: str = "9.15.9") -> tuple[tempfile.TemporaryDirectory[str], pathlib.Path, pathlib.Path]:
         temp = tempfile.TemporaryDirectory()
         root = pathlib.Path(temp.name)
         bin_dir = root / "bin"
@@ -154,7 +156,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         receipts.mkdir()
 
         (bin_dir / "node").write_text("#!/usr/bin/env bash\nprintf 'v22.23.2\\n'\n")
-        (bin_dir / "pnpm").write_text("#!/usr/bin/env bash\nprintf '9.15.4\\n'\n")
+        (bin_dir / "pnpm").write_text(f"#!/usr/bin/env bash\nprintf '{pnpm_version}\\n'\n")
         (bin_dir / "realpath").write_text(
             "#!/usr/bin/env bash\n"
             "[ \"${1:-}\" = -m ] && shift\n"
@@ -206,6 +208,38 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
             (pathlib.Path(temp.name) / "receipts/JOV-9900000.json").read_text(),
             "receipt\n",
         )
+
+    def test_host_pnpm_guards_execute_before_workspace_or_storage_mutation(self) -> None:
+        package = json.loads((ROOT / "package.json").read_text())
+        self.assertEqual(package["packageManager"], "pnpm@9.15.9")
+        exercised = set()
+        for version in ("9.15.9", "9.15.4", "10.0.0"):
+            with self.subTest(version=version):
+                temp, wrapper, log = self._wrapper_fixture(pnpm_version=version)
+                self.addCleanup(temp.cleanup)
+                root = pathlib.Path(temp.name)
+                workspace = root / "JOV-9900002"
+                workspace.mkdir()
+                env = {**os.environ, "EVENT_LOG": str(log), "PATH": f"{root / 'bin'}:{os.environ['PATH']}"}
+                result = subprocess.run(["bash", "-x", str(wrapper), str(workspace)], env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0 if version == "9.15.9" else 69, result.stderr)
+                if version != "9.15.9":
+                    self.assertFalse(log.exists(), "wrong toolchain must not prepare or clone a workspace")
+                # Execute the installer's actual toolchain preflight in isolation;
+                # the privileged mount/service mutations are deliberately not invoked.
+                block = INSTALLER.read_text().split('tool_path=', 1)[1].split('\nuser_systemctl=', 1)[0]
+                script = ('set -euo pipefail\n'
+                          f'node_target={shlex.quote(str(root / "bin/node"))}\n'
+                          'owner=fixture\ncorepack_home=/unused\n'
+                          'tool_path=' + block)
+                installed = subprocess.run(["bash", "-x", "-c", script], capture_output=True, text=True)
+                self.assertEqual(installed.returncode, 0 if version == "9.15.9" else 69, installed.stderr)
+                for observed in (result, installed):
+                    self.assertIn(f"+ [[ {version} == 9.15.9 ]]", observed.stderr.replace("\\", ""))
+                exercised.add(version)
+        self.assertEqual(exercised, {"9.15.9", "9.15.4", "10.0.0"})
+        print("HOST_PNPM_PIN_COVERAGE guards=2/2 accepted=9.15.9 rejected=9.15.4,10.0.0")
 
     def test_cache_failure_aborts_without_activation(self) -> None:
         temp, wrapper, log = self._wrapper_fixture(cache_exit=78)

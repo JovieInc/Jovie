@@ -69,7 +69,7 @@ esac
 tool_path="$(dirname "$node_target"):/usr/local/bin:/usr/bin:/bin"
 tool_env=(env "HOME=/home/$owner" "COREPACK_HOME=$corepack_home" COREPACK_ENABLE_NETWORK=0 "PATH=$tool_path")
 [[ "$("${tool_env[@]}" node --version)" == "v22.23.2" ]] || { echo "Node 22.23.2 validation failed" >&2; exit 69; }
-[[ "$("${tool_env[@]}" pnpm --version)" == "9.15.4" ]] || { echo "pnpm 9.15.4 validation failed" >&2; exit 69; }
+[[ "$("${tool_env[@]}" pnpm --version)" == "9.15.9" ]] || { echo "pnpm 9.15.9 validation failed" >&2; exit 69; }
 
 user_systemctl=(runuser -u "$owner" -- env "XDG_RUNTIME_DIR=/run/user/$owner_uid" systemctl --user)
 service_state_before="$("${user_systemctl[@]}" show symphony-elixir.service -p ActiveState --value)"
