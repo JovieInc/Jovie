@@ -1557,6 +1557,82 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
                 self.assertEqual(paths["workflow"].read_bytes(), before)
                 self.assertEqual(paths["gate"].read_text(), "old gate\n")
 
+    def _select_profile(self, paths, profile: str) -> None:
+        settings = paths["workflow"].parent / "runner-source.env"
+        settings.write_text(f"JOVIE_CONFIGURATION_PROFILE={profile}\n")
+        settings.chmod(0o600)
+
+    def test_codex_profile_adopts_router_and_five_agents_from_codex_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            self._select_profile(paths, "governor-bounded-codex")
+            bounded = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            paths["workflow"].write_text(bounded.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1"))
+            process = self._install(fixture, env)
+            installed = paths["workflow"].read_text()
+            expected = (fixture / "scripts/symphony/profiles/governor-bounded-codex/WORKFLOW.md").read_text()
+            receipt = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(installed, expected)
+        self.assertIn("command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server", installed)
+        self.assertNotIn("/usr/bin/false", installed)
+        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', installed)
+        self.assertIn("symphony-five-pr-repair-20260908", installed)
+        self.assertIn("max_retry_attempts: 1", installed)
+        self.assertIn("max_concurrent_agents: 5", installed)
+        self.assertEqual(receipt["configurationProfile"], "governor-bounded-codex")
+        self.assertEqual(receipt["workflow"]["codex"], "in")
+        self.assertTrue(receipt["workflow"]["matches"])
+        self.assertEqual(receipt["workflow"]["sourceMaxConcurrentAgents"], 5)
+        self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], 5)
+
+    def test_codex_profile_reinstall_retains_lower_ceiling_and_codex_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            self._select_profile(paths, "governor-bounded-codex")
+            codex = (fixture / "scripts/symphony/profiles/governor-bounded-codex/WORKFLOW.md").read_text()
+            expected = codex.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1")
+            paths["workflow"].write_text(expected)
+            process = self._install(fixture, env)
+            installed = paths["workflow"].read_text()
+            receipt = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(installed, expected)
+        self.assertIn("command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server", expected)
+        self.assertEqual(receipt["workflow"]["codex"], "in")
+        self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], 1)
+        self.assertTrue(receipt["workflow"]["matches"])
+        self.assertEqual(receipt["workflow"]["matchMode"], "bounded_concurrency_overlay")
+
+    def test_codex_profile_rejects_concurrency_above_five_and_codex_out_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            self._select_profile(paths, "governor-bounded-codex")
+            codex_path = fixture / "scripts/symphony/profiles/governor-bounded-codex/WORKFLOW.md"
+            original = codex_path.read_text()
+            paths["workflow"].write_text(original)
+            raised = self._install(fixture, env, workflow_overlay="6")
+            self.assertNotEqual(raised.returncode, 0, raised.stdout)
+            self.assertEqual(paths["workflow"].read_text(), original)
+            self.assertIn("refusing unmatched Gem configuration", raised.stderr)
+            codex_path.write_text(original.replace(
+                "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server",
+                "command: /usr/bin/false",
+            ))
+            subprocess.run(["git", "-C", str(fixture), "add", "."], check=True, env=_git_env())
+            subprocess.run(["git", "-C", str(fixture), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-qm", "codex out"], check=True, env=_git_env())
+            before = paths["workflow"].read_text()
+            rejected = self._install(fixture, env)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertEqual(paths["workflow"].read_text(), before)
+            self.assertIn("Codex IN", rejected.stderr)
+
     def test_bounded_profile_rejects_controller_ceiling_above_reviewed_maximum(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)

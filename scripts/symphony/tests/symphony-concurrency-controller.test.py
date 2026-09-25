@@ -792,15 +792,71 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
                 for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):
                     installed.write_text(text)
                     with self.assertRaises(SystemExit): exec(compile(code, str(installer), "exec"), {})
+            bounded_source = self.SOURCE.replace(
+                "  max_concurrent_agents: 4\n",
+                "  max_concurrent_agents: 4\ncodex:\n  command: /usr/bin/false\n",
+            )
+            source.write_text(bounded_source)
+
+            def bounded_installed(value: str) -> str:
+                return bounded_source.replace(
+                    "max_concurrent_agents: 4", f"max_concurrent_agents: {value}"
+                )
+
             with mock.patch.dict(MODULE.os.environ, {**env, "CONFIGURATION_PROFILE": "governor-bounded"}):
-                installed.write_text(self.overlay("1"))
+                installed.write_text(bounded_installed("1"))
                 namespace = {}
                 with mock.patch("builtins.print"):
                     exec(compile(code, str(installer), "exec"), namespace)
                 self.assertEqual(namespace["receipt"]["configurationProfile"], "governor-bounded")
-                installed.write_text(self.overlay("128"))
+                self.assertEqual(namespace["receipt"]["workflow"]["codex"], "out")
+                installed.write_text(bounded_installed("128"))
                 with self.assertRaises(SystemExit):
                     exec(compile(code, str(installer), "exec"), {})
+                installed.write_text(
+                    bounded_installed("1").replace(
+                        "command: /usr/bin/false",
+                        "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server",
+                    )
+                )
+                with self.assertRaises(SystemExit):
+                    exec(compile(code, str(installer), "exec"), {})
+            codex_source = self.SOURCE.replace(
+                "  max_concurrent_agents: 4\n",
+                "  max_concurrent_agents: 5\ncodex:\n"
+                "  command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server\n",
+            )
+            source.write_text(codex_source)
+
+            def codex_installed(value: str) -> str:
+                return codex_source.replace(
+                    "max_concurrent_agents: 5", f"max_concurrent_agents: {value}"
+                )
+
+            with mock.patch.dict(MODULE.os.environ, {**env, "CONFIGURATION_PROFILE": "governor-bounded-codex"}):
+                installed.write_text(codex_installed("5"))
+                namespace = {}
+                with mock.patch("builtins.print"):
+                    exec(compile(code, str(installer), "exec"), namespace)
+                self.assertEqual(namespace["receipt"]["workflow"]["codex"], "in")
+                self.assertEqual(namespace["receipt"]["workflow"]["installedMaxConcurrentAgents"], 5)
+                self.assertTrue(namespace["receipt"]["workflow"]["matches"])
+                installed.write_text(codex_installed("1"))
+                namespace = {}
+                with mock.patch("builtins.print"):
+                    exec(compile(code, str(installer), "exec"), namespace)
+                self.assertTrue(namespace["receipt"]["workflow"]["matches"])
+                self.assertEqual(namespace["receipt"]["workflow"]["matchMode"], "bounded_concurrency_overlay")
+                for rejected in (
+                    codex_installed("6"),
+                    codex_installed("5").replace(
+                        "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server",
+                        "command: /usr/bin/false",
+                    ),
+                ):
+                    installed.write_text(rejected)
+                    with self.assertRaises(SystemExit):
+                        exec(compile(code, str(installer), "exec"), {})
 
     def test_any_other_workflow_drift_fails_closed(self):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
