@@ -25,10 +25,12 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           BODY_FILE="$RUNNER_TEMP/pr_body.txt"
+          # Markers carry hyphenated values (UUIDs, JOV-NNNN). Capture up to the
+          # last alphanumeric so a trailing "-->" never leaks into the value.
           printf '%s' "$PR_BODY" > "$BODY_FILE"
 
-          LINEAR_ISSUE_ID=$(sed -n 's/.*linear-issue-id:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
-          LINEAR_ISSUE_IDENTIFIER=$(sed -n 's/.*linear-issue-identifier:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
+          LINEAR_ISSUE_ID=$(sed -n 's/.*linear-issue-id:\([A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9]\).*/\1/p' "$BODY_FILE" | head -1)
+          LINEAR_ISSUE_IDENTIFIER=$(sed -n 's/.*linear-issue-identifier:\([A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9]\).*/\1/p' "$BODY_FILE" | head -1)
 
           # Fallback: infer identifier (e.g. JOV-1433) from the head branch
           # (Cursor + this repo's convention: "<user>/jov-NNNN-…" or "itstimwhite/jov-NNNN-…").
