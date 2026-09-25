@@ -116,7 +116,12 @@ export function routeFromPattern(pattern) {
     .replace(/\\\./g, '.')
     .replace(/\\\//g, '/');
   const withoutHost = stripped.replace(/^https?:\/\/[^/]+/, '');
-  if (withoutHost.includes('/app/admin/')) return '/app/admin/*';
+  if (
+    withoutHost.includes('/app/admin/') ||
+    withoutHost.includes('/app/ov/')
+  ) {
+    return '/app/admin/*';
+  }
   const pathMatch = withoutHost.match(/(\/[A-Za-z0-9[\]{}_|()?+*,./-]*)/);
   if (!pathMatch) return '*';
   return (
@@ -228,7 +233,7 @@ function tighter(left, right) {
     return left.value < right.value ? left : right;
   }
   if (left.level === 'error' && right.level !== 'error') return left;
-  if (right.level === 'error' && left.level !== 'error') return right;
+  if (right.level === 'error' && right.level !== 'error') return right;
   return left;
 }
 
