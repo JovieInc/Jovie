@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -163,9 +163,11 @@ describe('checkSummerEvePin', () => {
       NODE_ENV: 'test',
       SUMMER_PIN_CHECK_VERCEL_TOKEN: TOKEN,
     } as NodeJS.ProcessEnv;
-    expect(await main(['--env-file', path], env, mockFetch().fetchImpl)).toBe(
-      0
-    );
+    expect(
+      await main(['--env-file', path], env, mockFetch().fetchImpl, file =>
+        readFileSync(file, 'utf8')
+      )
+    ).toBe(0);
     expect(JSON.stringify([log.mock.calls, error.mock.calls])).not.toContain(
       'super-secret-token'
     );

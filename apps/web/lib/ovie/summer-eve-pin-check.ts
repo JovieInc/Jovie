@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import {
   ovieSummerEveDeploymentOriginSchema,
   ovieSummerEveExpectedDeploymentIdSchema,
@@ -199,12 +198,12 @@ export async function checkSummerEvePin(
   return 0;
 }
 
-export function readSummerPinEnvFile(path: string): {
+export function readSummerPinEnvFile(contents: string): {
   origin?: string;
   deploymentId?: string;
 } {
   const values = new Map<string, string>();
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/u)) {
+  for (const line of contents.split(/\r?\n/u)) {
     const eq = line.indexOf('=');
     if (!line || line.startsWith('#') || eq <= 0) continue;
     const key = line.slice(0, eq);
@@ -248,10 +247,17 @@ export function parseSummerPinCheckArgs(argv: readonly string[]): {
 export async function main(
   argv: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
-  fetchImpl: typeof fetch = globalThis.fetch
+  fetchImpl: typeof fetch = globalThis.fetch,
+  readFile?: (path: string) => string
 ): Promise<number> {
   const args = parseSummerPinCheckArgs(argv);
-  const fromFile = args.envFile ? readSummerPinEnvFile(args.envFile) : {};
+  if (args.envFile && !readFile) {
+    throw new Error('--env-file requires a file reader');
+  }
+  const fromFile =
+    args.envFile && readFile
+      ? readSummerPinEnvFile(readFile(args.envFile))
+      : {};
   return checkSummerEvePin({
     origin:
       args.origin ?? env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN ?? fromFile.origin,
