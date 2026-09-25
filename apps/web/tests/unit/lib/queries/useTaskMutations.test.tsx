@@ -124,6 +124,48 @@ describe('useTaskMutations', () => {
     });
   });
 
+  it('reorders a cached list by board order when status changes', async () => {
+    const later = createTask({
+      id: 'task-later',
+      title: 'Later',
+      position: 10,
+      status: 'todo',
+    });
+    const earlier = createTask({
+      id: 'task-earlier',
+      title: 'Earlier',
+      position: 0,
+      status: 'todo',
+    });
+    mockUpdateTask.mockResolvedValue(
+      createTask({ id: later.id, status: 'done' })
+    );
+
+    queryClient.setQueryData(queryKeys.tasks.list('profile-1'), {
+      tasks: [later, earlier],
+      nextCursor: null,
+    } satisfies TaskListResult);
+
+    const { result } = renderHook(() => useUpdateTaskMutation(), { wrapper });
+
+    act(() => {
+      result.current.mutate({
+        taskId: later.id,
+        data: { status: 'done' },
+      });
+    });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<TaskListResult>(
+        queryKeys.tasks.list('profile-1')
+      );
+      expect(cached?.tasks.map(task => task.id)).toEqual([
+        earlier.id,
+        later.id,
+      ]);
+    });
+  });
+
   it('updates profile-scoped stats optimistically from the cached task list', async () => {
     const task = createTask();
     let resolveUpdate!: (value: TaskView) => void;
