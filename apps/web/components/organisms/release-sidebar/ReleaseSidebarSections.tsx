@@ -167,7 +167,7 @@ function getDspStatus({
 }
 
 function getProviderGlyph(label: string, fallback: string): string {
-  return (label.match(/[a-z0-9]/iu)?.[0] ?? fallback[0] ?? '?').toUpperCase();
+  return (/[a-z0-9]/iu.exec(label)?.[0] ?? fallback[0] ?? '?').toUpperCase();
 }
 
 function getDspAvatarItems(
