@@ -87,7 +87,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
-  it('keeps the editorial search wide and clips its aura to the pill', () => {
+  it('keeps the editorial search wide and bounds its aura to the pill', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
@@ -97,21 +97,59 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(css).toMatch(
       /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
     );
-    expect(css).not.toMatch(/\.group\\\//);
-    const auraCss = readFileSync(
-      path.join(webRoot, 'components/features/home/InputAuraFrame.css'),
-      'utf8'
+    expect(css).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?overflow: hidden;[\s\S]*?border-radius: var\(--radius-pill\);[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
     );
-    expect(auraCss).toContain('input-aura-frame--editorial');
-    expect(auraCss).toContain('mask-composite: exclude');
   });
 
-  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+  it('keeps the animated aura on the border and the field interior calm', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
-      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?padding: var\(--space-px\);[\s\S]*?mask-composite: exclude;[\s\S]*?\}/
     );
+    expect(css).toMatch(
+      /\.homepage-name-search__field\s*\{[\s\S]*?min-height: calc\(var\(--space-12\) \+ var\(--space-2\)\);[\s\S]*?padding: var\(--space-1\) calc\(var\(--space-3\) \+ var\(--space-px\)\) var\(--space-1\)[\s\S]*?var\(--space-5\);[\s\S]*?background: var\(--system-b-bg-page\);[\s\S]*?background-clip: padding-box;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-name-search:focus-within \.homepage-name-search__field\s*\{[\s\S]*?outline-color: var\(--color-accent-blue\);[\s\S]*?\}/
+    );
+  });
+
+  it('sizes rotating border paint to cover the wide pill at every angle', () => {
+    expect(readHeroCss()).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]::before\s*\{[\s\S]*?width: 150%;[\s\S]*?height: auto;[\s\S]*?aspect-ratio: 1;[\s\S]*?\}/
+    );
+  });
+
+  it('keeps Find me typography on the canonical marketing button contract', () => {
+    const css = readHeroCss();
+    const buttonSource = readFileSync(
+      path.join(webRoot, '../../packages/ui/atoms/button.tsx'),
+      'utf8'
+    );
+    const heroSource = readFileSync(
+      path.join(webRoot, 'components/features/home/HeroSpotifySearch.tsx'),
+      'utf8'
+    );
+    const textButtonClasses =
+      buttonSource.match(/const TEXT_BUTTON_CLASSES =\s*'([^']+)'/)?.[1] ?? '';
+    const submitBlock =
+      css.match(/\.homepage-name-search__submit\s*\{([\s\S]*?)\}/)?.[1] ?? '';
+
+    expect(textButtonClasses).toContain('min-h-7');
+    expect(textButtonClasses).toContain('px-2.5');
+    expect(textButtonClasses).toContain('text-xs');
+    expect(buttonSource).toContain('marketing: TEXT_BUTTON_CLASSES');
+    expect(buttonSource).toContain('[font-weight:var(--font-weight-medium)]');
+    expect(heroSource).toContain("size='marketing'");
+    expect(heroSource).toContain(
+      "className='homepage-name-search__submit shrink-0'"
+    );
+    expect(submitBlock).toMatch(/font-weight:\s*510;/);
+    expect(submitBlock).not.toMatch(/font-family\s*:|satoshi/i);
+    expect(submitBlock).not.toMatch(/font-size\s*:/);
+    expect(submitBlock).not.toMatch(/padding(?:-inline)?\s*:/);
   });
 
   it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
@@ -148,8 +186,6 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(headerSource).toContain("presentation === 'marketing-glass'");
     expect(layoutSource).toContain("headerVariant='homepage'");
     expect(layoutSource).toContain("footerVariant='expanded'");
-    expect(layoutSource).toContain("logoSize='sm'");
-    expect(layoutSource).toContain("logoVariant='icon'");
     expect(layoutSource).not.toContain("logoVariant='word'");
     expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
 

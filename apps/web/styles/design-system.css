@@ -802,18 +802,24 @@
    while giving the equally prominent choices one row and Customize its own
    full-width row. */
 @media (max-width: 383px) {
-  .cookie-actions--compact {
+  .cookie-banner-card--above-public-profile-dock .cookie-actions--compact {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .cookie-actions--compact > .cookie-action--choice,
-  .cookie-actions--compact > .cookie-action--customize {
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--choice,
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--customize {
     width: 100%;
     min-width: 0;
   }
 
-  .cookie-actions--compact > .cookie-action--customize {
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--customize {
     grid-column: 1 / -1;
   }
 }
@@ -1127,6 +1133,18 @@ html[data-profile-initial-mode]
   .profile-viewport:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
+    padding-left: max(var(--page-pad), env(safe-area-inset-left));
+    padding-right: max(var(--page-pad), env(safe-area-inset-right));
+    padding-block: clamp(16px, 2vw, 24px);
+  }
+
+  /* Match desktop max-width so SSR compact class produces the same frame width
+     as the JS-switched desktop class, eliminating layout shift on hydration. */
+  .public-profile-layout-frame--compact {
+    max-width: min(
+      100%,
+      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+    );
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-pad), env(safe-area-inset-right));
     padding-block: clamp(16px, 2vw, 24px);
@@ -1460,8 +1478,10 @@ html[data-profile-initial-mode]
 /* Dark mode — Jovie Noir Ion ziawi lock (2026-09-09–10).
    Exactly 5 surfaces. Focus = ion. Aqua/gold/flare alias mint/orange/red. */
 :root.dark {
+  /* —— Noir Ion anchors (canonical approved values) —— */
   --noir-ion-canvas: #030407;
   --noir-ion-shell: #06080d;
+  --noir-ion-panel: #0a0d16;
   --noir-ion-card: #0f1420;
   --noir-ion-elevated: #151b2a;
   --noir-ion-floating: #1b2436;
@@ -1503,7 +1523,9 @@ html[data-profile-initial-mode]
   --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
-  --app-shell-content-surface: #0f1420;
+  /* App-shell token dark-mode overrides (migrated from linear-tokens.css,
+     JOV-5466). Only tokens that differ from light mode are listed here. */
+  --app-shell-content-surface: #0a0d16;
   --app-shell-card-shadow: none;
   --app-shell-border: rgba(168, 176, 195, 0.12);
   --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
@@ -1566,8 +1588,13 @@ html[data-profile-initial-mode]
   --color-border-subtle: var(--noir-ion-border-subtle);
   --color-border-default: var(--noir-ion-border-default);
   --color-border-strong: var(--noir-ion-border-strong);
-  --color-border-focus: #11afff;
+  --color-border-focus: #2563ff;
+  /* Ion focus */
 
+  /* Accent palette rotation — Noir Ion semantics
+     blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
+     teal/Aqua: system · green/Mint: success · orange: warning
+     red: danger */
   --color-accent-gray: #8d8d93;
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
   --color-accent-blue: #11afff;
@@ -1585,8 +1612,10 @@ html[data-profile-initial-mode]
   --color-accent-teal: #3ffa8b;
   --color-accent-teal-subtle: rgba(63, 250, 139, 0.12);
 
+  /* Interactive accent — Ion electric blue (focus, links, active selection).
+     CTAs remain high-contrast light pills per DESIGN.md; Ion carries intent. */
   --color-accent: var(--noir-ion-ion);
-  --color-accent-hover: #11afff;
+  --color-accent-hover: #3bc0ff;
   --color-accent-active: var(--noir-ion-ion-solid);
   --color-accent-subtle: var(--noir-ion-ion-soft);
 
