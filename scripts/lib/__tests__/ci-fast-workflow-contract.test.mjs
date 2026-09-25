@@ -2130,3 +2130,206 @@ it('selects and enforces offline failure behavior coverage for module-only and t
     );
   }
 });
+
+describe('Symphony selector toolchain cache', () => {
+  const SELECTOR =
+    'scripts/symphony/tests/run-governor-bounded-codex-selector.sh';
+  const CACHE_PATHS = [
+    '${{ runner.temp }}/symphony-selector-beam',
+    '${{ runner.temp }}/symphony-selector-mix-home',
+    '${{ runner.temp }}/symphony-selector-src/elixir/deps',
+    '${{ runner.temp }}/symphony-selector-src/elixir/_build/test',
+  ];
+  const remaining = () =>
+    jobBlock('ci-fast-remaining', 'ci-profile-admission-browser');
+
+  function step(block, name) {
+    const start = block.indexOf(`      - name: ${name}\n`);
+    expect(start, `missing step ${name}`).toBeGreaterThanOrEqual(0);
+    const next = block.indexOf('\n      - name: ', start + 1);
+    return block.slice(start, next === -1 ? block.length : next);
+  }
+
+  function printCacheKey() {
+    const out = execFileSync('bash', [SELECTOR, '--print-cache-key'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    return Object.fromEntries(
+      out
+        .trim()
+        .split('\n')
+        .map(line => [
+          line.slice(0, line.indexOf('=')),
+          line.slice(line.indexOf('=') + 1),
+        ])
+    );
+  }
+
+  it('restores an exact key built from the pin, BEAM versions, platform and script hash', () => {
+    const block = remaining();
+    expect(step(block, 'Resolve Symphony selector cache key')).toContain(
+      `bash ${SELECTOR} --print-cache-key >> "$GITHUB_OUTPUT"`
+    );
+    const restore = step(block, 'Restore Symphony selector cache');
+    expect(restore).toContain(
+      'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+    );
+    for (const output of ['platform', 'otp', 'elixir', 'pin']) {
+      expect(restore).toContain(
+        `\${{ steps.selector-cache-key.outputs.${output} }}`
+      );
+    }
+    expect(restore).toContain('${{ runner.os }}');
+    expect(restore).toContain(`\${{ hashFiles('${SELECTOR}') }}`);
+    // Exact key only: another pin or toolchain must never seed build outputs.
+    expect(restore).not.toContain('restore-keys');
+    for (const path of CACHE_PATHS) expect(restore).toContain(path);
+
+    const key = printCacheKey();
+    const runtime = readFileSync(
+      resolve(REPO_ROOT, 'scripts/symphony/symphony_official_runtime.py'),
+      'utf8'
+    );
+    expect(key.pin).toBe(
+      runtime.match(/OFFICIAL_SYMPHONY_GIT_SHA = "([0-9a-f]{40})"/)?.[1]
+    );
+    expect(key.otp).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(key.elixir).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(key.platform).toMatch(/^[a-z]+-[\d.]+-\w+$/);
+  });
+
+  it('points the selector at the cached paths and saves only from main pushes', () => {
+    const block = remaining();
+    const keyAt = block.indexOf('- name: Resolve Symphony selector cache key');
+    const restoreAt = block.indexOf('- name: Restore Symphony selector cache');
+    const laneAt = block.indexOf('- name: Run structural ci-fast lane');
+    const saveAt = block.indexOf('- name: Save Symphony selector cache');
+    expect(keyAt).toBeGreaterThan(0);
+    expect(restoreAt).toBeGreaterThan(keyAt);
+    expect(laneAt).toBeGreaterThan(restoreAt);
+    expect(saveAt).toBeGreaterThan(laneAt);
+
+    const lane = step(block, 'Run structural ci-fast lane');
+    expect(lane).toContain(
+      'SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam'
+    );
+    expect(lane).toContain(
+      'MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix'
+    );
+    expect(lane).toContain(
+      'HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex'
+    );
+    // Overriding the checkout would skip the pinned clone entirely.
+    expect(block).not.toContain('SYMPHONY_SELECTOR_CHECKOUT');
+    expect(readFileSync(resolve(REPO_ROOT, SELECTOR), 'utf8')).toContain(
+      'CHECKOUT="${RUNNER_TEMP:-/tmp}/symphony-selector-src"'
+    );
+
+    const ready = step(block, 'Check Symphony selector cache outputs');
+    expect(ready).toContain("github.event_name == 'push'");
+    expect(ready).toContain("github.ref == 'refs/heads/main'");
+    expect(ready).toContain("steps.selector-cache.outputs.cache-hit != 'true'");
+    const save = step(block, 'Save Symphony selector cache');
+    expect(save).toContain(
+      "if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}"
+    );
+    expect(save).toContain('continue-on-error: true');
+    expect(save).toContain(
+      'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+    );
+    expect(save).toContain(
+      'key: ${{ steps.selector-cache.outputs.cache-primary-key }}'
+    );
+    for (const path of CACHE_PATHS) expect(save).toContain(path);
+  });
+
+  function runSelectorWithStubs(installedOtp) {
+    const { pin, otp, elixir } = printCacheKey();
+    const otpMajor = otp.split('.')[0];
+    const root = mkdtempSync(join(tmpdir(), 'selector-cache-'));
+    try {
+      const log = join(root, 'calls.log');
+      const stubs = join(root, 'stubs');
+      const prefix = join(root, 'symphony-selector-beam');
+      const elixirDir = join(root, 'symphony-selector-src', 'elixir');
+      for (const dir of [
+        stubs,
+        join(prefix, 'bin'),
+        join(prefix, 'otp', 'bin'),
+        join(prefix, 'otp', 'releases', otpMajor),
+        join(elixirDir, 'deps', 'jason'),
+        join(elixirDir, '_build', 'test', 'lib'),
+      ]) {
+        mkdirSync(dir, { recursive: true });
+      }
+      const stub = (file, body) => {
+        writeFileSync(file, `#!/usr/bin/env bash\n${body}\n`);
+        chmodSync(file, 0o755);
+      };
+      stub(
+        join(stubs, 'git'),
+        [
+          `echo "git $*" >> "${log}"`,
+          'if [[ "$1" == clone ]]; then mkdir -p "${@: -1}/.git"; exit 0; fi',
+          'if [[ "$3" == checkout ]]; then mkdir -p "$2/elixir/test/symphony_elixir"; fi',
+          `if [[ "$3" == rev-parse ]]; then echo "${pin}"; fi`,
+          'exit 0',
+        ].join('\n')
+      );
+      stub(join(stubs, 'curl'), `echo "curl $*" >> "${log}"; exit 22`);
+      stub(join(prefix, 'otp', 'bin', 'erl'), 'exit 0');
+      stub(
+        join(prefix, 'bin', 'elixir'),
+        `printf 'Erlang/OTP ${otpMajor}\\n\\nElixir ${elixir} (compiled with Erlang/OTP ${otpMajor})\\n'`
+      );
+      stub(join(prefix, 'bin', 'mix'), `echo "mix $*" >> "${log}"`);
+      writeFileSync(
+        join(prefix, 'otp', 'releases', otpMajor, 'OTP_VERSION'),
+        `${installedOtp ?? otp}\n`
+      );
+      writeFileSync(join(elixirDir, '_build', 'test', 'lib', 'marker'), 'x');
+      const result = spawnSync('bash', [SELECTOR], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          PATH: `${stubs}:/usr/bin:/bin`,
+          HOME: root,
+          RUNNER_TEMP: root,
+          SYMPHONY_ELIXIR_PREFIX: prefix,
+        },
+      });
+      return {
+        result,
+        calls: existsSync(log) ? readFileSync(log, 'utf8') : '',
+        build: existsSync(join(elixirDir, '_build', 'test', 'lib', 'marker')),
+        deps: existsSync(join(elixirDir, 'deps', 'jason')),
+        parked: existsSync(join(root, 'symphony-selector-src.restored')),
+      };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('reuses a verified warm toolchain and restored build outputs without downloads', () => {
+    const run = runSelectorWithStubs();
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.result.stdout).toContain('symphony-selector-beam=warm');
+    expect(run.calls).not.toContain('curl');
+    expect(run.calls).toMatch(/git clone .*JovieInc\/symphony\.git/);
+    expect(run.calls).toContain('mix local.hex --force --if-missing');
+    expect(run.calls).toContain('mix local.rebar --force --if-missing');
+    expect(run.calls).toContain('mix deps.get');
+    expect(run.build).toBe(true);
+    expect(run.deps).toBe(true);
+    expect(run.parked).toBe(false);
+  });
+
+  it('reinstalls instead of trusting a restored toolchain whose OTP drifted', () => {
+    const run = runSelectorWithStubs('26.2.5');
+    expect(run.result.status).not.toBe(0);
+    expect(run.result.stdout).not.toContain('symphony-selector-beam=warm');
+    expect(run.calls).toMatch(/curl .*builds\.hex\.pm\/builds\/otp\//);
+    expect(run.calls).not.toContain('mix ');
+  });
+});
