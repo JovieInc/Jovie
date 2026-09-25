@@ -52,8 +52,8 @@ function routeFileExistsFor(href: string) {
 describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
     expect(MARKETING_NAV_LINKS).toEqual([
-      { href: '/artists', label: 'Artists' },
-      { href: '/product', label: 'Product' },
+      { href: '/about', label: 'About' },
+      { href: '/product', label: 'For Artists' },
       { href: '/pricing', label: 'Pricing' },
     ]);
   });
