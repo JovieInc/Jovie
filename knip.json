@@ -68,6 +68,7 @@
           "vitest.config.mts",
           "vitest.config.ci.mts",
           "vitest.config.fast.mts",
+          "vitest.config.ci-contracts.mts",
           "vitest.config.minimal.mts",
           "vitest.config.mjs"
         ],

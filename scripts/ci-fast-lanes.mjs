@@ -117,7 +117,7 @@ export function webCiContractTestsCommand(
     .sort()
     .map(path => ` --exclude=${path}`)
     .join('');
-  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
+  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 export const ROUTE_PREP_COVERAGE_COMMAND =
   'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
@@ -1311,7 +1311,7 @@ export async function runStructural(opts = {}) {
           // quarantine ledger (#18339 landed a red deploy contract that way).
           // Targeting Vitest directly also fails closed when the file cannot
           // be resolved or contains no tests.
-          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
     ...(selected.has('operations') ? operationsParts : []),
