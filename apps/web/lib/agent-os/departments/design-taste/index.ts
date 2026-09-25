@@ -170,7 +170,7 @@ const ext = (p: string) => {
   const i = b.lastIndexOf('.');
   return i <= 0 ? '' : b.slice(i).toLowerCase();
 };
-const clamp01 = (n: number) => (Number.isNaN(n) || n < 0 ? 0 : n > 1 ? 1 : n);
+const clamp01 = (n: number) => (Number.isNaN(n) || n < 0 ? 0 : Math.min(n, 1));
 const snip = (t: string) => {
   const s = t.trim().replaceAll(/\s+/g, ' ');
   return s.length <= 160 ? s : `${s.slice(0, 157)}…`;

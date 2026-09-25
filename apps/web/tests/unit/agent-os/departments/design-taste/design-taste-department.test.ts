@@ -110,6 +110,29 @@ describe('design-taste department', () => {
     expect(prComment).toContain('agent-run-artifact');
   });
 
+  it('keeps half of the reviewed hunks in the coverage score', async () => {
+    const diff = `diff --git a/apps/web/components/features/dashboard/Card.tsx b/apps/web/components/features/dashboard/Card.tsx
+--- a/apps/web/components/features/dashboard/Card.tsx
++++ b/apps/web/components/features/dashboard/Card.tsx
+@@ -1,2 +1,3 @@
+ export function Card() {
+-  return <div className="bg-surface-1">Ok</div>;
++  return <div className="bg-surface-1">Ok</div>;
++  return <div className="text-[#ff00aa]">Bad</div>;
+ }`;
+
+    const result = await runDesignTasteDepartment({
+      runId: 'coverage-half',
+      changedFiles: ['apps/web/components/features/dashboard/Card.tsx'],
+      unifiedDiff: diff,
+      policyPath,
+      rootDirectory,
+    });
+
+    expect(result.manifest?.kpis.designSystemCoverage).toBe(0.5);
+    expect(result.manifest?.kpis.surfaceElevationConsistencyScore).toBe(1);
+  });
+
   it('fails closed when design-taste policy is missing', async () => {
     await expect(
       runDesignTasteDepartment({
