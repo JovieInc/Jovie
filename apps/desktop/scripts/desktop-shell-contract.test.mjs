@@ -772,7 +772,9 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     'src/build-identity.generated.ts'
   );
   const identityJsonPath = join(desktopRoot, 'build/build-identity.json');
-  const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8');
+  const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8').catch(
+    () => null
+  );
   const originalIdentityGenerated = await readFile(
     identityGeneratedPath,
     'utf8'
@@ -893,8 +895,8 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       }
     );
   } finally {
-    await writeFile(envGeneratedPath, originalEnvGenerated);
     for (const [filePath, original] of [
+      [envGeneratedPath, originalEnvGenerated],
       [identityGeneratedPath, originalIdentityGenerated],
       [identityJsonPath, originalIdentityJson],
     ]) {
