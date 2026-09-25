@@ -102,6 +102,10 @@ describe('normalized plan intent persistence', () => {
   );
   it('keeps legacy identities as data without accepting unknown plans', () => {
     setPlanIntent('max', 'yearly');
+    expect(getPlanIntentRecord()).toMatchObject({
+      plan: 'max',
+      interval: 'year',
+    });
     setPlanIntent('unknown');
     expect(getPlanIntent()).toBe('max');
     expect(getBillingInterval()).toBe('year');
