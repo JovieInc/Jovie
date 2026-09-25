@@ -3,9 +3,11 @@
 // merge_group enforces HYGIENE_LIMITS.maxTrackedBytes on the synthetic
 // base + members tree and ejects the whole group when it overflows, so one
 // over-budget PR (or main sitting at the edge) blocks every queued PR. This
-// runs on the source pull_request with local git evidence and projects the same
-// total as `base tip + (PR head - merge base)`, counting bytes with the exact
-// parseTrackedRegularTree used by the merge_group check. It fails an
+// runs on the source pull_request with local git evidence: it builds the real
+// merged tree of base tip + PR head with `git merge-tree --write-tree` and
+// counts it with the exact parseTrackedRegularTree used by the merge_group
+// check. Scalar `base + (head - merge base)` arithmetic is wrong whenever both
+// sides touch the same path, so the merged tree itself is measured. It fails an
 // over-budget PR before queue admission and warns above 95% of budget.
 //
 // Kept out of merge-group-member-policy.mjs: that trusted queue policy must not
@@ -66,6 +68,31 @@ function localGit(args) {
   });
 }
 
+// Returns the merged tree OID, or null when base and head conflict (a
+// conflicted PR cannot be admitted to the queue, so there is nothing to project).
+export function mergedTreeSha({ baseSha, git, headSha, mergeBaseSha }) {
+  let output;
+  try {
+    output = git([
+      'merge-tree',
+      '--write-tree',
+      '--no-messages',
+      // Byte totals do not depend on rename pairing; exact-only rename
+      // detection avoids spurious rename/delete conflicts between unrelated
+      // files.
+      '-X',
+      'find-renames=100%',
+      `--merge-base=${mergeBaseSha}`,
+      baseSha,
+      headSha,
+    ]);
+  } catch (error) {
+    if (error && typeof error === 'object' && error.status === 1) return null;
+    throw error;
+  }
+  return requireSha(String(output).split('\n')[0].trim(), 'merged tree');
+}
+
 export function enforceProjectedTreeBudget({
   baseSha,
   git = localGit,
@@ -78,11 +105,17 @@ export function enforceProjectedTreeBudget({
   requireSha(mergeBaseSha, 'PR_MERGE_BASE');
   requireSha(headSha, 'PR_HEAD_SHA');
   const base = measureGitTree(baseSha, git);
-  const mergeBase = measureGitTree(mergeBaseSha, git);
-  const head = measureGitTree(headSha, git);
-  const delta = head.bytes - mergeBase.bytes;
-  const bytes = base.bytes + delta;
-  const detail = `base ${base.bytes} + PR delta ${delta >= 0 ? '+' : ''}${delta}`;
+  const treeSha = mergedTreeSha({ baseSha, git, headSha, mergeBaseSha });
+  if (treeSha === null) {
+    log(
+      '::warning::Projected combined tree: skipped — PR head conflicts with the base; resolve the conflict to project the merged size.'
+    );
+    return null;
+  }
+  const merged = measureGitTree(treeSha, git);
+  const bytes = merged.bytes;
+  const delta = bytes - base.bytes;
+  const detail = `merged tree; base ${base.bytes} ${delta >= 0 ? '+' : ''}${delta}`;
   if (bytes > maxTrackedBytes) {
     throw new Error(
       `${bytes} bytes of tracked regular files (${detail}) exceeds the ${maxTrackedBytes}-byte combined-tree budget; the merge queue would reject this PR`
