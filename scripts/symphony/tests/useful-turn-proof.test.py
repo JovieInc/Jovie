@@ -35,8 +35,9 @@ class ProofBoundaryTests(unittest.TestCase):
 
     def test_legacy_contract_remains_byte_identical(self):
         import hashlib
+        # Pin moved when intake was mirrored onto closure_health.issue_intake_allowed.
         legacy = Path(C.__file__).read_text().split("\n\n# Additive v2 substrate.")[0]
-        self.assertEqual(hashlib.sha256(legacy.encode()).hexdigest(), "fbfd5b8e23f54f159efa8bf865bce19be9400354aad953843cd50f839f289004")
+        self.assertEqual(hashlib.sha256(legacy.encode()).hexdigest(), "7a2a2c3edac352979a0e727712e816fd6894d5e6ec322d6ce4eb07967407258f")
 
     def test_positive_round_trip_and_exact_bounds(self):
         for count in (0, 1, 10, 40, 41):
