@@ -5936,15 +5936,20 @@
   --system-b-release-provider-accent-hover: var(--color-accent-hover);
 }
 
-:where(.system-b-spotify-connect-card) {
+:where(.system-b-spotify-connect-card),
+:where([data-spotify-connect-surface="card"]) {
   overflow: visible;
   background: var(--system-b-app-content-surface);
+  padding: calc(var(--space-3) + var(--space-0-5));
 }
 
-:where(.system-b-spotify-connect-status-card) {
+:where(.system-b-spotify-connect-status-card),
+:where([data-spotify-connect-surface="status"]) {
   display: flex;
   min-height: calc(var(--space-10) + var(--space-4));
   align-items: center;
+  gap: var(--space-2-5);
+  padding-inline: var(--space-2-5);
   background: color-mix(
     in oklab,
     var(--system-b-app-content-surface) 88%,
