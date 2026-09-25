@@ -542,7 +542,10 @@ export function findAttributionOvercredit(
 ): InvariantFinding[] {
   const violations: InvariantFinding[] = [];
   for (const allocation of allocations) {
-    if (!Number.isFinite(allocation.sourceValue) || allocation.sourceValue < 0) {
+    if (
+      !Number.isFinite(allocation.sourceValue) ||
+      allocation.sourceValue < 0
+    ) {
       violations.push({
         invariant: 'attribution-allocation-bounded',
         kind: 'violation',
