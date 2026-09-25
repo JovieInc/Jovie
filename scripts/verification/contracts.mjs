@@ -5,6 +5,7 @@ export const AUDIT_EVIDENCE_SCHEMA = 'jovie-audit-evidence/v1';
 export const PROVIDER_QUALIFICATION_SCHEMA = 'jovie-provider-qualification/v1';
 export const AUDIT_LEDGER_ENTRY_SCHEMA = 'jovie-audit-evidence-ledger-entry/v1';
 export const SHADOW_CERTIFICATE_SCHEMA = 'jovie-audit-shadow-certificate/v1';
+export const RUNTIME_CONFIG_SCHEMA = 'jovie-runtime-config/v1';
 
 export const NON_PASS_OUTCOMES = Object.freeze([
   'failed',

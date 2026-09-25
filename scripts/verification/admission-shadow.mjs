@@ -16,6 +16,10 @@ import {
   SHADOW_CERTIFICATE_SCHEMA,
   sha256,
 } from './contracts.mjs';
+import {
+  runtimeConfigDigest,
+  validateRuntimeConfigSnapshot,
+} from './runtime-config.mjs';
 
 export const VERIFIER_AUTHORITY = Object.freeze({
   allowed: Object.freeze(['repository-read', 'output-write']),
@@ -133,7 +137,7 @@ export function sealAuditEvidence({
   authority = VERIFIER_AUTHORITY,
   toolDigest,
   modelDigest = null,
-  configDigest,
+  configSnapshot,
   inputBundleDigest,
   redactionManifestDigest,
   findings = [],
@@ -142,6 +146,13 @@ export function sealAuditEvidence({
   completedAt,
 }) {
   assertVerifierAuthority(authority);
+  const configErrors = validateRuntimeConfigSnapshot(configSnapshot);
+  const configBlockers = Array.isArray(configSnapshot?.blockers)
+    ? configSnapshot.blockers
+    : [];
+  if (configErrors.length > 0 || configBlockers.length > 0) {
+    throw new Error([...configErrors, ...configBlockers].join('\n'));
+  }
   const definitionDigest = auditDefinitionDigest(definition);
   const stale =
     !sameRunBinding(subjectAtStart, subjectAtFinish) ||
@@ -154,7 +165,8 @@ export function sealAuditEvidence({
     auditDefinitionDigest: definitionDigest,
     toolDigest,
     modelDigest,
-    configDigest,
+    configVersion: configSnapshot.version,
+    configDigest: runtimeConfigDigest(configSnapshot),
     inputBundleDigest,
     redactionManifestDigest,
     outcome: stale ? 'stale_at_birth' : outcome,

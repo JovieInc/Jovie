@@ -12,6 +12,7 @@ import {
 import { appendEvidenceEntry } from './append-only-ledger.mjs';
 import { SYMPHONY_CHANGE_SAFETY_AUDIT } from './audit-registry.mjs';
 import { digestObject, PROVIDER_QUALIFICATION_SCHEMA } from './contracts.mjs';
+import { buildRuntimeConfigSnapshot } from './runtime-config.mjs';
 
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
@@ -22,6 +23,24 @@ const REQUIRED_CONTEXT = Object.freeze(
     SYMPHONY_CHANGE_SAFETY_AUDIT.requiredContext.map(path => [path, DIGEST])
   )
 );
+const CONFIG_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    name: 'DATABASE_URL',
+    kind: 'secret-presence',
+    required: true,
+    material: true,
+  }),
+]);
+
+function configSnapshot(overrides = {}) {
+  return buildRuntimeConfigSnapshot({
+    version: 'web-runtime-1',
+    environment: 'staging',
+    definitions: CONFIG_DEFINITIONS,
+    values: { DATABASE_URL: 'present-but-never-recorded' },
+    ...overrides,
+  });
+}
 
 function subject(overrides = {}) {
   return buildAuditSubject({
@@ -47,7 +66,7 @@ function sealed(overrides = {}) {
     outcome: 'satisfied',
     producer: { kind: 'deterministic' },
     toolDigest: DIGEST,
-    configDigest: DIGEST,
+    configSnapshot: configSnapshot(),
     inputBundleDigest: DIGEST,
     redactionManifestDigest: DIGEST,
     startedAt: '2026-09-02T11:59:00.000Z',
@@ -201,6 +220,21 @@ describe('admission-control shadow evidence', () => {
     assert.equal(
       sealed({ definitionAtFinish: changedDefinition }).outcome,
       'stale_at_birth'
+    );
+  });
+
+  it('binds a validated config version and derived digest to the code subject', () => {
+    const receipt = sealed();
+    assert.equal(receipt.configVersion, 'web-runtime-1');
+    assert.match(receipt.configDigest, /^[a-f0-9]{64}$/);
+    assert.notEqual(receipt.configDigest, DIGEST);
+    assert.throws(
+      () => sealed({ configSnapshot: configSnapshot({ values: {} }) }),
+      /required-config-missing:DATABASE_URL/
+    );
+    assert.throws(
+      () => sealed({ configSnapshot: { schema: 'invented' } }),
+      /runtime config schema/
     );
   });
 
