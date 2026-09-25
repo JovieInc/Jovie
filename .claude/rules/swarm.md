@@ -1,5 +1,5 @@
 ---
-paths: ["scripts/hermes/**", "scripts/backlog-orchestrator/**", ".claude/commands/qa-swarm*"]
+paths: ["scripts/symphony/**", "scripts/backlog-orchestrator/**", ".claude/commands/qa-swarm*"]
 ---
 
 # Ruflo-Coordinated Swarm Pattern
