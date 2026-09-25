@@ -79,7 +79,10 @@ const TOKEN_MAP = {
 
 /** Parse `--noir-ion-*` anchors from the `:root.dark` block of the CSS. */
 export function loadAnchors(css = readFileSync(SOURCE_PATH, 'utf8')) {
-  const blocks = css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+  /** @type {string[]} */
+  const blocks = [
+    ...(css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? []),
+  ];
   const block = blocks.find(b => b.includes('--noir-ion-canvas'));
   if (!block) {
     throw new Error(
