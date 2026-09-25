@@ -154,6 +154,23 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the artist pay page when that screen changes', () => {
+    const source = 'apps/web/app/[username]/pay/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artist-pay');
+
+    assert.equal(kindOf(source), 'registered');
+    assert.deepEqual(screen?.sources, [source]);
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(changed => changed.id),
+      ['web.artist-pay']
+    );
+  });
+
   it('registers the public artists directory for changed-surface certification', () => {
     const source = 'apps/web/app/artists/page.tsx';
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artists');
