@@ -1597,6 +1597,11 @@ jobs:
           # PRs, including test-only edits. Merge groups already force this lane.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
+          # Invariant-scanned sources must run invariants:check (#18182 added a
+          # readFileSync to apps/desktop/src/main.ts unchecked). Derived from the
+          # invariants' own scan roots; a node failure fails this step closed.
+          STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"
+
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
           STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-no-native-dialogs|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
