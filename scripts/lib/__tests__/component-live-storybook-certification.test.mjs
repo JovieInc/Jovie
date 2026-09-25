@@ -341,9 +341,11 @@ describe('live Storybook component certification', () => {
     browser = await chromium.launch({ headless: true });
   }, BROWSER_LAUNCH_TIMEOUT_MS);
 
+  // Closing Chromium is process teardown on the same loaded runner, so it
+  // gets the launch budget rather than Vitest's 10s default hook timeout.
   afterAll(async () => {
     await browser?.close();
-  });
+  }, BROWSER_LAUNCH_TIMEOUT_MS);
 
   it('qualifies exact Node 22 and rejects other majors', () => {
     expect(qualifyNode22('22.23.2').ok).toBe(true);
