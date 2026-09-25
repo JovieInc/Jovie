@@ -75,8 +75,6 @@ function DashboardAnalyticsOverviewError() {
         label='Profile Views'
         value='Temporarily unavailable'
         icon={BarChart3}
-        iconClassName='text-info'
-        valueClassName='text-app font-book leading-5 tracking-normal text-tertiary-token'
         aria-label='Profile Views Metric Unavailable'
       />
       <ContentMetricCard
@@ -84,8 +82,6 @@ function DashboardAnalyticsOverviewError() {
         label='Unique Visitors'
         value='Temporarily unavailable'
         icon={Users}
-        iconClassName='text-success'
-        valueClassName='text-app font-book leading-5 tracking-normal text-tertiary-token'
         aria-label='Unique Visitors Metric Unavailable'
       />
     </OverviewMetricGrid>
@@ -358,7 +354,6 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             refetch();
           }}
           disabled={refreshing}
-          className='h-8 gap-2 px-3'
           aria-label='Refresh Analytics Overview'
         >
           <Icon
