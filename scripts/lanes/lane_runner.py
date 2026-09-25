@@ -40,6 +40,8 @@ EXCLUDED_LABELS = frozenset({
     "type:epic", "codex-blocked",
 })
 MAX_FAILURES = 3
+RETRY_BACKOFF_S = 1800
+PROVIDER_COOLDOWN_S = 900
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/tests?/|/__tests__/|(^|/)test_[^/]+\.py$)")
@@ -82,12 +84,22 @@ class Issue:
     labels: list[str] = field(default_factory=list)
 
 
-def pick_issue(issues: list[Issue], failures: dict[str, int]) -> Issue | None:
-    """Symphony's order: priority 1..4 then none, oldest first; skip excluded and 3x failures."""
+def failure_record(value) -> dict:
+    return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
+
+
+def pick_issue(issues: list[Issue], failures: dict, now: float | None = None) -> Issue | None:
+    """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
+    3x failures, and issues still inside their retry backoff."""
+    now = time.time() if now is None else now
+
+    def retryable(identifier: str) -> bool:
+        record = failure_record(failures.get(identifier))
+        return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
+
     eligible = [
         issue for issue in issues
-        if not EXCLUDED_LABELS & {label.lower() for label in issue.labels}
-        and failures.get(issue.identifier, 0) < MAX_FAILURES
+        if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
     ]
     eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
     return eligible[0] if eligible else None
@@ -292,6 +304,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                    timeout=host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
+            if agent.returncode != 0 and receipt.get("verdict") == "no-change":
+                # The provider never worked the issue (auth, quota, crash): its fault, not the issue's.
+                receipt.update(verdict="provider-error", reasons=[f"agent-exit:{agent.returncode}"])
         except subprocess.TimeoutExpired as error:
             receipt.update(verdict="failed", reasons=[f"timeout:{error.cmd[0] if error.cmd else '?'}"])
         except Exception as error:  # a broken run must still leave a receipt and free its issue
@@ -374,6 +389,15 @@ def worker(host: Host, name: str) -> int:
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
+    if verdict == "provider-error":
+        cooldown = host.state / "cooldown" / name
+        cooldown.parent.mkdir(parents=True, exist_ok=True)
+        cooldown.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+        linear.move(issue.id, "Todo")
+        linear.comment(issue.id, f"🤖 lane `{name}` provider failed before working the issue "
+                                 f"({', '.join(receipt.get('reasons', []))}); lane cooling down, issue back to Todo.")
+        slot.release()
+        return 1
     if verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
                                  f"queued; required checks and the merge queue decide.")
@@ -381,11 +405,12 @@ def worker(host: Host, name: str) -> int:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            failures[issue.identifier] = failures.get(issue.identifier, 0) + 1
+            record = failure_record(failures.get(issue.identifier))
+            failures[issue.identifier] = {"count": record["count"] + 1, "at": time.time()}
             failures_path(host).write_text(json.dumps(failures))
         finally:
             claim.release()
-        exhausted = failures[issue.identifier] >= MAX_FAILURES
+        exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
         linear.move(issue.id, "Triage" if exhausted else "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
                                  + ("Returned to Triage after 3 attempts." if exhausted else "Back to Todo."))
@@ -400,13 +425,21 @@ def worker(host: Host, name: str) -> int:
 def dispatch(host: Host) -> int:
     prune_worktrees(host)
     for name, spec in load_providers().items():
-        if not spec.get("enabled", True) or not provider_healthy(spec):
+        if not spec.get("enabled", True) or cooling(host, name) or not provider_healthy(spec):
             continue
         for _ in range(host.slots(name, spec.get("slots", 1))):
             subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True)
     return 0
+
+
+def cooling(host: Host, name: str) -> bool:
+    path = host.state / "cooldown" / name
+    try:
+        return float(path.read_text()) > time.time()
+    except (OSError, ValueError):
+        return False
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:

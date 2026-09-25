@@ -44,6 +44,11 @@ class SelectionTest(unittest.TestCase):
             issue("JOV-4", priority=1),
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
+
+    def test_recent_failures_back_off_before_retry(self):
+        failures = {"JOV-1": {"count": 1, "at": 1000.0}}
+        self.assertIsNone(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 60))
+        self.assertEqual(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 1801).identifier, "JOV-1")
         self.assertIsNone(lane.pick_issue([issue("JOV-9", labels=["infra"])], {}))
 
 
@@ -276,6 +281,11 @@ class RunIssueTest(unittest.TestCase):
         prompt = next((self.host.state / "runs").glob("*.prompt.md")).read_text()
         self.assertIn("ctx", prompt)
 
+    def test_agent_that_never_worked_is_a_provider_error(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
+        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"]}, FakeLinear([]), issue())
+        self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
+
     def test_a_crashing_harness_still_leaves_a_failed_receipt(self):
         def crash(*a, **k):
             raise ValueError("gh down")
@@ -312,8 +322,19 @@ class WorkerTest(unittest.TestCase):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
         for _ in range(3):
             lane.worker(self.host, "devin")
+            failures = json.loads((self.host.state / "failures.json").read_text())
+            failures["JOV-3"]["at"] = 0  # skip the retry backoff between attempts
+            (self.host.state / "failures.json").write_text(json.dumps(failures))
         self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Triage"])
-        self.assertEqual(json.loads((self.host.state / "failures.json").read_text()), {"JOV-3": 3})
+        self.assertEqual(json.loads((self.host.state / "failures.json").read_text())["JOV-3"]["count"], 3)
+
+    def test_provider_error_cools_the_lane_without_charging_the_issue(self):
+        lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": ["agent-exit:2"]}
+        self.assertEqual(lane.worker(self.host, "devin"), 1)
+        self.assertTrue(lane.cooling(self.host, "devin"))
+        self.assertFalse((self.host.state / "failures.json").exists())
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        self.assertEqual(self.execs, [])
 
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
