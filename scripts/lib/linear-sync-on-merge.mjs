@@ -19,6 +19,23 @@ const PARENT_LABEL_RE = /^(parent|epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
 
 /**
+ * Subset of fetch that production `globalThis.fetch` and the regression
+ * doubles both satisfy. checkJs rejects a test double typed as `typeof fetch`
+ * when it returns a plain envelope instead of `Response`.
+ *
+ * @typedef {{
+ *   ok: boolean,
+ *   status?: number,
+ *   json: () => Promise<unknown>,
+ *   headers?: { get?: (name: string) => string | null | undefined },
+ * }} HttpResponse
+ * @typedef {(
+ *   input: string | URL | Request,
+ *   init?: RequestInit,
+ * ) => Promise<HttpResponse>} HttpFetch
+ */
+
+/**
  * @param {unknown} label
  * @returns {string}
  */
@@ -337,10 +354,11 @@ export function decideLinearCloseOnMerge(input) {
 }
 
 /**
- * @param {typeof fetch} fetchImpl
+ * @param {HttpFetch} fetchImpl
  * @param {string} apiKey
  * @param {string} query
  * @param {Record<string, unknown>} variables
+ * @returns {Promise<Record<string, any>>}
  */
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
   const response = await fetchImpl(LINEAR_API, {
@@ -354,7 +372,10 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
   if (!response.ok) {
     throw new Error(`Linear HTTP ${response.status}`);
   }
-  const payload = await response.json();
+  const payload =
+    /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
+      await response.json()
+    );
   if (Array.isArray(payload.errors) && payload.errors.length > 0) {
     throw new Error(
       payload.errors
@@ -371,7 +392,7 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
 
 /**
  * @param {{
- *   readonly fetchImpl: typeof fetch,
+ *   readonly fetchImpl: HttpFetch,
  *   readonly token: string,
  *   readonly repository: string,
  *   readonly maxPages?: number,
@@ -418,13 +439,14 @@ const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
 
 /**
  * @param {{
- *   readonly fetchImpl?: typeof fetch,
+ *   readonly fetchImpl?: HttpFetch,
  *   readonly env?: NodeJS.ProcessEnv,
  *   readonly log?: (message: string) => void,
  *   readonly allowlist?: ReadonlySet<string>,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
+  /** @type {HttpFetch} */
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
