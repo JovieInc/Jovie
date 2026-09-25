@@ -767,6 +767,92 @@ describe('delivery state machine', () => {
     }
   });
 
+  it('scans persisted red-loop records once per snapshot while holding the queue lock', async () => {
+    // Per-action loadLoopRecords rescans grow the summer-queue lock hold with
+    // the red-loop directory size, the same shape as the lifecycle receipts.
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-loop-scan-'));
+    const loopDirectory = join(directory, 'red-loop');
+    const fsPromises = require('node:fs/promises');
+    const originalReaddir = fsPromises.readdir;
+    let loopScans = 0;
+    fsPromises.readdir = (path, ...rest) => {
+      if (`${path}` === loopDirectory) loopScans += 1;
+      return originalReaddir(path, ...rest);
+    };
+    syncBuiltinESMExports();
+    try {
+      const stackAction = (key, rootPr) => ({
+        schema: 'jovie-stack-health-action/v1',
+        repository: REPO,
+        taskKey: key.repeat(64),
+        deliveryKey: `closure-stack:${key.repeat(64)}`,
+        action: 'split-or-retarget-draft-stack',
+        owner: 'symphony',
+        writer: 'symphony',
+        issue: 'JOV-5362',
+        rootPr,
+        rootHeadSha: key.repeat(40),
+        prNumbers: [rootPr],
+        memberHeads: [{ pr: rootPr, headSha: key.repeat(40) }],
+        maxDepth: 1,
+        promotionPath: [
+          { pr: rootPr, base: 'main', head: key, headSha: key.repeat(40) },
+        ],
+        integrator: null,
+        deadline: null,
+        violations: ['missing-stack-integrator'],
+        safety: 'receipt-only; requalify exact heads before split-or-retarget',
+      });
+      const repairActions = ['1', '2', '3', '4', '5'].map((key, index) =>
+        stackAction(key, 18001 + index)
+      );
+      const evidenceRoots = [18101, 18102, 18103];
+      const persist = observedAt => {
+        loopScans = 0;
+        return persistClosureHealthActions(
+          {
+            schema: 'jovie-closure-health/v1',
+            authority: 'Summer',
+            observedAt,
+            reasons: ['draft-stack-policy-violation'],
+            stackHealth: {
+              violations: [
+                ...repairActions.map(item => ({ rootPr: item.rootPr })),
+                ...evidenceRoots.map(rootPr => ({ rootPr })),
+              ],
+            },
+            repairActions,
+          },
+          { stateDir: directory }
+        );
+      };
+      const first = await persist('2026-09-20T10:00:00.000Z');
+      assert.equal(first.actionCount, repairActions.length);
+      assert.equal(first.evidenceCount, evidenceRoots.length);
+      const firstScans = loopScans;
+
+      // A later snapshot of the same stacks hits duplicate loop records and
+      // reactivates each one; that must not rescan red-loop per row.
+      const replay = await persist('2026-09-20T11:00:00.000Z');
+      const replayScans = loopScans;
+      assert.equal(replay.actionCount, repairActions.length);
+      assert.equal(replay.evidenceCount, evidenceRoots.length);
+      assert.equal(replay.resolution.queue.items.length, 8);
+      assert.deepEqual(
+        { firstScans, replayScans },
+        { firstScans: 1, replayScans: 1 }
+      );
+
+      // The single scan still fails closed: an unreadable record rejects the run.
+      await writeFile(join(loopDirectory, 'poison.json'), '{bad json\n');
+      await assert.rejects(persist('2026-09-20T12:00:00.000Z'), SyntaxError);
+    } finally {
+      fsPromises.readdir = originalReaddir;
+      syncBuiltinESMExports();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('quarantines malformed persisted siblings and atomically retains valid actions', async () => {
     const directory = await mkdtemp(
       join(tmpdir(), 'jovie-pr-lifecycle-poison-')
