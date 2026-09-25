@@ -16,7 +16,6 @@ import {
   ilike,
   inArray,
   isNull,
-  max,
   or,
   type SQL,
 } from 'drizzle-orm';
@@ -24,12 +23,15 @@ import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
 import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
 import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import { sanitizeTaskDueAt } from '@/lib/tasks/task-due-date';
+import {
+  getNextTaskPosition,
+  reserveTaskNumber,
+} from '@/lib/tasks/task-reservation';
 import { buildTaskUpdateFieldPatch } from '@/lib/tasks/task-update';
 import type {
   CreateTaskInput,
@@ -58,6 +60,7 @@ function getTaskListWhereClause(profileId: string, filters?: TaskFilters) {
   const conditions: (SQL<unknown> | undefined)[] = [
     eq(tasks.creatorProfileId, profileId),
     isNull(tasks.deletedAt),
+    isNull(tasks.archivedAt),
   ];
 
   if (filters?.status) {
@@ -208,34 +211,6 @@ async function assertReleaseAccess(
   if (!release) {
     throw new Error('Release not found or access denied');
   }
-}
-
-async function getNextTaskPosition(profileId: string): Promise<number> {
-  const [row] = await db
-    .select({ maxPosition: max(tasks.position) })
-    .from(tasks)
-    .where(and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt)));
-
-  return (row?.maxPosition ?? -1) + 1;
-}
-
-async function reserveTaskNumber(profileId: string): Promise<number> {
-  const [row] = await db
-    .update(creatorProfiles)
-    .set({
-      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profileId))
-    .returning({
-      taskNumber: drizzleSql<number>`${creatorProfiles.nextTaskNumber} - 1`,
-    });
-
-  if (!row) {
-    throw new Error('Profile not found');
-  }
-
-  return row.taskNumber;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -927,7 +902,13 @@ export async function getTaskStats(
       count: count(),
     })
     .from(tasks)
-    .where(and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt)))
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        isNull(tasks.archivedAt)
+      )
+    )
     .groupBy(tasks.status);
 
   const stats = formatTaskStats(rows);
@@ -943,6 +924,7 @@ export async function getTaskStats(
       and(
         eq(tasks.creatorProfileId, profileId),
         isNull(tasks.deletedAt),
+        isNull(tasks.archivedAt),
         inArray(tasks.status, ['backlog', 'todo', 'in_progress']),
         gt(tasks.updatedAt, newerThan)
       )

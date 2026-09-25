@@ -114,6 +114,10 @@ vi.mock('@/lib/onboarding/reserved-handle', () => ({
   reserveOnboardingHandle: mockReserveOnboardingHandle,
 }));
 
+vi.mock('@/lib/tasks/chat-work-record', () => ({
+  ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
+}));
+
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 
 const HANDLE_UNIQUE_VIOLATION = new Error(
