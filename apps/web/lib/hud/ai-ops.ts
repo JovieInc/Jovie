@@ -56,7 +56,7 @@ function isAgentBranch(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return (
     /^(codex|claude|codegen-bot|linear)\//.test(value) ||
-    /(^|\/)jov-[0-9]+/i.test(value)
+    /(^|\/)jov-\d+/i.test(value)
   );
 }
 
