@@ -165,16 +165,21 @@ describe('runStructural screenshot contract discovery', () => {
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
     runStructural({ execute });
-    const explicitCiFiles = execute.mock.calls
-      .map(([command]) => String(command))
-      .filter(command => command !== WEB_CI_CONTRACT_TESTS_COMMAND)
+    const commands = execute.mock.calls.map(([command]) => String(command));
+    const directoryRuns = commands.filter(command =>
+      /vitest\.config\.mts tests\/unit\/ci( |$)/.test(command)
+    );
+    expect(directoryRuns).toHaveLength(1);
+    const explicitCiFiles = commands
+      .filter(command => command !== directoryRuns[0])
       .flatMap(
         command => command.match(/tests\/unit\/ci\/[\w.-]+\.test\.ts/g) ?? []
       );
+    expect(explicitCiFiles.length).toBeGreaterThan(0);
     // Anything named explicitly elsewhere must be excluded from the directory
     // run, or it executes twice (Sentry on #18344).
     for (const file of explicitCiFiles) {
-      expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(`--exclude=${file}`);
+      expect(directoryRuns[0]).toContain(`--exclude=${file}`);
     }
   });
 
@@ -629,6 +634,24 @@ describe('webCiContractTestsCommand', () => {
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps files run elsewhere excluded when the ledger is unreadable', () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    try {
+      const command = webCiContractTestsCommand(
+        join(tmpdir(), 'ci-contract-ledger-does-not-exist.json'),
+        ['tests/unit/ci/deploy-workflow.test.ts']
+      );
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+      );
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining('::warning::Quarantine ledger')
+      );
+    } finally {
+      stderr.mockRestore();
     }
   });
 
