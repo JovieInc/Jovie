@@ -191,6 +191,35 @@ describe('runStructural screenshot contract discovery', () => {
     expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
   });
 
+  it.each([
+    'scripts/symphony/shipping_lead_worker_evidence.py',
+    'scripts/symphony/tests/shipping-lead-worker-evidence.test.py',
+  ])('enforces worker evidence coverage for an isolated change to %s', path => {
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.CI_PRODUCT_LANES = 'operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi.fn(command => ({
+      code: command.includes('jovie-shipping-worker-evidence.coverage')
+        ? 19
+        : 0,
+      output: 'worker coverage regression\n',
+    }));
+    const result = runStructural({ changedFileList: [path], execute });
+    expect(result.code).toBe(19);
+    expect(result.skipped).toBeUndefined();
+    const commands = execute.mock.calls.map(([command]) => command);
+    expect(
+      commands.filter(command =>
+        command.includes('jovie-shipping-worker-evidence.coverage')
+      )
+    ).toHaveLength(1);
+    expect(commands.at(-1)).toContain('--fail-under=100');
+    expect(commands.at(-1)).toContain(
+      'coverage run --branch scripts/symphony/tests/shipping-lead-worker-evidence.test.py'
+    );
+    expect(result.output).toContain('worker coverage regression');
+  });
+
   it('stops before later structural commands when the screenshot contract fails', () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'operations';

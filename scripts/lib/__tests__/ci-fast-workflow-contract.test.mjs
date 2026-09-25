@@ -1207,6 +1207,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'summer-symphony-outbox-(consumer(\\.test)?|contract\\.test)\\.mjs$'
     );
     expect(CI_FAST_SOURCE).toContain(
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-shipping-worker-evidence.coverage" python3 -m coverage run --branch scripts/symphony/tests/shipping-lead-worker-evidence.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-shipping-worker-evidence.coverage" python3 -m coverage report --include="*/scripts/symphony/shipping_lead_worker_evidence.py" --show-missing --precision=2 --fail-under=100'
+    );
+    expect(CI_FAST_SOURCE).toContain(
       'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-observer.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/backlog-orchestrator/__tests__/shipping-lead-observer.test.mjs'
     );
     expect(CI_FAST_SOURCE).toContain(
@@ -1616,6 +1619,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/model-router.py',
       'scripts/symphony/symphony-nvme-package-cache.sh',
       'scripts/symphony/symphony-reconciler.py',
+      'scripts/symphony/shipping_lead_worker_evidence.py',
+      'scripts/symphony/tests/shipping-lead-worker-evidence.test.py',
       'scripts/backlog-orchestrator/shipping-lead-observer.mjs',
       'scripts/backlog-orchestrator/shipping-lead-worker-observer.mjs',
       'scripts/backlog-orchestrator/__tests__/shipping-lead-observer.test.mjs',
