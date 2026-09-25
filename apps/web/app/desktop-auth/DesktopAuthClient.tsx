@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
@@ -9,7 +11,6 @@ import {
   openDesktopAuthUrl,
   useDesktopAppBootSignal,
 } from '@/lib/desktop/electron-bridge';
-import { MacCinematicSurface } from './MacCinematicSurface';
 
 export type DesktopAuthOpenState = 'idle' | 'opening' | 'opened' | 'error';
 type CopyState = 'idle' | 'copying' | 'copied' | 'error';
@@ -231,8 +232,13 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
   );
 
   return (
-    <MacCinematicSurface state={openState} testId='desktop-auth-handoff'>
+    <main
+      className='relative isolate grid min-h-dvh place-items-center bg-base px-6 text-primary-token [color-scheme:dark]'
+      data-desktop-auth-state={openState}
+      data-testid='desktop-auth-handoff'
+    >
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
+        <BrandLogo aria-hidden size={BRAND_MARK_SIZE.splash} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
         <DesktopAuthHandoffActions
           authUrl={authUrl}
@@ -240,6 +246,6 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
           showCancelSignIn
         />
       </section>
-    </MacCinematicSurface>
+    </main>
   );
 }
