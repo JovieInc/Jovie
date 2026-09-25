@@ -116,15 +116,19 @@ const ARTIST_SPOTIFY_ID = 'sp-fedde';
 /**
  * Select-call order for a created outcome:
  *  0. db owner lookup (reconcileCreditedArtistProfiles)
- *  1. db.selectDistinct credited-artist candidates
- *  2. tx artist lock select
- *  3. tx exact-ID profiles
- *  4. tx friendly-candidate taken batch (JOV-6528)
- *  5. tx fallback-handle owner (only reached when the fallback is used)
+ *  1. tx owner exact-profile check (bindOwnerRegistryArtist)
+ *  2. tx owner registry-binding check (bindOwnerRegistryArtist)
+ *  3. db.selectDistinct credited-artist candidates
+ *  4. tx artist lock select
+ *  5. tx exact-ID profiles
+ *  6. tx friendly-candidate taken batch (JOV-6528)
+ *  7. tx chosen-handle owner
  */
 function seedCreatedPath(friendlyTaken: Row[]) {
   hoisted.selectResults = [
     [{ id: OWNER_PROFILE_ID, usernameNormalized: 'owner-handle' }],
+    [],
+    [],
     [
       {
         artistId: ARTIST_ID,
@@ -175,12 +179,17 @@ describe('reconcileCandidate handle selection (JOV-6528)', () => {
         }),
       }),
       update: (table: { _: { name: string } }) => ({
-        set: (values: Row) => ({
-          where: () => {
+        set: (values: Row) => {
+          const builder: Record<string, unknown> = {};
+          builder.where = () => builder;
+          builder.returning = () => {
             if (table._.name === 'artists') hoisted.updatedArtists.push(values);
             return Promise.resolve([{ id: ARTIST_ID }]);
-          },
-        }),
+          };
+          builder.then = (resolve: (value: undefined) => unknown) =>
+            Promise.resolve(undefined).then(resolve);
+          return builder;
+        },
       }),
     };
   });

@@ -71,8 +71,10 @@ export function normalizeArtistNameToHandleBase(name: string): string {
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-  const slug = folded.replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-+|-+$/g, '');
-  return slug;
+  // Punctuation is removed. Spaces and slashes stay separators so
+  // "N*i$ha O'Connor" becomes niha-oconnor, while "AC/DC" stays ac-dc.
+  const stripped = folded.replaceAll(/[^a-z0-9\s/-]+/g, '');
+  return stripped.replaceAll(/[\s/-]+/g, '-').replaceAll(/^-+|-+$/g, '');
 }
 
 /**
@@ -112,10 +114,12 @@ export function composeFriendlyArtistHandleCandidates(input: {
       continue;
     }
 
-    const forms = [base.replaceAll('-', ''), base.split('-')[0] ?? ''].filter(
-      form => form.length > 0 && !seen.has(form)
-    );
-    for (const form of forms) seen.add(form);
+    const forms: string[] = [];
+    for (const form of [base.replaceAll('-', ''), base.split('-')[0] ?? '']) {
+      if (!form || seen.has(form)) continue;
+      seen.add(form);
+      forms.push(form);
+    }
 
     for (const form of forms) {
       // Enforce the canonical username contract (reserved words, format,
