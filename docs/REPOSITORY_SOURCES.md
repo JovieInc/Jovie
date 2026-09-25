@@ -150,7 +150,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/production-controller-health.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `eca3e62c48daa7a38d26066a13fd01a4cf9c977c8e86c6b85a1d1cbb73a714fc`)
 - `.github/workflows/production-controller.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `64ca50e7d538b54a98b18025c10159fc43d3d99da2ecc48f5d19725a11877c0c`)
 - `.github/workflows/production-marker-recovery.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `94181a74204ab56850977a637dc674a2efaac33a04f2d3702da23c393df52771`)
-- `.github/workflows/production-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8ab456a2dfd973a3634f1916699ca25e54bf43111d6b4b8e018ec3fa286cc74d`)
+- `.github/workflows/production-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `210f921097f88aa9a7b8d63c1a8fc172ddf9c402cb1b08d01a1c0dbc1d7a1c1c`)
 - `.github/workflows/reusable-ci-lint.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `c5a2654ad2aa43d36647a822b231233cba37c55972e19b61085bca609f452d30`)
 - `.github/workflows/rolling-ci-dispatch.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bfc552deed22c382555db6588a6293c08f5ae3321937fab7dc462bb35af41c8e`)
 - `.github/workflows/runner-autoscaler-canary.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fed98a20bbd3bb8046359596e71da1fd48ff5fb88bca2063381c6a777e0e883e`)
@@ -368,7 +368,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/eve-pilot/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b95f55b8b2e91e1879999ad77c8afd327de2558ed577f30644f5a2b1c9f56fd2`)
+- `apps/eve-pilot/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a89fbe8cb8d91a3cd1febb7e34a36379eadd320ffecc4d4c415d6b4b9fd2340c`)
 
 ### `apps/eve-pilot/package.json`: packageManager
 
@@ -425,7 +425,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@types/node": "26.6.2",
   "@vitest/coverage-v8": "5.0.1",
   "typescript": "6.0.3",
-  "vercel": "59.23.2",
+  "vercel": "59.25.0",
   "vitest": "5.0.1"
 }
 ```
@@ -554,7 +554,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0b558b81b877092fd268eb5f944737ab9e93f911494c1e978b666d8eea3a54f8`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `3c599a4605300279e10925d0101ec17330b49a0fc0b5dca6e964793d0371e25c`)
 
 ### `apps/web/package.json`: engines
 
@@ -780,9 +780,9 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@ai-sdk/gateway": "^4.0.90",
+  "@ai-sdk/gateway": "^4.0.91",
   "@ai-sdk/react": "^4.0.116",
-  "@ai-sdk/xai": "^5.0.6",
+  "@ai-sdk/xai": "^5.0.7",
   "@better-auth/oauth-provider": "1.7.5",
   "@dnd-kit/core": "^6.3.1",
   "@dnd-kit/sortable": "^10.0.0",
@@ -839,7 +839,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "cmdk": "^1.1.1",
   "date-fns": "^4.3.0",
   "dompurify": "^3.4.16",
-  "dotenv": "^17.4.2",
+  "dotenv": "^18.0.0",
   "drizzle-orm": "0.45.3",
   "exceljs": "4.4.0",
   "flags": "^4.3.1",
@@ -941,7 +941,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `274c1736327e3e19c73a2a76d8fe6884cf447a42692258de22eb7ebbdda9fc8c`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9690ee58724245c44fb01d8f4e512e6ce6007f4252149ea75db6cad4c64fa8b6`)
 
 ### `package.json`: packageManager
 
@@ -1173,7 +1173,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "tsx": "^4.23.15",
   "turbo": "^2.11.3",
   "typescript": "^6.0.3",
-  "vercel": "59.23.2",
+  "vercel": "59.25.0",
   "vitest": "5.0.1"
 }
 ```

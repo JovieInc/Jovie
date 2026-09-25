@@ -89,7 +89,7 @@ describe('Eve framework smoke', () => {
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as { devDependencies?: Record<string, string> };
 
-    expect(manifest.devDependencies?.vercel).toBe('59.23.2');
+    expect(manifest.devDependencies?.vercel).toBe('59.25.0');
   });
 
   it('discovers Eve with Summer presentation and Photon channels offline', () => {
