@@ -2339,6 +2339,25 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      # Turbopack's persistent build cache (Next 16 default) lives under
+      # apps/web/.next/cache/turbopack; without it every combined build is a
+      # cold ~3 min compile. Merge-group and dispatch runs only restore the
+      # newest trusted main entry. Only push-to-main writes, at most once per
+      # UTC day per dependency hash, after the whole job passes. The path is
+      # compiler state only (no fetch/image cache, no build output), and
+      # Turbopack revalidates every entry against the current inputs.
+      - name: Resolve Next build cache day
+        id: next-build-cache-day
+        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Restore Next build cache (read-only)
+        id: next-build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -2412,6 +2431,35 @@ jobs:
           path: apps/web/test-results/
           allow-markdown: 'true'
           retention-days: 3
+      - name: Measure Next build cache (trusted main only)
+        id: next-build-cache-size
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-build-cache.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/web/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Next build cache (trusted main only)
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ steps.next-build-cache.outputs.cache-primary-key }}
 
   ci-build-ovie:
     name: Ovie Build (combined)
