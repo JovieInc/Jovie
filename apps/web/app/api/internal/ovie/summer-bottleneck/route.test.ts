@@ -294,8 +294,20 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     );
     vi.stubGlobal('fetch', fetch);
     expect(input.signals.ciAudit.measurements).toHaveLength(1);
-    expect(input.signals.ciAudit.classes).toEqual([]);
-    expect(input.signals.ciAudit.excludedClasses).toHaveLength(6);
+    expect(input.signals.ciAudit.classes).toEqual([
+      {
+        id: 'affected-only-unit-selection',
+        state: 'open',
+        owner: 'ci-risk-classifier',
+        'impact-rule': 'affected-unit-paths-only',
+        action: 'remediate-selected-ci-audit-class',
+        handle: 'audit:affected-only-units',
+      },
+    ]);
+    expect(input.signals.ciAudit.excludedClasses).toHaveLength(5);
+    expect(
+      input.signals.ciAudit.excludedClasses.map((row: { id: string }) => row.id)
+    ).not.toContain('affected-only-unit-selection');
     expect((await POST(request(input))).status).toBe(202);
     expect(
       JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).signals.ciAudit
@@ -314,6 +326,12 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubGlobal('fetch', fetch);
     for (const change of [
       { excludedClasses: [...audit.excludedClasses].reverse() },
+      {
+        classes: [{ ...audit.classes[0], id: 'controller-cascade-coalescing' }],
+      },
+      { classes: [{ ...audit.classes[0], state: 'implemented' }] },
+      { classes: [{ ...audit.classes[0], owner: 'forged-owner' }] },
+      { classes: [] },
       { measurements: [...audit.measurements, ...audit.measurements] },
       {
         measurements: [

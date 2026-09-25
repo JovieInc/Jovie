@@ -1,4 +1,4 @@
-"""Read-only CI observations; no class mapping or execution authority is inferred."""
+"""Read-only CI observations. One accepted class mapping; checks stay non-dispatchable."""
 from __future__ import annotations
 
 import hashlib
@@ -13,12 +13,39 @@ CLASS_IDS = (
     "controller-cascade-coalescing", "controller-check-run-pagination-cap",
     "merge-group-flake-baseline-ratchet", "obsolete-unaffected-native-lanes",
 )
+# Smallest CI execute class. Owner is the catalog owner for this id.
+# The impact rule stays on affected unit paths. Action is the existing
+# CI-class repair verb. Handle is the admission check key.
+ACCEPTED_CLASS_ID = "affected-only-unit-selection"
+ACCEPTED_CLASS = {
+    "id": ACCEPTED_CLASS_ID,
+    "state": "open",
+    "owner": "ci-risk-classifier",
+    "impact-rule": "affected-unit-paths-only",
+    "action": "remediate-selected-ci-audit-class",
+    "handle": "audit:affected-only-units",
+}
+ACCEPTED_CLASS_FIELDS = frozenset(ACCEPTED_CLASS)
 SHA = re.compile(r"^[a-f0-9]{40}$")
 MAX_PAGES = 10
 MAX_TARGETS = 3
 MAX_MEASUREMENTS = 25
 MAX_SAFE_INTEGER = 2**53 - 1
 REASONS = ("class-unmapped", "owner-unaccepted", "impact-rule-unaccepted", "action-unaccepted")
+
+
+def excluded_classes():
+    return [{"id": name, "reason": "mapping-unaccepted"}
+            for name in CLASS_IDS if name != ACCEPTED_CLASS_ID]
+
+
+def class_mapping_accepted(item):
+    """Accept only the one mapped class, as open or partial."""
+    return (isinstance(item, dict) and set(item) == ACCEPTED_CLASS_FIELDS
+            and item["id"] == ACCEPTED_CLASS_ID
+            and item["state"] in {"open", "partial"}
+            and all(item[key] == ACCEPTED_CLASS[key]
+                    for key in ("owner", "impact-rule", "action", "handle")))
 
 
 def _digest(value):
@@ -55,8 +82,8 @@ def _head(reader, repo, pr):
 def observe_ci_audit(repo, revision, reader, *, targets=(), clock=None):
     """Reuse the fleet's authenticated reader and existing repair inventory.
 
-    This bounded sample preserves failures even without owner/action/impact
-    authority. All six classes remain excluded until their mapping is accepted.
+    This bounded sample preserves failures without granting per-check dispatch.
+    One class mapping is accepted. The other five stay excluded.
     A fresh read of an old check does not change its completion timestamp.
     """
     if repo != "JovieInc/Jovie" or not _sha(revision):
@@ -103,7 +130,7 @@ def observe_ci_audit(repo, revision, reader, *, targets=(), clock=None):
             issues.add("incomplete-observation")
             if isinstance(error, ValueError) and str(error) == "head-changed":
                 issues.add("head-drift")
-        # Even partial reads are useful diagnostics. They never create classes.
+        # Even partial reads are useful diagnostics. They never add a class.
         checked += len(runs)
         evidence.append({"pr": pr, "head": expected, "checks": list(runs.values()), "total": total})
         for row in runs.values():
@@ -137,8 +164,8 @@ def observe_ci_audit(repo, revision, reader, *, targets=(), clock=None):
     failures.sort(key=lambda row: (row["pr"] or 0, row["checkId"]))
     result = {
         "schema": SCHEMA, "observedAt": observed_at, "sourceRevision": revision,
-        "sourceDigest": _digest(evidence), "classes": [],
-        "excludedClasses": [{"id": name, "reason": "mapping-unaccepted"} for name in CLASS_IDS],
+        "sourceDigest": _digest(evidence), "classes": [dict(ACCEPTED_CLASS)],
+        "excludedClasses": excluded_classes(),
         "measurements": failures[:MAX_MEASUREMENTS],
         "sample": {"checkRunsObserved": checked, "failuresObserved": len(failures),
                    "failuresOmitted": max(0, len(failures) - MAX_MEASUREMENTS),
@@ -156,11 +183,15 @@ def validate_projection(value, revision, now, max_age_seconds):
         raise ValueError("CI audit fields invalid")
     age = (now - _time(value["observedAt"])).total_seconds()
     if (value["schema"] != SCHEMA or value["sourceRevision"] != revision
-            or not -60 <= age <= max_age_seconds or value["classes"] != []
+            or not -60 <= age <= max_age_seconds
             or not isinstance(value["sourceDigest"], str)
             or not re.fullmatch(r"[a-f0-9]{64}", value["sourceDigest"])):
         raise ValueError("CI audit binding invalid")
-    if value["excludedClasses"] != [{"id": name, "reason": "mapping-unaccepted"} for name in CLASS_IDS]:
+    classes = value["classes"]
+    if (not isinstance(classes, list) or len(classes) != 1
+            or not class_mapping_accepted(classes[0])):
+        raise ValueError("CI audit class mapping invalid")
+    if value["excludedClasses"] != excluded_classes():
         raise ValueError("CI audit exclusions invalid")
     rows = value["measurements"]
     if not isinstance(rows, list) or len(rows) > MAX_MEASUREMENTS:
