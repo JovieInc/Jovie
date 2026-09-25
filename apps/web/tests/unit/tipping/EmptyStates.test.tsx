@@ -1,15 +1,17 @@
 import { render, screen } from '@testing-library/react';
+import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   TippingEmptyState,
   TippingMetricsSkeleton,
 } from '@/components/features/pay/EmptyStates';
 
-// Mock next/image
 vi.mock('next/image', () => ({
-  default: (props: any) => {
-    // eslint-disable-next-line jsx-a11y/alt-text -- Mock for next/image
-    return <img {...props} />;
+  default: ({
+    fill: _fill,
+    ...props
+  }: ImgHTMLAttributes<HTMLImageElement> & { readonly fill?: boolean }) => {
+    return <img {...props} alt={props.alt ?? ''} />;
   },
 }));
 
@@ -62,7 +64,35 @@ describe('TippingEmptyState', () => {
       'No Venmo Account Connected'
     );
   });
+
+  it('keeps each tipping illustration inside the 36px EmptyState icon slot', () => {
+    const { unmount } = render(
+      <TippingEmptyState type='no-venmo' animate={false} />
+    );
+    assertIllustrationFitsSlot('Illustration of a disconnected Venmo account');
+    unmount();
+
+    render(<TippingEmptyState type='pending-metrics' animate={false} />);
+    assertIllustrationFitsSlot('Illustration of pending payment metrics');
+  });
 });
+
+function assertIllustrationFitsSlot(alt: string) {
+  const image = screen.getByAltText(alt);
+  const frame = image.parentElement;
+  const slot = screen
+    .getByTestId('tipping-empty-state')
+    .querySelector('.h-9.w-9');
+
+  expect(frame).not.toBeNull();
+  expect(frame?.className).toContain('h-9');
+  expect(frame?.className).toContain('w-9');
+  expect(frame?.className).toContain('overflow-hidden');
+  expect(frame?.className).not.toContain('h-24');
+  expect(frame?.className).not.toContain('w-24');
+  expect(slot).not.toBeNull();
+  expect(slot?.contains(image)).toBe(true);
+}
 
 describe('TippingMetricsSkeleton', () => {
   it('renders skeleton with default rows', () => {

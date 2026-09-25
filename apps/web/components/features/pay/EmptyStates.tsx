@@ -57,12 +57,12 @@ export function TippingEmptyState({
     >
       <EmptyState
         icon={
-          <div className='relative h-24 w-24'>
+          <div className='relative h-9 w-9 max-h-full max-w-full overflow-hidden'>
             <Image
               src={config.illustration}
               alt={config.altText}
               fill
-              sizes='(max-width: 768px) 100vw, 192px'
+              sizes='36px'
               className='object-contain'
               aria-hidden='true'
             />
