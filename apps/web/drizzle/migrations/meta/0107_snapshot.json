@@ -1,5 +1,5 @@
 {
-  "id": "ec9cfa8b-90ab-486e-a83d-1c6c3142bc9e",
+  "id": "69d86396-ae51-472e-85d9-90ebf42a1f0a",
   "prevId": "405de4e1-5e97-41e7-8774-4eeb7db5320b",
   "version": "7",
   "dialect": "postgresql",
@@ -27662,7 +27662,7 @@
         },
         "recipient_preferences_marketing_consent_valid": {
           "name": "recipient_preferences_marketing_consent_valid",
-          "value": "(\"recipient_preferences\".\"marketing_opt_in\" = false and \"recipient_preferences\".\"marketing_consent_version\" is null and \"recipient_preferences\".\"marketing_consent_recorded_at\" is null) or (\"recipient_preferences\".\"marketing_opt_in\" = true and \"recipient_preferences\".\"marketing_consent_version\" = 'recipient-marketing-v1' and \"recipient_preferences\".\"marketing_consent_recorded_at\" is not null)"
+          "value": "(\"recipient_preferences\".\"marketing_opt_in\" = false and \"recipient_preferences\".\"marketing_consent_version\" is null and \"recipient_preferences\".\"marketing_consent_recorded_at\" is null) or (\"recipient_preferences\".\"marketing_opt_in\" = true and \"recipient_preferences\".\"marketing_consent_version\" is not null and \"recipient_preferences\".\"marketing_consent_version\" = 'recipient-marketing-v1' and \"recipient_preferences\".\"marketing_consent_recorded_at\" is not null)"
         }
       },
       "isRLSEnabled": false

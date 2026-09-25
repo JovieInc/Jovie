@@ -96,9 +96,11 @@ export const recipientPreferences = pgTable(
       'recipient_preferences_quiet_hours_valid',
       drizzleSql`${table.quietHoursStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${table.quietHoursEnd} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${table.quietHoursStart} <> ${table.quietHoursEnd}`
     ),
+    // PostgreSQL CHECK accepts NULL. Comparing a missing version with `=`
+    // yields NULL, so the opted-in arm must also require IS NOT NULL.
     marketingConsentValid: check(
       'recipient_preferences_marketing_consent_valid',
-      drizzleSql`(${table.marketingOptIn} = false and ${table.marketingConsentVersion} is null and ${table.marketingConsentRecordedAt} is null) or (${table.marketingOptIn} = true and ${table.marketingConsentVersion} = 'recipient-marketing-v1' and ${table.marketingConsentRecordedAt} is not null)`
+      drizzleSql`(${table.marketingOptIn} = false and ${table.marketingConsentVersion} is null and ${table.marketingConsentRecordedAt} is null) or (${table.marketingOptIn} = true and ${table.marketingConsentVersion} is not null and ${table.marketingConsentVersion} = 'recipient-marketing-v1' and ${table.marketingConsentRecordedAt} is not null)`
     ),
   })
 );

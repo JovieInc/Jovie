@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,6 +68,88 @@ function memoryStore(
   };
 }
 
+function marketingConsentCheckExpression(migrationSql: string): string {
+  const marker =
+    'CONSTRAINT "recipient_preferences_marketing_consent_valid" CHECK (';
+  const start = migrationSql.indexOf(marker);
+  if (start < 0) {
+    throw new Error('marketing consent check is missing from the migration');
+  }
+  const expressionStart = start + marker.length;
+  const expressionEnd = migrationSql.indexOf(')\n);', expressionStart);
+  if (expressionEnd < 0) {
+    throw new Error('marketing consent check is not closed');
+  }
+  return migrationSql
+    .slice(expressionStart, expressionEnd)
+    .replaceAll('"recipient_preferences".', '');
+}
+
+/**
+ * SQLite and PostgreSQL both let a CHECK pass when the expression is NULL.
+ * The generated constraint runs in a child Node process because Vitest cannot
+ * bundle `node:sqlite`.
+ */
+function marketingConsentCheckAccepts(row: {
+  marketingOptIn: boolean;
+  marketingConsentVersion: string | null;
+  marketingConsentRecordedAt: string | null;
+}): boolean {
+  const migrationSql = readFileSync(
+    join(process.cwd(), 'drizzle/migrations/0107_recipient_preferences.sql'),
+    'utf8'
+  );
+  const expression = marketingConsentCheckExpression(migrationSql);
+  const probe = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `import { DatabaseSync } from 'node:sqlite';
+const expression = process.env.CHECK_SQL;
+const db = new DatabaseSync(':memory:');
+db.exec(\`CREATE TABLE recipient_preferences (
+  marketing_opt_in integer not null,
+  marketing_consent_version text,
+  marketing_consent_recorded_at text,
+  CHECK (\${expression})
+)\`);
+try {
+  db.prepare('INSERT INTO recipient_preferences (marketing_opt_in, marketing_consent_version, marketing_consent_recorded_at) VALUES (?, ?, ?)').run(
+    Number(process.env.OPT_IN),
+    process.env.CONSENT_VERSION === '' ? null : process.env.CONSENT_VERSION,
+    process.env.RECORDED_AT === '' ? null : process.env.RECORDED_AT
+  );
+  process.stdout.write('accepted');
+} catch (error) {
+  if (error instanceof Error && error.message.includes('CHECK constraint failed')) {
+    process.stdout.write('rejected');
+  } else {
+    throw error;
+  }
+} finally {
+  db.close();
+}`,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CHECK_SQL: expression,
+        OPT_IN: row.marketingOptIn ? '1' : '0',
+        CONSENT_VERSION: row.marketingConsentVersion ?? '',
+        RECORDED_AT: row.marketingConsentRecordedAt ?? '',
+      },
+    }
+  );
+  if (probe.status !== 0) {
+    throw new Error(probe.stderr || 'consent check probe failed');
+  }
+  if (probe.stdout === 'accepted') return true;
+  if (probe.stdout === 'rejected') return false;
+  throw new Error(`unexpected consent check probe output: ${probe.stdout}`);
+}
+
 function customerWrite(
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> {
@@ -112,6 +195,37 @@ describe('recipient preference persistence', () => {
     expect(sql).toContain(`'${MARKETING_CONSENT_VERSION}'`);
     expect(sql).toContain('REFERENCES "public"."ba_users"("id")');
     expect(sql).not.toContain('clerk');
+    expect(sql).toContain('"marketing_consent_version" is not null');
+  });
+
+  it('rejects an opted-in row when the consent version is null', () => {
+    expect(
+      marketingConsentCheckAccepts({
+        marketingOptIn: true,
+        marketingConsentVersion: null,
+        marketingConsentRecordedAt: CONSENT_AT,
+      })
+    ).toBe(false);
+  });
+
+  it('accepts an opted-in row with the consent version and timestamp', () => {
+    expect(
+      marketingConsentCheckAccepts({
+        marketingOptIn: true,
+        marketingConsentVersion: MARKETING_CONSENT_VERSION,
+        marketingConsentRecordedAt: CONSENT_AT,
+      })
+    ).toBe(true);
+  });
+
+  it('accepts an opted-out row with null consent provenance', () => {
+    expect(
+      marketingConsentCheckAccepts({
+        marketingOptIn: false,
+        marketingConsentVersion: null,
+        marketingConsentRecordedAt: null,
+      })
+    ).toBe(true);
   });
 
   it('reads a stored consent timestamp through the drizzle accessor', async () => {
