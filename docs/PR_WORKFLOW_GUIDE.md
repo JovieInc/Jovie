@@ -1,96 +1,22 @@
 # PR Workflow Guide
 
-## Linear State Flow
+> **Retired 2026-09-25 (JOV-5426):** this guide described a label-driven
+> auto-merge flow (`auto-merge` label fan-out, manual production promotion)
+> that no longer exists. Current truth:
 
-Every PR tied to a Linear issue follows this three-state flow:
+- **How PRs land:** [`docs/PR_FLOW.md`](./PR_FLOW.md) — open a draft, keep the
+  exact head green, then request GitHub's normal **Merge when ready**; the
+  native merge queue owns admission. There is **no `auto-merge` label**, no PR
+  label fans out CI, and there is no production-promotion branch or manual
+  promotion lane. Queue semantics: [`.github/MERGE_QUEUE.md`](../.github/MERGE_QUEUE.md).
+  Required status checks: [`.github/BRANCH_PROTECTION.md`](../.github/BRANCH_PROTECTION.md).
+- **Linear issue state:** the [Linear Ownership Contract](../.claude/rules/linear.md)
+  governs the three-state flow — mark the issue `In Progress` before editing
+  (Symphony records it in the lease; ad-hoc agents do it manually), move it to
+  `In Review` when you open the PR (or require the lease-handoff receipt), and
+  **never** set `Done` yourself: `linear-sync-on-merge.yml` auto-transitions it
+  on merge. Preserve the PR body's `<!-- linear-issue-id:... -->` comment
+  (injected by `.github/workflows/auto-pr-on-push.yml`) and the `jov-XXXX`
+  branch pattern so the merge workflow can find the issue.
 
-```
-Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Done]
-         ^ manual              ^ auto (orchestrator)    ^ auto (sync-on-merge)
-```
-
-- **In Progress** — the agent marks the issue before editing files. Dispatched work (via `linear-ai-orchestrator.yml`) sets this automatically; ad-hoc work is the agent's responsibility. See `AGENTS.md` → "Linear Ownership Contract".
-- **In Review** — `.github/workflows/linear-ai-orchestrator.yml` (`sync_linear_in_review` job) sets this when the PR is opened.
-- **Done** — `.github/workflows/linear-sync-on-merge.yml` sets this when the PR merges.
-
-**Troubleshooting**: if the auto-transitions don't fire, the issue→PR link is broken. Verify:
-
-1. The PR body contains `<!-- linear-issue-id:... -->` (injected by `.github/workflows/auto-pr-on-push.yml`), OR
-2. The branch name contains `jov-NNNN` (e.g., `codex/jov-1433-foo`, `itstimwhite/jov-1433-foo`).
-
-If neither is present, the workflows cannot find the Linear issue and state stays stuck.
-
-## Creating PRs with Auto-merge
-
-Agent automation has a separate capacity guard: Linear dispatch, orchestrator
-pickup, and the agent push-to-PR bridge defer new agent work when 5 agent PRs
-are already open. The push-to-PR bridge creates draft PRs; verification and
-agent pipeline jobs decide when they are ready for auto-merge.
-
-### Option 1: Helper Script (Recommended)
-```bash
-./scripts/create-pr.sh "feat: add user authentication" "Implement OAuth login with Google and GitHub providers"
-```
-
-### Option 2: Manual with gh CLI
-```bash
-# Create PR
-gh pr create --title "feat: add user auth" --body "Implement OAuth login"
-
-# Add auto-merge label
-gh pr edit <PR_NUMBER> --add-label "auto-merge"
-```
-
-## Auto-merge Behavior
-
-The auto-merge workflow will:
-
-✅ **Enable auto-merge for PRs with `auto-merge` label when:**
-- All CI checks pass
-- PR is not draft
-- No active machine gate (`blocked`, conflict, required-check failure, etc.)
-
-⏸️ **Skip auto-merge for PRs with these labels:**
-- `blocked` - PR is blocked
-- `claude:needs-fixes` - Claude detected issues
-
-## PR Types
-
-### Regular PRs (like Claude Code creates)
-- ✅ **Auto-merge**: Only if `auto-merge` label is present
-- 🔄 **Merge method**: Squash and merge
-- ⚡ **CI requirements**: Fast checks (lint, typecheck)
-
-### Special PR Types
-- **Dependabot**: Auto-merge for patch/minor updates and security fixes
-- **Codegen**: Auto-merge with `codegen` label
-- **Production promotion**: Manual merge only (no auto-merge)
-
-## Best Practices
-
-1. **Always add `auto-merge` label** when creating PRs via Claude Code
-2. **Use conventional commit format** in PR titles
-3. **Add blocking labels** if PR needs human review
-4. **Monitor CI status** - auto-merge only triggers after green CI
-5. **Avoid CodeRabbit rate limits** - batch commits and avoid rapid-fire re-reviews (wait 1–2 minutes if prompted)
-
-## Troubleshooting
-
-### Auto-merge not triggering?
-- Check if PR has `auto-merge` label
-- Verify CI checks are passing
-- Ensure no blocking labels are present
-- Check workflow logs in GitHub Actions
-
-### CodeRabbit says “rate limit exceeded”?
-- Don’t spam `@coderabbitai review` or push many tiny commits in a short window; batch changes into fewer commits.
-- Wait the cooldown time shown in the CodeRabbit comment before re-triggering review.
-- If the comment mentions usage credits are exhausted, either top up credits or skip CodeRabbit until credits are restored.
-
-### Need to stop unsafe admission?
-```bash
-gh pr edit <PR_NUMBER> --add-label "hold"
-```
-
-Use `hold` only for a concrete machine-verifiable incident. Taste is steered
-before PR creation or certified after landing behind a feature flag.
+Keep PRs small, focused, and conventional-commit formatted.
