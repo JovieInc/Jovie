@@ -438,18 +438,15 @@ describe('annotateClaimedStatusForCurrentUser', () => {
     expect(annotated.isClaimedByCurrentUser).toBeUndefined();
   });
 
-  it('fails closed when the ownership lookup fails', async () => {
+  it('does not report an ownership lookup failure as an unowned claim', async () => {
     mockSelect.mockImplementationOnce(() => {
       throw new Error('Connection refused');
     });
 
     const results = [makeResult({ id: 'claimed-id', name: 'Claimed' })];
-    const annotated = await annotateClaimedStatusForCurrentUser(
-      results,
-      'user-1'
-    );
-
-    expect(annotated).toEqual(results);
+    await expect(
+      annotateClaimedStatusForCurrentUser(results, 'user-1')
+    ).rejects.toThrow('Connection refused');
   });
 });
 
