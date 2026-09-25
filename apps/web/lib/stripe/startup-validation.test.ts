@@ -121,4 +121,70 @@ describe('Artist Visibility billing startup contract', () => {
       ],
     });
   });
+
+  it('alerts once for unchanged failures across repeated validation calls', async () => {
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', undefined);
+    const { validateStripeBillingConfig } = await import(
+      './startup-validation'
+    );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const result = validateStripeBillingConfig();
+      expect(result.healthy).toBe(false);
+      expect(result.issues).toEqual([
+        'Missing Stripe env vars: STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
+        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.',
+      ]);
+    }
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Stripe billing misconfigured at startup'),
+      expect.objectContaining({ level: 'fatal' })
+    );
+  });
+
+  it('re-alerts when the failure set changes between validation calls', async () => {
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', undefined);
+    const { validateStripeBillingConfig } = await import(
+      './startup-validation'
+    );
+
+    validateStripeBillingConfig();
+    validateStripeBillingConfig();
+
+    // Env "changes between retries": credentials disappear too.
+    vi.stubEnv('STRIPE_SECRET_KEY', undefined);
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', undefined);
+    vi.stubEnv('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', undefined);
+
+    validateStripeBillingConfig();
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureMessage).toHaveBeenLastCalledWith(
+      'Stripe billing misconfigured at startup: Missing Stripe env vars: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY; No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.',
+      expect.objectContaining({ level: 'fatal' })
+    );
+  });
+
+  it('re-alerts after recovery when the same failure returns', async () => {
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', undefined);
+    const { validateStripeBillingConfig } = await import(
+      './startup-validation'
+    );
+
+    validateStripeBillingConfig();
+    validateStripeBillingConfig();
+
+    // Recovered (a fix landed between retries).
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', 'price_visibility');
+    expect(validateStripeBillingConfig().healthy).toBe(true);
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+
+    // Same failure returns in the same process: alert again.
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', undefined);
+    validateStripeBillingConfig();
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(2);
+  });
 });
