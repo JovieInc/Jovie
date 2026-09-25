@@ -1303,6 +1303,62 @@ ${selectedGateScript}`,
     expect(buildLayout).not.toContain('actions/download-artifact');
   });
 
+  it('restores the Build+Layout Turbopack cache read-only and writes it only from trusted main', () => {
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const stepAt = name => buildLayout.indexOf(`      - name: ${name}\n`);
+    const step = name => {
+      const start = stepAt(name);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = buildLayout.indexOf('\n      - ', start + 1);
+      return buildLayout.slice(start, next === -1 ? undefined : next);
+    };
+    const restore = step('Restore Next build cache (read-only)');
+    const measure = step('Measure Next build cache (trusted main only)');
+    const save = step('Save Next build cache (trusted main only)');
+    const trustedMain =
+      "success() && github.event_name == 'push' && github.ref == 'refs/heads/main'";
+
+    // Restore runs on every event and happens before the build it warms.
+    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
+      stepAt('Build exact combined head')
+    );
+    expect(restore).toContain('uses: actions/cache/restore@');
+    expect(restore).not.toMatch(/^\s+if:/m);
+    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
+    expect(restore).toContain(
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}"
+    );
+    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
+
+    // Only compiler state is cached: never fetch/image caches or build output.
+    expect(buildLayout).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
+    expect(buildLayout).not.toContain('uses: actions/cache@');
+
+    // Writes happen after the layout guard, only from trusted main pushes,
+    // only on a primary-key miss, and only below the size bound.
+    expect(stepAt('Run deterministic layout behavior guard')).toBeLessThan(
+      stepAt('Save Next build cache (trusted main only)')
+    );
+    expect(measure).toContain(`if: \${{ ${trustedMain} &&`);
+    expect(measure).toContain(
+      "steps.next-build-cache.outputs.cache-hit != 'true'"
+    );
+    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
+    expect(measure).toContain('must not be a symlink');
+    expect(save).toContain(`if: \${{ ${trustedMain} &&`);
+    expect(save).toContain(
+      "steps.next-build-cache-size.outputs.eligible == 'true'"
+    );
+    expect(save).toContain('uses: actions/cache/save@');
+    expect(save).toContain('path: apps/web/.next/cache/turbopack');
+    expect(save).toContain(
+      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
+    );
+    expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    expect(buildLayout).not.toContain('pull_request_target');
+    expect(buildLayout).not.toContain('secrets.');
+  });
+
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
     const workflowHeader = IOS_CI_WORKFLOW.slice(
       0,
