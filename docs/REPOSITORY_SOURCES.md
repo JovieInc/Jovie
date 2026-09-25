@@ -94,7 +94,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/canary-health-gate.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2fa2573a068ff9417f44b9c411fa2aa7108ebee4767b9ab4c7aba339b072c2cf`)
 - `.github/workflows/ci-duration-ratchet.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `6f64012b41f283ad4a2590bc7940dbe437ddc8801bda909fde38c95fe18c88bf`)
 - `.github/workflows/ci-shard-contract-canary.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4c90ef068f3dc9ab64409e8efd3c205fbd70f048503c674c7b05ad2240d9f43e`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `cc39f6b07589a6f1db5db59880ea7ade614cfa32d2e3281bcde7e3d6c5fd4823`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3833a9ab8b96cc9ec5a47e5e5a39ebf694b71cd7927f41e3804dc50dc002ccbc`)
 - `.github/workflows/claude-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f1f135723f00a69124e7e6b2963ac5228f1b8a5a8f4ed7d69908ae48c79784b9`)
 - `.github/workflows/claude.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bd45f27892b0df484dbdd0093affe753bda3d4f4268a21ceb2cb4735d8e94ee8`)
 - `.github/workflows/codeql.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `08ec59de790de6e33e4a6761d28c910bb1d6ab796d6dcfb437615deb6af522c6`)
@@ -133,8 +133,8 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/merge-queue-ruleset-verify.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `736d2913acbe972199708b623471d93eb9fb4b7dfb52279352b418ac077aeb17`)
 - `.github/workflows/neon-ephemeral-branch-cleanup.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3f08c435e5f63dcea54eea95097f2c006894a3a2d8ed709c7930af7ea2c6d765`)
 - `.github/workflows/neon-scheduled-cleanup.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `14a62714074247f9120d09085ef843b302878fa88e2693479a54d744d51507d9`)
-- `.github/workflows/nightly-testing-agent.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `12b15b44a12b4d814ba73535106fb00016fd1367c59079540fb3dcd2e29fd085`)
-- `.github/workflows/nightly-tests.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2a80cde0021128c7cef65f887eae9c6b66235d7c3b6ca53b02ca05e45ba18b72`)
+- `.github/workflows/nightly-testing-agent.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `19500949a7c29455ae2a921f1a2f1216d6a3b2bcd64b4b0f62b3cc83bbaeb8a5`)
+- `.github/workflows/nightly-tests.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f8b49a071cb4a2089bea55f9c6cf674076c05682ed230c9b5636730c612da5cf`)
 - `.github/workflows/node-runtime-compatibility.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `91a9d5e771f3241443b5fc81e541bc62eb28ab77d8d4f4c43ef8d916c7745603`)
 - `.github/workflows/node-runtime-freshness.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ee1755260109960434c175bad0c42fc59caa7cb38b519b73845c1f05bea13038`)
 - `.github/workflows/npm-publish.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ae6095fbb1555270ec488ce03c978dc0d408fa11da7eb192123812aa85e7ac76`)
@@ -554,7 +554,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `2287d8c6667a3e2768ed8f530e6e63431cc6a126acdea3d5ea5c36416a0c33f7`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0b558b81b877092fd268eb5f944737ab9e93f911494c1e978b666d8eea3a54f8`)
 
 ### `apps/web/package.json`: engines
 
@@ -861,6 +861,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "react-dom": "19.2.8",
   "react-error-boundary": "^6.1.6",
   "recharts": "3.10.1",
+  "redis": "5.12.1",
   "remark": "^15.0.1",
   "remark-gfm": "^4.0.1",
   "remark-html": "^16.0.1",
