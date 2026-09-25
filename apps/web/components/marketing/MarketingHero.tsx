@@ -507,20 +507,24 @@ function MarketingHeroLanding({
   );
 }
 
-function MarketingHeroPublic({
-  variant,
-  headline,
-  subtitle,
-  primaryCta,
-  secondaryCta,
-  linkComponent = Link,
-  headingId,
-  testId,
-  className,
-  ...variantProps
-}: MarketingHeroPublicProps) {
+function MarketingHeroPublic(props: MarketingHeroPublicProps) {
+  const {
+    variant,
+    headline,
+    subtitle,
+    primaryCta,
+    secondaryCta,
+    linkComponent = Link,
+    headingId,
+    testId,
+    className,
+  } = props;
   const layoutVariant =
     variant === 'desktop' || variant === 'mobile' ? 'split' : 'center';
+  const image =
+    props.variant === 'desktop' || props.variant === 'mobile'
+      ? props.image
+      : null;
   return (
     <MarketingHeroFrame
       className={cn(
@@ -561,36 +565,22 @@ function MarketingHeroPublic({
                 ) : null}
               </div>
             ) : null}
-            {variant === 'developer' ? (
-              <MarketingHeroDeveloperCommand
-                {...(variantProps as MarketingHeroPublicDeveloperProps).install}
-              />
+            {props.variant === 'developer' ? (
+              <MarketingHeroDeveloperCommand {...props.install} />
             ) : null}
-            {variant === 'claim' ? (
-              <HeroSpotifySearch
-                {...(variantProps as MarketingHeroPublicClaimProps).claim}
-              />
+            {props.variant === 'claim' ? (
+              <HeroSpotifySearch {...props.claim} />
             ) : null}
           </div>
-          {variant === 'desktop' || variant === 'mobile' ? (
+          {image ? (
             <div className='marketing-hero-media'>
               {/* The public image contract is intentionally inert until its route adapter lands. */}
               <Image
-                src={
-                  (variantProps as MarketingHeroPublicDesktopProps).image.src
-                }
-                alt={
-                  (variantProps as MarketingHeroPublicDesktopProps).image.alt
-                }
-                width={
-                  (variantProps as MarketingHeroPublicDesktopProps).image.width
-                }
-                height={
-                  (variantProps as MarketingHeroPublicDesktopProps).image.height
-                }
-                sizes={
-                  (variantProps as MarketingHeroPublicDesktopProps).image.sizes
-                }
+                src={image.src}
+                alt={image.alt}
+                width={image.width}
+                height={image.height}
+                sizes={image.sizes}
               />
             </div>
           ) : null}

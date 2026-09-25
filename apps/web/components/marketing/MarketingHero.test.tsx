@@ -264,6 +264,8 @@ describe('MarketingHero source-backed default story', () => {
     );
 
     const copyButton = screen.getByRole('button', { name: 'Copy command' });
+    expect(screen.getByText('jovie --help')).toBeVisible();
+    expect(screen.getByText('Available now.')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Developer hero' })).toHaveClass(
       'marketing-hero-public-heading'
     );
