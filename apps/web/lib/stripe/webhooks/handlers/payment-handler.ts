@@ -24,6 +24,7 @@ import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { recordCommission } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -238,6 +239,37 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         throw new Error('Billing update omitted canonical app user ID');
       }
       await invalidateBillingCache(result.appUserId);
+
+      // JOV-6459: payment success is emitted from the VERIFIED webhook, never
+      // inferred from the billing success page — the buyer is never required
+      // to reach /billing/success for the funnel to reconcile. Idempotent on
+      // the Stripe event id so webhook redeliveries persist one durable row.
+      // Failure is a required receipt (JOV-6166 pattern): Stripe's retry is
+      // the reconciliation path, so swallowing here would leave a successful
+      // state transition permanently unmeasured behind a 200.
+      const receipt = await trackServerEvent(
+        'payment_succeeded',
+        { appUserId: result.appUserId, source: 'invoice_payment_succeeded' },
+        undefined,
+        { dedupeKey: `stripe_event:${stripeEventId}` }
+      );
+      if (!receipt.ok) {
+        await captureCriticalError(
+          'Payment succeeded analytics receipt failed',
+          new Error(
+            `payment_succeeded receipt not persisted: ${receipt.error}`
+          ),
+          {
+            route: '/api/stripe/webhooks',
+            event: 'invoice.payment_succeeded',
+            invoiceId: invoice.id,
+          }
+        );
+        throw new Error(
+          `payment_succeeded analytics receipt failed: ${receipt.error}`
+        );
+      }
+
       await this.tryRecordReferralCommission(result.appUserId, invoice);
       this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
 

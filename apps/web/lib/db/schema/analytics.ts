@@ -388,6 +388,12 @@ export const serverAnalyticsEvents = pgTable(
       .$type<Record<string, string | number | boolean | null>>()
       .default({})
       .notNull(),
+    // JOV-6459: server-derived idempotency key for revenue-critical events
+    // (e.g. 'activation_completed:profile:<id>'). Nullable — events without a
+    // natural dedupe key stay unconstrained (Postgres unique indexes ignore
+    // NULLs). Retries, refreshes, multi-tab/multi-device replays and webhook
+    // redeliveries collapse to one durable row per key.
+    dedupeKey: text('dedupe_key'),
     occurredAt: timestamp('occurred_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -402,6 +408,9 @@ export const serverAnalyticsEvents = pgTable(
     sourceOccurredAtIdx: index(
       'server_analytics_events_source_occurred_at_idx'
     ).on(table.sourceEntityType, table.sourceEntityId, table.occurredAt),
+    dedupeKeyUnique: uniqueIndex(
+      'server_analytics_events_dedupe_key_unique'
+    ).on(table.dedupeKey),
     createdAtIdx: index('server_analytics_events_created_at_idx').on(
       table.createdAt
     ),

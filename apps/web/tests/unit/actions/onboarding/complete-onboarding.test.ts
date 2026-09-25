@@ -33,6 +33,7 @@ const {
   mockResolveClerkIdentity,
   mockFinalizePostOnboarding,
   mockMarkWaitlistSignedUpInTx,
+  mockTrackServerEvent,
   mockUpdateExistingProfile,
   mockValidateUsername,
   mockWithDbSessionTx,
@@ -75,6 +76,7 @@ const {
   mockResolveClerkIdentity: vi.fn(),
   mockFinalizePostOnboarding: vi.fn(),
   mockMarkWaitlistSignedUpInTx: vi.fn(),
+  mockTrackServerEvent: vi.fn(),
   mockUpdateExistingProfile: vi.fn(),
   mockValidateUsername: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
@@ -143,6 +145,10 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/leads/funnel-events', () => ({
   attributeLeadSignupFromAppUserId: mockAttributeLeadSignupFromAppUserId,
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -223,6 +229,11 @@ describe('completeOnboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockTrackServerEvent.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-1',
+      duplicate: false,
+    });
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk-user-123' });
     mockGetCachedCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
     mockValidateUsername.mockReturnValue({ isValid: true });
@@ -691,6 +702,53 @@ describe('completeOnboarding', () => {
     );
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockGetCachedCurrentUser).toHaveBeenCalled();
+  });
+
+  it('persists the durable activation event with the server-derived dedupe key', async () => {
+    await completeOnboarding({
+      username: 'Artist',
+      displayName: 'Artist Name',
+      email: 'artist@example.com',
+      redirectToDashboard: false,
+    });
+
+    // JOV-6459: activation evidence is persisted server-side at the
+    // authoritative state transition, idempotent on the profile key.
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'activation_completed',
+      { profileId: 'profile-123', source: 'onboarding_complete' },
+      undefined,
+      { dedupeKey: 'profile:profile-123' }
+    );
+  });
+
+  it('never lets an activation event failure interrupt onboarding', async () => {
+    mockTrackServerEvent.mockRejectedValueOnce(
+      new Error('analytics persistence down')
+    );
+
+    const result = await completeOnboarding({
+      username: 'Artist',
+      displayName: 'Artist Name',
+      email: 'artist@example.com',
+      redirectToDashboard: false,
+    });
+
+    // The business state transition succeeded and is reported as complete;
+    // the telemetry failure is captured, not propagated.
+    expect(result).toEqual({
+      username: 'artist',
+      status: 'created',
+      profileId: 'profile-123',
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'activation_completed event failed',
+      expect.objectContaining({ message: 'analytics persistence down' }),
+      expect.objectContaining({
+        route: 'onboarding',
+        contextData: { profileId: 'profile-123' },
+      })
+    );
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {

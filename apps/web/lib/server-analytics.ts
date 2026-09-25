@@ -1,6 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { eq } from 'drizzle-orm';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
@@ -114,6 +115,15 @@ export const SERVER_ANALYTICS_EVENTS = {
       'utm_campaign_matches_release',
     ],
     source: { property: 'releaseId', type: 'release' },
+  },
+  activation_completed: {
+    category: 'profile',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  payment_succeeded: {
+    category: 'entitlement',
+    properties: ['appUserId', 'source'],
   },
   bandsintown_api_key_saved: {
     category: 'tour',
@@ -249,6 +259,16 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['smart_link_clicked'],
   },
   {
+    path: 'app/onboarding/actions/index.ts',
+    invocations: 1,
+    events: ['activation_completed'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
+    invocations: 1,
+    events: ['payment_succeeded'],
+  },
+  {
     path: 'lib/notifications/analytics.ts',
     invocations: 7,
     events: [
@@ -381,7 +401,7 @@ const UUID_PATTERN =
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export type ServerAnalyticsDelivery =
-  | { readonly ok: true; readonly eventId: string }
+  | { readonly ok: true; readonly eventId: string; readonly duplicate: boolean }
   | {
       readonly ok: false;
       readonly error:
@@ -446,7 +466,8 @@ function sanitizeProperties(
 export async function trackServerEvent(
   event: string,
   properties?: Record<string, unknown>,
-  distinctId?: string
+  distinctId?: string,
+  options?: { readonly dedupeKey?: string }
 ): Promise<ServerAnalyticsDelivery> {
   // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
   // contract and never persists the raw distinct id.
@@ -482,31 +503,65 @@ export async function trackServerEvent(
     return { ok: false, error: 'invalid_properties' };
   }
 
+  // JOV-6459: server-derived idempotency key. The key is derived from the
+  // verified business state (profile id, Stripe event id), never from browser
+  // markers, so retries, refreshes, multi-tab/multi-device replays and webhook
+  // redeliveries persist exactly one durable row.
+  const dedupeKey =
+    typeof options?.dedupeKey === 'string' && options.dedupeKey.length > 0
+      ? `${event}:${options.dedupeKey}`
+      : null;
+
   try {
+    const insert = db.insert(serverAnalyticsEvents).values({
+      contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
+      eventName: event,
+      category: definition.category,
+      privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
+      consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
+      sourceEntityType: definition.source?.type ?? null,
+      sourceEntityId:
+        typeof sourceEntityId === 'string' ? sourceEntityId : null,
+      properties: sanitized,
+      dedupeKey,
+      occurredAt: new Date(),
+    });
+
     const [stored] = await withTimeout(
-      db
-        .insert(serverAnalyticsEvents)
-        .values({
-          contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
-          eventName: event,
-          category: definition.category,
-          privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
-          consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
-          sourceEntityType: definition.source?.type ?? null,
-          sourceEntityId:
-            typeof sourceEntityId === 'string' ? sourceEntityId : null,
-          properties: sanitized,
-          occurredAt: new Date(),
-        })
-        .returning({ id: serverAnalyticsEvents.id }),
+      dedupeKey
+        ? insert
+            .onConflictDoNothing({
+              target: serverAnalyticsEvents.dedupeKey,
+            })
+            .returning({ id: serverAnalyticsEvents.id })
+        : insert.returning({ id: serverAnalyticsEvents.id }),
       {
         timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
         context: 'Server analytics delivery',
       }
     );
 
-    if (!stored) throw new Error('Server analytics insert returned no row');
-    return { ok: true, eventId: stored.id };
+    if (!stored) {
+      // Unique-key conflict: the event was already durably persisted by an
+      // earlier attempt. This is a successful idempotent delivery, not a
+      // failure — report duplicate so callers can distinguish first-write.
+      const [existing] = await withTimeout(
+        db
+          .select({ id: serverAnalyticsEvents.id })
+          .from(serverAnalyticsEvents)
+          .where(eq(serverAnalyticsEvents.dedupeKey, dedupeKey))
+          .limit(1),
+        {
+          timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
+          context: 'Server analytics dedupe lookup',
+        }
+      );
+      if (existing) {
+        return { ok: true, eventId: existing.id, duplicate: true };
+      }
+      throw new Error('Server analytics dedupe lookup returned no row');
+    }
+    return { ok: true, eventId: stored.id, duplicate: false };
   } catch (error) {
     const deliveryUnknown =
       error instanceof Error &&

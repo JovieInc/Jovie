@@ -38,6 +38,7 @@ import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -407,6 +408,30 @@ export async function completeOnboarding({
       await attributeLeadSignupFromAppUserId(userId);
     } catch (error) {
       throw createOnboardingReceiptPendingError(error);
+    }
+
+    // JOV-6459: durable canonical activation event from the authoritative
+    // state transition (the transaction above set onboarding_completed_at).
+    // Client magic-moment telemetry is supplemental bookkeeping and never the
+    // evidence that activation was measured. Idempotent on the server-derived
+    // profile key so refreshes, retries and multi-device replays persist one
+    // row. Bounded and non-fatal: telemetry must never interrupt onboarding —
+    // the leads receipt above remains the required business record, and a
+    // missed event row is reconcilable from creator_profiles.onboarding_completed_at.
+    if (completion.profileId) {
+      try {
+        await trackServerEvent(
+          'activation_completed',
+          { profileId: completion.profileId, source: 'onboarding_complete' },
+          undefined,
+          { dedupeKey: `profile:${completion.profileId}` }
+        );
+      } catch (error) {
+        await captureError('activation_completed event failed', error, {
+          route: 'onboarding',
+          contextData: { profileId: completion.profileId },
+        });
+      }
     }
 
     if (pendingClaim?.mode === 'token_backed') {
