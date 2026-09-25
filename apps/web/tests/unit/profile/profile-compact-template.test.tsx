@@ -766,7 +766,7 @@ describe('ProfileCompactTemplate', () => {
     expect(scrollRegion.className).toContain('-mx-(--page-pad)');
     expect(scrollRegion.className).toContain('px-(--page-pad)');
     expect(scrollRegion.className).toContain('overflow-x-clip');
-    expect(scrollRegion.className).toContain('[touch-action:pan-y]');
+    expect(scrollRegion.className).toContain('touch-pan-y');
     expect(scrollRegion.className).toContain('overflow-y-auto');
     expect(scrollRegion.className).toContain('min-w-0');
   });

@@ -875,7 +875,7 @@ export function ProfileCompactSurface({
               // release rows stay inside the inset, and locks the cross axis
               // so a vertical drag cannot pan the leftover overflow (JOV-6573).
               (isHomeMode || isMusicMode) && '-mx-(--page-pad) px-(--page-pad)',
-              isMusicMode && 'min-w-0 overflow-x-clip [touch-action:pan-y]',
+              isMusicMode && 'min-w-0 overflow-x-clip touch-pan-y',
               homeContentScrollClassName,
               isHomeMode && 'profile-home-content-scroll',
               // Home mode: the scroll region becomes a flex column so the
