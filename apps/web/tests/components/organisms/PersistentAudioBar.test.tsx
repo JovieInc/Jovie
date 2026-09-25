@@ -777,10 +777,12 @@ describe('PersistentAudioBar', () => {
       screen.getByRole('button', { name: 'Show waveform' })
     ).toBeInTheDocument();
 
+    toggleTrack.mockClear();
     fireEvent.keyDown(globalThis, { key: 'l' });
     expect(push).toHaveBeenCalledWith(
       buildLyricsRoute('track-1', { from: APP_ROUTES.CHAT })
     );
+    expect(toggleTrack).not.toHaveBeenCalled();
 
     fireEvent.keyDown(globalThis, { key: '`' });
     // Minimize collapses the full docked bar; mini chrome lives in the sidebar.
