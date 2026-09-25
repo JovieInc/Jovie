@@ -17,7 +17,7 @@ describe('Eve installation contract', () => {
     // bumps edit the manifest but not this test.
     const EVE_PIN = '0.63.0';
 
-    expect(packageJson.packageManager).toBe('pnpm@9.15.4');
+    expect(packageJson.packageManager).toBe('pnpm@9.15.9');
     expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))

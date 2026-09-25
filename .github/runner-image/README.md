@@ -29,7 +29,7 @@ dependency/browser layer. The script emits only root/workspace manifests,
 lockfile-declared patches, and the runner contract with deterministic metadata.
 
 The Dockerfile installs Node 22.23.2 into the Actions toolcache, activates pnpm
-9.15.4, installs the exact lockfile, stores an integrity-checked installed-tree
+9.15.9, installs the exact lockfile, stores an integrity-checked installed-tree
 archive under `/opt/jovie-installed-tree`, and installs Playwright 1.60 Chromium
 plus Linux system dependencies. It writes the marker only after validating the
 archive and the exact browser executables.
