@@ -2,12 +2,14 @@ import { z } from 'zod';
 import {
   getNotificationCaptureError,
   getNotificationCaptureIssue,
-  NOTIFICATION_CAPTURE_ERROR_MESSAGES,
 } from '@/lib/notifications/capture-validation';
 
 import { uuidSchema } from './base';
 
-export { getNotificationCaptureError, NOTIFICATION_CAPTURE_ERROR_MESSAGES };
+export {
+  getNotificationCaptureError,
+  NOTIFICATION_CAPTURE_ERROR_MESSAGES,
+} from '@/lib/notifications/capture-validation';
 
 /**
  * Notification validation schemas for subscriber management.
