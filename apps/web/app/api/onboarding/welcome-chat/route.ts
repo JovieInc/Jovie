@@ -22,6 +22,7 @@ import { getAppFlagValue } from '@/lib/flags/server';
 import { seedOnboardingPresenceBuild } from '@/lib/onboarding/presence-build';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
+import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_INITIAL_REPLY_LENGTH = 2000;
@@ -275,6 +276,21 @@ export async function POST(request: Request) {
       },
       { clerkUserId: user.clerkId ?? undefined }
     );
+
+    // JOV-4514: durable work record for the conversation. Covers the
+    // newly-created, reused, and orphan-claimed paths above; idempotent.
+    // Non-fatal: the welcome chat must still work if it fails.
+    try {
+      await ensureChatWorkRecord({
+        conversationId: result.conversationId,
+        creatorProfileId: profile.id,
+      });
+    } catch (workRecordError) {
+      await captureError('Failed to create chat work record', workRecordError, {
+        route: '/api/onboarding/welcome-chat',
+        conversationId: result.conversationId,
+      });
+    }
 
     // JOV-3988: seed presence-build task queue after welcome message lands.
     // Soft-fail: any seed error degrades to the current welcome chat only.
