@@ -233,13 +233,14 @@ describe('musicfetch resilient client', () => {
     expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(2);
   });
 
-  it('waits for another instance with a few backoff GETs', async () => {
+  it('waits for another instance until the peer result is published', async () => {
     vi.useFakeTimers();
     try {
       const payload = { result: { id: 'from-peer' } };
       let resultGets = 0;
       const redis = {
         get: vi.fn(async (key: string) => {
+          if (String(key).startsWith('musicfetch:lock:')) return 'peer';
           if (!String(key).startsWith('musicfetch:result:')) return null;
           resultGets += 1;
           if (resultGets < 4) return null;
@@ -272,24 +273,70 @@ describe('musicfetch resilient client', () => {
     }
   });
 
-  it('issues one cache-miss GET and five backoff GETs before a direct request', async () => {
+  it('does not fetch again while the 20s lease still holds a late peer result', async () => {
     vi.useFakeTimers();
     try {
-      let resultGets = 0;
+      const started = Date.now();
+      const payload = { result: { id: 'after-15s' } };
       const redis = {
         get: vi.fn(async (key: string) => {
+          const elapsed = Date.now() - started;
+          if (String(key).startsWith('musicfetch:lock:')) return 'peer';
           if (!String(key).startsWith('musicfetch:result:')) return null;
-          resultGets += 1;
+          if (elapsed < 16_000) return null;
+          return JSON.stringify(payload);
+        }),
+        set: vi.fn(async () => null),
+        del: vi.fn(async () => 1),
+      };
+      mockGetRedis.mockReturnValue(redis);
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { musicfetchRequest } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      const pending = musicfetchRequest<{ result: { id: string } }>(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        { timeoutMs: 2000 }
+      );
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(result.result.id).toBe('after-15s');
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(Date.now() - started).toBeGreaterThanOrEqual(16_000);
+      expect(Date.now() - started).toBeLessThan(20_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fetches once the lock is gone instead of waiting out the lease', async () => {
+    vi.useFakeTimers();
+    try {
+      const started = Date.now();
+      const redis = {
+        get: vi.fn(async (key: string) => {
+          const elapsed = Date.now() - started;
+          if (String(key).startsWith('musicfetch:lock:')) {
+            return elapsed >= 500 ? null : 'peer';
+          }
           return null;
         }),
         set: vi.fn(async () => null),
         del: vi.fn(async () => 1),
       };
       mockGetRedis.mockReturnValue(redis);
-      const fetchMock = vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ result: { id: 'direct' } }),
-      }));
+      let fetchedAt: number | null = null;
+      const fetchMock = vi.fn(async () => {
+        fetchedAt = Date.now() - started;
+        return {
+          ok: true,
+          json: async () => ({ result: { id: 'direct' } }),
+        };
+      });
       vi.stubGlobal('fetch', fetchMock);
 
       const { musicfetchRequest } = await import(
@@ -304,8 +351,54 @@ describe('musicfetch resilient client', () => {
       const result = await pending;
 
       expect(result.result.id).toBe('direct');
-      expect(resultGets).toBe(6);
       expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchedAt).toBeGreaterThanOrEqual(500);
+      expect(fetchedAt).toBeLessThan(2_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits out the 20s lease before a direct request when the lock stays held', async () => {
+    vi.useFakeTimers();
+    try {
+      const started = Date.now();
+      const redis = {
+        get: vi.fn(async (key: string) => {
+          const elapsed = Date.now() - started;
+          if (String(key).startsWith('musicfetch:lock:')) {
+            return elapsed >= 20_000 ? null : 'peer';
+          }
+          return null;
+        }),
+        set: vi.fn(async () => null),
+        del: vi.fn(async () => 1),
+      };
+      mockGetRedis.mockReturnValue(redis);
+      let fetchedAt: number | null = null;
+      const fetchMock = vi.fn(async () => {
+        fetchedAt = Date.now() - started;
+        return {
+          ok: true,
+          json: async () => ({ result: { id: 'direct' } }),
+        };
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { musicfetchRequest } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      const pending = musicfetchRequest<{ result: { id: string } }>(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        { timeoutMs: 2000 }
+      );
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(result.result.id).toBe('direct');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchedAt).toBeGreaterThanOrEqual(20_000);
     } finally {
       vi.useRealTimers();
     }

@@ -13,8 +13,13 @@ const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 const MAX_RETRY_ATTEMPTS = 3;
 const DEDUP_LOCK_TTL_SECONDS = 20;
 const DEDUP_RESULT_TTL_SECONDS = 20;
-/** Cross-instance wait. Five GETs, not an 80-iteration 250ms poll. */
-const DEDUP_WAIT_BACKOFF_MS = [500, 1000, 2000, 4000, 8000] as const;
+const DEDUP_LOCK_TTL_MS = DEDUP_LOCK_TTL_SECONDS * 1000;
+/**
+ * Cross-instance wait. The steps cover the full 20s lock lease (the previous
+ * 15.5s sum fetched again while the owner still held the lock). A missing
+ * lock ends the wait immediately.
+ */
+const DEDUP_WAIT_BACKOFF_MS = [500, 1000, 2000, 4000, 8000, 500, 4000] as const;
 
 const requestRateLimiter = createRateLimiter({
   name: 'musicfetch',
@@ -112,18 +117,40 @@ async function withRedisDedup<T>(
     }
   }
 
+  let waitedMs = 0;
   for (const waitMs of DEDUP_WAIT_BACKOFF_MS) {
-    await delay(waitMs);
-    const result = await redis.get<string>(resultKey);
-    if (result) {
-      return (typeof result === 'string' ? JSON.parse(result) : result) as T;
-    }
+    const slice = Math.min(waitMs, DEDUP_LOCK_TTL_MS - waitedMs);
+    if (slice <= 0) break;
+    await delay(slice);
+    waitedMs += slice;
+    const result = await readDedupedResult<T>(redis, resultKey);
+    if (result !== undefined) return result;
+    const lock = await redis.get<string>(lockKey);
+    if (!lock) return request();
+  }
+
+  const late = await readDedupedResult<T>(redis, resultKey);
+  if (late !== undefined) return late;
+  const lock = await redis.get<string>(lockKey);
+  if (lock) {
+    throw new MusicfetchRequestError(
+      'MusicFetch dedup lease still held after the wait'
+    );
   }
 
   logger.warn('MusicFetch dedup wait timed out, issuing direct request', {
     dedupKey,
   });
   return request();
+}
+
+async function readDedupedResult<T>(
+  redis: NonNullable<ReturnType<typeof getRedis>>,
+  resultKey: string
+): Promise<T | undefined> {
+  const cached = await redis.get<string>(resultKey);
+  if (!cached) return undefined;
+  return (typeof cached === 'string' ? JSON.parse(cached) : cached) as T;
 }
 
 function isRetryableStatus(status: number): boolean {
