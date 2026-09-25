@@ -31,11 +31,14 @@ describe('ThemeToggleIcon', () => {
   it.each([
     ['dark', 'dark'],
     [undefined, undefined],
-  ] as const)('uses the sun icon for the %s fallback branch', (theme, resolvedTheme) => {
-    const { getByTestId } = render(
-      <ThemeToggleIcon theme={theme} resolvedTheme={resolvedTheme} />
-    );
+  ] as const)(
+    'uses the sun icon for the %s fallback branch',
+    (theme, resolvedTheme) => {
+      const { getByTestId } = render(
+        <ThemeToggleIcon theme={theme} resolvedTheme={resolvedTheme} />
+      );
 
-    expect(getByTestId('sun-icon')).toBeInTheDocument();
-  });
+      expect(getByTestId('sun-icon')).toBeInTheDocument();
+    }
+  );
 });
