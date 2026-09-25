@@ -206,7 +206,7 @@ const LANES = [
     id: 'profile-admission',
     name: 'Public Profile Admission',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     run: runProfileAdmission,
   },
   {
@@ -913,6 +913,7 @@ function runProfileAdmission() {
     'apps/web/app/api/profile/**',
     'apps/web/components/features/release/SmartLinkProviderButton.tsx',
     'apps/web/components/features/profile/**',
+    'apps/web/components/providers/QueryProvider*',
     'apps/web/components/organisms/CookieBannerMount.tsx',
     'apps/web/components/organisms/CookieBannerSection.tsx',
     'apps/web/lib/cookies/**',
@@ -920,6 +921,9 @@ function runProfileAdmission() {
     'apps/web/lib/rate-limit/**',
     'apps/web/lib/tracking/pac-**',
     'apps/web/styles/design-system.css',
+    'apps/web/tests/unit/profile/profile-compact-template.test.tsx',
+    'apps/web/tests/e2e/profile-admission.spec.ts',
+    'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts',
     'apps/web/tests/e2e/profile/**',
     'apps/web/tests/e2e/public-profile-smoke.spec.ts',
     'apps/web/tests/e2e/utils/public-surface-**',
@@ -1212,10 +1216,10 @@ export async function runStructural(opts = {}) {
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
-    'node --test scripts/ci-release-trigger-contract.test.mjs',
+    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1282,14 +1286,6 @@ export async function runStructural(opts = {}) {
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-registration-gate',
-    // CI workflow changes live at the repo root, so Turbo --affected can select
-    // only the root package and return success after running zero web tests.
-    // Target Vitest directly so the deploy contract always executes and fails
-    // closed when the file cannot be resolved or contains no tests. The rest of
-    // tests/unit/ci (setup-doppler-action included) runs in
-    // webCiContractTestsCommand(); deploy-workflow stays here because that
-    // command excludes quarantine-ledger entries.
-    `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
@@ -1305,13 +1301,17 @@ export async function runStructural(opts = {}) {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
-          webCiContractTestsCommand(
-            undefined,
-            selected.has('web') ? [DEPLOY_WORKFLOW_CI_TEST] : []
-          ),
+          webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
+          // Run the deploy contract by name for operations-only changes too:
+          // .github/scripts and workflow diffs select only the operations lane,
+          // and the directory run above skips it while it sits in the
+          // quarantine ledger (#18339 landed a red deploy contract that way).
+          // Targeting Vitest directly also fails closed when the file cannot
+          // be resolved or contains no tests.
+          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
     ...(selected.has('operations') ? operationsParts : []),

@@ -229,6 +229,31 @@ describe('runStructural screenshot contract discovery', () => {
     }
   );
 
+  it.each([
+    ['web', 1],
+    ['operations', 1],
+    ['web,operations', 1],
+    ['ios', 0],
+  ])(
+    'runs the quarantined deploy contract by name once for lanes %s',
+    async (lanes, expected) => {
+      // #18339 landed a red deploy contract through an operations-only diff:
+      // the directory run excludes quarantined files and the by-name run was
+      // web-only.
+      process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+      await runStructural({ execute });
+      const byName = execute.mock.calls.filter(([command]) =>
+        String(command).endsWith('tests/unit/ci/deploy-workflow.test.ts')
+      );
+      expect(byName).toHaveLength(expected);
+    }
+  );
+
   it('runs on a pull request changing the PR Size Guard workflow', async () => {
     process.env.GITHUB_EVENT_NAME = 'pull_request';
     process.env.CI_PRODUCT_LANES = 'operations';

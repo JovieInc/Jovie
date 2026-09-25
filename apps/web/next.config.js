@@ -11,6 +11,23 @@ const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
   'public/product-screenshots/**/*',
 ];
+// Relative to apps/web; only paths no runtime code reads. Turbopack matches
+// these as unanchored globs (no extglobs) against repo-relative module paths.
+// It does not apply them to outputFileTracingIncludes, which it adds last.
+const traceExcludes = [
+  // Test suites, fixtures and Playwright snapshots. The runtime reads only
+  // tests/quarantine.json (lib/testing/quarantine-ledger.server.ts), the one
+  // top-level tests/ entry starting with `q`. Use `[^q]`: Next's picomatch
+  // reads `[!q]` as "! or q".
+  'tests/[^q]*',
+  'tests/*/**',
+  // Migrations run from scripts, never from a request.
+  'drizzle/**',
+  // CI and agent report output.
+  'reports/**',
+  // Lint rule sources and their options.
+  'eslint-rules/**',
+];
 
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
@@ -58,6 +75,13 @@ const nextConfig = {
     ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
+  },
+  // Dynamic fs paths make NFT over-approximate and copy repo files no route
+  // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration
+  // snapshots). tests/unit/ci/vercel-config.test.ts proves no exclude drops a
+  // runtime file.
+  outputFileTracingExcludes: {
+    '**': traceExcludes,
   },
   // Note: previously we set outputFileTracingIncludes with globs into
   // node_modules/.pnpm/node_modules/{import,require}-in-the-middle. Those
@@ -739,6 +763,7 @@ function exposeBaseStaticConfigForTooling(config) {
     headers: nextConfig.headers,
     images: nextConfig.images,
     outputFileTracingIncludes: nextConfig.outputFileTracingIncludes,
+    outputFileTracingExcludes: nextConfig.outputFileTracingExcludes,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,
   });

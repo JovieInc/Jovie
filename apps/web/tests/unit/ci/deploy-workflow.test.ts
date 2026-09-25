@@ -334,6 +334,8 @@ describe('source PR path-output reachability contract', () => {
       'ci-drizzle-check',
       'ci-integration-ready',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
       'ci-layout-guard',
@@ -1209,6 +1211,13 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(readinessJob).toContain('QUEUE_PROVEN');
     expect(readinessJob).toContain('Web Unit Tests:$RUN_WEB:$UNIT_RESULT');
     expect(readinessJob).toContain('Build + Layout');
+    expect(readinessJob).toContain(
+      'Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT'
+    );
+    expect(readinessJob).toContain(
+      'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');
@@ -1277,12 +1286,17 @@ describe('deploy workflow Vercel env resolution', () => {
     // The token must never reach the CLI as an argument (process lists and
     // logs expose argv). The failure-tail redactor legitimately names the
     // flag inside a regex, so assert on argument shapes, not the bare string.
-    expect(deployScript).not.toMatch(/--token(?:=|\s+)["'$]/);
-    expect(deployScript).not.toMatch(/--token(?:=|\s+)\$\{?VERCEL_TOKEN/);
-    expect('--token "$VERCEL_TOKEN"').toMatch(/--token(?:=|\s+)["'$]/);
-    expect('--token=${VERCEL_TOKEN}').toMatch(
-      /--token(?:=|\s+)\$\{?VERCEL_TOKEN/
-    );
+    // Any value after the flag counts, quoted or bare; the redactor's regex
+    // (`--token(?:=|\s+)`) is followed by `(`, so it never matches.
+    const tokenArgument = /--token(?:=|\s+)\S/;
+    expect(deployScript).not.toMatch(tokenArgument);
+    for (const leak of [
+      '--token abc123',
+      '--token="$VERCEL_TOKEN"',
+      '--token ${VERCEL_TOKEN}',
+    ]) {
+      expect(leak).toMatch(tokenArgument);
+    }
   });
 
   it('skips catalog mutation only for the manual PR preview build', () => {

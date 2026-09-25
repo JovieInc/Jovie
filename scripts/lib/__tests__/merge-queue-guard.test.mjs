@@ -483,14 +483,14 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
-  it('runs required Storybook geometry contracts in the combined layout gate', () => {
+  it('runs required Storybook geometry contracts in the combined Storybook gate', () => {
     const ciWorkflowYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
       'utf8'
     );
     const combinedLayoutBlock = extractWorkflowJobBlock(
       ciWorkflowYaml,
-      'ci-build-layout'
+      'ci-storybook-surfaces'
     );
 
     expect(combinedLayoutBlock).toMatch(
@@ -612,6 +612,30 @@ describe('aggregate required checks', () => {
       expect(malformed.errors).toContain(
         'live ruleset bypass_actors must be an array'
       );
+    }
+
+    // GitHub omits bypass_actors for a workflow GITHUB_TOKEN; the read-only
+    // observer opts in explicitly and must still reject malformed/non-empty.
+    const { bypass_actors: _omitted, ...tokenView } = {
+      bypass_actors: [],
+      rules: nativeRules,
+    };
+    const unavailable = validateLiveMergeQueueRuleset(tokenView, {
+      backend: 'native',
+      allowUnavailableBypassActors: true,
+    });
+    expect(unavailable).toMatchObject({
+      ok: true,
+      errors: [],
+      bypassActorsVisible: false,
+    });
+    expect(result.bypassActorsVisible).toBe(true);
+    for (const bypass_actors of [{}, [{ actor_id: 158384 }]]) {
+      const stillUnsafe = validateLiveMergeQueueRuleset(
+        { bypass_actors, rules: nativeRules },
+        { backend: 'native', allowUnavailableBypassActors: true }
+      );
+      expect(stillUnsafe.ok).toBe(false);
     }
 
     for (const actor_id of [158384, 2934433]) {

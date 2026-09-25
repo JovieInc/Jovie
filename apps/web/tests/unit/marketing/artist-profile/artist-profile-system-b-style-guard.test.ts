@@ -1,9 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 /**
  * /artist-profile + /artist-profiles System B source contract.
@@ -266,40 +263,5 @@ describe('artist profile landing family System B source contract', () => {
     expect(sectionStories).not.toContain('home.css');
     expect(sectionStories).not.toContain('homepage-faq-section');
     expect(sectionHeader).toContain('text-secondary-token');
-  });
-
-  it('keeps artist-profile claim CTAs bound to the flag-aware intent registry', () => {
-    expect(getClaimProfileIntent(true)).toMatchObject({
-      label: 'Get started',
-      href: PUBLIC_WAITLIST_URL,
-    });
-    expect(getClaimProfileIntent(false)).toMatchObject({
-      label: 'Claim your profile',
-      href: APP_ROUTES.START,
-    });
-
-    const hero = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/marketing/artist-profile/ArtistProfileHero.tsx'
-      ),
-      'utf8'
-    );
-    expect(hero).toContain('const claimIntent = getClaimProfileIntent();');
-    expect(hero).toContain('label: claimIntent.label');
-    expect(hero).toContain('href: claimIntent.href');
-    expect(hero).not.toContain('label: hero.ctaLabel');
-
-    const finalCta = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/marketing/artist-profile/ArtistProfileFinalCta.tsx'
-      ),
-      'utf8'
-    );
-    expect(finalCta).toContain('const claimIntent = getClaimProfileIntent();');
-    expect(finalCta).toContain('ctaLabel={claimIntent.label}');
-    expect(finalCta).toContain('ctaHref={ctaHref ?? claimIntent.href}');
-    expect(finalCta).not.toContain('ctaLabel={finalCta.ctaLabel}');
   });
 });

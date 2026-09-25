@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PUBLIC_PROFILE_DESKTOP_CONTEXT } from '@/data/publicProfileDesktopOptimization';
+import { track } from '@/lib/analytics';
 import { ClaimBanner } from '../../../components/features/profile/ClaimBanner';
 
 vi.mock('@/lib/analytics', () => ({
@@ -38,6 +40,10 @@ vi.mock('next/link', () => ({
 describe('ClaimBanner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the organic claim variant with the server-provided CTA', () => {
@@ -126,5 +132,29 @@ describe('ClaimBanner', () => {
       'data-prefetch',
       'false'
     );
+  });
+
+  it('attributes claim-banner exposure with the desktop exclusivity contract', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 1180px)',
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    render(
+      <ClaimBanner
+        profileHandle='unfazed'
+        ctaHref='/unfazed/claim?next=auth'
+        variant='verified_claim'
+      />
+    );
+
+    expect(track).toHaveBeenCalledWith('profile_claim_banner_impression', {
+      profile_handle: 'unfazed',
+      variant: 'verified_claim',
+      layout: 'desktop',
+      ...PUBLIC_PROFILE_DESKTOP_CONTEXT,
+    });
   });
 });

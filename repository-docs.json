@@ -4,95 +4,11 @@
   "entrypoints": ["README.md", "CLAUDE.md", "docs/DOCUMENTATION.md"],
   "sources": [
     {
-      "path": ".agents/skills/gstack/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
       "path": ".nvmrc",
       "purpose": "Local manifest or workflow; review related instructions when changed"
     },
     {
-      "path": "apps/console/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/desktop/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/docs/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/eve-pilot/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/extension/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/macos/MenuMonitor/Package.swift",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/ovie/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/should-i-make/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "apps/web/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/action-contracts/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/agent-transport-contracts/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/audio-contracts/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/auth-routing/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/extension-contracts/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/jovie-cli/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "packages/ui/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
       "path": "pnpm-workspace.yaml",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "scripts/symphony/codex-cli/package.json",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "tools/shipping-menu-bar/Package.swift",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
-      "path": "workers/observability-ingest/package.json",
       "purpose": "Local manifest or workflow; review related instructions when changed"
     },
     {

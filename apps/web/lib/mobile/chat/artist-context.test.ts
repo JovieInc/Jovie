@@ -39,6 +39,10 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/analytics/authorized-read', () => ({
+  readAuthorizedProfileViews: vi.fn().mockResolvedValue(9),
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     warn: hoisted.warn,
@@ -102,6 +106,7 @@ describe('fetchMobileArtistContext', () => {
 
     const context = await fetchMobileArtistContext({
       profileId: PROFILE_ID,
+      userId: 'user_123',
       authorizedProfile: AUTHORIZED,
     });
 
@@ -114,6 +119,7 @@ describe('fetchMobileArtistContext', () => {
 
     const context = await fetchMobileArtistContext({
       profileId: PROFILE_ID,
+      userId: 'user_123',
       authorizedProfile: AUTHORIZED,
     });
 
@@ -139,6 +145,7 @@ describe('fetchMobileArtistContext', () => {
 
     const context = await fetchMobileArtistContext({
       profileId: PROFILE_ID,
+      userId: 'user_123',
       authorizedProfile: AUTHORIZED,
     });
 
@@ -147,6 +154,7 @@ describe('fetchMobileArtistContext', () => {
       username: 'loaded',
       bio: 'bio',
       genres: ['indie'],
+      profileViews: 9,
       hasSocialLinks: false,
       hasMusicLinks: false,
     });

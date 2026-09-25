@@ -1,4 +1,4 @@
-import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
+import { readAuthorizedDashboardAnalytics } from '@/lib/analytics/authorized-read';
 import { formatAnalyticsStageRate } from '@/lib/utils/analytics-growth';
 
 export type MobileAudienceHighlightsStatTile = {
@@ -43,28 +43,40 @@ function buildCaptureRateHint(
 export async function buildMobileAudienceHighlights(
   clerkUserId: string
 ): Promise<MobileAudienceHighlightsResponse> {
-  const [currentWeek, priorWeek] = await Promise.all([
-    getUserDashboardAnalytics(clerkUserId, '7d', 'traffic'),
-    getUserDashboardAnalytics(clerkUserId, '30d', 'traffic'),
+  const [currentWeek, priorWindow] = await Promise.all([
+    readAuthorizedDashboardAnalytics({
+      userId: clerkUserId,
+      range: '7d',
+      view: 'traffic',
+    }),
+    readAuthorizedDashboardAnalytics({
+      userId: clerkUserId,
+      range: '30d',
+      view: 'traffic',
+    }),
   ]);
 
-  const currentViews = currentWeek.profile_views ?? 0;
-  const trailingViews = Math.max(
-    0,
-    (priorWeek.profile_views ?? 0) - currentViews
-  );
+  const currentViews = currentWeek.analytics.profile_views ?? 0;
+  const priorViews = priorWindow.analytics.profile_views ?? 0;
+  const windowsDiffer = priorWindow.range !== currentWeek.range;
+  const trailingViews = windowsDiffer
+    ? Math.max(0, priorViews - currentViews)
+    : 0;
   const priorWeekViews = Math.round(trailingViews / 3);
+  const heroDeltaLabel = windowsDiffer
+    ? formatDeltaLabel(currentViews, priorWeekViews)
+    : null;
 
-  const uniqueUsers = currentWeek.unique_users ?? 0;
-  const subscribers = currentWeek.subscribers ?? 0;
-  const totalClicks = currentWeek.total_clicks ?? 0;
-  const listenClicks = currentWeek.listen_clicks ?? 0;
+  const uniqueUsers = currentWeek.analytics.unique_users ?? 0;
+  const subscribers = currentWeek.analytics.subscribers ?? 0;
+  const totalClicks = currentWeek.analytics.total_clicks ?? 0;
+  const listenClicks = currentWeek.analytics.listen_clicks ?? 0;
 
   return {
     rangeLabel: 'Last 7 days',
     heroLabel: 'Profile views',
     heroValue: currentViews,
-    heroDeltaLabel: formatDeltaLabel(currentViews, priorWeekViews),
+    heroDeltaLabel,
     statTiles: [
       {
         label: 'Unique fans',

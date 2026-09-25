@@ -16,7 +16,9 @@
 
 const https = require('https');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 // Configuration
 const ANALYSIS_LIMIT = 30; // Number of recent workflow runs to analyze
@@ -25,6 +27,11 @@ const FLAKY_FAILURE_THRESHOLD = 5; // % failure rate to flag as flaky
 const FLAKY_RETRY_THRESHOLD = 10; // % retry rate to flag as flaky
 const HIGH_FLAKINESS_THRESHOLD = 5; // Number of flaky tests to trigger alert
 const HIGH_RETRY_RATE_THRESHOLD = 20; // % of runs with retries to trigger alert
+// Unit Tests shards upload Vitest retried-then-passed tests under this prefix
+// (scripts/lib/vitest-retry-reporter.mjs). Vitest's in-process --retry keeps
+// the step green, so step conclusions alone can never reveal these flakes.
+const UNIT_FLAKY_ARTIFACT_PATTERN = 'unit-flaky-*';
+const UNIT_FLAKY_REPORT_SUFFIX = '.flaky.json';
 
 /**
  * Make GitHub API request
@@ -251,8 +258,11 @@ async function analyzeFlakiness(token, owner, repo) {
     if (runHadFailure) runsWithFailures++;
   }
 
+  const unitStats = collectUnitRetryFlakes(runs, `${owner}/${repo}`);
+
   return {
     testStats,
+    unitStats,
     totalRuns,
     runsWithRetries,
     runsWithFailures,
@@ -314,6 +324,137 @@ function extractTestExecutions(job) {
  */
 function normalizeJobName(name) {
   return name.replace(/\s*\(\d+\/\d+\)$/, '');
+}
+
+/**
+ * Download a run's retried-then-passed unit-test reports with the gh CLI.
+ * Missing artifacts (older runs, no Unit Tests job) are not an error.
+ */
+function downloadUnitFlakeArtifacts(
+  runId,
+  repository,
+  destDir,
+  exec = execFileSync
+) {
+  try {
+    exec(
+      'gh',
+      [
+        'run',
+        'download',
+        String(runId),
+        '--repo',
+        repository,
+        '--pattern',
+        UNIT_FLAKY_ARTIFACT_PATTERN,
+        '--dir',
+        destDir,
+      ],
+      { stdio: 'pipe' }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read every *.flaky.json under dir and return its flaky entries.
+ */
+function readUnitFlakeReports(dir) {
+  const entries = [];
+  let files = [];
+  try {
+    files = fs.readdirSync(dir, { recursive: true });
+  } catch {
+    return entries;
+  }
+  for (const relative of files) {
+    const file = String(relative);
+    if (!file.endsWith(UNIT_FLAKY_REPORT_SUFFIX)) continue;
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      for (const entry of Array.isArray(report.flaky) ? report.flaky : []) {
+        if (entry && typeof entry.name === 'string') {
+          entries.push({
+            file: String(entry.file ?? ''),
+            name: entry.name,
+            retryCount: Number(entry.retryCount) || 1,
+          });
+        }
+      }
+    } catch (error) {
+      console.warn(`Could not parse ${file}: ${error.message}`);
+    }
+  }
+  return entries;
+}
+
+/**
+ * Fold per-run flaky entries into per-test stats.
+ * @param {Array<{ runId: number|string, entries: Array<{file: string, name: string, retryCount: number}> }>} runs
+ */
+function aggregateUnitFlakes(runs) {
+  const stats = new Map();
+  for (const { runId, entries } of runs) {
+    for (const entry of entries) {
+      const key = `Unit › ${entry.file} › ${entry.name}`;
+      const current = stats.get(key) ?? { runIds: new Set(), retries: 0 };
+      current.runIds.add(String(runId));
+      current.retries += entry.retryCount;
+      stats.set(key, current);
+    }
+  }
+  return stats;
+}
+
+/**
+ * Every unit test that failed and then passed on retry against the same code
+ * is flaky by definition, so each one is reported (no rate threshold).
+ */
+function calculateUnitRetryFlakes(unitStats, runsAnalyzed) {
+  const flakyTests = [];
+  for (const [name, stats] of unitStats.entries()) {
+    const runs = stats.runIds.size;
+    const retryRate = runsAnalyzed > 0 ? (runs / runsAnalyzed) * 100 : 100;
+    const flakinessScore = retryRate * 0.3;
+    flakyTests.push({
+      name,
+      failureRate: '0.0',
+      retryRate: retryRate.toFixed(1),
+      flakinessScore: flakinessScore.toFixed(1),
+      failures: 0,
+      successes: runs,
+      retries: stats.retries,
+      runs,
+      lastFailure: null,
+      severity:
+        flakinessScore > 30 ? 'high' : flakinessScore > 15 ? 'medium' : 'low',
+    });
+  }
+  return flakyTests;
+}
+
+/**
+ * Collect retried-then-passed unit tests from the analyzed runs' artifacts.
+ * @param {Array<{ id: number|string }>} runs
+ * @param {string} repository
+ * @param {{ download?: (runId: number|string, repository: string, destDir: string) => boolean, rootDir?: string }} [options]
+ */
+function collectUnitRetryFlakes(
+  runs,
+  repository,
+  { download = downloadUnitFlakeArtifacts, rootDir } = {}
+) {
+  const baseDir =
+    rootDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'unit-flaky-'));
+  const perRun = [];
+  for (const run of runs) {
+    const dir = path.join(baseDir, String(run.id));
+    download(run.id, repository, dir);
+    perRun.push({ runId: run.id, entries: readUnitFlakeReports(dir) });
+  }
+  return aggregateUnitFlakes(perRun);
 }
 
 /**
@@ -402,7 +543,7 @@ function generateReport(
   // Flaky tests table
   if (flakyTests.length > 0) {
     report += `## Flaky Tests (${flakyTests.length})\n\n`;
-    report += `Tests exceeding thresholds (>${FLAKY_FAILURE_THRESHOLD}% failure rate OR >${FLAKY_RETRY_THRESHOLD}% retry rate):\n\n`;
+    report += `Tests exceeding thresholds (>${FLAKY_FAILURE_THRESHOLD}% failure rate OR >${FLAKY_RETRY_THRESHOLD}% retry rate), plus every unit test that failed then passed on Vitest retry (\`Unit › …\`):\n\n`;
     report += `| Severity | Test Name | Failure Rate | Retry Rate | Score | Failures | Successes | Retries |\n`;
     report += `|----------|-----------|-------------|-----------|-------|----------|-----------|--------|\n`;
 
@@ -496,10 +637,20 @@ async function main() {
     const [owner, repo] = repository.split('/');
 
     // Analyze flakiness
-    const { testStats, totalRuns, runsWithRetries, runsWithFailures } =
-      await analyzeFlakiness(token, owner, repo);
+    const {
+      testStats,
+      unitStats,
+      totalRuns,
+      runsWithRetries,
+      runsWithFailures,
+    } = await analyzeFlakiness(token, owner, repo);
 
-    const flakyTests = calculateMetrics(testStats);
+    const flakyTests = [
+      ...calculateMetrics(testStats),
+      ...calculateUnitRetryFlakes(unitStats, totalRuns),
+    ].sort(
+      (a, b) => parseFloat(b.flakinessScore) - parseFloat(a.flakinessScore)
+    );
     const report = generateReport(
       flakyTests,
       totalRuns,
@@ -559,7 +710,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  aggregateUnitFlakes,
   analyzeFlakiness,
+  calculateUnitRetryFlakes,
+  collectUnitRetryFlakes,
+  downloadUnitFlakeArtifacts,
+  readUnitFlakeReports,
   buildAttemptOneOutcomes,
   buildWorkflowRunsApiPath,
   calculateMetrics,

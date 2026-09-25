@@ -159,8 +159,11 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 | Viewport | Tab Bar Behavior |
 |---|---|
 | < 768px (mobile) | Tab bar renders at the bottom of the viewport-locked surface |
-| 768–1179px (tablet / embedded mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
-| >= 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop arranges the same four destinations in top chrome. It must not invent Alerts/Events-only destinations or hide Shows when empty. |
+| 768–1179px (tablet / compact mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
+| ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition instead of a bottom drawer. The compact surface and bottom tab bar do not render. Desktop arranges the same four destinations in top chrome. It must not invent Alerts/Events-only destinations or hide Shows when empty. |
+| ≥ 1180px (explicit embedded preview) | The compact surface may render only inside a labeled preview frame with a keyboard-operable exit to the full profile. |
+
+Optimization contract: `apps/web/data/publicProfileDesktopOptimization.ts` (JOV-INV-012). Exposure and outcome reuse existing `profile_claim_banner_impression` / `profile_claim_banner_click` analytics; do not add a parallel stack.
 
 Desktop and compact share one destination/action contract (JOV-6198).
 

@@ -41,7 +41,10 @@ jobs:
       - name: Verify live merge-queue ruleset
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-merge-queue-check.mjs verify
+        # github.token cannot read ruleset bypass_actors (GitHub returns it
+        # only to ruleset editors), so bypass-actor parity is reported as an
+        # explicit warning; every other ruleset field is still enforced.
+        run: node scripts/ci-merge-queue-check.mjs verify --allow-unavailable-bypass-actors
 
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
