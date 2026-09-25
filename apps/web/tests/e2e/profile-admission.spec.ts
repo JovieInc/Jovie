@@ -449,18 +449,29 @@ test.describe('public profile browser admission', () => {
         await expect(
           page.locator('[data-interactive-ready="true"]')
         ).toHaveCount(0);
+        // JOV-6452: the server paints the real desktop surface (no
+        // "Loading profile…" interstitial) and CSS picks the visible
+        // breakpoint surface — the compact shell never presents a mobile
+        // tab bar to desktop visitors.
+        await expect(page.getByTestId('profile-desktop-loading')).toHaveCount(
+          0
+        );
+        await expect(page.getByText('Loading profile…')).toHaveCount(0);
         if (width >= 1180) {
           await expect(
-            page.getByTestId('profile-desktop-loading')
+            page.getByTestId('profile-desktop-surface')
           ).toBeVisible();
-          await expect(
-            page.getByTestId('profile-desktop-loading')
-          ).toHaveAttribute('aria-hidden', 'true');
-          await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+          // The compact slot (mobile shell + tab bar) is clip-hidden by CSS
+          // on server paint — it never presents visually to desktop visitors.
+          const slotBox = await page
+            .locator('.public-profile-layout-compact-slot')
+            .boundingBox();
+          expect(slotBox?.width).toBeLessThanOrEqual(1);
+          expect(slotBox?.height).toBeLessThanOrEqual(1);
         } else {
           await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
           await expect(
-            page.getByTestId('profile-desktop-loading')
+            page.getByTestId('profile-desktop-surface')
           ).toBeHidden();
         }
         await testInfo.attach(`server-paint-${width}`, {

@@ -73,7 +73,6 @@ const ProfileDesktopSurface = dynamic(
       module => module.ProfileDesktopSurface
     ),
   {
-    ssr: false,
     loading: () => <ProfileDesktopLoadingPlaceholder />,
   }
 );
@@ -924,7 +923,7 @@ export function ProfileCompactTemplate({
                 allowSignedInEscape={!embeddedPreview}
                 renderInteractiveOverlays
                 renderSemanticHeading={!isDesktopLayout}
-                drawerOpen={drawerOpen}
+                drawerOpen={drawerOpen && isHydrated && !isDesktopLayout}
                 drawerView={drawerView}
                 activeMode={requestedMode}
                 onModeSelect={nextMode => {
@@ -960,10 +959,11 @@ export function ProfileCompactTemplate({
             </div>
           </div>
         }
-        desktopBanner={isDesktopLayout ? profileBanner : null}
+        desktopBanner={embeddedPreview ? null : profileBanner}
         desktopSurface={
           <ProfileDesktopSurface
             presentation='modal'
+            overlaysEnabled={isDesktopLayout}
             onReady={handleDesktopSurfaceReady}
             artist={artist}
             socialLinks={socialLinks}
