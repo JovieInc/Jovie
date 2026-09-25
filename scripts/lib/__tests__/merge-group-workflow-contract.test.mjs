@@ -352,7 +352,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('timeout-minutes: 8');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
@@ -396,8 +396,16 @@ describe('merge_group workflow contract', () => {
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeLessThan(120_000);
+    // A still-running required check must be able to finish: the helper
+    // polls for minutes, and the job timeout leaves >=90s for setup so the
+    // helper's pending diagnostic (not a hard cancel) is the failure mode.
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThanOrEqual(300_000);
+    const admissionTimeoutMinutes = Number(
+      admission.match(/timeout-minutes:\s*(\d+)/)?.[1]
+    );
+    expect(
+      admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_WAIT_MS
+    ).toBeGreaterThanOrEqual(90_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -779,6 +787,35 @@ describe('merge_group workflow contract', () => {
     );
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).not.toContain('timeout-minutes: 60');
+  });
+
+  it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
+    for (const jobId of [
+      'ci-fast-remaining',
+      'ci-profile-admission-browser',
+      'ci-exact-head-coverage',
+    ]) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      // fetch-depth: 0 fetches every branch and tag; diff bases only need
+      // HEAD's full ancestry plus origin/<base>.
+      expect(job, jobId).not.toContain('fetch-depth: 0');
+      expect(job, jobId).toContain('fetch-depth: 1');
+      expect(job, jobId).toContain('persist-credentials: false');
+      expect(job, jobId).not.toContain('filter: blob:none');
+      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      expect(fetchScript, jobId).toContain(
+        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+      );
+      expect(job, jobId).toContain(
+        "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
+      );
+      expect(
+        job.indexOf('name: Fetch base-branch history'),
+        jobId
+      ).toBeLessThan(
+        job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
+      );
+    }
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {

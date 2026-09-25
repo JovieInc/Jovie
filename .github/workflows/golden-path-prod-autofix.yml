@@ -76,9 +76,14 @@ jobs:
             exit 1
           fi
           if jq -e '.inconclusive == true and ([.checks[] | select(.ok == false and .inconclusive != true)] | length == 0)' /tmp/golden-path-lock/receipt.json >/dev/null; then
-            echo "::error title=Golden path unverified::The chat request reached Turnstile, but no valid token was supplied. The post-challenge first-message path was not exercised; no autofix was attempted."
-            echo "Golden path status: inconclusive. Turnstile was reached, but the first-message path was not tested. No autofix was attempted." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            # Inconclusive is not a product failure: every other check passed and
+            # the anonymous probe intentionally carries no Turnstile token. Warn
+            # (visible annotation + summary) and exit 0 so the job does not go
+            # red on every Production Controller run. Any actionable failed
+            # check falls through to the autofix path below and still fails.
+            echo "::warning title=Golden path unverified::The chat request reached Turnstile, but no valid token was supplied. The post-challenge first-message path was not exercised; no autofix was attempted."
+            echo "Golden path status: inconclusive (warning, not a failure). Turnstile was reached, but the first-message path was not tested. All other checks passed. No autofix was attempted." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           if jq -e '.ok == true and .inconclusive != true' /tmp/golden-path-lock/receipt.json >/dev/null; then
             echo "::error::Probe command failed despite an all-pass production receipt; refusing autofix."

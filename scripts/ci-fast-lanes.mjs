@@ -415,7 +415,10 @@ function repoLanes() {
 
 const GIT_FETCH_NOISE_LINE =
   /^\s*(?:\* \[new (?:branch|tag)\]|[0-9a-f]+\.\.[0-9a-f]+\s)/u;
-const DIAGNOSTIC_LINE = /\b(?:ERROR|\w*Error|FAIL|FAILED|failed|expected)\b/u;
+// Lowercase `error` catches TypeScript's `file.ts(1,2): error TS2532: …` while
+// the word boundary still skips summary noise such as `errors: 0`.
+const DIAGNOSTIC_LINE =
+  /\b(?:ERROR|\w*Error|error|FAIL|FAILED|failed|expected)\b/u;
 const ANSI_ESCAPE = new RegExp(
   `${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`,
   'gu'
@@ -437,7 +440,10 @@ export function extractDiagnosticLines(text, { max = 5, width = 200 } = {}) {
     if (!line || !DIAGNOSTIC_LINE.test(line)) continue;
     lines.push(line.length > width ? `${line.slice(0, width - 1)}…` : line);
   }
-  return [...new Set(lines)].slice(-max);
+  // Keep the LAST occurrence of a repeated line so a root cause that repeats
+  // at the end of the log is not dropped by the tail slice.
+  const newestFirst = [...new Set(lines.reverse())];
+  return newestFirst.slice(0, max).reverse();
 }
 
 /** Escape a workflow-command message per GitHub Actions rules. */
@@ -484,6 +490,32 @@ export function laneFailureExcerpt(laneId, output) {
   return `${header}\n\n${excerpt(text, 1200 - header.length - 3)}`;
 }
 
+const PYTEST_IDENTITY_LINE = /^FAILED scripts\/[\w./-]+\.py::/u;
+
+/**
+ * Join a header's lead line with as many body lines as fit in `max` chars.
+ * Diagnostic lines are chosen from the END so earlier errors cannot crowd out
+ * the final root-cause line; registered pytest identities keep their order
+ * so the first failing test stays the lead identity.
+ */
+function budgetHeader(header, max = 400) {
+  const [lead, ...rest] = header.split('\n');
+  const separator = ' | ';
+  const fromEnd = !rest.every(line => PYTEST_IDENTITY_LINE.test(line));
+  const ordered = fromEnd ? [...rest].reverse() : rest;
+  const kept = [];
+  let used = lead.length;
+  for (const line of ordered) {
+    const cost = separator.length + line.length;
+    if (used + cost > max) break;
+    kept.push(line);
+    used += cost;
+  }
+  if (kept.length === 0 && ordered.length > 0) kept.push(ordered[0]);
+  if (fromEnd) kept.reverse();
+  return [lead, ...kept].join(separator).slice(0, max);
+}
+
 /** One-line, escaped `::error::` body (≤400 chars before escaping). */
 export function failureAnnotationMessage(lane, logExcerpt) {
   if (!logExcerpt) return '';
@@ -492,7 +524,7 @@ export function failureAnnotationMessage(lane, logExcerpt) {
       logExcerpt.startsWith('Structural command ')) ||
     logExcerpt.startsWith('Diagnostics:\n');
   const short = useHeader
-    ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
+    ? budgetHeader(logExcerpt.split('\n\n')[0])
     : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
   return escapeAnnotationMessage(short);
 }

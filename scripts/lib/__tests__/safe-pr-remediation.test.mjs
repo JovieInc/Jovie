@@ -8,8 +8,10 @@ import {
   buildRemediationReceipt,
   classifyDependencyManifestChange,
   classifyEveLockDrift,
+  classifyRootLockDrift,
   validatePlanAuthority,
   validateRemediationArtifact,
+  validateRootRemediationArtifact,
   waitForCommittedPrHead,
 } from '../safe-pr-remediation.mjs';
 
@@ -470,14 +472,251 @@ describe('secretless test receipt and atomic writer', () => {
   });
 });
 
+describe('safe root workspace lockfile remediation (PR #18250 class)', () => {
+  const WEB_BASE = Buffer.from(
+    JSON.stringify({
+      scripts: { dev: 'next dev' },
+      dependencies: { ai: '^7.0.107' },
+    })
+  );
+  const WEB_HEAD = Buffer.from(
+    JSON.stringify({
+      scripts: { dev: 'next dev' },
+      dependencies: { ai: '^7.0.112' },
+    })
+  );
+  const ROOT_BASE = Buffer.from(
+    JSON.stringify({
+      devDependencies: { vitest: '5.0.1' },
+      pnpm: { overrides: { jsdom: '26.1.0' } },
+    })
+  );
+  const OUTDATED_LOG =
+    'ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile" because pnpm-lock.yaml is not up to date with <ROOT>/apps/web/package.json';
+
+  /** @param {Array<[string, Buffer, Buffer]>} entries */
+  function rootEvidence(
+    entries = [['apps/web/package.json', WEB_BASE, WEB_HEAD]]
+  ) {
+    return entries.map(([path, baseBytes, headBytes]) =>
+      classifyDependencyManifestChange({ baseBytes, headBytes, path })
+    );
+  }
+
+  function rootCandidate(overrides = {}) {
+    const base = candidate();
+    return {
+      ...base,
+      workflowRun: { ...base.workflowRun, id: 789, name: 'CI' },
+      files: ['apps/web/package.json'],
+      failedJobs: [
+        { id: 11, name: 'Lint', conclusion: 'failure', log: 'lint failed' },
+        { id: 12, name: 'ci-fast', conclusion: 'failure', log: OUTDATED_LOG },
+      ],
+      manifestEvidence: rootEvidence(),
+      ...overrides,
+    };
+  }
+
+  it('admits a Dependabot manifest bump whose root lockfile was left stale', () => {
+    expect(classifyRootLockDrift(rootCandidate())).toMatchObject({
+      eligible: true,
+      plan: {
+        kind: 'root-workspace-lockfile',
+        prNumber: 16096,
+        expectedHeadOid: HEAD,
+        workflowRunId: 789,
+        failedJobId: 12,
+        lockfilePath: 'pnpm-lock.yaml',
+        changedFiles: ['apps/web/package.json'],
+        manifestEvidence: [
+          {
+            path: 'apps/web/package.json',
+            changes: [
+              {
+                section: 'dependencies',
+                name: 'ai',
+                before: '^7.0.107',
+                after: '^7.0.112',
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it('refuses an overrides/config mismatch with an explicit reason (PR #18247)', () => {
+    const result = classifyRootLockDrift(
+      rootCandidate({
+        files: ['apps/web/package.json', 'pnpm-lock.yaml'],
+        failedJobs: [
+          {
+            id: 12,
+            name: 'ci-fast',
+            conclusion: 'failure',
+            log: 'ERR_PNPM_LOCKFILE_CONFIG_MISMATCH  Cannot proceed with the frozen installation. The current "overrides" configuration doesn\'t match the value found in the lockfile',
+          },
+        ],
+      })
+    );
+    expect(result).toEqual({
+      eligible: false,
+      reason: 'lockfile-config-mismatch',
+    });
+  });
+
+  it('never rewrites a root pnpm.overrides change', () => {
+    const rootHead = Buffer.from(
+      JSON.stringify({
+        devDependencies: { vitest: '5.0.1' },
+        pnpm: { overrides: { jsdom: '30.1.0' } },
+      })
+    );
+    expect(
+      classifyRootLockDrift(
+        rootCandidate({
+          files: ['apps/web/package.json', 'package.json'],
+          manifestEvidence: rootEvidence([
+            ['apps/web/package.json', WEB_BASE, WEB_HEAD],
+            ['package.json', ROOT_BASE, rootHead],
+          ]),
+        })
+      )
+    ).toEqual({ eligible: false, reason: 'manifest-policy-field-changed' });
+  });
+
+  it.each([
+    [
+      'non-Dependabot author',
+      { pr: { ...candidate().pr, user: { login: 'some-user' } } },
+      'author-not-dependabot',
+    ],
+    [
+      'Eve Pilot run routed to the root lane',
+      {
+        workflowRun: { ...candidate().workflowRun, name: 'Eve Pilot' },
+      },
+      'workflow-identity-mismatch',
+    ],
+    [
+      'root lockfile already edited',
+      { files: ['apps/web/package.json', 'pnpm-lock.yaml'] },
+      'root-lockfile-already-changed',
+    ],
+    [
+      'source edit',
+      { files: ['apps/web/package.json', 'apps/web/lib/x.ts'] },
+      'non-dependency-file-changed',
+    ],
+    [
+      'unrelated CI failure',
+      {
+        failedJobs: [
+          { id: 12, name: 'ci-fast', conclusion: 'failure', log: 'tsc error' },
+        ],
+      },
+      'failure-not-allowlisted',
+    ],
+    [
+      'missing manifest evidence',
+      { manifestEvidence: [] },
+      'manifest-evidence-missing',
+    ],
+  ])('rejects %s', (_name, override, reason) => {
+    expect(classifyRootLockDrift(rootCandidate(override))).toEqual({
+      eligible: false,
+      reason,
+    });
+  });
+
+  it('binds, revalidates, and writes only the root lockfile', () => {
+    const plan = classifyRootLockDrift(rootCandidate()).plan;
+    const lockfileBytes = Buffer.from("lockfileVersion: '9.0'\n");
+    const receipt = buildRemediationReceipt({ plan, lockfileBytes });
+    const freshManifests = [
+      {
+        path: 'apps/web/package.json',
+        baseBytes: WEB_BASE,
+        headBytes: WEB_HEAD,
+      },
+    ];
+    const input = {
+      plan,
+      freshPr: candidate().pr,
+      freshFiles: ['apps/web/package.json'],
+      receipt,
+      freshManifests,
+      lockfileBytes,
+      expectedRepository: REPO,
+      expectedWorkflowRunId: 789,
+    };
+
+    expect(receipt.testCommands).toEqual([
+      'pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --ignore-pnpmfile',
+      'node scripts/lockfile-specifier-preflight.mjs',
+    ]);
+    expect(validateRootRemediationArtifact(input)).toEqual({ valid: true });
+    expect(
+      validateRootRemediationArtifact({
+        ...input,
+        freshManifests: [{ ...freshManifests[0], headBytes: WEB_BASE }],
+      })
+    ).toMatchObject({ valid: false, reason: 'fresh-package-mismatch' });
+    expect(
+      validateRootRemediationArtifact({
+        ...input,
+        lockfileBytes: Buffer.from('tampered'),
+      })
+    ).toMatchObject({ valid: false, reason: 'lockfile-hash-mismatch' });
+    expect(
+      validateRootRemediationArtifact({
+        ...input,
+        receipt: { ...receipt, kind: undefined },
+      })
+    ).toMatchObject({ valid: false, reason: 'invalid-schema' });
+
+    const variables = buildCreateCommitVariables({
+      plan,
+      receipt,
+      lockfileBytes,
+    });
+    expect(variables.input.expectedHeadOid).toBe(HEAD);
+    expect(variables.input.message.headline).toBe(
+      'fix(deps): refresh root lockfile'
+    );
+    expect(variables.input.fileChanges).toEqual({
+      additions: [
+        { path: 'pnpm-lock.yaml', contents: lockfileBytes.toString('base64') },
+      ],
+    });
+  });
+
+  it('rejects a forged root plan that widens the writable path', () => {
+    const plan = classifyRootLockDrift(rootCandidate()).plan;
+    for (const forged of [
+      { ...plan, lockfilePath: 'package.json' },
+      { ...plan, changedFiles: [...plan.changedFiles, 'pnpm-lock.yaml'] },
+      { ...plan, manifestEvidence: [] },
+    ])
+      expect(
+        validatePlanAuthority({
+          plan: forged,
+          expectedRepository: REPO,
+          expectedWorkflowRunId: 789,
+        })
+      ).toMatchObject({ valid: false });
+  });
+});
+
 describe('GitHub Actions remediation separation', () => {
   const workflow = readFileSync(
     resolve(process.cwd(), '.github/workflows/safe-pr-remediation.yml'),
     'utf8'
   );
 
-  it('dispatches only after the isolated Eve workflow fails', () => {
-    expect(workflow).toContain("workflows: ['Eve Pilot']");
+  it('dispatches only after the isolated Eve workflow or root CI fails', () => {
+    expect(workflow).toContain("workflows: ['Eve Pilot', 'CI']");
     expect(workflow).toContain('types: [completed]');
     expect(workflow).toContain(
       "github.event.workflow_run.conclusion == 'failure'"
@@ -523,5 +762,33 @@ describe('GitHub Actions remediation separation', () => {
     expect(workflow).not.toContain('CLAUDE_CODE_OAUTH_TOKEN');
     expect(workflow).not.toContain('git push');
     expect(workflow).not.toContain('self-hosted');
+  });
+
+  it('keeps the root lane lockfile-only, script-free, and kind-gated', () => {
+    expect(workflow).toContain('kind: ${{ steps.plan.outputs.kind }}');
+    expect(workflow).toContain(
+      'run: pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile --no-frozen-lockfile'
+    );
+    expect(
+      workflow.match(
+        /run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --ignore-pnpmfile/g
+      )
+    ).toHaveLength(2);
+    expect(workflow).toContain(
+      'run: node scripts/lockfile-specifier-preflight.mjs'
+    );
+    for (const step of workflow.split(/\n\s+- name: /).slice(1)) {
+      if (/working-directory: candidate\n/.test(step))
+        expect(step).toContain(
+          "if: needs.plan.outputs.kind == 'root-workspace-lockfile'"
+        );
+      if (/working-directory: candidate\/apps\/eve-pilot/.test(step))
+        expect(step).toContain(
+          "if: needs.plan.outputs.kind == 'eve-isolated-lockfile'"
+        );
+    }
+    // Root pnpm.overrides is a deliberate pin: nothing writes package.json.
+    expect(workflow).not.toMatch(/pnpm (?:add|up|update|pkg)\b/);
+    expect(workflow).not.toContain('--fix-lockfile');
   });
 });
