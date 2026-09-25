@@ -3,13 +3,26 @@
 tracker:
   kind: linear
   provider:
-    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"
     team_key: "JOV"
     api_key: $LINEAR_API_KEY
   required_labels:
-    - symphony-five-pr-repair-20260908
+    - agent-ready
+  # Scheduler filters are labels and states only. There is no identifier or
+  # pull-number denylist. JOV-5914, JOV-6519, #17453, and #17156 stay out only
+  # while they lack agent-ready. Adding agent-ready with no excluded label admits them.
   excluded_labels:
     - no-symphony
+    - billing
+    - blocked:payments
+    - stripe
+    - cost-monitoring
+    - blocked:auth
+    - auth
+    - area:auth
+    - infra
+    - area:infra
+    - infrastructure
+    - vercel
   active_states:
     - Todo
     - In Progress
@@ -65,7 +78,7 @@ Ticket: `{{ issue.identifier }}` — {{ issue.title }}
 Status: {{ issue.state }}
 URL: {{ issue.url }}
 
-Intake is restricted to the configured project and required label within the Jovie Linear team. Native Codex runs through symphony-agent-router with Apps disabled. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Only the mechanical `no-symphony` dead-letter label excludes dispatch; legacy human-review labels never do. An issue that hits the bounded ceiling of permanent Linear 4xx errors is dead-lettered to a durable `symphony-issue-dead-letter/v1` receipt and must receive the `no-symphony` label before any further machine pickup. <!-- JOV-INV-028 -->
+Intake is team-wide on JOV for issues labeled `agent-ready`, including `Todo`. It is not limited to project `symphony-ui-pilot-96d6b9c5b2d5` or label `symphony-five-pr-repair-20260908`. Native Codex runs through symphony-agent-router with Apps disabled. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 are not excluded by identifier. They stay outside intake only while they lack `agent-ready`. Adding `agent-ready` with no excluded label selects them. Deploy, permissions, billing, and spend work is excluded by `vercel`, `infra`, `area:infra`, `infrastructure`, `blocked:auth`, `auth`, `area:auth`, `billing`, `blocked:payments`, `stripe`, and `cost-monitoring`, in addition to the mechanical `no-symphony` dead-letter label. Legacy human-review labels (`human-review-required`, `needs-human`, `no-auto`) never exclude dispatch. An issue that hits the bounded ceiling of permanent Linear 4xx errors is dead-lettered to a durable `symphony-issue-dead-letter/v1` receipt and must receive the `no-symphony` label before any further machine pickup. <!-- JOV-INV-028 -->
 
 Closure enforcement depends on the runtime wrapper's configured mode. In enforcement mode, an unhealthy, missing, or stale Summer closure-health receipt holds admission. With `--closure-observe-only`, the wrapper observes that receipt without enforcing the closure hold. Native pickup still checks tracker state, terminal fences, shared issue leases, and existing PRs; routing, provider authentication, and capacity checks remain separate. Observe-only mode grants no additional intake, push, merge, deployment, or runtime-change authority. The isolated fallback worker separately enforces its fleet admission fields before new work.
 

@@ -339,13 +339,69 @@ exit 0
             "  command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server\n",
             1,
         ).replace(
-            "Native Codex execution is disabled in this profile.",
-            "Native Codex runs through symphony-agent-router with Apps disabled.",
+            '  provider:\n'
+            '    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"\n'
+            '    team_key: "JOV"\n'
+            '    api_key: $LINEAR_API_KEY\n'
+            '  required_labels:\n'
+            '    - symphony-five-pr-repair-20260908\n'
+            '  excluded_labels:\n'
+            '    - no-symphony\n',
+            '  provider:\n'
+            '    team_key: "JOV"\n'
+            '    api_key: $LINEAR_API_KEY\n'
+            '  required_labels:\n'
+            '    - agent-ready\n'
+            '  # Scheduler filters are labels and states only. There is no identifier or\n'
+            '  # pull-number denylist. JOV-5914, JOV-6519, #17453, and #17156 stay out only\n'
+            '  # while they lack agent-ready. Adding agent-ready with no excluded label admits them.\n'
+            '  excluded_labels:\n'
+            '    - no-symphony\n'
+            '    - billing\n'
+            '    - blocked:payments\n'
+            '    - stripe\n'
+            '    - cost-monitoring\n'
+            '    - blocked:auth\n'
+            '    - auth\n'
+            '    - area:auth\n'
+            '    - infra\n'
+            '    - area:infra\n'
+            '    - infrastructure\n'
+            '    - vercel\n',
+            1,
+        ).replace(
+            "Intake is restricted to the configured project and required label within the Jovie Linear team. "
+            "Native Codex execution is disabled in this profile. ",
+            "Intake is team-wide on JOV for issues labeled `agent-ready`, including `Todo`. "
+            "It is not limited to project `symphony-ui-pilot-96d6b9c5b2d5` or label "
+            "`symphony-five-pr-repair-20260908`. "
+            "Native Codex runs through symphony-agent-router with Apps disabled. ",
+            1,
+        ).replace(
+            "Only the mechanical `no-symphony` dead-letter label excludes dispatch; "
+            "legacy human-review labels never do.",
+            "JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 are not excluded by "
+            "identifier. They stay outside intake only while they lack `agent-ready`. "
+            "Adding `agent-ready` with no excluded label selects them. "
+            "Deploy, permissions, billing, and spend work is excluded by `vercel`, `infra`, "
+            "`area:infra`, `infrastructure`, `blocked:auth`, `auth`, `area:auth`, `billing`, "
+            "`blocked:payments`, `stripe`, and `cost-monitoring`, in addition to the mechanical "
+            "`no-symphony` dead-letter label. Legacy human-review labels "
+            "(`human-review-required`, `needs-human`, `no-auto`) never exclude dispatch.",
             1,
         )
         self.assertEqual(codex, expected)
-        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', codex)
-        self.assertIn("symphony-five-pr-repair-20260908", codex)
+        front = codex.split("---", 2)[1]
+        self.assertNotIn("project_slug:", front)
+        self.assertNotIn("symphony-five-pr-repair-20260908", front)
+        self.assertIn("- agent-ready", front)
+        for label in (
+            "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
+            "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
+        ):
+            self.assertIn(f"    - {label}\n", front)
+        self.assertIn("#17453", front)
+        self.assertIn("#17156", front)
         self.assertIn("max_retry_attempts: 1", codex)
         self.assertEqual(codex.count("max_concurrent_agents: 5"), 1)
         self.assertNotIn("/usr/bin/false", codex)
@@ -376,8 +432,9 @@ exit 0
         for replacement in (
             original.replace(b"agents: 5", b"agents: 6"),
             original.replace(E.CODEX_IN_COMMAND.encode(), b"command: /usr/bin/false"),
-            original.replace(b"symphony-five-pr-repair-20260908", b"symphony"),
-            original.replace(b'project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', b'project_slug: "other"'),
+            original.replace(b"- agent-ready", b"- not-ready"),
+            original.replace(b'team_key: "JOV"', b'team_key: "OTHER"'),
+            original.replace(b"    - billing\n", b""),
         ):
             with self.subTest(change=replacement[:80]):
                 self.workflow.write_bytes(replacement)
