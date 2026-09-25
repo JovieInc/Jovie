@@ -168,7 +168,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/sonarcloud.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `09bc196bb40a32dfa4730f6f08a29e16cadfb8832963dd34090c01c857dbe18a`)
 - `.github/workflows/source-admission-review-signal.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5cb384928cd8fe419024a9beae51b8c25912e34729a5bbcc4adb7bcc581e9a7e`)
 - `.github/workflows/stuck-draft-autoclose.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `30eb3b35bfccda016ad176718fe85cda625d5dab8a7679622b74d95c0785c75d`)
-- `.github/workflows/summer-eve-pin.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `da12dc60364557eda2c01f99c4a8d7c4e72090b788820fef7fd200f95bf7c362`)
+- `.github/workflows/summer-eve-pin.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1bb3abbe295a26d673035a98ae288058fa7d77ebbc44e85b53b5cd3f7a1be71f`)
 - `.github/workflows/symphony-control-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `874529f76161100dbf19fe6d27b9d8f374f2588ead47e66852eefe9b7b044fc3`)
 - `.github/workflows/synthetic-monitoring.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `31ae5c2fd6b80984556b8e92cd88c7e36aceefac2db66eb120d6609ca72edab8`)
 - `.github/workflows/taste-classifier.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `39097269d64868683dcf9e04873fe5d1428f7fc024669e6e28fff1709f52aa9f`)

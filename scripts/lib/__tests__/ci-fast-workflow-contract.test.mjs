@@ -1427,7 +1427,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('fail-fast skips later remaining lanes after the first failure', () => {
+  it('fail-fast runs every cheap lane but skips structural after a failure', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-fail-fast-'));
     const outPath = join(repo, 'ci-fast-lanes.json');
     try {
@@ -1441,7 +1441,7 @@ describe('ci-fast bounded parallel workflow', () => {
             ...process.env,
             CI_FAST_LANE_GROUP: 'remaining',
             CI_FAST_LANES_OUT: outPath,
-            CI_FAST_SKIP_STRUCTURAL: 'true',
+            CI_FAST_SKIP_STRUCTURAL: 'false',
             CI_FAST_ONLY_STRUCTURAL: 'false',
             PATH: repo,
           },
@@ -1450,14 +1450,15 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(result.status).not.toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       const failed = payload.lanes.filter(lane => lane.status === 'failure');
-      const skipped = payload.lanes.filter(
+      const skippedByFailFast = payload.lanes.filter(
         lane =>
           lane.status === 'skipped' &&
           String(lane.logExcerpt).includes('fail-fast')
       );
-      expect(failed.length).toBe(1);
-      expect(skipped.length).toBeGreaterThan(0);
-      expect(payload.lanes.at(-1).status).toBe('skipped');
+      // Every cheap lane reports in one cycle; only structural is spared.
+      expect(failed.length).toBeGreaterThan(1);
+      expect(skippedByFailFast.map(lane => lane.id)).toEqual(['structural']);
+      expect(payload.lanes.at(-1).id).toBe('structural');
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

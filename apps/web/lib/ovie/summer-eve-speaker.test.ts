@@ -67,7 +67,6 @@ async function collect(value = input) {
   return events;
 }
 beforeEach(() => {
-  vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
   fetchShadow.mockReset();
   fetchShadow
     .mockResolvedValueOnce(
