@@ -233,7 +233,7 @@ function tighter(left, right) {
     return left.value < right.value ? left : right;
   }
   if (left.level === 'error' && right.level !== 'error') return left;
-  if (right.level === 'error' && right.level !== 'error') return right;
+  if (right.level === 'error' && left.level !== 'error') return right;
   return left;
 }
 
