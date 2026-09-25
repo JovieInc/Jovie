@@ -3,7 +3,7 @@ import {
   isRenderFixtureEnabled,
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
-import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
+import { ProfileAdmissionFixtureClient } from '../../../(marketing)/renders/profile-admission/ProfileAdmissionFixtureClient';
 
 export const revalidate = false;
 export const metadata = RENDER_FIXTURE_METADATA;

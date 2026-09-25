@@ -263,7 +263,7 @@ describe('performance route manifest', () => {
         'button:has-text("Get updates")',
       ],
       'public-profile-mode-tour': [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
+        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
       ],
     };
     for (const route of warmProfileRoutes) {

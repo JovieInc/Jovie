@@ -992,7 +992,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-tour"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
+        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
       ],
     },
     viewport: { width: 390, height: 844 },

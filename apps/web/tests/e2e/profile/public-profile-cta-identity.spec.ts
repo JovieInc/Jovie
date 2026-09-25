@@ -174,7 +174,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
         expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);
         await expect(
-          page.getByRole('button', { name: 'Shows', exact: true })
+          page.getByRole('button', { name: 'Events', exact: true })
         ).toBeVisible();
       }
       await capture(`${viewport.id}-identity.png`);
@@ -204,7 +204,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         await expect(navigation).toBeVisible();
         await expect(
           navigation.getByRole('button', {
-            name: 'Shows',
+            name: 'Events',
             exact: true,
           })
         ).toBeVisible();
@@ -214,7 +214,7 @@ test.describe('Public profile CTA and identity evidence', () => {
             exact: true,
           })
         ).toHaveAttribute('aria-current', 'page');
-        // Shows stays in shared nav even when empty. Wave 1 owns empty-state
+        // Events stays in shared nav even when empty. Wave 1 owns empty-state
         // copy; this card is destination naming only.
         const overview = surface.getByTestId('profile-desktop-home-overview');
         await expect(overview).toBeVisible();
@@ -243,7 +243,7 @@ test.describe('Public profile CTA and identity evidence', () => {
       );
       const eventsNav = page
         .getByTestId('profile-bottom-nav')
-        .getByRole('button', { name: 'Shows', exact: true });
+        .getByRole('button', { name: 'Events', exact: true });
       await eventsNav.click();
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();

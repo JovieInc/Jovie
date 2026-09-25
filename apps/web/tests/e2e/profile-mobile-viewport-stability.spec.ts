@@ -1686,7 +1686,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await page.keyboard.press(focusNextKey);
       focusedEvents = await page.evaluate(
-        () => document.activeElement?.getAttribute('aria-label') === 'Shows'
+        () => document.activeElement?.getAttribute('aria-label') === 'Events'
       );
       if (focusedEvents) break;
     }
