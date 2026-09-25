@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OperationalTasksPanel.test.tsx
+import { useQuery } from '@tanstack/react-query';
 import {
   CircleAlert,
   CircleCheck,
@@ -14,8 +15,10 @@ import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TaskProjectionListRow } from '@/components/organisms/table';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import { cn } from '@/lib/utils';
-import { useHudShippingStateQuery } from './useHudShippingStateQuery';
+
+const OPERATIONAL_TASK_POLL_MS = 6_000;
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
@@ -23,6 +26,18 @@ type WorkflowVisual = {
   readonly label: string;
   readonly className: string;
   readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
+};
+
+const EMPTY_FEED: OperationalTaskFeed = {
+  canonicalSource: 'linear',
+  cacheMode: 'local-reconciled',
+  syncState: 'syncing',
+  sourceId: 'symphony-runtime',
+  observedAt: null,
+  lastSyncedAt: null,
+  freshnessDeadline: null,
+  tasks: [],
+  deltas: [],
 };
 
 function workflowVisual(
@@ -89,6 +104,21 @@ function formatTimestamp(value: string | null): string {
   })}`;
 }
 
+async function fetchOperationalTasks(
+  kioskToken: string | null,
+  signal: AbortSignal
+): Promise<ShippingCockpitProjection> {
+  const url = new URL('/api/hud/shipping-state', globalThis.location.origin);
+  if (kioskToken) url.searchParams.set('kiosk', kioskToken);
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Operational task cache fetch failed (${response.status})`);
+  }
+  const parsed = parseShippingCockpitProjection(await response.json());
+  if (!parsed) throw new Error('Operational task cache contract was invalid');
+  return parsed;
+}
+
 export function OperationalTasksPanelView({
   feed,
   requestState = 'idle',
@@ -110,7 +140,7 @@ export function OperationalTasksPanelView({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='overflow-hidden'
+      className='overflow-hidden p-0'
       data-testid='ovie-operational-tasks'
     >
       <div className='flex min-h-16 items-center justify-between gap-3 border-b border-subtle px-3 py-2'>
@@ -196,16 +226,22 @@ export function OperationalTasksPanelView({
 export function OperationalTasksPanel({
   kioskToken = null,
 }: Readonly<{ readonly kioskToken?: string | null }>) {
-  const query = useHudShippingStateQuery(kioskToken);
-  const requestState = query.isFetching
-    ? 'fetching'
-    : query.operationalRequestState === 'error'
-      ? 'error'
-      : 'idle';
+  const query = useQuery({
+    queryKey: ['hud', 'operational-tasks', kioskToken],
+    queryFn: ({ signal }) => fetchOperationalTasks(kioskToken, signal),
+    placeholderData: previous => previous,
+    gcTime: OPERATIONAL_TASK_POLL_MS * 2,
+    staleTime: OPERATIONAL_TASK_POLL_MS,
+    refetchInterval: OPERATIONAL_TASK_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+  });
   return (
     <OperationalTasksPanelView
-      feed={query.operationalTasks}
-      requestState={requestState}
+      feed={query.data?.operationalTasks ?? EMPTY_FEED}
+      requestState={
+        query.isError ? 'error' : query.isFetching ? 'fetching' : 'idle'
+      }
     />
   );
 }

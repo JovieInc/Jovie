@@ -6,8 +6,7 @@ import {
 
 export { SHIPPING_STATE_SCHEMA };
 export const SHIPPING_STATE_FRESHNESS_BUDGET_MS = SHIPPING_STATE_FRESHNESS_MS;
-/** One interval for the delivery card and operational tasks. Under the 10s freshness budget. */
-export const SHIPPING_STATE_POLL_INTERVAL_MS = 6_000;
+export const SHIPPING_STATE_POLL_INTERVAL_MS = 4_000;
 export const SHIPPING_STATE_CLOCK_UNCERTAINTY_MS = 1_000;
 export const SHIPPING_STATE_CACHE_GC_MS = 30_000;
 

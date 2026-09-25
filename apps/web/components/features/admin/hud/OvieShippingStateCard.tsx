@@ -1,15 +1,24 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
+import { useQuery } from '@tanstack/react-query';
 import { Ship } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type {
-  ShippingMeaningView,
-  ShippingStateView,
+import {
+  applyShippingStateRead,
+  createEmptyShippingStateView,
+  createShippingMachine,
+  expireShippingStateIfNeeded,
+  SHIPPING_STATE_CACHE_GC_MS,
+  SHIPPING_STATE_POLL_INTERVAL_MS,
+  type ShippingMachineState,
+  type ShippingMeaningView,
+  type ShippingStateView,
+  shippingStateReadFromHttp,
 } from '@/lib/ovie/shipping-state-client';
-import { useHudShippingStateQuery } from './useHudShippingStateQuery';
+import { REALTIME_CACHE } from '@/lib/queries/cache-strategies';
 
 const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   fresh: 'Fresh',
@@ -45,7 +54,69 @@ function compactMetaValue(value: string | null): string | null {
 }
 
 function useOvieShippingStateQuery(kioskToken: string | null) {
-  const query = useHudShippingStateQuery(kioskToken);
+  const machineRef = useRef<ShippingMachineState>(createShippingMachine());
+  const tokenRef = useRef<string | null>(kioskToken);
+  if (tokenRef.current !== kioskToken) {
+    tokenRef.current = kioskToken;
+    machineRef.current = createShippingMachine();
+  }
+  const query = useQuery({
+    queryKey: ['hud', 'ovie-shipping-state', kioskToken],
+    queryFn: async ({ signal }) => {
+      const requestToken = kioskToken;
+      const url = new URL(
+        '/api/hud/shipping-state',
+        globalThis.location.origin
+      );
+      if (kioskToken) url.searchParams.set('kiosk', kioskToken);
+      let response: Response;
+      try {
+        response = await fetch(url, { signal, cache: 'no-store' });
+      } catch {
+        if (signal.aborted || tokenRef.current !== requestToken) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        const now = Date.now();
+        machineRef.current = expireShippingStateIfNeeded(
+          applyShippingStateRead(
+            machineRef.current,
+            { kind: 'disconnected' },
+            now
+          ),
+          now
+        );
+        return machineRef.current.view;
+      }
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+      if (signal.aborted || tokenRef.current !== requestToken) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const now = Date.now();
+      machineRef.current = expireShippingStateIfNeeded(
+        applyShippingStateRead(
+          machineRef.current,
+          shippingStateReadFromHttp(response.status, payload),
+          now
+        ),
+        now
+      );
+      return machineRef.current.view;
+    },
+    ...REALTIME_CACHE,
+    staleTime: 0,
+    gcTime: SHIPPING_STATE_CACHE_GC_MS,
+    refetchInterval: SHIPPING_STATE_POLL_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: false,
+  });
   const refetch = query.refetch;
   useEffect(() => {
     function onResume(event: Event) {
@@ -67,8 +138,8 @@ function useOvieShippingStateQuery(kioskToken: string | null) {
     };
   }, [refetch]);
   return {
-    view: query.view,
-    isPending: query.isPending,
+    view: query.data ?? createEmptyShippingStateView(),
+    isPending: query.isPending && !query.data,
   };
 }
 
@@ -130,6 +201,7 @@ export function OvieShippingStateCard({
   return (
     <ContentSurfaceCard
       surface='details'
+      className='min-h-40 space-y-3 p-3'
       data-testid='hud-shipper-status-panel'
       data-ovie-shipping-state='true'
       data-truth={view.truth}
@@ -143,23 +215,18 @@ export function OvieShippingStateCard({
       aria-live='polite'
       aria-label='Ubuntu Shipping State'
     >
-      <div
-        className='min-h-40 space-y-3 p-3'
-        data-testid='hud-shipper-status-geometry'
-      >
-        <div className='flex min-h-5 items-center justify-between gap-3'>
-          <div className='flex items-center gap-2'>
-            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
-            <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
-              Delivery
-            </p>
-          </div>
-          <span className='text-2xs font-medium text-secondary-token'>
-            {isPending ? 'Unknown' : truthLabel(view)}
-          </span>
+      <div className='flex min-h-5 items-center justify-between gap-3'>
+        <div className='flex items-center gap-2'>
+          <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+          <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
+            Delivery
+          </p>
         </div>
-        <ShippingStateBody view={view} />
+        <span className='text-2xs font-medium text-secondary-token'>
+          {isPending ? 'Unknown' : truthLabel(view)}
+        </span>
       </div>
+      <ShippingStateBody view={view} />
     </ContentSurfaceCard>
   );
 }
