@@ -117,12 +117,22 @@ export function authorizeEveCapability(
 
 function readIdentityInstructions(id: EveIdentityId): string {
   const candidates = [
-    resolve(process.cwd(), '../eve-pilot/identities', id, 'instructions.md'),
-    resolve(process.cwd(), 'apps/eve-pilot/identities', id, 'instructions.md'),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      '../eve-pilot/identities',
+      id,
+      'instructions.md'
+    ),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      'apps/eve-pilot/identities',
+      id,
+      'instructions.md'
+    ),
   ];
   for (const path of candidates) {
-    if (existsSync(path)) {
-      return readFileSync(path, 'utf8');
+    if (existsSync(/* turbopackIgnore: true */ path)) {
+      return readFileSync(/* turbopackIgnore: true */ path, 'utf8');
     }
   }
   return '';

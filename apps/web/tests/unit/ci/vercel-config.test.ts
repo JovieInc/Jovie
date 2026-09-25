@@ -268,4 +268,47 @@ describe('Vercel function config', () => {
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
   });
+
+  it('opts whole-project filesystem readers out of Turbopack tracing', () => {
+    const tracedCallSites: Array<{ file: string; callees: string[] }> = [
+      {
+        file: 'apps/web/lib/filesystem-paths.ts',
+        callees: ['path.resolve', 'path.join'],
+      },
+      {
+        file: 'apps/web/lib/ovie/identity.ts',
+        callees: ['resolve', 'existsSync', 'readFileSync'],
+      },
+      {
+        file: 'apps/web/lib/ovie/mcp/artist-profile-inventory.ts',
+        callees: ['resolve', 'readFileSync'],
+      },
+      {
+        file: 'apps/web/lib/changelog-source.ts',
+        callees: ['fs.existsSync', 'fs.readFileSync'],
+      },
+      {
+        file: 'apps/web/lib/testing/quarantine-ledger.server.ts',
+        callees: ['resolve', 'readFileSync'],
+      },
+    ];
+
+    for (const { file, callees } of tracedCallSites) {
+      const source = readFileSync(resolve(repoRoot, file), 'utf8');
+      const pattern = new RegExp(
+        `\\b(?:${callees.map(callee => callee.replaceAll('.', '\\.')).join('|')})\\(`,
+        'g'
+      );
+      const misses: string[] = [];
+      for (const match of source.matchAll(pattern)) {
+        const argument = source.slice((match.index ?? 0) + match[0].length);
+        if (!argument.trimStart().startsWith('/* turbopackIgnore: true */')) {
+          const line = source.slice(0, match.index).split('\n').length;
+          misses.push(`${file}:${line} ${match[0]}`);
+        }
+      }
+
+      expect(misses, file).toEqual([]);
+    }
+  });
 });

@@ -142,12 +142,20 @@ export function parseProfileCapabilitiesFromRegistry(
 
 export function loadProfileCapabilitiesFromDisk(): ProfileCapability[] {
   const candidates = [
-    resolve(process.cwd(), 'docs/FEATURE_REGISTRY.md'),
-    resolve(process.cwd(), '../../docs/FEATURE_REGISTRY.md'),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      'docs/FEATURE_REGISTRY.md'
+    ),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      '../../docs/FEATURE_REGISTRY.md'
+    ),
   ];
   for (const path of candidates) {
     try {
-      return parseProfileCapabilitiesFromRegistry(readFileSync(path, 'utf8'));
+      return parseProfileCapabilitiesFromRegistry(
+        readFileSync(/* turbopackIgnore: true */ path, 'utf8')
+      );
     } catch {
       // try next
     }
