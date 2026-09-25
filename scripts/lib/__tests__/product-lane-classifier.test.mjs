@@ -293,6 +293,12 @@ describe('product lane classifier', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       ]).selectedLanes
     ).toEqual(['operations']);
+    // Workflow-only diffs stay off the web lane; the operations structural
+    // lane runs apps/web/tests/unit/ci instead (ci-fast-lanes.test.mjs).
+    expect(
+      classifyProductLanes(['.github/workflows/pr-size-guard.yml'])
+        .selectedLanes
+    ).toEqual(['operations']);
     expect(
       classifyProductLanes([
         'scripts/symphony/signals/gem-publisher-commission.request',
