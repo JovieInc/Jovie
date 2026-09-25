@@ -63,12 +63,32 @@ describe('JOV-INV-026 performance invariant factory', () => {
     }
     assert.equal(
       routeFromPattern(adminAssertions.matchingUrlPattern),
-      '/app/admin/*'
+      '/app/ov/*'
     );
     assert.equal(
       adminAssertions.assertions['categories:performance'][0],
       'error'
     );
+    const pack = projectPerformancePack();
+    for (const url of finalUrls) {
+      const violations = planLinearIssues({
+        pack,
+        measurements: [
+          {
+            url: `https://jov.ie${url}`,
+            source: 'lhci',
+            metrics: { performance_score: 0.1 },
+          },
+        ],
+      });
+      assert.ok(
+        violations.some(
+          item =>
+            item.fingerprint === 'perf-violation:/app/ov/*:performance_score'
+        ),
+        `missing OV proposal for ${url}`
+      );
+    }
   });
 
   it('accepts the checked-in performance pack', () => {
