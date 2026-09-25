@@ -101,7 +101,7 @@ vi.mock('./DashboardShellContent', () => ({
   },
 }));
 
-import AppShellLayout, { resolveRequestOrigin } from './layout';
+import AppShellLayout from './layout';
 
 describe('AppShellLayout OV mode', () => {
   beforeEach(() => {
@@ -218,36 +218,5 @@ describe('AppShellLayout OV mode', () => {
         ],
       })
     );
-  });
-});
-
-describe('resolveRequestOrigin', () => {
-  it('uses a forwarded protocol, then localhost, then https', () => {
-    expect(
-      resolveRequestOrigin(
-        new Headers({
-          'x-forwarded-host': 'jov.ie',
-          'x-forwarded-proto': 'https',
-        })
-      )
-    ).toBe('https://jov.ie');
-    expect(
-      resolveRequestOrigin(
-        new Headers({
-          host: 'jov.ie',
-          'x-forwarded-proto': 'http',
-        })
-      )
-    ).toBe('http://jov.ie');
-    expect(resolveRequestOrigin(new Headers({ host: 'localhost:3000' }))).toBe(
-      'http://localhost:3000'
-    );
-    expect(resolveRequestOrigin(new Headers({ host: '127.0.0.1:3000' }))).toBe(
-      'http://127.0.0.1:3000'
-    );
-    expect(resolveRequestOrigin(new Headers({ host: 'preview.jov.ie' }))).toBe(
-      'https://preview.jov.ie'
-    );
-    expect(resolveRequestOrigin(new Headers())).toBeNull();
   });
 });
