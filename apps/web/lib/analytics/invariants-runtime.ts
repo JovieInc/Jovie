@@ -166,9 +166,9 @@ export function evaluateDashboardAnalyticsInvariants(
 
   const subsetRelations: AnalyticsInvariantInput['subsetRelations'] = [
     // Listen clicks are a filtered slice of total link clicks (same
-    // click_events population, same is_bot filter, same range).
+    // click population, same bot filter, same range).
     { parent: 'total_clicks', child: 'listen_clicks' },
-    // Tip visits are also a click_events slice.
+    // Tip visits are also a slice of that click population.
     { parent: 'total_clicks', child: 'tip_link_visits' },
   ];
 
