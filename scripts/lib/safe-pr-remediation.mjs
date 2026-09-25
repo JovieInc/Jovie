@@ -10,6 +10,18 @@ export const RECEIPT_SCHEMA = 'jovie-safe-pr-remediation-receipt/v1';
 export const REMEDIATION_CONTEXT = 'jovie-safe-remediation/v1';
 export const TARGET_PACKAGE_PATH = 'apps/eve-pilot/package.json';
 export const TARGET_LOCKFILE_PATH = 'apps/eve-pilot/pnpm-lock.yaml';
+export const EVE_KIND = 'eve-isolated-lockfile';
+// Root workspace lane: Dependabot sometimes bumps a workspace manifest without
+// regenerating the root pnpm-lock.yaml (PR #18250). Only the lockfile is ever
+// written; package.json (including pnpm.overrides) is never modified here.
+export const ROOT_KIND = 'root-workspace-lockfile';
+export const ROOT_LOCKFILE_PATH = 'pnpm-lock.yaml';
+export const ROOT_WORKFLOW_NAME = 'CI';
+const MAX_ROOT_MANIFESTS = 20;
+const MAX_ROOT_FAILED_JOB_LOGS = 8;
+const OUTDATED_ROOT_LOCKFILE_RE =
+  /pnpm-lock\.yaml is not up to date with <ROOT>\/(?:[A-Za-z0-9@._-]+\/)*package\.json/;
+const LOCKFILE_CONFIG_MISMATCH_RE = /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/;
 
 const REQUIRED_LABELS = new Set(['automated', 'dependencies']);
 const HARD_HOLD_LABELS = new Set([
@@ -26,6 +38,10 @@ const TEST_COMMANDS = Object.freeze([
   'pnpm run typecheck',
   'pnpm run test',
   'pnpm run build',
+]);
+const ROOT_TEST_COMMANDS = Object.freeze([
+  'pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --ignore-pnpmfile',
+  'node scripts/lockfile-specifier-preflight.mjs',
 ]);
 const DEPENDENCY_SECTIONS = Object.freeze([
   'dependencies',
@@ -56,7 +72,11 @@ function registrySemverSpecifier(value) {
   );
 }
 
-export function classifyDependencyManifestChange({ baseBytes, headBytes }) {
+export function classifyDependencyManifestChange({
+  baseBytes,
+  headBytes,
+  path = TARGET_PACKAGE_PATH,
+}) {
   let base;
   let head;
   try {
@@ -101,7 +121,7 @@ export function classifyDependencyManifestChange({ baseBytes, headBytes }) {
   return {
     valid: true,
     evidence: {
-      path: TARGET_PACKAGE_PATH,
+      path,
       baseSha256: sha256(baseBytes),
       headSha256: sha256(headBytes),
       changes,
@@ -125,6 +145,7 @@ function validatePrIdentity({
   repository,
   expectedHeadOid,
   expectedBaseOid = undefined,
+  kind = EVE_KIND,
 }) {
   if (!pr || !Array.isArray(files) || files.length === 0)
     return 'missing-pr-evidence';
@@ -147,12 +168,25 @@ function validatePrIdentity({
     return 'hard-hold';
   if ([...REQUIRED_LABELS].some(label => !labels.has(label)))
     return 'missing-dependency-label';
+  if (files.some(path => !allowedDependencyFile(path)))
+    return 'non-dependency-file-changed';
+  if (kind === ROOT_KIND) {
+    const manifestCount = files.filter(isManifestPath).length;
+    if (manifestCount === 0) return 'no-manifest-changed';
+    if (manifestCount > MAX_ROOT_MANIFESTS) return 'too-many-manifests';
+    if (files.includes(ROOT_LOCKFILE_PATH))
+      return 'root-lockfile-already-changed';
+    return null;
+  }
+  if (kind !== EVE_KIND) return 'unknown-kind';
   if (!files.includes(TARGET_PACKAGE_PATH)) return 'eve-manifest-not-changed';
   if (files.includes(TARGET_LOCKFILE_PATH))
     return 'eve-lockfile-already-changed';
-  if (files.some(path => !allowedDependencyFile(path)))
-    return 'non-dependency-file-changed';
   return null;
+}
+
+function isManifestPath(path) {
+  return /(^|\/)package\.json$/.test(path);
 }
 
 export function classifyEveLockDrift({
@@ -201,7 +235,7 @@ export function classifyEveLockDrift({
     eligible: true,
     plan: {
       schema: PLAN_SCHEMA,
-      kind: 'eve-isolated-lockfile',
+      kind: EVE_KIND,
       repository,
       prNumber: pr.number,
       expectedHeadOid: workflowRun.head_sha,
@@ -217,14 +251,154 @@ export function classifyEveLockDrift({
   };
 }
 
+/**
+ * Root workspace lockfile drift. The overrides/config mismatch is refused
+ * with an explicit reason: pnpm.overrides is a deliberate pin, so the lane
+ * never regenerates a lockfile to agree with a Dependabot-edited override.
+ */
+export function classifyRootLockDrift({
+  workflowRun,
+  pr,
+  files,
+  failedJobs,
+  repository,
+  manifestEvidence,
+}) {
+  if (
+    workflowRun?.name !== ROOT_WORKFLOW_NAME ||
+    workflowRun?.conclusion !== 'failure' ||
+    workflowRun?.event !== 'pull_request' ||
+    workflowRun?.head_sha !== pr?.head?.sha ||
+    workflowRun?.pull_requests?.length !== 1 ||
+    workflowRun.pull_requests[0]?.number !== pr?.number
+  )
+    return { eligible: false, reason: 'workflow-identity-mismatch' };
+  if (pr?.user?.login !== 'dependabot[bot]')
+    return { eligible: false, reason: 'author-not-dependabot' };
+  if (
+    (failedJobs ?? []).some(job =>
+      LOCKFILE_CONFIG_MISMATCH_RE.test(job?.log ?? '')
+    )
+  )
+    return { eligible: false, reason: 'lockfile-config-mismatch' };
+
+  const identityFailure = validatePrIdentity({
+    pr,
+    files,
+    repository,
+    expectedHeadOid: workflowRun.head_sha,
+    kind: ROOT_KIND,
+  });
+  if (identityFailure) return { eligible: false, reason: identityFailure };
+
+  const manifestPaths = files.filter(isManifestPath).sort();
+  const evidence = Array.isArray(manifestEvidence) ? manifestEvidence : [];
+  const invalid = evidence.find(entry => !entry?.valid);
+  if (invalid)
+    return {
+      eligible: false,
+      reason: invalid?.reason ?? 'manifest-evidence-missing',
+    };
+  if (
+    evidence.length !== manifestPaths.length ||
+    evidence.some(
+      (entry, index) => entry.evidence?.path !== manifestPaths[index]
+    )
+  )
+    return { eligible: false, reason: 'manifest-evidence-missing' };
+
+  const failedJob = (failedJobs ?? []).find(
+    job =>
+      job?.conclusion === 'failure' &&
+      Number.isInteger(job?.id) &&
+      /ERR_PNPM_OUTDATED_LOCKFILE/.test(job?.log ?? '') &&
+      OUTDATED_ROOT_LOCKFILE_RE.test(job?.log ?? '')
+  );
+  if (!failedJob) return { eligible: false, reason: 'failure-not-allowlisted' };
+
+  return {
+    eligible: true,
+    plan: {
+      schema: PLAN_SCHEMA,
+      kind: ROOT_KIND,
+      repository,
+      prNumber: pr.number,
+      expectedHeadOid: workflowRun.head_sha,
+      baseOid: pr.base.sha,
+      headRefName: pr.head.ref,
+      workflowRunId: workflowRun.id,
+      failedJobId: failedJob.id,
+      lockfilePath: ROOT_LOCKFILE_PATH,
+      changedFiles: [...files].sort(),
+      manifestEvidence: evidence.map(entry => entry.evidence),
+    },
+  };
+}
+
+function validManifestEvidenceEntry(entry, expectedPath) {
+  return (
+    entry?.path === expectedPath &&
+    /^[0-9a-f]{64}$/.test(entry.baseSha256 ?? '') &&
+    /^[0-9a-f]{64}$/.test(entry.headSha256 ?? '') &&
+    Array.isArray(entry.changes) &&
+    entry.changes.length > 0
+  );
+}
+
+function validRootPlanBody(plan) {
+  if (!Array.isArray(plan.changedFiles)) return false;
+  const manifestPaths = plan.changedFiles.filter(isManifestPath).sort();
+  return (
+    plan.lockfilePath === ROOT_LOCKFILE_PATH &&
+    plan.packagePath === undefined &&
+    manifestPaths.length > 0 &&
+    manifestPaths.length <= MAX_ROOT_MANIFESTS &&
+    !plan.changedFiles.includes(ROOT_LOCKFILE_PATH) &&
+    !plan.changedFiles.some(path => !allowedDependencyFile(path)) &&
+    Array.isArray(plan.manifestEvidence) &&
+    plan.manifestEvidence.length === manifestPaths.length &&
+    plan.manifestEvidence.every((entry, index) =>
+      validManifestEvidenceEntry(entry, manifestPaths[index])
+    )
+  );
+}
+
+function validPlanEnvelope({
+  plan,
+  expectedRepository,
+  expectedWorkflowRunId,
+}) {
+  return (
+    plan?.schema === PLAN_SCHEMA &&
+    plan.repository === expectedRepository &&
+    plan.workflowRunId === expectedWorkflowRunId &&
+    Number.isInteger(plan.prNumber) &&
+    plan.prNumber > 0 &&
+    Number.isInteger(plan.failedJobId) &&
+    plan.failedJobId > 0 &&
+    /^[0-9a-f]{40}$/.test(plan.expectedHeadOid ?? '') &&
+    /^[0-9a-f]{40}$/.test(plan.baseOid ?? '') &&
+    typeof plan.headRefName === 'string' &&
+    plan.headRefName.length > 0
+  );
+}
+
 export function validatePlanAuthority({
   plan,
   expectedRepository,
   expectedWorkflowRunId,
 }) {
+  if (plan?.kind === ROOT_KIND)
+    return validPlanEnvelope({
+      plan,
+      expectedRepository,
+      expectedWorkflowRunId,
+    }) && validRootPlanBody(plan)
+      ? { valid: true }
+      : { valid: false, reason: 'invalid-plan-authority' };
   if (
     plan?.schema !== PLAN_SCHEMA ||
-    plan.kind !== 'eve-isolated-lockfile' ||
+    plan.kind !== EVE_KIND ||
     plan.repository !== expectedRepository ||
     plan.workflowRunId !== expectedWorkflowRunId ||
     !Number.isInteger(plan.prNumber) ||
@@ -251,6 +425,11 @@ export function validatePlanAuthority({
   return { valid: true };
 }
 
+/**
+ * @param {{plan: any, packageBytes?: Buffer, lockfileBytes: Buffer}} input
+ *   packageBytes is required for the Eve lane only; the root lane binds every
+ *   manifest through the plan's hashed evidence instead.
+ */
 export function buildRemediationReceipt({ plan, packageBytes, lockfileBytes }) {
   const authority = validatePlanAuthority({
     plan,
@@ -258,6 +437,18 @@ export function buildRemediationReceipt({ plan, packageBytes, lockfileBytes }) {
     expectedWorkflowRunId: plan?.workflowRunId,
   });
   if (!authority.valid) throw new Error('invalid remediation plan');
+  if (plan.kind === ROOT_KIND)
+    return {
+      schema: RECEIPT_SCHEMA,
+      kind: ROOT_KIND,
+      planSha256: sha256(Buffer.from(JSON.stringify(plan))),
+      repository: plan.repository,
+      prNumber: plan.prNumber,
+      expectedHeadOid: plan.expectedHeadOid,
+      workflowRunId: plan.workflowRunId,
+      lockfileSha256: sha256(lockfileBytes),
+      testCommands: [...ROOT_TEST_COMMANDS],
+    };
   return {
     schema: RECEIPT_SCHEMA,
     planSha256: sha256(Buffer.from(JSON.stringify(plan))),
@@ -332,6 +523,87 @@ export function validateRemediationArtifact({
   return { valid: true };
 }
 
+/**
+ * @param {{
+ *   plan: any;
+ *   freshPr: any;
+ *   freshFiles: string[];
+ *   receipt: any;
+ *   freshManifests: Array<{path: string, baseBytes: Buffer, headBytes: Buffer}>;
+ *   lockfileBytes: Buffer;
+ *   expectedRepository: string;
+ *   expectedWorkflowRunId: number;
+ * }} input
+ */
+export function validateRootRemediationArtifact({
+  plan,
+  freshPr,
+  freshFiles,
+  receipt,
+  freshManifests,
+  lockfileBytes,
+  expectedRepository,
+  expectedWorkflowRunId,
+}) {
+  const authority = validatePlanAuthority({
+    plan,
+    expectedRepository,
+    expectedWorkflowRunId,
+  });
+  if (
+    !authority.valid ||
+    plan.kind !== ROOT_KIND ||
+    receipt?.schema !== RECEIPT_SCHEMA ||
+    receipt.kind !== ROOT_KIND
+  )
+    return { valid: false, reason: 'invalid-schema' };
+  const identityFailure = validatePrIdentity({
+    pr: freshPr,
+    files: freshFiles,
+    repository: plan.repository,
+    expectedHeadOid: plan.expectedHeadOid,
+    expectedBaseOid: plan.baseOid,
+    kind: ROOT_KIND,
+  });
+  if (identityFailure) return { valid: false, reason: identityFailure };
+  if (
+    freshPr.number !== plan.prNumber ||
+    freshPr.head?.ref !== plan.headRefName ||
+    JSON.stringify([...freshFiles].sort()) !== JSON.stringify(plan.changedFiles)
+  )
+    return { valid: false, reason: 'pr-evidence-drift' };
+  if (
+    receipt.planSha256 !== sha256(Buffer.from(JSON.stringify(plan))) ||
+    receipt.repository !== plan.repository ||
+    receipt.prNumber !== plan.prNumber ||
+    receipt.expectedHeadOid !== plan.expectedHeadOid ||
+    receipt.workflowRunId !== plan.workflowRunId
+  )
+    return { valid: false, reason: 'receipt-identity-mismatch' };
+  const manifests = new Map(
+    (freshManifests ?? []).map(entry => [entry.path, entry])
+  );
+  for (const expected of plan.manifestEvidence) {
+    const fresh = manifests.get(expected.path);
+    if (
+      !fresh?.baseBytes ||
+      !fresh?.headBytes ||
+      sha256(fresh.baseBytes) !== expected.baseSha256 ||
+      sha256(fresh.headBytes) !== expected.headSha256
+    )
+      return { valid: false, reason: 'fresh-package-mismatch' };
+  }
+  if (receipt.lockfileSha256 !== sha256(lockfileBytes))
+    return { valid: false, reason: 'lockfile-hash-mismatch' };
+  if (
+    JSON.stringify(receipt.testCommands) !== JSON.stringify(ROOT_TEST_COMMANDS)
+  )
+    return { valid: false, reason: 'test-receipt-mismatch' };
+  if (lockfileBytes.length === 0)
+    return { valid: false, reason: 'empty-lockfile' };
+  return { valid: true };
+}
+
 export function buildCreateCommitVariables({ plan, receipt, lockfileBytes }) {
   const authority = validatePlanAuthority({
     plan,
@@ -348,13 +620,19 @@ export function buildCreateCommitVariables({ plan, receipt, lockfileBytes }) {
       },
       expectedHeadOid: plan.expectedHeadOid,
       message: {
-        headline: 'fix(eve): refresh isolated lockfile',
+        headline:
+          plan.kind === ROOT_KIND
+            ? 'fix(deps): refresh root lockfile'
+            : 'fix(eve): refresh isolated lockfile',
         body: `GitHub Actions safe remediation for PR #${plan.prNumber}.\n\nReceipt: ${REMEDIATION_CONTEXT}\nSource workflow run: ${plan.workflowRunId}`,
       },
       fileChanges: {
         additions: [
           {
-            path: TARGET_LOCKFILE_PATH,
+            path:
+              plan.kind === ROOT_KIND
+                ? ROOT_LOCKFILE_PATH
+                : TARGET_LOCKFILE_PATH,
             contents: lockfileBytes.toString('base64'),
           },
         ],
@@ -468,6 +746,90 @@ function appendOutput(name, value) {
   appendFileSync(output, `${name}=${value}\n`);
 }
 
+function writePlanOutputs(result) {
+  appendOutput('candidate', String(result.eligible));
+  if (!result.eligible) {
+    appendOutput('reason', result.reason);
+    return;
+  }
+  appendOutput('kind', result.plan.kind);
+  appendOutput('pr_number', String(result.plan.prNumber));
+  appendOutput('expected_head', result.plan.expectedHeadOid);
+  appendOutput(
+    'plan_b64',
+    Buffer.from(JSON.stringify(result.plan)).toString('base64')
+  );
+}
+
+/**
+ * pnpm.overrides is a deliberate pin. When Dependabot edits the lockfile's
+ * overrides block without the matching root package.json change, the lane
+ * refuses loudly instead of rewriting either side (PR #18247).
+ */
+function failOnConfigMismatch(result, prNumber) {
+  if (result.reason !== 'lockfile-config-mismatch') return;
+  const message = `PR #${prNumber}: ERR_PNPM_LOCKFILE_CONFIG_MISMATCH. The lockfile "overrides" block no longer matches root package.json pnpm.overrides. Overrides are deliberate pins, so safe remediation will not regenerate this lockfile; close the Dependabot PR or change pnpm.overrides in a reviewed PR.`;
+  console.error(`::error title=Dependabot overrides mismatch::${message}`);
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+  process.exitCode = 1;
+}
+
+async function fetchFailedJobLogs({ repository, workflowRun, token, accept }) {
+  const jobsResponse = await githubRequest(
+    `/repos/${repository}/actions/runs/${workflowRun.id}/jobs?filter=latest&per_page=100`,
+    { token }
+  );
+  const failedJobs = [];
+  for (const job of jobsResponse.jobs ?? []) {
+    if (job.conclusion !== 'failure' || !accept(job)) continue;
+    if (failedJobs.length >= MAX_ROOT_FAILED_JOB_LOGS) break;
+    const log = await githubRequest(
+      `/repos/${repository}/actions/jobs/${job.id}/logs`,
+      { token }
+    );
+    failedJobs.push({
+      id: job.id,
+      name: job.name,
+      conclusion: job.conclusion,
+      log: typeof log === 'string' ? log : '',
+    });
+  }
+  return failedJobs;
+}
+
+async function planRootCommand({ repository, workflowRun, pr, files, token }) {
+  const manifestPaths = files.filter(isManifestPath).sort();
+  const manifestEvidence = [];
+  if (manifestPaths.length <= MAX_ROOT_MANIFESTS) {
+    for (const path of manifestPaths) {
+      const [baseBytes, headBytes] = await Promise.all([
+        fetchRepositoryFile(repository, path, pr.base.sha, token),
+        fetchRepositoryFile(repository, path, workflowRun.head_sha, token),
+      ]);
+      manifestEvidence.push(
+        classifyDependencyManifestChange({ baseBytes, headBytes, path })
+      );
+    }
+  }
+  const failedJobs = await fetchFailedJobLogs({
+    repository,
+    workflowRun,
+    token,
+    accept: () => true,
+  });
+  const result = classifyRootLockDrift({
+    workflowRun,
+    pr,
+    files,
+    failedJobs,
+    repository,
+    manifestEvidence,
+  });
+  writePlanOutputs(result);
+  failOnConfigMismatch(result, pr.number);
+}
+
 async function planCommand() {
   const token = process.env.GH_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
@@ -485,12 +847,22 @@ async function planCommand() {
   const pr = await githubRequest(`/repos/${repository}/pulls/${prNumber}`, {
     token,
   });
+  // Cheap author gate first: the root lane observes every failed CI run.
+  if (
+    workflowRun.name === ROOT_WORKFLOW_NAME &&
+    pr?.user?.login !== 'dependabot[bot]'
+  ) {
+    writePlanOutputs({ eligible: false, reason: 'author-not-dependabot' });
+    return;
+  }
   const files = await fetchChangedFiles(repository, prNumber, token);
   if (!/^[0-9a-f]{40}$/.test(pr.base?.sha ?? '')) {
     appendOutput('candidate', 'false');
     appendOutput('reason', 'invalid-base');
     return;
   }
+  if (workflowRun.name === ROOT_WORKFLOW_NAME)
+    return planRootCommand({ repository, workflowRun, pr, files, token });
   const basePackageBytes = await fetchRepositoryFile(
     repository,
     TARGET_PACKAGE_PATH,
@@ -507,52 +879,28 @@ async function planCommand() {
     baseBytes: basePackageBytes,
     headBytes: headPackageBytes,
   });
-  const jobsResponse = await githubRequest(
-    `/repos/${repository}/actions/runs/${workflowRun.id}/jobs?filter=latest&per_page=100`,
-    { token }
-  );
-  const failedJobs = [];
-  for (const job of jobsResponse.jobs ?? []) {
-    if (
-      job.name !== 'Verify isolated Eve pilot' ||
-      job.conclusion !== 'failure'
-    )
-      continue;
-    const log = await githubRequest(
-      `/repos/${repository}/actions/jobs/${job.id}/logs`,
-      { token }
-    );
-    failedJobs.push({
-      id: job.id,
-      name: job.name,
-      conclusion: job.conclusion,
-      log,
-    });
-  }
-  const result = classifyEveLockDrift({
-    workflowRun,
-    pr,
-    files,
-    failedJobs,
+  const failedJobs = await fetchFailedJobLogs({
     repository,
-    manifestEvidence,
+    workflowRun,
+    token,
+    accept: job => job.name === 'Verify isolated Eve pilot',
   });
-  appendOutput('candidate', String(result.eligible));
-  if (!result.eligible) {
-    appendOutput('reason', result.reason);
-    return;
-  }
-  appendOutput('pr_number', String(result.plan.prNumber));
-  appendOutput('expected_head', result.plan.expectedHeadOid);
-  appendOutput(
-    'plan_b64',
-    Buffer.from(JSON.stringify(result.plan)).toString('base64')
+  writePlanOutputs(
+    classifyEveLockDrift({
+      workflowRun,
+      pr,
+      files,
+      failedJobs,
+      repository,
+      manifestEvidence,
+    })
   );
 }
 
 function receiptCommand(args) {
   const plan = JSON.parse(readFileSync(args.get('--plan'), 'utf8'));
-  const packageBytes = readFileSync(args.get('--package'));
+  const packageBytes =
+    plan?.kind === ROOT_KIND ? undefined : readFileSync(args.get('--package'));
   const lockfileBytes = readFileSync(args.get('--lockfile'));
   const receipt = buildRemediationReceipt({
     plan,
@@ -560,6 +908,76 @@ function receiptCommand(args) {
     lockfileBytes,
   });
   writeFileSync(args.get('--output'), `${JSON.stringify(receipt)}\n`);
+}
+
+async function validateFreshEvidence({
+  plan,
+  receipt,
+  args,
+  lockfileBytes,
+  token,
+  repository,
+  workflowRunId,
+}) {
+  const freshPr = await githubRequest(
+    `/repos/${plan.repository}/pulls/${plan.prNumber}`,
+    { token }
+  );
+  const freshFiles = await fetchChangedFiles(
+    plan.repository,
+    plan.prNumber,
+    token
+  );
+  if (plan.kind === ROOT_KIND) {
+    const freshManifests = [];
+    for (const entry of plan.manifestEvidence ?? []) {
+      const [baseBytes, headBytes] = await Promise.all([
+        fetchRepositoryFile(plan.repository, entry.path, plan.baseOid, token),
+        fetchRepositoryFile(
+          plan.repository,
+          entry.path,
+          plan.expectedHeadOid,
+          token
+        ),
+      ]);
+      freshManifests.push({ path: entry.path, baseBytes, headBytes });
+    }
+    return validateRootRemediationArtifact({
+      plan,
+      freshPr,
+      freshFiles,
+      receipt,
+      freshManifests,
+      lockfileBytes,
+      expectedRepository: repository,
+      expectedWorkflowRunId: workflowRunId,
+    });
+  }
+  const packageBytes = readFileSync(args.get('--package'));
+  const freshPackageBytes = await fetchRepositoryFile(
+    plan.repository,
+    TARGET_PACKAGE_PATH,
+    plan.expectedHeadOid,
+    token
+  );
+  const freshBasePackageBytes = await fetchRepositoryFile(
+    plan.repository,
+    TARGET_PACKAGE_PATH,
+    plan.baseOid,
+    token
+  );
+  return validateRemediationArtifact({
+    plan,
+    freshPr,
+    freshFiles,
+    receipt,
+    packageBytes,
+    freshBasePackageBytes,
+    freshPackageBytes,
+    lockfileBytes,
+    expectedRepository: repository,
+    expectedWorkflowRunId: workflowRunId,
+  });
 }
 
 async function commitCommand(args) {
@@ -575,40 +993,15 @@ async function commitCommand(args) {
     throw new Error('writer event has no workflow run id');
   const plan = JSON.parse(readFileSync(args.get('--plan'), 'utf8'));
   const receipt = JSON.parse(readFileSync(args.get('--receipt'), 'utf8'));
-  const packageBytes = readFileSync(args.get('--package'));
   const lockfileBytes = readFileSync(args.get('--lockfile'));
-  const freshPr = await githubRequest(
-    `/repos/${plan.repository}/pulls/${plan.prNumber}`,
-    { token }
-  );
-  const freshFiles = await fetchChangedFiles(
-    plan.repository,
-    plan.prNumber,
-    token
-  );
-  const freshPackageBytes = await fetchRepositoryFile(
-    plan.repository,
-    TARGET_PACKAGE_PATH,
-    plan.expectedHeadOid,
-    token
-  );
-  const freshBasePackageBytes = await fetchRepositoryFile(
-    plan.repository,
-    TARGET_PACKAGE_PATH,
-    plan.baseOid,
-    token
-  );
-  const validation = validateRemediationArtifact({
+  const validation = await validateFreshEvidence({
     plan,
-    freshPr,
-    freshFiles,
     receipt,
-    packageBytes,
-    freshBasePackageBytes,
-    freshPackageBytes,
+    args,
     lockfileBytes,
-    expectedRepository: repository,
-    expectedWorkflowRunId: workflowRunId,
+    token,
+    repository,
+    workflowRunId,
   });
   if (!validation.valid)
     throw new Error(`safe remediation refused: ${validation.reason}`);
@@ -644,7 +1037,9 @@ async function commitCommand(args) {
       state: 'success',
       context: REMEDIATION_CONTEXT,
       description:
-        'Exact-head Eve lockfile repaired and tested by GitHub Actions',
+        plan.kind === ROOT_KIND
+          ? 'Exact-head root lockfile repaired and verified by GitHub Actions'
+          : 'Exact-head Eve lockfile repaired and tested by GitHub Actions',
       target_url: targetUrl,
     },
   });
