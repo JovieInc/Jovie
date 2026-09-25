@@ -355,10 +355,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   let destination: URL;
   try {
-    const target = await resolveSummerEveCallerOrigin({
-      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
-      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
-    });
+    const target = await resolveSummerEveCallerOrigin();
     destination = new URL(EVE_BOTTLENECK_PATH, target.origin);
   } catch (error) {
     if (error instanceof SummerPinInvalidError) {

@@ -16,11 +16,12 @@ const workflow = readFileSync(
   'utf8'
 );
 
-describe('summer eve pin workflow', () => {
-  it('skips without the token, stays read-only, and pins actions', () => {
+describe('summer eve identity workflow', () => {
+  it('stays read-only, rejects deployment pins, and checks source-bound identity', () => {
     expect(workflow).toContain("cron: '*/30 * * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('pull_request:');
+    expect(workflow).not.toContain('paths:');
     expect(workflow).toContain(
       'controller-hop-exception: jovie-controller-hop/v1'
     );
@@ -28,11 +29,12 @@ describe('summer eve pin workflow', () => {
     expect(workflow).toContain('contents: read');
     expect(workflow).not.toContain('contents: write');
     expect(workflow).toContain(
-      '::notice::SUMMER_PIN_CHECK_VERCEL_TOKEN is absent; skipping the Summer Eve pin check.'
+      'node --test scripts/summer-deployment-pin-guard.test.mjs'
     );
-    expect(workflow).toContain('exit 0');
-    expect(workflow).toContain('skip=true');
-    expect(workflow).toContain("steps.token.outputs.skip != 'true'");
+    expect(workflow).toContain('pnpm check:summer-eve-pin');
+    expect(workflow).not.toContain('vercel env pull');
+    expect(workflow).not.toContain('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN');
+    expect(workflow).not.toContain('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID');
     const pkg = JSON.parse(
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
     ) as { scripts: Record<string, string> };

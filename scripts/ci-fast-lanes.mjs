@@ -8,10 +8,11 @@
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
  * browser admission job.
  *
- * Fail-fast: the first failed lane skips later lanes in the same group so
- * biome/typecheck red does not pay for structural Playwright. Skipped-later
- * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
- * historical run-every-lane report. Local callers may omit the selector to
+ * Fail-fast: the first failed lane skips the expensive structural lane so
+ * biome/typecheck red does not pay for structural Playwright. Cheap lanes
+ * always run so one CI cycle reports every cheap failure instead of hiding
+ * later lanes behind the first red one. Skipped lanes still emit a receipt.
+ * Set CI_FAST_FAIL_FAST=false to run structural even after a failure. Local callers may omit the selector to
  * retain the all-lanes default.
  *
  * Usage:
@@ -412,10 +413,88 @@ function repoLanes() {
   return cachedRepoLanes;
 }
 
+const GIT_FETCH_NOISE_LINE =
+  /^\s*(?:\* \[new (?:branch|tag)\]|[0-9a-f]+\.\.[0-9a-f]+\s)/u;
+const DIAGNOSTIC_LINE = /\b(?:ERROR|\w*Error|FAIL|FAILED|failed|expected)\b/u;
+const ANSI_ESCAPE = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`,
+  'gu'
+);
+
+/** Drop `git fetch` ref-update noise so excerpts keep the real failure. */
+export function stripGitFetchNoise(text) {
+  return (text || '')
+    .split('\n')
+    .filter(line => !GIT_FETCH_NOISE_LINE.test(line))
+    .join('\n');
+}
+
+/** Last few bounded, de-duplicated lines that look like a failure cause. */
+export function extractDiagnosticLines(text, { max = 5, width = 200 } = {}) {
+  const lines = [];
+  for (const raw of stripGitFetchNoise(text).split('\n')) {
+    const line = raw.replace(ANSI_ESCAPE, '').trim();
+    if (!line || !DIAGNOSTIC_LINE.test(line)) continue;
+    lines.push(line.length > width ? `${line.slice(0, width - 1)}…` : line);
+  }
+  return [...new Set(lines)].slice(-max);
+}
+
+/** Escape a workflow-command message per GitHub Actions rules. */
+export function escapeAnnotationMessage(text) {
+  return String(text ?? '')
+    .replaceAll('%', '%25')
+    .replaceAll('\r', '%0D')
+    .replaceAll('\n', '%0A');
+}
+
+/** Escape a workflow-command property value (e.g. `title=`). */
+export function escapeAnnotationProperty(text) {
+  return escapeAnnotationMessage(text)
+    .replaceAll(':', '%3A')
+    .replaceAll(',', '%2C');
+}
+
+function commandLabel(command, max = 80) {
+  const flat = String(command ?? '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
 function excerpt(text, max = 1200) {
-  const trimmed = (text || '').trim();
+  if (max <= 0) return '';
+  const trimmed = stripGitFetchNoise(text).trim();
   if (trimmed.length <= max) return trimmed;
   return `…${trimmed.slice(-max)}`;
+}
+
+/**
+ * Failure excerpt for a lane: diagnostic lines first, then the output tail.
+ * The structural lane already builds its own header in runStructural.
+ */
+export function laneFailureExcerpt(laneId, output) {
+  const text = output || '';
+  if (laneId === 'structural' && text.startsWith('Structural command ')) {
+    return excerpt(text);
+  }
+  const diagnostics = extractDiagnosticLines(text);
+  if (diagnostics.length === 0) return excerpt(text);
+  const header = ['Diagnostics:', ...diagnostics].join('\n');
+  return `${header}\n\n${excerpt(text, 1200 - header.length - 3)}`;
+}
+
+/** One-line, escaped `::error::` body (≤400 chars before escaping). */
+export function failureAnnotationMessage(lane, logExcerpt) {
+  if (!logExcerpt) return '';
+  const useHeader =
+    (lane.id === 'structural' &&
+      logExcerpt.startsWith('Structural command ')) ||
+    logExcerpt.startsWith('Diagnostics:\n');
+  const short = useHeader
+    ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
+    : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
+  return escapeAnnotationMessage(short);
 }
 
 /** Keep only registered pytest identities; assertion bodies are not diagnostic labels. */
@@ -438,9 +517,13 @@ function structuralFailureExcerpt(command, output, index, count, code) {
     identities.add(identity);
     if (identities.size === 3) break;
   }
+  // Registered pytest identities win; otherwise surface the likeliest cause
+  // (e.g. a coverage-threshold ERROR) instead of only the exit code.
+  const diagnostics = identities.size > 0 ? [] : extractDiagnosticLines(output);
   const header = [
-    `Structural command ${index + 1}/${count} failed (exit ${code}).`,
+    `Structural command ${index + 1}/${count} failed (exit ${code}). Command: ${commandLabel(command)}`,
     ...identities,
+    ...diagnostics,
   ].join('\n');
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
@@ -907,15 +990,12 @@ export function runStructural(opts = {}) {
 function annotateFailure(lane, logExcerpt) {
   // GitHub Actions annotation — visible on the PR Checks UI.
   const msg = `${lane.name} failed. Fix: ${lane.nextLocalCommand}`;
-  console.error(`::error title=${lane.name}::${msg}`);
-  if (logExcerpt) {
-    // Keep annotation body short; full log is in the step output.
-    const short =
-      lane.id === 'structural' && logExcerpt.startsWith('Structural command ')
-        ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
-        : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
-    console.error(`::error::${short}`);
-  }
+  console.error(
+    `::error title=${escapeAnnotationProperty(lane.name)}::${escapeAnnotationMessage(msg)}`
+  );
+  // Keep annotation body short; full log is in the step output.
+  const short = failureAnnotationMessage(lane, logExcerpt);
+  if (short) console.error(`::error::${short}`);
 }
 
 function writeSummary(results, groupId) {
@@ -977,6 +1057,9 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+/** Lanes worth skipping after an earlier failure; every other lane is cheap. */
+export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
+
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
@@ -1000,7 +1083,7 @@ function main() {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
 
-      if (failedFast) {
+      if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
         console.log(`[ci-fast] ${lane.id}: skipped`);
         console.log(logExcerpt);
@@ -1030,7 +1113,10 @@ function main() {
         : outcome.code === 0
           ? 'success'
           : 'failure';
-      const logExcerpt = excerpt(outcome.output);
+      const logExcerpt =
+        status === 'failure'
+          ? laneFailureExcerpt(lane.id, outcome.output)
+          : excerpt(outcome.output);
 
       if (status === 'failure') {
         annotateFailure(lane, logExcerpt);

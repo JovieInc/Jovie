@@ -18,11 +18,16 @@ const eventId = ovieSummerTurnId({
 
 function identity(deploymentId: string): Response {
   return Response.json({
+    schema: SUMMER_PRODUCTION.identitySchema,
     id: SUMMER_PRODUCTION.serviceId,
     projectId: SUMMER_PRODUCTION.projectId,
+    teamId: SUMMER_PRODUCTION.teamId,
     environment: 'production',
     deploymentId,
     blobAuth: 'oidc',
+    status: SUMMER_PRODUCTION.sourceBoundStatus,
+    sourceRevision: 'a'.repeat(40),
+    productionOrigin: SUMMER_PRODUCTION.productionOrigin,
   });
 }
 

@@ -1720,6 +1720,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'TURNSTILE_SECRET_KEY',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
     ];
 
     expect(dopplerIndex).toBeGreaterThanOrEqual(0);

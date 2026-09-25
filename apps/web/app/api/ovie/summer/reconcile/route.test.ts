@@ -150,7 +150,6 @@ describe('GET /api/ovie/summer/reconcile', () => {
     vi.clearAllMocks();
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', founderUserId);
-    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', currentDeploymentId);
     store = new MemoryOperatingStore();
     mocks.getOvieOperatingStore.mockReturnValue(store);
     mocks.getSessionContext.mockResolvedValue({
@@ -272,9 +271,10 @@ describe('GET /api/ovie/summer/reconcile', () => {
     vi.mocked(resolveSummerEveCallerOrigin).mockRejectedValueOnce(
       new SummerPinInvalidError(
         {
+          origin: 'https://summer.jov.ie',
           projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',
           environment: 'production',
-          deploymentId: null,
+          status: 'source-bound',
         },
         { status: 404 }
       )
