@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LANE_COMMANDS,
+  ROUTE_PREP_COVERAGE_COMMAND,
   runDesignConformance,
   runStructural,
 } from '../../ci-fast-lanes.mjs';
@@ -227,6 +228,20 @@ describe('runStructural screenshot contract discovery', () => {
       SCREENSHOT_CATALOG_COMMAND,
       STRUCTURAL_RUNNER_COVERAGE_COMMAND,
     ]);
+  });
+
+  it('runs route-prep behavior coverage for the operations structural lane', () => {
+    process.env.GITHUB_EVENT_NAME = 'merge_group';
+    process.env.CI_PRODUCT_LANES = 'operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
+
+    expect(runStructural({ execute }).code).toBe(0);
+    expect(
+      execute.mock.calls.some(
+        ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
+      )
+    ).toBe(true);
   });
 
   it('uses the default executor on the structural skip path', () => {

@@ -9,6 +9,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -351,6 +352,236 @@ with path.open("a+") as challenger:
         self.assertEqual(result.stdout.strip(), "codex-started")
         self.assertEqual(probe_calls.read_text().splitlines(), ["call"])
         self.assertEqual(guard_calls.read_text().splitlines(), ["call", "call"])
+
+    def age_capacity_state(self, seconds: int = 600) -> pathlib.Path:
+        state = pathlib.Path(self.environment_state)
+        stamp = time.time() - seconds
+        os.utime(state, (stamp, stamp))
+        return state
+
+    def install_route_prep_stubs(
+        self,
+        env: dict[str, str],
+        *,
+        probe_body: str,
+        require_fresh_state: bool = True,
+    ) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+        probe_calls = self.root / "probe-calls"
+        probe = self.executable("probe", probe_body)
+        key_seen = self.root / "auto-route-key"
+        state = env["CODEX_ACCOUNTS_STATE"]
+        freshness = (
+            "const age = Date.now() - statSync(process.env.CODEX_ACCOUNTS_STATE).mtimeMs;\n"
+            "if (!(age >= 0 && age <= 5 * 60 * 1000)) process.exit(78);\n"
+            if require_fresh_state
+            else ""
+        )
+        auto_route = pathlib.Path(env["SYMPHONY_AUTO_ROUTE"])
+        auto_route.write_text(
+            "#!/usr/bin/env node\n"
+            "import { writeFileSync, statSync } from 'node:fs';\n"
+            f"writeFileSync({json.dumps(str(key_seen))}, process.env.LINEAR_API_KEY || '');\n"
+            "if (!process.env.LINEAR_API_KEY) process.exit(78);\n"
+            + freshness
+            + "writeFileSync(process.env.SYMPHONY_WORKSPACE + '/.symphony-routing.json', JSON.stringify({\n"
+            "  schema: 'symphony-routing/v1',\n"
+            "  issue: 'JOV-5954',\n"
+            "  model: 'gpt-5.6-sol',\n"
+            "}) + '\\n');\n"
+            "process.stdout.write('ROUTE_ADMITTED schema=symphony-routing/v1 issue=JOV-5954 model=gpt-5.6-sol source=created-receipt\\n');\n"
+        )
+        env["SYMPHONY_CODEX_ACCOUNT_PROBE"] = str(probe)
+        env.pop("LINEAR_API_KEY", None)
+        return probe_calls, key_seen, pathlib.Path(state)
+
+    def test_new_issue_refreshes_stale_capacity_and_keeps_the_linear_key_out_of_the_agent(self) -> None:
+        guard = self.executable("guard", "exit 0\n")
+        env = self.environment(guard)
+        self.environment_state = env["CODEX_ACCOUNTS_STATE"]
+        state = self.age_capacity_state()
+        before = state.stat().st_mtime
+        probe_calls, key_seen, _state = self.install_route_prep_stubs(
+            env,
+            probe_body=(
+                'printf "%s\\n" "${CODEX_ACCOUNT_PROBE_MODE:-}" >> "$PROBE_CALLS"\n'
+                '[ "${CODEX_ACCOUNT_PROBE_MODE:-}" = "refresh-freshness" ]\n'
+                'python3 - "$CODEX_ACCOUNTS_STATE" <<\'PY\'\n'
+                "import pathlib, sys\n"
+                "path = pathlib.Path(sys.argv[1])\n"
+                "path.write_text(path.read_text())\n"
+                "PY\n"
+            ),
+        )
+        env["PROBE_CALLS"] = str(probe_calls)
+        config = self.workspace / "scripts/symphony/config"
+        config.mkdir(parents=True)
+        shutil.copyfile(
+            ROOT / "scripts/symphony/config/model-registry.json",
+            config / "model-registry.json",
+        )
+        key_file = self.root / "agent-saw-key"
+        rotate = self.root / "rotate"
+        rotate.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, pathlib\n"
+            f"pathlib.Path({json.dumps(str(key_file))}).write_text('yes' if os.environ.get('LINEAR_API_KEY') else 'no')\n"
+            "print('codex-started')\n"
+        )
+        rotate.chmod(0o755)
+        exhausted = self.root / "exhausted.py"
+        exhausted.write_text(
+            'import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n'
+        )
+        env.update({
+            "SYMPHONY_CODEX_ROUTER": str(ROOT / "scripts/symphony/symphony-codex-router"),
+            "SYMPHONY_CODEX_EXHAUSTED": str(exhausted),
+            "SYMPHONY_CODEX_ROTATE": str(rotate),
+        })
+        result = subprocess.run(
+            [str(ROUTER), "app-server"],
+            cwd=self.workspace,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "codex-started")
+        self.assertNotIn("ROUTE_ADMITTED", result.stdout)
+        self.assertIn(
+            "ROUTE_ADMITTED schema=symphony-routing/v1 issue=JOV-5954 model=gpt-5.6-sol source=created-receipt",
+            result.stderr,
+        )
+        self.assertNotIn("test-only", result.stdout + result.stderr)
+        self.assertEqual(probe_calls.read_text().splitlines(), ["refresh-freshness"])
+        self.assertGreater(state.stat().st_mtime, before)
+        self.assertEqual(key_seen.read_text(), "test-only")
+        self.assertEqual(key_file.read_text(), "no")
+
+    def test_stale_capacity_refresh_failure_does_not_launch_or_rewrite_state(self) -> None:
+        calls = self.root / "auto-route-called"
+        guard = self.executable("guard", "exit 0\n")
+        env = self.environment(guard)
+        self.environment_state = env["CODEX_ACCOUNTS_STATE"]
+        state = self.age_capacity_state()
+        before = state.read_bytes()
+        probe_calls = self.root / "probe-calls"
+        probe = self.executable(
+            "probe",
+            f'printf "%s\\n" "${{CODEX_ACCOUNT_PROBE_MODE:-}}" >> "{probe_calls}"\nexit 75\n',
+        )
+        auto_route = pathlib.Path(env["SYMPHONY_AUTO_ROUTE"])
+        auto_route.write_text(
+            "#!/usr/bin/env node\n"
+            "import { writeFileSync } from 'node:fs';\n"
+            f"writeFileSync({json.dumps(str(calls))}, 'called');\n"
+            "process.exit(0);\n"
+        )
+        env["SYMPHONY_CODEX_ACCOUNT_PROBE"] = str(probe)
+        env.pop("LINEAR_API_KEY", None)
+        result = subprocess.run(
+            [str(ROUTER), "app-server"],
+            cwd=self.workspace,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertEqual(result.stderr.strip(), (
+            "codex-rotate: CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 "
+            "class=provider-capacity retryable=true reason=app_server_capacity_unavailable "
+            "retryAt=unknown waitSeconds=unknown"
+        ))
+        self.assertEqual(probe_calls.read_text().splitlines(), ["refresh-freshness"])
+        self.assertFalse(calls.exists())
+        self.assertEqual(state.read_bytes(), before)
+        self.assertFalse((self.workspace / ".symphony-routing.json").exists())
+        self.assertNotIn("test-only", result.stdout + result.stderr)
+
+    def test_missing_linear_key_fails_closed_before_a_capacity_refresh(self) -> None:
+        guard = self.executable("guard", "exit 0\n")
+        for label, contents in (("missing", None), ("empty", "LINEAR_API_KEY=\n")):
+            with self.subTest(label=label):
+                accounts = self.home / ".codex-accounts"
+                if accounts.exists():
+                    shutil.rmtree(accounts)
+                env = self.environment(guard)
+                self.environment_state = env["CODEX_ACCOUNTS_STATE"]
+                self.age_capacity_state()
+                probe_calls = self.root / f"probe-calls-{label}"
+                probe = self.executable(
+                    f"probe-{label}",
+                    f'printf "called\\n" >> "{probe_calls}"\nexit 0\n',
+                )
+                calls = self.root / f"auto-route-{label}"
+                auto_route = pathlib.Path(env["SYMPHONY_AUTO_ROUTE"])
+                auto_route.write_text(
+                    "#!/usr/bin/env node\n"
+                    "import { writeFileSync } from 'node:fs';\n"
+                    f"writeFileSync({json.dumps(str(calls))}, 'called');\n"
+                )
+                env["SYMPHONY_CODEX_ACCOUNT_PROBE"] = str(probe)
+                env.pop("LINEAR_API_KEY", None)
+                linear_env = self.home / ".config/symphony/linear.env"
+                if contents is None:
+                    linear_env.unlink()
+                else:
+                    linear_env.write_text(contents)
+                result = subprocess.run(
+                    [str(ROUTER), "app-server"],
+                    cwd=self.workspace,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    timeout=10,
+                )
+                self.assertEqual(result.returncode, 75, result.stderr)
+                self.assertFalse(probe_calls.exists())
+                self.assertFalse(calls.exists())
+                self.assertNotIn("test-only", result.stdout + result.stderr)
+
+    def test_fresh_capacity_skips_refresh_for_a_new_issue(self) -> None:
+        guard = self.executable("guard", "exit 0\n")
+        env = self.environment(guard)
+        self.environment_state = env["CODEX_ACCOUNTS_STATE"]
+        probe_calls, key_seen, _state = self.install_route_prep_stubs(env, probe_body="exit 75\n")
+        codex = self.executable("capture", 'printf "codex-started\\n"\n')
+        env["SYMPHONY_CODEX_ROUTER"] = str(codex)
+        result = subprocess.run(
+            [str(ROUTER), "app-server"],
+            cwd=self.workspace,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "codex-started")
+        self.assertIn("ROUTE_ADMITTED schema=symphony-routing/v1", result.stderr)
+        self.assertFalse(probe_calls.exists())
+        self.assertEqual(key_seen.read_text(), "test-only")
+
+    def test_saved_route_does_not_refresh_stale_capacity(self) -> None:
+        guard = self.executable("guard", "exit 0\n")
+        probe_calls = self.root / "probe-calls"
+        probe = self.executable("probe", f'printf "called\\n" >> "{probe_calls}"\n')
+        env = self.environment(guard, probe=probe)
+        self.environment_state = env["CODEX_ACCOUNTS_STATE"]
+        self.age_capacity_state()
+        self.write_route()
+        env.pop("LINEAR_API_KEY", None)
+        result = subprocess.run(
+            [str(ROUTER), "app-server"],
+            cwd=self.workspace,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "codex-started")
+        self.assertFalse(probe_calls.exists())
 
     def test_ready_codex_does_not_spend_a_recovery_probe(self) -> None:
         guard = self.executable("guard", "exit 0\n")
