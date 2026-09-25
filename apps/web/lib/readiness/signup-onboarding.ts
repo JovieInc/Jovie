@@ -114,9 +114,9 @@ export function formatSignupOnboardingReadinessReport(
 
   if (result.required.length === 0) {
     lines.push(
-      '[signup-readiness] local target: no production signup keys required'
+      '[signup-readiness] local target: no production signup keys required',
+      '[signup-readiness] status=passed'
     );
-    lines.push('[signup-readiness] status=passed');
     return lines.join('\n');
   }
 
