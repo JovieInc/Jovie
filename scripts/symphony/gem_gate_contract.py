@@ -8,6 +8,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from closure_health import issue_intake_allowed
+
 
 SCHEMA = "jovie-fleet-gate/v1"
 INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
@@ -253,8 +255,6 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     closure_signal_allowed = closure_signal.get("newIssueIntakeAllowed")
     if not isinstance(closure_signal_allowed, bool):
         raise GateContractError("closure health intake signal must be boolean")
-    if closure_signal_allowed is not (closure_status == "healthy"):
-        raise GateContractError("closure health status contradicts intake signal")
     if closure_signal.get("promotionContinues") is not True:
         raise GateContractError("closure health signal must preserve promotion")
     if closure_signal.get("remediationContinues") is not True:
@@ -264,6 +264,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         isinstance(reason, str) for reason in closure_reasons
     ):
         raise GateContractError("closure health reasons are malformed")
+    if closure_signal_allowed is not issue_intake_allowed(closure_status, closure_reasons):
+        raise GateContractError("closure health status contradicts intake signal")
     if not isinstance(closure_admission, dict):
         raise GateContractError("closure admission is missing")
     closure_allowed = closure_admission.get("newIssueIntakeAllowed")
