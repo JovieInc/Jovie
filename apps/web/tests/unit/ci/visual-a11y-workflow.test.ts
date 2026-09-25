@@ -139,10 +139,18 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const mergeReadyJob = getJobBlock(workflow, 'ci-merge-group-ready');
     const buildLayoutJob = getJobBlock(workflow, 'ci-build-layout');
 
-    expect(prReadyJob).not.toMatch(/ci-a11y|ci-layout-guard|ci-build-layout/);
+    expect(prReadyJob).not.toMatch(
+      /ci-a11y|ci-layout-guard|ci-build-layout|ci-build-ovie|ci-storybook-surfaces/
+    );
     expect(mergeReadyJob).toContain('ci-build-layout');
     expect(mergeReadyJob).toContain(
       'BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"'
+    );
+    expect(mergeReadyJob).toContain(
+      'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(mergeReadyJob).toContain(
+      'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
     );
     expect(buildLayoutJob).toContain('runs-on: ubuntu-latest');
     expect(buildLayoutJob).toContain('Build exact combined head');

@@ -2,13 +2,14 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
+  globSync,
   mkdtempSync,
   readFileSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
@@ -16,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const repoRequire = createRequire(resolve(repoRoot, 'package.json'));
+const appWebRoot = resolve(repoRoot, 'apps/web');
 const vercelRequire = createRequire(repoRequire.resolve('vercel/package.json'));
 const buildUtilsEntry = vercelRequire.resolve('@vercel/build-utils');
 const buildUtilsRequire = createRequire(buildUtilsEntry);
@@ -35,7 +37,13 @@ type VercelConfig = {
 
 type NextConfigForTest = {
   outputFileTracingIncludes?: Record<string, string[]>;
+  outputFileTracingExcludes?: Record<string, string[]>;
 };
+
+type Picomatch = (
+  glob: string | string[],
+  options: { dot: boolean; contains: boolean }
+) => (input: string) => boolean;
 
 function readVercelConfig(relativePath: string): VercelConfig {
   const configPath = resolve(repoRoot, relativePath);
@@ -88,14 +96,51 @@ function loadNextConfigForTracingTest(): NextConfigForTest {
     { filename: configPath }
   );
 
-  const includes = configModule.exports.outputFileTracingIncludes;
-  return {
-    outputFileTracingIncludes: includes
+  const copyRouteGlobs = (globs?: Record<string, string[]>) =>
+    globs
       ? Object.fromEntries(
-          Object.entries(includes).map(([route, paths]) => [route, [...paths]])
+          Object.entries(globs).map(([route, paths]) => [route, [...paths]])
         )
-      : undefined,
+      : undefined;
+  return {
+    outputFileTracingIncludes: copyRouteGlobs(
+      configModule.exports.outputFileTracingIncludes
+    ),
+    outputFileTracingExcludes: copyRouteGlobs(
+      configModule.exports.outputFileTracingExcludes
+    ),
   };
+}
+
+// Models turbo-tasks-fs globset.rs for the glob subset trace excludes use,
+// after next-core relativize_glob strips `../` against the app dir.
+function turbopackGlobSource(exclude: string): string {
+  let root = 'apps/web';
+  let glob = exclude;
+  while (glob.startsWith('../') || glob.startsWith('./')) {
+    if (glob.startsWith('../')) {
+      root = root.includes('/') ? dirname(root) : '';
+      glob = glob.slice(3);
+    } else {
+      glob = glob.slice(2);
+    }
+  }
+  const pattern = root ? `${root}/${glob}` : glob;
+  // Turbopack has no extglobs: `!(x)` would silently match nothing.
+  if (/[{}?\\()]/.test(pattern)) {
+    throw new Error(
+      `Trace exclude outside the modeled glob subset: ${pattern}`
+    );
+  }
+  return pattern
+    .split(/(\*\*|\*|\[!?[^\]]+\])/)
+    .map(token => {
+      if (token === '**') return '.*';
+      if (token === '*') return '[^/]*';
+      if (token.startsWith('[')) return token.replace('[!', '[^');
+      return token.replace(/[.+^$|[\]]/g, '\\$&');
+    })
+    .join('');
 }
 
 describe('Vercel function config', () => {
@@ -267,6 +312,83 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+  });
+
+  it('excludes non-runtime repo files from traces without dropping runtime reads', () => {
+    const nextConfig = loadNextConfigForTracingTest();
+    const excludesByRoute = nextConfig.outputFileTracingExcludes ?? {};
+    // '**' is the only route glob that also matches the root route '/'.
+    expect(Object.keys(excludesByRoute)).toEqual(['**']);
+    const excludes = excludesByRoute['**'] ?? [];
+    expect(excludes).toEqual(
+      expect.arrayContaining(['tests/[^q]*', 'tests/*/**', 'drizzle/**'])
+    );
+
+    // `next build --turbopack` filters traced modules in Rust (next-api nft.rs):
+    // excludes are relativized to the repo root and matched unanchored against
+    // repo-relative paths. Webpack builds use collect-build-traces.js instead:
+    // excludes joined to the app dir, matched with picomatch.
+    const turbopackExclude = new RegExp(
+      excludes.map(turbopackGlobSource).join('|')
+    );
+    const picomatch = createRequire(resolve(appWebRoot, 'package.json'))(
+      'next/dist/compiled/picomatch'
+    ) as Picomatch;
+    const webpackExclude = picomatch(
+      excludes.map(exclude => resolve(appWebRoot, exclude)),
+      { dot: true, contains: true }
+    );
+    const excludedBy = (repoPath: string) => ({
+      turbopack: turbopackExclude.test(repoPath),
+      webpack: webpackExclude(resolve(repoRoot, repoPath)),
+    });
+
+    const includedRuntimeFiles = Object.values(
+      nextConfig.outputFileTracingIncludes ?? {}
+    )
+      .flat()
+      .flatMap(include => globSync(include, { cwd: appWebRoot }))
+      .map(file => relative(repoRoot, resolve(appWebRoot, file)));
+    expect(includedRuntimeFiles).toEqual(
+      expect.arrayContaining([
+        'CHANGELOG.md',
+        'docs/FEATURE_REGISTRY.md',
+        'apps/web/tests/quarantine.json',
+        'apps/web/screenshot-catalog/current/manifest.json',
+      ])
+    );
+
+    // Include-listed files plus other files request-time code reads.
+    const runtimeReads = [
+      ...includedRuntimeFiles,
+      'apps/web/lib/seo/ratchet-baseline.json',
+      'apps/web/lib/eval/holdout.json',
+      'apps/web/public/fonts/Inter-Latin.woff2',
+      'apps/web/public/brand/Jovie-Wordmark-Cream.svg',
+      'apps/web/lib/testing/quarantine-ledger.server.ts',
+      'node_modules/.pnpm/node_modules/drizzle-orm/index.js',
+    ];
+    for (const runtimePath of runtimeReads) {
+      expect(excludedBy(runtimePath), runtimePath).toEqual({
+        turbopack: false,
+        webpack: false,
+      });
+    }
+
+    const tracedNoise = [
+      'apps/web/tests/e2e/__snapshots__/auth-visual.spec.ts/signin-page-desktop.png',
+      'apps/web/tests/unit/design-system/raw-button.baseline.json',
+      'apps/web/tests/critical-component-map.json',
+      'apps/web/drizzle/migrations/meta/0000_snapshot.json',
+      'apps/web/reports/test-coverage-snapshot.json',
+      'apps/web/eslint-rules/shadcn-no-restyle.options.json',
+    ];
+    for (const noisePath of tracedNoise) {
+      expect(excludedBy(noisePath), noisePath).toEqual({
+        turbopack: true,
+        webpack: true,
+      });
+    }
   });
 
   it('opts whole-project filesystem readers out of Turbopack tracing', () => {

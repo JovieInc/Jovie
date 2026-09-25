@@ -25,6 +25,7 @@ import {
   LANE_GROUPS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
+  OFFLINE_FAILURE_COVERAGE_COMMAND,
   selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
@@ -456,6 +457,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'biome',
       'design-conformance',
       'design-exception-registry',
+      'design-governance-enforcement',
       'design-system-source-ratchet',
       'eslint-server-boundaries',
       'guardrails',
@@ -803,6 +805,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'guardrails',
       'design-system-source-ratchet',
       'design-exception-registry',
+      'design-governance-enforcement',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -832,9 +835,11 @@ describe('ci-fast bounded parallel workflow', () => {
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
+      'design-governance-enforcement':
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
@@ -845,7 +850,9 @@ describe('ci-fast bounded parallel workflow', () => {
         ' && ' +
         ACQUISITION_CERTIFICATION_COMMAND +
         ' && ' +
-        DESKTOP_RELEASE_COVERAGE_COMMAND,
+        DESKTOP_RELEASE_COVERAGE_COMMAND +
+        ' && ' +
+        OFFLINE_FAILURE_COVERAGE_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -1427,7 +1434,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('fail-fast skips later remaining lanes after the first failure', () => {
+  it('fail-fast runs every cheap lane but skips structural after a failure', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-fail-fast-'));
     const outPath = join(repo, 'ci-fast-lanes.json');
     try {
@@ -1441,7 +1448,7 @@ describe('ci-fast bounded parallel workflow', () => {
             ...process.env,
             CI_FAST_LANE_GROUP: 'remaining',
             CI_FAST_LANES_OUT: outPath,
-            CI_FAST_SKIP_STRUCTURAL: 'true',
+            CI_FAST_SKIP_STRUCTURAL: 'false',
             CI_FAST_ONLY_STRUCTURAL: 'false',
             PATH: repo,
           },
@@ -1450,14 +1457,15 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(result.status).not.toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       const failed = payload.lanes.filter(lane => lane.status === 'failure');
-      const skipped = payload.lanes.filter(
+      const skippedByFailFast = payload.lanes.filter(
         lane =>
           lane.status === 'skipped' &&
           String(lane.logExcerpt).includes('fail-fast')
       );
-      expect(failed.length).toBe(1);
-      expect(skipped.length).toBeGreaterThan(0);
-      expect(payload.lanes.at(-1).status).toBe('skipped');
+      // Every cheap lane reports in one cycle; only structural is spared.
+      expect(failed.length).toBeGreaterThan(1);
+      expect(skippedByFailFast.map(lane => lane.id)).toEqual(['structural']);
+      expect(payload.lanes.at(-1).id).toBe('structural');
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -1526,6 +1534,17 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_COMMANDS['profile-admission']).toContain(
       'tests/unit/profile/ProfileHomeRail.test.tsx'
     );
+    for (const testFile of [
+      'components/features/profile/templates/PublicProfileLayoutShell.test.tsx',
+      'components/features/profile/templates/ProfileDesktopSurface.test.tsx',
+      'tests/unit/profile/profile-compact-template.test.tsx',
+    ]) {
+      expect(LANE_COMMANDS['profile-admission']).toContain(testFile);
+    }
+    expect(LANE_COMMANDS['profile-admission']).toContain('--coverage');
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx'
+    );
     expect(CI_FAST_SOURCE).toContain(
       ':(glob)apps/web/app/\\\\[username\\\\]/**'
     );
@@ -1535,6 +1554,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toContain('tests/e2e/profile-admission.spec.ts');
     expect(browser).toContain('--config=playwright.config.noauth.ts');
     expect(browser).toContain('--project=chromium');
+    expect(browser).toContain(
+      'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts'
+    );
+    expect(browser).toContain(
+      'apps/web/tests/e2e/utils/profile-admission-diagnostics.test.mjs'
+    );
     expect(browser).toMatch(/github\.event_name.*merge_group/);
     expect(browser).toMatch(/github\.event_name.*pull_request/);
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
@@ -2061,4 +2086,47 @@ describe('CI diff selection on a divergent PR', () => {
       rmSync(repository, { recursive: true, force: true });
     }
   });
+});
+
+it('selects and enforces offline failure behavior coverage for module-only and test-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  expect(pattern).toBeDefined();
+  for (const path of [
+    'scripts/lib/rolling-ci-failure-disposition.mjs',
+    'scripts/lib/__tests__/rolling-ci-failure-disposition.test.mjs',
+  ]) {
+    expect(
+      spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status,
+      path
+    ).toBe(0);
+  }
+  expect(
+    spawnSync('grep', ['-qE', pattern], {
+      input: 'scripts/lib/rolling-ci-failure-disposition.mjs.unrelated\n',
+    }).status
+  ).toBe(1);
+  expect(LANE_COMMANDS.structural).toContain(OFFLINE_FAILURE_COVERAGE_COMMAND);
+  expect(
+    CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const operationsParts = ['),
+      CI_FAST_SOURCE.indexOf('const webParts = [')
+    )
+  ).toContain('OFFLINE_FAILURE_COVERAGE_COMMAND');
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    'lib/__tests__/rolling-ci-failure-disposition.test.mjs'
+  );
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    '--coverage.include="$PWD/scripts/lib/rolling-ci-failure-disposition.mjs"'
+  );
+  for (const metric of [
+    'lines=100',
+    'statements=100',
+    'functions=100',
+    'branches=95',
+    'perFile=true',
+  ]) {
+    expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+      `--coverage.thresholds.${metric}`
+    );
+  }
 });

@@ -748,7 +748,11 @@ describe('ProfileCompactTemplate', () => {
     expect(surfaceSlot).toHaveClass('relative', 'min-h-0', 'flex-1');
   });
 
-  it('does not bleed the content scroll region outside home mode', async () => {
+  // Regression: JOV-6573 — Music uses the same padding-box clip as home.
+  // A fixed inset leaves the release rows under the side padding, and
+  // overflow-y-auto computes overflow-x to auto, so a vertical drag pans
+  // sideways. The Music scrollport bleeds to the shell edge and locks x.
+  it('bleeds the Music scroll region to the shell edge and locks horizontal panning', async () => {
     render(
       <ProfileCompactTemplate
         mode='listen'
@@ -759,7 +763,27 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const scrollRegion = screen.getByTestId('profile-content-scroll');
+    expect(scrollRegion.className).toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).toContain('px-(--page-pad)');
+    expect(scrollRegion.className).toContain('overflow-x-clip');
+    expect(scrollRegion.className).toContain('touch-pan-y');
+    expect(scrollRegion.className).toContain('overflow-y-auto');
+    expect(scrollRegion.className).toContain('min-w-0');
+  });
+
+  it('does not bleed the content scroll region on non-music modes', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const scrollRegion = screen.getByTestId('profile-content-scroll');
     expect(scrollRegion.className).not.toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).not.toContain('overflow-x-clip');
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {

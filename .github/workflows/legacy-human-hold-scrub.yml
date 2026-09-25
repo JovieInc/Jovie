@@ -1,4 +1,5 @@
 name: Legacy Human Hold Scrub
+# clock-class: temporal-resource
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Trusted base workflow removes retired PR control labels without checking out or executing candidate code.

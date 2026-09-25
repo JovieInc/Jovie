@@ -352,7 +352,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('timeout-minutes: 8');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
@@ -396,8 +396,16 @@ describe('merge_group workflow contract', () => {
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeLessThan(120_000);
+    // A still-running required check must be able to finish: the helper
+    // polls for minutes, and the job timeout leaves >=90s for setup so the
+    // helper's pending diagnostic (not a hard cancel) is the failure mode.
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThanOrEqual(300_000);
+    const admissionTimeoutMinutes = Number(
+      admission.match(/timeout-minutes:\s*(\d+)/)?.[1]
+    );
+    expect(
+      admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_WAIT_MS
+    ).toBeGreaterThanOrEqual(90_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -430,9 +438,12 @@ describe('merge_group workflow contract', () => {
     for (const jobId of [
       'ci-unit-tests',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
       'ci-cross-product-integration',
+      'ci-product-lane-receipt',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -470,10 +481,15 @@ describe('merge_group workflow contract', () => {
     expect(units).toMatch(
       /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toMatch(
-      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
-    );
+    for (const jobId of [
+      'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId), jobId).toMatch(
+        /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
+      );
+    }
 
     for (const jobId of [
       'ci-unit-runner-route',
@@ -489,7 +505,8 @@ describe('merge_group workflow contract', () => {
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
-    const build = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     const ovieTests = units.slice(
       units.indexOf(
         '      - name: Run Ovie route and private-boundary coverage'
@@ -500,9 +517,16 @@ describe('merge_group workflow contract', () => {
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
-      build.indexOf('      - name: Build independent Ovie app'),
-      build.indexOf('      - name: Build exact combined head')
+      build.indexOf('      - name: Build independent Ovie app')
     );
+    expect(build).toContain('name: Ovie Build (combined)');
+    expect(build).not.toContain('fetch-depth: 0');
+    expect(build).not.toContain('setup-playwright');
+    // The absent-app guard is preserved on both the setup and build steps.
+    expect(
+      build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
+    ).toHaveLength(2);
+    expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
@@ -546,6 +570,8 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
+    expect(aggregate).toContain('ci-build-ovie');
+    expect(aggregate).toContain('ci-storybook-surfaces');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
     expect(aggregate).toContain('ci-cross-product-integration');
@@ -568,6 +594,12 @@ describe('merge_group workflow contract', () => {
       'Merge-group admission succeeded without a valid admitted/obsolete disposition'
     );
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
+    expect(aggregate).toContain(
+      'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
+    );
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
     expect(aggregate).toContain(
@@ -636,6 +668,8 @@ describe('merge_group workflow contract', () => {
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
       'ci-cross-product-integration',
@@ -779,6 +813,35 @@ describe('merge_group workflow contract', () => {
     );
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).not.toContain('timeout-minutes: 60');
+  });
+
+  it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
+    for (const jobId of [
+      'ci-fast-remaining',
+      'ci-profile-admission-browser',
+      'ci-exact-head-coverage',
+    ]) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      // fetch-depth: 0 fetches every branch and tag; diff bases only need
+      // HEAD's full ancestry plus origin/<base>.
+      expect(job, jobId).not.toContain('fetch-depth: 0');
+      expect(job, jobId).toContain('fetch-depth: 1');
+      expect(job, jobId).toContain('persist-credentials: false');
+      expect(job, jobId).not.toContain('filter: blob:none');
+      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      expect(fetchScript, jobId).toContain(
+        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+      );
+      expect(job, jobId).toContain(
+        "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
+      );
+      expect(
+        job.indexOf('name: Fetch base-branch history'),
+        jobId
+      ).toBeLessThan(
+        job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
+      );
+    }
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
@@ -1106,16 +1169,19 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0
-unselected Web rejects unit execution|false|success|skipped|false|skipped|1
-unselected Web rejects build execution|false|skipped|success|false|skipped|1
-healthy Web passes with iOS skipped|true|success|success|false|skipped|0
-selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1
-selected Web rejects failed unit shard|true|failure|success|false|skipped|1
-selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1
-deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1`;
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped
+unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped
+unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success
+selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success
+selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped`;
     for (const testCase of cases.split('\n')) {
-      const [name, web, unit, build, runIos, iosResult, status] =
+      const [name, web, unit, build, runIos, iosResult, status, ovie, story] =
         testCase.split('|');
       const result = spawnSync(
         'bash',
@@ -1128,6 +1194,8 @@ UNIT_RESULT="$2"
 BUILD_LAYOUT_RESULT="$3"
 RUN_IOS="$4"
 IOS_RESULT="$5"
+OVIE_BUILD_RESULT="$6"
+STORYBOOK_SURFACES_RESULT="$7"
 RUN_MACOS=false
 MACOS_RESULT=skipped
 RUN_CROSS_PRODUCT=false
@@ -1139,6 +1207,8 @@ ${selectedGateScript}`,
           build,
           runIos,
           iosResult,
+          ovie,
+          story,
         ],
         { encoding: 'utf8' }
       );
@@ -1296,7 +1366,7 @@ ${selectedGateScript}`,
   });
 
   it('fails closed unless every changed component renders in live Storybook on the exact merge-group diff', () => {
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-storybook-surfaces');
     const certification = buildLayout.indexOf(
       'node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"'
     );
@@ -1970,6 +2040,8 @@ ${selectedGateScript}`,
       'ci-risk-classifier',
       'ci-fast',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
       'ci-promptfoo-evals',

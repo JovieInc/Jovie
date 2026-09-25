@@ -4,14 +4,29 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+  extractDiagnosticLines,
+  failureAnnotationMessage,
   LANE_COMMANDS,
+  laneFailureExcerpt,
   ROUTE_PREP_COVERAGE_COMMAND,
   runDesignConformance,
   runStructural,
+  stripGitFetchNoise,
+  webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
-const SCREENSHOT_CATALOG_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
+  resolve(
+    import.meta.dirname,
+    '..',
+    '..',
+    '..',
+    'apps/web/tests/quarantine.json'
+  )
+);
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
@@ -144,6 +159,30 @@ describe('runStructural screenshot contract discovery', () => {
     vi.clearAllMocks();
   });
 
+  it('never runs a tests/unit/ci file in two structural commands', () => {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    process.env.CI_PRODUCT_LANES = 'web,operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+    runStructural({ execute });
+    const commands = execute.mock.calls.map(([command]) => String(command));
+    const directoryRuns = commands.filter(command =>
+      /vitest\.config\.mts tests\/unit\/ci( |$)/.test(command)
+    );
+    expect(directoryRuns).toHaveLength(1);
+    const explicitCiFiles = commands
+      .filter(command => command !== directoryRuns[0])
+      .flatMap(
+        command => command.match(/tests\/unit\/ci\/[\w.-]+\.test\.ts/g) ?? []
+      );
+    expect(explicitCiFiles.length).toBeGreaterThan(0);
+    // Anything named explicitly elsewhere must be excluded from the directory
+    // run, or it executes twice (Sentry on #18344).
+    for (const file of explicitCiFiles) {
+      expect(directoryRuns[0]).toContain(`--exclude=${file}`);
+    }
+  });
+
   it.each([
     ['web', true],
     ['operations', true],
@@ -161,13 +200,13 @@ describe('runStructural screenshot contract discovery', () => {
 
       const result = runStructural({ execute });
       const screenshotCalls = execute.mock.calls.filter(
-        ([command]) => command === SCREENSHOT_CATALOG_COMMAND
+        ([command]) => command === WEB_CI_CONTRACT_TESTS_COMMAND
       );
 
       expect(result.code).toBe(0);
       expect(screenshotCalls).toHaveLength(expected ? 1 : 0);
       if (expected) {
-        expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
+        expect(execute.mock.calls[0][0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
         expect(execute.mock.calls[1][0]).toBe(
           STRUCTURAL_RUNNER_COVERAGE_COMMAND
         );
@@ -175,6 +214,31 @@ describe('runStructural screenshot contract discovery', () => {
         expect(result.skipped).toBe(true);
         expect(execute).not.toHaveBeenCalled();
       }
+    }
+  );
+
+  it.each([
+    ['web', 1],
+    ['operations', 1],
+    ['web,operations', 1],
+    ['ios', 0],
+  ])(
+    'runs the quarantined deploy contract by name once for lanes %s',
+    (lanes, expected) => {
+      // #18339 landed a red deploy contract through an operations-only diff:
+      // the directory run excludes quarantined files and the by-name run was
+      // web-only.
+      process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+      runStructural({ execute });
+      const byName = execute.mock.calls.filter(([command]) =>
+        String(command).endsWith('tests/unit/ci/deploy-workflow.test.ts')
+      );
+      expect(byName).toHaveLength(expected);
     }
   );
 
@@ -191,8 +255,37 @@ describe('runStructural screenshot contract discovery', () => {
 
     expect(result.code).toBe(0);
     expect(result.skipped).toBeUndefined();
-    expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
+    expect(execute.mock.calls[0][0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
   });
+
+  // #18222 changed only pr-size-guard.yml: classified operations-only, the web
+  // Unit Tests shards skipped, and main went red on apps/web/tests/unit/ci.
+  it.each([
+    '.github/workflows/pr-size-guard.yml',
+    '.github/workflows/ci.yml',
+    '.github/actions/setup-doppler/action.yml',
+    '.github/scripts/production-marker-state.mjs',
+    'scripts/ci/neon-orphan-reaper.mjs',
+    'config/node-runtime-policy.json',
+  ])(
+    'runs every apps/web/tests/unit/ci contract when only %s changes in a merge group',
+    path => {
+      const receipt = classifyProductLanes([path]);
+      expect(receipt.selectedLanes).toEqual(['operations']);
+      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      process.env.CI_PRODUCT_LANES = receipt.selectedLanes.join(',');
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+
+      const result = runStructural({ changedFileList: [path], execute });
+
+      expect(result.code).toBe(0);
+      expect(result.skipped).toBeUndefined();
+      expect(execute.mock.calls[0][0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
+    }
+  );
 
   it('stops before later structural commands when the screenshot contract fails', () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
@@ -204,9 +297,13 @@ describe('runStructural screenshot contract discovery', () => {
 
     expect(runStructural({ execute })).toMatchObject({
       code: 17,
-      output: expect.stringContaining('failed (exit 17).\n\nfixture drift'),
+      output: expect.stringMatching(
+        /failed \(exit 17\)\. Command: [^\n]+\n\nfixture drift/u
+      ),
     });
-    expect(execute).toHaveBeenCalledExactlyOnceWith(SCREENSHOT_CATALOG_COMMAND);
+    expect(execute).toHaveBeenCalledExactlyOnceWith(
+      WEB_CI_CONTRACT_TESTS_COMMAND
+    );
   });
 
   it('stops when runner coverage falls below its hosted floor', () => {
@@ -220,12 +317,12 @@ describe('runStructural screenshot contract discovery', () => {
 
     expect(runStructural({ execute })).toMatchObject({
       code: 19,
-      output: expect.stringContaining(
-        'failed (exit 19).\n\ncoverage floor failed'
+      output: expect.stringMatching(
+        /failed \(exit 19\)\. Command: [^\n]+\ncoverage floor failed\n\ncoverage floor failed$/u
       ),
     });
     expect(execute.mock.calls.map(([command]) => command)).toEqual([
-      SCREENSHOT_CATALOG_COMMAND,
+      WEB_CI_CONTRACT_TESTS_COMMAND,
       STRUCTURAL_RUNNER_COVERAGE_COMMAND,
     ]);
   });
@@ -258,7 +355,7 @@ describe('runStructural screenshot contract discovery', () => {
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
 
     expect(runStructural({ execute })).toMatchObject({ code: 0 });
-    expect(execute.mock.calls[0][0]).toBe(SCREENSHOT_CATALOG_COMMAND);
+    expect(execute.mock.calls[0][0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect(execute.mock.calls[1][0]).toBe(STRUCTURAL_RUNNER_COVERAGE_COMMAND);
   });
 });
@@ -374,13 +471,54 @@ describe('structural failure diagnostics', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    const execute = vi.fn(() => ({ code: 31, output: 'unknown failure\n' }));
+    const execute = vi.fn((/** @type {string} */ _command) => ({
+      code: 31,
+      output: 'unknown failure\n',
+    }));
     const result = runStructural({ execute });
     expect(result.code).toBe(31);
     expect(execute).toHaveBeenCalledTimes(1);
     expect(result.output).toMatch(
-      /^Structural command 1\/\d+ failed \(exit 31\)\.\n\nunknown failure$/u
+      /^Structural command 1\/\d+ failed \(exit 31\)\. Command: \S[^\n]*\n\nunknown failure$/u
     );
+    const label = result.output.split('\n')[0].split(' Command: ')[1];
+    expect(label.length).toBeLessThanOrEqual(80);
+    const firstCommand = execute.mock.calls[0]?.[0] ?? '';
+    expect(firstCommand.replace(/\s+/gu, ' ')).toContain(
+      label.replace(/…$/u, '')
+    );
+  });
+
+  it('surfaces the coverage ERROR line and drops git fetch noise when no identity exists', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const coverageError =
+      'ERROR: Coverage for lines (99.13%) does not meet "app/api/internal/ovie/summer-bottleneck/route.ts" threshold (100%)';
+    const output = [
+      ' * [new branch]            feature/a -> origin/feature/a',
+      '   1a2b3c4..5d6e7f8  main       -> origin/main',
+      coverageError,
+      ...Array.from(
+        { length: 4000 },
+        (_, index) =>
+          ` * [new branch]      noise-${index} -> origin/noise-${index}`
+      ),
+    ].join('\n');
+    const execute = vi.fn(() => ({ code: 1, output }));
+    const result = runStructural({ execute });
+    expect(result.code).toBe(1);
+    const [header, body] = result.output.split('\n\n');
+    expect(header.split('\n')).toEqual([
+      expect.stringMatching(
+        /^Structural command 1\/\d+ failed \(exit 1\)\. Command: /u
+      ),
+      coverageError,
+    ]);
+    expect(result.output).not.toContain('[new branch]');
+    expect(result.output).not.toContain('1a2b3c4..5d6e7f8');
+    expect(body).toBe(coverageError);
+    expect(result.output.length).toBeLessThanOrEqual(1200);
   });
 
   it.each(['noisy', 'long-header', 'other-lane'])(
@@ -490,4 +628,190 @@ exit 0
       }
     }
   );
+});
+
+describe('webCiContractTestsCommand', () => {
+  it('honors the quarantine ledger and keeps browser-heavy receipts out', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-contract-ledger-'));
+    const ledger = join(dir, 'quarantine.json');
+    try {
+      writeFileSync(
+        ledger,
+        JSON.stringify({
+          entries: [
+            { kind: 'unit', path: 'tests/unit/ci/deploy-workflow.test.ts' },
+            { kind: 'unit', path: 'tests/unit/inbox/webhook-handler.test.ts' },
+            { kind: 'e2e', path: 'tests/unit/ci/not-a-unit.spec.ts' },
+          ],
+        })
+      );
+      const command = webCiContractTestsCommand(ledger);
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+      );
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/playwright-artifact-secrets.test.ts'
+      );
+      expect(command).not.toContain('webhook-handler');
+      expect(command).not.toContain('not-a-unit');
+      expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps files run elsewhere excluded when the ledger is unreadable', () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    try {
+      const command = webCiContractTestsCommand(
+        join(tmpdir(), 'ci-contract-ledger-does-not-exist.json'),
+        ['tests/unit/ci/deploy-workflow.test.ts']
+      );
+      expect(command).toContain(
+        '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+      );
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining('::warning::Quarantine ledger')
+      );
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('excludes the live ledger deploy-workflow quarantine', () => {
+    expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(
+      '--exclude=tests/unit/ci/deploy-workflow.test.ts'
+    );
+  });
+});
+
+describe('failure annotation helpers', () => {
+  it('strips git fetch ref-update noise but keeps real lines', () => {
+    expect(
+      stripGitFetchNoise(
+        [
+          ' * [new branch]      a -> origin/a',
+          ' * [new tag]         v1 -> v1',
+          '   0abc..1def  main -> origin/main',
+          'real line',
+        ].join('\n')
+      )
+    ).toBe('real line');
+  });
+
+  it('keeps the last bounded, de-duplicated diagnostic lines without ANSI codes', () => {
+    const esc = String.fromCharCode(27);
+    const text = [
+      'Error: first',
+      'ok line',
+      `${esc}[31m FAIL ${esc}[39m tests/a.test.ts > case`,
+      'TypeError: boom',
+      'AssertionError: expected 1 to be 2',
+      'TypeError: boom',
+      `ERROR: ${'x'.repeat(300)}`,
+      '1 failed, 3 passed',
+      'failure without keyword match',
+    ].join('\n');
+    const lines = extractDiagnosticLines(text);
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toBe('FAIL  tests/a.test.ts > case');
+    expect(lines).toContain('TypeError: boom');
+    expect(lines).toContain('AssertionError: expected 1 to be 2');
+    expect(lines.at(-1)).toBe('1 failed, 3 passed');
+    expect(lines.every(line => line.length <= 200)).toBe(true);
+    expect(lines).not.toContain('Error: first');
+    expect(extractDiagnosticLines('all good\n')).toEqual([]);
+    expect(extractDiagnosticLines(undefined)).toEqual([]);
+  });
+
+  it('escapes workflow-command messages and properties', () => {
+    expect(escapeAnnotationMessage('99.13% a\r\nb')).toBe('99.13%25 a%0D%0Ab');
+    expect(escapeAnnotationProperty('Lane: a, b')).toBe('Lane%3A a%2C b');
+  });
+
+  it('puts diagnostics first in a non-structural lane excerpt and annotation', () => {
+    const output = [
+      ' * [new branch]  x -> origin/x',
+      'Error: Coverage 99.5% below 100%',
+      ...Array.from({ length: 50 }, (_, index) => `tail ${index}`),
+    ].join('\n');
+    const excerpt = laneFailureExcerpt('typecheck', output);
+    expect(excerpt.startsWith('Diagnostics:\nError: Coverage 99.5%')).toBe(
+      true
+    );
+    expect(excerpt).not.toContain('[new branch]');
+    expect(excerpt.length).toBeLessThanOrEqual(1200);
+    const annotation = failureAnnotationMessage({ id: 'typecheck' }, excerpt);
+    expect(annotation).toBe(
+      'Diagnostics: | Error: Coverage 99.5%25 below 100%25'
+    );
+    expect(annotation).not.toMatch(/[\r\n]/u);
+  });
+
+  it('falls back to the output tail when no diagnostic line exists', () => {
+    const output = Array.from({ length: 12 }, (_, i) => `line ${i}`).join('\n');
+    expect(laneFailureExcerpt('typecheck', output)).toBe(output);
+    expect(failureAnnotationMessage({ id: 'typecheck' }, output)).toBe(
+      Array.from({ length: 8 }, (_, i) => `line ${i + 4}`).join(' | ')
+    );
+    expect(failureAnnotationMessage({ id: 'typecheck' }, '')).toBe('');
+  });
+
+  it('keeps the newest diagnostics when the annotation header exceeds its budget', () => {
+    const early = Array.from(
+      { length: 4 },
+      (_, index) => `Error: early ${index} ${'x'.repeat(150)}`
+    );
+    const output = [...early, 'Error: final root cause'].join('\n');
+    const annotation = failureAnnotationMessage(
+      { id: 'typecheck' },
+      laneFailureExcerpt('typecheck', output)
+    );
+    expect(annotation.startsWith('Diagnostics: | ')).toBe(true);
+    expect(annotation.endsWith('Error: final root cause')).toBe(true);
+    expect(annotation).not.toContain('early 0');
+    expect(annotation.length).toBeLessThanOrEqual(400);
+  });
+
+  it('keeps the last occurrence of a repeated diagnostic line', () => {
+    const text = [
+      'Error: root cause',
+      'Error: b',
+      'Error: c',
+      'Error: d',
+      'Error: e',
+      'Error: f',
+      'Error: root cause',
+    ].join('\n');
+    expect(extractDiagnosticLines(text)).toEqual([
+      'Error: c',
+      'Error: d',
+      'Error: e',
+      'Error: f',
+      'Error: root cause',
+    ]);
+  });
+
+  it('matches lowercase TypeScript compiler errors but not error-count summaries', () => {
+    const text = [
+      "src/a.ts(1,2): error TS2532: Object is possibly 'undefined'.",
+      'errors: 0',
+      'Found 0 errors.',
+    ].join('\n');
+    expect(extractDiagnosticLines(text)).toEqual([
+      "src/a.ts(1,2): error TS2532: Object is possibly 'undefined'.",
+    ]);
+  });
+
+  it('keeps the structural header as the annotation for structural failures', () => {
+    const excerpt = laneFailureExcerpt(
+      'structural',
+      'Structural command 2/9 failed (exit 1). Command: pnpm x\nERROR: 50%\n\ntail'
+    );
+    expect(failureAnnotationMessage({ id: 'structural' }, excerpt)).toBe(
+      'Structural command 2/9 failed (exit 1). Command: pnpm x | ERROR: 50%25'
+    );
+  });
 });

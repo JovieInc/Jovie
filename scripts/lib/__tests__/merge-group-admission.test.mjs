@@ -8,6 +8,7 @@ import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  MERGE_GROUP_ADMISSION_WAIT_MS,
   normalizeLiveQueueEntriesPage,
   parseQueueHeadPullRequestNumber,
   runAdmissionFromEnv,
@@ -728,5 +729,85 @@ describe('merge-group admission evidence', () => {
       })
     ).rejects.toThrow(/within 6ms/);
     expect(elapsed).toBe(6);
+  });
+
+  // Regression: runs 35878871922 / 35930041899 failed with
+  // "did not pass within 90000ms" while PR Size Guard was merely in_progress.
+  it('keeps polling a required check that is still in_progress past 90s under the default budget', async () => {
+    let elapsed = 0;
+    const statuses = [];
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        checkName === 'PR Size Guard' && elapsed < 150_000
+          ? checkPage(checkName, 'in_progress')
+          : checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries: async () => [liveEntry()],
+      loadQueueRef: async () => queueRef(),
+      now: () => elapsed,
+      onStatus: message => statuses.push(message),
+      sleep: async delayMs => {
+        elapsed += delayMs;
+      },
+    });
+
+    expect(result.admitted).toBe(true);
+    expect(elapsed).toBeGreaterThan(90_000);
+    expect(
+      statuses.some(status => /PR Size Guard=in_progress/.test(status))
+    ).toBe(true);
+  });
+
+  it('still fails fast when an in_progress check concludes with failure', async () => {
+    let elapsed = 0;
+    await expect(
+      waitForMergeGroupAdmission({
+        event: event(),
+        loadCheckRuns: async ({ checkName }) =>
+          checkName === 'PR Size Guard'
+            ? elapsed < 9
+              ? checkPage(checkName, 'in_progress')
+              : checkPage(checkName, 'completed', 'failure')
+            : checkPage(checkName, 'completed', 'success'),
+        loadLiveQueueEntries: async () => [liveEntry()],
+        loadQueueRef: async () => queueRef(),
+        maxWaitMs: 60,
+        now: () => elapsed,
+        onStatus: () => {},
+        pollIntervalMs: 3,
+        sleep: async delayMs => {
+          elapsed += delayMs;
+        },
+      })
+    ).rejects.toThrow(/PR Size Guard completed with failure/);
+    expect(elapsed).toBe(9);
+  });
+
+  it('names the still-pending check when the deadline expires', async () => {
+    let elapsed = 0;
+    await expect(
+      waitForMergeGroupAdmission({
+        event: event(),
+        loadCheckRuns: async ({ checkName }) =>
+          checkName === 'PR Size Guard'
+            ? checkPage(checkName, 'in_progress')
+            : checkPage(checkName, 'completed', 'success'),
+        loadLiveQueueEntries: async () => [liveEntry()],
+        loadQueueRef: async () => queueRef(),
+        maxWaitMs: 6,
+        now: () => elapsed,
+        onStatus: () => {},
+        pollIntervalMs: 3,
+        sleep: async delayMs => {
+          elapsed += delayMs;
+        },
+      })
+    ).rejects.toThrow(
+      /within 6ms \(still pending: Fork PR Gate=success, PR Size Guard=in_progress\)/
+    );
+  });
+
+  it('defaults to a multi-minute admission budget', () => {
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(360_000);
   });
 });

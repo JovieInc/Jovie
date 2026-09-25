@@ -283,6 +283,17 @@ describe('ProfileCompactSurface', () => {
     expect(listenSurface).not.toHaveAttribute('data-profile-overflow-mode');
   });
 
+  it('bleeds the Music scrollport to the shell edge and locks horizontal panning', () => {
+    renderSurface({ activeMode: 'listen' });
+
+    const scrollRegion = screen.getByTestId('profile-content-scroll');
+    expect(scrollRegion.className).toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).toContain('px-(--page-pad)');
+    expect(scrollRegion.className).toContain('overflow-x-clip');
+    expect(scrollRegion.className).toContain('touch-pan-y');
+    expect(scrollRegion.className).toContain('overflow-y-auto');
+  });
+
   it('keeps the home hero and content regions in the responsive layout contract', () => {
     renderSurface();
 

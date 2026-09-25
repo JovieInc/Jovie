@@ -47,7 +47,7 @@ export class ConnectorMemoryBridge {
         metadata: buildEvidenceMetadata(evidence, {
           connectorEnrichment: true,
           factKind: mention.factKind,
-          ...(mention.metadata ?? {}),
+          ...mention.metadata,
         }),
         evidence,
       });

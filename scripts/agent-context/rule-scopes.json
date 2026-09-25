@@ -68,7 +68,7 @@
       "scripts/hermes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "73e61f1035f4d715e08422a99a0577f72f3f9f84c87d43554a7b9a7c9bdc53ee"
+    "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "b73bbd897bc1ffb7ed34691539f403dbfe4aeea15076fbe749c8537cb6431ffe"
+    "bodySha256": "5ca2f740799c7c440033c4d2465ddcb16c7d72f61ec27a669996269edd209401"
   },
   {
     "file": ".claude/rules/security.md",

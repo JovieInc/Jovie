@@ -78,4 +78,23 @@ describe('POST /api/workflow-captures', () => {
     expect(response.status).toBe(401);
     expect(hoisted.createRequest).not.toHaveBeenCalled();
   });
+
+  it('returns an internal error when persistence throws', async () => {
+    hoisted.createRequest.mockRejectedValue(new Error('db down'));
+
+    const response = await POST(
+      new Request('https://jov.ie/api/workflow-captures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestingTaskId: 'task-1',
+          title: 'Record YouTube Studio workflow',
+          instructions: 'Start an experiment and stop before publishing.',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'internal-error' });
+  });
 });

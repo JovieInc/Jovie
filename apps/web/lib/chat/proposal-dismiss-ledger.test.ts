@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dismissProposal,
   isProposalDismissed,
@@ -27,6 +27,19 @@ describe('proposal-dismiss-ledger', () => {
     dismissProposal(undefined);
     undismissProposal(undefined);
     expect(isProposalDismissed(undefined)).toBe(false);
+  });
+
+  it('keeps an empty ledger when storage is missing', () => {
+    vi.stubGlobal('localStorage', undefined);
+    try {
+      expect(isProposalDismissed('tool-1')).toBe(false);
+      dismissProposal('tool-1');
+      expect(isProposalDismissed('tool-1')).toBe(false);
+      undismissProposal('tool-1');
+      expect(isProposalDismissed('tool-1')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('survives re-read from storage (reload durability)', () => {

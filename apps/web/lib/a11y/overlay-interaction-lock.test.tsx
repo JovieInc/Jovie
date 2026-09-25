@@ -46,6 +46,17 @@ describe('hasGenuineBlockingOverlay', () => {
     expect(hasGenuineBlockingOverlay()).toBe('menu');
   });
 
+  it('classifies an open dialog overlay and an open sheet overlay by slot', () => {
+    const { unmount } = render(
+      <div data-slot='dialog-overlay' data-state='open' />
+    );
+    expect(hasGenuineBlockingOverlay()).toBe('overlay');
+    unmount();
+
+    render(<div data-slot='sheet-overlay' data-state='open' />);
+    expect(hasGenuineBlockingOverlay()).toBe('overlay');
+  });
+
   it('does not treat a closed leftover overlay as a genuine blocker', () => {
     render(
       <div

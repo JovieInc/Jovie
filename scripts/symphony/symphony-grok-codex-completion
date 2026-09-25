@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Codex-CLI-shaped completion shim for useful-turn probes.
+
+symphony_useful_turn_probe always invokes:
+  <codexPath> exec ... --model <model> --config model_provider="<provider>"
+      --output-last-message <path> <prompt>
+with CODEX_HOME set to the enrolled account directory.
+
+Stock Codex responses wire_api against api.x.ai rejects Codex tool schemas.
+This shim performs one chat.completions turn and writes the assistant text
+to --output-last-message exactly as Codex would.
+
+The bearer comes from the live grok CLI auth file (~/.grok/auth.json, or
+SYMPHONY_GROK_AUTH_PATH). A synced CODEX_HOME/auth.json copy is ignored.
+The grok CLI owns refresh and atomic replacement of that file; this process
+never writes it. An expired, missing, or malformed token fails closed and
+is never printed.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+def load_trust():
+    """Import the repo or host copy of symphony_proof_context. Stdlib only besides that."""
+    candidates = []
+    override = os.environ.get("SYMPHONY_SCRIPTS", "").strip()
+    if override:
+        candidates.append(Path(override).expanduser())
+    candidates.append(Path(__file__).resolve().parent)
+    candidates.append(Path.home() / "gem-workspace" / "scripts")
+    seen = set()
+    for directory in candidates:
+        key = str(directory)
+        if key in seen:
+            continue
+        seen.add(key)
+        module = directory / "symphony_proof_context.py"
+        if not module.is_file() or module.is_symlink():
+            continue
+        if key not in sys.path:
+            sys.path.insert(0, key)
+        trust = importlib.import_module("symphony_proof_context")
+        if not hasattr(trust, "grok_access_token"):
+            continue
+        return trust
+    print("symphony-grok-codex-completion: symphony proof context library missing", file=sys.stderr)
+    raise SystemExit(2)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def completion_opener():
+    return urllib.request.build_opener(_NoRedirect())
+
+
+def redact(text: str, secrets: list[str]) -> str:
+    redacted = text
+    for secret in sorted({item for item in secrets if isinstance(item, str) and item}, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted]")
+    return redacted[:800]
+
+
+def provider_override(items: list[str]) -> str | None:
+    found = None
+    for item in items:
+        if "model_provider" not in item or "=" not in item:
+            continue
+        value = item.split("=", 1)[1].strip().strip('"').strip("'")
+        found = value
+    return found
+
+
+def strip_fences(text: str) -> str:
+    cleaned = text.strip()
+    if not cleaned.startswith("```"):
+        return cleaned
+    lines = cleaned.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def chat_completion(model: str, prompt: str, token: str, secrets: list[str]) -> str:
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a precise computation helper. Reply with only the requested JSON object and nothing else.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0,
+        "max_tokens": 256,
+    }
+    request = urllib.request.Request(
+        "https://api.x.ai/v1/chat/completions",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with completion_opener().open(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        print(f"xAI chat.completions HTTP {exc.code}: {redact(detail, secrets)}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except Exception as exc:  # noqa: BLE001
+        print(f"xAI chat.completions failed: {redact(str(exc), secrets)}", file=sys.stderr)
+        raise SystemExit(1) from None
+    try:
+        text = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        print(f"unexpected xAI payload: {redact(json.dumps(payload), secrets)}", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(text, str) or not text.strip():
+        print("empty completion", file=sys.stderr)
+        raise SystemExit(1)
+    return strip_fences(text)
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] != "exec":
+        print("symphony-grok-codex-completion: expected `exec` subcommand", file=sys.stderr)
+        return 2
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--sandbox")
+    parser.add_argument("--skip-git-repo-check", action="store_true")
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--config", action="append", default=[])
+    parser.add_argument("--output-last-message", required=True, type=Path)
+    parser.add_argument("prompt")
+    args, _unknown = parser.parse_known_args(argv[1:])
+
+    codex_home = Path(os.environ.get("CODEX_HOME", "")).expanduser()
+    if not codex_home.is_dir():
+        print("CODEX_HOME missing", file=sys.stderr)
+        return 2
+    provider = provider_override(args.config)
+    if provider is not None and provider != "grok":
+        print(f"unexpected model_provider override: {args.config}", file=sys.stderr)
+        return 2
+
+    trust = load_trust()
+    try:
+        entry = trust.select_xai_oidc_entry(trust.load_grok_auth_document())
+        trust.grok_stable_principal(entry)
+        token = trust.grok_access_token(entry)
+    except trust.GrokAuthError as exc:
+        print(f"symphony-grok-codex-completion: {exc}", file=sys.stderr)
+        return 1
+    refresh = entry.get("refresh_token")
+    secrets = [token, refresh if isinstance(refresh, str) else ""]
+    try:
+        cleaned = chat_completion(args.model, args.prompt, token, secrets)
+    except SystemExit as exc:
+        code = exc.code
+        return code if isinstance(code, int) else 1
+    output = args.output_last_message
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(cleaned, encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

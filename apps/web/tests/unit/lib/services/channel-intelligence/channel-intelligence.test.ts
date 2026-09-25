@@ -230,9 +230,12 @@ describe('channel playlist freshness + no-invent gate', () => {
     expect(evaluateChannelPlaylistRuleCase('invented-refused').passed).toBe(
       true
     );
-    expect(evaluateChannelPlaylistRuleCase('dormant-dropped').passed).toBe(
-      true
-    );
+    expect(evaluateChannelPlaylistRuleCase('dormant-dropped')).toEqual({
+      id: 'dormant-dropped',
+      passed: true,
+      reason:
+        'Lists with no add/activity in 12 months are dropped; 90-day preferred',
+    });
     expect(
       evaluateChannelPlaylistRuleCase('missing-activity-unknown').passed
     ).toBe(true);

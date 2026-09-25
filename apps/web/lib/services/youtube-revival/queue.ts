@@ -110,18 +110,21 @@ export function buildChallengerSets(flags: RevivalFlag[]): ChallengerSet[] {
     flags.includes('ctr_below_median') ||
     flags.includes('high_impressions_low_views')
   ) {
-    challengers.push({
-      hypothesis: 'Test a face-in-thumbnail vs. no-face variant',
-      packagingElement: 'face',
-      rationale:
-        'Low CTR is often resolved by swapping the face presence based on niche priors.',
-    });
-    challengers.push({
-      hypothesis: 'Rewrite the title with a stronger curiosity or benefit hook',
-      packagingElement: 'title_hook',
-      rationale:
-        'Titles under 30 characters with a clear promise outperform longer descriptive titles in search and browse.',
-    });
+    challengers.push(
+      {
+        hypothesis: 'Test a face-in-thumbnail vs. no-face variant',
+        packagingElement: 'face',
+        rationale:
+          'Low CTR is often resolved by swapping the face presence based on niche priors.',
+      },
+      {
+        hypothesis:
+          'Rewrite the title with a stronger curiosity or benefit hook',
+        packagingElement: 'title_hook',
+        rationale:
+          'Titles under 30 characters with a clear promise outperform longer descriptive titles in search and browse.',
+      }
+    );
   }
 
   if (flags.includes('evergreen_declining_reach')) {

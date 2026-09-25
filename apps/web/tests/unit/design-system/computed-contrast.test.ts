@@ -205,6 +205,9 @@ describe('computed contrast primitives', () => {
   it('parseColor handles hex shorthand and alpha hex', () => {
     expect(parseColor('#fff')?.luminance).toBeCloseTo(1, 5);
     expect(parseColor('#00000080')?.alpha).toBeCloseTo(0.5, 1);
+    const slashRgb = parseColor('rgb(255/0/0/0.5)');
+    expect(slashRgb?.alpha).toBeCloseTo(0.5, 5);
+    expect(slashRgb?.luminance).toBeCloseTo(0.2126, 3);
   });
 
   it('resolveValue supports fallbacks and rejects cycles', () => {

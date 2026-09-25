@@ -8,10 +8,11 @@
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
  * browser admission job.
  *
- * Fail-fast: the first failed lane skips later lanes in the same group so
- * biome/typecheck red does not pay for structural Playwright. Skipped-later
- * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
- * historical run-every-lane report. Local callers may omit the selector to
+ * Fail-fast: the first failed lane skips the expensive structural lane so
+ * biome/typecheck red does not pay for structural Playwright. Cheap lanes
+ * always run so one CI cycle reports every cheap failure instead of hiding
+ * later lanes behind the first red one. Skipped lanes still emit a receipt.
+ * Set CI_FAST_FAIL_FAST=false to run structural even after a failure. Local callers may omit the selector to
  * retain the all-lanes default.
  *
  * Usage:
@@ -28,7 +29,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -50,6 +51,8 @@ export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
 ]);
 export const DELIVERY_CONTROLLER_COVERAGE_COMMAND = `node ${DELIVERY_CONTROLLER_COVERAGE_ARGS.join(' ')}`;
 
+export const OFFLINE_FAILURE_COVERAGE_COMMAND =
+  'pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/rolling-ci-failure-disposition.test.mjs --maxWorkers=1 --coverage --coverage.include="$PWD/scripts/lib/rolling-ci-failure-disposition.mjs" --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-offline-failure-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=95';
 export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
@@ -65,8 +68,58 @@ export const BILLING_COVERAGE_COMMAND = Object.freeze(
 );
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
-const SCREENSHOT_CATALOG_CONTRACT_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+// apps/web/tests/unit/ci reads .github/**, scripts/**, and other non-web
+// contract inputs. Those paths select only the operations lane, which skips
+// the web Unit Tests shards, so run the whole directory here (#18222 landed a
+// workflow-only diff that turned main red because only Unit Tests ran it).
+// Excluded here because another job or command owns them, so nothing runs
+// twice: the browser-heavy Playwright artifact receipt (web Unit Tests), the
+// production-marker-state coverage gate (operations structural command), and
+// every unit test in the quarantine ledger (Unit Tests reruns those with
+// retries under continue-on-error).
+const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
+  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  'tests/unit/ci/production-marker-state.test.ts',
+]);
+// Run by name in the web structural parts so it executes even while it sits in
+// the quarantine ledger.
+const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+export function webCiContractTestsCommand(
+  ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
+  runElsewhere = []
+) {
+  // An unreadable ledger fails closed onto running every contract test, but
+  // files another command in the same plan names explicitly (`runElsewhere`)
+  // stay excluded so they never execute twice.
+  let quarantined = [];
+  try {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    quarantined = (Array.isArray(ledger?.entries) ? ledger.entries : [])
+      .filter(
+        entry =>
+          entry?.kind === 'unit' &&
+          typeof entry.path === 'string' &&
+          entry.path.startsWith('tests/unit/ci/')
+      )
+      .map(entry => entry.path);
+  } catch (error) {
+    process.stderr.write(
+      `::warning::Quarantine ledger ${ledgerPath} is unreadable (${error?.message ?? error}); running every tests/unit/ci contract.\n`
+    );
+    quarantined = [];
+  }
+  const excludes = [
+    ...new Set([
+      ...WEB_CI_CONTRACT_ALWAYS_EXCLUDED,
+      ...quarantined,
+      ...runElsewhere,
+    ]),
+  ]
+    .sort()
+    .map(path => ` --exclude=${path}`)
+    .join('');
+  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
+}
 export const ROUTE_PREP_COVERAGE_COMMAND =
   'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
@@ -132,6 +185,13 @@ const LANES = [
     run: runDesignExceptionRegistry,
   },
   {
+    id: 'design-governance-enforcement',
+    name: 'Design governance enforcement',
+    nextLocalCommand:
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+    run: runDesignGovernanceEnforcement,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -147,7 +207,7 @@ const LANES = [
     id: 'profile-admission',
     name: 'Public Profile Admission',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     run: runProfileAdmission,
   },
   {
@@ -168,7 +228,9 @@ const LANES = [
       ' && ' +
       ACQUISITION_CERTIFICATION_COMMAND +
       ' && ' +
-      DESKTOP_RELEASE_COVERAGE_COMMAND,
+      DESKTOP_RELEASE_COVERAGE_COMMAND +
+      ' && ' +
+      OFFLINE_FAILURE_COVERAGE_COMMAND,
     run: runStructural,
   },
 ];
@@ -190,6 +252,7 @@ export const LANE_GROUPS = Object.freeze({
     'guardrails',
     'design-system-source-ratchet',
     'design-exception-registry',
+    'design-governance-enforcement',
     'design-conformance',
     'ios-fast',
     'profile-admission',
@@ -412,10 +475,120 @@ function repoLanes() {
   return cachedRepoLanes;
 }
 
+const GIT_FETCH_NOISE_LINE =
+  /^\s*(?:\* \[new (?:branch|tag)\]|[0-9a-f]+\.\.[0-9a-f]+\s)/u;
+// Lowercase `error` catches TypeScript's `file.ts(1,2): error TS2532: …` while
+// the word boundary still skips summary noise such as `errors: 0`.
+const DIAGNOSTIC_LINE =
+  /\b(?:ERROR|\w*Error|error|FAIL|FAILED|failed|expected)\b/u;
+const ANSI_ESCAPE = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`,
+  'gu'
+);
+
+/** Drop `git fetch` ref-update noise so excerpts keep the real failure. */
+export function stripGitFetchNoise(text) {
+  return (text || '')
+    .split('\n')
+    .filter(line => !GIT_FETCH_NOISE_LINE.test(line))
+    .join('\n');
+}
+
+/** Last few bounded, de-duplicated lines that look like a failure cause. */
+export function extractDiagnosticLines(text, { max = 5, width = 200 } = {}) {
+  const lines = [];
+  for (const raw of stripGitFetchNoise(text).split('\n')) {
+    const line = raw.replace(ANSI_ESCAPE, '').trim();
+    if (!line || !DIAGNOSTIC_LINE.test(line)) continue;
+    lines.push(line.length > width ? `${line.slice(0, width - 1)}…` : line);
+  }
+  // Keep the LAST occurrence of a repeated line so a root cause that repeats
+  // at the end of the log is not dropped by the tail slice.
+  const newestFirst = [...new Set(lines.reverse())];
+  return newestFirst.slice(0, max).reverse();
+}
+
+/** Escape a workflow-command message per GitHub Actions rules. */
+export function escapeAnnotationMessage(text) {
+  return String(text ?? '')
+    .replaceAll('%', '%25')
+    .replaceAll('\r', '%0D')
+    .replaceAll('\n', '%0A');
+}
+
+/** Escape a workflow-command property value (e.g. `title=`). */
+export function escapeAnnotationProperty(text) {
+  return escapeAnnotationMessage(text)
+    .replaceAll(':', '%3A')
+    .replaceAll(',', '%2C');
+}
+
+function commandLabel(command, max = 80) {
+  const flat = String(command ?? '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
 function excerpt(text, max = 1200) {
-  const trimmed = (text || '').trim();
+  if (max <= 0) return '';
+  const trimmed = stripGitFetchNoise(text).trim();
   if (trimmed.length <= max) return trimmed;
   return `…${trimmed.slice(-max)}`;
+}
+
+/**
+ * Failure excerpt for a lane: diagnostic lines first, then the output tail.
+ * The structural lane already builds its own header in runStructural.
+ */
+export function laneFailureExcerpt(laneId, output) {
+  const text = output || '';
+  if (laneId === 'structural' && text.startsWith('Structural command ')) {
+    return excerpt(text);
+  }
+  const diagnostics = extractDiagnosticLines(text);
+  if (diagnostics.length === 0) return excerpt(text);
+  const header = ['Diagnostics:', ...diagnostics].join('\n');
+  return `${header}\n\n${excerpt(text, 1200 - header.length - 3)}`;
+}
+
+const PYTEST_IDENTITY_LINE = /^FAILED scripts\/[\w./-]+\.py::/u;
+
+/**
+ * Join a header's lead line with as many body lines as fit in `max` chars.
+ * Diagnostic lines are chosen from the END so earlier errors cannot crowd out
+ * the final root-cause line; registered pytest identities keep their order
+ * so the first failing test stays the lead identity.
+ */
+function budgetHeader(header, max = 400) {
+  const [lead, ...rest] = header.split('\n');
+  const separator = ' | ';
+  const fromEnd = !rest.every(line => PYTEST_IDENTITY_LINE.test(line));
+  const ordered = fromEnd ? [...rest].reverse() : rest;
+  const kept = [];
+  let used = lead.length;
+  for (const line of ordered) {
+    const cost = separator.length + line.length;
+    if (used + cost > max) break;
+    kept.push(line);
+    used += cost;
+  }
+  if (kept.length === 0 && ordered.length > 0) kept.push(ordered[0]);
+  if (fromEnd) kept.reverse();
+  return [lead, ...kept].join(separator).slice(0, max);
+}
+
+/** One-line, escaped `::error::` body (≤400 chars before escaping). */
+export function failureAnnotationMessage(lane, logExcerpt) {
+  if (!logExcerpt) return '';
+  const useHeader =
+    (lane.id === 'structural' &&
+      logExcerpt.startsWith('Structural command ')) ||
+    logExcerpt.startsWith('Diagnostics:\n');
+  const short = useHeader
+    ? budgetHeader(logExcerpt.split('\n\n')[0])
+    : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
+  return escapeAnnotationMessage(short);
 }
 
 /** Keep only registered pytest identities; assertion bodies are not diagnostic labels. */
@@ -438,9 +611,13 @@ function structuralFailureExcerpt(command, output, index, count, code) {
     identities.add(identity);
     if (identities.size === 3) break;
   }
+  // Registered pytest identities win; otherwise surface the likeliest cause
+  // (e.g. a coverage-threshold ERROR) instead of only the exit code.
+  const diagnostics = identities.size > 0 ? [] : extractDiagnosticLines(output);
   const header = [
-    `Structural command ${index + 1}/${count} failed (exit ${code}).`,
+    `Structural command ${index + 1}/${count} failed (exit ${code}). Command: ${commandLabel(command)}`,
     ...identities,
+    ...diagnostics,
   ].join('\n');
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
@@ -643,6 +820,27 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
+function runDesignGovernanceEnforcement() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Design governance enforcement skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const selected = selectedProductLanes();
+  if (!selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No web product lane selected\n',
+      skipped: true,
+    };
+  }
+  return shell(LANE_COMMANDS['design-governance-enforcement']);
+}
+
 /**
  * @typedef {object} DesignConformanceOpts
  * @property {string[] | null} [changedFileList]
@@ -718,6 +916,7 @@ function runProfileAdmission() {
     'apps/web/app/api/profile/**',
     'apps/web/components/features/release/SmartLinkProviderButton.tsx',
     'apps/web/components/features/profile/**',
+    'apps/web/components/providers/QueryProvider*',
     'apps/web/components/organisms/CookieBannerMount.tsx',
     'apps/web/components/organisms/CookieBannerSection.tsx',
     'apps/web/lib/cookies/**',
@@ -725,6 +924,9 @@ function runProfileAdmission() {
     'apps/web/lib/rate-limit/**',
     'apps/web/lib/tracking/pac-**',
     'apps/web/styles/design-system.css',
+    'apps/web/tests/unit/profile/profile-compact-template.test.tsx',
+    'apps/web/tests/e2e/profile-admission.spec.ts',
+    'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts',
     'apps/web/tests/e2e/profile/**',
     'apps/web/tests/e2e/public-profile-smoke.spec.ts',
     'apps/web/tests/e2e/utils/public-surface-**',
@@ -772,14 +974,15 @@ export function runStructural(opts = {}) {
   const operationsParts = [
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
+    OFFLINE_FAILURE_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
-    'node --test scripts/ci-release-trigger-contract.test.mjs',
+    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -846,11 +1049,6 @@ export function runStructural(opts = {}) {
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-registration-gate',
-    // CI workflow changes live at the repo root, so Turbo --affected can select
-    // only the root package and return success after running zero web tests.
-    // Target Vitest directly so the deploy contract always executes and fails
-    // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
@@ -866,10 +1064,17 @@ export function runStructural(opts = {}) {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
-          SCREENSHOT_CATALOG_CONTRACT_COMMAND,
+          webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
+          // Run the deploy contract by name for operations-only changes too:
+          // .github/scripts and workflow diffs select only the operations lane,
+          // and the directory run above skips it while it sits in the
+          // quarantine ledger (#18339 landed a red deploy contract that way).
+          // Targeting Vitest directly also fails closed when the file cannot
+          // be resolved or contains no tests.
+          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
     ...(selected.has('operations') ? operationsParts : []),
@@ -907,15 +1112,12 @@ export function runStructural(opts = {}) {
 function annotateFailure(lane, logExcerpt) {
   // GitHub Actions annotation — visible on the PR Checks UI.
   const msg = `${lane.name} failed. Fix: ${lane.nextLocalCommand}`;
-  console.error(`::error title=${lane.name}::${msg}`);
-  if (logExcerpt) {
-    // Keep annotation body short; full log is in the step output.
-    const short =
-      lane.id === 'structural' && logExcerpt.startsWith('Structural command ')
-        ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
-        : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
-    console.error(`::error::${short}`);
-  }
+  console.error(
+    `::error title=${escapeAnnotationProperty(lane.name)}::${escapeAnnotationMessage(msg)}`
+  );
+  // Keep annotation body short; full log is in the step output.
+  const short = failureAnnotationMessage(lane, logExcerpt);
+  if (short) console.error(`::error::${short}`);
 }
 
 function writeSummary(results, groupId) {
@@ -977,6 +1179,9 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+/** Lanes worth skipping after an earlier failure; every other lane is cheap. */
+export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
+
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
@@ -1000,7 +1205,7 @@ function main() {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
 
-      if (failedFast) {
+      if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
         console.log(`[ci-fast] ${lane.id}: skipped`);
         console.log(logExcerpt);
@@ -1030,7 +1235,10 @@ function main() {
         : outcome.code === 0
           ? 'success'
           : 'failure';
-      const logExcerpt = excerpt(outcome.output);
+      const logExcerpt =
+        status === 'failure'
+          ? laneFailureExcerpt(lane.id, outcome.output)
+          : excerpt(outcome.output);
 
       if (status === 'failure') {
         annotateFailure(lane, logExcerpt);

@@ -976,7 +976,10 @@ jobs:
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    # Must exceed MERGE_GROUP_ADMISSION_WAIT_MS (6 min) plus setup/checkout so
+    # a still-running required check fails via the helper's diagnostic, not a
+    # hard job cancel.
+    timeout-minutes: 8
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
@@ -1522,8 +1525,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
@@ -1556,7 +1573,7 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
-          STRUCTURAL_CONTROL_PATTERN='^(scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
+          STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
 
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
@@ -1755,8 +1772,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -2268,6 +2299,11 @@ jobs:
 
   # Queue and admin-fallback integration evidence stays in one hosted
   # workspace. No Actions artifact upload/download sits on the critical path.
+  # The combined web gate runs as three parallel hosted jobs with identical
+  # gating: web build + layout (this job, keeps the required check name), the
+  # independent Ovie build, and the Storybook surface matrix. Every aggregate
+  # that consumes ci-build-layout must also consume ci-build-ovie and
+  # ci-storybook-surfaces so the split stays fail-closed.
   ci-build-layout:
     name: Build + Layout (combined)
     needs: [ci-path-changes, ci-merge-group-admission]
@@ -2299,26 +2335,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The effective coalesced-head diff base may be older than the direct
-          # queue parent; the changed-component gate must have its full ancestry.
-          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
-      # This guard permits the trusted-classifier prerequisite to land before
-      # the app. Once present, Ovie must independently build and typecheck.
-      - name: Build independent Ovie app
-        if: hashFiles('apps/ovie/package.json') != ''
-        run: |
-          pnpm --filter @jovie/ovie typecheck
-          pnpm --filter @jovie/ovie build
-          test -f apps/ovie/.next/BUILD_ID
-          test -f apps/ovie/.next/standalone/apps/ovie/server.js
-          test ! -d apps/ovie/.next/standalone/apps/docs/app
-        env:
-          NEXT_PUBLIC_APP_URL: http://localhost:3105
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -2383,6 +2403,101 @@ jobs:
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+      - name: Upload combined layout failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          allow-markdown: 'true'
+          retention-days: 3
+
+  ci-build-ovie:
+    name: Ovie Build (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      ) &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        if: hashFiles('apps/ovie/package.json') != ''
+      # This guard permits the trusted-classifier prerequisite to land before
+      # the app. Once present, Ovie must independently build and typecheck.
+      - name: Build independent Ovie app
+        if: hashFiles('apps/ovie/package.json') != ''
+        run: |
+          pnpm --filter @jovie/ovie typecheck
+          pnpm --filter @jovie/ovie build
+          test -f apps/ovie/.next/BUILD_ID
+          test -f apps/ovie/.next/standalone/apps/ovie/server.js
+          test ! -d apps/ovie/.next/standalone/apps/docs/app
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3105
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+
+  ci-storybook-surfaces:
+    name: Storybook Surface Matrix (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      ) &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The effective coalesced-head diff base may be older than the direct
+          # queue parent; the changed-component gate must have its full ancestry.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
       # surface nesting combination from .claude/rules/ui.md against Storybook
       # in light + dark mode. Secret-free (Storybook aliases mock Clerk/auth);
@@ -2426,12 +2541,12 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
-      - name: Upload combined layout failure evidence
+      - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           allow-markdown: 'true'
           retention-days: 3
@@ -2557,7 +2672,7 @@ jobs:
   ci-cross-product-integration:
     name: Cross-Product Integration (combined)
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-ios, ci-macos]
+      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -2584,11 +2699,13 @@ jobs:
           RUN_IOS: ${{ needs.ci-path-changes.outputs.run_ios }}
           WEB_UNITS: ${{ needs.ci-unit-tests.result }}
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          WEB_OVIE: ${{ needs.ci-build-ovie.result }}
+          WEB_STORYBOOK: ${{ needs.ci-storybook-surfaces.result }}
           MAC_RESULT: ${{ needs.ci-macos.result }}
           IOS_RESULT: ${{ needs.ci-ios.result }}
         run: |
           set -euo pipefail
-          [ "$RUN_WEB" != 'true' ] || { [ "$WEB_UNITS" = 'success' ] && [ "$WEB_BUILD" = 'success' ]; }
+          [ "$RUN_WEB" != 'true' ] || { [ "$WEB_UNITS" = 'success' ] && [ "$WEB_BUILD" = 'success' ] && [ "$WEB_OVIE" = 'success' ] && [ "$WEB_STORYBOOK" = 'success' ]; }
           [ "$RUN_MAC" != 'true' ] || [ "$MAC_RESULT" = 'success' ]
           [ "$RUN_IOS" != 'true' ] || [ "$IOS_RESULT" = 'success' ]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2604,11 +2721,12 @@ jobs:
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
+      needs.ci-merge-group-admission.result == 'success' &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
@@ -2626,6 +2744,8 @@ jobs:
           FAST: ${{ needs.ci-fast.result }}
           WEB_UNIT: ${{ needs.ci-unit-tests.result }}
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          WEB_OVIE: ${{ needs.ci-build-ovie.result }}
+          WEB_STORYBOOK: ${{ needs.ci-storybook-surfaces.result }}
           IOS: ${{ needs.ci-ios.result }}
           MAC: ${{ needs.ci-macos.result }}
           CROSS: ${{ needs.ci-cross-product-integration.result }}
@@ -2641,7 +2761,7 @@ jobs:
           jq -n \
             --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
             --argjson mac "[\"$(lane_result "$RUN_MAC" "$MAC")\",\"$(lane_result "$RUN_MAC" "$FAST")\"]" \
-            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
+            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_STORYBOOK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
             --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
@@ -4191,6 +4311,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Retried-then-passed tests (scripts/lib/vitest-retry-reporter.mjs) for
+      # the nightly Test Flakiness Report. Observability only.
+      - name: Preserve retried-then-passed unit tests
+        if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-flaky-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.flaky.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
         if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
@@ -4229,8 +4361,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
 
       - name: Verify exact coverage head and diff base
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
@@ -5707,6 +5855,8 @@ jobs:
         ci-unit-tests,
         ci-exact-head-coverage,
         ci-build-layout,
+        ci-build-ovie,
+        ci-storybook-surfaces,
         ci-ios,
         ci-macos,
         ci-cross-product-integration,
@@ -5739,6 +5889,8 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"
+          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           MACOS_RESULT="${{ needs.ci-macos.result }}"
           CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
@@ -5781,7 +5933,9 @@ jobs:
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Exact-head Coverage | $COVERAGE_RESULT |"
-            echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
+            echo "| Build + Layout | $BUILD_LAYOUT_RESULT |"
+            echo "| Ovie Build | $OVIE_BUILD_RESULT |"
+            echo "| Storybook Surface Matrix | $STORYBOOK_SURFACES_RESULT |"
             echo "| iOS Fast Unit + Coverage | $IOS_RESULT |"
             echo "| Mac Build + Test | $MACOS_RESULT |"
             echo "| Cross-Product Integration | $CROSS_PRODUCT_RESULT |"
@@ -5833,6 +5987,8 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT" \
+            "Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT" \
             "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
@@ -6496,6 +6652,8 @@ jobs:
         drizzle-migration-guard,
         ci-unit-tests,
         ci-build-layout,
+        ci-build-ovie,
+        ci-storybook-surfaces,
         ci-ios,
         ci-macos,
         ci-cross-product-integration,
@@ -6541,6 +6699,8 @@ jobs:
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"
+          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           MACOS_RESULT="${{ needs.ci-macos.result }}"
           CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
@@ -6564,6 +6724,8 @@ jobs:
               "Migration Guard:$MIGRATION_RESULT" \
               "Unit Tests:$UNIT_RESULT" \
               "Build + Layout:$BUILD_LAYOUT_RESULT" \
+              "Ovie Build:$OVIE_BUILD_RESULT" \
+              "Storybook Surface Matrix:$STORYBOOK_SURFACES_RESULT" \
               "iOS Fast Unit + Coverage:$IOS_RESULT" \
               "Mac Build + Test:$MACOS_RESULT" \
               "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
@@ -6604,6 +6766,8 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT" \
+            "Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT" \
             "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do

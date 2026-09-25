@@ -32,6 +32,7 @@ import {
 import {
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
+  loopRecordSnapshot,
   persistDraftStackResolutions,
   persistLoopOutcome,
   readSummerQueue,
@@ -349,8 +350,12 @@ async function loadLifecycleActions(stateDir) {
   return records;
 }
 
-async function persistLifecycleAction(action, { stateDir, dryRun }) {
-  const records = dryRun ? [] : await loadLifecycleActions(stateDir);
+/**
+ * `records` is the snapshot's single directory load. Re-reading the whole
+ * receipt directory per action made the summer-queue lock hold O(actions x
+ * receipts) and starved Delivery Control Receipts past its 30s lock timeout.
+ */
+async function persistLifecycleAction(action, { stateDir, dryRun, records }) {
   const previous = records
     .filter(record => record.lifecycleKey === action.lifecycleKey)
     .sort((left, right) => {
@@ -407,6 +412,7 @@ async function persistLifecycleAction(action, { stateDir, dryRun }) {
   ) {
     throw new Error('PR lifecycle action key collision');
   }
+  if (persisted.status === 'created') records.push(persisted.value);
   return {
     status: persisted.status,
     receipt: persisted.value,
@@ -904,6 +910,7 @@ export async function persistDeliveryOutcome(
     reactivateDraftStack = false,
     queueLockHeld = false,
     draftStackGeneration = null,
+    loopRecords = null,
   } = {}
 ) {
   const receiptDestination = receiptPath(stateDir, receipt);
@@ -935,6 +942,7 @@ export async function persistDeliveryOutcome(
     stateDir,
     reactivateDraftStack,
     queueLockHeld,
+    loopRecords,
   });
   return {
     status: persistedReceipt.status,
@@ -1043,6 +1051,7 @@ export async function persistClosureHealthActions(
   }
   const persistSnapshot = async (queueLockHeld, draftStackAuthority = null) => {
     const results = [];
+    const loopRecords = queueLockHeld ? loopRecordSnapshot(stateDir) : null;
     for (const action of boundedActions) {
       const receipt = buildStackHealthReceipt(action, { now: observedAt });
       results.push(
@@ -1053,10 +1062,15 @@ export async function persistClosureHealthActions(
           reactivateDraftStack:
             activeViolationRoots?.has(action.rootPr) === true,
           draftStackGeneration: draftStackAuthority?.snapshotKey || null,
+          loopRecords,
         })
       );
     }
     const lifecycle = [];
+    const lifecycleRecords =
+      dryRun || boundedLifecycleRows.every(row => row.error)
+        ? []
+        : await loadLifecycleActions(stateDir).catch(error => error);
     for (const row of boundedLifecycleRows) {
       if (row.error) {
         lifecycle.push({
@@ -1067,9 +1081,11 @@ export async function persistClosureHealthActions(
         continue;
       }
       try {
+        if (lifecycleRecords instanceof Error) throw lifecycleRecords;
         const persisted = await persistLifecycleAction(row.action, {
           stateDir,
           dryRun,
+          records: lifecycleRecords,
         });
         lifecycle.push({
           status: persisted.status,
@@ -1119,6 +1135,7 @@ export async function persistClosureHealthActions(
           dryRun,
           queueLockHeld,
           reactivateDraftStack: true,
+          loopRecords,
         })
       );
     }
@@ -1131,6 +1148,7 @@ export async function persistClosureHealthActions(
         queueLockHeld,
         draftStackAuthority,
         repository,
+        loopRecords,
       }
     );
     const rejectedLifecycle = lifecycle.filter(

@@ -334,6 +334,8 @@ describe('source PR path-output reachability contract', () => {
       'ci-drizzle-check',
       'ci-integration-ready',
       'ci-build-layout',
+      'ci-build-ovie',
+      'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
       'ci-layout-guard',
@@ -1209,6 +1211,13 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(readinessJob).toContain('QUEUE_PROVEN');
     expect(readinessJob).toContain('Web Unit Tests:$RUN_WEB:$UNIT_RESULT');
     expect(readinessJob).toContain('Build + Layout');
+    expect(readinessJob).toContain(
+      'Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT'
+    );
+    expect(readinessJob).toContain(
+      'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');
@@ -1274,7 +1283,20 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('--build-env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).toContain('--env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).not.toMatch(/--(?:build-)?env\s+[^\s]+=/);
-    expect(deployScript).not.toContain('--token');
+    // The token must never reach the CLI as an argument (process lists and
+    // logs expose argv). The failure-tail redactor legitimately names the
+    // flag inside a regex, so assert on argument shapes, not the bare string.
+    // Any value after the flag counts, quoted or bare; the redactor's regex
+    // (`--token(?:=|\s+)`) is followed by `(`, so it never matches.
+    const tokenArgument = /--token(?:=|\s+)\S/;
+    expect(deployScript).not.toMatch(tokenArgument);
+    for (const leak of [
+      '--token abc123',
+      '--token="$VERCEL_TOKEN"',
+      '--token ${VERCEL_TOKEN}',
+    ]) {
+      expect(leak).toMatch(tokenArgument);
+    }
   });
 
   it('skips catalog mutation only for the manual PR preview build', () => {
@@ -1344,11 +1366,9 @@ describe('deploy workflow Vercel env resolution', () => {
       resolve(repoRoot, 'node_modules/vercel/dist/commands/deploy/index.js'),
       'utf8'
     );
-    expect(packageJson.devDependencies.vercel).toBe('59.23.2');
-    expect(vercelEntry).toContain(
-      'process.env.VERCEL_TOKEN&&(explicitToken=process.env.VERCEL_TOKEN,tokenSource="env")'
-    );
-    expect(vercelDeploy).toContain('val=process.env[key]');
+    expect(packageJson.devDependencies.vercel).toBe('56.3.2');
+    expect(vercelEntry).toContain('else if (process.env.VERCEL_TOKEN)');
+    expect(vercelDeploy).toContain('val = process.env[key]');
     expect(vercelDeploy).toContain('Reading ${import_chalk.default.bold(');
 
     const fixtureRoot = mkdtempSync(
@@ -1527,6 +1547,34 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(deployScript).toContain('.vercel/jovie-generated-public-files');
     expect(deployScript).toContain('rm -f -- "$generated_file"');
     expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+  });
+
+  it('pins the last Vercel CLI whose prebuilt tgz archives extract server-side', () => {
+    // Every staging `deploy --prebuilt --archive=tgz` since the 56.3.2 ->
+    // 59.16.0 bump (#18080) was created, then failed at "Extracting
+    // deployment files" with "Unexpected error". Last green deploy-staging
+    // ran CLI 56.3.2 (job 106502335969); the first red one ran 59.16.0 on the
+    // same 6861-file output (job 106515900378). The CLI also runs the
+    // `vercel build` step, so the pin covers the bundled @vercel/next too.
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+    ) as { devDependencies: Record<string, string> };
+    const lockfile = readFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), 'utf8');
+    const dependabot = readFileSync(
+      resolve(repoRoot, '.github/dependabot.yml'),
+      'utf8'
+    );
+    // The root importer runs from `  .:` to the next two-space importer key.
+    const rootImporter =
+      /\n {2}\.:\n([\s\S]*?)(?=\n {2}\S|\npackages:)/.exec(lockfile)?.[1] ?? '';
+
+    expect(packageJson.devDependencies.vercel).toBe('56.3.2');
+    expect(rootImporter).toMatch(
+      /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
+    );
+    expect(dependabot).toMatch(
+      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+    );
   });
 
   it('builds the staging prebuilt in-job and refuses source-cache substitution', () => {
@@ -4313,14 +4361,24 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
 describe('ci-fast critical deploy contract', () => {
   it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
-    const command =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts';
+    // The deploy contract runs by name (it sits in the quarantine ledger, so
+    // the tests/unit/ci directory run excludes it); setup-doppler-action and
+    // the rest of tests/unit/ci run in the directory command.
+    const byName =
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}';
+    const directory =
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
 
-    expect(ciFastLanes).toContain(command);
-    expect(command).toContain('tests/unit/ci/setup-doppler-action.test.ts');
-    expect(command).not.toContain('turbo');
-    expect(command).not.toContain('--affected');
-    expect(command).not.toContain('--passWithNoTests');
+    expect(ciFastLanes).toContain(
+      "const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';"
+    );
+    expect(ciFastLanes).toContain(byName);
+    expect(ciFastLanes).toContain(directory);
+    for (const command of [byName, directory]) {
+      expect(command).not.toContain('turbo');
+      expect(command).not.toContain('--affected');
+      expect(command).not.toContain('--passWithNoTests');
+    }
   });
 });
 

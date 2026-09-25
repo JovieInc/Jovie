@@ -254,7 +254,6 @@ export function PersistentAudioBar() {
       if (key === 'l' && plainKey && playbackState.hasLyrics) {
         event.preventDefault();
         handleOpenLyrics();
-        return;
       }
     }
 

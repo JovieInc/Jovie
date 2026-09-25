@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { reviewMerchContent } from './content-review';
 import {
   buildMerchImagePrompt,
+  formatMerchDesignConcept,
   MERCH_DESIGN_STRATEGIES,
   resolveMerchGenerationPrerequisites,
   selectionCountsToWeights,
@@ -14,6 +15,23 @@ const source = {
   provenanceTitle: 'Static Bloom',
   rightsStatus: 'owned' as const,
 };
+
+describe('formatMerchDesignConcept', () => {
+  it('appends a source suffix only when a source label is present', () => {
+    expect(
+      formatMerchDesignConcept('Signal Field', 'stadium tee graphic', null)
+    ).toBe('Signal Field direction: stadium tee graphic');
+    expect(
+      formatMerchDesignConcept(
+        'Signal Field',
+        'stadium tee graphic',
+        'song title: Static Bloom'
+      )
+    ).toBe(
+      'Signal Field direction: stadium tee graphic · Source: song title: Static Bloom'
+    );
+  });
+});
 
 describe('selectionCountsToWeights', () => {
   it('is empty (equal weighting) with no selection history', () => {

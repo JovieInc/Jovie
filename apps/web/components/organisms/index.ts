@@ -2,9 +2,6 @@
 // Complex combinations of molecules and atoms
 // Named exports for tree-shaking (no `export *`)
 
-// Compatibility export; canonical owner lives at the molecule layer.
-export type { EmptyStateProps } from '../molecules/EmptyState';
-export { EmptyState } from '../molecules/EmptyState';
 export type { AvatarUploadableProps } from './AvatarUploadable';
 export { AvatarUploadable } from './AvatarUploadable';
 export type { BenefitsSectionProps } from './BenefitsSection';

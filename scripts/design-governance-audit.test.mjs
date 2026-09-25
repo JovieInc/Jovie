@@ -18,13 +18,14 @@ test('repo design governance audit has no FAIL checks', () => {
   );
 });
 
-test('audit requires the standing enforcement commands', () => {
+test('audit confirms the standing enforcement commands are wired into ci-fast', () => {
   const { results } = runConformanceAudit();
   const wiring = results.find(item => item.id === 'enforcement-wiring');
-  assert.equal(wiring?.status, 'WARN');
+  assert.equal(wiring?.status, 'PASS');
   assert.match(wiring.detail, /design:governance:audit/);
   assert.match(wiring.detail, /design:tokens:export:check/);
-  assert.match(wiring.detail, /not a ci-fast merge gate/);
+  assert.match(wiring.detail, /design:authority:check/);
+  assert.match(wiring.detail, /lint:touch-target/);
   const scripts = results.find(item => item.id === 'package-scripts');
   assert.equal(scripts?.status, 'PASS');
 });

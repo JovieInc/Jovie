@@ -35,6 +35,32 @@ describe('GET /[username]/feed.xml', () => {
     expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
   });
 
+  it('returns 404 when the profile is missing or private', async () => {
+    const { GET } = await import('./route');
+
+    hoisted.getProfileByUsername.mockResolvedValueOnce(null);
+    const missing = await GET(
+      new Request('https://jov.ie/realartist/feed.xml'),
+      {
+        params: Promise.resolve({ username: 'realartist' }),
+      }
+    );
+    expect(missing.status).toBe(404);
+
+    hoisted.getProfileByUsername.mockResolvedValueOnce({
+      id: 'profile-1',
+      username: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: false,
+    });
+    const privateProfile = await GET(
+      new Request('https://jov.ie/realartist/feed.xml'),
+      { params: Promise.resolve({ username: 'realartist' }) }
+    );
+    expect(privateProfile.status).toBe(404);
+    expect(hoisted.getReleasesForProfileLite).not.toHaveBeenCalled();
+  });
+
   it('keeps legitimate public artist feeds discoverable', async () => {
     hoisted.getProfileByUsername.mockResolvedValue({
       id: 'profile-1',

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertTurnstileClientServerPairCompatible,
+  getBrowserTurnstileHostname,
   normalizeTurnstileHostname,
   resolveTurnstileSecretKey,
   resolveTurnstileSiteKey,
@@ -48,14 +49,12 @@ describe('shouldUseTurnstileDummyKeys', () => {
     expect(shouldUseTurnstileDummyKeys(host)).toBe(true);
   });
 
-  it.each([
-    'jov.ie',
-    'www.jov.ie',
-    'staging.jov.ie',
-    'main.jov.ie',
-  ])('does not use dummy keys on allowlisted host %s', host => {
-    expect(shouldUseTurnstileDummyKeys(host)).toBe(false);
-  });
+  it.each(['jov.ie', 'www.jov.ie', 'staging.jov.ie', 'main.jov.ie'])(
+    'does not use dummy keys on allowlisted host %s',
+    host => {
+      expect(shouldUseTurnstileDummyKeys(host)).toBe(false);
+    }
+  );
 
   it('does not force dummy keys when hostname is unknown (SSR-safe)', () => {
     expect(shouldUseTurnstileDummyKeys(null)).toBe(false);
@@ -163,6 +162,29 @@ describe('client/server pair guardrail (mismatch impossible)', () => {
     expect(
       assertTurnstileClientServerPairCompatible('jov.ie', REAL_SITE_KEY, null)
     ).toMatchObject({ ok: false });
+  });
+
+  it('reads the browser hostname only when location exists', () => {
+    vi.stubGlobal('location', undefined);
+    try {
+      expect(getBrowserTurnstileHostname()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    vi.stubGlobal('location', { hostname: '' });
+    try {
+      expect(getBrowserTurnstileHostname()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    vi.stubGlobal('location', { hostname: 'jov.ie' });
+    try {
+      expect(getBrowserTurnstileHostname()).toBe('jov.ie');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('preview host never keeps a real sitekey when real env is present', () => {

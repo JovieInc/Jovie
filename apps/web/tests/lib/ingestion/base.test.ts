@@ -82,7 +82,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(2);
+      expect(links).toHaveLength(2);
     });
 
     it('skips internal platform links', () => {
@@ -95,7 +95,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(1);
+      expect(links).toHaveLength(1);
       expect(links[0].platformId).toBe('instagram');
     });
 
@@ -106,7 +106,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(0);
+      expect(links).toHaveLength(0);
     });
 
     it('skips javascript links', () => {
@@ -116,7 +116,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(0);
+      expect(links).toHaveLength(0);
     });
 
     it('skips mailto links', () => {
@@ -126,7 +126,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(0);
+      expect(links).toHaveLength(0);
     });
 
     it('skips tel links', () => {
@@ -136,7 +136,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(0);
+      expect(links).toHaveLength(0);
     });
 
     it('deduplicates links by canonical identity', () => {
@@ -150,7 +150,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(1);
+      expect(links).toHaveLength(1);
     });
 
     it('sets correct evidence', () => {
@@ -174,7 +174,7 @@ describe('Base Extraction Utilities', () => {
         sourcePlatform: 'test',
         sourceSignal: 'test_signal',
       });
-      expect(links.length).toBe(0);
+      expect(links).toHaveLength(0);
     });
   });
 

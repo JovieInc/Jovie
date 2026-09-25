@@ -253,6 +253,7 @@ apps/desktop/src/*
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
+test-report.*.flaky.json
 
 # marketing architecture loop state (JOV loop, 2026-07-06)
 .context/marketing-architecture/

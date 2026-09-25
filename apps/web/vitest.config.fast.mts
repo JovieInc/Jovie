@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
+import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
 // so that Vite's @fs handler can locate files when the path contains spaces.
@@ -54,6 +55,12 @@ const junitOutputFile =
   (isCI && shardArgv
     ? `test-report.${shardArgv.replace(/\//g, '-')}.junit.xml`
     : 'test-report.junit.xml');
+// Retried-then-passed tests are invisible under --retry; this sidecar JSON
+// (next to the junit file) feeds the nightly Test Flakiness Report.
+const flakyOutputFile = junitOutputFile.replace(
+  /\.junit\.xml$|$/,
+  '.flaky.json'
+);
 
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
@@ -240,6 +247,10 @@ export default defineConfig({
       ? [
           ['default', { summary: false }],
           ['junit', { outputFile: junitOutputFile }],
+          new RetryVisibilityReporter({
+            outputFile: flakyOutputFile,
+            label: shardArgv ? `shard ${shardArgv}` : '',
+          }),
         ]
       : ['default'],
 
