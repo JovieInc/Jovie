@@ -90,7 +90,7 @@ export async function GET(
 
   const profile = await getProfileByUsername(username);
 
-  if (!profile || !profile.isPublic) {
+  if (!profile?.isPublic) {
     return NextResponse.json(
       { error: 'Artist not found' },
       {

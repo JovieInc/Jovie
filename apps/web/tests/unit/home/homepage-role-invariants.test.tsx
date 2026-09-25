@@ -82,6 +82,27 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(artistProfilesSource).toContain('MarketingPlatformSpecBento');
   });
 
+  it('allows hash and exact start destinations on public proof', () => {
+    const tile = {
+      id: 'proof',
+      name: 'Tim',
+      handle: 'tim',
+      scenarioId: 'live',
+      label: 'Live',
+    };
+    expect(auditHomepagePublicProof([{ ...tile, href: '#pricing' }])).toEqual(
+      []
+    );
+    expect(
+      auditHomepagePublicProof([{ ...tile, href: '/start?plan=pro' }])
+    ).toEqual([]);
+    expect(
+      auditHomepagePublicProof([{ ...tile, href: '/starting' }]).map(
+        finding => finding.code
+      )
+    ).toContain('homepage-claimed-destination-not-public');
+  });
+
   it('rejects the JOV-5333 deliberate-red homepage regression', () => {
     expect(
       presenceOnlyHomepageMountsPass(

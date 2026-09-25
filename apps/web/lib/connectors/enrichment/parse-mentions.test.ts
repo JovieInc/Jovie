@@ -22,6 +22,21 @@ describe('connector enrichment parse-mentions', () => {
     expect(output.every(mention => mention.confidence >= 0.7)).toBe(true);
   });
 
+  it('reads a hyphenated booking subject the same way as an em dash', () => {
+    const mentions = extractGmailMentions({
+      subject: 'Booking Confirmation - Output Brooklyn, May 23 2026',
+      from: 'Bookings <bookings@example.com>',
+      snippet: 'See you there.',
+    });
+
+    expect(
+      mentions.some(
+        mention =>
+          mention.name === 'Output Brooklyn' && mention.type === 'location'
+      )
+    ).toBe(true);
+  });
+
   it('returns no mentions for prompt-injection fixture email', () => {
     const injection = FIXTURE_BOOKING_EMAILS.find(
       email => email.id === 'fixture-msg-005'

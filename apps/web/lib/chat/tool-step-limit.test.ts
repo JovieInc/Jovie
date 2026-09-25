@@ -50,6 +50,17 @@ describe('isChatToolStepCapExhausted', () => {
     );
   });
 
+  it('reads the last step when only that step still has tool calls', () => {
+    const steps = Array.from({ length: CHAT_TOOL_STEP_LIMIT_FREE }, () => ({
+      toolCalls: [] as { toolName: string }[],
+    }));
+    steps[steps.length - 1] = { toolCalls: [{ toolName: 'loopTool' }] };
+
+    expect(isChatToolStepCapExhausted(steps, CHAT_TOOL_STEP_LIMIT_FREE)).toBe(
+      true
+    );
+  });
+
   it('returns true when the cap is reached with pending tool calls', () => {
     const steps = Array.from({ length: CHAT_TOOL_STEP_LIMIT_FREE }, () => ({
       toolCalls: [{ toolName: 'loopTool' }],

@@ -4,6 +4,7 @@ import {
   validateLiveRobotsTxt,
   validateLiveSitemapXml,
   validateProductionRobots,
+  validateSourceMetadataPatterns,
 } from '@/lib/seo/ratchet';
 
 describe('SEO ratchet library — live robots/sitemap parsers (JOV-11044)', () => {
@@ -71,5 +72,64 @@ describe('SEO ratchet library — live robots/sitemap parsers (JOV-11044)', () =
     expect(
       issues.some(issue => issue.code === 'robots-missing-ai-crawler')
     ).toBe(true);
+  });
+});
+
+describe('validateSourceMetadataPatterns character class', () => {
+  const required = ['canonical', 'title', 'description'] as const;
+
+  it('accepts colon-separated metadata wiring', () => {
+    const source = `
+      export const metadata = {
+        title: 'Jovie',
+        description: 'Public page',
+        alternates: {
+          canonical: 'https://jov.ie',
+        },
+      };
+    `;
+
+    expect(
+      validateSourceMetadataPatterns(source, required, 'colon-form')
+    ).toEqual([]);
+  });
+
+  it('accepts comma-separated metadata wiring', () => {
+    const source = `
+      export const metadata = {
+        title,
+        description,
+        alternates: {
+          canonical,
+        },
+      };
+    `;
+
+    expect(
+      validateSourceMetadataPatterns(source, required, 'comma-form')
+    ).toEqual([]);
+  });
+
+  it('rejects metadata wiring that has neither colon nor comma', () => {
+    const source = `
+      export const metadata = {
+        title
+        description
+        alternates: {
+          canonical
+        },
+      };
+    `;
+    const issues = validateSourceMetadataPatterns(
+      source,
+      required,
+      'bare-form'
+    );
+
+    expect(issues.map(issue => issue.code)).toEqual([
+      'missing-source-canonical',
+      'missing-source-title',
+      'missing-source-description',
+    ]);
   });
 });

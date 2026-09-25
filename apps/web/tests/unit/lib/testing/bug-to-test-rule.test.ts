@@ -17,6 +17,20 @@ describe('bug-to-test rule', () => {
     expect(evaluation.isBugFix).toBe(false);
   });
 
+  it('treats a colon-form fix subject as a bug fix', () => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: ['apps/web/lib/auth/session.ts'],
+      commitMessages: ['fix: clear stale session cookie'],
+      prTitle: 'fix: clear stale session cookie',
+    });
+
+    expect(evaluation.isBugFix).toBe(true);
+    expect(evaluation.bugFixSignals).toEqual([
+      'PR title "fix: clear stale session cookie"',
+      'commit "fix: clear stale session cookie"',
+    ]);
+  });
+
   it('requires regression test evidence for fix commits', () => {
     const evaluation = evaluateBugToTestRule({
       changedFiles: ['apps/web/lib/auth/session.ts'],

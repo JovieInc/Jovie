@@ -25,6 +25,7 @@ import {
   LANE_GROUPS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
+  OFFLINE_FAILURE_COVERAGE_COMMAND,
   selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
@@ -849,7 +850,9 @@ describe('ci-fast bounded parallel workflow', () => {
         ' && ' +
         ACQUISITION_CERTIFICATION_COMMAND +
         ' && ' +
-        DESKTOP_RELEASE_COVERAGE_COMMAND,
+        DESKTOP_RELEASE_COVERAGE_COMMAND +
+        ' && ' +
+        OFFLINE_FAILURE_COVERAGE_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -2083,4 +2086,47 @@ describe('CI diff selection on a divergent PR', () => {
       rmSync(repository, { recursive: true, force: true });
     }
   });
+});
+
+it('selects and enforces offline failure behavior coverage for module-only and test-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  expect(pattern).toBeDefined();
+  for (const path of [
+    'scripts/lib/rolling-ci-failure-disposition.mjs',
+    'scripts/lib/__tests__/rolling-ci-failure-disposition.test.mjs',
+  ]) {
+    expect(
+      spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status,
+      path
+    ).toBe(0);
+  }
+  expect(
+    spawnSync('grep', ['-qE', pattern], {
+      input: 'scripts/lib/rolling-ci-failure-disposition.mjs.unrelated\n',
+    }).status
+  ).toBe(1);
+  expect(LANE_COMMANDS.structural).toContain(OFFLINE_FAILURE_COVERAGE_COMMAND);
+  expect(
+    CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const operationsParts = ['),
+      CI_FAST_SOURCE.indexOf('const webParts = [')
+    )
+  ).toContain('OFFLINE_FAILURE_COVERAGE_COMMAND');
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    'lib/__tests__/rolling-ci-failure-disposition.test.mjs'
+  );
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    '--coverage.include="$PWD/scripts/lib/rolling-ci-failure-disposition.mjs"'
+  );
+  for (const metric of [
+    'lines=100',
+    'statements=100',
+    'functions=100',
+    'branches=95',
+    'perFile=true',
+  ]) {
+    expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+      `--coverage.thresholds.${metric}`
+    );
+  }
 });

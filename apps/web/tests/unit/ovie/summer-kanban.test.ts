@@ -541,6 +541,28 @@ describe('Summer Kanban (JOV-5215)', () => {
     });
   });
 
+  it('skips a blank receipt handle and uses the next one', () => {
+    const initiative = summerKanbanInitiative('ini_receipt_only', {
+      routingState: 'done',
+      destinationHandle: null,
+      evidence: [
+        { kind: 'receipt', summary: OVIE_QUEUED_ACK, ref: DEST_KANBAN },
+      ],
+    });
+    initiative.receipts = [
+      { ...initiative.receipts[0]!, destinationHandle: '   ' },
+      { ...initiative.receipts[0]!, destinationHandle: 'task_from_receipt' },
+    ];
+
+    expect(toSummerKanbanCard(initiative)?.terminalEvidence).toEqual({
+      state: 'proven',
+      ref: 'task_from_receipt',
+      url: null,
+      summary: null,
+      observedAt: null,
+    });
+  });
+
   it('maps record age to fresh/stale and missing timestamps to unknown, never fresh', async () => {
     const t0 = '2026-09-03T00:00:00.000Z';
     const fresh = toSummerKanbanCard(

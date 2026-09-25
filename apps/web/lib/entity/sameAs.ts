@@ -48,7 +48,7 @@ const SAME_AS_PLATFORMS = new Set([
 
 /** Normalize an ISNI string to 16 digits (strips spaces/hyphens) */
 function normalizeIsni(raw: string): string {
-  return raw.replace(/[\s\-]/g, '');
+  return raw.replace(/[\s-]/g, '');
 }
 
 /**

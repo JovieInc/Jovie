@@ -102,6 +102,7 @@ describe('public profile indexing policy', () => {
   it.each([
     ['tmoc0g1x9dwmk71', 'gp moc+clerk test'],
     ['tmoc209131l1r6w', 'GP MOC+CLERK TEST'],
+    ['tim', 'Real Name +clerk test'],
   ])(
     'excludes by Clerk-test display name even without the handle shape: %s',
     (handle, displayName) => {

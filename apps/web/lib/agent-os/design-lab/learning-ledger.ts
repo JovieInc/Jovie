@@ -205,7 +205,7 @@ export function appendDesignLearningEntry(
   candidate: unknown
 ): readonly DesignLearningEntry[] {
   const entry = DesignLearningEntrySchema.parse(candidate);
-  const duplicate = existing.find(
+  const duplicate = existing.some(
     item =>
       item.entryId === entry.entryId || item.contentHash === entry.contentHash
   );

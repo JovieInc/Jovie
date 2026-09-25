@@ -507,6 +507,23 @@ function createApi() {
       return records;
     } catch (error) { if (error?.code === 'ENOENT') return []; throw error; }
   }
+  // One lazy red-loop scan per locked run. Rescanning per row made the
+  // summer-queue lock hold grow with directory size. Records created in the
+  // run are appended as disk would return them, and a failed scan is rethrown
+  // to every dependent read exactly as a per-row rescan would have thrown.
+  function loopRecordSnapshot(stateDir) {
+    let records = null;
+    return {
+      load() {
+        records ||= loadLoopRecords(stateDir);
+        return records.then(loaded => [...loaded]);
+      },
+      add(record) {
+        if (records) records = records.then(loaded => [...loaded, JSON.parse(JSON.stringify(record))]);
+      },
+    };
+  }
+  const readLoopRecords = (stateDir, loopRecords) => loopRecords ? loopRecords.load() : loadLoopRecords(stateDir);
   async function readSummerQueue(stateDir) {
     try { return JSON.parse(await readFile(join(stateDir, 'summer-queue.json'), 'utf8')); }
     catch (error) { if (error?.code === 'ENOENT') return null; throw error; }
@@ -543,8 +560,8 @@ function createApi() {
       if (locked && code !== 0) throw new Error(`summer queue writer lock helper exited ${code}: ${stderr.trim()}`);
     }
   }
-  async function writeSummerQueue(stateDir, observedAt, draftStackAuthority = null) {
-    const records = await loadLoopRecords(stateDir);
+  async function writeSummerQueue(stateDir, observedAt, draftStackAuthority = null, loopRecords = null) {
+    const records = await readLoopRecords(stateDir, loopRecords);
     const current = await readSummerQueue(stateDir);
     const authority = draftStackAuthority || current?.draftStackAuthority || null;
     const visibleRecords = records.filter(record => draftStackRecordVisibleForAuthority(record, authority));
@@ -560,7 +577,7 @@ function createApi() {
     await rename(temporary, queuePath);
     return { queue, queuePath };
   }
-  async function persistLoopOutcome(record, { stateDir = '', dryRun = false, beforeProject = null, reactivateDraftStack = false, queueLockHeld = false } = {}) {
+  async function persistLoopOutcome(record, { stateDir = '', dryRun = false, beforeProject = null, reactivateDraftStack = false, queueLockHeld = false, loopRecords = null } = {}) {
     assertNoUnattendedRed([record]);
     const destination = join(stateDir, 'red-loop', `${record.loopKey}.json`);
     let recordPath = destination;
@@ -569,8 +586,9 @@ function createApi() {
     if (dryRun) return { status: 'dry-run', record, recordPath: destination, evidence, evidencePath };
     const persist = async () => {
       let persisted = await atomicCreate(destination, record);
+      if (persisted.status === 'created') loopRecords?.add(persisted.value);
       if (reactivateDraftStack && persisted.status === 'duplicate') {
-        const latest = (await loadLoopRecords(stateDir))
+        const latest = (await readLoopRecords(stateDir, loopRecords))
           .filter(item => item.stallClass === 'draft-stack-policy' && item.pr === record.pr && item.repository === record.repository)
           .reduce((current, item) => current ? preferDraftStackRecord(current, item) : item, null);
         if (
@@ -584,6 +602,7 @@ function createApi() {
           };
           recordPath = join(stateDir, 'red-loop', `${reactivated.loopKey}.json`);
           persisted = await atomicCreate(recordPath, reactivated);
+          if (persisted.status === 'created') loopRecords?.add(persisted.value);
         }
       }
       const persistedEvidence = evidence ? await atomicCreate(evidencePath, evidence) : null;
@@ -591,14 +610,14 @@ function createApi() {
       if (queueLockHeld) {
         return { status: persisted.status, record: persisted.value, recordPath, evidence: persistedEvidence?.value || null, evidencePath, queue: null, queuePath: null };
       }
-      const { queue, queuePath } = await writeSummerQueue(stateDir, record.observedAt);
+      const { queue, queuePath } = await writeSummerQueue(stateDir, record.observedAt, null, loopRecords);
       return { status: persisted.status, record: persisted.value, recordPath, evidence: persistedEvidence?.value || null, evidencePath, queue, queuePath };
     };
     return queueLockHeld ? persist() : withSummerQueueLock(stateDir, persist);
   }
   async function persistDraftStackResolutions(
     activeRoots,
-    { stateDir = '', dryRun = false, now = new Date().toISOString(), queueLockHeld = false, draftStackAuthority = null, repository = null } = {}
+    { stateDir = '', dryRun = false, now = new Date().toISOString(), queueLockHeld = false, draftStackAuthority = null, repository = null, loopRecords = null } = {}
   ) {
     if (activeRoots == null) {
       return { status: 'unobserved', resolved: [], queue: null, queuePath: null };
@@ -613,7 +632,7 @@ function createApi() {
     if (dryRun) return { status: 'dry-run', resolved: [], queue: null, queuePath: null };
     const persist = async () => {
       const resolutionObservedAt = iso(now);
-      const records = await loadLoopRecords(stateDir);
+      const records = await readLoopRecords(stateDir, loopRecords);
       const latest = new Map();
       const visibleLatest = new Map();
       const scopedRepository = repoName(repository);
@@ -660,15 +679,16 @@ function createApi() {
         };
         const destination = join(stateDir, 'red-loop', `${tombstone.loopKey}.json`);
         const persisted = await atomicCreate(destination, tombstone);
+        if (persisted.status === 'created') loopRecords?.add(persisted.value);
         resolved.push({ rootPr: root, status: persisted.status, record: persisted.value });
       }
-      const { queue, queuePath } = await writeSummerQueue(stateDir, resolutionObservedAt, draftStackAuthority);
+      const { queue, queuePath } = await writeSummerQueue(stateDir, resolutionObservedAt, draftStackAuthority, loopRecords);
       return { status: resolved.length ? 'resolved' : 'unchanged', resolved, queue, queuePath };
     };
     return queueLockHeld ? persist() : withSummerQueueLock(stateDir, persist);
   }
   const classifyAndOpenFromDelivery = (input, options = {}) => openLoopRecord(classifyStall(input, options), options);
-  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, buildEscalationHandoff, prepareEscalation, escalate, advanceAttempt, planDelegatedDiagnosis, planFounderContact, transitionFounderContact, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, readSummerQueue, persistLoopOutcome, persistDraftStackResolutions, withSummerQueueLock, classifyAndOpenFromDelivery };
+  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, buildEscalationHandoff, prepareEscalation, escalate, advanceAttempt, planDelegatedDiagnosis, planFounderContact, transitionFounderContact, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, loopRecordSnapshot, readSummerQueue, persistLoopOutcome, persistDraftStackResolutions, withSummerQueueLock, classifyAndOpenFromDelivery };
 }
 
 const api = createApi();
@@ -694,6 +714,7 @@ export const projectSummerQueue = api.projectSummerQueue;
 export const assertNoUnattendedRed = api.assertNoUnattendedRed;
 export const evidenceTaskForRecord = api.evidenceTaskForRecord;
 export const loadLoopRecords = api.loadLoopRecords;
+export const loopRecordSnapshot = api.loopRecordSnapshot;
 export const readSummerQueue = api.readSummerQueue;
 export const persistLoopOutcome = api.persistLoopOutcome;
 export const persistDraftStackResolutions = api.persistDraftStackResolutions;

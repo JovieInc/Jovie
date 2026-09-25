@@ -46,7 +46,7 @@ const DSP_PLATFORMS: Record<string, string> = {
 
 function nonEmptyUrl(url: string | null | undefined): string | null {
   const trimmed = url?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function buildUniqueSocialUrls(

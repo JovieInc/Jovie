@@ -519,6 +519,38 @@ describe('campaign monitoring (JOV-2212)', () => {
     expect(resumed.status).not.toBe('paused');
   });
 
+  it('marks a strong campaign at risk when a channel is off', () => {
+    const counters = {
+      clicks: 200,
+      purchases: 20,
+      replies: 40,
+      optIns: 15,
+      channelStatuses: {
+        jovie_link: 'ok' as const,
+        email: 'ok' as const,
+        sms: 'ok' as const,
+        profile: 'ok' as const,
+        social: 'ok' as const,
+      },
+    };
+    const healthy = buildCampaignHealthSnapshot({
+      campaignId: 'camp_channels',
+      counters,
+      now: NOW.toISOString(),
+    });
+    expect(healthy.status).toBe('healthy');
+
+    const atRisk = buildCampaignHealthSnapshot({
+      campaignId: 'camp_channels',
+      counters: {
+        ...counters,
+        channelStatuses: { ...counters.channelStatuses, email: 'off' },
+      },
+      now: NOW.toISOString(),
+    });
+    expect(atRisk.status).toBe('at_risk');
+  });
+
   it('recommends extend window on strong conversion', () => {
     const snapshot = buildCampaignHealthSnapshot({
       campaignId: 'camp_hot',

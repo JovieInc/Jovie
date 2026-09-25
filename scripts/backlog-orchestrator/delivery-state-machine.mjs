@@ -32,6 +32,7 @@ import {
 import {
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
+  loopRecordSnapshot,
   persistDraftStackResolutions,
   persistLoopOutcome,
   readSummerQueue,
@@ -909,6 +910,7 @@ export async function persistDeliveryOutcome(
     reactivateDraftStack = false,
     queueLockHeld = false,
     draftStackGeneration = null,
+    loopRecords = null,
   } = {}
 ) {
   const receiptDestination = receiptPath(stateDir, receipt);
@@ -940,6 +942,7 @@ export async function persistDeliveryOutcome(
     stateDir,
     reactivateDraftStack,
     queueLockHeld,
+    loopRecords,
   });
   return {
     status: persistedReceipt.status,
@@ -1048,6 +1051,7 @@ export async function persistClosureHealthActions(
   }
   const persistSnapshot = async (queueLockHeld, draftStackAuthority = null) => {
     const results = [];
+    const loopRecords = queueLockHeld ? loopRecordSnapshot(stateDir) : null;
     for (const action of boundedActions) {
       const receipt = buildStackHealthReceipt(action, { now: observedAt });
       results.push(
@@ -1058,6 +1062,7 @@ export async function persistClosureHealthActions(
           reactivateDraftStack:
             activeViolationRoots?.has(action.rootPr) === true,
           draftStackGeneration: draftStackAuthority?.snapshotKey || null,
+          loopRecords,
         })
       );
     }
@@ -1130,6 +1135,7 @@ export async function persistClosureHealthActions(
           dryRun,
           queueLockHeld,
           reactivateDraftStack: true,
+          loopRecords,
         })
       );
     }
@@ -1142,6 +1148,7 @@ export async function persistClosureHealthActions(
         queueLockHeld,
         draftStackAuthority,
         repository,
+        loopRecords,
       }
     );
     const rejectedLifecycle = lifecycle.filter(
