@@ -3,6 +3,10 @@ name: Summer Eve pin check
 # Confirms the Jovie production pin is a READY production deployment of
 # production Summer and reports drift from https://summer.jov.ie.
 # clock-class: upstream-advisory
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: A read-only schedule reads the Jovie production pin with SUMMER_PIN_CHECK_VERCEL_TOKEN and does not mutate GitHub.
+# removal-trigger: Remove this schedule when the advisory exact pin and check:summer-eve-pin are retired.
 
 on:
   workflow_dispatch:

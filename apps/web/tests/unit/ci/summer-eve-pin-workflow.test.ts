@@ -25,6 +25,10 @@ describe('summer eve pin workflow', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('pull_request:');
     expect(workflow).toContain('scripts/check-summer-eve-pin.ts');
+    expect(workflow).toContain(
+      'controller-hop-exception: jovie-controller-hop/v1'
+    );
+    expect(workflow).toContain('accountable-writer: Summer');
     expect(workflow).toContain('contents: read');
     expect(workflow).not.toContain('contents: write');
     const skip = workflow.slice(
