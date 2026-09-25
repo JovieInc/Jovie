@@ -34,6 +34,16 @@ describe('merge queue live verify workflow', () => {
     expect(workflow).not.toContain('gh issue create');
   });
 
+  it('reads bypass actors with the contents token instead of a ruleset-write scope', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(workflow).toContain('bypassActors.totalCount');
+    expect(workflow).not.toContain('administration:');
+    expect(workflow).not.toContain('GH_TOKEN: ${{ secrets.');
+  });
+
   it('does not add live verify to source PR or merge-group CI', () => {
     const ciWorkflow = readFileSync(ciWorkflowPath, 'utf8');
 

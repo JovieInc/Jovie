@@ -39,6 +39,7 @@ import {
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
   requiredStatusDecision,
+  resolveLiveBypassActors,
   uiFastTrackPolicy,
   unmergeableEjectDecision,
   unmergeableReenqueueDecision,
@@ -651,6 +652,77 @@ describe('aggregate required checks', () => {
         expect.stringContaining('bypass_actors must be empty'),
       ])
     );
+  });
+
+  it('hydrates an empty bypass list only from a proven GraphQL totalCount', () => {
+    expect(resolveLiveBypassActors({ totalCount: 0, nodes: [] })).toEqual({
+      ok: true,
+      bypass_actors: [],
+    });
+
+    const redacted = resolveLiveBypassActors({
+      totalCount: 2,
+      nodes: [null, null],
+    });
+    expect(redacted.ok).toBe(true);
+    if (redacted.ok) expect(redacted.bypass_actors).toHaveLength(2);
+
+    const role = resolveLiveBypassActors({
+      totalCount: 1,
+      nodes: [
+        {
+          bypassMode: 'ALWAYS',
+          organizationAdmin: false,
+          repositoryRoleDatabaseId: 5,
+          repositoryRoleName: 'admin',
+        },
+      ],
+    });
+    expect(role).toEqual({
+      ok: true,
+      bypass_actors: [
+        { actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'ALWAYS' },
+      ],
+    });
+
+    expect(
+      resolveLiveBypassActors({
+        totalCount: 1,
+        nodes: [{ organizationAdmin: true, bypassMode: 'ALWAYS' }],
+      }).bypass_actors
+    ).toEqual([
+      {
+        actor_id: null,
+        actor_type: 'OrganizationAdmin',
+        bypass_mode: 'ALWAYS',
+      },
+    ]);
+
+    for (const connection of [
+      undefined,
+      {},
+      { totalCount: 0 },
+      { totalCount: 0, nodes: [null] },
+      { totalCount: 1, nodes: ['redacted'] },
+      { totalCount: -1, nodes: [] },
+    ]) {
+      expect(resolveLiveBypassActors(connection).ok).toBe(false);
+    }
+
+    const truncated = resolveLiveBypassActors({ totalCount: 3, nodes: [] });
+    expect(truncated.ok).toBe(true);
+    if (truncated.ok) expect(truncated.bypass_actors).toHaveLength(3);
+  });
+
+  it('reads GraphQL bypass actors when REST omits the field', () => {
+    const source = readFileSync(
+      resolve(REPO_ROOT, 'scripts/ci-merge-queue-check.mjs'),
+      'utf8'
+    );
+    expect(source).toContain('resolveLiveBypassActors');
+    expect(source).toMatch(/'api',\s*'graphql'/);
+    expect(source).toContain('bypassActors(first: 100)');
+    expect(source).toContain('Array.isArray(ruleset?.bypass_actors)');
   });
 
   it('rejects retired or unknown backend names', () => {

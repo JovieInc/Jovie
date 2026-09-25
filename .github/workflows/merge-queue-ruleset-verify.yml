@@ -38,6 +38,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # REST omits bypass_actors without ruleset write access. GITHUB_TOKEN
+      # has no administration scope (workflow syntax rejects that key). verify
+      # keeps this contents: read token and hydrates bypass_actors from GraphQL
+      # bypassActors.totalCount, which is visible here. Missing or non-empty
+      # lists still fail closed.
       - name: Verify live merge-queue ruleset
         env:
           GH_TOKEN: ${{ github.token }}

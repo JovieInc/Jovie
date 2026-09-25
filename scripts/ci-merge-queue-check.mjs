@@ -7,6 +7,7 @@ import {
   frontItemChurnDecision,
   MERGE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
+  resolveLiveBypassActors,
   unmergeableEjectDecision,
   unmergeableReenqueueDecision,
   validateLiveMergeQueueRuleset,
@@ -35,26 +36,81 @@ function readRepoFile(relativePath) {
   return readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
 }
 
-function loadLiveRuleset() {
+const GH_EXEC_ENV = {
+  GH_FORCE_TTY: '0',
+  NO_COLOR: '1',
+  FORCE_COLOR: '0',
+};
+
+const LIVE_BYPASS_ACTORS_QUERY =
+  'query($id: Int!) { repository(owner: "JovieInc", name: "Jovie") { ruleset(databaseId: $id) { databaseId bypassActors(first: 100) { totalCount nodes { bypassMode organizationAdmin repositoryRoleName repositoryRoleDatabaseId } } } } }';
+
+function ghApi(args) {
+  return execFileSync('gh', args, {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      ...GH_EXEC_ENV,
+    },
+  });
+}
+
+function readGraphqlBypassActors(rulesetId) {
+  let parsed;
   try {
-    const json = execFileSync(
-      'gh',
-      ['api', `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`],
-      {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GH_FORCE_TTY: '0',
-          NO_COLOR: '1',
-          FORCE_COLOR: '0',
-        },
-      }
+    parsed = JSON.parse(
+      ghApi([
+        'api',
+        'graphql',
+        '-f',
+        `query=${LIVE_BYPASS_ACTORS_QUERY}`,
+        '-F',
+        `id=${rulesetId}`,
+      ])
     );
-    return JSON.parse(json);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      error: `Live ruleset bypass actor read failed: ${reason}`,
+    };
+  }
+  const graphError = Array.isArray(parsed?.errors)
+    ? parsed.errors.find(entry => typeof entry?.message === 'string')?.message
+    : null;
+  if (graphError) {
+    return {
+      ok: false,
+      error: `Live ruleset bypass actor read failed: ${graphError}`,
+    };
+  }
+  const ruleset = parsed?.data?.repository?.ruleset;
+  if (ruleset?.databaseId !== Number(rulesetId)) {
+    return {
+      ok: false,
+      error: `Live ruleset bypass actor read did not return ruleset ${rulesetId}`,
+    };
+  }
+  return resolveLiveBypassActors(ruleset.bypassActors);
+}
+
+function loadLiveRuleset() {
+  let ruleset;
+  try {
+    ruleset = JSON.parse(
+      ghApi([
+        'api',
+        `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`,
+      ])
+    );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return { error: reason };
   }
+  if (Array.isArray(ruleset?.bypass_actors)) return ruleset;
+  const bypassActors = readGraphqlBypassActors(MERGE_QUEUE_POLICY.rulesetId);
+  if (!bypassActors.ok) return { error: bypassActors.error };
+  return { ...ruleset, bypass_actors: bypassActors.bypass_actors };
 }
 
 function printPolicySummary() {

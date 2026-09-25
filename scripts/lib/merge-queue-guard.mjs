@@ -1429,6 +1429,102 @@ export function validateMergeQueueRepoConfig(input) {
 }
 
 /**
+ * REST Get a repository ruleset omits `bypass_actors` unless the caller has
+ * write access to the ruleset. GraphQL `bypassActors.totalCount` is visible
+ * to a contents/metadata token. Actor nodes are null when identities are
+ * redacted, and a hidden non-empty list keeps totalCount above zero.
+ *
+ * Returns an array only for a well-formed connection. An empty array is
+ * returned only when totalCount and nodes both prove the list is empty.
+ *
+ * @param {unknown} connection
+ * @returns {{
+ *   ok: true,
+ *   bypass_actors: Array<Record<string, unknown>>,
+ * } | { ok: false, error: string }}
+ */
+export function resolveLiveBypassActors(connection) {
+  const totalCount =
+    connection && typeof connection === 'object'
+      ? /** @type {{ totalCount?: unknown, nodes?: unknown }} */ (connection)
+          .totalCount
+      : undefined;
+  const nodes =
+    connection && typeof connection === 'object'
+      ? /** @type {{ nodes?: unknown }} */ (connection).nodes
+      : undefined;
+  if (
+    typeof totalCount !== 'number' ||
+    !Number.isInteger(totalCount) ||
+    totalCount < 0 ||
+    !Array.isArray(nodes)
+  ) {
+    return {
+      ok: false,
+      error:
+        'live ruleset bypass actor read did not return totalCount and nodes',
+    };
+  }
+  if (nodes.length > totalCount) {
+    return {
+      ok: false,
+      error:
+        'live ruleset bypass actor read returned more nodes than totalCount',
+    };
+  }
+  if (totalCount === 0) return { ok: true, bypass_actors: [] };
+
+  /** @type {Array<Record<string, unknown>>} */
+  const bypassActors = [];
+  for (const node of nodes) {
+    if (node == null) {
+      bypassActors.push({ actor_id: null, actor_type: null });
+      continue;
+    }
+    if (typeof node !== 'object' || Array.isArray(node)) {
+      return {
+        ok: false,
+        error: 'live ruleset bypass actor read returned a malformed node',
+      };
+    }
+    bypassActors.push(mapGraphqlBypassActor(node));
+  }
+  while (bypassActors.length < totalCount) {
+    bypassActors.push({ actor_id: null, actor_type: null });
+  }
+  return { ok: true, bypass_actors: bypassActors };
+}
+
+/**
+ * @param {object} node
+ * @returns {Record<string, unknown>}
+ */
+function mapGraphqlBypassActor(node) {
+  const bypassMode =
+    'bypassMode' in node &&
+    (typeof node.bypassMode === 'string' || node.bypassMode == null)
+      ? node.bypassMode
+      : null;
+  if ('organizationAdmin' in node && node.organizationAdmin === true) {
+    return {
+      actor_id: null,
+      actor_type: 'OrganizationAdmin',
+      bypass_mode: bypassMode,
+    };
+  }
+  const roleId =
+    'repositoryRoleDatabaseId' in node ? node.repositoryRoleDatabaseId : null;
+  if (typeof roleId === 'number' && Number.isInteger(roleId)) {
+    return {
+      actor_id: roleId,
+      actor_type: 'RepositoryRole',
+      bypass_mode: bypassMode,
+    };
+  }
+  return { actor_id: null, actor_type: null, bypass_mode: bypassMode };
+}
+
+/**
  * Validate a live GitHub ruleset payload (gh api repos/.../rulesets/...).
  *
  * @param {Record<string, unknown>} ruleset
