@@ -7,6 +7,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -97,6 +98,26 @@ describe('remediation cooldown recovery', () => {
       assert.equal(receipt.resetAt, resetAt);
       assert.equal(receipt.retryAt, new Date(resetAt).toISOString());
       assert.match(result.stderr, /scheduled remediation clock will retry/);
+      const launcher = resolve(stateRoot, 'backlog-launcher.mjs');
+      await symlink(executable, launcher);
+      const linked = await execFileAsync(
+        process.execPath,
+        [launcher, 'remediate'],
+        {
+          env: {
+            ...process.env,
+            LINEAR_API_KEY: key,
+            LINEAR_BACKOFF_STATE_DIR: stateRoot,
+            XDG_CACHE_HOME: stateRoot,
+          },
+        }
+      );
+      assert.equal(
+        JSON.parse(
+          linked.stderr.match(/Failure receipt: (\{.*\})/)?.[1] || '{}'
+        ).code,
+        'RATE_LIMITED'
+      );
     } finally {
       await rm(stateRoot, { recursive: true, force: true });
     }
@@ -2212,11 +2233,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const body = source.slice(start, end);
     assert.ok(start >= 0 && end > start);
     assert.match(body, /stage: 'collision-preflight'/);
+    assert.match(body, /options\.preflight \|\| admissionPreflight/);
+    const initialPreflight = body.indexOf('checkPreflight(team, selected)');
     assert.ok(
-      body.indexOf('admissionPreflight(team, selected)') <
-        body.indexOf('buildDeterministicPlanEvidence')
+      initialPreflight >= 0 &&
+        initialPreflight < body.indexOf('buildDeterministicPlanEvidence')
     );
-    assert.match(body, /admissionPreflight\(team, current\)/);
+    assert.match(body, /checkPreflight\(team, current\)/);
   });
 
   it('rechecks refreshed research receipts before reading fingerprints', async () => {
