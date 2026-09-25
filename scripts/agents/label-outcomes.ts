@@ -12,6 +12,7 @@
 
 import {
   decideOutcome,
+  incidentStartedAfterMerge,
   isRevertOfPr,
   matchIncidentFiles,
   normalizeRepoPath,
@@ -46,6 +47,11 @@ async function main(): Promise<void> {
   const { owner, repo } = githubRepo();
   const rows = (await fetchLabelCandidates(sql)).slice(0, MAX_ROWS);
   const nowMs = Date.now();
+  const mergedPrCache = new Map<
+    string,
+    ReturnType<typeof listRecentlyMergedPrs>
+  >();
+  const issueCache = new Map<string, ReturnType<typeof listIssuesSince>>();
   const counts: Record<string, number> = {};
   const patches: {
     id: string;
@@ -77,73 +83,80 @@ async function main(): Promise<void> {
           return null;
         }
       );
-      if (pr) {
-        prState = pr.state;
-        prMerged = Boolean(pr.merged_at);
-        mergeTimestampMs = pr.merged_at
-          ? new Date(pr.merged_at).getTime()
-          : null;
-        mergeIso = pr.merged_at;
-        prNumber = pr.number;
+      if (!pr) continue;
+      prState = pr.state;
+      prMerged = Boolean(pr.merged_at);
+      mergeTimestampMs = pr.merged_at ? new Date(pr.merged_at).getTime() : null;
+      mergeIso = pr.merged_at;
+      prNumber = pr.number;
 
-        const files = await getPrFiles(
-          parsed.owner,
-          parsed.repo,
-          pr.number
-        ).catch(() => []);
-        const filePaths = files.map(f => normalizeRepoPath(f.filename));
-        diffStats = {
-          files: filePaths,
-          fileCount: files.length,
-          additions: files.reduce((s, f) => s + f.additions, 0),
-          deletions: files.reduce((s, f) => s + f.deletions, 0),
-        };
+      const files = await getPrFiles(
+        parsed.owner,
+        parsed.repo,
+        pr.number
+      ).catch(() => []);
+      const filePaths = files.map(f => normalizeRepoPath(f.filename));
+      diffStats = {
+        files: filePaths,
+        fileCount: files.length,
+        additions: files.reduce((s, f) => s + f.additions, 0),
+        deletions: files.reduce((s, f) => s + f.deletions, 0),
+      };
 
-        const checks = await getCheckRuns(
-          parsed.owner,
-          parsed.repo,
-          pr.head.sha
-        ).catch(() => []);
-        ciResult = checks.map(c => ({
-          name: c.name,
-          status: c.status,
-          conclusion: c.conclusion,
-          runId: c.id,
-        }));
+      const checks = await getCheckRuns(
+        parsed.owner,
+        parsed.repo,
+        pr.head.sha
+      ).catch(() => []);
+      ciResult = checks.map(c => ({
+        name: c.name,
+        status: c.status,
+        conclusion: c.conclusion,
+        runId: c.id,
+      }));
 
-        if (prMerged && mergeIso) {
-          // Revert join: recently merged PRs that look like reverts of this one.
-          const candidates = await listRecentlyMergedPrs(
+      if (prMerged && mergeIso) {
+        // Revert join: recently merged PRs that look like reverts of this one.
+        let candidatesPromise = mergedPrCache.get(mergeIso);
+        if (!candidatesPromise) {
+          candidatesPromise = listRecentlyMergedPrs(
             parsed.owner,
             parsed.repo,
             mergeIso
           ).catch(() => []);
-          for (const c of candidates) {
-            if (c.number === pr.number) continue;
-            if (
-              isRevertOfPr({
-                title: c.title,
-                body: c.body,
-                headRefName: c.head?.ref,
-              }) &&
-              revertTargetPrNumber({ title: c.title, body: c.body }) ===
-                pr.number
-            ) {
-              revertLink = c.html_url;
-              break;
-            }
+          mergedPrCache.set(mergeIso, candidatesPromise);
+        }
+        const candidates = await candidatesPromise;
+        for (const c of candidates) {
+          if (c.number === pr.number) continue;
+          if (
+            isRevertOfPr({
+              title: c.title,
+              body: c.body,
+              headRefName: c.head?.ref,
+            }) &&
+            revertTargetPrNumber({ title: c.title, body: c.body }) === pr.number
+          ) {
+            revertLink = c.html_url;
+            break;
           }
+        }
 
-          // Sentry incident join within the post-merge window.
-          if (sentryConfigured()) {
-            const issues = await listIssuesSince(mergeIso).catch(() => []);
-            for (const issue of issues) {
-              const frames = await issueStackFilenames(issue.id).catch(
-                () => []
-              );
-              if (matchIncidentFiles(frames, filePaths).length > 0) {
-                incidentIds.push(issue.id);
-              }
+        // Sentry incident join within the post-merge window.
+        if (sentryConfigured()) {
+          let issuesPromise = issueCache.get(mergeIso);
+          if (!issuesPromise) {
+            issuesPromise = listIssuesSince(mergeIso).catch(() => []);
+            issueCache.set(mergeIso, issuesPromise);
+          }
+          const issues = await issuesPromise;
+          for (const issue of issues) {
+            if (!incidentStartedAfterMerge(issue.firstSeen, mergeIso)) {
+              continue;
+            }
+            const frames = await issueStackFilenames(issue.id).catch(() => []);
+            if (matchIncidentFiles(frames, filePaths).length > 0) {
+              incidentIds.push(issue.id);
             }
           }
         }

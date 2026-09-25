@@ -16,7 +16,10 @@
  */
 
 import { createHash } from 'node:crypto';
-
+import {
+  ingestionWatermark,
+  readBackfillDays,
+} from '../../apps/web/lib/coding-agent-runs/outcomes';
 import {
   type CodingAgentRunUpsert,
   getSql,
@@ -76,25 +79,35 @@ function countTools(
 async function ingestHyperagent(
   upsert: (r: CodingAgentRunUpsert) => Promise<void>,
   since: Date | null
-): Promise<{ scanned: number; ingested: number }> {
+): Promise<{ scanned: number; ingested: number; retryFrom: string | null }> {
   const client = await HyperagentClient.create();
   if (!client) {
     console.log(`[${JOB}] hyperagent: no MCP token, skipping`);
-    return { scanned: 0, ingested: 0 };
+    return { scanned: 0, ingested: 0, retryFrom: null };
   }
 
   const agents = new Map((await client.listAgents()).map(a => [a.id, a.name]));
   let scanned = 0;
   let ingested = 0;
+  let retryFrom: string | null = null;
+  const noteIncomplete = (iso: string) => {
+    if (!retryFrom || iso < retryFrom) retryFrom = iso;
+  };
 
   for await (const t of client.listThreads()) {
-    if (scanned >= MAX_THREADS_PER_RUN) break;
+    if (scanned >= MAX_THREADS_PER_RUN) {
+      noteIncomplete(t.updatedAt);
+      break;
+    }
     // Keyset is newest-first; stop once past the watermark window.
     if (since && new Date(t.updatedAt) < since) break;
     scanned++;
 
     const detail = await client.getThread(t.id, 50).catch(() => null);
-    if (!detail || detail.isRunning || detail.awaitingApproval) continue;
+    if (!detail || detail.isRunning || detail.awaitingApproval) {
+      noteIncomplete(t.updatedAt);
+      continue;
+    }
 
     const toolsUsed: Record<string, number> = {};
     const texts: string[] = [];
@@ -137,27 +150,31 @@ async function ingestHyperagent(
     });
     ingested++;
   }
-  return { scanned, ingested };
+  return { scanned, ingested, retryFrom };
 }
 
 async function ingestDevin(
   upsert: (r: CodingAgentRunUpsert) => Promise<void>,
   since: Date | null
-): Promise<{ scanned: number; ingested: number }> {
+): Promise<{ scanned: number; ingested: number; retryFrom: string | null }> {
   const client = DevinClient.create();
   if (!client) {
     console.log(`[${JOB}] devin: DEVIN_API_KEY not set, skipping`);
-    return { scanned: 0, ingested: 0 };
+    return { scanned: 0, ingested: 0, retryFrom: null };
   }
 
   const sessions = await client.listSessions();
   let scanned = 0;
   let ingested = 0;
+  let retryFrom: string | null = null;
 
   for (const s of sessions) {
     const updated = s.updated_at ?? s.created_at;
     if (since && updated && new Date(updated) < since) continue;
-    if (!devinSessionFinished(s)) continue;
+    if (!devinSessionFinished(s)) {
+      if (updated && (!retryFrom || updated < retryFrom)) retryFrom = updated;
+      continue;
+    }
     scanned++;
 
     const detail = await client.getSession(s.session_id).catch(() => s);
@@ -197,17 +214,15 @@ async function ingestDevin(
     });
     ingested++;
   }
-  return { scanned, ingested };
+  return { scanned, ingested, retryFrom };
 }
 
 async function main(): Promise<void> {
   loadHermesEnv();
-  const backfillDays =
-    Number(process.env.INGEST_BACKFILL_DAYS) ||
-    Number(
-      process.argv.find(a => a.startsWith('--backfill-days='))?.split('=')[1]
-    ) ||
-    30;
+  const backfillDays = readBackfillDays(
+    process.argv,
+    process.env.INGEST_BACKFILL_DAYS
+  );
   const { lastIngestedAt } = loadWatermark();
   const since = lastIngestedAt
     ? new Date(lastIngestedAt)
@@ -221,7 +236,9 @@ async function main(): Promise<void> {
   const hg = await ingestHyperagent(upsert, since);
   const dv = await ingestDevin(upsert, since);
 
-  saveWatermark(new Date().toISOString());
+  saveWatermark(
+    ingestionWatermark(new Date().toISOString(), [hg.retryFrom, dv.retryFrom])
+  );
   console.log(
     `[${JOB}] done: hyperagent ${hg.ingested}/${hg.scanned} ingested, ` +
       `devin ${dv.ingested}/${dv.scanned} ingested`

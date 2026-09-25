@@ -81,18 +81,13 @@ export function outcomeWindowClosed(
   return nowMs - mergeTimestampMs >= OUTCOME_WINDOW_MS;
 }
 
-const REVERT_TITLE_RE = /\brevert\b/i;
-
-function extractPrNumberFromRef(text: string): number | null {
-  const m = text.match(/#(\d+)/);
-  return m ? Number(m[1]) : null;
-}
+const REVERT_TITLE_RE = /^revert\b/i;
+const REVERT_BODY_RE =
+  /(?:^|\n)\s*(?:reverts\s+[\w.-]+\/[\w.-]+#\d+|this reverts commit\b)/i;
 
 /**
- * Detect whether a candidate PR is a revert of `targetPrNumber`.
- * Matches GitHub's conventions: title starting with/containing "Revert",
- * or body lines like "Reverts org/repo#123" / "This reverts commit <sha>"
- * (the caller passes commits separately for the sha case).
+ * Detect a GitHub revert PR. A later PR that merely mentions the word
+ * "revert" (for example "Fix revert-button bug") is not a revert.
  */
 export function isRevertOfPr(candidate: {
   title?: string | null;
@@ -104,7 +99,7 @@ export function isRevertOfPr(candidate: {
   const head = candidate.headRefName ?? '';
   return (
     REVERT_TITLE_RE.test(title) ||
-    /\breverts?\b/i.test(body) ||
+    REVERT_BODY_RE.test(body) ||
     /^revert[-/]/i.test(head)
   );
 }
@@ -119,9 +114,50 @@ export function revertTargetPrNumber(candidate: {
     /reverts?\s+(?:pull\s+(?:request\s+)?)?[\w.-]+\/[\w.-]+#(\d+)/i
   );
   if (direct) return Number(direct[1]);
-  const hashRef = haystack.match(/revert[^\n]*#(\d+)/i);
-  if (hashRef) return Number(hashRef[1]);
-  return extractPrNumberFromRef(haystack);
+  const titled = haystack.match(/(?:^|\n)\s*revert\b[^\n]*#(\d+)/i);
+  if (titled) return Number(titled[1]);
+  return null;
+}
+
+/** True when a Sentry issue was first seen at or after the PR merged. */
+export function incidentStartedAfterMerge(
+  firstSeen: string | null | undefined,
+  mergeIso: string
+): boolean {
+  return Boolean(firstSeen) && (firstSeen as string) >= mergeIso;
+}
+
+/** Watermark stays at the oldest unfinished thread so the next run retries it. */
+export function ingestionWatermark(
+  nowIso: string,
+  incompleteIsos: readonly (string | null | undefined)[]
+): string {
+  const floors = incompleteIsos.filter(
+    (value): value is string => typeof value === 'string' && value.length > 0
+  );
+  floors.sort();
+  return floors[0] ?? nowIso;
+}
+
+/** Accept `--backfill-days 30` and `--backfill-days=30`. Env wins when set. */
+export function readBackfillDays(
+  argv: readonly string[],
+  envValue?: string
+): number {
+  const fromEnv = Number(envValue);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] ?? '';
+    if (arg === '--backfill-days') {
+      const next = Number(argv[i + 1]);
+      if (Number.isFinite(next) && next > 0) return next;
+    }
+    if (arg.startsWith('--backfill-days=')) {
+      const next = Number(arg.slice('--backfill-days='.length));
+      if (Number.isFinite(next) && next > 0) return next;
+    }
+  }
+  return 30;
 }
 
 /**

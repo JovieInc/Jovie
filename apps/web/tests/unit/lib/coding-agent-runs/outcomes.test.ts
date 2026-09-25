@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decideOutcome,
+  incidentStartedAfterMerge,
+  ingestionWatermark,
   isRevertOfPr,
   matchIncidentFiles,
   normalizeRepoPath,
   outcomeWindowClosed,
   parseGithubPrUrl,
+  readBackfillDays,
   repoRelativePath,
   revertTargetPrNumber,
 } from '@/lib/coding-agent-runs/outcomes';
@@ -142,6 +145,52 @@ describe('revert detection', () => {
     ).toBe(true);
     expect(isRevertOfPr({ headRefName: 'revert-1234-fix' })).toBe(true);
     expect(isRevertOfPr({ title: 'feat: add thing', body: null })).toBe(false);
+    expect(
+      isRevertOfPr({
+        title: 'fix: restore the button',
+        body: 'Fix revert-button bug',
+      })
+    ).toBe(false);
+  });
+
+  it('does not treat a mention of revert as the reverted PR number', () => {
+    expect(
+      revertTargetPrNumber({
+        title: 'fix: restore the button',
+        body: 'Fix revert-button bug #555',
+      })
+    ).toBeNull();
+  });
+
+  it('counts a Sentry issue only when it starts after the merge', () => {
+    expect(
+      incidentStartedAfterMerge('2026-09-25T12:00:00Z', '2026-09-25T11:00:00Z')
+    ).toBe(true);
+    expect(
+      incidentStartedAfterMerge('2026-09-20T12:00:00Z', '2026-09-25T11:00:00Z')
+    ).toBe(false);
+    expect(incidentStartedAfterMerge(undefined, '2026-09-25T11:00:00Z')).toBe(
+      false
+    );
+  });
+
+  it('holds the ingest watermark at the oldest unfinished thread', () => {
+    expect(
+      ingestionWatermark('2026-09-25T16:00:00.000Z', [
+        null,
+        '2026-09-25T15:10:00.000Z',
+        '2026-09-25T15:40:00.000Z',
+      ])
+    ).toBe('2026-09-25T15:10:00.000Z');
+    expect(ingestionWatermark('2026-09-25T16:00:00.000Z', [])).toBe(
+      '2026-09-25T16:00:00.000Z'
+    );
+  });
+
+  it('reads both backfill-day flag forms', () => {
+    expect(readBackfillDays(['--backfill-days', '14'])).toBe(14);
+    expect(readBackfillDays(['--backfill-days=7'])).toBe(7);
+    expect(readBackfillDays(['--backfill-days', '14'], '3')).toBe(3);
   });
 
   it('extracts the reverted PR number', () => {

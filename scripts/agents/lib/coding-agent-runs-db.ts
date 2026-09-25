@@ -101,8 +101,11 @@ export async function fetchLabelCandidates(
     SELECT id, source, pr_url, pr_number, outcome_label, merge_timestamp,
            completed_at, diff_stats
     FROM coding_agent_runs
-    WHERE outcome_label = 'open'
-       OR merge_timestamp >= NOW() - INTERVAL '8 days'
+    WHERE (pr_url IS NOT NULL OR pr_number IS NOT NULL)
+      AND (
+        outcome_label = 'open'
+        OR merge_timestamp >= NOW() - INTERVAL '8 days'
+      )
     ORDER BY completed_at ASC NULLS LAST, ingested_at
     LIMIT 500
   ` as Promise<LabelCandidateRow[]>;

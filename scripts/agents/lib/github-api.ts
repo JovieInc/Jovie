@@ -139,8 +139,8 @@ export async function listRecentlyMergedPrs(
     );
     if (!batch?.length) break;
     for (const pr of batch) {
-      if (!pr.merged_at) continue;
-      if (pr.merged_at < sinceIso) return out;
+      // updated-desc is not merge-desc. An older merge must not stop the page.
+      if (!pr.merged_at || pr.merged_at < sinceIso) continue;
       out.push(pr);
     }
     if (batch.length < 100) break;

@@ -1,11 +1,48 @@
 /**
  * Jev query surface (JOV-6508): cost-per-landed-PR per agent per model.
  *
- * `costPerLandedPr` = sum(cost_usd where cost_source='actual')
- *                     / count(outcome_label='landed')
- * grouped by `source` + `model_name`, over an optional trailing window.
- * Estimated-cost rows never enter the numerator — estimates are not truth.
+ * Denominator and numerator are landed rows with a non-null actual cost.
+ * Estimated or unknown costs are not treated as zero.
  */
+export const ACTUAL_LANDED_COST_FILTER =
+  "outcome_label = 'landed' AND cost_source = 'actual' AND cost_usd IS NOT NULL";
+
+export interface ActualLandedCostInput {
+  readonly outcomeLabel: string;
+  readonly costSource: string;
+  readonly costUsd: number | null;
+}
+
+export function summarizeActualLandedCost(
+  rows: readonly ActualLandedCostInput[]
+): {
+  landedCount: number;
+  actualCostUsdLanded: number | null;
+  costPerLandedPrUsd: number | null;
+} {
+  const actual = rows.filter(
+    row =>
+      row.outcomeLabel === 'landed' &&
+      row.costSource === 'actual' &&
+      row.costUsd != null
+  );
+  if (actual.length === 0) {
+    return {
+      landedCount: 0,
+      actualCostUsdLanded: null,
+      costPerLandedPrUsd: null,
+    };
+  }
+  const actualCostUsdLanded = actual.reduce(
+    (sum, row) => sum + (row.costUsd ?? 0),
+    0
+  );
+  return {
+    landedCount: actual.length,
+    actualCostUsdLanded,
+    costPerLandedPrUsd: actualCostUsdLanded / actual.length,
+  };
+}
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
@@ -34,15 +71,15 @@ export async function costPerLandedPr(opts?: {
     SELECT
       source,
       model_name,
-      COUNT(*) FILTER (WHERE outcome_label = 'landed') AS landed_count,
+      COUNT(*) FILTER (WHERE ${drizzleSql.raw(ACTUAL_LANDED_COST_FILTER)}) AS landed_count,
       SUM(cost_usd) FILTER (
-        WHERE cost_source = 'actual' AND outcome_label = 'landed'
+        WHERE ${drizzleSql.raw(ACTUAL_LANDED_COST_FILTER)}
       ) AS actual_cost_usd_landed,
       CASE
-        WHEN COUNT(*) FILTER (WHERE outcome_label = 'landed') = 0 THEN NULL
+        WHEN COUNT(*) FILTER (WHERE ${drizzleSql.raw(ACTUAL_LANDED_COST_FILTER)}) = 0 THEN NULL
         ELSE SUM(cost_usd) FILTER (
-          WHERE cost_source = 'actual' AND outcome_label = 'landed'
-        ) / COUNT(*) FILTER (WHERE outcome_label = 'landed')
+          WHERE ${drizzleSql.raw(ACTUAL_LANDED_COST_FILTER)}
+        ) / COUNT(*) FILTER (WHERE ${drizzleSql.raw(ACTUAL_LANDED_COST_FILTER)})
       END AS cost_per_landed_pr_usd
     FROM coding_agent_runs
     WHERE 1 = 1
