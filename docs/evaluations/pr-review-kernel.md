@@ -1,7 +1,9 @@
 # Draft-PR review kernel
 
-Status: Phase 0 (contracts only). No workflow runs yet, no model is called, and
-nothing is posted.
+Status: Phase 1 (shadow), shipped disabled. `.github/workflows/pr-review.yml`
+writes a receipt artifact and never posts. It runs only once
+`vars.PR_REVIEW_ENABLED` is `true` and the `PR_REVIEW_AI_GATEWAY_API_KEY` secret
+exists; without the key the receipt is `incomplete` / `no-key`.
 
 The goal is an advisory reviewer that runs on draft PRs. It finds possible defects
 cheaply, verifies them independently, and gives the PR's existing author evidence
@@ -72,12 +74,41 @@ Contract: [`scripts/lib/pr-review-contracts.mjs`](../../scripts/lib/pr-review-co
 of the relevant subscription cost.
 **Then:** move verification to subscription pools through Symphony admission.
 
+## Models
+
+| Role | Default | Allowed alternatives (replay only) |
+|---|---|---|
+| Discovery | `deepseek/deepseek-v4.1-flash` | `deepseek/deepseek-v4-flash`, `z-ai/glm-5.3-flash` |
+| Verification | `z-ai/glm-5.3` | `z-ai/glm-5.3-flash` |
+
+- Verification decides what gets posted, so it gets the stronger model. Its calls
+  are short, which keeps that cheap.
+- Discovery and verification must be different families; `assertRoutes` refuses
+  otherwise.
+- Prices come from the Symphony registry. DeepSeek V4.1 Flash is not in the
+  registry yet, so `REVIEW_MODEL_OVERRIDES` in `scripts/pr-review/models.mjs`
+  prices it at the published peak rate. A registry entry replaces the override
+  automatically. The Gateway model id is unverified until the first live run.
+- Replays switch models with `PR_REVIEW_DISCOVERY_MODEL` and
+  `PR_REVIEW_VERIFICATION_MODEL`, limited to the allowlist above.
+- Per-PR budget: $0.50 (`DEFAULT_RUN_LIMITS.budgetUsd`).
+
+## Enabling the shadow run
+
+1. Add the repository secret `PR_REVIEW_AI_GATEWAY_API_KEY` (a Gateway key with a
+   spend cap).
+2. Set the repository variable `PR_REVIEW_ENABLED=true`.
+3. Push a draft PR and download `pr-review-receipt-<pr>-<sha>` from the run.
+
+Score replays with `node scripts/pr-review/replay.mjs <seed.json>`.
+
 ## Phases
 
-1. **Contracts (this change):** the receipt and finding contracts, the risk floors,
+1. **Contracts (done):** the receipt and finding contracts, the risk floors,
    and the release.md finding states.
-2. **Shadow run:** add the kernel and a `pr-review.yml` workflow triggered by
-   `workflow_run` of the CI Risk Classifier. Receipts are stored as artifacts only.
+2. **Shadow run (this change):** the kernel in `scripts/pr-review/` and a
+   `pr-review.yml` workflow triggered by `workflow_run` of CI. Importers are found
+   with `git grep` for now; the TypeScript compiler API walk is deferred. Receipts are stored as artifacts only.
    Replay a seed set of 40–60 historical regressions plus about 20 clean PRs.
 3. **Publish:** the summary comment and inline findings. `/ship` reads the receipt.
    This phase opens only when confirmed precision of posted findings is at least
