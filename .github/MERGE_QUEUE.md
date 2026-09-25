@@ -21,7 +21,8 @@ parent lands. There is no second landing transport.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
-   transitions its Linear issue to `Done`.
+   comments with the merge SHA and transitions its Linear issue to `Done`
+   only when the close guard allows it.
 
 Do not directly merge queue-eligible PRs or use a second transport. GitHub's
 normal Merge when ready records intent and owns admission.

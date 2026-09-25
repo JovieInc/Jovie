@@ -70,7 +70,7 @@ The legacy `scripts/symphony/jobs/voice-memo-ingest.ts` watcher is not the activ
 2. Hermes-Air files exactly one Linear issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). A voice-derived issue references only the sanitized private proposal receipt, never the raw memo or transcript.
 3. Linear-backed Symphony selects eligible work under the Linear ownership contract.
 4. GitHub Issue dispatchers and local/remote GitHub issue shippers remain retired; GitHub is used only for the resulting PR, Actions, and merge-queue evidence.
-5. The PR preserves its Linear marker and `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` transitions the canonical issue after merge.
+5. The PR preserves its Linear marker and `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the canonical issue after merge. It moves that issue to Done only when the close guard allows it.
 
 If Linear is unavailable, rate-limited, or rejects the mutation, queue a Telegram-derived or already-sanitized intent in `~/.hermes/state/linear-queue.jsonl` for operator inspection and dispatch nothing. Never fall back to GitHub. A voice-derived proposal remains only in the private voice store and may be retried after service recovery without copying its raw memo or transcript into shared gbrain or the queue.
 

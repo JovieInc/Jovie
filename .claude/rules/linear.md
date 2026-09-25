@@ -74,7 +74,7 @@ Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc session
 
    In both cases, preserve the PR body's `<!-- linear-issue-id:... -->` comment and the `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the issue at merge time.
 
-3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions the issue to `Done` and posts the merge SHA as a comment.
+3. **On merge — no action required.** `linear-sync-on-merge.yml` posts the merge SHA as a comment. It moves the issue to `Done` only when no linked PR is still open or draft, the PR body does not declare remaining required work or a dependent stack, and the issue is not a commissioning or parent issue and has no open sub-issues. Otherwise it comments and leaves the state unchanged.
 
 Do not duplicate a Symphony-owned transition. Never manually perform the `Done` transition; that races the merge workflow.
 
