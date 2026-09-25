@@ -775,10 +775,14 @@ describe('delivery state machine', () => {
     const fsPromises = require('node:fs/promises');
     const originalReaddir = fsPromises.readdir;
     let loopScans = 0;
-    fsPromises.readdir = (path, ...rest) => {
-      if (`${path}` === loopDirectory) loopScans += 1;
-      return originalReaddir(path, ...rest);
-    };
+    fsPromises.readdir = /** @type {typeof originalReaddir} */ (
+      /** @type {unknown} */ (
+        (/** @type {any} */ path, /** @type {any[]} */ ...rest) => {
+          if (`${path}` === loopDirectory) loopScans += 1;
+          return originalReaddir(path, ...rest);
+        }
+      )
+    );
     syncBuiltinESMExports();
     try {
       const stackAction = (key, rootPr) => ({
