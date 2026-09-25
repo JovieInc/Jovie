@@ -175,6 +175,25 @@ describe('generateProfileStructuredData', () => {
     });
   });
 
+  it('trims padded profile urls into sameAs and drops whitespace-only urls', () => {
+    const data = generateProfileStructuredData(
+      {
+        ...BASE_PROFILE,
+        spotify_url: '  https://open.spotify.com/artist/padded  ',
+        apple_music_url: '   ',
+        youtube_url: null,
+        musicbrainz_id: null,
+      },
+      ['pop'],
+      [],
+      [],
+      []
+    );
+    const artist = findInGraph(data, 'MusicGroup');
+    expect(artist?.sameAs).toContain('https://open.spotify.com/artist/padded');
+    expect(artist?.sameAs).not.toContain('   ');
+  });
+
   it('omits sameAs when no valid social URLs exist', () => {
     const data = generateProfileStructuredData(
       {

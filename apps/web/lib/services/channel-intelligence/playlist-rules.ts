@@ -66,12 +66,12 @@ function parseActivityAt(
 
 function copiedName(row: FetchedPlaylistRow): string | undefined {
   const name = row.name?.trim();
-  return name ? name : undefined;
+  return name || undefined;
 }
 
 function copiedUrl(row: FetchedPlaylistRow): string | undefined {
   const url = row.url?.trim();
-  return url ? url : undefined;
+  return url || undefined;
 }
 
 function copiedFollowerCount(row: FetchedPlaylistRow): number | undefined {
