@@ -53,6 +53,15 @@ describe('TippingEmptyState', () => {
 
     expect(container.firstChild).toHaveClass('custom-class');
   });
+
+  it('composes the canonical EmptyState molecule', () => {
+    render(<TippingEmptyState type='no-venmo' animate={false} />);
+
+    expect(screen.getByTestId('tipping-empty-state')).toBeInTheDocument();
+    expect(screen.getByTestId('tipping-empty-state')).toHaveTextContent(
+      'No Venmo Account Connected'
+    );
+  });
 });
 
 describe('TippingMetricsSkeleton', () => {
