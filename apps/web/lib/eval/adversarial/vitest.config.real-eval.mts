@@ -1,7 +1,7 @@
-import react from '@vitejs/plugin-react';
-import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
+import react from '@vitejs/plugin-react';
+import dotenv from 'dotenv';
 import { defineConfig } from 'vitest/config';
 
 const webRoot = (() => {
