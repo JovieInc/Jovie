@@ -268,6 +268,42 @@ class ProtectedIntakeCheckTests(unittest.TestCase):
         with mock.patch.object(module.subprocess, "run", self._gh_payload(payload)):
             self.assertEqual(module.github_pulls("JOV-7201", None), [])
 
+    def test_complete_github_search_returns_only_pull_numbers(self) -> None:
+        module = load_check()
+        payload = {
+            "total_count": 2,
+            "incomplete_results": False,
+            "items": [
+                {"number": 7201, "pull_request": {"url": "https://github.com/JovieInc/Jovie/pull/7201"}},
+                {"number": 12},
+            ],
+        }
+        with mock.patch.object(module.subprocess, "run", self._gh_payload(payload)):
+            self.assertEqual(module.github_pulls("JOV-7201", None), [7201])
+
+    def test_github_transport_failures_are_unresolved(self) -> None:
+        module = load_check()
+        failures = [
+            subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="null", stderr=""),
+            subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="{", stderr=""),
+            subprocess.CompletedProcess(args=["gh"], returncode=1, stdout="", stderr="HTTP 405"),
+        ]
+        for completed in failures:
+            with self.subTest(returncode=completed.returncode, stdout=completed.stdout):
+                def run(*_args, _completed=completed, **_kwargs):
+                    return _completed
+
+                with mock.patch.object(module.subprocess, "run", run):
+                    with self.assertRaises(module.LinkageUnresolved):
+                        module.github_pulls("JOV-7201", None)
+
+        def explode(*_args, **_kwargs):
+            raise OSError("gh missing")
+
+        with mock.patch.object(module.subprocess, "run", explode):
+            with self.assertRaises(module.LinkageUnresolved):
+                module.github_pulls("JOV-7201", None)
+
     def test_incomplete_or_partial_github_search_is_unresolved(self) -> None:
         module = load_check()
         rejected = [
