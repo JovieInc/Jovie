@@ -16,6 +16,7 @@ const mockGetClientIP = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockAuth,
+  getFreshAuth: mockAuth,
   getOptionalAuth: mockAuth,
   getCachedSessionTokenAuth: mockAuth,
 }));
@@ -156,6 +157,7 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Unauthorized');
+      expect(mockRequireAdmin).toHaveBeenCalledWith({ session: 'fresh' });
     });
 
     it('returns 403 when impersonation is disabled', async () => {
@@ -322,6 +324,7 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Unauthorized');
+      expect(mockRequireAdmin).toHaveBeenCalledWith({ session: 'fresh' });
     });
 
     it('ends impersonation successfully', async () => {

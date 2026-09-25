@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGetCachedAuth,
+  mockGetFreshAuth,
   mockIsAdmin,
   mockCaptureWarning,
   mockAddBreadcrumb,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
+  mockGetFreshAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
   mockCaptureWarning: vi.fn(),
   mockAddBreadcrumb: vi.fn(),
@@ -14,6 +16,7 @@ const {
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getFreshAuth: mockGetFreshAuth,
   getOptionalAuth: mockGetCachedAuth,
   getCachedSessionTokenAuth: mockGetCachedAuth,
 }));
@@ -103,6 +106,24 @@ describe('requireAdmin (Better Auth)', () => {
         message: expect.stringContaining('masked:user_admin'),
       })
     );
+    expect(mockGetFreshAuth).not.toHaveBeenCalled();
+  });
+
+  it('uses a fresh session when role changes require it', async () => {
+    mockGetFreshAuth.mockResolvedValue({
+      userId: 'user_admin',
+      sessionId: 'sess_fresh',
+      orgId: null,
+    });
+    mockIsAdmin.mockResolvedValue(true);
+
+    const { requireAdmin } = await import('@/lib/admin/middleware');
+    const response = await requireAdmin({ session: 'fresh' });
+
+    expect(response).toBeNull();
+    expect(mockGetFreshAuth).toHaveBeenCalledTimes(1);
+    expect(mockGetCachedAuth).not.toHaveBeenCalled();
+    expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
   });
 });
 

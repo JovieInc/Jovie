@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
@@ -41,7 +41,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getFreshAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -213,7 +213,7 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getFreshAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

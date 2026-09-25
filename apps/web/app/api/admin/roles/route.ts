@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
@@ -18,7 +18,7 @@ import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
  */
 export async function POST(request: Request) {
   // Require admin privileges
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   try {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     invalidateAdminCache(targetUserId);
 
     // Get current admin user ID for logging
-    const { userId: currentAdminId } = await getCachedAuth();
+    const { userId: currentAdminId } = await getFreshAuth();
 
     logger.info(
       `[admin/roles] Admin role granted to user ${targetUserId} by ${currentAdminId}`
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
  */
 export async function DELETE(request: Request) {
   // Require admin privileges
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   try {
@@ -111,7 +111,7 @@ export async function DELETE(request: Request) {
     }
 
     const { userId: targetUserId } = validation.data;
-    const { userId: currentAdminId } = await getCachedAuth();
+    const { userId: currentAdminId } = await getFreshAuth();
 
     // Prevent self-revocation
     if (targetUserId === currentAdminId) {

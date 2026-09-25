@@ -6,6 +6,7 @@ const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getFreshAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({

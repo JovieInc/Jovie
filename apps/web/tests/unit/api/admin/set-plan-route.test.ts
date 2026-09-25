@@ -23,6 +23,7 @@ vi.mock('@/lib/admin/middleware', () => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
+  getFreshAuth: hoisted.getCachedAuthMock,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -61,6 +62,7 @@ describe('POST /api/admin/set-plan', () => {
       })
     );
 
+    expect(hoisted.requireAdminMock).toHaveBeenCalledWith({ session: 'fresh' });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
