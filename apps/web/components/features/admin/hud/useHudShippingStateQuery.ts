@@ -1,7 +1,8 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {
@@ -40,15 +41,53 @@ const EMPTY_OPERATIONAL_FEED: OperationalTaskFeed = {
 
 const shippingMachines = new Map<string, ShippingMachineState>();
 const lastOperationalTasks = new Map<string, OperationalTaskFeed>();
+const shippingObservers = new Map<string, number>();
+const subscribedCaches = new WeakSet<object>();
 
 function tokenKey(kioskToken: string | null): string {
   return kioskToken ?? '';
+}
+
+function forgetHudShippingState(key: string): void {
+  shippingMachines.delete(key);
+  lastOperationalTasks.delete(key);
+}
+
+function retainHudShippingStateUntilQueryRemoval(cache: {
+  subscribe: (
+    listener: (event: {
+      type: string;
+      query: { queryKey: readonly unknown[] };
+    }) => void
+  ) => () => void;
+}): void {
+  if (subscribedCaches.has(cache)) return;
+  subscribedCaches.add(cache);
+  cache.subscribe(event => {
+    if (event.type !== 'removed') return;
+    const { queryKey } = event.query;
+    if (queryKey[0] !== 'hud' || queryKey[1] !== 'shipping-state') return;
+    const token = queryKey[2];
+    forgetHudShippingState(tokenKey(typeof token === 'string' ? token : null));
+  });
 }
 
 /** Test-only: the shipping machine is shared by every HUD observer. */
 export function resetHudShippingStateForTests(): void {
   shippingMachines.clear();
   lastOperationalTasks.clear();
+  shippingObservers.clear();
+}
+
+/** Test-only: module maps must not outlive the query that filled them. */
+export function hudShippingStateRetentionForTests(): {
+  machines: number;
+  operationalFeeds: number;
+} {
+  return {
+    machines: shippingMachines.size,
+    operationalFeeds: lastOperationalTasks.size,
+  };
 }
 
 function snapshotFor(
@@ -71,6 +110,23 @@ function snapshotFor(
  * observers share a query function without diverging refs.
  */
 export function useHudShippingStateQuery(kioskToken: string | null) {
+  const queryClient = useQueryClient();
+  retainHudShippingStateUntilQueryRemoval(queryClient.getQueryCache());
+
+  useEffect(() => {
+    const key = tokenKey(kioskToken);
+    shippingObservers.set(key, (shippingObservers.get(key) ?? 0) + 1);
+    return () => {
+      const remaining = (shippingObservers.get(key) ?? 1) - 1;
+      if (remaining > 0) {
+        shippingObservers.set(key, remaining);
+        return;
+      }
+      shippingObservers.delete(key);
+      forgetHudShippingState(key);
+    };
+  }, [kioskToken]);
+
   const query = useQuery({
     queryKey: ['hud', 'shipping-state', kioskToken],
     queryFn: async ({ signal }) => {
@@ -119,6 +175,10 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
         now
       );
       shippingMachines.set(key, next);
+      if (response.status === 401 || response.status === 403) {
+        lastOperationalTasks.delete(key);
+        return snapshotFor(key, next.view, 'error');
+      }
       const parsed = response.ok
         ? parseShippingCockpitProjection(payload)
         : null;
@@ -130,7 +190,12 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
       );
     },
     ...REALTIME_CACHE,
-    placeholderData: previous => previous,
+    placeholderData: (previousData, previousQuery) => {
+      if (!previousQuery || previousQuery.queryKey[2] !== kioskToken) {
+        return undefined;
+      }
+      return previousData;
+    },
     staleTime: 0,
     gcTime: SHIPPING_STATE_CACHE_GC_MS,
     refetchInterval: SHIPPING_STATE_POLL_INTERVAL_MS,

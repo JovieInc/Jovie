@@ -3,7 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
-import { resetHudShippingStateForTests } from '@/components/features/admin/hud/useHudShippingStateQuery';
+import {
+  hudShippingStateRetentionForTests,
+  resetHudShippingStateForTests,
+} from '@/components/features/admin/hud/useHudShippingStateQuery';
+import { unknownProjection } from '@/lib/ovie/shipping-state';
 import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
 
 const fetchMock = vi.fn();
@@ -13,6 +17,23 @@ function createQueryClient() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+}
+
+function RetentionHarness({
+  client,
+  showCard,
+}: {
+  client: QueryClient;
+  showCard: boolean;
+}) {
+  return (
+    <QueryClientProvider client={client}>
+      <div>
+        {showCard ? <OvieShippingStateCard kioskToken='token-a' /> : null}
+      </div>
+      <OperationalTasksPanel kioskToken='token-a' />
+    </QueryClientProvider>
+  );
 }
 
 function jsonResponse(status: number, body: unknown) {
@@ -65,6 +86,39 @@ const projection = {
     exactLiveBuild: { state: 'measured', value: true },
   },
 };
+
+function cockpitWithTask(title: string) {
+  const base = unknownProjection({
+    sequence: 1,
+    observationTimestamp: '2026-09-01T22:00:00.000Z',
+    emissionTimestamp: '2026-09-01T22:00:00.000Z',
+    latencyMs: 1,
+    publishing: true,
+    lastError: null,
+  });
+  return {
+    ...base,
+    operationalTasks: {
+      ...base.operationalTasks,
+      syncState: 'fresh' as const,
+      lastSyncedAt: '2026-09-01T22:00:00.000Z',
+      tasks: [
+        {
+          id: 'linear:JOV-5544',
+          linearIdentifier: 'JOV-5544',
+          linearUrl: 'https://linear.app/jovie/issue/JOV-5544/cache',
+          title,
+          workflowState: 'running' as const,
+          priority: 'high' as const,
+          attempt: 1,
+          retryAt: null,
+          sourceRevision: 'rev-token-a',
+          updatedAt: '2026-09-01T22:00:00.000Z',
+        },
+      ],
+    },
+  };
+}
 
 const LABELS = [
   'Queued',
@@ -263,5 +317,108 @@ describe('OvieShippingStateCard', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       '/api/hud/shipping-state'
     );
+  });
+
+  it('does not keep the previous token operational tasks after a switch or a 401', async () => {
+    const tokenB = deferredResponse();
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, cockpitWithTask('Token A secret'))
+      )
+      .mockImplementationOnce(() => tokenB.promise);
+    const client = createQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <OperationalTasksPanel kioskToken='token-a' />
+        <OvieShippingStateCard kioskToken='token-a' />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Token A secret')).toBeTruthy();
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <OperationalTasksPanel kioskToken='token-b' />
+        <OvieShippingStateCard kioskToken='token-b' />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByText('Token A secret')).toBeNull();
+    expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
+      'data-revision',
+      ''
+    );
+
+    tokenB.resolve(jsonResponse(401, { error: 'Unauthorized' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
+        'data-truth',
+        'unauthorized'
+      );
+    });
+    expect(screen.queryByText('Token A secret')).toBeNull();
+  });
+
+  it('drops a token operational feed after that token returns 401', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, cockpitWithTask('Token A secret'))
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(401, { error: 'Unauthorized', state: 'unauthorized' })
+      );
+    const client = createQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <OperationalTasksPanel kioskToken='token-a' />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Token A secret')).toBeTruthy();
+    await client.refetchQueries({
+      queryKey: ['hud', 'shipping-state', 'token-a'],
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Token A secret')).toBeNull();
+    });
+    expect(
+      screen.getByText('Task cache unavailable. Retrying automatically.')
+    ).toBeTruthy();
+  });
+
+  it('drops module shipping maps when the last observer unmounts or the query is removed', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, cockpitWithTask('Token A secret'))
+    );
+    const client = createQueryClient();
+    const { rerender, unmount } = render(
+      <RetentionHarness client={client} showCard />
+    );
+
+    expect(await screen.findByText('Token A secret')).toBeTruthy();
+    expect(hudShippingStateRetentionForTests()).toEqual({
+      machines: 1,
+      operationalFeeds: 1,
+    });
+
+    rerender(<RetentionHarness client={client} showCard={false} />);
+    expect(hudShippingStateRetentionForTests()).toEqual({
+      machines: 1,
+      operationalFeeds: 1,
+    });
+
+    client.removeQueries({ queryKey: ['hud', 'shipping-state', 'token-a'] });
+    expect(hudShippingStateRetentionForTests()).toEqual({
+      machines: 0,
+      operationalFeeds: 0,
+    });
+
+    expect(await screen.findByText('Token A secret')).toBeTruthy();
+    unmount();
+    expect(hudShippingStateRetentionForTests()).toEqual({
+      machines: 0,
+      operationalFeeds: 0,
+    });
   });
 });
