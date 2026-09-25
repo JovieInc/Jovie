@@ -566,7 +566,7 @@ class CodexRotateTests(unittest.TestCase):
         journal_path.write_text(json.dumps(journal)); journal_path.chmod(0o600)
         worker = self.root / "protocol-worker"
         worker.write_text("#!" + sys.executable + "\n" +
-            'import json, os, subprocess, sys\n'
+            'import json, os, subprocess, sys, time\n'
             'def send(value): print(json.dumps(value), flush=True)\n'
             'send({"method":"thread/started","params":{"thread":{"id":"thread-1","cwd":os.getcwd()}}})\n'
             'assert sys.stdin.readline().strip() == "continue"\n'
@@ -576,12 +576,18 @@ class CodexRotateTests(unittest.TestCase):
             'subprocess.run(["git","add","result.txt"],check=True)\n'
             'subprocess.run(["git","-c","user.name=Fixture","-c","user.email=fixture@example.invalid","commit","-qm","result"],check=True)\n'
             'send({"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed"}}})\n'
-            'print("separate stderr",file=sys.stderr)\n')
+            'print("separate stderr",file=sys.stderr,flush=True)\n'
+            'os.close(1); os.close(2)\n'
+            'deadline = time.monotonic() + 10\n'
+            'while not os.path.exists(os.environ["EXIT_RELEASE_FILE"]):\n'
+            '    assert time.monotonic() < deadline\n'
+            '    time.sleep(0.01)\n')
         worker.chmod(0o755)
+        release = self.root / "release-worker-exit"
         process = subprocess.Popen([str(LAUNCHER), "app-server"], cwd=workspace, bufsize=0,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env=self.env(CODEX_REAL_BIN=worker, GEM_WORKSPACE=gem, INVOCATION_ID="b" * 32,
-                         CODEX_REDEEM_RESET_CREDITS=0))
+                         CODEX_REDEEM_RESET_CREDITS=0, EXIT_RELEASE_FILE=release))
         try:
             for method in ("thread/started", "turn/started"):
                 deadline = time.monotonic() + 10
@@ -595,22 +601,38 @@ class CodexRotateTests(unittest.TestCase):
                         break
                 self.assertEqual(observed, method)
                 process.stdin.write(b"continue\n"); process.stdin.flush()
+            ready, _, _ = select.select([process.stdout], [], [], 10)
+            self.assertTrue(ready)
+            self.assertEqual(json.loads(process.stdout.readline())["method"], "turn/completed")
+            evidence_root = private / "worker-evidence"
+            # Bash may retain a copy of the output pipe until its child returns.
+            # Whether capture has seen EOF or not, no exit receipt may exist yet.
+            self.assertEqual(list(evidence_root.glob("exit-*.json")), [])
+            self.assertIsNone(process.poll(), "completed turn/closed stdout cannot prove child exit")
+            release.touch()
             output, errors = process.communicate(timeout=10)
             self.assertEqual(process.returncode, 0, errors.decode())
-            self.assertEqual(json.loads(output)["method"], "turn/completed")
+            self.assertEqual(output, b"")
             self.assertEqual(errors, b"separate stderr\n")
         finally:
             if process.poll() is None:
                 process.kill(); process.communicate()
             for stream in (process.stdin, process.stdout, process.stderr):
                 stream.close()
-        files = list((private / "worker-evidence").glob("*.json"))
+        files = [path for path in (private / "worker-evidence").glob("*.json") if not path.name.startswith("exit-")]
         self.assertEqual(len(files), 1)
         candidate = json.loads(files[0].read_text())
         self.assertEqual(candidate["taskDigest"], task_digest)
         self.assertEqual(candidate["executionBaseHead"], base)
         self.assertEqual(candidate["executionFinalHead"], git("rev-parse", "HEAD").decode().strip())
         self.assertFalse(candidate["executionTerminated"])
+        exits = list((private / "worker-evidence").glob("exit-*.json"))
+        self.assertEqual(len(exits), 1)
+        receipt = json.loads(exits[0].read_text())
+        self.assertEqual(receipt["candidateDigest"], candidate["digest"])
+        self.assertEqual((receipt["processExitCode"], receipt["launcherExitCode"]), (0, 0))
+        self.assertTrue(receipt["workerProcessExited"])
+        self.assertFalse(receipt["taskTerminal"])
         self.assertEqual(json.loads((self.accounts / "state.json").read_text())["cooldowns"], {})
 
     def test_app_server_stdout_limit_quarantines_zero_exit_account(self):

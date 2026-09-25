@@ -7,7 +7,9 @@ session, stopped execution and production result before trusting a candidate.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
+import re
 import json
 import os
 from pathlib import Path
@@ -20,6 +22,8 @@ import time
 from shipping_lead_worker_evidence import NativeTurnEvidence, capture_stream, digest
 
 LIMIT = 1024 * 1024
+EXIT_SCHEMA = "symphony-shipping-worker-exit/v1"
+DIGEST = re.compile(r"[a-f0-9]{64}")
 
 
 def owned_directory(path: Path, private: bool = False) -> None:
@@ -63,11 +67,12 @@ def producer_digest(directory: Path) -> str:
 
 
 def binding_from_journal(private_root: Path, workspace: Path, invocation_id: str,
-                         producer_sha256: str) -> dict:
+                         producer_sha256: str, *, require_workspace: bool = True) -> dict:
     owned_directory(private_root.parent.parent)
     owned_directory(private_root.parent)
     owned_directory(private_root, private=True)
-    owned_directory(workspace)
+    if require_workspace:
+        owned_directory(workspace)
     state = json.loads(read_owned(private_root / "state.json"))
     active = state.get("active") if isinstance(state, dict) else None
     if (not isinstance(state, dict) or state.get("schema") != "jovie.summer-symphony-consumer-state/v1"
@@ -129,7 +134,12 @@ def publish_candidate(private_root: Path, value: dict) -> Path:
     data = (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
     if len(data) > LIMIT:
         raise ValueError("worker evidence candidate oversized")
-    destination = root / (value["digest"] + ".json")
+    identity = value["digest"]
+    if value.get("schema") == EXIT_SCHEMA:
+        if not isinstance(value.get("candidateDigest"), str) or not DIGEST.fullmatch(value["candidateDigest"]):
+            raise ValueError("worker evidence exit reference invalid")
+        identity = "exit-" + value["candidateDigest"]
+    destination = root / (identity + ".json")
     fd, name = tempfile.mkstemp(prefix=".candidate-", dir=root)
     temporary = Path(name)
     try:
@@ -155,11 +165,11 @@ def publish_candidate(private_root: Path, value: dict) -> Path:
 
 
 def capture(source, destination, *, gem_workspace: Path, workspace: Path,
-            invocation_id: str, producer_directory: Path) -> bool:
+            invocation_id: str, producer_directory: Path, pointer: Path | None = None) -> bool:
     private_root = gem_workspace / "state" / "summer-symphony-consumer"
-    def binding():
+    def binding(require_workspace=True):
         return binding_from_journal(private_root, workspace, invocation_id,
-                                    producer_digest(producer_directory))
+                                    producer_digest(producer_directory), require_workspace=require_workspace)
     try:
         initial = binding()
         reader = NativeTurnEvidence(initial, git=lambda: git_snapshot(workspace))
@@ -170,18 +180,86 @@ def capture(source, destination, *, gem_workspace: Path, workspace: Path,
             destination.flush()
         return False
     def publish(value):
-        if binding() != initial:
+        if binding(require_workspace=False) != initial:
             raise ValueError("worker evidence binding changed before publication")
         publish_candidate(private_root, value)
+        if pointer is not None:
+            write_pointer(pointer, value["digest"])
     return capture_stream(source, destination, reader, publish)
 
 
-def main() -> int:
+def write_pointer(path: Path, candidate_digest: str) -> None:
+    # The launcher creates this private, empty mktemp file before starting Codex.
+    # Native messages never choose it. Refuse to replace another capture attempt.
+    fd = os.open(path, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
-        capture(sys.stdin.buffer, sys.stdout.buffer,
-                gem_workspace=Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")),
-                workspace=Path.cwd(), invocation_id=os.environ.get("INVOCATION_ID", ""),
-                producer_directory=Path(__file__).resolve().parent)
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size != 0):
+            raise ValueError("worker evidence pointer unsafe")
+        with os.fdopen(os.dup(fd), "wb") as output:
+            output.write((candidate_digest + "\n").encode("ascii"))
+            output.flush()
+            os.fsync(output.fileno())
+    finally:
+        os.close(fd)
+
+
+def record_exit(pointer: Path, process_code: int, launcher_code: int, *, gem_workspace: Path,
+                workspace: Path, invocation_id: str, producer_directory: Path,
+                now=lambda: datetime.now(timezone.utc)) -> Path:
+    if any(type(code) is not int or not 0 <= code <= 255 for code in (process_code, launcher_code)):
+        raise ValueError("worker evidence exit code invalid")
+    private_root = gem_workspace / "state/summer-symphony-consumer"
+    binding = binding_from_journal(private_root, workspace, invocation_id, producer_digest(producer_directory),
+                                   require_workspace=False)
+    reference = read_owned(pointer).decode("ascii").strip()
+    if not DIGEST.fullmatch(reference):
+        raise ValueError("worker evidence pointer invalid")
+    root = private_root / "worker-evidence"
+    owned_directory(root, private=True)
+    candidate = json.loads(read_owned(root / (reference + ".json")))
+    if (not isinstance(candidate, dict) or candidate.get("schema") != "symphony-shipping-worker-candidate/v1"
+            or candidate.get("digest") != reference
+            or digest({key: value for key, value in candidate.items() if key != "digest"}) != reference
+            or any(candidate.get(key) != value for key, value in binding.items())
+            or candidate.get("executionTerminated") is not False):
+        raise ValueError("worker evidence exit candidate cross-bound")
+    observed = now()
+    if (observed.tzinfo is None or observed.utcoffset().total_seconds() != 0
+            or observed < datetime.fromisoformat(candidate["observedAt"].replace("Z", "+00:00"))):
+        raise ValueError("worker evidence exit clock invalid")
+    fixed = {"schema": EXIT_SCHEMA, **binding, "candidateDigest": reference,
+             "sessionId": candidate["sessionId"], "processExitCode": process_code,
+             "launcherExitCode": launcher_code, "workerProcessExited": True, "taskTerminal": False}
+    destination = root / ("exit-" + reference + ".json")
+    if destination.exists():
+        prior = json.loads(read_owned(destination))
+        if (set(prior) != {*fixed, "observedAt", "digest"}
+                or any(prior.get(key) != value for key, value in fixed.items())
+                or prior.get("digest") != digest({key: value for key, value in prior.items() if key != "digest"})
+                or not datetime.fromisoformat(candidate["observedAt"].replace("Z", "+00:00"))
+                <= datetime.fromisoformat(prior["observedAt"].replace("Z", "+00:00")) <= observed):
+            raise ValueError("worker evidence exit receipt conflict")
+        return destination
+    value = {**fixed, "observedAt": observed.isoformat().replace("+00:00", "Z")}
+    return publish_candidate(private_root, {**value, "digest": digest(value)})
+
+
+def main(argv=None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    try:
+        recording_exit = len(args) == 5 and args[0] == "--record-exit"
+        context = dict(gem_workspace=Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")),
+                       workspace=Path(args[4]) if recording_exit else Path.cwd(),
+                       invocation_id=os.environ.get("INVOCATION_ID", ""),
+                       producer_directory=Path(__file__).resolve().parent)
+        if recording_exit:
+            record_exit(Path(args[1]), int(args[2]), int(args[3]), **context)
+        elif not args or (len(args) == 2 and args[0] == "--candidate-pointer"):
+            capture(sys.stdin.buffer, sys.stdout.buffer, pointer=Path(args[1]) if args else None, **context)
+        else:
+            raise ValueError("worker evidence arguments invalid")
         return 0
     except Exception:
         # Never include provider output, journal contents, paths or credentials.

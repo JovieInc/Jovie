@@ -1,5 +1,6 @@
 """Exercise local Git, private journal binding and immutable candidate publication."""
 import contextlib
+from datetime import datetime, timedelta, timezone
 import io
 import json
 import os
@@ -173,6 +174,7 @@ class CaptureTest(unittest.TestCase):
         self.assertEqual(destination.getvalue(), b"".join(rows))
         files = list((self.private / "worker-evidence").glob("*.json"))
         self.assertEqual(len(files), 1)
+        self.assertEqual(list((self.private / "worker-evidence").glob("exit-*.json")), [])
         result = json.loads(files[0].read_text())
         self.assertFalse(result["executionTerminated"])
         self.assertEqual(result["executionFinalHead"], self.git("rev-parse", "HEAD").decode().strip())
@@ -216,15 +218,95 @@ class CaptureTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "changed during read"):
                 capture.read_owned(path)
 
+    def exit_context(self):
+        return dict(gem_workspace=self.gem, workspace=self.workspace,
+                    invocation_id="b" * 32, producer_directory=self.producer)
+
+    def prepared_pointer(self):
+        value = self.candidate()
+        capture.publish_candidate(self.private, value)
+        pointer = self.root / "candidate-pointer"
+        pointer.write_bytes(b""); pointer.chmod(0o600)
+        capture.write_pointer(pointer, value["digest"])
+        return pointer, value
+
+    def test_exit_receipt_binds_exact_candidate_and_preserves_both_statuses_without_task_completion(self):
+        pointer, candidate = self.prepared_pointer()
+        moment = datetime.now(timezone.utc)
+        result = capture.record_exit(pointer, 0, 75, **self.exit_context(), now=lambda: moment)
+        value = json.loads(result.read_text())
+        self.assertEqual(value["candidateDigest"], candidate["digest"])
+        self.assertEqual(value["sessionId"], candidate["sessionId"])
+        self.assertEqual(value["processExitCode"], 0)
+        self.assertEqual(value["launcherExitCode"], 75)
+        self.assertTrue(value["workerProcessExited"])
+        self.assertFalse(value["taskTerminal"])
+        self.assertEqual(capture.record_exit(pointer, 0, 75, **self.exit_context(),
+                         now=lambda: moment + timedelta(seconds=1)), result)
+        with self.assertRaisesRegex(ValueError, "receipt conflict"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context())
+
+    def test_exit_refuses_missing_cross_bound_changed_or_malformed_evidence(self):
+        pointer, candidate = self.prepared_pointer()
+        for code in (True, -1, 256):
+            with self.assertRaisesRegex(ValueError, "exit code invalid"):
+                capture.record_exit(pointer, code, 0, **self.exit_context())
+        with self.assertRaisesRegex(ValueError, "clock invalid"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context(), now=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc))
+        with self.assertRaisesRegex(ValueError, "clock invalid"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context(), now=lambda: datetime(2026, 1, 1))
+        candidate_path = self.private / "worker-evidence" / (candidate["digest"] + ".json")
+        original = candidate_path.read_bytes()
+        candidate_path.write_text(json.dumps({**candidate, "executionTerminated": True}))
+        with self.assertRaisesRegex(ValueError, "candidate cross-bound"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context())
+        candidate_path.write_bytes(original)
+        pointer.write_text("../state.json")
+        with self.assertRaisesRegex(ValueError, "pointer invalid"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context())
+        pointer.write_text(candidate["digest"])
+        self.state["active"]["admissionProgress"]["mutationCount"] = 0; self.save()
+        with self.assertRaisesRegex(ValueError, "not attempted"):
+            capture.record_exit(pointer, 0, 0, **self.exit_context())
+
+    def test_verified_candidate_survives_workspace_cleanup_but_initial_capture_requires_it(self):
+        pointer, candidate = self.prepared_pointer()
+        shutil.rmtree(self.workspace)
+        result = capture.record_exit(pointer, 0, 0, **self.exit_context())
+        self.assertEqual(json.loads(result.read_text())["candidateDigest"], candidate["digest"])
+        with self.assertRaises(OSError): self.binding()
+
+    def test_capture_pointer_cannot_overwrite_another_attempt_or_follow_symlink(self):
+        pointer, candidate = self.prepared_pointer()
+        with self.assertRaisesRegex(ValueError, "pointer unsafe"):
+            capture.write_pointer(pointer, candidate["digest"])
+        pointer.unlink(); pointer.symlink_to(self.private / "state.json")
+        with self.assertRaises(OSError): capture.write_pointer(pointer, candidate["digest"])
+        value = {"schema": capture.EXIT_SCHEMA, "candidateDigest": "../unsafe"}
+        value["digest"] = capture.digest(value)
+        with self.assertRaisesRegex(ValueError, "exit reference invalid"):
+            capture.publish_candidate(self.private, value)
+
+    def test_main_dispatches_capture_and_exit_only_for_exact_argument_shapes(self):
+        with patch.object(capture, "capture", return_value=False) as project:
+            self.assertEqual(capture.main(["--candidate-pointer", str(self.root / "pointer")]), 0)
+            self.assertEqual(project.call_args.kwargs["pointer"], self.root / "pointer")
+        with patch.object(capture, "record_exit") as exited:
+            self.assertEqual(capture.main(["--record-exit", str(self.root / "pointer"), "17", "75", str(self.workspace)]), 0)
+            self.assertEqual(exited.call_args.args, (self.root / "pointer", 17, 75))
+            self.assertEqual(exited.call_args.kwargs["workspace"], self.workspace)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(capture.main(["--invalid"]), 1)
+
     def test_main_keeps_errors_constant_and_does_not_print_journal_or_paths(self):
         class BinaryIO:
             buffer = io.BytesIO()
         with patch.object(capture.sys, "stdin", BinaryIO()), patch.object(capture.sys, "stdout", BinaryIO()):
             with patch.object(capture, "capture", return_value=False):
-                self.assertEqual(capture.main(), 0)
+                self.assertEqual(capture.main([]), 0)
             errors = io.StringIO()
             with contextlib.redirect_stderr(errors), patch.object(capture, "capture", side_effect=OSError("SECRET/path")):
-                self.assertEqual(capture.main(), 1)
+                self.assertEqual(capture.main([]), 1)
             self.assertEqual(errors.getvalue(), "worker-evidence: capture-unavailable\n")
 
 

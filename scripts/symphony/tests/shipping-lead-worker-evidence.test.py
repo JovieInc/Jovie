@@ -62,6 +62,10 @@ class NativeEvidenceTest(unittest.TestCase):
         self.assertIsNone(self.reader.finish())
         result = self.reader.observe(self.turn("turn/completed", turn_id="turn-2", status="completed"))
         self.assertEqual(result["sessionId"], "thread-1-turn-2")
+        self.assertEqual(result["sessionIds"], ["thread-1-turn-1", "thread-1-turn-2"])
+        self.assertLessEqual(result["threadStartedAt"], result["startedAt"])
+        result["sessionIds"].clear()
+        self.assertEqual(self.reader.finish()["sessionIds"], ["thread-1-turn-1", "thread-1-turn-2"])
 
     def test_failed_interrupted_or_error_bearing_turn_cannot_qualify_changed_git_head(self):
         for status, error in [("failed", {"message": "synthetic failure"}), ("interrupted", None),

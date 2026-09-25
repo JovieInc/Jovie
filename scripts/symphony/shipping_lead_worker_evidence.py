@@ -7,6 +7,7 @@ No prompts, tool output, account identity or credentials enter the projection.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from copy import deepcopy
 import hashlib
 import json
 import re
@@ -105,7 +106,7 @@ class NativeTurnEvidence:
             self.base = git_snapshot(self.git())
             if not self.base["clean"]:
                 raise ValueError("worker evidence initial workspace is dirty")
-            self._time()
+            self.thread_started_at = self._time()
             return None
         turn = params.get("turn")
         if (self.thread_id is None or params.get("threadId") != self.thread_id
@@ -142,18 +143,20 @@ class NativeTurnEvidence:
             "schema": SCHEMA, **self.binding,
             "threadId": self.thread_id, "turnId": turn_id,
             "sessionId": f"{self.thread_id}-{turn_id}",
+            "sessionIds": [f"{self.thread_id}-{seen}" for seen in sorted(self.seen)],
+            "threadStartedAt": self.thread_started_at,
             "startedAt": started_at, "observedAt": observed_at,
             "executionBaseHead": self.base["head"], "executionFinalHead": final["head"],
             "turnStatus": "completed", "executionTerminated": False,
         }
         self.candidate = {**value, "digest": digest(value)}
-        return dict(self.candidate)
+        return deepcopy(self.candidate)
 
     def finish(self) -> dict | None:
         """EOF is not execution proof; incomplete final turns produce no candidate."""
         if self.poisoned or self.active is not None or self.candidate is None:
             return None
-        return dict(self.candidate)
+        return deepcopy(self.candidate)
 
 
 def capture_stream(source, destination, reader: NativeTurnEvidence, publish: Callable[[dict], None],

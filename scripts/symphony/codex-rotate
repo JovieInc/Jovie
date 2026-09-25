@@ -1263,7 +1263,8 @@ log "START account=$account lease_fds=${account_lock_fds[*]} args=$*"
 tmp_out=$(mktemp)
 tmp_err=$(mktemp)
 tmp_provider_error=$(mktemp)
-trap 'rm -f "$tmp_out" "$tmp_err" "$tmp_provider_error"' EXIT
+tmp_worker_candidate=$(mktemp)
+trap 'rm -f "$tmp_out" "$tmp_err" "$tmp_provider_error" "$tmp_worker_candidate"' EXIT
 set +e
 # Keep the streams separate: Codex CLI owns stderr errors, while app-server owns
 # structured stdout events. Mixing them lets arbitrary JSON-RPC values or tool
@@ -1272,8 +1273,9 @@ set +e
 # launchers and non-app-server work retain their existing stream capture.
 worker_capture="$(dirname -- "${BASH_SOURCE[0]}")/shipping_worker_capture.py"
 if [[ "$app_server_mode" == "1" && -f "$worker_capture" ]]; then
+  worker_workspace="$(pwd -P)"
   "$REAL_CODEX" "$@" \
-    > >(python3 "$worker_capture" | tee -a "$tmp_out") \
+    > >(python3 "$worker_capture" --candidate-pointer "$tmp_worker_candidate" | tee -a "$tmp_out") \
     2> >(tee -a "$tmp_err" >&2)
 else
   "$REAL_CODEX" "$@" \
@@ -1281,6 +1283,7 @@ else
     2> >(tee -a "$tmp_err" >&2)
 fi
 rc=$?
+worker_rc=$rc
 set -e
 # Bash does not guarantee that process substitutions finish before the next
 # command. Wait for both tee processes so the terminal event is present before
@@ -1330,5 +1333,12 @@ if classify_provider_error "$tmp_out" "$tmp_err" "$rc" >"$tmp_provider_error"; t
   fi
 fi
 
+# The foreground child has returned and both stream readers have completed.
+# Preserve raw child status and the existing classifier's final status separately.
+# This observes one process exit, never completion of the admitted task.
+if [[ -s "$tmp_worker_candidate" && -f "$worker_capture" ]]; then
+  python3 "$worker_capture" --record-exit "$tmp_worker_candidate" "$worker_rc" "$rc" "$worker_workspace" ||
+    log "EVIDENCE worker-exit-unavailable"
+fi
 log "EXIT account=$account rc=$rc"
 exit "$rc"

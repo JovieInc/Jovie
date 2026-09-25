@@ -77,7 +77,16 @@ the consumer; private ownership and a candidate digest do not replace signed
 task validation. Missing admission simply preserves native stdout without proof.
 No prompts, tool output, account identity or credentials enter the candidate.
 
-The candidate still records `executionTerminated: false`. Consumer correlation
-across native continuation turns, positive process-stop proof, exact commit/CI/
-merge/production verification, durable terminal reconciliation and signed
-reservation release remain part of JOV-6586.
+The candidate still records `executionTerminated: false` and includes the observed
+thread start and native turn sessions for later acceptance correlation. After the
+foreground worker returns and stream readers finish, the launcher writes a separate
+immutable exit receipt tied to that candidate. It preserves the raw child status
+and final provider-classified status separately. A completed turn while its worker
+is still alive cannot produce this receipt. The captured workspace identity survives
+workspace cleanup; initial capture still requires the actual owned directory.
+
+This receipt proves one worker process returned, with `taskTerminal: false`.
+Consumer acceptance/continuation correlation, same-generation official inactivity,
+exact commit/CI/merge/production verification, durable terminal reconciliation and
+signed reservation release remain part of JOV-6586. Failed or incomplete workers
+without a useful candidate also still require a separate terminal recovery path.
