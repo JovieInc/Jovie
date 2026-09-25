@@ -53,4 +53,10 @@ export type DashboardAnalyticsResponse = {
   tip_link_visits?: number;
   recent_clicks?: number;
   view?: DashboardAnalyticsView;
+  /**
+   * Versioned evidence receipts (JOV-6582, contract `analytics.evidence-receipt/v1`).
+   * Additive: legacy consumers ignore it; receipt-aware consumers (dashboard,
+   * agents) read window/freshness/availability from here instead of re-deriving.
+   */
+  evidence?: import('@/lib/analytics/evidence-receipt').EvidenceReceiptSet;
 };

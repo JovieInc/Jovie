@@ -31,6 +31,13 @@ export type MetricValueType = 'count' | 'rate';
 /** The unit a metric is expressed in. */
 export type MetricUnit = 'views' | 'people' | 'clicks' | 'percent';
 
+/**
+ * Version of the metric DEFINITIONS (identity, formula, source semantics).
+ * Bump when a definition changes meaning so evidence receipts
+ * (lib/analytics/evidence-receipt.ts) can distinguish old values from new.
+ */
+export const METRICS_CONTRACT_VERSION = 'analytics.metrics/v2' as const;
+
 export interface CanonicalMetricDefinition {
   /** Human-readable canonical name. */
   readonly label: string;
@@ -43,6 +50,8 @@ export interface CanonicalMetricDefinition {
   readonly source: string;
   readonly valueType: MetricValueType;
   readonly unit: MetricUnit;
+  /** Definition version — carried on every evidence receipt for this metric. */
+  readonly version: string;
 }
 
 /** Every canonical analytics metric key. */
@@ -72,6 +81,7 @@ export const CANONICAL_METRICS: Record<
       'daily_profile_views: SUM(view_count) WHERE creator_profile_id = :profileId AND view_date >= :startDate',
     valueType: 'count',
     unit: 'views',
+    version: METRICS_CONTRACT_VERSION,
   },
   unique_views: {
     label: 'Unique Views',
@@ -81,6 +91,7 @@ export const CANONICAL_METRICS: Record<
       'audience_members: COUNT(*) WHERE creator_profile_id = :profileId AND last_seen_at >= :startDate AND NOT (tags @> \'["bot"]\')',
     valueType: 'count',
     unit: 'people',
+    version: METRICS_CONTRACT_VERSION,
   },
   unique_users: {
     label: 'Unique Visitors',
@@ -90,6 +101,7 @@ export const CANONICAL_METRICS: Record<
       'audience_members: COUNT(*) WHERE creator_profile_id = :profileId AND last_seen_at >= :startDate',
     valueType: 'count',
     unit: 'people',
+    version: METRICS_CONTRACT_VERSION,
   },
   total_clicks: {
     label: 'Total Clicks',
@@ -98,6 +110,7 @@ export const CANONICAL_METRICS: Record<
       'click_events: COUNT(*) WHERE creator_profile_id = :profileId AND is_bot = false AND created_at >= :startDate',
     valueType: 'count',
     unit: 'clicks',
+    version: METRICS_CONTRACT_VERSION,
   },
   listen_clicks: {
     label: 'Listen Clicks',
@@ -106,6 +119,7 @@ export const CANONICAL_METRICS: Record<
     source: "click_events: COUNT(*) … AND link_type = 'listen'",
     valueType: 'count',
     unit: 'clicks',
+    version: METRICS_CONTRACT_VERSION,
   },
   social_clicks: {
     label: 'Social Clicks',
@@ -113,6 +127,7 @@ export const CANONICAL_METRICS: Record<
     source: "click_events: COUNT(*) … AND link_type = 'social'",
     valueType: 'count',
     unit: 'clicks',
+    version: METRICS_CONTRACT_VERSION,
   },
   tip_link_visits: {
     label: 'Tip Link Visits',
@@ -120,6 +135,7 @@ export const CANONICAL_METRICS: Record<
     source: "click_events: COUNT(*) … AND link_type = 'tip'",
     valueType: 'count',
     unit: 'clicks',
+    version: METRICS_CONTRACT_VERSION,
   },
   ticket_clicks: {
     label: 'Ticket Clicks',
@@ -128,6 +144,7 @@ export const CANONICAL_METRICS: Record<
       "click_events: COUNT(*) WHERE metadata->>'contentType' = 'tour_date' AND metadata->>'contentId' = :tourDateId AND is_bot = false",
     valueType: 'count',
     unit: 'clicks',
+    version: METRICS_CONTRACT_VERSION,
   },
   subscribers: {
     label: 'Followers',
@@ -137,6 +154,7 @@ export const CANONICAL_METRICS: Record<
       'notification_subscriptions: COUNT(*) WHERE creator_profile_id = :profileId AND created_at >= :startDate',
     valueType: 'count',
     unit: 'people',
+    version: METRICS_CONTRACT_VERSION,
   },
   identified_users: {
     label: 'Identified Users',
@@ -146,6 +164,7 @@ export const CANONICAL_METRICS: Record<
       'audience_members: COUNT(*) WHERE creator_profile_id = :profileId AND updated_at >= :startDate AND email IS NOT NULL',
     valueType: 'count',
     unit: 'people',
+    version: METRICS_CONTRACT_VERSION,
   },
   ctr: {
     label: 'Click-Through Rate',
@@ -154,6 +173,7 @@ export const CANONICAL_METRICS: Record<
     source: 'derived: (total_clicks / profile_views) * 100',
     valueType: 'rate',
     unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
   },
   capture_rate: {
     label: 'Capture Rate',
@@ -162,6 +182,7 @@ export const CANONICAL_METRICS: Record<
     source: 'derived: (subscribers / unique_users) * 100',
     valueType: 'rate',
     unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
   },
 };
 
