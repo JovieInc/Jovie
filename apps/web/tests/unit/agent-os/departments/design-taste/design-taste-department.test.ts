@@ -108,6 +108,17 @@ describe('design-taste department', () => {
     const prComment = await readFile(result.prCommentPath!, 'utf8');
     expect(prComment).toContain('Design/Taste Department Review');
     expect(prComment).toContain('agent-run-artifact');
+    expect(prComment).toMatch(
+      /`apps\/web\/components\/features\/dashboard\/Card\.tsx:\d+`/
+    );
+    const autoFix = result.manifest?.proposals.find(
+      proposal => proposal.kind === 'auto-fix-branch'
+    );
+    expect(autoFix?.body).toMatch(
+      /- \[emoji\] apps\/web\/components\/features\/dashboard\/Card\.tsx:\d+ — /
+    );
+    expect(autoFix?.branchName).toMatch(/^agent\/design-taste-autofix-/);
+    expect(autoFix?.body).toContain(`Branch: \`${autoFix?.branchName}\``);
   });
 
   it('fails closed when design-taste policy is missing', async () => {

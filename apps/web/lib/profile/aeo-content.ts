@@ -856,8 +856,9 @@ function buildLatestReleaseFaq(params: {
   const listedReleaseCount = latestRelease?.title
     ? Math.max(releases.length, 1)
     : releases.length;
+  const releasedOn = releaseDate ? ` released on ${releaseDate}` : '';
   const answer = latestRelease?.title
-    ? `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releaseDate ? ` released on ${releaseDate}` : ''}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`
+    ? `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`
     : `${artist.name}'s public Jovie profile does not list a release yet. Use the profile's listening links for current music updates.`;
 
   return {
@@ -887,9 +888,10 @@ function buildTouringFaq(params: {
   }
 
   const date = formatDate(nextTourDate.startDate);
+  const dateLabel = date ? ` ${date}` : '';
   return {
     question: `Is ${artist.name} touring?`,
-    answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${date ? ` ${date}` : ''} at ${formatTourLocation(nextTourDate)}.`,
+    answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${dateLabel} at ${formatTourLocation(nextTourDate)}.`,
     source: nextTourDate.ticketUrl
       ? { label: 'Ticket listing', href: nextTourDate.ticketUrl }
       : {
@@ -912,9 +914,10 @@ function buildMerchFaq(params: {
   }
 
   const price = formatPrice(primaryCard.retailPriceCents);
+  const priceLabel = price ? ` priced at ${price}` : '';
   return {
     question: `Where can I buy ${artist.name} merch?`,
-    answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${price ? ` priced at ${price}` : ''}.`,
+    answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${priceLabel}.`,
     source: {
       label: 'Official merch card',
       href: profilePath(
