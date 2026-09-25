@@ -297,6 +297,7 @@ describe('runM2RevenuePathCanary', () => {
       new Date('2026-09-18T06:37:00.080Z'),
       new Date('2026-09-18T06:37:01.000Z'),
     ];
+    let capturedHeaders: Headers | null = null;
     const receipt = await runM2RevenuePathCanary({
       baseUrl: 'https://jov.ie/',
       now: () => {
@@ -306,6 +307,9 @@ describe('runM2RevenuePathCanary', () => {
       },
       fetchImpl: async (input, init) => {
         const url = String(input);
+        if (!capturedHeaders) {
+          capturedHeaders = new Headers(init?.headers);
+        }
         if (url.endsWith('/') || url.endsWith('jov.ie')) {
           return htmlResponse(200, HOME_HTML, 'https://jov.ie/');
         }
@@ -347,6 +351,8 @@ describe('runM2RevenuePathCanary', () => {
       },
     });
 
+    expect(capturedHeaders?.get('accept')).toContain('text/html');
+    expect(capturedHeaders?.get('user-agent')).toBeTruthy();
     expect(receipt.pass).toBe(true);
     expect(receipt.issue).toBe('JOV-6439');
     expect(receipt.distinctFrom).toBe('generic-uptime');
