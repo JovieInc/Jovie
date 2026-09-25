@@ -7,10 +7,15 @@ const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   returning: vi.fn(),
   values: vi.fn(),
+  onConflictDoNothing: vi.fn(),
+  select: vi.fn(),
+  from: vi.fn(),
+  where: vi.fn(),
+  limit: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: { insert: mocks.insert },
+  db: { insert: mocks.insert, select: mocks.select },
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -58,8 +63,18 @@ describe('server analytics contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.returning.mockResolvedValue([{ id: 'event-1' }]);
-    mocks.values.mockReturnValue({ returning: mocks.returning });
+    mocks.onConflictDoNothing.mockReturnValue({
+      returning: mocks.returning,
+    });
+    mocks.values.mockReturnValue({
+      returning: mocks.returning,
+      onConflictDoNothing: mocks.onConflictDoNothing,
+    });
     mocks.insert.mockReturnValue({ values: mocks.values });
+    mocks.limit.mockResolvedValue([{ id: 'event-1' }]);
+    mocks.where.mockReturnValue({ limit: mocks.limit });
+    mocks.from.mockReturnValue({ where: mocks.where });
+    mocks.select.mockReturnValue({ from: mocks.from });
   });
 
   afterEach(() => {
@@ -72,13 +87,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(29);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(31);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(29);
+    ).toBe(31);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
@@ -114,13 +129,18 @@ describe('server analytics contract', () => {
       'raw-user-id-must-not-persist'
     );
 
-    expect(result).toEqual({ ok: true, eventId: 'event-1' });
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      duplicate: false,
+    });
     expect(mocks.values).toHaveBeenCalledWith(
       expect.objectContaining({
         contractVersion: 'server-analytics/v1',
         consentPolicy: 'first_party_operational_measurement',
         eventName: 'release_deleted',
         privacyClass: 'pseudonymous_ids_no_contact_data',
+        dedupeKey: null,
         properties: {
           profileId: PROFILE_ID,
           releaseId: RELEASE_ID,
@@ -269,5 +289,94 @@ describe('server analytics contract', () => {
         }),
       })
     );
+  });
+
+  it('persists a deduped activation event with the server-derived key', async () => {
+    const result = await trackServerEvent(
+      'activation_completed',
+      { profileId: PROFILE_ID, source: 'onboarding_complete' },
+      undefined,
+      { dedupeKey: 'profile:11111111-1111-4111-8111-111111111111' }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      duplicate: false,
+    });
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'activation_completed',
+        category: 'profile',
+        sourceEntityType: 'creator_profile',
+        sourceEntityId: PROFILE_ID,
+        // The key is prefixed with the event name so distinct event types
+        // can never collide on the same entity id.
+        dedupeKey: `activation_completed:profile:${PROFILE_ID}`,
+        properties: {
+          profileId: PROFILE_ID,
+          source: 'onboarding_complete',
+        },
+      })
+    );
+    expect(mocks.onConflictDoNothing).toHaveBeenCalledWith({
+      target: expect.objectContaining({ name: 'dedupe_key' }),
+    });
+  });
+
+  it('reports an idempotent duplicate delivery without writing a second row', async () => {
+    // Conflict path: onConflictDoNothing returning yields no row because the
+    // dedupe key already exists; the dedupe lookup resolves the stored id.
+    mocks.returning.mockResolvedValueOnce([]);
+    mocks.limit.mockResolvedValueOnce([{ id: 'stored-earlier' }]);
+
+    const result = await trackServerEvent(
+      'payment_succeeded',
+      { appUserId: PROFILE_ID, source: 'invoice_payment_succeeded' },
+      undefined,
+      { dedupeKey: 'stripe_event:evt_123' }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'stored-earlier',
+      duplicate: true,
+    });
+    expect(mocks.select).toHaveBeenCalled();
+  });
+
+  it('derives the dedupe key from verified Stripe event ids for payment success', async () => {
+    await trackServerEvent(
+      'payment_succeeded',
+      { appUserId: PROFILE_ID, source: 'invoice_payment_succeeded' },
+      undefined,
+      { dedupeKey: 'stripe_event:evt_456' }
+    );
+
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'payment_succeeded',
+        category: 'entitlement',
+        dedupeKey: 'payment_succeeded:stripe_event:evt_456',
+      })
+    );
+  });
+
+  it('treats an unresolved duplicate conflict as a persistence failure, not a delivery', async () => {
+    // Conflict path where the dedupe lookup also finds nothing: the insert
+    // neither returned a row nor can prove a prior delivery — this must not
+    // be reported as ok.
+    mocks.returning.mockResolvedValueOnce([]);
+    mocks.limit.mockResolvedValueOnce([]);
+
+    const result = await trackServerEvent(
+      'activation_completed',
+      { profileId: PROFILE_ID, source: 'onboarding_complete' },
+      undefined,
+      { dedupeKey: `profile:${PROFILE_ID}` }
+    );
+
+    expect(result).toEqual({ ok: false, error: 'persistence_failed' });
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });

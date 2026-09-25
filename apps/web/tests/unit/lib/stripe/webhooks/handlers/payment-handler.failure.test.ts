@@ -14,6 +14,7 @@ const {
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
   mockLogFallback,
+  mockTrackServerEvent,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -22,6 +23,11 @@ const {
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -68,6 +74,11 @@ describe('@critical PaymentHandler - payment failed', () => {
     handler = new PaymentHandler();
 
     mockGetPlanFromPriceId.mockReturnValue('standard');
+    mockTrackServerEvent.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-row-1',
+      duplicate: false,
+    });
     mockUpdateUserBillingStatus.mockResolvedValue({
       success: true,
       appUserId: 'app_user_test',

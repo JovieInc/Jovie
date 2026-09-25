@@ -14,6 +14,7 @@ const {
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
   mockLogFallback,
+  mockTrackServerEvent,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -22,6 +23,11 @@ const {
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -73,6 +79,11 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       appUserId: 'app_user_test',
     });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
+    mockTrackServerEvent.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-row-1',
+      duplicate: false,
+    });
   });
 
   afterEach(() => {
@@ -123,6 +134,104 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
+  });
+
+  it('persists the payment_succeeded receipt idempotently from the verified webhook', async () => {
+    // JOV-6459: the durable analytics event fires from the verified Stripe
+    // webhook — never inferred from the /billing/success return page — and
+    // dedupes on the Stripe event id across webhook redeliveries.
+    const mockSubscription = {
+      id: 'sub_receipt',
+      status: 'active',
+      customer: 'cus_receipt',
+      metadata: { clerk_user_id: 'user_abc123' },
+      items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+    } as unknown as Stripe.Subscription;
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_receipt_1',
+        type: 'invoice.payment_succeeded',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'in_receipt',
+            customer: 'cus_receipt',
+            subscription: 'sub_receipt',
+            amount_due: 2000,
+            attempt_count: 1,
+          } as unknown as Stripe.Invoice,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_receipt_1',
+      stripeEventTimestamp: new Date(),
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'payment_succeeded',
+      {
+        appUserId: 'app_user_test',
+        source: 'invoice_payment_succeeded',
+      },
+      undefined,
+      { dedupeKey: 'stripe_event:evt_receipt_1' }
+    );
+  });
+
+  it('rethrows when the receipt is not persisted so Stripe retries reconcile the event', async () => {
+    const mockSubscription = {
+      id: 'sub_receipt_fail',
+      status: 'active',
+      customer: 'cus_receipt_fail',
+      metadata: { clerk_user_id: 'user_abc123' },
+      items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+    } as unknown as Stripe.Subscription;
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    // The real sink returns {ok:false} on persistence failure instead of
+    // throwing — the required-receipt check must treat that as a failure too.
+    mockTrackServerEvent.mockResolvedValueOnce({
+      ok: false,
+      error: 'persistence_failed',
+    });
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_receipt_fail',
+        type: 'invoice.payment_succeeded',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'in_receipt_fail',
+            customer: 'cus_receipt_fail',
+            subscription: 'sub_receipt_fail',
+            amount_due: 2000,
+            attempt_count: 1,
+          } as unknown as Stripe.Invoice,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_receipt_fail',
+      stripeEventTimestamp: new Date(),
+    };
+
+    await expect(handler.handle(context)).rejects.toThrow(
+      'payment_succeeded analytics receipt failed: persistence_failed'
+    );
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Payment succeeded analytics receipt failed',
+      expect.objectContaining({
+        message: 'payment_succeeded receipt not persisted: persistence_failed',
+      }),
+      expect.objectContaining({
+        route: '/api/stripe/webhooks',
+        event: 'invoice.payment_succeeded',
+      })
+    );
   });
 
   it('handles invoice with expanded subscription object', async () => {

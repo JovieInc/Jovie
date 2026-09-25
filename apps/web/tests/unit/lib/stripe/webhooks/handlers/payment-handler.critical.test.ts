@@ -22,6 +22,7 @@ const {
   mockSendPaymentRecoveredEmail,
   mockShouldSendDunningEmail,
   mockLoggerWarn,
+  mockTrackServerEvent,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -35,6 +36,11 @@ const {
   mockSendPaymentRecoveredEmail: vi.fn(),
   mockShouldSendDunningEmail: vi.fn(),
   mockLoggerWarn: vi.fn(),
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -105,6 +111,11 @@ describe('@critical PaymentHandler', () => {
 
     // Default mock implementations
     mockGetPlanFromPriceId.mockReturnValue('standard');
+    mockTrackServerEvent.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-row-1',
+      duplicate: false,
+    });
     mockUpdateUserBillingStatus.mockResolvedValue({
       success: true,
       appUserId: 'app_user_default',
