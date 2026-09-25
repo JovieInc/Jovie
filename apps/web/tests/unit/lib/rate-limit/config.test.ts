@@ -230,9 +230,12 @@ describe('Rate Limit Config', () => {
     });
 
     describe('analytics configuration', () => {
-      it('should enable analytics for critical operations', () => {
-        expect(RATE_LIMITERS.paymentIntent.analytics).toBe(true);
-        expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(true);
+      it('does not enable Upstash analytics; nothing reads it', () => {
+        expect(RATE_LIMITERS.paymentIntent.analytics).toBe(false);
+        expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(false);
+        for (const limiter of Object.values(RATE_LIMITERS)) {
+          expect(limiter.analytics).toBe(false);
+        }
       });
 
       it('should preserve ordinary navigation telemetry fanout', () => {
@@ -248,6 +251,10 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.publicProfile.analytics).toBe(false);
         expect(RATE_LIMITERS.publicClick.analytics).toBe(false);
         expect(RATE_LIMITERS.health.analytics).toBe(false);
+        // /api/v1/:username fail-closes on this bucket. Analytics was already
+        // off and the algorithm stays fixed-window (estimator upper bound 3).
+        expect(RATE_LIMITERS.publicArtistApi.analytics).toBe(false);
+        expect(RATE_LIMITERS.publicArtistApi.algorithm).toBe('fixed-window');
       });
 
       it('keeps high-volume authenticated shells on the 3-command fixed-window diet', () => {

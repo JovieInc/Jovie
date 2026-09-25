@@ -42,7 +42,7 @@ import {
   AUTH_RATE_LIMIT_RULES,
   isDeterministicTestOtpEmail,
 } from './rate-limit-rules';
-import { secondaryStorage } from './secondary-storage';
+import { authRateLimitStorage } from './rate-limit-storage';
 
 export {
   AUTH_RATE_LIMIT_RULES,
@@ -373,18 +373,17 @@ export const auth = betterAuth({
     expiresIn: 604800, // 7 days
     updateAge: 86400, // roll expiry at most once per day
     cookieCache: { enabled: true, maxAge: 300 },
-    // Postgres stays the durable session store; Redis loss ≠ mass logout.
+    // Postgres is the durable session store. The cookie cache covers repeat
+    // reads for five minutes. Redis is not a session replica.
     storeSessionInDatabase: true,
   },
   verification: {
-    // Keep OTP/verification values durable in ba_verifications as well —
-    // secondary storage is best-effort by design.
+    // OTP and other one-time values stay in ba_verifications.
     storeInDatabase: true,
   },
-  secondaryStorage,
   rateLimit: {
     enabled: true,
-    storage: 'secondary-storage',
+    customStorage: authRateLimitStorage,
     customRules: AUTH_RATE_LIMIT_RULES,
   },
   trustedOrigins: () => resolveTrustedOrigins(),

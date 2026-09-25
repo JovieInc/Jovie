@@ -38,7 +38,7 @@ const baseConfig = {
   limit: 50,
   window: '1 m',
   prefix: 'public:test',
-  analytics: false,
+  analytics: false as const,
   algorithm: 'fixed-window' as const,
   trafficClass: 'internal' as const,
 };

@@ -70,8 +70,10 @@ vi.mock('@/lib/auth/rate-limit-rules', () => ({
   AUTH_RATE_LIMIT_RULES: {},
   isDeterministicTestOtpEmail: () => false,
 }));
-vi.mock('@/lib/auth/secondary-storage', () => ({
-  secondaryStorage: {},
+vi.mock('@/lib/auth/rate-limit-storage', () => ({
+  authRateLimitStorage: {
+    consume: async () => ({ allowed: true, retryAfter: null }),
+  },
 }));
 
 await import('@/lib/auth/better-auth');
@@ -99,9 +101,15 @@ function getOptions() {
 }
 
 describe('Better Auth base URL', () => {
-  it('keeps verification values database-backed when Redis is secondary', () => {
+  it('keeps sessions in Postgres and rate limits on Redis counters', () => {
     expect(getOptions().verification).toEqual({ storeInDatabase: true });
-    expect(getOptions().secondaryStorage).toBeDefined();
+    expect(getOptions().secondaryStorage).toBeUndefined();
+    expect(getOptions().session).toMatchObject({
+      storeSessionInDatabase: true,
+      cookieCache: { enabled: true, maxAge: 300 },
+    });
+    expect(getOptions().rateLimit?.customStorage).toBeDefined();
+    expect(getOptions().rateLimit?.storage).toBeUndefined();
   });
 
   it('derives request-specific URLs from exact trusted hosts', () => {
