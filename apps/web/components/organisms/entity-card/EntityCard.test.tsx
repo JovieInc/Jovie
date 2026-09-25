@@ -534,4 +534,47 @@ describe('ProfilePacCard landscape states', () => {
     const action = screen.getByRole('link', { name: /listen/i });
     expect(action.parentElement).toHaveClass('mt-auto', 'shrink-0');
   });
+
+  it('shows the subscribed state without an error line after email signup', async () => {
+    mockSubscribeToNotifications.mockResolvedValue({ ok: true });
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: '/preview.mp3',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        artPriority
+      />
+    );
+
+    const card = screen.getByTestId('profile-pac');
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'prompt'));
+    fireEvent.change(screen.getByRole('textbox', { name: /email address/i }), {
+      target: { value: 'fan@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
+
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'success'));
+    expect(screen.getByText("You're in")).toBeInTheDocument();
+    expect(
+      screen.getByText('Watch your inbox for Tim White updates.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/didn't go through/i)).toBeNull();
+    expect(
+      screen.queryByRole('textbox', { name: /email address/i })
+    ).toBeNull();
+    expect(mockSubscribeToNotifications).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artistId: 'artist-1',
+        channel: 'email',
+        email: 'fan@example.com',
+        source: 'profile_pac',
+      })
+    );
+  });
 });
