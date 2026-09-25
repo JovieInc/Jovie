@@ -12,6 +12,12 @@ describe('ProgressBar', () => {
 
     const bar = screen.getByRole('progressbar');
     expect(bar).toHaveAttribute('aria-valuenow', '42');
+
+    render(<ProgressBar value={0} label='Waiting' />);
+    expect(screen.getAllByRole('progressbar')[1]).toHaveAttribute(
+      'aria-valuenow',
+      '0'
+    );
     expect(bar).toHaveAttribute('aria-valuetext', '42%');
     expect(bar).toHaveAttribute('aria-valuemin', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '100');
