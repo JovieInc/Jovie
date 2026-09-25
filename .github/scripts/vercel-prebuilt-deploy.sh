@@ -114,9 +114,10 @@ run_deploy() {
 }
 
 emit_failure_diagnostic() {
-  # Never echo provider output: it may contain credentials or workflow commands.
-  # Node is already required by the Vercel CLI. Read only a bounded tail and
-  # emit allowlisted fields; diagnostic failure must not change deploy status.
+  # Provider output may contain credentials or workflow commands. Node is
+  # already required by the Vercel CLI. Read only a bounded tail, emit
+  # allowlisted receipt fields plus a redacted, command-neutralized line tail
+  # and one ::error:: annotation; diagnostic failure must not change status.
   node - "$1" "$2" "$3" "$4" <<'NODE'
 const fs = require('node:fs');
 const [file, mode, attempt, status] = process.argv.slice(2);
@@ -129,7 +130,16 @@ try {
   const output = buffer.subarray(0, read).toString('utf8');
   const codes = ['ENOENT', 'EACCES', 'ENOSPC', 'ENOTFOUND', 'EAI_AGAIN',
     'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED'];
-  const errorCode = codes.find(code => new RegExp(`\\b${code}\\b`).test(output)) || 'UNKNOWN';
+  const signatures = [
+    ['AUTH', /token is not valid|invalid token|not authorized|\bforbidden\b|status code 40[13]\b/i],
+    ['RATE_LIMITED', /rate.?limit|too many requests|status code 429\b/i],
+    ['PAYLOAD_TOO_LARGE', /too large|size limit|status code 413\b/i],
+    ['MISSING_FILES', /missing_files|missing files/i],
+    ['PREBUILT_OUTPUT_INVALID', /filePathMap/i],
+    ['PROVIDER_5XX', /status code 5\d\d\b|internal server error|bad gateway|service unavailable/i],
+  ];
+  const errorCode = codes.find(code => new RegExp(`\\b${code}\\b`).test(output))
+    || signatures.find(([, pattern]) => pattern.test(output))?.[0] || 'UNKNOWN';
   const urls = [...output.matchAll(/https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app(?=\/?(?:\s|$))/gi)];
   const candidate = urls.at(-1)?.[0] || null;
   const token = process.env.VERCEL_TOKEN;
@@ -145,6 +155,33 @@ try {
     errorCode, asset, deploymentUrl,
   };
   process.stderr.write(`Deploy failure diagnostic: ${JSON.stringify(receipt)}\n`);
+  const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const redact = line => {
+    let out = token ? line.replace(new RegExp(escapeRegExp(token), 'g'), '[redacted]') : line;
+    return out
+      .replace(/(--token(?:=|\s+))\S+/gi, '$1[redacted]')
+      .replace(/(\bbearer\s+)\S+/gi, '$1[redacted]')
+      .replace(/(\b[\w-]*(?:token|secret|password|authorization|api[_-]?key)["']?\s*[:=]\s*)(?!bearer\s)\S+/gi, '$1[redacted]')
+      .replace(/:\/\/[^/\s@]+@/g, '://[redacted]@');
+  };
+  // The read may start mid-line (possibly mid-secret): drop that fragment.
+  const rawLines = output.split(/\r?\n|\r/);
+  if (size > buffer.length) rawLines.shift();
+  const tail = rawLines
+    .map(line => line.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ''))
+    .filter(line => line.trim() !== '')
+    .slice(-40)
+    .map(line => /^\s*(?:::|##\[)/.test(line) ? '[workflow command line removed]' : redact(line).slice(0, 300));
+  process.stderr.write(`Vercel CLI output tail (last ${tail.length} lines, redacted):\n`);
+  for (const line of tail) process.stderr.write(`  | ${line}\n`);
+  const specific = [...tail].reverse().find(line => line !== '[workflow command line removed]'
+    && /\berror\b|error:|ERR_|failed/i.test(line));
+  const escapeData = value => value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const message = `Vercel ${receipt.mode} deploy attempt ${receipt.attempt ?? '?'} failed `
+    + `(exit ${receipt.exitStatus ?? '?'}, ${errorCode})${specific ? `: ${specific.trim()}` : ''}`;
+  // A timeout may still hand off an accepted deployment, so it only warns.
+  const level = receipt.exitStatus === 124 || receipt.exitStatus === 137 ? 'warning' : 'error';
+  process.stdout.write(`::${level} title=Vercel deploy failed::${escapeData(message)}\n`);
 } catch {
   process.stderr.write('Deploy failure diagnostic unavailable\n');
 } finally {
