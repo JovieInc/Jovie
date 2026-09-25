@@ -434,7 +434,7 @@ test.describe('public profile browser admission', () => {
       });
       await expect(eventsButton).toBeVisible();
       await expect(
-        navigation.getByRole('button', { name: 'Events', exact: true })
+        navigation.getByRole('button', { name: 'Shows', exact: true })
       ).toHaveCount(0);
       if (fixture.layout === 'compact') {
         await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
