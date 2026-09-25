@@ -20,9 +20,11 @@ jobs:
       - run: python3 -m coverage run --branch --include=scripts/repository_docs.py -m unittest discover -s tests -p test_repository_docs.py -v
       - run: python3 -m coverage report --show-missing --fail-under=100
       # Ratchet on pull requests: fail only when this PR makes the projection
-      # stale. Any merge that edits a source without regenerating (for example a
-      # Dependabot manifest bump) otherwise turns parity red on every open PR's
-      # merge ref for a change none of them made. Pushes to main stay strict.
+      # stale or, on an already-stale base, adds drift the base does not have
+      # (.github/scripts/repository-docs-ratchet.sh). Any merge that edits a
+      # source without regenerating (for example a Dependabot manifest bump)
+      # otherwise turns parity red on every open PR's merge ref for a change
+      # none of them made. Pushes to main stay strict.
       - name: Check source projection
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -36,8 +38,4 @@ jobs:
           fi
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           git worktree add --detach "$RUNNER_TEMP/parity-base" "$BASE_SHA"
-          if python3 scripts/repository_docs.py --root "$RUNNER_TEMP/parity-base"; then
-            echo "::error::This PR makes docs/REPOSITORY_SOURCES.md stale; run: python3 scripts/repository_docs.py --write"
-            exit 1
-          fi
-          echo "::warning::docs/REPOSITORY_SOURCES.md is already stale on the base branch; not caused by this PR"
+          bash .github/scripts/repository-docs-ratchet.sh . "$RUNNER_TEMP/parity-base"

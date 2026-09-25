@@ -4,6 +4,12 @@ The operator-owned context names the installed binary/workflow and source tree.
 Consumers remeasure these files and the enrolled profiles on every observation.
 Private completion artifacts belong to the same OS principal as the probe. This
 is filesystem provenance, not a signature against a compromised host principal.
+
+Grok codex-account seats bind the live grok CLI principal (~/.grok/auth.json,
+or SYMPHONY_GROK_AUTH_PATH). The bearer key, refresh token, expiry, and
+create_time are not part of that identity. The grok CLI owns refresh; this
+module never writes the auth file. Other providers still bind the full
+auth.json bytes under the account directory.
 """
 from __future__ import annotations
 
@@ -13,7 +19,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import gem_gate_contract as contract
 
@@ -29,12 +35,165 @@ def private_json(path: Path) -> object:
     return json.loads(path.read_text())
 
 
+class GrokAuthError(ValueError):
+    """Secret-free failure for the live grok CLI auth file."""
+
+
+GROK_AUTH_ENV = "SYMPHONY_GROK_AUTH_PATH"
+GROK_ISSUER = "https://auth.x.ai"
+# Clock skew only. A token this far in the past is expired; refresh stays with the grok CLI.
+GROK_TOKEN_EXPIRY_SKEW = timedelta(seconds=30)
+# Allowlist. key, refresh_token, expires_at, create_time, names, and unknown fields are excluded.
+GROK_STABLE_PRINCIPAL_FIELDS = (
+    "auth_mode",
+    "email",
+    "oidc_client_id",
+    "oidc_issuer",
+    "principal_id",
+    "principal_type",
+    "team_id",
+    "user_id",
+)
+
+
+def grok_live_auth_path() -> Path:
+    """Live grok CLI credentials. A CODEX_HOME/auth.json copy is not authoritative."""
+    override = os.environ.get(GROK_AUTH_ENV, "").strip()
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".grok" / "auth.json"
+
+
+def _private_grok_auth(path: Path) -> None:
+    if path.is_symlink():
+        raise GrokAuthError("symlinked grok auth")
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise GrokAuthError(f"missing grok auth: {path}") from exc
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise GrokAuthError(f"untrusted grok auth permissions: {path}")
+
+
+def load_grok_auth_document(path: Path | None = None) -> dict:
+    auth_path = path or grok_live_auth_path()
+    _private_grok_auth(auth_path)
+    try:
+        data = json.loads(auth_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise GrokAuthError("malformed grok auth") from exc
+    if not isinstance(data, dict):
+        raise GrokAuthError("malformed grok auth")
+    return data
+
+
+def _is_xai_oidc_entry(key: object, value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    issuer = value.get("oidc_issuer")
+    if issuer == GROK_ISSUER:
+        return True
+    # Today's seat files use an https://auth.x.ai::* key. A different issuer is not this seat.
+    return issuer is None and "x.ai" in str(key)
+
+
+def select_xai_oidc_entry(data: dict) -> dict:
+    """Select the single https://auth.x.ai OIDC entry. Ambiguous files fail closed."""
+    if not isinstance(data, dict) or not data:
+        raise GrokAuthError("missing xAI auth entries")
+    matches = [value for key, value in data.items() if _is_xai_oidc_entry(key, value)]
+    if not matches:
+        raise GrokAuthError("no xAI OIDC auth entry")
+    if len(matches) != 1:
+        raise GrokAuthError("ambiguous xAI auth entries")
+    return matches[0]
+
+
+def grok_stable_principal(entry: dict) -> dict:
+    if not isinstance(entry, dict):
+        raise GrokAuthError("malformed grok auth")
+    principal = {}
+    for field in GROK_STABLE_PRINCIPAL_FIELDS:
+        if field not in entry or entry[field] is None:
+            continue
+        value = entry[field]
+        if type(value) is not str or not value:
+            raise GrokAuthError("malformed grok principal")
+        principal[field] = value
+    if principal.get("oidc_issuer") != GROK_ISSUER:
+        raise GrokAuthError("grok auth issuer mismatch")
+    if not principal.get("user_id") and not principal.get("principal_id"):
+        raise GrokAuthError("grok auth missing principal")
+    return principal
+
+
+def grok_access_token(entry: dict, now: datetime | None = None) -> str:
+    """Return the access token or fail closed. Never includes the token in the error."""
+    if not isinstance(entry, dict):
+        raise GrokAuthError("malformed grok auth")
+    token = entry.get("key")
+    if type(token) is not str or not token:
+        raise GrokAuthError("no bearer key in grok auth")
+    raw = entry.get("expires_at")
+    if type(raw) is not str or not raw:
+        raise GrokAuthError("grok auth missing expires_at")
+    try:
+        expiry = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise GrokAuthError("malformed grok auth expires_at") from exc
+    if expiry.tzinfo is None:
+        raise GrokAuthError("malformed grok auth expires_at")
+    current = now or datetime.now(timezone.utc)
+    if expiry <= current - GROK_TOKEN_EXPIRY_SKEW:
+        raise GrokAuthError("grok access token expired")
+    return token
+
+
+def _toml_model_provider(path: Path) -> str | None:
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if "=" not in line:
+            continue
+        left, right = line.split("=", 1)
+        if left.strip() != "model_provider":
+            continue
+        return right.strip().strip('"').strip("'")
+    return None
+
+
+def grok_profile_identity(path: Path) -> str:
+    """Bind a grok seat to its live principal, config bytes, and account path."""
+    auth_path = grok_live_auth_path()
+    if auth_path.is_symlink() or any((path / name).is_symlink() for name in ("auth.json", "config.toml")):
+        raise ValueError("symlinked account identity")
+    entry = select_xai_oidc_entry(load_grok_auth_document(auth_path))
+    principal = grok_stable_principal(entry)
+    parts = [
+        "grok-live-principal/v1",
+        str(path.resolve()),
+        str(auth_path.resolve()),
+        principal,
+        digest(path / "config.toml"),
+    ]
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
+
+
 def profile_identity(path: Path) -> str:
-    # Configuration and auth replacement invalidate prior enrollment/proofs.
+    # Config replacement and a different principal invalidate prior enrollment.
+    # Grok seats ignore rotating bearer material; kimi and other codex accounts
+    # still hash the full auth.json bytes.
     if path.is_symlink() or not path.is_dir():
         raise ValueError("invalid account path")
     if any((path / name).is_symlink() for name in ("auth.json", "config.toml")):
         raise ValueError("symlinked account identity")
+    if _toml_model_provider(path / "config.toml") == "grok":
+        return grok_profile_identity(path)
     parts = [str(path.resolve()), digest(path / "auth.json"), digest(path / "config.toml")]
     return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
 
