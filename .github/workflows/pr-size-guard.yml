@@ -57,7 +57,7 @@ jobs:
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     # The trusted policy has a 45s aggregate API deadline. Keep this producer
-    # terminal before merge-group admission's 90s external-check deadline.
+    # terminal well before merge-group admission's 6-minute external-check deadline.
     timeout-minutes: 1
     steps:
       - name: Check out trusted queue policy

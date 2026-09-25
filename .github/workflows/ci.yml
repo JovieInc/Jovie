@@ -976,7 +976,10 @@ jobs:
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    # Must exceed MERGE_GROUP_ADMISSION_WAIT_MS (6 min) plus setup/checkout so
+    # a still-running required check fails via the helper's diagnostic, not a
+    # hard job cancel.
+    timeout-minutes: 8
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
