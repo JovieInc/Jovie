@@ -173,7 +173,11 @@ export async function getCurrentUserEntitlements(options?: {
 
   let userEmail: string | null = null;
   try {
-    const userIdentity = resolveUserIdentity(await getCachedCurrentUser());
+    const userIdentity = resolveUserIdentity(
+      await (options?.session === 'fresh'
+        ? getCachedCurrentUser(FRESH_ENTITLEMENT_AUTH)
+        : getCachedCurrentUser())
+    );
     userEmail = userIdentity.email;
   } catch (error) {
     logger.error('Failed to load user identity for entitlements', {

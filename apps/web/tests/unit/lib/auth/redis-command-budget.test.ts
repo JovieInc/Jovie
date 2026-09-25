@@ -1,11 +1,4 @@
-/**
- * Redis commands on the session, admin, and public-artist paths.
- *
- * Counts are produced by executing the current functions, Better Auth's
- * session route, Upstash Ratelimit, and the pre-change admin Redis body
- * from `apps/web/lib/admin/roles.ts` at 6c65244. That body was removed in
- * this branch, so the test runs it here instead of shelling out to git.
- */
+/** Redis command counts for session, admin, and public-artist paths. */
 
 import { Ratelimit } from '@upstash/ratelimit';
 import { betterAuth } from 'better-auth';
@@ -99,11 +92,7 @@ function totalCommands(tally: CommandTally): number {
   return tally.get + tally.set + tally.del + tally.evalsha + tally.eval;
 }
 
-/**
- * `tryRedisPath` from `apps/web/lib/admin/roles.ts` at 6c65244.
- * A cached value other than "1" returned immediately. "1" and misses
- * rechecked Postgres and then SET the result.
- */
+/** Pre-change `tryRedisPath`: non-"1" cache hits return; "1" and misses SET. */
 async function tryRedisPathAt6c65244(
   cacheKey: string,
   redis: { get: (key: string) => Promise<unknown>; set: Function },

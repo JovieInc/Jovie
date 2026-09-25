@@ -28,14 +28,7 @@ import { attachSentryContext } from '@/lib/sentry/set-user-context';
  * Better Auth is the live session path. A missing or invalid Better Auth
  * session yields NULL_AUTH_RESULT; there is no fallback to the retired provider.
  *
- * Read-only callers use the signed cookie cache (`session.cookieCache`,
- * 5 minutes), which skips the secondary-storage GET. The app user is still
- * loaded from Postgres. Fresh reads (`disableCookieCache: true`) are only
- * for security mutations via `getFreshAuth`, `requireAdmin({ session:
- * 'fresh' })`, or `getCurrentUserEntitlements({ session: 'fresh' })`. A
- * still-valid `session_data` cookie must not authorize those paths after
- * the server session is revoked. Sign-out uses Better Auth's own
- * `findSession`.
+ * Cookie cache for reads. `session: 'fresh'` disables it for identity too.
  */
 
 /** `userId` is `users.id`, never Better Auth or `users.clerkId`. */
@@ -87,6 +80,8 @@ const FRESH_SESSION_QUERY = { disableCookieCache: true } as const;
 interface FreshAuthSlot {
   settled: boolean;
   result: AuthResult;
+  loaded: boolean;
+  session: Awaited<ReturnType<typeof auth.api.getSession>> | null;
 }
 
 /** Per-request slot so a later cookie read reuses the fresh identity. */
@@ -94,15 +89,25 @@ const freshAuthSlot = cache(
   (): FreshAuthSlot => ({
     settled: false,
     result: NULL_AUTH_RESULT,
+    loaded: false,
+    session: null,
   })
 );
 
 async function loadBetterAuthSession(mode: SessionRead) {
+  const slot = freshAuthSlot();
+  if (mode === 'fresh' && slot.loaded) return slot.session;
+
   const headerStore = await headers();
-  return auth.api.getSession({
+  const session = await auth.api.getSession({
     headers: headerStore,
     ...(mode === 'fresh' ? { query: FRESH_SESSION_QUERY } : {}),
   });
+  if (mode === 'fresh') {
+    slot.loaded = true;
+    slot.session = session;
+  }
+  return session;
 }
 
 async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {
@@ -201,7 +206,7 @@ export const getOptionalAuth = cache(async (): Promise<AuthResult> => {
 });
 
 export const getCachedCurrentUser = cache(
-  async (): Promise<JovieUser | null> => {
+  async (options?: { session?: SessionRead }): Promise<JovieUser | null> => {
     const bypassSession = await getCachedDevTestAuthSession();
     if (bypassSession) {
       const bypassUser = buildDevTestAuthCurrentUser(bypassSession);
@@ -230,7 +235,9 @@ export const getCachedCurrentUser = cache(
     }
 
     try {
-      const session = await loadBetterAuthSession('cookie');
+      const session = await loadBetterAuthSession(
+        options?.session === 'fresh' ? 'fresh' : 'cookie'
+      );
       if (!session) {
         return null;
       }

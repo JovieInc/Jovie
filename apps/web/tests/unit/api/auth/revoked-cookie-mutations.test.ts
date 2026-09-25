@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * A revoked server session can still present a valid `session_data` cookie
- * for up to five minutes. These tests load the real session helper and the
- * real route handlers. `getSession` returns that cookie session unless the
- * caller passes `disableCookieCache`, which is the revoked-session read.
- */
-
 const mockGetSession = vi.hoisted(() => vi.fn());
 const mockGetAppUser = vi.hoisted(() => vi.fn());
 const mockDevBypass = vi.hoisted(() => vi.fn());
@@ -19,6 +12,9 @@ const mockWriteFlagOverride = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockDbDelete = vi.hoisted(() => vi.fn());
+const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
+const mockGetWaitlistAccess = vi.hoisted(() => vi.fn());
+const mockApproveWaitlist = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof import('react')>();
@@ -85,6 +81,23 @@ vi.mock('@/lib/flags/write-override.server', () => ({
   writeFlagOverride: mockWriteFlagOverride,
 }));
 
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  getUserBillingInfo: mockGetUserBillingInfo,
+}));
+vi.mock('@/lib/auth/gate', () => ({
+  getWaitlistAccess: mockGetWaitlistAccess,
+}));
+vi.mock('@/lib/waitlist/approval', () => ({
+  approveWaitlistEntryInTx: mockApproveWaitlist,
+  finalizeWaitlistApproval: vi.fn(),
+}));
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn(),
+}));
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: vi.fn(),
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -96,19 +109,19 @@ vi.mock('@/lib/db', () => ({
 import { POST as deleteAccount } from '@/app/api/account/delete/route';
 import { POST as rollbackFlag } from '@/app/api/admin/feature-flags/rollback/route';
 import { POST as writeFlag } from '@/app/api/admin/feature-flags/route';
+import { POST as unwaitlist } from '@/app/api/dev/unwaitlist/route';
 import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
 
 const AUDIT_EVENT_ID = '0e9b2e6e-3f6f-4c1a-9f3c-2f7d0a1b2c3d';
 
-const COOKIE_SESSION = {
-  session: { id: 'sess_revoked', token: 'tok_revoked' },
-  user: {
-    id: 'ba_user_1',
-    email: 'artist@example.com',
-    name: 'Artist',
-    image: null,
-  },
-};
+function namedSession(id: string, email: string) {
+  return {
+    session: { id, token: id },
+    user: { id, email, name: id, image: null },
+  };
+}
+
+const COOKIE_SESSION = namedSession('ba_user_1', 'artist@example.com');
 
 function sessionReadDisabledCookieCache(call: readonly unknown[]): boolean {
   const arg = call[0] as
@@ -243,5 +256,39 @@ describe('revoked session with a still-valid cookie', () => {
       )
     ).toBe(true);
     expect(mockWriteFlagOverride).not.toHaveBeenCalled();
+  });
+
+  it('loads the fresh email when a mutation cookie still names another user', async () => {
+    vi.stubEnv('VERCEL_ENV', 'development');
+    mockGetAppUser.mockImplementation(async (baId: string) => ({
+      id: baId === 'ba_fresh' ? 'user_fresh' : 'user_stale',
+      userStatus: 'active',
+      deletedAt: null,
+    }));
+    mockGetSession.mockImplementation(async (arg?: unknown) =>
+      sessionReadDisabledCookieCache([arg])
+        ? namedSession('ba_fresh', 'fresh@example.com')
+        : namedSession('ba_stale', 'stale@example.com')
+    );
+    mockGetUserBillingInfo.mockResolvedValue({ success: true, data: null });
+    mockGetWaitlistAccess.mockResolvedValue({ entryId: null });
+    const response = await unwaitlist();
+    expect(response.status).toBe(404);
+    expect(mockGetWaitlistAccess).toHaveBeenCalledWith('fresh@example.com');
+    expect(mockApproveWaitlist).not.toHaveBeenCalled();
+    expect(
+      mockGetSession.mock.calls.every(sessionReadDisabledCookieCache)
+    ).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it('rejects unwaitlist for a revoked cookie before waitlist approval', async () => {
+    vi.stubEnv('VERCEL_ENV', 'development');
+    const response = await unwaitlist();
+    expect(response.status).toBe(401);
+    expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
+    expect(mockApproveWaitlist).not.toHaveBeenCalled();
+    expect(mockGetUserBillingInfo).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
