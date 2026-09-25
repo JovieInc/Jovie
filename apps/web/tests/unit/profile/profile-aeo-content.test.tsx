@@ -185,14 +185,19 @@ describe('Profile AEO content', () => {
       expect(faq.source.label.length).toBeGreaterThan(0);
     }
 
-    expect(content.faqs[1]?.answer).toContain('May 1, 2026');
+    expect(content.faqs[1]?.answer).toBe(
+      'DJ Test\'s latest listed release is "Neon Circuit", a single released on May 1, 2026. The public catalog currently lists 2 releases.'
+    );
     expect(content.faqs[1]?.source.href).toBe('/dj-test/neon-circuit');
-    expect(content.faqs[2]?.answer).toContain('Warehouse 9');
+    expect(content.faqs[2]?.answer).toBe(
+      'Yes. DJ Test has 1 upcoming show listed on Jovie; the next listed date is July 4, 2026 at Warehouse 9 in Brooklyn, NY, US.'
+    );
     expect(content.faqs[2]?.source.href).toBe(
       'https://tickets.example.com/dj-test'
     );
-    expect(content.faqs[3]?.answer).toContain('Signal Hoodie');
-    expect(content.faqs[3]?.answer).toContain('$68.00');
+    expect(content.faqs[3]?.answer).toBe(
+      'Official DJ Test merch is available on Jovie. The current featured item is "Signal Hoodie", a hoodie priced at $68.00.'
+    );
 
     // Copy quality: no generic pronoun boilerplate or awkward "working in".
     expect(content.description.join(' ')).not.toContain('Their public Jovie');
@@ -375,6 +380,33 @@ describe('Profile AEO content', () => {
     ).toContain('description-identity-missing');
   });
 
+  it('treats a dot in the artist name as a literal character', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'A.B',
+        handle: 'ab',
+        tagline: 'Producer',
+        career_highlights: 'A.B plays clubs.',
+      },
+      now,
+    });
+
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const dottedAsAnyChar: ProfileAeoContentModel = {
+      ...content,
+      descriptionBlocks: content.descriptionBlocks.map(block => ({
+        ...block,
+        text: block.text.replaceAll('A.B', 'AxB'),
+      })),
+    };
+
+    expect(
+      validateProfileAeoContent(dottedAsAnyChar).map(issue => issue.code)
+    ).toContain('description-identity-missing');
+  });
+
   it('preserves accepted source spans around unsupported claims', () => {
     const content = buildProfileAeoContent({
       artist: {
@@ -446,6 +478,18 @@ describe('Profile AEO content', () => {
       value: 'Berlin, DE',
     });
     expect(content.facts.some(fact => fact.label === 'Hometown')).toBe(false);
+
+    const samePlace = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: 'Austin, TX',
+        location: 'Austin, TX',
+      },
+      now,
+    });
+    expect(samePlace.facts.filter(fact => fact.label === 'Based In')).toEqual(
+      []
+    );
 
     const withHometown = buildProfileAeoContent({ artist: baseArtist, now });
     expect(withHometown.facts).toContainEqual({

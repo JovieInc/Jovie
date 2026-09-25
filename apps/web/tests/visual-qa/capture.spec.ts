@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { recordVisualQaCapture } from '@/lib/agent-os/visual-qa/manifest';
 import {
   resolveVisualQaPhaseScreenshotPath,
@@ -129,9 +129,7 @@ test.describe('Visual QA capture pipeline', () => {
           contentType: 'application/json',
         });
 
-        if (!result.passed) {
-          throw new Error(result.message);
-        }
+        expect(result.passed, result.message).toBe(true);
       });
     }
   }

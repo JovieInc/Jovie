@@ -317,10 +317,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           release.date ? `${release.date}T00:00:00Z` : undefined
         )
       )
-    )
-  );
-
-  editorialPages.push(
+    ),
     ...engineeringStories.flatMap(story =>
       story.source
         ? [

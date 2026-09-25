@@ -51,13 +51,13 @@ const INTENTIONAL_INERT_SELECTOR = [
 function isVisibleBlockingOverlay(element: HTMLElement): boolean {
   if (element.getAttribute('aria-hidden') === 'true') return false;
   if (element.hasAttribute('inert')) return false;
-  if (element.getAttribute('data-state') === 'closed') return false;
+  if (element.dataset.state === 'closed') return false;
   const style = globalThis.getComputedStyle(element);
   return style.display !== 'none' && style.visibility !== 'hidden';
 }
 
 function classifyOverlay(element: HTMLElement): OverlayLockReason {
-  const slot = element.getAttribute('data-slot');
+  const slot = element.dataset.slot;
   if (slot === 'dialog-overlay' || slot === 'sheet-overlay') return 'overlay';
   const role = element.getAttribute('role');
   if (role === 'menu') return 'menu';

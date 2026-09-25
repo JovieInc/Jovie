@@ -1,4 +1,5 @@
 name: desktop-release
+# clock-class: skip-if-unchanged
 run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # controller-hop-exception: jovie-controller-hop/v1

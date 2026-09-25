@@ -47,13 +47,13 @@ function parseMoneyCents(raw: string, suffix: string | undefined): number {
 }
 
 function parseBuyerName(from: string): string | null {
-  const name = from.match(SENDER_NAME_RE)?.[1]?.trim();
+  const name = SENDER_NAME_RE.exec(from)?.[1]?.trim();
   if (!name || name.length < 2 || NON_BUYER_SENDER_RE.test(name)) return null;
   return name;
 }
 
 function parseCompany(text: string): string | null {
-  const company = text.match(COMPANY_RE)?.[1]?.trim();
+  const company = COMPANY_RE.exec(text)?.[1]?.trim();
   if (!company || company.length < 2) return null;
   return company;
 }
@@ -61,7 +61,7 @@ function parseCompany(text: string): string | null {
 function parseBudget(
   text: string
 ): { readonly minimum: number; readonly maximum: number } | null {
-  const match = text.match(BUDGET_RE);
+  const match = BUDGET_RE.exec(text);
   if (!match?.[1]) return null;
 
   const minimum = parseMoneyCents(match[1], match[2]);
@@ -83,7 +83,7 @@ function parseBudget(
 
 function parseDepositPercent(text: string): number | null {
   if (/\bhalf\s+(?:deposit|upfront)\b/i.test(text)) return 50;
-  const match = text.match(DEPOSIT_PERCENT_RE);
+  const match = DEPOSIT_PERCENT_RE.exec(text);
   const percent = Number.parseInt(match?.[1] ?? match?.[2] ?? '', 10);
   return Number.isInteger(percent) && percent >= 50 && percent <= 100
     ? percent
@@ -91,12 +91,12 @@ function parseDepositPercent(text: string): number | null {
 }
 
 function parseUsageTermDays(text: string): number | null {
-  const days = Number.parseInt(text.match(USAGE_TERM_RE)?.[1] ?? '', 10);
+  const days = Number.parseInt(USAGE_TERM_RE.exec(text)?.[1] ?? '', 10);
   return Number.isInteger(days) && days >= 1 && days <= 90 ? days : null;
 }
 
 function parseIncludedRevisions(text: string): 0 | 1 | null {
-  const raw = text.match(REVISION_RE)?.[1]?.toLowerCase();
+  const raw = REVISION_RE.exec(text)?.[1]?.toLowerCase();
   if (raw === 'no' || raw === 'zero' || raw === '0') return 0;
   if (raw === 'one' || raw === '1') return 1;
   return null;

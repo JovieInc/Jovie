@@ -51,6 +51,8 @@ export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
 ]);
 export const DELIVERY_CONTROLLER_COVERAGE_COMMAND = `node ${DELIVERY_CONTROLLER_COVERAGE_ARGS.join(' ')}`;
 
+export const OFFLINE_FAILURE_COVERAGE_COMMAND =
+  'pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/rolling-ci-failure-disposition.test.mjs --maxWorkers=1 --coverage --coverage.include="$PWD/scripts/lib/rolling-ci-failure-disposition.mjs" --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-offline-failure-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=95';
 export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
@@ -328,7 +330,7 @@ const LANES = [
     id: 'profile-admission',
     name: 'Public Profile Admission',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     run: runProfileAdmission,
   },
   {
@@ -349,7 +351,9 @@ const LANES = [
       ' && ' +
       ACQUISITION_CERTIFICATION_COMMAND +
       ' && ' +
-      DESKTOP_RELEASE_COVERAGE_COMMAND,
+      DESKTOP_RELEASE_COVERAGE_COMMAND +
+      ' && ' +
+      OFFLINE_FAILURE_COVERAGE_COMMAND,
     run: runStructural,
   },
 ];
@@ -1035,6 +1039,7 @@ function runProfileAdmission() {
     'apps/web/app/api/profile/**',
     'apps/web/components/features/release/SmartLinkProviderButton.tsx',
     'apps/web/components/features/profile/**',
+    'apps/web/components/providers/QueryProvider*',
     'apps/web/components/organisms/CookieBannerMount.tsx',
     'apps/web/components/organisms/CookieBannerSection.tsx',
     'apps/web/lib/cookies/**',
@@ -1042,6 +1047,9 @@ function runProfileAdmission() {
     'apps/web/lib/rate-limit/**',
     'apps/web/lib/tracking/pac-**',
     'apps/web/styles/design-system.css',
+    'apps/web/tests/unit/profile/profile-compact-template.test.tsx',
+    'apps/web/tests/e2e/profile-admission.spec.ts',
+    'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts',
     'apps/web/tests/e2e/profile/**',
     'apps/web/tests/e2e/public-profile-smoke.spec.ts',
     'apps/web/tests/e2e/utils/public-surface-**',
@@ -1089,6 +1097,7 @@ export function runStructural(opts = {}) {
   const operationsParts = [
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
+    OFFLINE_FAILURE_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',

@@ -497,7 +497,7 @@ export async function runM2RevenuePathCanary(
       ...init,
       headers: {
         ...headers,
-        ...(init.headers ?? {}),
+        ...init.headers,
       },
       signal: init.signal ?? AbortSignal.timeout(timeoutMs),
     });

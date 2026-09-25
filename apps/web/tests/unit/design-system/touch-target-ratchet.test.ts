@@ -273,6 +273,8 @@ describe('touch-target detection — violations are caught (red→green proof)',
 
   it('tagHasSub44Height is precise about the 44px boundary', () => {
     expect(tagHasSub44Height('<button className="h-10">')).toBe(true); // 40px
+    expect(tagHasSub44Height('<button className="h-0.5">')).toBe(true);
+    expect(tagHasSub44Height('<button className="h-0x5">')).toBe(false);
     expect(tagHasSub44Height('<button className="h-11">')).toBe(false); // 44px
     expect(tagHasSub44Height('<button className="h-[43px]">')).toBe(true);
     expect(tagHasSub44Height('<button className="h-[44px]">')).toBe(false);

@@ -112,11 +112,11 @@ function sourceUnavailable(
   };
 }
 
-function formatCents(cents: number): string {
+export function formatCents(cents: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: cents >= 100_00 ? 0 : 2,
+    maximumFractionDigits: cents >= 10_000 ? 0 : 2,
   }).format(cents / 100);
 }
 

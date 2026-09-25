@@ -53,9 +53,9 @@ export async function GET(request: Request, { params }: RouteParams) {
         ETag: blob.blob.etag,
       },
     });
-  } catch (caught) {
+  } catch (error_) {
     return workflowCaptureErrorResponse(
-      caught,
+      error_,
       '/api/workflow-captures/[id]/media'
     );
   }

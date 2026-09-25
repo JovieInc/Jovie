@@ -91,7 +91,7 @@ export function getLibrarySavedViewPredicate(
 }
 
 export function readPersistedLibrarySavedView(): LibrarySavedViewId {
-  if (typeof globalThis.window === 'undefined') return 'all';
+  if (globalThis.window === undefined) return 'all';
   try {
     const stored = globalThis.localStorage?.getItem(
       LIBRARY_SAVED_VIEW_STORAGE_KEY
@@ -103,7 +103,7 @@ export function readPersistedLibrarySavedView(): LibrarySavedViewId {
 }
 
 export function persistLibrarySavedView(id: LibrarySavedViewId): void {
-  if (typeof globalThis.window === 'undefined') return;
+  if (globalThis.window === undefined) return;
   try {
     if (id === 'all') {
       globalThis.localStorage?.removeItem(LIBRARY_SAVED_VIEW_STORAGE_KEY);

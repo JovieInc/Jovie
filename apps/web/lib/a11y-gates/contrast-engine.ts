@@ -97,7 +97,7 @@ export function extractRules(css: string): CssRule[] {
       buf = '';
       stack.push({ prelude, isAt: prelude.startsWith('@') });
     } else if (ch === '}') {
-      const top = stack[stack.length - 1];
+      const top = stack.at(-1);
       if (top && !top.isAt) {
         const atContext = stack
           .slice(0, -1)
@@ -248,7 +248,7 @@ export function parseColor(value: string): ParsedColor | null {
   const rgb = v.match(/^rgba?\(([^)]+)\)$/);
   if (rgb) {
     const parts = rgb[1]
-      .replace(/\//g, ' ')
+      .replaceAll('/', ' ')
       .split(/[\s,]+/)
       .filter(Boolean);
     if (parts.length < 3) return null;

@@ -49,28 +49,25 @@ async function loadLangfuseClient(): Promise<
 > {
   if (!shouldEnableLangfuse()) return null;
 
-  if (!langfuseClientPromise) {
-    langfuseClientPromise = (async () => {
-      try {
-        const { Langfuse } = await import('langfuse');
-        return new Langfuse({
-          secretKey: readProcessEnv('LANGFUSE_SECRET_KEY'),
-          publicKey: readProcessEnv('LANGFUSE_PUBLIC_KEY'),
-          baseUrl:
-            readProcessEnv('LANGFUSE_BASE_URL') ?? DEFAULT_LANGFUSE_BASE_URL,
-          flushAt: 15,
-          flushInterval: 10_000,
-          requestTimeout: LANGFUSE_REQUEST_TIMEOUT_MS,
-          environment:
-            readProcessEnv('VERCEL_ENV') ?? readProcessEnv('NODE_ENV'),
-          release: readProcessEnv('NEXT_PUBLIC_BUILD_SHA'),
-        });
-      } catch (error) {
-        console.warn('[langfuse] Client init failed:', error);
-        return null;
-      }
-    })();
-  }
+  langfuseClientPromise ??= (async () => {
+    try {
+      const { Langfuse } = await import('langfuse');
+      return new Langfuse({
+        secretKey: readProcessEnv('LANGFUSE_SECRET_KEY'),
+        publicKey: readProcessEnv('LANGFUSE_PUBLIC_KEY'),
+        baseUrl:
+          readProcessEnv('LANGFUSE_BASE_URL') ?? DEFAULT_LANGFUSE_BASE_URL,
+        flushAt: 15,
+        flushInterval: 10_000,
+        requestTimeout: LANGFUSE_REQUEST_TIMEOUT_MS,
+        environment: readProcessEnv('VERCEL_ENV') ?? readProcessEnv('NODE_ENV'),
+        release: readProcessEnv('NEXT_PUBLIC_BUILD_SHA'),
+      });
+    } catch (error) {
+      console.warn('[langfuse] Client init failed:', error);
+      return null;
+    }
+  })();
 
   return langfuseClientPromise;
 }
