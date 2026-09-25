@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "f872fbcf37472f2312c1cdcb72c66e1bd79084a8fedef50b15bc0a51c34e484e"
+    "bodySha256": "4070cd6df3521c8d116e8c776a9fcaafe8ce49983f781ce7daa182710ef1c07c"
   },
   {
     "file": ".claude/rules/security.md",
