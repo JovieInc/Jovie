@@ -263,13 +263,13 @@ export async function annotateClaimedStatusForCurrentUser(
         : result
     );
   } catch (error) {
-    // Search remains available, but the UI must fail closed for claimed rows
-    // when ownership cannot be established.
+    // A swallowed lookup looks like "claimed by someone else" and disables
+    // Connect with no way to retry. The route surfaces this as a search error.
     logger.warn(
       '[Spotify Search] Current-user claimed status lookup failed:',
       error
     );
-    return results;
+    throw error;
   }
 }
 
