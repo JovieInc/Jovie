@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { routeFromPattern } from './performance-budgets.mjs';
 import {
   AUDITOR_MODEL,
   alreadyFiled,
@@ -29,6 +30,32 @@ const overlay = source =>
   }).join('\n');
 
 describe('JOV-INV-026 performance invariant factory', () => {
+  it('binds every admin Lighthouse URL to error-level assertions and its budget route', () => {
+    const config = JSON.parse(
+      readFileSync('apps/web/.lighthouserc.admin.pr.json', 'utf8')
+    );
+    const packageJson = JSON.parse(
+      readFileSync('apps/web/package.json', 'utf8')
+    );
+    const script = packageJson.scripts['test:lighthouse:admin:pr'];
+    const urls = script
+      .match(/LIGHTHOUSE_DASHBOARD_URLS=([^ ]+)/)?.[1]
+      .split(',');
+    const [adminAssertions] = config.ci.assert.assertMatrix;
+    const matcher = new RegExp(adminAssertions.matchingUrlPattern);
+
+    assert.equal(urls?.length, 4);
+    for (const url of urls) assert.equal(matcher.test(url), true, url);
+    assert.equal(
+      routeFromPattern(adminAssertions.matchingUrlPattern),
+      '/app/admin/*'
+    );
+    assert.equal(
+      adminAssertions.assertions['categories:performance'][0],
+      'error'
+    );
+  });
+
   it('accepts the checked-in performance pack', () => {
     assert.deepEqual(validatePerformanceFactory(), []);
     const pack = JSON.parse(readFileSync(PERFORMANCE_PACK_PATH, 'utf8'));
