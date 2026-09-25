@@ -87,10 +87,15 @@ async function waitForExit(child, timeoutMs = 15_000) {
   });
 }
 
-async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
+async function spawnLifecycleHarness(
+  action,
+  timeoutMs = 5_000,
+  { armFileName = 'ready.json' } = {}
+) {
   const dir = mkdtempSync(join(tmpdir(), 'storybook-vitest-owner-test-'));
   temps.push(dir);
   const readyFile = join(dir, 'ready.json');
+  const armFile = join(dir, armFileName);
   const helperPidFile = join(dir, 'browser-helper.pid');
   const helperSignalFile = join(dir, 'browser-helper-signals.log');
   const browserExecutable = join(dir, 'chromium');
@@ -115,7 +120,7 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
   `;
   const script = `
     import { spawn } from 'node:child_process';
-    import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+    import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
     import {
       STORYBOOK_VITEST_OWNER_ARG,
       startStorybookVitestLifecycle,
@@ -128,11 +133,14 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
         })
       : null;
     controller?.unref();
+    // The arm file (ready.json by default) holds the watchdog's deadline and
+    // owner/controller checks until this harness has started its browser.
     const lifecycle = await startStorybookVitestLifecycle({
       leaseDir: ${JSON.stringify(dir)},
       runMode: true,
       timeoutMs: ${timeoutMs},
       controllerPids: controller ? [controller.pid] : undefined,
+      armFile: ${JSON.stringify(armFile)},
     });
     const duplicate = ${JSON.stringify(action)} === 'duplicate'
       ? await startStorybookVitestLifecycle({
@@ -140,6 +148,7 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
           token: lifecycle.token,
           runMode: true,
           timeoutMs: ${timeoutMs},
+          armFile: ${JSON.stringify(armFile)},
         })
       : null;
     const browser = spawn(
@@ -171,7 +180,7 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
     }
     const helperPid = Number(readFileSync(${JSON.stringify(helperPidFile)}, 'utf8'));
     writeFileSync(
-      ${JSON.stringify(readyFile)},
+      ${JSON.stringify(`${readyFile}.tmp`)},
       JSON.stringify({
         ownerPid: process.pid,
         browserPid: browser.pid,
@@ -181,8 +190,10 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
         tempRoot: lifecycle.tempRoot,
         leasePath: lifecycle.leasePath,
         duplicateTempRoot: duplicate?.tempRoot ?? null,
+        armFile: ${JSON.stringify(armFile)},
       })
     );
+    renameSync(${JSON.stringify(`${readyFile}.tmp`)}, ${JSON.stringify(readyFile)});
 
     if (
       ${JSON.stringify(action)} === 'success' ||
@@ -997,6 +1008,39 @@ describe('live Storybook lifecycle', () => {
       expect(await waitUntilProcessGone(ready.helperPid, 10_000)).toBe(true);
       expect(existsSync(ready.tempRoot)).toBe(false);
       expect(existsSync(ready.leasePath)).toBe(false);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'holds an expired lease until its arm file exists, then reaps it',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang', 250, {
+        armFileName: 'armed',
+      });
+      const lease = JSON.parse(readFileSync(ready.leasePath, 'utf8'));
+      expect(lease.armFile).toBe(ready.armFile);
+      await waitFor(() => Date.now() >= lease.deadlineAt);
+      ownedPids.push(lease.watchdogPid);
+      killProcessGroup({ pid: lease.watchdogPid }, 'SIGKILL');
+      expect(await waitUntilProcessGone(lease.watchdogPid, 10_000)).toBe(true);
+
+      const held = await reapStaleStorybookVitestLeases({
+        leaseDir: dirname(ready.leasePath),
+      });
+      expect(held.reapedTokens).not.toContain(ready.token);
+      expect(isProcessGone(child.pid)).toBe(false);
+      expect(isProcessGone(ready.browserPid)).toBe(false);
+      expect(existsSync(ready.leasePath)).toBe(true);
+
+      writeFileSync(ready.armFile, 'armed');
+      const reaped = await reapStaleStorybookVitestLeases({
+        leaseDir: dirname(ready.leasePath),
+      });
+      expect(reaped.reapedTokens).toContain(ready.token);
+      const exit = await waitForExit(child);
+      expect([143, null]).toContain(exit.code);
+      await expectLifecycleArtifactsGone(ready);
     },
     LIFECYCLE_TEST_TIMEOUT_MS
   );
