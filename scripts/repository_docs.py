@@ -52,19 +52,20 @@ def render(root, config, pending=None):
 
 def run(root, write=False, upstreams=None):
     root = Path(root).resolve()
-    config = json.loads((root / "repository-docs.json").read_text())
+    registry = local(root, "repository-docs.json")
+    config = json.loads(registry.read_text())
     if config["schemaVersion"] != 1 or not config["sources"] or not config["entrypoints"]:
         raise ValueError("invalid documentation registry")
     upstreams = upstreams or {}
     pending, errors, destinations = [], [], set()
     entrypoints = {local(root, entry) for entry in config["entrypoints"]}
     output = local(root, config["output"])
-    if output in entrypoints or output == root / "repository-docs.json" or output in {local(root, i["path"]) for i in config["sources"]}:
+    if output in entrypoints or output == registry or output in {local(root, i["path"]) for i in config["sources"]}:
         raise ValueError("projection cannot overwrite a source or entry point")
     # Validate every import before writing anything; never run upstream code.
     for item in config["imports"]:
         target = local(root, item["destination"])
-        if target in destinations or target in entrypoints or target == output or target == root / "repository-docs.json":
+        if target in destinations or target in entrypoints or target == output or target == registry:
             raise ValueError("duplicate or reserved import destination")
         destinations.add(target)
         if not re.fullmatch(r"[0-9a-f]{40}", item["revision"]) or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):

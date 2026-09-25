@@ -1425,6 +1425,6 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 Updates are independent reviewable consumer changes. Local instructions remain source-owned.
 
-- `scripts/repository_docs.py` ← `JovieInc/ci@f4dd7982b527a94bab3581c7507a4094d6b47bdf:scripts/repository_docs.py` (SHA-256 `e30513e859bba4e86d878aeec9a72c4f300567679901f72aad72030a4e0b1c9b`)
-- `tests/test_repository_docs.py` ← `JovieInc/ci@f4dd7982b527a94bab3581c7507a4094d6b47bdf:tests/test_repository_docs.py` (SHA-256 `f62877c3a34176b3eb1d914a7f6a1cf876cb7d53b2233fc9f43e5649910888fc`)
-- `docs/company/CI_TOOL_LICENSE` ← `JovieInc/ci@f4dd7982b527a94bab3581c7507a4094d6b47bdf:LICENSE` (SHA-256 `c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143`)
+- `scripts/repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:scripts/repository_docs.py` (SHA-256 `578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43`)
+- `tests/test_repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:tests/test_repository_docs.py` (SHA-256 `9cb660d8c2fa145b17cc04e522a9e692ff8131f6126e6a584527ccbc3d3fbe80`)
+- `docs/company/CI_TOOL_LICENSE` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:LICENSE` (SHA-256 `c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143`)

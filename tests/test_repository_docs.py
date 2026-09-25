@@ -116,6 +116,23 @@ class DocumentationParity(unittest.TestCase):
                 self.assertEqual((self.root / "README.md").read_bytes(), original)
                 self.assertFalse((self.root / "docs/SOURCES.md").exists())
 
+    def test_symlinked_registry_cannot_be_overwritten(self):
+        registry = self.root / "repository-docs.json"
+        registry.rename(self.root / "config.json")
+        registry.symlink_to("config.json")
+        (self.root / "config-alias").symlink_to("config.json")
+        for destination in ("repository-docs.json", "config.json", "config-alias"):
+            for writer in ("output", "import"):
+                with self.subTest(destination=destination, writer=writer):
+                    self.config["output"] = destination if writer == "output" else "docs/SOURCES.md"
+                    self.config["imports"] = [] if writer == "output" else [{"repository": "x/y", "revision": "a" * 40, "path": "p", "destination": destination, "sha256": docs.digest(b"replacement")}]
+                    self.save()
+                    before = registry.read_bytes()
+                    with self.assertRaises(ValueError): docs.run(self.root, True)
+                    self.assertEqual(registry.read_bytes(), before)
+                    self.assertTrue(registry.is_symlink())
+                    self.assertFalse((self.root / "docs/SOURCES.md").exists())
+
     def test_imported_sources_use_pending_bytes_before_any_mutation(self):
         upstream = self.root / "upstream"
         upstream.mkdir()

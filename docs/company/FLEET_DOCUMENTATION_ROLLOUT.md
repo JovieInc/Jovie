@@ -37,7 +37,7 @@ is silently counted as conformant. No source change implies live commissioning.
 **Ovie:** after PR #15 establishes the app root, add `repository-docs.json` listing
 that app's actual manifest and workflow paths plus README/AGENTS. Vendor the same
 reviewed CI script/tests/license and company contract with exact revisions and
-hashes. Add the nonblocking shadow workflow and run the seven parity scenarios
+hashes. Add the nonblocking shadow workflow and run the parity regression suite
 with full statement/branch coverage. Preserve the extraction's own commands and
 runtime proof. Do not derive the app root from the archived Swift README.
 
@@ -58,8 +58,8 @@ scripts, run untrusted PR code with signing access, or rewrite assets.
 
 Local source parity and fixture rollback are preparation evidence. Hosted shadow
 results, independent source review, native queue/merge, actual consumer canary and
-rollback each need distinct receipts. Consumer imports currently reference draft
-source commits; qualify those sources before consumer promotion. Upstream merges
+rollback each need distinct receipts. Qualify the exact pinned upstream sources
+before consumer promotion. Upstream merges
 may squash commits; retain reviewed source provenance or repin in a new consumer
 commit, then recheck. No dependency on unrelated sibling test suites is added.
 
