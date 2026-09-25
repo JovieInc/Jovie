@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
@@ -14,7 +14,7 @@ import { uploadPlaylistCoverImage } from '@/lib/playlists/upload-cover-image';
 import { getJovieSpotifyUserId } from '@/lib/spotify/jovie-account';
 
 async function requireAdminAction(): Promise<void> {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getFreshAuth();
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
   }

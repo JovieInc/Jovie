@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { featureFlagAuditEvents } from '@/lib/db/schema/feature-flags';
 import { captureError } from '@/lib/error-tracking';
@@ -29,10 +29,10 @@ const RequestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getFreshAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

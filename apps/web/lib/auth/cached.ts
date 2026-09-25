@@ -35,17 +35,38 @@ import { attachSentryContext } from '@/lib/sentry/set-user-context';
  * without skipping the database.
  *
  * Fresh reads (`disableCookieCache: true`, one secondary-storage GET) are
- * only for security mutations. `getFreshAuth` is that read. Paths:
+ * only for security mutations. `getFreshAuth` is that read. A still-valid
+ * `session_data` cookie must not authorize these paths after the server
+ * session is revoked or deleted. Paths:
  * - Sign-out: Better Auth `POST /api/auth/sign-out` (`authClient.signOut`
  *   in `hooks/useJovieAuth.tsx`) calls `findSession` and `deleteSession`
  *   itself. It does not use this module or the cookie cache.
  * - Role changes: `POST` and `DELETE /api/admin/roles`.
  * - Permission changes: `POST` and `DELETE /api/admin/impersonate`.
+ *   Impersonate GET stays on the cookie cache.
  * - Billing mutations: `POST /api/stripe/checkout`, `POST /api/stripe/cancel`,
  *   `POST` and `DELETE /api/stripe/plan-change`, `POST /api/stripe/portal`,
  *   `POST /api/admin/set-plan`.
  *   Plan-change GET, plan-change preview, billing status, and billing
  *   history stay on the cookie cache.
+ * - Account erasure: `POST /api/account/delete`. Account export stays on
+ *   the cookie cache.
+ * - Runtime flag writes: `POST /api/admin/feature-flags` and
+ *   `POST /api/admin/feature-flags/rollback`. `GET /api/feature-flags`
+ *   stays on the cookie cache.
+ * - Production deploy: `POST /api/deploy/promote`. Deploy status stays
+ *   on the cookie cache.
+ * - Admin privilege and destructive server actions in
+ *   `app/app/(shell)/admin/actions.ts` (verify, ban, unban, delete),
+ *   playlist approval, and platform-connection settings.
+ * - Investor-link, investor-settings, and investor-update mutations.
+ *   Investor GETs stay on the cookie cache.
+ * - Other admin mutations authorize with
+ *   `requireAdmin({ session: 'fresh' })` or
+ *   `getCurrentUserEntitlements({ session: 'fresh' })`.
+ *   Admin and dashboard reads stay on the cookie cache.
+ * - Non-production plan and trial overrides:
+ *   `POST /api/dev/test-user/set-plan` and `set-trial-state`.
  */
 
 /** `userId` is `users.id`, never Better Auth or `users.clerkId`. */
@@ -178,9 +199,13 @@ async function resolveRequestAuth(mode: SessionRead): Promise<AuthResult> {
   return result;
 }
 
-export const getCachedAuth = cache(async (): Promise<AuthResult> => {
-  return resolveRequestAuth('cookie');
-});
+export const getCachedAuth = cache(
+  async (options?: { session?: 'cookie' | 'fresh' }): Promise<AuthResult> => {
+    return resolveRequestAuth(
+      options?.session === 'fresh' ? 'fresh' : 'cookie'
+    );
+  }
+);
 
 /** Authoritative session read for the security mutations listed above. */
 export const getFreshAuth = cache(async (): Promise<AuthResult> => {

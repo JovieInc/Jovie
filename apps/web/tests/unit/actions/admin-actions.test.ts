@@ -34,6 +34,7 @@ const {
 // ---------------------------------------------------------------------------
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getFreshAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({

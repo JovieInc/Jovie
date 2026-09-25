@@ -100,7 +100,7 @@ async function readOptionalBody(
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   let body: SummerControlBody | null = null;
   try {
     body = await readOptionalBody(request);

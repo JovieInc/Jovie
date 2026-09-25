@@ -157,8 +157,15 @@ function normalizeBillingPlan(params: {
   };
 }
 
-export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
-  const authResult = await getCachedAuth();
+const FRESH_ENTITLEMENT_AUTH = { session: 'fresh' } as const;
+
+export async function getCurrentUserEntitlements(options?: {
+  session?: 'cookie' | 'fresh';
+}): Promise<UserEntitlements> {
+  const authResult =
+    options?.session === 'fresh'
+      ? await getCachedAuth(FRESH_ENTITLEMENT_AUTH)
+      : await getCachedAuth();
   const { userId } = authResult;
   if (!userId) {
     return UNAUTHENTICATED_ENTITLEMENTS;

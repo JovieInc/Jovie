@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { getRedis } from '@/lib/redis';
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     return developmentOnlyForbiddenJson();
   }
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getFreshAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

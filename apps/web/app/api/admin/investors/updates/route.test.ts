@@ -9,7 +9,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/admin/middleware', () => ({ requireAdmin: mocks.requireAdmin }));
-vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mocks.getCachedAuth,
+  getFreshAuth: mocks.getCachedAuth,
+}));
 vi.mock('@/lib/investors/update-store', () => ({
   loadInvestorUpdateReviewState: mocks.loadState,
   recordInvestorUpdateCandidateDecision: mocks.recordDecision,

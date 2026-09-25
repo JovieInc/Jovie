@@ -43,8 +43,8 @@ function jsonError(message: string, status: number) {
   );
 }
 
-async function requireAdminAccess() {
-  const entitlements = await getCurrentUserEntitlements();
+async function requireAdminAccess(session: 'cookie' | 'fresh' = 'cookie') {
+  const entitlements = await getCurrentUserEntitlements({ session });
 
   if (!entitlements.isAuthenticated) {
     return jsonError('Unauthorized', 401);
@@ -315,7 +315,7 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/outreach — Queue a limited batch of pending outreach emails.
  */
 export async function POST(request: NextRequest) {
-  const authError = await requireAdminAccess();
+  const authError = await requireAdminAccess('fresh');
   if (authError) {
     return authError;
   }
@@ -361,7 +361,7 @@ export async function POST(request: NextRequest) {
  * PATCH /api/admin/outreach — Toggle campaign settings (e.g. campaignsEnabled).
  */
 export async function PATCH(request: NextRequest) {
-  const authError = await requireAdminAccess();
+  const authError = await requireAdminAccess('fresh');
   if (authError) {
     return authError;
   }

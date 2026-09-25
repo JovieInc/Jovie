@@ -5,8 +5,10 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-export async function requireAdminHudApiAccess(): Promise<NextResponse | null> {
-  const entitlements = await getCurrentUserEntitlements();
+export async function requireAdminHudApiAccess(options?: {
+  session?: 'cookie' | 'fresh';
+}): Promise<NextResponse | null> {
+  const entitlements = await getCurrentUserEntitlements(options);
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

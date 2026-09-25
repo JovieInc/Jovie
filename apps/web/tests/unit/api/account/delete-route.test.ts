@@ -15,6 +15,7 @@ vi.mock('@vercel/blob', () => ({ del: mockDeleteBlobs }));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getFreshAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({

@@ -146,7 +146,7 @@ async function resolveAdminEntitlements(_route: string): Promise<
 > {
   // getCurrentUserEntitlements degrades gracefully on billing failure.
   // Admin status is fetched independently and preserved even when billing is down.
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
     return {
