@@ -801,7 +801,10 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
       );
-      expect(job.indexOf('name: Fetch base-branch history'), jobId).toBeLessThan(
+      expect(
+        job.indexOf('name: Fetch base-branch history'),
+        jobId
+      ).toBeLessThan(
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
