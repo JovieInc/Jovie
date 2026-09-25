@@ -286,6 +286,13 @@ class RunIssueTest(unittest.TestCase):
         receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
+    def test_explicit_decline_becomes_not_shippable(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
+        spec = {"cmd": [sys.executable, "-c", "print('NOT-SHIPPABLE: already fixed on main by #18196')"]}
+        receipt = lane.run_issue(self.host, "claude", spec, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "not-shippable")
+        self.assertEqual(receipt["reasons"], ["already fixed on main by #18196"])
+
     def test_a_crashing_harness_still_leaves_a_failed_receipt(self):
         def crash(*a, **k):
             raise ValueError("gh down")
@@ -327,6 +334,13 @@ class WorkerTest(unittest.TestCase):
             (self.host.state / "failures.json").write_text(json.dumps(failures))
         self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Triage"])
         self.assertEqual(json.loads((self.host.state / "failures.json").read_text())["JOV-3"]["count"], 3)
+
+    def test_not_shippable_goes_to_triage_without_a_failure(self):
+        lane.run_issue = lambda *a: {"verdict": "not-shippable", "reasons": ["already fixed"]}
+        lane.worker(self.host, "devin")
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Triage"))
+        self.assertFalse((self.host.state / "failures.json").exists())
+        self.assertEqual(len(self.execs), 1)
 
     def test_provider_error_cools_the_lane_without_charging_the_issue(self):
         lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": ["agent-exit:2"]}

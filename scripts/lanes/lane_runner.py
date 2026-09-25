@@ -173,6 +173,12 @@ def gate_rules(changes: list[Change]) -> list[str]:
     return failures
 
 
+def not_shippable_reason(output: str) -> str | None:
+    """The agent's explicit decline, e.g. already fixed on main; routed to Triage, never retried."""
+    found = re.findall(r"NOT-SHIPPABLE:\s*(.+)", output)
+    return found[-1].strip()[:500] if found else None
+
+
 def parse_numstat(text: str) -> list[Change]:
     changes = []
     for line in text.splitlines():
@@ -304,7 +310,11 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                    timeout=host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
-            if agent.returncode != 0 and receipt.get("verdict") == "no-change":
+            log.flush()
+            declined = not_shippable_reason((runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
+            if declined and receipt.get("verdict") == "no-change":
+                receipt.update(verdict="not-shippable", reasons=[declined])
+            elif agent.returncode != 0 and receipt.get("verdict") == "no-change":
                 # The provider never worked the issue (auth, quota, crash): its fault, not the issue's.
                 receipt.update(verdict="provider-error", reasons=[f"agent-exit:{agent.returncode}"])
         except subprocess.TimeoutExpired as error:
@@ -398,7 +408,11 @@ def worker(host: Host, name: str) -> int:
                                  f"({', '.join(receipt.get('reasons', []))}); lane cooling down, issue back to Todo.")
         slot.release()
         return 1
-    if verdict in ("landing", "verified-not-queued"):
+    if verdict == "not-shippable":
+        linear.move(issue.id, "Triage")
+        linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
+                                 "Returned to Triage for Summer/owner routing.")
+    elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
                                  f"queued; required checks and the merge queue decide.")
     else:
