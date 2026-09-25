@@ -228,6 +228,8 @@ export function planOfflineFailureDispositions(input = {}) {
       plan = buildHostedRepairPlan({
         dispatch: { ...dispatch, events: [event] },
         headRefName: input.headRefName,
+        baseSha: input.baseSha,
+        changedFiles: input.changedFiles,
       });
     } catch {
       return base('stop', 'invalid-dispatch-state');

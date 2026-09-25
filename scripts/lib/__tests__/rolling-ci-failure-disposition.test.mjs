@@ -77,6 +77,15 @@ function fixture(overrides = {}) {
     },
     triage,
     observations,
+    baseSha: 'b'.repeat(40),
+    changedFiles: [
+      {
+        filename: path,
+        status: 'modified',
+        mode: '100644',
+        blobSha: 'c'.repeat(40),
+      },
+    ],
   };
 }
 const first = input => planOfflineFailureDispositions(input).dispositions[0];
