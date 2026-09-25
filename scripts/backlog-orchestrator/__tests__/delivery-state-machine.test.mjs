@@ -9,6 +9,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -24,6 +25,7 @@ import {
   transitionDeliveryReceipt,
 } from '../delivery-state-machine.mjs';
 
+const require = createRequire(import.meta.url);
 const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
 
@@ -718,6 +720,45 @@ describe('delivery state machine', () => {
       assert.equal(output.lifecycleRejectedCount, 1);
       assert.equal(output.lifecycleActions[1].status, 'created');
     } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('scans persisted lifecycle receipts once per snapshot while holding the queue lock', async () => {
+    // Per-action rescans held the summer-queue lock ~60s in production and
+    // timed out Delivery Control Receipts (run 36119641162).
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-scan-'));
+    const receiptDirectory = join(directory, 'pr-lifecycle-actions');
+    const fsPromises = require('node:fs/promises');
+    const originalReaddir = fsPromises.readdir;
+    let receiptScans = 0;
+    fsPromises.readdir = (path, ...rest) => {
+      if (`${path}` === receiptDirectory) receiptScans += 1;
+      return originalReaddir(path, ...rest);
+    };
+    syncBuiltinESMExports();
+    try {
+      const actions = [17001, 17002, 17003, 17004, 17005].map(
+        (pr, inventoryIndex) => lifecycleAction({ pr, inventoryIndex })
+      );
+      const result = await persistClosureHealthActions(
+        {
+          repository: REPO,
+          observedAt: actions[0].observedAt,
+          lifecycleActions: actions,
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.lifecycleActionCount, actions.length);
+      assert.deepEqual(
+        result.lifecycleActions.map(action => action.status),
+        actions.map(() => 'created')
+      );
+      assert.equal(receiptScans, 1);
+    } finally {
+      fsPromises.readdir = originalReaddir;
+      syncBuiltinESMExports();
       await rm(directory, { recursive: true, force: true });
     }
   });
