@@ -1011,14 +1011,6 @@ export function runStructural(opts = {}) {
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-registration-gate',
-    // CI workflow changes live at the repo root, so Turbo --affected can select
-    // only the root package and return success after running zero web tests.
-    // Target Vitest directly so the deploy contract always executes and fails
-    // closed when the file cannot be resolved or contains no tests. The rest of
-    // tests/unit/ci (setup-doppler-action included) runs in
-    // webCiContractTestsCommand(); deploy-workflow stays here because that
-    // command excludes quarantine-ledger entries.
-    `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
@@ -1034,13 +1026,17 @@ export function runStructural(opts = {}) {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
-          webCiContractTestsCommand(
-            undefined,
-            selected.has('web') ? [DEPLOY_WORKFLOW_CI_TEST] : []
-          ),
+          webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
+          // Run the deploy contract by name for operations-only changes too:
+          // .github/scripts and workflow diffs select only the operations lane,
+          // and the directory run above skips it while it sits in the
+          // quarantine ledger (#18339 landed a red deploy contract that way).
+          // Targeting Vitest directly also fails closed when the file cannot
+          // be resolved or contains no tests.
+          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
     ...(selected.has('operations') ? operationsParts : []),
