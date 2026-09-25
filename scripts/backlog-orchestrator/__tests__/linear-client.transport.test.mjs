@@ -897,13 +897,13 @@ describe('Shipping Lead complete admission evidence', () => {
 
   it('rejects failed, incomplete, or changed later pages without returning partial evidence', async () => {
     await withKey('test-key-admission-rejection', async () => {
-      for (const failure of [
-        'transport',
-        'identity',
-        'revision',
-        'missing',
-        'cursor',
-        'duplicate',
+      for (const [failure, expectedCode] of [
+        ['transport', 'PAGE_FETCH_FAILED'],
+        ['identity', 'PAGE_FETCH_FAILED'],
+        ['revision', 'PAGE_FETCH_FAILED'],
+        ['missing', 'PAGE_FETCH_FAILED'],
+        ['cursor', 'CURSOR_STALLED'],
+        ['duplicate', 'DUPLICATE_ISSUE'],
       ]) {
         let pages = 0;
         await assert.rejects(
@@ -945,10 +945,15 @@ describe('Shipping Lead complete admission evidence', () => {
               });
             },
           }),
-          error =>
-            ['PAGE_FETCH_FAILED', 'CURSOR_STALLED', 'DUPLICATE_ISSUE'].includes(
-              error.code
-            )
+          error => {
+            assert.equal(error.code, expectedCode);
+            if (['identity', 'revision', 'missing'].includes(failure))
+              assert.match(
+                error.cause.message,
+                /issue changed during comment pagination/
+              );
+            return true;
+          }
         );
         assert.equal(pages, 2);
       }
