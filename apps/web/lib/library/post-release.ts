@@ -101,7 +101,7 @@ export function transitionPresenceFinding(
     ) {
       return { ok: false, reason: 'draft_missing' };
     }
-    let status = finding.status;
+    let status: LibraryPresenceFinding['status'] = finding.status;
     if (finding.actionMode === 'draft_request') status = 'drafted';
     else if (finding.actionMode === 'direct_update') status = 'resolved';
     return {
