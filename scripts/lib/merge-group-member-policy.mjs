@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
-import { HYGIENE_LIMITS } from './repo-hygiene-limits.mjs';
+import {
+  HYGIENE_LIMITS,
+  trackedBytesBudgetWarning,
+} from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
@@ -619,6 +622,8 @@ export async function runPolicy({
       request,
       token,
     });
+    const warning = trackedBytesBudgetWarning(payload.bytes);
+    if (warning) log(`::warning::Combined tree: ${warning}`);
     log(
       `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
     );
