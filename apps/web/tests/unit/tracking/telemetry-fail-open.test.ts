@@ -58,7 +58,7 @@ describe('fail-open telemetry transport (JOV-6585)', () => {
     expect(fetchCalls).toHaveLength(0);
   });
 
-  it('stays silent when fetch throws before returning a promise', () => {
+  it('stays silent when fetch throws before returning a promise', async () => {
     navigatorStub().sendBeacon = undefined;
     setFetch((() => {
       throw new TypeError('Failed to construct request');
@@ -68,7 +68,7 @@ describe('fail-open telemetry transport (JOV-6585)', () => {
     expect(
       postJsonBeacon('/api/profile/view', { handle: 'artist' }, onError)
     ).toBe(false);
-    expect(onError).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
   });
 
   it('stays silent when sendBeacon is blocked and the keepalive fetch rejects (offline)', async () => {
@@ -122,7 +122,7 @@ describe('fail-open telemetry transport (JOV-6585)', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to fetch exactly once when sendBeacon rejects the payload', () => {
+  it('falls back to fetch exactly once when sendBeacon rejects the payload', async () => {
     navigatorStub().sendBeacon = vi.fn(
       () => false
     ) as unknown as typeof navigator.sendBeacon;
@@ -132,7 +132,7 @@ describe('fail-open telemetry transport (JOV-6585)', () => {
     expect(postJsonBeacon('/api/profile/view', { handle: 'artist' })).toBe(
       false
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
 });
 

@@ -10,7 +10,8 @@
 function notifyBeaconFailure(reason: unknown, onError?: () => void): void {
   // Network, CSP, and sandbox failures are Error instances. Any other
   // rejection value is still a failed send. Either way the caller continues.
-  if (reason instanceof Error || reason != null) onError?.();
+  const detail = reason instanceof Error ? reason.name : typeof reason;
+  if (detail.length > 0) onError?.();
 }
 
 export function postJsonBeacon(
@@ -35,20 +36,21 @@ export function postJsonBeacon(
     return false;
   }
 
-  try {
-    void fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      keepalive: true,
-    }).catch((reason: unknown) => {
+  // A synchronous fetch throw (CSP connect-src, sandboxed document) rejects
+  // this chain the same way a network failure does. There is no try around
+  // the promise: the caller returns before either settlement.
+  void Promise.resolve()
+    .then(() =>
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      })
+    )
+    .catch((reason: unknown) => {
       notifyBeaconFailure(reason, onError);
     });
-  } catch (error: unknown) {
-    // A synchronous fetch constructor throw (CSP connect-src violation,
-    // sandboxed context) must not break the primary action either.
-    notifyBeaconFailure(error, onError);
-  }
 
   return false;
 }
