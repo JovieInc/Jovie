@@ -28,7 +28,7 @@ GATE_MODULE = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(GATE_MODULE)
 
 
-def stale_capacity_receipt():
+def stale_capacity_receipt(closure_health=None):
     observed_at = GATE_MODULE.isoformat(GATE_MODULE.utc_now())
     main_sha = "a" * 40
     return GATE_MODULE.evaluate(
@@ -43,7 +43,8 @@ def stale_capacity_receipt():
                 "greenReadyPrs": 2,
                 "target": 15,
             },
-            "closureHealth": {
+            "closureHealth": closure_health
+            or {
                 "schema": "jovie-closure-health/v1",
                 "status": "healthy",
                 "authority": "Summer",
@@ -516,6 +517,49 @@ class JovieOwnershipTests(unittest.TestCase):
             self.assertEqual(MODULE.ready_autonomous_draft(big)["reason"], "too_large_for_queue")
             self.assertEqual(MODULE.ready_autonomous_draft(dirty)["reason"], "conflicting")
         run.assert_not_called()
+
+
+class ClosureIntakeContractTests(unittest.TestCase):
+    """validate_gate_result mirrors closure_health.issue_intake_allowed."""
+
+    def test_red_issue_blocked_reasons_with_intake_open_pass(self):
+        receipt = stale_capacity_receipt(
+            {
+                "schema": "jovie-closure-health/v1",
+                "status": "red",
+                "authority": "Summer",
+                "newIssueIntakeAllowed": True,
+                "promotionContinues": True,
+                "remediationContinues": True,
+                "reasons": ["expired-held-prs", "internally-repairable-prs-open"],
+            }
+        )
+        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        closure = validated["signals"]["closureHealth"]
+        self.assertEqual(closure["status"], "red")
+        self.assertTrue(closure["newIssueIntakeAllowed"])
+        self.assertTrue(validated["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_red_non_issue_blocked_reason_with_intake_open_raises(self):
+        # Applied after evaluate(): the gate replaces this inconsistent signal
+        # with the fail-closed placeholder before a receipt is emitted.
+        receipt = stale_capacity_receipt()
+        closure = receipt["signals"]["closureHealth"]
+        closure["status"] = "red"
+        closure["newIssueIntakeAllowed"] = True
+        closure["reasons"] = ["gate-evaluation-failed"]
+        with self.assertRaisesRegex(
+            RuntimeError, "closure health status contradicts intake signal"
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_healthy_closure_with_intake_open_passes(self):
+        receipt = stale_capacity_receipt()
+        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        closure = validated["signals"]["closureHealth"]
+        self.assertEqual(closure["status"], "healthy")
+        self.assertTrue(closure["newIssueIntakeAllowed"])
+        self.assertEqual(closure["reasons"], [])
 
 
 if __name__ == "__main__":

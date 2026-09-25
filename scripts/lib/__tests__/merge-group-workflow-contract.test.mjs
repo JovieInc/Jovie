@@ -352,7 +352,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('timeout-minutes: 8');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
@@ -396,8 +396,16 @@ describe('merge_group workflow contract', () => {
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThan(60_000);
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeLessThan(120_000);
+    // A still-running required check must be able to finish: the helper
+    // polls for minutes, and the job timeout leaves >=90s for setup so the
+    // helper's pending diagnostic (not a hard cancel) is the failure mode.
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThanOrEqual(300_000);
+    const admissionTimeoutMinutes = Number(
+      admission.match(/timeout-minutes:\s*(\d+)/)?.[1]
+    );
+    expect(
+      admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_WAIT_MS
+    ).toBeGreaterThanOrEqual(90_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
