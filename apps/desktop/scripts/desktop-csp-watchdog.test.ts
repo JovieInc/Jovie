@@ -10,6 +10,47 @@ const REAL_CSP =
   "form-action 'self'; script-src 'self' 'nonce-abc123' 'unsafe-eval' https://clerk.jov.ie; " +
   "style-src 'self' 'unsafe-inline'";
 
+type Listener = (
+  details: Record<string, unknown>,
+  callback: (response: Record<string, unknown>) => void
+) => void;
+
+interface FakeWebRequest {
+  listener: Listener | undefined;
+  filter: unknown;
+}
+
+function fakeSessionWithCapturedFilter(): {
+  session: never;
+  webRequest: FakeWebRequest;
+} {
+  const webRequest: FakeWebRequest = {
+    listener: undefined,
+    filter: undefined,
+  };
+  const session = {
+    webRequest: {
+      onHeadersReceived: (
+        filter: unknown,
+        fn: Listener,
+        ...rest: unknown[]
+      ) => {
+        // Electron's two call shapes: with a filter (filter, listener) and
+        // without (listener). Record which shape arrived.
+        if (typeof filter === 'function' && fn === undefined) {
+          webRequest.filter = null;
+          webRequest.listener = filter as Listener;
+        } else {
+          webRequest.filter = filter;
+          webRequest.listener = fn;
+        }
+        void rest;
+      },
+    },
+  };
+  return { session: session as never, webRequest };
+}
+
 // JOV-3835: Electron delivers response headers with the origin server's casing.
 // A present CSP under a lowercase key must be detected as 'present' — otherwise
 // the watchdog injects a restrictive fallback that the browser intersects with
@@ -79,34 +120,86 @@ test('a divergent report-only policy alongside a good enforcing CSP is present',
   ).toBe('present');
 });
 
-// Redirects (and other non-2xx responses) carry no CSP header and no body.
-// They must be skipped: evaluating them misclassifies every 3xx as 'missing',
-// flooding security telemetry with false positives.
-test('non-2xx main-frame responses are not evaluated', () => {
-  let listener:
-    | ((
-        details: Record<string, unknown>,
-        callback: (response: Record<string, unknown>) => void
-      ) => void)
-    | undefined;
-  const fakeSession = {
-    webRequest: {
-      onHeadersReceived: (fn: NonNullable<typeof listener>) => {
-        listener = fn;
-      },
-    },
-  };
+// JOV-5290: the interceptor must be registered WITH a URL filter scoped to the
+// app origin (plus a mainFrame type filter). Without it, Electron routes every
+// response in the session through this blocking main-process listener.
+test('onHeadersReceived is registered with an app-origin mainFrame URL filter', () => {
+  const { session, webRequest } = fakeSessionWithCapturedFilter();
+
+  installDesktopCspWatchdog({
+    session,
+    appOrigin: 'https://staging.jov.ie',
+    report: vi.fn(),
+  });
+
+  expect(webRequest.listener).toBeDefined();
+  expect(webRequest.filter).toBeDefined();
+  expect(webRequest.filter).toEqual({
+    urls: ['https://staging.jov.ie/*'],
+    types: ['mainFrame'],
+  });
+});
+
+// The filter must tolerate sloppy origin input (trailing slash) and still
+// produce a valid Electron URL pattern.
+test('the URL filter normalizes a trailing-slash app origin', () => {
+  const { session, webRequest } = fakeSessionWithCapturedFilter();
+
+  installDesktopCspWatchdog({
+    session,
+    appOrigin: 'https://jov.ie/',
+    report: vi.fn(),
+  });
+
+  expect(webRequest.filter).toEqual({
+    urls: ['https://jov.ie/*'],
+    types: ['mainFrame'],
+  });
+});
+
+// Listener-level receipt: even when invoked, a non-app-origin response must
+// pass through untouched — no header mutation, no telemetry.
+test('non-app-origin main-frame responses are passed through untouched', () => {
+  const { session, webRequest } = fakeSessionWithCapturedFilter();
   const report = vi.fn();
 
   installDesktopCspWatchdog({
-    session: fakeSession as never,
+    session,
     appOrigin: 'https://staging.jov.ie',
     report,
   });
 
-  expect(listener).toBeDefined();
   const callback = vi.fn();
-  listener!(
+  webRequest.listener!(
+    {
+      resourceType: 'mainFrame',
+      url: 'https://evil.example.com/app',
+      statusCode: 200,
+      responseHeaders: { 'content-type': ['text/html'] },
+    },
+    callback
+  );
+
+  expect(report).not.toHaveBeenCalled();
+  expect(callback).toHaveBeenCalledWith({ cancel: false });
+});
+
+// Redirects (and other non-2xx responses) carry no CSP header and no body.
+// They must be skipped: evaluating them misclassifies every 3xx as 'missing',
+// flooding security telemetry with false positives.
+test('non-2xx main-frame responses are not evaluated', () => {
+  const { session, webRequest } = fakeSessionWithCapturedFilter();
+  const report = vi.fn();
+
+  installDesktopCspWatchdog({
+    session,
+    appOrigin: 'https://staging.jov.ie',
+    report,
+  });
+
+  expect(webRequest.listener).toBeDefined();
+  const callback = vi.fn();
+  webRequest.listener!(
     {
       resourceType: 'mainFrame',
       url: 'https://staging.jov.ie/signin',

@@ -123,7 +123,7 @@ GitHub-Issue workflows remain visible for auditability but cannot run:
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
-  - Behavior: reads the canonical Linear marker from the merged PR and transitions that issue to Done
+  - Behavior: reads the canonical Linear marker from the merged PR and transitions that issue to Done only when every linked PR is already merged or closed and the issue is not a commissioning or parent issue. Otherwise it leaves the issue open and comments with the reason.
 
 ## Main CI Health Monitor
 

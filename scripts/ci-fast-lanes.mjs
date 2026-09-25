@@ -67,8 +67,58 @@ export const BILLING_COVERAGE_COMMAND = Object.freeze(
 );
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
-const SCREENSHOT_CATALOG_CONTRACT_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+// apps/web/tests/unit/ci reads .github/**, scripts/**, and other non-web
+// contract inputs. Those paths select only the operations lane, which skips
+// the web Unit Tests shards, so run the whole directory here (#18222 landed a
+// workflow-only diff that turned main red because only Unit Tests ran it).
+// Excluded here because another job or command owns them, so nothing runs
+// twice: the browser-heavy Playwright artifact receipt (web Unit Tests), the
+// production-marker-state coverage gate (operations structural command), and
+// every unit test in the quarantine ledger (Unit Tests reruns those with
+// retries under continue-on-error).
+const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
+  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  'tests/unit/ci/production-marker-state.test.ts',
+]);
+// Run by name in the web structural parts so it executes even while it sits in
+// the quarantine ledger.
+const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+export function webCiContractTestsCommand(
+  ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
+  runElsewhere = []
+) {
+  // An unreadable ledger fails closed onto running every contract test, but
+  // files another command in the same plan names explicitly (`runElsewhere`)
+  // stay excluded so they never execute twice.
+  let quarantined = [];
+  try {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    quarantined = (Array.isArray(ledger?.entries) ? ledger.entries : [])
+      .filter(
+        entry =>
+          entry?.kind === 'unit' &&
+          typeof entry.path === 'string' &&
+          entry.path.startsWith('tests/unit/ci/')
+      )
+      .map(entry => entry.path);
+  } catch (error) {
+    process.stderr.write(
+      `::warning::Quarantine ledger ${ledgerPath} is unreadable (${error?.message ?? error}); running every tests/unit/ci contract.\n`
+    );
+    quarantined = [];
+  }
+  const excludes = [
+    ...new Set([
+      ...WEB_CI_CONTRACT_ALWAYS_EXCLUDED,
+      ...quarantined,
+      ...runElsewhere,
+    ]),
+  ]
+    .sort()
+    .map(path => ` --exclude=${path}`)
+    .join('');
+  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
+}
 export const ROUTE_PREP_COVERAGE_COMMAND =
   'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
@@ -134,6 +184,13 @@ const LANES = [
     run: runDesignExceptionRegistry,
   },
   {
+    id: 'design-governance-enforcement',
+    name: 'Design governance enforcement',
+    nextLocalCommand:
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+    run: runDesignGovernanceEnforcement,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -192,6 +249,7 @@ export const LANE_GROUPS = Object.freeze({
     'guardrails',
     'design-system-source-ratchet',
     'design-exception-registry',
+    'design-governance-enforcement',
     'design-conformance',
     'ios-fast',
     'profile-admission',
@@ -759,6 +817,27 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
+function runDesignGovernanceEnforcement() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Design governance enforcement skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const selected = selectedProductLanes();
+  if (!selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No web product lane selected\n',
+      skipped: true,
+    };
+  }
+  return shell(LANE_COMMANDS['design-governance-enforcement']);
+}
+
 /**
  * @typedef {object} DesignConformanceOpts
  * @property {string[] | null} [changedFileList]
@@ -1206,8 +1285,11 @@ export async function runStructural(opts = {}) {
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
-    // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
+    // closed when the file cannot be resolved or contains no tests. The rest of
+    // tests/unit/ci (setup-doppler-action included) runs in
+    // webCiContractTestsCommand(); deploy-workflow stays here because that
+    // command excludes quarantine-ledger entries.
+    `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
@@ -1223,7 +1305,10 @@ export async function runStructural(opts = {}) {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
-          SCREENSHOT_CATALOG_CONTRACT_COMMAND,
+          webCiContractTestsCommand(
+            undefined,
+            selected.has('web') ? [DEPLOY_WORKFLOW_CI_TEST] : []
+          ),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
