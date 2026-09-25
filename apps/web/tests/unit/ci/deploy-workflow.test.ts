@@ -1277,12 +1277,17 @@ describe('deploy workflow Vercel env resolution', () => {
     // The token must never reach the CLI as an argument (process lists and
     // logs expose argv). The failure-tail redactor legitimately names the
     // flag inside a regex, so assert on argument shapes, not the bare string.
-    expect(deployScript).not.toMatch(/--token(?:=|\s+)["'$]/);
-    expect(deployScript).not.toMatch(/--token(?:=|\s+)\$\{?VERCEL_TOKEN/);
-    expect('--token "$VERCEL_TOKEN"').toMatch(/--token(?:=|\s+)["'$]/);
-    expect('--token=${VERCEL_TOKEN}').toMatch(
-      /--token(?:=|\s+)\$\{?VERCEL_TOKEN/
-    );
+    // Any value after the flag counts, quoted or bare; the redactor's regex
+    // (`--token(?:=|\s+)`) is followed by `(`, so it never matches.
+    const tokenArgument = /--token(?:=|\s+)\S/;
+    expect(deployScript).not.toMatch(tokenArgument);
+    for (const leak of [
+      '--token abc123',
+      '--token="$VERCEL_TOKEN"',
+      '--token ${VERCEL_TOKEN}',
+    ]) {
+      expect(leak).toMatch(tokenArgument);
+    }
   });
 
   it('skips catalog mutation only for the manual PR preview build', () => {
