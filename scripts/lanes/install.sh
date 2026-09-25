@@ -10,7 +10,10 @@ here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$state"
 LANES_STATE="$state" LANES_REPO="$repo" python3 "$here/lane_runner.py" update
 tick="python3 $state/current/lane_runner.py update; exec python3 $state/current/lane_runner.py dispatch"
-path="$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+# The installing shell's Node goes first so timers use the repo-pinned version, not
+# whatever launchd/systemd would find (e.g. Homebrew's newer Node).
+node_dir="$(dirname "$(command -v node)")"
+path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 if [ "$(uname)" = "Darwin" ]; then
   plist="$HOME/Library/LaunchAgents/com.jovie.lanes.plist"
