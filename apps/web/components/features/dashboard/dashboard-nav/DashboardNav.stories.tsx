@@ -2,11 +2,13 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
 import {
   Sidebar,
   SidebarContent,
   SidebarProvider,
 } from '@/components/organisms/Sidebar';
+import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { DashboardNav } from './DashboardNav';
@@ -73,3 +75,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const RuntimeUpdate: Story = {
+  render: () => (
+    <RuntimeUpdateProvider>
+      <DashboardNav />
+      <InboxRuntimeNotification />
+    </RuntimeUpdateProvider>
+  ),
+};

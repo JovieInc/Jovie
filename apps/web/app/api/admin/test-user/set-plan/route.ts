@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export async function POST() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

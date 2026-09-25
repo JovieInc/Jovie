@@ -16,7 +16,8 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/symphony/symphony-nvme-package-cache.sh"
 NODE_VERSION = "22.23.2"
-PNPM_VERSION = "9.15.4"
+PNPM_VERSION = "9.15.9"
+PNPM_ENGINE = ">=9.15.4 <10"
 SCHEMA = "symphony-nvme-package-cache/v2"
 
 
@@ -86,7 +87,7 @@ class Fixture:
                     "private": True,
                     "engines": {
                         "node": f">={NODE_VERSION} <23",
-                        "pnpm": PNPM_VERSION,
+                        "pnpm": PNPM_ENGINE,
                     },
                     "packageManager": f"pnpm@{PNPM_VERSION}",
                 }
@@ -104,7 +105,7 @@ class Fixture:
         (self.bin / "node").write_text(f"#!/usr/bin/env bash\nprintf 'v{node_version}\\n'\n")
         (self.bin / "pnpm").write_text(
             "#!/usr/bin/env bash\n"
-            "if [ \"${1:-}\" = --version ]; then printf '9.15.4\\n'; exit 0; fi\n"
+            "if [ \"${1:-}\" = --version ]; then printf '9.15.9\\n'; exit 0; fi\n"
             "printf '%s\\n' \"$*\" >> \"$PNPM_LOG\"\n"
             "if [ \"${1:-}\" = fetch ]; then\n"
             "  if [ \"${PNPM_FETCH_EXIT:-0}\" -ne 0 ]; then exit \"$PNPM_FETCH_EXIT\"; fi\n"

@@ -26,7 +26,7 @@ export async function POST() {
 
   try {
     // Check authentication
-    ({ userId } = await getCachedAuth());
+    ({ userId } = await getCachedAuth({ session: 'fresh' }));
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

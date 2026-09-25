@@ -73,6 +73,7 @@ describe('primary marketing navigation contract', () => {
       'Authors',
     ]);
     expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
+      'Music Smart Links',
       'Fan Notifications',
       'Instant Merch',
       'YouTube Thumbnails',

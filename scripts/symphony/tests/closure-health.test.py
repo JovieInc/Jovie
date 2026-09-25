@@ -663,7 +663,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(by_pr[31]["owner"], "controller")
         self.assertIsNone(by_pr[31]["headSha"])
 
-    def test_native_merge_queue_policy_scales_builds_with_20_minute_budget(self):
+    def test_native_merge_queue_policy_scales_builds_with_60_minute_budget(self):
         ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
             encoding="utf-8"
         )
@@ -671,7 +671,7 @@ class ClosureClassificationTests(unittest.TestCase):
             encoding="utf-8"
         )
         for source in (ruleset, guard):
-            self.assertRegex(source, r"check_response_timeout_minutes:\s*20")
+            self.assertRegex(source, r"check_response_timeout_minutes:\s*60")
             self.assertRegex(source, r"max_entries_to_build:\s*2")
             self.assertRegex(source, r"max_entries_to_merge:\s*5")
 
@@ -2500,40 +2500,14 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertNotIn("bearer-sensitive", str(raised.exception))
         self.assertIn("[REDACTED]", str(raised.exception))
 
-    def test_queue_controller_maps_terminal_active_and_missing_runs(self):
-        cases = [
-            ({"status": "completed", "conclusion": "success"}, "green"),
-            ({"status": "completed", "conclusion": "failure"}, "failed"),
-            ({"status": "in_progress", "conclusion": None}, "recovering"),
-            ({"status": "mystery", "conclusion": None}, "unknown"),
-        ]
-        for latest, expected in cases:
-            with self.subTest(status=latest["status"], conclusion=latest["conclusion"]):
-                latest.update(
-                    {
-                        "id": 42,
-                        "html_url": "https://example.test/run/42",
-                        "updated_at": NOW.isoformat(),
-                    }
-                )
-                completed = mock.Mock(
-                    stdout=MODULE.json.dumps({"workflow_runs": [latest]})
-                )
-                with mock.patch.object(
-                    MODULE.subprocess, "run", return_value=completed
-                ):
-                    result = MODULE._observe_queue_controller("JovieInc/Jovie")
-                self.assertEqual(result["status"], expected)
-
-        completed = mock.Mock(stdout=MODULE.json.dumps({"workflow_runs": []}))
-        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
-            self.assertEqual(
-                MODULE._observe_queue_controller("JovieInc/Jovie"),
-                {"status": "unknown", "reason": "controller-run-missing"},
-            )
-
     def test_live_observer_propagates_one_end_to_end_deadline(self):
         expected_deadline = 10.0 + MODULE.CLOSURE_OBSERVATION_SECONDS
+        controller = {
+            "status": "green",
+            "kind": "symphony",
+            "source": "live",
+            "observedAt": MODULE.isoformat(NOW),
+        }
         with mock.patch.object(
             MODULE.time, "monotonic", return_value=10.0
         ), mock.patch.object(
@@ -2542,21 +2516,28 @@ class ClosureObservationTests(unittest.TestCase):
             return_value={"prs": [], "mainOid": "a" * 40, "latestMergeAt": None},
         ) as snapshot_read, mock.patch.object(
             MODULE, "observe_promotion_evidence", return_value=[]
-        ) as promotion_read, mock.patch.object(
-            MODULE, "_observe_queue_controller", return_value={"status": "green"}
-        ) as controller_read:
-            MODULE.observe_closure_health("JovieInc/Jovie", previous=None, now=NOW)
+        ) as promotion_read:
+            MODULE.observe_closure_health(
+                "JovieInc/Jovie",
+                previous=None,
+                now=NOW,
+                controller_observation=controller,
+            )
 
         self.assertEqual(snapshot_read.call_args.args[1], expected_deadline)
         self.assertEqual(promotion_read.call_args.args[3], expected_deadline)
-        self.assertEqual(controller_read.call_args.args[1], expected_deadline)
-        self.assertEqual(controller_read.call_count, 1)
 
     def test_live_observer_emits_typed_health_and_fails_closed_on_transport(self):
         prs = [
             pr(1, title="feat: JOV-1", queued=True),
             pr(2, title="wip: JOV-2", draft=True),
         ]
+        controller = {
+            "status": "green",
+            "kind": "symphony",
+            "source": "live",
+            "observedAt": MODULE.isoformat(NOW),
+        }
         with mock.patch.object(
             MODULE,
             "_run_graphql_snapshot",
@@ -2565,10 +2546,6 @@ class ClosureObservationTests(unittest.TestCase):
                 "mainOid": "a" * 40,
                 "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
             },
-        ), mock.patch.object(
-            MODULE,
-            "_observe_queue_controller",
-            return_value={"status": "green", "runId": 42},
         ), mock.patch.object(
             MODULE,
             "_readback_promotion_state",
@@ -2585,10 +2562,14 @@ class ClosureObservationTests(unittest.TestCase):
             },
         ):
             result = MODULE.observe_closure_health(
-                "JovieInc/Jovie", previous=None, now=NOW
+                "JovieInc/Jovie",
+                previous=None,
+                now=NOW,
+                controller_observation=controller,
             )
 
         self.assertEqual(result["status"], "healthy")
+        self.assertEqual(result["controller"], controller)
         self.assertEqual(result["repository"], "JovieInc/Jovie")
         self.assertEqual(result["openPrs"], 2)
         self.assertEqual(result["eligiblePrs"], 1)
@@ -2598,7 +2579,10 @@ class ClosureObservationTests(unittest.TestCase):
             MODULE, "_run_graphql_snapshot", side_effect=ValueError("bad snapshot")
         ):
             failed = MODULE.observe_closure_health(
-                "JovieInc/Jovie", previous=None, now=NOW
+                "JovieInc/Jovie",
+                previous=None,
+                now=NOW,
+                controller_observation=controller,
             )
         self.assertEqual(failed["status"], "red")
         self.assertEqual(failed["repository"], "JovieInc/Jovie")
@@ -2638,10 +2622,6 @@ class ClosureObservationTests(unittest.TestCase):
             },
         ), mock.patch.object(
             MODULE,
-            "_observe_queue_controller",
-            return_value={"status": "green", "runId": 42},
-        ), mock.patch.object(
-            MODULE,
             "_readback_promotion_state",
             return_value={
                 "baseOid": "a" * 40,
@@ -2656,7 +2636,15 @@ class ClosureObservationTests(unittest.TestCase):
             },
         ):
             result = MODULE.observe_closure_health(
-                "JovieInc/LogYourBody", previous=None, now=NOW
+                "JovieInc/LogYourBody",
+                previous=None,
+                now=NOW,
+                controller_observation={
+                    "status": "green",
+                    "kind": "symphony",
+                    "source": "live",
+                    "observedAt": MODULE.isoformat(NOW),
+                },
             )
 
         self.assertEqual(result["status"], "red")
@@ -2665,228 +2653,89 @@ class ClosureObservationTests(unittest.TestCase):
             result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
         )
 
-    @staticmethod
-    def _controller_runs(*runs: dict[str, object]) -> mock.Mock:
-        return mock.Mock(stdout=MODULE.json.dumps({"workflow_runs": list(runs)}))
+    def test_missing_or_malformed_controller_observation_fails_closed(self):
+        for observation in (None, [], {}, {"status": "unknown"}, {"status": 1}):
+            with self.subTest(observation=observation), mock.patch.object(
+                MODULE, "_run_graphql_snapshot"
+            ) as snapshot_read:
+                result = MODULE.observe_closure_health(
+                    "JovieInc/Jovie",
+                    previous=None,
+                    now=NOW,
+                    controller_observation=observation,
+                )
 
-    def test_in_progress_latest_run_judges_latest_completed_run(self):
-        completed_success = {
-            "id": 41,
-            "status": "completed",
-            "conclusion": "success",
-            "html_url": "https://example.test/run/41",
-            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
-        }
-        in_flight = {
-            "id": 42,
-            "status": "in_progress",
-            "conclusion": None,
-            "html_url": "https://example.test/run/42",
-            "updated_at": NOW.isoformat(),
-        }
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(in_flight, completed_success),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+            self.assertEqual(result["status"], "red")
+            self.assertFalse(result["newIssueIntakeAllowed"])
+            self.assertEqual(result["reasons"], ["closure-observation-unknown"])
+            self.assertIn("controller observation", result["error"])
+            snapshot_read.assert_not_called()
 
-        self.assertEqual(result["status"], "green")
-        self.assertEqual(result["runId"], 41)
-        self.assertEqual(result["runStatus"], "completed")
-        self.assertEqual(result["conclusion"], "success")
-        self.assertEqual(result["activeRunId"], 42)
+        with mock.patch.object(MODULE, "_run_graphql_snapshot") as snapshot_read:
+            omitted = MODULE.observe_closure_health(
+                "JovieInc/Jovie", previous=None, now=NOW
+            )
 
-        health = MODULE.evaluate_closure_health(
-            snapshot(controller=result),
-            previous=None,
-            now=NOW,
+        self.assertEqual(omitted["status"], "red")
+        self.assertFalse(omitted["newIssueIntakeAllowed"])
+        self.assertEqual(omitted["reasons"], ["closure-observation-unknown"])
+        self.assertIn("controller observation", omitted["error"])
+        snapshot_read.assert_not_called()
+
+    def test_failed_symphony_controller_keeps_existing_red_threshold(self):
+        failed = {"status": "failed", "kind": "symphony"}
+        previous = MODULE.evaluate_closure_health(
+            snapshot(controller=failed), previous=None, now=NOW
         )
-        self.assertEqual(health["status"], "healthy")
-        self.assertNotIn("controller", health["episodes"])
-        self.assertTrue(health["newIssueIntakeAllowed"])
+        self.assertEqual(previous["status"], "grace")
+        self.assertNotIn("queue-controller-red-over-10m", previous["reasons"])
 
-    def test_in_progress_latest_run_keeps_latest_completed_failure_red(self):
-        completed_failure = {
-            "id": 41,
-            "status": "completed",
-            "conclusion": "failure",
-            "html_url": "https://example.test/run/41",
-            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
-        }
-        in_flight = {
-            "id": 42,
-            "status": "queued",
-            "conclusion": None,
-            "html_url": "https://example.test/run/42",
-            "updated_at": NOW.isoformat(),
-        }
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(in_flight, completed_failure),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
-
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["runId"], 41)
-        self.assertEqual(result["activeRunId"], 42)
-
-        stalled = snapshot(controller=result)
-        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
-        self.assertEqual(first["status"], "grace")
-        self.assertFalse(first["newIssueIntakeAllowed"])
         later = MODULE.evaluate_closure_health(
-            stalled,
-            previous=first,
+            snapshot(controller=failed),
+            previous=previous,
             now=NOW + timedelta(minutes=11),
         )
         self.assertEqual(later["status"], "red")
         self.assertIn("queue-controller-red-over-10m", later["reasons"])
+        self.assertEqual(later["controller"], failed)
 
-    def test_only_active_runs_stay_recovering_without_completed_evidence(self):
-        runs = [
-            {
-                "id": 42,
-                "status": "in_progress",
-                "conclusion": None,
-                "html_url": "https://example.test/run/42",
-                "updated_at": NOW.isoformat(),
-            },
-            {
-                "id": 41,
-                "status": "queued",
-                "conclusion": None,
-                "html_url": "https://example.test/run/41",
-                "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
-            },
-        ]
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(*runs),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
-
-        self.assertEqual(result["status"], "recovering")
-        self.assertEqual(result["runId"], 42)
-        self.assertEqual(result["runStatus"], "in_progress")
-        self.assertNotIn("activeRunId", result)
-
-    def test_missing_runs_fail_closed(self):
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
-
-        self.assertEqual(
-            result,
-            {"status": "unknown", "reason": "controller-run-missing"},
+    def test_fresh_green_symphony_clears_persisted_controller_failure_episode(self):
+        failed = {"status": "failed", "kind": "symphony"}
+        first_failure = MODULE.evaluate_closure_health(
+            snapshot(controller=failed), previous=None, now=NOW
         )
-        health = MODULE.evaluate_closure_health(
-            snapshot(controller=result),
-            previous=None,
-            now=NOW,
-        )
-        self.assertEqual(health["status"], "grace")
-        self.assertFalse(health["newIssueIntakeAllowed"])
-
-    def test_cancelled_latest_run_judges_latest_verdict_run(self):
-        cancelled = {
-            "id": 43,
-            "status": "completed",
-            "conclusion": "cancelled",
-            "html_url": "https://example.test/run/43",
-            "updated_at": NOW.isoformat(),
-        }
-        completed_success = {
-            "id": 41,
-            "status": "completed",
-            "conclusion": "success",
-            "html_url": "https://example.test/run/41",
-            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
-        }
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(cancelled, completed_success),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
-
-        self.assertEqual(result["status"], "green")
-        self.assertEqual(result["runId"], 41)
-        self.assertEqual(result["conclusion"], "success")
-
-        health = MODULE.evaluate_closure_health(
-            snapshot(controller=result),
-            previous=None,
-            now=NOW,
-        )
-        self.assertEqual(health["status"], "healthy")
-        self.assertNotIn("controller", health["episodes"])
-
-    def test_cancelled_latest_run_keeps_latest_verdict_failure_red(self):
-        cancelled = {
-            "id": 43,
-            "status": "completed",
-            "conclusion": "cancelled",
-            "html_url": "https://example.test/run/43",
-            "updated_at": NOW.isoformat(),
-        }
-        completed_failure = {
-            "id": 41,
-            "status": "completed",
-            "conclusion": "failure",
-            "html_url": "https://example.test/run/41",
-            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
-        }
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(cancelled, completed_failure),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
-
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["runId"], 41)
-
-        stalled = snapshot(controller=result)
-        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
-        self.assertEqual(first["status"], "grace")
-        later = MODULE.evaluate_closure_health(
-            stalled,
-            previous=first,
+        persisted_failure = MODULE.evaluate_closure_health(
+            snapshot(controller=failed),
+            previous=first_failure,
             now=NOW + timedelta(minutes=11),
         )
-        self.assertEqual(later["status"], "red")
-        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+        self.assertIn("controller", persisted_failure["episodes"])
+        self.assertIn("queue-controller-red-over-10m", persisted_failure["reasons"])
 
-    def test_only_cancelled_and_active_runs_stay_recovering(self):
-        in_flight = {
-            "id": 44,
-            "status": "in_progress",
-            "conclusion": None,
-            "html_url": "https://example.test/run/44",
-            "updated_at": NOW.isoformat(),
-        }
-        cancelled = {
-            "id": 43,
-            "status": "completed",
-            "conclusion": "cancelled",
-            "html_url": "https://example.test/run/43",
-            "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+        now = NOW + timedelta(minutes=12)
+        green = {
+            "status": "green",
+            "kind": "symphony",
+            "source": "live",
+            "observedAt": MODULE.isoformat(now),
         }
         with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=self._controller_runs(in_flight, cancelled),
-        ):
-            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+            MODULE,
+            "_run_graphql_snapshot",
+            return_value={"prs": [], "mainOid": "a" * 40, "latestMergeAt": None},
+        ), mock.patch.object(MODULE, "observe_promotion_evidence", return_value=[]):
+            result = MODULE.observe_closure_health(
+                "JovieInc/Jovie",
+                previous=persisted_failure,
+                now=now,
+                controller_observation=green,
+            )
 
-        self.assertEqual(result["status"], "recovering")
-        self.assertEqual(result["runId"], 44)
+        self.assertEqual(result["status"], "healthy")
+        self.assertTrue(result["newIssueIntakeAllowed"])
+        self.assertEqual(result["controller"], green)
+        self.assertNotIn("controller", result["episodes"])
+        self.assertNotIn("queue-controller-red-over-10m", result["reasons"])
 
 
 if __name__ == "__main__":

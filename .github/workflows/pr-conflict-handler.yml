@@ -4,8 +4,14 @@ name: PR Conflict Handler
 # branches use the shared exact-head GitHub rebase. True same-repository
 # conflicts are resolved in a credential-free FX job and delivered by a
 # separate App-token writer only after an exact head/base reread.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Conflicted PRs may emit no CI completion; trusted-main metadata events wake the existing exact-PR DIRTY repair jobs and existing trusted writer.
+# revisit-trigger: Before enabling or expanding this event route, Gem must recheck the no-CI conflict gap, shared-writer exclusion, and atomic capacity admission.
 
 on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
     inputs:
       apply:
@@ -17,7 +23,7 @@ on:
           - 'true'
           - 'false'
       max_concurrent:
-        description: 'Operator ceiling above the adaptive 2 -> 10 -> 40 cohorts.'
+        description: 'Read-only planner ceiling; hosted canary apply is capped at one.'
         required: false
         default: '40'
   push:
@@ -27,6 +33,17 @@ on:
     types: [completed]
 
 permissions: {}
+
+# Stable repository-wide canary slot shared with Rolling CI Dispatch. Empty
+# workflow_run associations stay inside this same bounded group. Safe drain:
+# pause new intake without changing the enable switch, canary PR, or HA writer
+# suppression; drain both workflow queues/runs and all work already accepted by
+# external HA; confirm both workflows and the HA writer are idle before changing
+# controls or restoring intake.
+concurrency:
+  group: jovie-fx-shared-canary-slot-${{ github.repository }}
+  cancel-in-progress: false
+  queue: max
 
 defaults:
   run:
@@ -43,12 +60,12 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Coalesce redundant CI-completion audits without ever cancelling an
-    # explicit operator run. Downstream per-PR leases remain independently
-    # serialized after a plan completes.
+    # Keep the planner's nested lease distinct from the workflow-wide shared
+    # slot. Audits, dry-runs, and fallbacks must not cancel an active plan.
     concurrency:
-      group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && 'operator' || 'audit' }}
-      cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+      group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}
+      cancel-in-progress: false
+      queue: max
     permissions:
       actions: read
       checks: read
@@ -142,7 +159,10 @@ jobs:
           QUEUED_CI: ${{ steps.capacity.outputs.queued_ci }}
           TRACKING_ISSUE: '16794'
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_PAYLOAD_PATH: ${{ github.event_path }}
           APPLY_INPUT: ${{ inputs.apply || 'false' }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
         run: |
           set -euo pipefail
           plan_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -158,7 +178,27 @@ jobs:
             apply='true'
           fi
 
+          if [[ "$apply" == 'true' && (
+            "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' ||
+            ! "$FX_HOSTED_REMEDIATION_CANARY_PR" =~ ^[1-9][0-9]*$
+          ) ]]; then
+            echo "::warning::Canary apply is disabled or misconfigured; retaining a read-only plan."
+            MODE="--dry-run"
+            apply='false'
+          fi
+          if [[ "$apply" == 'true' ]]; then
+            MAX_CONCURRENT=1
+          fi
+
+          event_args=()
+          if [[ "$EVENT_NAME" == 'pull_request_target' ]]; then
+            test -n "$EVENT_PAYLOAD_PATH"
+            test -f "$EVENT_PAYLOAD_PATH"
+            event_args=(--event-payload-file "$EVENT_PAYLOAD_PATH")
+          fi
+
           node scripts/pr-conflict-handler.mjs "$MODE" \
+            "${event_args[@]}" \
             --repo "$REPOSITORY" \
             --max-concurrent "$MAX_CONCURRENT" \
             --runner-capacity "$RUNNER_CAPACITY" \
@@ -170,6 +210,42 @@ jobs:
             --json | tee "$RUNNER_TEMP/pr-conflict-handler.log"
 
           jq -e '.fxMatrix | type == "array"' "$RUNNER_TEMP/pr-conflict-handler-plan.json" >/dev/null
+          if [[ "$apply" == 'true' ]]; then
+            jq -e --argjson canary "$FX_HOSTED_REMEDIATION_CANARY_PR" '
+              . as $plan |
+              (.items | type == "array" and length <= 1) and
+              all(.items[]?; .number == $canary and .pr.number == $canary) and
+              (.fxMatrix | type == "array") and
+              (.exceptionMatrix | type == "array") and
+              ((.fxMatrix | length) + (.exceptionMatrix | length) <= 1) and
+              (.capacity.maxConcurrent == 1) and
+              (.capacity.availableCiSlots | type == "number" and . >= 0 and . <= 1) and
+              ((.fxMatrix | length) == 0 or
+               (.capacity.availableCiSlots == 1 and all(.fxMatrix[]?; .adaptiveCap == 1))) and
+              all(.fxMatrix[]?;
+                . as $fx |
+                $fx.prNumber == $canary and
+                ($fx.adaptiveCap | type == "number" and . >= 0 and . <= 1) and
+                any($plan.items[]?;
+                  .number == $canary and .action == "escalate_conflict_fx" and
+                  .pr.headRefName == $fx.headRefName and .pr.headRefOid == $fx.headRefOid and
+                  .pr.baseRefName == $fx.baseRefName and .pr.baseRefOid == $fx.baseRefOid
+                )
+              ) and
+              all(.exceptionMatrix[]?;
+                . as $exception |
+                $exception.prNumber == $canary and
+                ($exception.adaptiveCap | type == "number" and . >= 0 and . <= 1) and
+                any($plan.items[]?;
+                  .number == $canary and
+                  (($exception.exceptionType == "permission" and .action == "emit_permission_exception") or
+                   ($exception.exceptionType == "exhausted" and .action == "emit_steering_exception")) and
+                  .pr.headRefName == $exception.headRefName and .pr.headRefOid == $exception.headRefOid and
+                  .pr.baseRefName == $exception.baseRefName and .pr.baseRefOid == $exception.baseRefOid
+                )
+              )
+            ' "$RUNNER_TEMP/pr-conflict-handler-plan.json" >/dev/null
+          fi
           raw_fx=$(jq -c '.fxMatrix // []' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
           raw_exceptions=$(jq -c '.exceptionMatrix // []' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
           adaptive_cap=$(jq -r '(.capacity.availableCiSlots // 0) | if . < 1 then 1 else . end' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
@@ -182,6 +258,10 @@ jobs:
             while IFS= read -r item; do
               [[ -n "$item" ]] || continue
               pr=$(jq -r '.prNumber' <<<"$item")
+              if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$pr" != "$FX_HOSTED_REMEDIATION_CANARY_PR" ]]; then
+                echo "::error::Canary configuration or action target changed before claim."
+                exit 1
+              fi
               expected_head=$(jq -r '.headRefOid' <<<"$item")
               expected_base=$(jq -r '.baseRefOid' <<<"$item")
               expected_base_ref=$(jq -r '.baseRefName' <<<"$item")
@@ -191,7 +271,7 @@ jobs:
               expected_auto_merge=$(jq -r '.autoMergeEnabled' <<<"$item")
               expected_draft=$(jq -r '.draftState' <<<"$item")
               live=$(GH_TOKEN="$GH_MUTATION_TOKEN" gh api "repos/$REPOSITORY/pulls/$pr" \
-                --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+                --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),baseRepo:.base.repo.full_name,headRepo:.head.repo.full_name,fork:.head.repo.fork,labels:(if (.labels|type)=="array" then [.labels[].name] else null end)}')
               # shellcheck disable=SC2016
               live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
                 -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
@@ -199,9 +279,18 @@ jobs:
                 -f qualifiedName="refs/heads/$expected_base_ref" \
                 --jq '.data.repository.ref.target.oid // ""')
               live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
-              if ! jq -e --arg head "$expected_head" --arg base "$expected_base" --arg baseRef "$expected_base_ref" --arg ref "$expected_ref" \
+              # shellcheck disable=SC2016
+              queue_before_claim=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+                -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isInMergeQueue mergeQueueEntry{position}}}}' \
+                -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$pr" \
+                --jq '.data.repository.pullRequest | {isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
+              if ! jq -e '.isInMergeQueue == false and .mergeQueueEntryPresent == false' <<<"$queue_before_claim" >/dev/null; then
+                echo "::notice::PR #$pr queue state unavailable or occupied before claim."
+                continue
+              fi
+              if ! jq -e --arg repo "$REPOSITORY" --arg head "$expected_head" --arg base "$expected_base" --arg baseRef "$expected_base_ref" --arg ref "$expected_ref" \
                 --argjson draft "$expected_draft" --argjson autoMerge "$expected_auto_merge" \
-                '.state == "open" and .draft == $draft and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref and .autoMerge == $autoMerge' \
+                '.state == "open" and .draft == $draft and .baseRepo == $repo and .headRepo == $repo and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref and .autoMerge == $autoMerge and (.labels|type)=="array" and all(.labels[]; (type == "string") and ((ascii_downcase | IN("hold", "gated", "incident")) | not))' \
                 <<<"$live" >/dev/null; then
                 echo "::notice::PR #$pr changed before claim; waiting for a fresh pass."
                 continue
@@ -291,6 +380,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
           BASE_HEAD: ${{ matrix.baseRefOid }}
@@ -302,6 +393,10 @@ jobs:
           ADAPTIVE_CAP: ${{ needs.plan.outputs.adaptive_cap }}
         run: |
           set -euo pipefail
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$FX_HOSTED_REMEDIATION_CANARY_PR" != "$PR_NUMBER" ]]; then
+            echo "::notice::Canary configuration changed before exception receipt; refusing the write."
+            exit 0
+          fi
           live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '{state:.state,head:.head.sha,baseRef:.base.ref}')
           # shellcheck disable=SC2016
@@ -355,6 +450,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      pull-requests: read
     concurrency:
       group: pr-conflict-fx-${{ github.repository }}-${{ matrix.prNumber }}
       cancel-in-progress: false
@@ -556,12 +652,68 @@ jobs:
             > "$artifact_dir/receipt.json"
           echo "model_required=$([[ "$outcome" == 'model_required' ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      - name: Recheck live PR identity and queue before FX spend
+        id: pre_spend_guard
+        if: steps.prepare.outputs.model_required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          EXPECTED_AUTO_MERGE: ${{ matrix.autoMergeEnabled }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
+        run: |
+          set -euo pipefail
+          eligible=false
+          outcome='fx_suppressed_live_boundary'
+          detail='live PR identity, hold, native queue, or canary configuration changed before model spend'
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$FX_HOSTED_REMEDIATION_CANARY_PR" != "$PR_NUMBER" ]]; then
+            detail='canary configuration no longer admits this PR before model spend'
+          else
+            if ! live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+              --jq '{number:.number,state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,headRef:.head.ref,baseRepo:.base.repo.full_name,headRepo:.head.repo.full_name,fork:.head.repo.fork,labels:(if (.labels|type)=="array" then [.labels[].name] else null end)}'); then
+              detail='live PR identity read failed before model spend'
+            elif ! jq -e --arg repo "$REPOSITORY" --argjson pr "$PR_NUMBER" --arg head "$SOURCE_HEAD" --arg baseRef "$BASE_REF" --arg headRef "$HEAD_REF" \
+              '.number == $pr and .state == "open" and .draft == false and .baseRepo == $repo and .headRepo == $repo and .fork == false and .head == $head and .baseRef == $baseRef and .headRef == $headRef and (.labels|type)=="array" and all(.labels[]; (type == "string") and ((ascii_downcase | IN("hold", "gated", "incident")) | not))' \
+              <<<"$live" >/dev/null; then
+              detail='live PR identity or hold check failed before model spend'
+            else
+              # shellcheck disable=SC2016
+              if ! live_state=$(gh api graphql \
+                -f query='query($owner:String!,$name:String!,$number:Int!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}} pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
+                -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
+                -f qualifiedName="refs/heads/$BASE_REF" \
+                --jq '.data.repository as $repository | {canonicalBaseOid:$repository.ref.target.oid,autoMergeEnabled:($repository.pullRequest | if has("autoMergeRequest") then .autoMergeRequest != null else null end),isInMergeQueue:$repository.pullRequest.isInMergeQueue,mergeQueueEntryPresent:($repository.pullRequest | if has("mergeQueueEntry") then .mergeQueueEntry != null else null end)}'); then
+                detail='canonical base, auto-merge, or native queue read failed before model spend'
+              elif ! jq -e --arg base "$BASE_HEAD" --argjson autoMerge "$EXPECTED_AUTO_MERGE" \
+                '.canonicalBaseOid == $base and (.autoMergeEnabled|type)=="boolean" and .autoMergeEnabled == $autoMerge and (.isInMergeQueue|type)=="boolean" and .isInMergeQueue == false and (.mergeQueueEntryPresent|type)=="boolean" and .mergeQueueEntryPresent == false' <<<"$live_state" >/dev/null; then
+                detail='canonical base, auto-merge, or native merge queue changed before model spend'
+              else
+                eligible=true
+                outcome='model_required'
+                detail='live PR identity, holds, canonical base, auto-merge, and native queue revalidated immediately before FX spend'
+              fi
+            fi
+          fi
+          {
+            echo "eligible=$eligible"
+            echo "outcome=$outcome"
+            echo "detail=$detail"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Run pinned stronger-model FX with no executable tools
         id: model
-        if: steps.prepare.outputs.model_required == 'true'
+        if: steps.prepare.outputs.model_required == 'true' && steps.pre_spend_guard.outputs.eligible == 'true'
         continue-on-error: true
         env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          FX_AI_GATEWAY_API_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
+          PR_NUMBER: ${{ matrix.prNumber }}
           FX_AUTO_UPGRADE: '0'
           FX_DISABLE_KEYCHAIN: '1'
           FX_MAX_AGENT_STEPS: '12'
@@ -570,6 +722,11 @@ jobs:
           HOME: ${{ runner.temp }}/fx-home
         run: |
           set -euo pipefail
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$FX_HOSTED_REMEDIATION_CANARY_PR" != "$PR_NUMBER" ]]; then
+            echo "::error::Canary configuration changed before model invocation."
+            exit 1
+          fi
+          : "${FX_AI_GATEWAY_API_KEY:?FX_AI_GATEWAY_API_KEY is required; no fallback is configured}"
           test "$(fx --version)" = '0.0.7'
           fx permissions --json > "$RUNNER_TEMP/fx-permissions-before-ask.json"
           conflicts=$(jq -c '.conflictFiles' "$RUNNER_TEMP/conflict-fx-artifact/receipt.json")
@@ -594,7 +751,7 @@ jobs:
             )
           ' "$RUNNER_TEMP/fx-status-before-ask.json" >/dev/null
           prompt=$(<"$RUNNER_TEMP/conflict-fx-artifact/prompt.txt")
-          exec fx ask --json --no-save -- "$prompt" \
+          AI_GATEWAY_API_KEY="$FX_AI_GATEWAY_API_KEY" exec fx ask --json --no-save -- "$prompt" \
             > "$RUNNER_TEMP/conflict-fx-artifact/fx-result.json"
 
       - name: Package model result after credential scope ends
@@ -602,6 +759,9 @@ jobs:
         if: always()
         env:
           MODEL_STEP_OUTCOME: ${{ steps.model.outcome }}
+          LIVE_GUARD_ELIGIBLE: ${{ steps.pre_spend_guard.outputs.eligible }}
+          LIVE_GUARD_OUTCOME: ${{ steps.pre_spend_guard.outputs.outcome }}
+          LIVE_GUARD_DETAIL: ${{ steps.pre_spend_guard.outputs.detail }}
           FX_MODEL: openai/gpt-5.6-sol
           SOURCE_HEAD: ${{ matrix.headRefOid }}
         run: |
@@ -610,6 +770,17 @@ jobs:
           receipt="$artifact_dir/receipt.json"
           outcome=$(jq -r '.outcome' "$receipt")
           if [[ "$outcome" == 'model_required' ]]; then
+            if [[ "$LIVE_GUARD_ELIGIBLE" != 'true' ]]; then
+              outcome="${LIVE_GUARD_OUTCOME:-fx_suppressed_live_boundary}"
+              detail="${LIVE_GUARD_DETAIL:-live PR eligibility was not proven before model spend}"
+              jq --arg outcome "$outcome" --arg detail "$detail" \
+                '.observedModel="" | .outcome=$outcome | .detail=$detail' \
+                "$receipt" > "$receipt.next"
+              mv "$receipt.next" "$receipt"
+              echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+              rm "$artifact_dir/prompt.txt" 2>/dev/null || true
+              exit 0
+            fi
             observed_model=$(jq -r '.model // ""' "$artifact_dir/fx-result.json" 2>/dev/null || true)
             if [[ "$MODEL_STEP_OUTCOME" != 'success' ]]; then
               outcome='fx_failed'
@@ -837,7 +1008,7 @@ jobs:
             --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
             --workdir /workspace \
             'node:22.23.2-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d' \
-            bash -lc 'corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
+            bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
           verify_rc=$?
           set -e
           verified=false
@@ -918,6 +1089,8 @@ jobs:
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
           EXPECTED_MODEL: openai/gpt-5.6-sol
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           VERIFICATION_OUTCOME: ${{ steps.verification.outcome }}
@@ -929,6 +1102,10 @@ jobs:
           verification="$RUNNER_TEMP/conflict-fx-verification/verification.json"
           echo 'trusted=false' >> "$GITHUB_OUTPUT"
           echo 'deliverable=false' >> "$GITHUB_OUTPUT"
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$FX_HOSTED_REMEDIATION_CANARY_PR" != "$PR_NUMBER" ]]; then
+            echo "::notice::Canary configuration changed before writer authorization."
+            exit 0
+          fi
           if [[ "$CHECKOUT_OUTCOME" != 'success' || "$DOWNLOAD_OUTCOME" != 'success' || ! -f "$receipt" || ! -f "$patch" ]]; then
             exit 0
           fi
@@ -975,6 +1152,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
           BASE_HEAD: ${{ matrix.baseRefOid }}
@@ -992,6 +1171,10 @@ jobs:
           EXPECTED_AUTO_MERGE: ${{ matrix.autoMergeEnabled }}
         run: |
           set -euo pipefail
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || "$FX_HOSTED_REMEDIATION_CANARY_PR" != "$PR_NUMBER" ]]; then
+            echo "::notice::Canary configuration changed before delivery; refusing all writes."
+            exit 0
+          fi
           artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
           receipt="$artifact_dir/receipt.json"
           patch="$artifact_dir/repair.patch"
@@ -1175,7 +1358,7 @@ jobs:
 
           # Exact live identity is read immediately before the sole branch push.
           live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),baseRepo:.base.repo.full_name,headRepo:.head.repo.full_name,fork:.head.repo.fork,labels:(if (.labels|type)=="array" then [.labels[].name] else null end)}')
           # shellcheck disable=SC2016
           live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
             -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
@@ -1188,22 +1371,31 @@ jobs:
             -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
             -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
             --jq '.data.repository.pullRequest | {autoMergeEnabled:(.autoMergeRequest != null),isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
-          if ! jq -e --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
+          if ! jq -e --arg repo "$REPOSITORY" --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
             --argjson draft "$EXPECTED_DRAFT" --argjson autoMerge "$EXPECTED_AUTO_MERGE" \
-            '.state == "open" and .draft == $draft and .autoMerge == $autoMerge and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref' \
+            '.state == "open" and .draft == $draft and .autoMerge == $autoMerge and .baseRepo == $repo and .headRepo == $repo and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref and (.labels|type)=="array" and all(.labels[]; (type == "string") and ((ascii_downcase | IN("hold", "gated", "incident")) | not))' \
             <<<"$live" >/dev/null; then
             post_status "$SOURCE_HEAD" error failed
             echo "::notice::PR #$PR_NUMBER changed before delivery; refusing a stale push."
             exit 0
           fi
-          if jq -e '.isInMergeQueue == true or .mergeQueueEntryPresent == true' <<<"$queue_before" >/dev/null; then
+          if ! jq -e '.isInMergeQueue == false and .mergeQueueEntryPresent == false and (.autoMergeEnabled|type)=="boolean"' <<<"$queue_before" >/dev/null; then
             post_status "$SOURCE_HEAD" error failed
             echo "::notice::PR #$PR_NUMBER entered the native merge queue; refusing any head mutation."
             exit 0
           fi
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
-            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"
+          if git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push --force-with-lease="refs/heads/$HEAD_REF:$SOURCE_HEAD" \
+            "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"; then
+            :
+          else
+            push_rc=$?
+            if ! post_status "$SOURCE_HEAD" error failed; then
+              echo "::warning::Could not publish the failed conflict delivery status."
+            fi
+            exit "$push_rc"
+          fi
 
           live_after=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
@@ -1300,8 +1492,20 @@ jobs:
           QUEUED_CI: ${{ needs.plan.outputs.queued_ci }}
           BEFORE_REPORT: ${{ needs.plan.outputs.before_report }}
           FX_MATRIX: ${{ needs.plan.outputs.fx_matrix }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PAYLOAD_PATH: ${{ github.event_path }}
         run: |
           set -euo pipefail
+          if [[ "$FX_HOSTED_REMEDIATION_ENABLED" != 'true' || ! "$FX_HOSTED_REMEDIATION_CANARY_PR" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::notice::Canary configuration changed before cohort receipt; skipping persistence."
+            exit 0
+          fi
+          jq -e --argjson canary "$FX_HOSTED_REMEDIATION_CANARY_PR" '
+            type == "array" and length == 1 and
+            all(.[]; .prNumber == $canary and (.adaptiveCap | type == "number" and . >= 0 and . <= 1))
+          ' <<<"$FX_MATRIX" >/dev/null
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           receipt="$RUNNER_TEMP/conflict-fx-cohort.json"
           marker_file="$RUNNER_TEMP/conflict-fx-cohort-marker.txt"
@@ -1527,7 +1731,13 @@ jobs:
           # cohort unhealthy rather than inventing improvement.
           after_report="$BEFORE_REPORT"
           backlog=$(jq -r '.states.DIRTY // 0' <<<"$BEFORE_REPORT")
-          if node scripts/pr-conflict-handler.mjs --dry-run \
+          event_args=()
+          if [[ "$EVENT_NAME" == 'pull_request_target' ]]; then
+            test -n "$EVENT_PAYLOAD_PATH"
+            test -f "$EVENT_PAYLOAD_PATH"
+            event_args=(--event-payload-file "$EVENT_PAYLOAD_PATH")
+          fi
+          if node scripts/pr-conflict-handler.mjs --dry-run "${event_args[@]}" \
             --repo "$REPOSITORY" \
             --max-concurrent 40 \
             --runner-capacity "$RUNNER_CAPACITY" \

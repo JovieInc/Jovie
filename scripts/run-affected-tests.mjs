@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -228,10 +229,12 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/fx-remediation-lane.mjs',
   'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
@@ -245,6 +248,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
@@ -286,6 +290,8 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const OWNERLESS_RECOVERY_POLICY_TEST =
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -301,14 +307,16 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
-  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/pr-conflict-event.test.mjs',
   'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
   'scripts/lib/__tests__/github-merge-queue.test.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
   'scripts/lib/__tests__/design-exception-registry.test.mjs',
@@ -334,6 +342,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+  'scripts/lib/__tests__/product-lane-classifier.test.mjs',
   'scripts/lib/__tests__/production-lane-range.test.mjs',
   'scripts/lib/__tests__/preview-env-contract.test.mjs',
 ];
@@ -408,6 +417,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/pr-check-failures.mjs',
   'scripts/lib/upsert-pr-comment.sh',
@@ -425,10 +435,84 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
+const OWNERLESS_RECOVERY_COVERAGE_INPUTS = new Set([
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
+  'scripts/ownerless-recovery-sweeper.mjs',
+]);
+const OWNERLESS_RECOVERY_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=lib/ownerless-recovery-policy.mjs',
+  '--coverage.include=ownerless-recovery-sweeper.mjs',
+  '--coverage.thresholds.perFile=true',
+  '--coverage.thresholds.statements=60',
+  '--coverage.thresholds.lines=65',
+  '--coverage.thresholds.branches=60',
+  '--coverage.thresholds.functions=50',
+];
 const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
   'scripts/symphony/tests/test_evaluate_fleet_gate.py',
   'scripts/symphony/tests/test_fleet_admission_receipt.py',
   'scripts/tests/test_gh_retry.py',
+];
+const DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS = new Set([
+  '.github/workflows/dependabot-auto-merge.yml',
+  '.github/dependabot.yml',
+  'scripts/dependabot-update-policy.mjs',
+  'scripts/dependabot-workflow-run-adapter.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+]);
+const DEPENDABOT_AUTO_MERGE_LANE = new Set([
+  ...DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/tests/test_agent_workflow_hygiene.py',
+]);
+const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/native-merge-intent.test.mjs',
+  'scripts/lib/__tests__/source-admission-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-include=scripts/native-merge-intent.mjs',
+  '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
+  '--test-coverage-lines=95',
+];
+const DEPENDABOT_AUTO_MERGE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=dependabot-update-policy.mjs',
+  '--coverage.thresholds.lines=95',
+  '--coverage.thresholds.branches=90',
+  '--coverage.thresholds.functions=95',
+];
+const DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS = [
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-lines=95',
+  DEPENDABOT_AUTO_MERGE_NODE_TESTS[0],
+];
+const DEPENDABOT_POLICY_CONTROL_TEST_ARGS = [
+  'exec',
+  'vitest',
+  '--root',
+  'scripts',
+  '--config',
+  'vitest.config.mts',
+  'run',
+  'lib/__tests__/dependabot-update-policy.test.mjs',
+  ...DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
 ];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
@@ -779,6 +863,9 @@ const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
 ]);
 const NO_UNATTENDED_RED_LANE = new Set([
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/fleet-gate-refresh.yml',
@@ -809,10 +896,30 @@ const NO_UNATTENDED_RED_PYTEST_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 const NO_UNATTENDED_RED_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
+const RETOUCH_PROMPT_SOURCES = [
+  'components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
+  'lib/services/retouching/style.ts',
+  'lib/services/retouching/style-prompt.ts',
+];
+const RETOUCH_PROMPT_PROOFS = [
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.test.tsx',
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+  'apps/web/lib/services/retouching/style.test.ts',
+  'apps/web/tests/unit/app/admin-system-map.test.tsx',
+];
+const RETOUCH_PROMPT_LANE = new Set([
+  ...RETOUCH_PROMPT_SOURCES.map(file => `apps/web/${file}`),
+  ...RETOUCH_PROMPT_PROOFS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -1075,6 +1182,15 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+const VERCEL_DEPLOY_DIAGNOSTICS_PAIR = new Set([
+  '.github/scripts/vercel-prebuilt-deploy.sh',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+]);
+const VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR = new Set([
+  ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+
 export function buildAffectedTestPlan(
   changedFiles,
   { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
@@ -1082,6 +1198,68 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  // The shell wrapper's behavior is exercised by the existing Python CI
+  // suite. Admit only the complete pair, optionally with the complete local
+  // selector pair; unknown peers and unavailable proof retain full fallback.
+  const isExactDeployDiagnostics = [
+    VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+    VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR,
+  ].some(
+    manifest =>
+      files.length === manifest.size && files.every(file => manifest.has(file))
+  );
+  if (isExactDeployDiagnostics) {
+    if (
+      ![
+        ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: VERCEL_CONGESTION_CONTROL_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (
+    files.some(file =>
+      RETOUCH_PROMPT_SOURCES.some(source => file === `apps/web/${source}`)
+    )
+  ) {
+    if (
+      !files.every(file => RETOUCH_PROMPT_LANE.has(file)) ||
+      !RETOUCH_PROMPT_PROOFS.every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/summer-commissioning/company-registry.test.mjs',
+        'scripts/summer-commissioning/project-creation-policy.test.mjs',
+      ],
+      retouchPromptCoverage: true,
+    };
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1377,8 +1555,17 @@ export function buildAffectedTestPlan(
     files.some(file => NO_UNATTENDED_RED_PRIMARY_INPUTS.has(file)) &&
     files.every(file => NO_UNATTENDED_RED_LANE.has(file));
   if (isBoundedNoUnattendedRedChange) {
+    if (
+      ![
+        ...NO_UNATTENDED_RED_NODE_TESTS,
+        ...NO_UNATTENDED_RED_SCRIPT_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
     return {
       mode: 'selected',
+      deliveryControllerCoverage: true,
       relatedFiles: [],
       mandatoryTests: [],
       selectedTests: [],
@@ -1444,6 +1631,31 @@ export function buildAffectedTestPlan(
   const earlySelectorInputCount = files.filter(file =>
     AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
   ).length;
+  const dependabotAutoMergeInputCount = files.filter(file =>
+    DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS.has(file)
+  ).length;
+  const isBoundedDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 &&
+    files.every(file => DEPENDABOT_AUTO_MERGE_LANE.has(file)) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const hasIncompleteDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 && !isBoundedDependabotAutoMergeChange;
+  if (isBoundedDependabotAutoMergeChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: DEPENDABOT_AUTO_MERGE_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+      nodeTests: DEPENDABOT_AUTO_MERGE_NODE_TESTS,
+      nodeTestArgs: DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS,
+    };
+  }
   const mergeQueueControllerInputCount = files.filter(file =>
     MERGE_QUEUE_CONTROLLER_INPUTS.has(file)
   ).length;
@@ -1466,6 +1678,11 @@ export function buildAffectedTestPlan(
       pythonTests: MERGE_QUEUE_CONTROLLER_PYTHON_TESTS,
       pythonUnittestTests: [],
       scriptVitestTests: MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: files.some(file =>
+        OWNERLESS_RECOVERY_COVERAGE_INPUTS.has(file)
+      )
+        ? OWNERLESS_RECOVERY_COVERAGE_ARGS
+        : [],
       nodeTests: [],
     };
   }
@@ -2105,6 +2322,7 @@ export function buildAffectedTestPlan(
         !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
       hasUnboundedBacklogRemediationChange ||
+      hasIncompleteDependabotAutoMergeChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||
       hasIncompletePrerequisiteTrain ||
@@ -2350,8 +2568,110 @@ export function buildProjectCreationTestCommand() {
   ];
 }
 
-export function buildSelectedTestCommands(plan, maxWorkers) {
+export function buildControlCoverageCommands() {
+  const nativeCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    ...CI_CONTROL_SCRIPT_TESTS.filter(
+      file => file !== OWNERLESS_RECOVERY_POLICY_TEST
+    ).map(file => file.replace(/^scripts\//, '')),
+    '--coverage',
+    '--coverage.include=merge-queue-backend.mjs',
+    '--coverage.include=lib/merge-group-admission.mjs',
+    '--coverage.include=lib/merge-queue-guard.mjs',
+    '--coverage.include=lib/native-queue-group-evidence.mjs',
+    '--coverage.include=lib/native-queue-policy-evidence.mjs',
+    '--coverage.include=lib/native-queue-eval.mjs',
+    '--coverage.include=native-queue-eval.mjs',
+    '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/github-open-prs-rest.mjs',
+    '--coverage.include=lib/pr-conflict-event.mjs',
+    '--coverage.include=lib/pr-conflict-handler.mjs',
+    '--coverage.thresholds.perFile=true',
+    '--coverage.thresholds.lines=85',
+    '--coverage.thresholds.branches=75',
+    '--coverage.thresholds.functions=82',
+  ];
+  const ownerlessCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    OWNERLESS_RECOVERY_POLICY_TEST.replace(/^scripts\//, ''),
+    '--maxWorkers',
+    '1',
+    ...OWNERLESS_RECOVERY_COVERAGE_ARGS,
+  ];
+  return [
+    ['pnpm', nativeCoverageArgs],
+    ['pnpm', ownerlessCoverageArgs],
+  ];
+}
+
+export function buildSelectedTestCommands(
+  plan,
+  maxWorkers,
+  base = 'origin/main',
+  head
+) {
   const commands = [];
+  if (plan.deliveryControllerCoverage) {
+    commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
+  }
+  if (plan.retouchPromptCoverage) {
+    if (
+      ![base, head].every(
+        sha => typeof sha === 'string' && /^[a-f0-9]{40}$/.test(sha)
+      )
+    ) {
+      throw new Error('prompt coverage requires exact base and head SHAs');
+    }
+    // Keep the hosted changed-source runner and real browser story intact.
+    commands.push([
+      'env',
+      [
+        `JOVIE_COVERAGE_INCLUDE=${RETOUCH_PROMPT_SOURCES.join('\n')}`,
+        'pnpm',
+        '--filter',
+        '@jovie/web',
+        'test:coverage',
+        '--changed',
+        base,
+        '--bail',
+        '1',
+      ],
+    ]);
+    commands.push([
+      'node',
+      [
+        'scripts/check-changed-test-coverage.mjs',
+        '--base',
+        base,
+        '--head',
+        head,
+      ],
+    ]);
+    commands.push([
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        '--config=vitest.config.storybook.mts',
+        'components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+      ],
+    ]);
+  }
   if ((plan.nodeTests || []).length > 0) {
     const companyTest =
       'scripts/summer-commissioning/company-registry.test.mjs';
@@ -2365,7 +2685,10 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
       file => file !== companyTest && file !== projectTest
     );
     if (otherTests.length > 0)
-      commands.push(['node', ['--test', ...otherTests]]);
+      commands.push([
+        'node',
+        [...(plan.nodeTestArgs || []), '--test', ...otherTests],
+      ]);
   }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([
@@ -2381,6 +2704,7 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
         ...plan.scriptVitestTests.map(file => file.replace(/^scripts\//, '')),
         '--maxWorkers',
         maxWorkers,
+        ...(plan.scriptVitestCoverageArgs || []),
       ],
     ]);
   }
@@ -2459,48 +2783,62 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   ];
 }
 
+export function buildControlTestCommands() {
+  return [
+    buildCompanyRegistryTestCommand(),
+    buildProjectCreationTestCommand(),
+    ...buildControlCoverageCommands(),
+    ['node', DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS],
+    ['pnpm', DEPENDABOT_POLICY_CONTROL_TEST_ARGS],
+    // The event test also executes the CLI entrypoint in-process. Its broad
+    // manual fleet path predates this slice, so enforce the measured CLI
+    // subset separately from the new event validator's per-file 85/75/82 gate.
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/pr-conflict-event.test.mjs',
+        '--coverage',
+        '--coverage.include=pr-conflict-handler.mjs',
+        '--coverage.thresholds.lines=55',
+        '--coverage.thresholds.branches=60',
+        '--coverage.thresholds.functions=65',
+      ],
+    ],
+    [
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
+        '--maxWorkers',
+        '1',
+      ],
+    ],
+  ];
+}
+
+export async function runControlTestCommands(execute = runCommandStatus) {
+  for (const [command, args] of buildControlTestCommands()) {
+    const status = await execute(command, args);
+    if (status !== 0) return status;
+  }
+  return 0;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
-    const companyStatus = await runCommandStatus(
-      ...buildCompanyRegistryTestCommand()
-    );
-    if (companyStatus !== 0) process.exit(companyStatus);
-    const projectStatus = await runCommandStatus(
-      ...buildProjectCreationTestCommand()
-    );
-    if (projectStatus !== 0) process.exit(projectStatus);
-    await runCommand('pnpm', [
-      'exec',
-      'vitest',
-      '--root',
-      'scripts',
-      ...['--config', 'vitest.config.mts'],
-      'run',
-      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
-      '--coverage',
-      '--coverage.include=merge-queue-backend.mjs',
-      '--coverage.include=lib/merge-group-admission.mjs',
-      '--coverage.include=lib/merge-queue-guard.mjs',
-      '--coverage.include=lib/native-queue-group-evidence.mjs',
-      '--coverage.include=lib/native-queue-policy-evidence.mjs',
-      '--coverage.include=lib/native-queue-eval.mjs',
-      '--coverage.include=**/scripts/native-queue-eval.mjs',
-      '--coverage.thresholds.perFile=true',
-      '--coverage.thresholds.lines=85',
-      '--coverage.thresholds.branches=75',
-      '--coverage.thresholds.functions=82',
-    ]);
-    await runCommand('pnpm', [
-      '--filter',
-      '@jovie/web',
-      'exec',
-      'vitest',
-      'run',
-      ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
-      '--maxWorkers',
-      '1',
-    ]);
+    process.exit(await runControlTestCommands());
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
@@ -2547,9 +2885,25 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     });
   }
 
-  await runCommands(buildSelectedTestCommands(plan, maxWorkers), 1, {
-    timeoutMs: shardTimeoutMs,
-    progressIntervalMs,
-    labelPrefix: 'selected',
-  });
+  const coverageBase = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', `${base}^{commit}`], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : base;
+  const coverageHead = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : undefined;
+  await runCommands(
+    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+    1,
+    {
+      timeoutMs: shardTimeoutMs,
+      progressIntervalMs,
+      labelPrefix: 'selected',
+    }
+  );
 }

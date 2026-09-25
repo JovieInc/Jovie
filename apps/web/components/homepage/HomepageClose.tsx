@@ -3,9 +3,15 @@
 
 import { Button } from '@jovie/ui/atoms/button';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
+import {
+  HOMEPAGE_CERTIFIED_CONTEXT,
+  HOMEPAGE_CERTIFIED_EVENTS,
+} from '@/data/homepageCertifiedOptimization';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { HomepagePrimaryAction } from './HomepagePrimaryAction';
 
-/** Saved canonical K4ar1: one focus-only action returns to the hero search. */
+/** The gated close requests access; the open-state action returns to search. */
 export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
 
@@ -32,15 +38,28 @@ export function HomepageClose() {
           {close.headline}
         </h2>
         <div className='homepage-close__actions'>
-          <Button
-            type='button'
-            size='marketing'
-            variant='primary'
-            onClick={focusProfileSearch}
-            data-testid='homepage-close-cta'
-          >
-            {close.action}
-          </Button>
+          {FEATURE_FLAGS.WAITLIST_ENABLED ? (
+            <HomepagePrimaryAction
+              submitTestId='homepage-close-cta'
+              submitAnalytics={{
+                eventName: HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
+                properties: {
+                  ...HOMEPAGE_CERTIFIED_CONTEXT,
+                  placement: 'close',
+                },
+              }}
+            />
+          ) : (
+            <Button
+              type='button'
+              size='marketing'
+              variant='primary'
+              onClick={focusProfileSearch}
+              data-testid='homepage-close-cta'
+            >
+              {close.action}
+            </Button>
+          )}
         </div>
       </div>
     </MarketingCtaSection>

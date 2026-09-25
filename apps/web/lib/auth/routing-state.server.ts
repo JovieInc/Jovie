@@ -105,11 +105,11 @@ function unsealVerificationValue(
 
 /**
  * Auth routing is a security-critical login dependency, not a cache. Keep its
- * short-lived one-time records in Better Auth's existing Postgres-backed
- * verification store so a Redis quota or network outage can shed analytics
- * without blocking sign-in. The verification adapter provides atomic consume
- * semantics, and secondary-storage deliberately bypasses Redis for every
- * `verification:` key.
+ * short-lived one-time records in Better Auth's Postgres verification store
+ * so a Redis quota or network outage can shed rate-limit counters without
+ * blocking sign-in. The verification adapter provides atomic consume
+ * semantics. Sessions are Postgres rows plus the cookie cache; Redis is not
+ * in that path.
  */
 async function createVerificationRecord(
   identifier: string,

@@ -37,6 +37,19 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/backlog-orchestrator/delivery-state-machine.mjs',
+  '--test-coverage-include=scripts/backlog-orchestrator/no-unattended-red.mjs',
+  '--test-coverage-lines=89',
+  '--test-coverage-branches=78',
+  '--test-coverage-functions=95',
+  'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+]);
+export const DELIVERY_CONTROLLER_COVERAGE_COMMAND = `node ${DELIVERY_CONTROLLER_COVERAGE_ARGS.join(' ')}`;
+
 export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
@@ -52,8 +65,12 @@ export const BILLING_COVERAGE_COMMAND = Object.freeze(
 );
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
-export const RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-wave-admission.test.mjs --coverage --coverage.allowExternal --coverage.include=release-wave-admission.mjs --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80';
+const SCREENSHOT_CATALOG_CONTRACT_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+export const ROUTE_PREP_COVERAGE_COMMAND =
+  'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
+const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -260,13 +277,14 @@ function shell(command, opts = {}) {
   };
 }
 
-function changedFiles(patterns) {
+/** @param {readonly string[]} patterns */
+export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   let diffBase = 'HEAD^1';
   if (event === 'pull_request') {
     const base = process.env.GITHUB_BASE_REF || 'main';
     // Prefer origin/<base> when available (fetch done by workflow).
-    const probe = shell(`git rev-parse --verify origin/${base}`);
+    const probe = shell(`git rev-parse --verify origin/${base}`, { cwd });
     diffBase =
       probe.code === 0
         ? `origin/${base}`
@@ -275,9 +293,14 @@ function changedFiles(patterns) {
     diffBase = process.env.TURBO_SCM_BASE;
   }
 
+  // A PR diff starts at its merge base; main-only updates are not PR changes.
+  // Combined-head and push checks retain their exact two-tree comparison.
+  const range =
+    event === 'pull_request' ? `${diffBase}...HEAD` : `${diffBase} HEAD`;
   const pathspecs = patterns.map(p => `'${p}'`).join(' ');
   const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD -- ${pathspecs}`
+    `git diff --diff-filter=ACDMRT --name-only ${range} -- ${pathspecs}`,
+    { cwd }
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).
@@ -368,27 +391,8 @@ export function runBillingCoverage() {
   return { code: 0, output: combined };
 }
 
-function listAllChangedFiles() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  let diffBase = 'HEAD^1';
-  if (event === 'pull_request') {
-    const base = process.env.GITHUB_BASE_REF || 'main';
-    const probe = shell(`git rev-parse --verify origin/${base}`);
-    diffBase =
-      probe.code === 0
-        ? `origin/${base}`
-        : process.env.TURBO_SCM_BASE || diffBase;
-  } else if (process.env.TURBO_SCM_BASE) {
-    diffBase = process.env.TURBO_SCM_BASE;
-  }
-  const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD`
-  );
-  if (result.code !== 0) return null;
-  return result.output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+export function listAllChangedFiles(cwd = REPO_ROOT) {
+  return changedFiles([], cwd);
 }
 
 let cachedRepoLanes = null;
@@ -412,6 +416,33 @@ function excerpt(text, max = 1200) {
   const trimmed = (text || '').trim();
   if (trimmed.length <= max) return trimmed;
   return `…${trimmed.slice(-max)}`;
+}
+
+/** Keep only registered pytest identities; assertion bodies are not diagnostic labels. */
+function structuralFailureExcerpt(command, output, index, count, code) {
+  const pytestArgs = /\bpython3 -m pytest\s+([^;&]+)/u.exec(command)?.[1] || '';
+  const targets = new Set(
+    pytestArgs
+      .split(/\s+/u)
+      .filter(path => /^scripts\/[\w./-]+\.py$/u.test(path))
+  );
+  const identities = new Set();
+  for (const line of output.split('\n')) {
+    const match =
+      /^FAILED (scripts\/[\w./-]+\.py)::([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)(?=\[| - |$)/u.exec(
+        line
+      );
+    if (!match || !targets.has(match[1])) continue;
+    const identity = `FAILED ${match[1]}::${match[2]}`;
+    if (identity.length > 200) continue;
+    identities.add(identity);
+    if (identities.size === 3) break;
+  }
+  const header = [
+    `Structural command ${index + 1}/${count} failed (exit ${code}).`,
+    ...identities,
+  ].join('\n');
+  return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
 
 function runBiome() {
@@ -710,7 +741,9 @@ function runProfileAdmission() {
   return shell(LANE_COMMANDS['profile-admission']);
 }
 
-function runStructural() {
+/** @param {{changedFileList?: readonly string[], execute?: (command: string) => {code: number, output: string}}} [opts] */
+export function runStructural(opts = {}) {
+  const execute = opts.execute ?? shell;
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
     return {
       code: 0,
@@ -721,7 +754,10 @@ function runStructural() {
 
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch') {
-    const lanes = repoLanes();
+    const lanes =
+      opts.changedFileList === undefined
+        ? repoLanes()
+        : classifyCiRepoLanes(opts.changedFileList);
     if (!lanes.runJovieProduct && !lanes.runSymphonyControl) {
       return {
         code: 0,
@@ -734,6 +770,8 @@ function runStructural() {
 
   const selected = selectedProductLanes();
   const operationsParts = [
+    ROUTE_PREP_COVERAGE_COMMAND,
+    DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
@@ -742,7 +780,6 @@ function runStructural() {
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs',
-    RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -759,7 +796,6 @@ function runStructural() {
     'python3 scripts/symphony/tests/run-safe-restart-gate.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage run --branch scripts/symphony/tests/upstream-burrito-payload.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage report --include="*/scripts/symphony/verify_upstream_burrito_payload.py" --show-missing --precision=2 --fail-under=90',
-    'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
     'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
     'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
@@ -785,7 +821,7 @@ function runStructural() {
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [
@@ -828,6 +864,9 @@ function runStructural() {
   const parts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
+          SCREENSHOT_CATALOG_CONTRACT_COMMAND,
+          STRUCTURAL_RUNNER_COVERAGE_COMMAND,
+          'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
         ]
       : []),
@@ -844,11 +883,20 @@ function runStructural() {
   }
 
   let combined = '';
-  for (const cmd of parts) {
-    const result = shell(cmd);
+  for (const [index, cmd] of parts.entries()) {
+    const result = execute(cmd);
     combined += result.output;
     if (result.code !== 0) {
-      return { code: result.code, output: combined };
+      return {
+        code: result.code,
+        output: structuralFailureExcerpt(
+          cmd,
+          result.output,
+          index,
+          parts.length,
+          result.code
+        ),
+      };
     }
   }
   return { code: 0, output: combined };
@@ -860,7 +908,10 @@ function annotateFailure(lane, logExcerpt) {
   console.error(`::error title=${lane.name}::${msg}`);
   if (logExcerpt) {
     // Keep annotation body short; full log is in the step output.
-    const short = logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
+    const short =
+      lane.id === 'structural' && logExcerpt.startsWith('Structural command ')
+        ? logExcerpt.split('\n\n')[0].replaceAll('\n', ' | ').slice(0, 400)
+        : logExcerpt.split('\n').slice(-8).join(' | ').slice(0, 400);
     console.error(`::error::${short}`);
   }
 }

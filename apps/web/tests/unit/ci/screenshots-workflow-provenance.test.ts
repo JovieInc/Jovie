@@ -80,6 +80,44 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(workflow).toContain("- 'apps/web/tests/visual-qa/**'");
   });
 
+  it('checks production public exports before catalog capture', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const serving = getStepBlock(
+      workflow,
+      'Verify public screenshot exports from production build'
+    );
+
+    expect(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    ).toBeLessThan(stepIndex(workflow, 'Capture screenshot catalog'));
+    expect(serving).toContain(
+      'tests/product-screenshots/public-export-serving.spec.ts'
+    );
+    expect(serving).toContain('--config=playwright.config.screenshots.ts');
+    expect(serving).toContain('--project=screenshots');
+    expect(serving).toContain('BASE_URL: http://localhost:3000');
+    expect(serving).toContain('SCREENSHOT_BUILD_MODE: production');
+  });
+
+  it('reruns when the screenshot producer or safe transport changes', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const producerPath of [
+      '.github/actions/upload-safe-playwright-artifact/**',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      '.github/workflows/screenshots.yml',
+      'apps/web/scripts/check-screenshot-catalog.ts',
+      'apps/web/scripts/png-optimization.ts',
+      'apps/web/scripts/stage-screenshot-catalog-transfer.ts',
+      'apps/web/scripts/sync-screenshot-public-export.ts',
+    ]) {
+      expect(workflow).toContain(`- '${producerPath}'`);
+    }
+  });
+
   it('certifies uploaded marketing captures through the trusted shipping gate', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const upload = getStepBlock(
@@ -189,7 +227,13 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(publishStart).toBeGreaterThan(generateStart);
     expect(certifyStart).toBeGreaterThan(publishStart);
     expect(generate).toContain('name: Generate Screenshots');
+    expect(generate).toContain(
+      'name: Stage generated screenshot catalog for transfer'
+    );
     expect(generate).toContain('Upload generated screenshot catalog');
+    expect(generate).toMatch(
+      /name: Upload generated screenshot catalog[\s\S]*?path: \.artifacts\/screenshot-catalog-transfer\//
+    );
     expect(generate).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(generate).not.toContain('Create or update screenshot PR');
     expect(publish).toContain('name: Publish Screenshot Catalog');
@@ -197,7 +241,7 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(publish).toContain('continue-on-error: true');
     expect(publish).toContain('Download generated screenshot catalog');
     expect(publish).toMatch(
-      /name: Download generated screenshot catalog[\s\S]*?path: apps\/web/
+      /name: Download generated screenshot catalog[\s\S]*?path: \./
     );
     expect(publish).toContain('Create or update screenshot PR');
     expect(publish).toContain('JOVIE_BOT_PRIVATE_KEY');

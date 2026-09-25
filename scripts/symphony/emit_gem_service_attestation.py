@@ -35,6 +35,11 @@ SURFACES = {
     "workflow": "scripts/symphony/WORKFLOW.md",
 }
 BOUNDED_PROFILE = "scripts/symphony/profiles/governor-bounded"
+CODEX_PROFILE = "scripts/symphony/profiles/governor-bounded-codex"
+CODEX_IN_COMMAND = "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server"
+CODEX_OUT_COMMAND = "command: /usr/bin/false"
+OPERATOR_PROFILES = ("canonical", "governor-bounded", "governor-bounded-codex")
+BOUNDED_CODEX = {"governor-bounded": "out", "governor-bounded-codex": "in"}
 BOUNDED_OVERRIDES = {
     "90-symphony-safe-restart-guard.conf", "build-pin.conf",
     "cursor-executable.conf", "summer-bottleneck-signing.conf", "governor-restricted.conf",
@@ -260,8 +265,33 @@ def compare_source(root: Path, revision: str, relative: str, installed: Path) ->
             "matches": expected is not None and expected == actual}
 
 
+def codex_posture(text: str) -> str:
+    has_in = CODEX_IN_COMMAND in text
+    has_out = CODEX_OUT_COMMAND in text
+    if has_in and not has_out:
+        return "in"
+    if has_out and not has_in:
+        return "out"
+    return "invalid"
+
+
+def profile_paths(profile: str) -> tuple[str, str]:
+    """Workflow path plus the drop-in directory attested for this profile.
+
+    governor-bounded-codex reuses the reviewed governor-bounded drop-ins.
+    Installing the workflow does not require a second drop-in pin.
+    """
+    if profile == "canonical":
+        return SURFACES["workflow"], "scripts/symphony/systemd/symphony-elixir.service.d"
+    if profile == "governor-bounded":
+        return BOUNDED_PROFILE + "/WORKFLOW.md", BOUNDED_PROFILE + "/systemd"
+    if profile == "governor-bounded-codex":
+        return CODEX_PROFILE + "/WORKFLOW.md", BOUNDED_PROFILE + "/systemd"
+    raise ValueError("unknown operator-selected configuration profile")
+
+
 def compare_workflow(root: Path, revision: str, installed: Path, profile: str = "canonical") -> dict:
-    relative = SURFACES["workflow"] if profile == "canonical" else BOUNDED_PROFILE + "/WORKFLOW.md"
+    relative, _dropins = profile_paths(profile)
     result = compare_source(root, revision, relative, installed)
     source = source_bytes(root, revision, relative).decode()
     target = installed.read_text()
@@ -270,19 +300,25 @@ def compare_workflow(root: Path, revision: str, installed: Path, profile: str = 
     before, after = list(pattern.finditer(source)), list(pattern.finditer(target))
     same = (len(before) == len(after) == 1 and
             pattern.sub(r"\1<runtime>\3", source) == pattern.sub(r"\1<runtime>\3", target))
-    if profile == "governor-bounded":
-        same = same and int(after[0].group(2)) <= int(before[0].group(2))
+    if profile in BOUNDED_CODEX:
+        same = (same and int(after[0].group(2)) <= int(before[0].group(2))
+                and codex_posture(source) == BOUNDED_CODEX[profile]
+                and codex_posture(target) == BOUNDED_CODEX[profile])
+        if profile == "governor-bounded-codex" and not (len(before) == 1 and int(before[0].group(2)) == 5):
+            same = False
     result.update(matches=same, matchMode="exact" if same and source == target else
                   "bounded_concurrency_overlay" if same else "invalid",
                   sourceMaxConcurrentAgents=int(before[0].group(2)) if len(before) == 1 else None,
                   installedMaxConcurrentAgents=int(after[0].group(2)) if len(after) == 1 else None)
+    if profile in BOUNDED_CODEX:
+        result["codex"] = BOUNDED_CODEX[profile] if same else codex_posture(target)
     return result
 
 
 def observe(provenance: Path, source_root: Path, source_revision: str,
             binary: Path, gem_root: Path, *, proc_root: Path = Path("/proc"),
             now: datetime | None = None, profile: str = "canonical") -> dict:
-    if profile not in {"canonical", "governor-bounded"}:
+    if profile not in OPERATOR_PROFILES:
         raise ValueError("unknown operator-selected configuration profile")
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None or not SHA.fullmatch(source_revision):
@@ -343,8 +379,7 @@ def observe(provenance: Path, source_root: Path, source_revision: str,
     overrides = []
     for name in fields.get("DropInPaths", "").split():
         path = Path(name)
-        directory = ("scripts/symphony/systemd/symphony-elixir.service.d" if profile == "canonical"
-                     else BOUNDED_PROFILE + "/systemd")
+        directory = profile_paths(profile)[1]
         relative = directory + "/" + path.name
         overrides.append({"name": path.name, **compare_source(source_root, source_revision, relative, path)})
     profile_complete = profile == "canonical" or {item["name"] for item in overrides} == BOUNDED_OVERRIDES
@@ -395,17 +430,47 @@ def publish(destination: Path, observe_once) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provenance", type=Path, required=True)
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--source-revision", required=True)
-    parser.add_argument("--profile", choices=("canonical", "governor-bounded"),
-                        default=os.environ.get("JOVIE_CONFIGURATION_PROFILE", "canonical"))
-    parser.add_argument("--binary", type=Path, default=Path.home() / ".local/bin/symphony")
+    parser.add_argument("--provenance", type=Path)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--source-revision")
+    parser.add_argument("--upstream-binding", type=Path)
+    parser.add_argument("--upstream-binding-sha256")
+    parser.add_argument("--profile", choices=OPERATOR_PROFILES)
+    parser.add_argument("--binary", type=Path)
     parser.add_argument("--gem-root", type=Path, default=Path.home() / "gem-workspace")
     parser.add_argument("--check", action="store_true", help="Observe without publishing")
     args = parser.parse_args()
-    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, args.binary, args.gem_root,
-                                  profile=args.profile)
+    upstream_requested = args.upstream_binding is not None or args.upstream_binding_sha256 is not None
+    if upstream_requested:
+        # The approved digest must come from outside the binding itself. Keep
+        # upstream preservation separate from the legacy healthy/admission file.
+        if (args.upstream_binding is None or args.upstream_binding_sha256 is None
+                or any(value is not None for value in (args.provenance, args.source_root,
+                    args.source_revision, args.profile, args.binary))):
+            print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                              "reason": "mixed-or-incomplete-observation-mode"}))
+            return 78
+        observe_once = lambda: observe_upstream_preservation(
+            args.upstream_binding, args.upstream_binding_sha256)
+        try:
+            receipt = observe_once() if args.check else publish(
+                args.gem_root / "state/symphony-upstream-preservation.json",
+                lambda: observe_with_retry(observe_once))
+            print(json.dumps(receipt, sort_keys=True))
+            return 0
+        except OBSERVATION_ERRORS as error:
+            print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                              "reason": "upstream-preservation-unverified",
+                              "failureReason": failure_reason(error)}))
+            return 78
+    if any(value is None for value in (args.provenance, args.source_root, args.source_revision)):
+        print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
+                          "reason": "legacy-observation-inputs-missing"}))
+        return 78
+    profile = args.profile or os.environ.get("JOVIE_CONFIGURATION_PROFILE", "canonical")
+    binary = args.binary or Path.home() / ".local/bin/symphony"
+    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, binary, args.gem_root,
+                                  profile=profile)
     try:
         receipt = observe_once() if args.check else publish(
             args.gem_root / "state/gem-service-attestation.json", lambda: observe_with_retry(observe_once))

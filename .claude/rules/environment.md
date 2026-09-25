@@ -20,7 +20,7 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 .\scripts\setup.ps1
 ```
 
-`setup.sh` is idempotent. It checks Node.js (22.x), pnpm (9.15.4), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+`setup.sh` is idempotent. It checks Node.js (22.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything else. Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
@@ -29,7 +29,7 @@ Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
 | **Node.js** | **22.x** (22.23.2+) | `.nvmrc`, `package.json` engines |
-| **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
+| **pnpm** | **9.15.9** (`packageManager`); engines `>=9.15.4 <10` | `package.json` |
 | **Turbo** | 2.8+ | Root devDependencies |
 
 AI agents frequently default to Node 18/20 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 22 LTS.
@@ -38,11 +38,11 @@ AI agents frequently default to Node 18/20 which **will fail** or cause subtle i
 
 ```bash
 node --version  # Expected: v22.23.2 or higher
-pnpm --version  # Expected: 9.15.4
+pnpm --version  # Expected: 9.15.9
 
 # If wrong:
 nvm use 22       # or: nvm install 22
-corepack enable && corepack prepare pnpm@9.15.4 --activate
+corepack enable && corepack prepare pnpm@9.15.9 --activate
 ```
 
 ## Common Mistakes
@@ -111,7 +111,7 @@ curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
 fnm install 22.23.2 && fnm use 22.23.2
-corepack enable && corepack prepare pnpm@9.15.4 --activate
+corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # 2. Doppler CLI
 apt-get update && apt-get install -y apt-transport-https ca-certificates curl gnupg
@@ -288,7 +288,7 @@ Mitigations (in priority order):
 
 ### "Command not found: pnpm"
 ```bash
-corepack enable && corepack prepare pnpm@9.15.4 --activate
+corepack enable && corepack prepare pnpm@9.15.9 --activate
 ```
 
 ### "Node version mismatch"

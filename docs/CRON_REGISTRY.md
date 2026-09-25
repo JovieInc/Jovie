@@ -32,6 +32,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Vercel Preview Cleanup` | (see workflow) | Terminal-event cleanup: cancels/deletes preview deployments for a closed PR's ref and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/vercel-preview-cleanup.yml` |
 | `Actions Cache GC` | `19 4 * * *` UTC | Evicts closed-ref, exact-key duplicate, and surplus `Linux-turbo-*` Actions caches. Keeps live pnpm/node/playwright caches on `main` and open PR refs unless unused and over budget. | `.github/workflows/actions-cache-gc.yml` |
 | `M2 Revenue-Path Canary` | `37 6 * * *` UTC + Production Controller `workflow_run` + manual / `workflow_call` | Daily + deploy-hook money-path probe: signed-out → claim → $199 Pro checkout → activation. Timestamped receipt; Slack + Linear with repro on red. Distinct from Canary Health Gate uptime. | `.github/workflows/m2-revenue-path-canary.yml` |
+| `Summer Eve pin check` | `*/30 * * * *` UTC + `workflow_dispatch` + pull request on pin files | Confirms the Jovie production pin is a READY production deployment of project `prj_LaVQva346cjp5XfrbAIIQUln7tPH` and warns when `summer.jov.ie` serves a different deployment. Skips with a notice when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is absent. | `.github/workflows/summer-eve-pin.yml` |
 
 ## Local Hermes Launchd Schedule
 

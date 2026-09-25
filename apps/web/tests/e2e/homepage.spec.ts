@@ -1,4 +1,5 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
   evaluateAcceptanceEvidence,
   evaluateRelationalGrid,
@@ -62,7 +63,7 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
   });
 
-  test('renders the editorial hero with the name search as the only control', async ({
+  test('renders the editorial hero with the configured primary action', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -79,14 +80,22 @@ test.describe('Homepage', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
-    const nameSearch = hero.getByPlaceholder('Search your name');
-    await expect(nameSearch).toBeVisible();
-    await expect(nameSearch).toHaveAccessibleName('Search your name');
-    await expect(
-      hero.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeEnabled();
-    await expect(hero.getByRole('link')).toHaveCount(0);
-    await expect(hero.getByRole('button')).toHaveCount(1);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        hero.getByRole('link', { name: 'Request access', exact: true })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+      await expect(hero.getByRole('combobox')).toHaveCount(0);
+      await expect(hero.getByRole('button')).toHaveCount(0);
+    } else {
+      const nameSearch = hero.getByPlaceholder('Search your name');
+      await expect(nameSearch).toBeVisible();
+      await expect(nameSearch).toHaveAccessibleName('Search your name');
+      await expect(
+        hero.getByRole('button', { name: 'Find me', exact: true })
+      ).toBeEnabled();
+      await expect(hero.getByRole('link')).toHaveCount(0);
+      await expect(hero.getByRole('button')).toHaveCount(1);
+    }
     await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
 
@@ -98,14 +107,16 @@ test.describe('Homepage', () => {
       (viewport?.height ?? 0) - 1
     );
 
-    const searchBox = await hero
-      .getByTestId('homepage-editorial-hero-search')
-      .boundingBox();
-    const inputBox = await hero
-      .getByPlaceholder('Search your name')
-      .boundingBox();
-    expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
-    expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
+    if (!FEATURE_FLAGS.WAITLIST_ENABLED) {
+      const searchBox = await hero
+        .getByTestId('homepage-editorial-hero-search')
+        .boundingBox();
+      const inputBox = await hero
+        .getByPlaceholder('Search your name')
+        .boundingBox();
+      expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
+      expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
+    }
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -116,7 +127,7 @@ test.describe('Homepage', () => {
     await expect(header).toBeVisible();
     await expect(header).toHaveAttribute(
       'data-presentation',
-      'marketing-glass'
+      'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
     await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
@@ -145,7 +156,7 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Get started' })
+      header.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -424,7 +435,7 @@ test.describe('Homepage', () => {
     expect(hydrationErrors).toEqual([]);
   });
 
-  test('locks the nine certified sections, their order, heading lines, and CLS', async ({
+  test('locks current editorial sections, action states, heading lines, and CLS', async ({
     page,
     browserName,
   }) => {
@@ -447,13 +458,9 @@ test.describe('Homepage', () => {
 
     const sectionIds = [
       'marketing-section-hero',
-      'marketing-section-logo-cloud',
       'homepage-section-connected',
-      'homepage-section-found',
-      'homepage-section-know',
       'homepage-section-relationships',
-      'homepage-section-smarter',
-      'homepage-section-built',
+      'homepage-editorial-changelog',
       'homepage-close',
     ];
     const sectionTops = await page.evaluate(
@@ -471,102 +478,35 @@ test.describe('Homepage', () => {
     expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
 
-    const heroToProofBoundary = await page.evaluate(() => {
-      const hero = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-hero"]'
-      );
-      const stack = document.querySelector<HTMLElement>(
-        '[data-testid="homepage-story-stack"]'
-      );
-      const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-logo-cloud"]'
-      );
-      if (!(hero && stack && proofSection)) return null;
-      return {
-        gap:
-          stack.getBoundingClientRect().top -
-          hero.getBoundingClientRect().bottom,
-        proofOffset:
-          proofSection.getBoundingClientRect().top -
-          stack.getBoundingClientRect().top,
-      };
-    });
-    expect(heroToProofBoundary).not.toBeNull();
-    expect(heroToProofBoundary?.gap).toBeGreaterThanOrEqual(0);
-    expect(heroToProofBoundary?.gap).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
-    ).toBeLessThanOrEqual(1);
-
-    // Section 2 retains verified logos on the page
-    // background, never a frosted card.
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(
-      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
-    ).toHaveCount(0);
-    await expect(
-      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
-    ).toBeVisible();
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
+    await expect(page.getByTestId('marketing-section-logo-cloud')).toHaveCount(
+      0
     );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-    await expect(proof.locator('svg')).toHaveCount(4);
-
-    // Locked section copy, verbatim.
-    for (const [id, headline, body] of [
-      [
-        'connected',
-        'Everything about you, connected.',
-        'Your work, links, story, and presence—organized into one living profile.',
-      ],
-      [
-        'found',
-        'Be found. Be understood.',
-        'Share the right version of you, legible wherever people want to know how you can help.',
-      ],
-      [
-        'know',
-        'Know who cares.',
-        'See who is paying attention, what brought them to you, and what they may want next.',
-      ],
-      [
-        'relationships',
-        'Turn attention into relationships.',
-        'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-      ],
-      [
-        'smarter',
-        'A presence that gets smarter.',
-        'Every interaction improves what you know, what you show, and what you do next.',
-      ],
-      [
-        'built',
-        'Built around who you are.',
-        'Jovie adapts to your work without reducing you to a category.',
-      ],
-    ] as const) {
-      const section = page.locator(
-        `[data-homepage-testid="homepage-section-${id}"]`
-      );
-      await expect(
-        section.getByRole('heading', { level: 2, name: headline })
-      ).toBeVisible();
-      await expect(section.getByText(body)).toBeVisible();
-    }
-
-    // Real product exports load at device quality where they appear.
     const connected = page.locator(
       '[data-homepage-testid="homepage-section-connected"]'
     );
+    await connected.scrollIntoViewIfNeeded();
+    await expect(
+      connected.getByRole('heading', {
+        name: 'Everything about you, connected.',
+      })
+    ).toBeVisible();
+    await expect(
+      connected.getByText('IDENTITY, ACROSS THE INTERNET')
+    ).toBeVisible();
+    await expect(
+      connected.getByText(
+        'Your work and story are scattered across the internet. Your identity should be easier to see.'
+      )
+    ).toBeVisible();
+    // The identity artwork remains editorial rather than a profile screenshot.
     await connected.scrollIntoViewIfNeeded();
     await expect(connected.locator('img')).toHaveCount(1);
     const relationships = page.locator(
       '[data-homepage-testid="homepage-section-relationships"]'
     );
     await relationships.scrollIntoViewIfNeeded();
-    await expect(relationships.locator('img')).toHaveCount(3);
+    await expect(relationships.locator('img')).toHaveCount(0);
+    await expect(relationships.getByRole('listitem')).toHaveCount(3);
     const exportSelector =
       '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
@@ -578,18 +518,25 @@ test.describe('Homepage', () => {
     );
     const exportQuality = await page
       .locator(exportSelector)
-      .evaluateAll(elements =>
-        elements.map(element => {
-          const img = element as HTMLImageElement;
-          const rect = img.getBoundingClientRect();
-          return {
-            alt: img.alt,
-            naturalWidth: img.naturalWidth,
-            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-          };
-        })
+      .evaluateAll(async elements =>
+        Promise.all(
+          elements.map(async element => {
+            const img = element as HTMLImageElement;
+            const rect = img.getBoundingClientRect();
+            // Responsive srcset naturalWidth is density-corrected. Decode the
+            // selected resource separately to measure its actual pixel width.
+            const resource = new Image();
+            resource.src = img.currentSrc;
+            await resource.decode();
+            return {
+              alt: img.alt,
+              naturalWidth: resource.naturalWidth,
+              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+            };
+          })
+        )
       );
-    expect(exportQuality).toHaveLength(4);
+    expect(exportQuality).toHaveLength(1);
     for (const image of exportQuality) {
       expect(
         image.naturalWidth,
@@ -597,20 +544,22 @@ test.describe('Homepage', () => {
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
 
-    // Section 9 repeats the name search; CTA is Find me, never Search.
     const close = page.getByTestId('marketing-section-cta');
     await close.scrollIntoViewIfNeeded();
     await expect(
-      close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
+      close.getByRole('heading', { name: 'Take control of your presence.' })
     ).toBeVisible();
-    await expect(close.getByText('Start with your name.')).toBeVisible();
-    await expect(close.getByPlaceholder('Search your name')).toBeVisible();
-    await expect(
-      close.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeEnabled();
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        close.getByRole('link', { name: 'Request access' })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    } else {
+      await close.getByRole('button', { name: 'Find your profile' }).click();
+      await expect(page.getByPlaceholder('Search your name')).toBeFocused();
+    }
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(FEATURE_FLAGS.WAITLIST_ENABLED ? 0 : 1);
     await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
     await expect(page.getByText('Get started')).toHaveCount(0);
     await expect(page.getByText('Drop more music')).toHaveCount(0);
@@ -649,7 +598,7 @@ test.describe('Homepage', () => {
           );
         })
       );
-      expect(headingLines).toHaveLength(8);
+      expect(headingLines).toHaveLength(4);
       await expect
         .poll(async () =>
           Math.max(
@@ -786,26 +735,28 @@ test.describe('Homepage', () => {
           Number.parseFloat(style.paddingRight)
         );
       }),
-      search.locator('.homepage-name-search').evaluate(element => {
-        const field = element.querySelector<HTMLElement>(
-          '.homepage-name-search__field'
-        );
-        const glow = element.querySelector<HTMLElement>(
-          '.input-aura-frame__illumination'
-        );
-        if (!(field && glow)) return null;
-        const fieldBounds = field.getBoundingClientRect();
-        const glowBounds = glow.getBoundingClientRect();
-        const glowStyle = getComputedStyle(glow);
-        return {
-          fieldLeft: fieldBounds.left,
-          fieldRight: fieldBounds.right,
-          glowLeft: glowBounds.left,
-          glowRight: glowBounds.right,
-          glowMaskComposite: glowStyle.maskComposite,
-          glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
-        };
-      }),
+      FEATURE_FLAGS.WAITLIST_ENABLED
+        ? Promise.resolve(null)
+        : search.locator('.homepage-name-search').evaluate(element => {
+            const field = element.querySelector<HTMLElement>(
+              '.homepage-name-search__field'
+            );
+            const glow = element.querySelector<HTMLElement>(
+              '.input-aura-frame__illumination'
+            );
+            if (!(field && glow)) return null;
+            const fieldBounds = field.getBoundingClientRect();
+            const glowBounds = glow.getBoundingClientRect();
+            const glowStyle = getComputedStyle(glow);
+            return {
+              fieldLeft: fieldBounds.left,
+              fieldRight: fieldBounds.right,
+              glowLeft: glowBounds.left,
+              glowRight: glowBounds.right,
+              glowMaskComposite: glowStyle.maskComposite,
+              glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
+            };
+          }),
     ]);
 
     expect(searchBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -815,20 +766,26 @@ test.describe('Homepage', () => {
     expect(searchBounds?.width ?? 0).toBeGreaterThanOrEqual(
       viewportWidth - heroInlinePadding - 1
     );
-    expect(searchMaterial).not.toBeNull();
-    expect(searchMaterial?.glowLeft).toBeCloseTo(
-      searchMaterial?.fieldLeft ?? Number.NaN,
-      0
-    );
-    expect(searchMaterial?.glowRight).toBeCloseTo(
-      searchMaterial?.fieldRight ?? Number.NaN,
-      0
-    );
-    expect(
-      searchMaterial?.glowMaskComposite === 'exclude' ||
-        searchMaterial?.glowWebkitMaskComposite === 'xor' ||
-        searchMaterial?.glowWebkitMaskComposite === 'XOR'
-    ).toBe(true);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      await expect(
+        search.getByRole('link', { name: 'Request access' })
+      ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    } else {
+      expect(searchMaterial).not.toBeNull();
+      expect(searchMaterial?.glowLeft).toBeCloseTo(
+        searchMaterial?.fieldLeft ?? Number.NaN,
+        0
+      );
+      expect(searchMaterial?.glowRight).toBeCloseTo(
+        searchMaterial?.fieldRight ?? Number.NaN,
+        0
+      );
+      expect(
+        searchMaterial?.glowMaskComposite === 'exclude' ||
+          searchMaterial?.glowWebkitMaskComposite === 'xor' ||
+          searchMaterial?.glowWebkitMaskComposite === 'XOR'
+      ).toBe(true);
+    }
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -851,7 +808,7 @@ test.describe('Homepage', () => {
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+      mobileNav.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -1088,28 +1045,52 @@ test.describe('Homepage', () => {
         };
       });
 
-    const heroSearch = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    // K4ar1 closing owns one focus-only action; the hero field is the sole
-    // search surface, so a duplicated close-search node must stay absent.
-    expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
-    expect(heroSearch).not.toBeNull();
-    expect(heroSearch?.treatment).toBe('editorial');
-    expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
+    if (FEATURE_FLAGS.WAITLIST_ENABLED) {
+      const actions = page.locator('.homepage-request-access a');
+      await expect(actions).toHaveCount(2);
+      for (const action of await actions.all()) {
+        await expect(action).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+        await expect(action).toHaveAttribute('data-size', 'marketing');
+      }
+      for (const width of [1440, 768, 375]) {
+        await page.setViewportSize({ width, height: 900 });
+        const action = await page
+          .getByTestId('homepage-primary-cta')
+          .boundingBox();
+        const copy = await page
+          .locator('.homepage-editorial-hero__copy')
+          .boundingBox();
+        expect(action).not.toBeNull();
+        expect(copy).not.toBeNull();
+        expect(
+          Math.abs(action!.x + action!.width / 2 - (copy!.x + copy!.width / 2))
+        ).toBeLessThanOrEqual(1);
+      }
+      await expect(page.getByRole('combobox')).toHaveCount(0);
+    } else {
+      const heroSearch = await measureSearch(
+        '[data-testid="homepage-editorial-hero-search"]'
+      );
+      // K4ar1 closing owns one focus-only action; the hero field is the sole
+      // search surface, so a duplicated close-search node must stay absent.
+      expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
+      expect(heroSearch).not.toBeNull();
+      expect(heroSearch?.treatment).toBe('editorial');
+      expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
+      expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
+      expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
 
-    const input = page
-      .getByTestId('homepage-editorial-hero-search')
-      .getByRole('combobox');
-    const idleBackground = heroSearch?.fieldBackground;
-    await input.focus();
-    const focused = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    expect(focused?.fieldBackground).toBe(idleBackground);
-    expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+      const input = page
+        .getByTestId('homepage-editorial-hero-search')
+        .getByRole('combobox');
+      const idleBackground = heroSearch?.fieldBackground;
+      await input.focus();
+      const focused = await measureSearch(
+        '[data-testid="homepage-editorial-hero-search"]'
+      );
+      expect(focused?.fieldBackground).toBe(idleBackground);
+      expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+    }
 
     const lightWell = page.locator('.homepage-editorial-hero__light-well');
     expect(
@@ -1171,7 +1152,7 @@ test.describe('Homepage', () => {
     // still route through /start.
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(FEATURE_FLAGS.WAITLIST_ENABLED ? 0 : 1);
 
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);

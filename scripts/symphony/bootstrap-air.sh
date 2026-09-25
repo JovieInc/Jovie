@@ -147,12 +147,12 @@ require_cmd shasum
 
 NODE_VERSION="$(node --version)"
 if [[ ! "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]]; then
-  die "Node 22.x required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+  die "Node 22.x required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.9 --activate"
 fi
 NODE_MINOR="${BASH_REMATCH[1]}"
 NODE_PATCH="${BASH_REMATCH[2]}"
 if ((10#$NODE_MINOR < 23 || (10#$NODE_MINOR == 23 && 10#$NODE_PATCH < 1))); then
-  die "Node >=22.23.2 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+  die "Node >=22.23.2 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.9 --activate"
 fi
 ok "Node $NODE_VERSION supported"
 NODE_BIN_DIR="$(dirname "$(command -v node)")"

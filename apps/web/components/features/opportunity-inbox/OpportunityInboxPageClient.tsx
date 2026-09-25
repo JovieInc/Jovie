@@ -13,6 +13,7 @@ import {
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageShell } from '@/components/organisms/PageShell';
+import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   OPPORTUNITY_SIGNAL_TYPE_META,
@@ -29,6 +30,7 @@ import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxM
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
 import { getRovingFocusIndex } from '@/lib/utils/keyboard';
+import { InboxRuntimeNotification } from './InboxRuntimeNotification';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -102,6 +104,7 @@ export function OpportunityInboxPageClient({
   connectedDSPs = [],
   initialLinks = [],
 }: OpportunityInboxPageClientProps) {
+  const runtimeUpdate = useRuntimeUpdate();
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -416,7 +419,7 @@ export function OpportunityInboxPageClient({
       stackKeyboardControlRef.current ??
       signalFilterRefs.current[signalFilterFocusIndex] ??
       inboxPageRef.current?.querySelector<HTMLElement>(
-        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button'
+        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button'
       );
 
     recoveryTarget?.focus();
@@ -447,6 +450,7 @@ export function OpportunityInboxPageClient({
           className='system-b-opportunity-inbox-page'
           data-testid='opportunity-inbox-content'
         >
+          <InboxRuntimeNotification />
           {pendingTourDates.length > 0 ? (
             <section
               className='system-b-opportunity-inbox-feed'
@@ -538,7 +542,7 @@ export function OpportunityInboxPageClient({
             )
           ) : null}
 
-          {!hasReviewableItems ? (
+          {!hasReviewableItems && !runtimeUpdate?.available ? (
             <OpportunityInboxEmptyState
               actionCards={inbox.emptyActionCards}
               founderMode={inboxHomeEnabled}

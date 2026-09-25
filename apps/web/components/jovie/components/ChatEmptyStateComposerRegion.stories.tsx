@@ -1,3 +1,4 @@
+import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect, useState } from 'react';
 import { fn } from 'storybook/test';

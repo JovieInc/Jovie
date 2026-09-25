@@ -43,6 +43,10 @@ except OSError:
 if REQUESTED_STATE.is_symlink() or requested_identity != STATE:
     raise SystemExit(76)
 if not STATE.is_file():
+    # Recover mode has nothing to clear. Refresh mode must not report success:
+    # the router treats exit 0 as a fresh capacity observation.
+    if os.environ.get("CODEX_ACCOUNT_PROBE_MODE", "recover") != "recover":
+        raise SystemExit(76)
     raise SystemExit(0)
 REAL_CODEX = os.environ["REAL_CODEX"]
 LOCKS = Path(os.environ["LOCKS_DIR"])
@@ -644,6 +648,124 @@ def recover(account, observed_cooldown, observed_error, observed_active, now):
         return "indeterminate"
 
 
+def select_refresh_account(now):
+    """One ready ChatGPT account, preferring the active alias.
+
+    Returns ('ready', name), ('none', None) when every account is cooling or
+    absent, or ('error', None) when the state cannot be trusted.
+    """
+    try:
+        with locked_state() as state:
+            cooldowns = state.get("cooldowns")
+            if cooldowns is None:
+                cooldowns = {}
+            if not isinstance(cooldowns, dict):
+                return "error", None
+            inventory = configured_inventory()
+            if inventory is None:
+                return "error", None
+            ready = []
+            for name, (_account, _auth_path, _config_path, auth) in inventory.items():
+                if not isinstance(auth, dict) or auth.get("auth_mode") != "chatgpt":
+                    continue
+                raw = cooldowns.get(name, 0)
+                try:
+                    until = int(raw or 0)
+                except (TypeError, ValueError):
+                    return "error", None
+                if until <= now:
+                    ready.append(name)
+            if not ready:
+                return "none", None
+            active = state.get("active")
+            if isinstance(active, str) and active in ready:
+                return "ready", active
+            return "ready", sorted(ready)[0]
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return "error", None
+
+
+def commit_capacity_observation(account, now):
+    """Rewrite state only after a live available verdict.
+
+    The mtime is the freshness window route prep trusts. Writing without an
+    available account/rateLimits/read would make stale cooldowns look current.
+    """
+    try:
+        with locked_state() as state:
+            cooldowns = state.get("cooldowns")
+            if cooldowns is None:
+                cooldowns = {}
+                state["cooldowns"] = cooldowns
+            if not isinstance(cooldowns, dict):
+                return False
+            try:
+                until = int(cooldowns.get(account) or 0)
+            except (TypeError, ValueError):
+                return False
+            if until > now:
+                return False
+            state["capacityObservedAt"] = now
+            state["capacityObservedAccount"] = account
+            state["capacityObservationSource"] = "app_server_rate_limits_read/v1"
+            temporary = STATE.with_suffix(STATE.suffix + ".tmp")
+            temporary.write_text(
+                json.dumps(state, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, STATE)
+            return True
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
+
+
+def refresh_one_account(account, now, deadline):
+    """Hold the account lease for one bounded rate-limit read. Never writes on failure."""
+    if LOCKS.exists() and LOCKS.is_symlink():
+        return "indeterminate"
+    account_lock = LOCKS / f"{account}.lock"
+    try:
+        account_lock.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return "indeterminate"
+    if account_lock.is_symlink():
+        return "indeterminate"
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(account_lock, flags, 0o600)
+    except OSError:
+        return "indeterminate"
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return "busy"
+        verdict = rpc_read_verdict(account, deadline)
+        if verdict != "available":
+            return "exhausted" if verdict == "exhausted" else "indeterminate"
+        return "refreshed" if commit_capacity_observation(account, now) else "indeterminate"
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+def refresh_freshness(deadline):
+    """On-demand freshness for route prep. One account, one read, fail closed."""
+    now = int(time.time())
+    status, account = select_refresh_account(now)
+    if status == "error":
+        return 76
+    if status != "ready":
+        return 75
+    outcome = refresh_one_account(account, now, deadline)
+    if outcome == "refreshed":
+        return 0
+    if outcome == "exhausted":
+        return 75
+    return 76
+
+
 now = int(time.time())
 external_deadline = os.environ.get("CODEX_ACCOUNT_PROBE_DEADLINE_EPOCH")
 try:
@@ -654,6 +776,11 @@ if deadline_epoch is not None and (not math.isfinite(deadline_epoch) or deadline
     raise SystemExit(76)
 budget = min(TOTAL_TIMEOUT, deadline_epoch - time.time()) if deadline_epoch is not None else TOTAL_TIMEOUT
 deadline = time.monotonic() + budget
+probe_mode = os.environ.get("CODEX_ACCOUNT_PROBE_MODE", "recover")
+if probe_mode == "refresh-freshness":
+    raise SystemExit(refresh_freshness(deadline))
+if probe_mode != "recover":
+    raise SystemExit(76)
 recovered = 0
 indeterminate = False
 candidates = read_candidates(now)

@@ -1185,6 +1185,7 @@ export function buildPlan(
     queuedCi = 0,
     cohortId = 'local',
     cohortHistory = [],
+    capacityPrs = [],
     now = Date.now(),
   } = {}
 ) {
@@ -1200,7 +1201,7 @@ export function buildPlan(
   ).length;
   const recentCohorts = mergeConflictFxCohortHistory(
     cohortHistory,
-    collectConflictFxCohorts(prs)
+    collectConflictFxCohorts([...prs, ...capacityPrs])
   );
   const adaptive = computeAdaptiveConcurrency({
     runnerCapacity,

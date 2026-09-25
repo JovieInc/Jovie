@@ -15,7 +15,6 @@ HOT_PATH_WORKFLOWS = (
     "agent-tick.yml",
     "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
-    "merge-queue-autoenroll.yml",
 )
 
 FULL_CHECKOUT_JOBS = (
@@ -26,8 +25,6 @@ FLEET_CONTROLLER_JOBS = (
     ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
-    ("merge-queue-autoenroll.yml", "enroll"),
-    ("merge-queue-autoenroll.yml", "rebase"),
     ("agent-tick.yml", "auto-ready"),
 )
 
@@ -415,7 +412,6 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     for workflow_name in (
         "agent-pipeline.yml",
         "pr-conflict-handler.yml",
-        "merge-queue-autoenroll.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
@@ -463,7 +459,7 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     )
 
     assert "npm install -g pnpm@" not in script
-    assert "corepack prepare pnpm@9.15.4 --activate" in script
+    assert "corepack prepare pnpm@9.15.9 --activate" in script
     assert "pnpm install --frozen-lockfile --ignore-scripts" in script
     assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
     assert ".headOwner == $repo_owner" in script
@@ -705,9 +701,15 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
         assert "run: gh --version" in block, (workflow, job_name)
 
 
-def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> None:
-    """CI-completion audits may supersede each other, never operator runs."""
+def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
+    """The shared canary slot queues all FX writers without cancelling work."""
     block = _job_block("pr-conflict-handler.yml", "plan")
+    workflow = (WORKFLOWS / "pr-conflict-handler.yml").read_text(
+        encoding="utf-8"
+    )
+    rolling = (WORKFLOWS / "rolling-ci-dispatch.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "runs-on: ubuntu-latest" in block
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
@@ -715,13 +717,20 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert (
         "group: pr-conflict-handler-${{ github.repository }}-"
-        "${{ github.event_name == 'workflow_dispatch' && "
-        "'operator' || 'audit' }}"
+        "${{ github.event_name == 'pull_request_target' && "
+        "format('pr-{0}', github.event.pull_request.number) || "
+        "(github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}"
     ) in block
-    assert (
-        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}"
-        in block
+    shared_slot = (
+        "group: jovie-fx-shared-canary-slot-${{ github.repository }}\n"
+        "  cancel-in-progress: false\n"
+        "  queue: max"
     )
+    assert shared_slot in workflow
+    assert shared_slot in rolling
+    assert "cancel-in-progress: false" in block
+    assert "queue: max" in block
+    assert "cancel-in-progress: ${{" not in block
     assert "EVENT_NAME: ${{ github.event_name }}" in block
     assert "APPLY_INPUT: ${{ inputs.apply || 'false' }}" in block
     assert 'if [[ "$EVENT_NAME" == "workflow_dispatch"' in block
@@ -794,9 +803,8 @@ def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() 
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
-    """Main/merge-group completions must not wake PR fleet controllers."""
+    """Filter CI events before trusted remediation consumes a runner."""
     for workflow, job_name in (
-        ("merge-queue-autoenroll.yml", "enroll"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
@@ -892,15 +900,18 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
         assert exact_identity_check in workflow
     assert ".base.sha" not in workflow
     assert re.search(
-        r'push\s+"https://github\.com/\$REPOSITORY\.git"\s+'
-        r'"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs/heads/\$HEAD_REF"',
+        r'push\s+--force-with-lease="refs/heads/\$HEAD_REF:\$SOURCE_HEAD"\s*\\?\s*'
+        r'"https://github\.com/\$REPOSITORY\.git"\s+'
+        r'"HEAD:refs/heads/\$HEAD_REF"',
         workflow,
         re.IGNORECASE,
     )
+    assert 'git merge-base --is-ancestor "$SOURCE_HEAD" "$resolved_commit"' in workflow
+    assert 'git merge-base --is-ancestor "$BASE_HEAD" "$resolved_commit"' in workflow
+    assert not re.search(r'\bpush\s+--force(?:\s|=|$)', workflow, re.IGNORECASE)
     assert "expected_base:0:12" not in workflow
     assert "BASE_HEAD:0:12" not in workflow
     for forbidden in (
-        "force-with-lease",
         "git push --force",
         "gh pr merge",
         "gh pr ready",
@@ -1577,7 +1588,37 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "Native autoenroll owns queue mutation" in dependabot
+    assert "scripts/native-merge-intent.mjs" in dependabot
+    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    assert "workflow_run.workflow_id == 178737329" in dependabot
+    adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "run?.workflow_id !== CI_WORKFLOW_ID" in adapter
+    assert "run.head_repository?.full_name" in adapter
+    assert "ref: ${{ github.sha }}" in dependabot
+    assert "Native autoenroll owns queue mutation" not in dependabot
+
+
+def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
+    """Both wake-up paths use only base policy and the helper's local imports."""
+    step = _step_block("dependabot-auto-merge.yml", "Checkout trusted reconciliation policy")
+    materialized = _sparse_checkout_paths(step)
+    workflow = (WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
+
+    assert "ref: ${{ github.sha }}" in step
+    assert "persist-credentials: false" in step
+    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
+    assert "github.event.workflow_run.event == 'pull_request'" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "actions/download-artifact" not in workflow
+    assert "      actions: read" in workflow
+    for entrypoint in (
+        "scripts/dependabot-workflow-run-adapter.mjs",
+        "scripts/native-merge-intent.mjs",
+    ):
+        assert entrypoint in materialized
+        _assert_local_runtime_closure(materialized, entrypoint)
 
 
 def test_retired_merge_queue_label_has_no_active_producers() -> None:
@@ -1587,7 +1628,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/release-queue-deferred.sh",
         REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
@@ -1620,7 +1660,6 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "edited" in trigger
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
-    assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
     assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
@@ -1662,14 +1701,12 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
 
 
 def test_fleet_controllers_share_one_evaluate_action() -> None:
-    """FGR, QDR, merge-queue, and production-controller must not copy-paste the gate CLI."""
+    """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
     script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
-        ("queue-deferred-release.yml", "fleet-policy", "policy"),
-        ("merge-queue-autoenroll.yml", "fleet-policy", "policy"),
         ("production-controller.yml", "fleet-promotion", "policy"),
     )
     for workflow, job_name, _step in callers:

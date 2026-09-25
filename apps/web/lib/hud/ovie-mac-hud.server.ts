@@ -17,6 +17,7 @@ import {
   windowToWeeklyUsd,
 } from '@/lib/hud/ovie-mac-hud';
 import { WHAT_SHIPPED_STATE_PATH } from '@/lib/hud/what-shipped';
+import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 
 const OVIE_MAC_HUD_IN_FLIGHT_PRS_QUERY = `
 query OvieMacHudInFlightPullRequests($owner: String!, $name: String!) {
@@ -210,11 +211,12 @@ export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests] =
+  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
     await Promise.all([
       getAdminStripeOverviewMetrics(),
       getAdminMercuryMetrics(),
       getOvieMacHudInFlightPullRequests(),
+      getLybDailyMrr(new Date(nowMs)),
     ]);
   const shipping = readShippingEntries();
   const financialAvailable =
@@ -255,6 +257,7 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    lybMrr,
     generatedAtIso,
     nowMs,
   });

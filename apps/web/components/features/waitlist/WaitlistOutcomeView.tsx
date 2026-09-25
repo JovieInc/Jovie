@@ -11,7 +11,8 @@ import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 export type WaitlistDisplayOutcome =
   | WaitlistAccessOutcome
   | 'pending'
-  | 'rate_limited';
+  | 'rate_limited'
+  | 'receipt_unavailable';
 
 interface WaitlistOutcomeViewProps {
   readonly outcome: WaitlistDisplayOutcome;
@@ -87,6 +88,12 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: "We Couldn't Save This",
     body: () =>
       'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
+    icon: RotateCcw,
+  },
+  receipt_unavailable: {
+    title: "We Couldn't Verify Your Request",
+    body: () =>
+      'Your account is signed in, but we could not verify a saved access request. Please try again later.',
     icon: RotateCcw,
   },
   rate_limited: {

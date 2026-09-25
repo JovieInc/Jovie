@@ -16,6 +16,12 @@ import {
   REFERRAL_CODE_PATTERN,
 } from '@/lib/referrals/config';
 import {
+  CheckoutCorrelationValidationError,
+  hasCheckoutCorrelation,
+  parseCheckoutCorrelation,
+} from '@/lib/stripe/checkout-correlation';
+import { checkoutCorrelationIdempotencyPart } from '@/lib/stripe/checkout-correlation.server';
+import {
   checkExistingPlanSubscription,
   getCheckoutErrorResponse,
 } from '@/lib/stripe/checkout-helpers';
@@ -132,7 +138,7 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
 
     const parsedBody = await parseJsonBody<{
@@ -140,6 +146,16 @@ export async function POST(request: NextRequest) {
       referralCode?: unknown;
       returnTo?: unknown;
       source?: unknown;
+      claimId?: unknown;
+      claim_id?: unknown;
+      runId?: unknown;
+      run_id?: unknown;
+      candidateId?: unknown;
+      candidate_id?: unknown;
+      offerVersion?: unknown;
+      offer_version?: unknown;
+      firstTouch?: unknown;
+      first_touch?: unknown;
     }>(request, {
       route: '/api/stripe/checkout',
       headers: NO_STORE_HEADERS,
@@ -152,6 +168,16 @@ export async function POST(request: NextRequest) {
       returnTo: rawReturnTo,
       source: rawSource,
     } = parsedBody.data;
+
+    let correlation;
+    try {
+      correlation = parseCheckoutCorrelation(parsedBody.data);
+    } catch (error) {
+      if (error instanceof CheckoutCorrelationValidationError) {
+        return jsonError(error.message, 400);
+      }
+      throw error;
+    }
     const checkoutSource =
       rawSource === 'onboarding' || rawSource === 'youtube_thumbnails'
         ? rawSource
@@ -213,7 +239,10 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
-    const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
+    const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
+    const idempotencyKey = correlationPart
+      ? `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${correlationPart}:${idempotencyBucket}`
+      : `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
     const planIdSuffix = selectedPlan
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
@@ -242,6 +271,7 @@ export async function POST(request: NextRequest) {
         cancelUrl,
         idempotencyKey,
         referralCode,
+        ...(hasCheckoutCorrelation(correlation) ? { correlation } : {}),
       })
     );
 

@@ -49,7 +49,7 @@ if path.exists() or path.is_symlink():
             raise SystemExit("process profile conflicts with operator profile")
         selected = persisted
 selected = selected if selected is not None else "canonical"
-if selected not in {"canonical", "governor-bounded"}:
+if selected not in {"canonical", "governor-bounded", "governor-bounded-codex"}:
     raise SystemExit("unknown operator profile")
 print(selected)
 PY
@@ -58,6 +58,8 @@ readonly CONFIGURATION_PROFILE
 case "${CONFIGURATION_PROFILE}" in
   canonical) WORKFLOW_RELATIVE="scripts/symphony/WORKFLOW.md" ;;
   governor-bounded) WORKFLOW_RELATIVE="scripts/symphony/profiles/governor-bounded/WORKFLOW.md" ;;
+  governor-bounded-codex) WORKFLOW_RELATIVE="scripts/symphony/profiles/governor-bounded-codex/WORKFLOW.md" ;;
+  *) printf 'unknown operator profile\n' >&2; exit 2 ;;
 esac
 readonly WORKFLOW_RELATIVE
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/${WORKFLOW_RELATIVE}"
@@ -311,28 +313,51 @@ install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
 install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
 install_atomic "${REGISTRY_CONFIG_SOURCE}" "${REGISTRY_CONFIG_TARGET}" 0644
 install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
-if [[ "${CONFIGURATION_PROFILE}" == governor-bounded ]]; then
-  # Preserve a smaller pressure-controller ceiling; an upgrade is not capacity
-  # authorization. The immutable source remains the attestation comparison.
-  python3 - "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" <<'PY'
+if [[ "${CONFIGURATION_PROFILE}" == governor-bounded || "${CONFIGURATION_PROFILE}" == governor-bounded-codex ]]; then
+  # Preserve a smaller pressure-controller ceiling on the same Codex posture.
+  # Switching from Codex OUT to governor-bounded-codex adopts the reviewed
+  # source ceiling. The immutable source remains the attestation comparison.
+  python3 - "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" "${CONFIGURATION_PROFILE}" <<'PY'
 import os
 from pathlib import Path
 import re
 import sys
 import tempfile
 
-source, target = map(Path, sys.argv[1:])
+source, target = map(Path, sys.argv[1:3])
+profile = sys.argv[3]
 text = source.read_text()
 pattern = re.compile(r'^(\s*max_concurrent_agents:\s*)([1-9][0-9]*)(\s*)$', re.MULTILINE)
 matches = list(pattern.finditer(text))
 if len(matches) != 1:
     raise SystemExit("invalid bounded source concurrency")
 ceiling = int(matches[0].group(2))
+codex_in = "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server"
+codex_out = "command: /usr/bin/false"
+
+def posture(body: str) -> str:
+    has_in = codex_in in body
+    has_out = codex_out in body
+    if has_in and not has_out:
+        return "in"
+    if has_out and not has_in:
+        return "out"
+    return "invalid"
+
+source_posture = posture(text)
+if profile == "governor-bounded" and source_posture != "out":
+    raise SystemExit("governor-bounded source must keep Codex OUT")
+if profile == "governor-bounded-codex" and (source_posture != "in" or ceiling != 5):
+    raise SystemExit("governor-bounded-codex source must keep Codex IN and max_concurrent_agents 5")
 if target.exists():
-    current = list(pattern.finditer(target.read_text()))
-    if len(current) != 1:
-        raise SystemExit("invalid installed bounded concurrency")
-    ceiling = min(ceiling, int(current[0].group(2)))
+    current_text = target.read_text()
+    # A Codex OUT ceiling is not authorization for the Codex IN profile.
+    adopt_source_ceiling = profile == "governor-bounded-codex" and posture(current_text) != "in"
+    if not adopt_source_ceiling:
+        current = list(pattern.finditer(current_text))
+        if len(current) != 1:
+            raise SystemExit("invalid installed bounded concurrency")
+        ceiling = min(ceiling, int(current[0].group(2)))
 text = pattern.sub(lambda match: match.group(1) + str(ceiling) + match.group(3), text)
 fd, name = tempfile.mkstemp(prefix='.governor-workflow-', dir=target.parent)
 try:
@@ -433,6 +458,10 @@ workflow_matches = False
 workflow_match_mode = "invalid"
 source_concurrency = None
 installed_concurrency = None
+expected_codex = {
+    "governor-bounded": "out",
+    "governor-bounded-codex": "in",
+}.get(os.environ["CONFIGURATION_PROFILE"])
 if len(source_matches) == 1 and len(installed_matches) == 1:
     source_concurrency = int(source_matches[0].group(2))
     installed_concurrency = int(installed_matches[0].group(2))
@@ -445,8 +474,27 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
     workflow_matches = (
         normalized(workflow_source) == normalized(workflow_installed)
     )
-    if os.environ["CONFIGURATION_PROFILE"] == "governor-bounded":
-        workflow_matches = workflow_matches and installed_concurrency <= source_concurrency
+    codex_in = "command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server"
+    codex_out = "command: /usr/bin/false"
+
+    def codex_posture(body: str) -> str:
+        has_in = codex_in in body
+        has_out = codex_out in body
+        if has_in and not has_out:
+            return "in"
+        if has_out and not has_in:
+            return "out"
+        return "invalid"
+
+    if expected_codex is not None:
+        workflow_matches = (
+            workflow_matches
+            and installed_concurrency <= source_concurrency
+            and codex_posture(workflow_source) == expected_codex
+            and codex_posture(workflow_installed) == expected_codex
+        )
+        if expected_codex == "in" and source_concurrency != 5:
+            workflow_matches = False
     if workflow_matches:
         workflow_match_mode = (
             "exact"
@@ -477,6 +525,7 @@ receipt = {
         "matchMode": workflow_match_mode,
         "sourceMaxConcurrentAgents": source_concurrency,
         "installedMaxConcurrentAgents": installed_concurrency,
+        **({"codex": expected_codex} if expected_codex is not None else {}),
     },
     "unit": {
         "sourceSha256": os.environ["UNIT_SOURCE_SHA"],

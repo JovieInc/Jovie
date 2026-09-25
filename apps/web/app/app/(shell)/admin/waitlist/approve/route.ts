@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     | Awaited<ReturnType<typeof getCurrentUserEntitlements>>
     | undefined;
   try {
-    entitlements = await getCurrentUserEntitlements();
+    entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },

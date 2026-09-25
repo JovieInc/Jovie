@@ -1,6 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 import {
+  ovieSummerEveDeploymentOriginSchema,
+  ovieSummerEveExpectedDeploymentIdSchema,
+} from './ovie/summer-eve-pin-schema';
+import {
   getDatabaseUrlErrorMessage,
   isDatabaseUrlValid,
 } from './utils/database-url-validator';
@@ -79,6 +83,8 @@ export const ServerEnvSchema = z.object({
   // env-validation-rules.ts (BETTER_AUTH_SECRET ≥32).
   BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
+  // Opt-in exact private app origin; auth validates protocol and origin shape.
+  OVIE_WEB_ORIGIN: z.string().url().optional(),
   AUTH_GOOGLE_CLIENT_ID: z.string().optional(),
   AUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
   AUTH_APPLE_CLIENT_ID: z.string().optional(),
@@ -131,18 +137,17 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
-  OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: z
-    .string()
-    .url()
-    .regex(
-      /^https:\/\/(?:jovie-eve-shadow|summer-operations)-[a-z0-9]+-jovie\.vercel\.app$/u,
-      'Must be an immutable Summer deployment URL in the Jovie team'
-    )
-    .optional(),
-  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: z
-    .string()
-    .regex(/^dpl_[A-Za-z0-9]+$/u)
-    .optional(),
+  /** Advisory pin. Runtime calls `https://summer.jov.ie`, not this origin. */
+  OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: ovieSummerEveDeploymentOriginSchema,
+  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID:
+    ovieSummerEveExpectedDeploymentIdSchema,
+  /**
+   * Protection Bypass for Automation secret from the jovie-eve-shadow
+   * project (the production Summer project). Sent only as
+   * `x-vercel-protection-bypass` to `https://summer.jov.ie`.
+   * This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
+   */
+  OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET: z.string().optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -150,6 +155,7 @@ export const ServerEnvSchema = z.object({
 
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
+  REVENUECAT_LYB_SECRET_API_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
@@ -246,9 +252,12 @@ export const ServerEnvSchema = z.object({
   MERCURY_CHECKING_ACCOUNT_ID: z.string().optional(),
   MERCURY_ACCOUNT_ID: z.string().optional(),
 
-  // Upstash Redis
+  // Upstash Redis (production). Non-production ignores these unless
+  // JOVIE_ALLOW_PRODUCTION_UPSTASH=1. REDIS_URL is optional loopback Redis.
   UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
+  REDIS_URL: z.string().trim().optional(),
+  JOVIE_ALLOW_PRODUCTION_UPSTASH: z.string().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
@@ -467,6 +476,7 @@ export const ENV_KEYS = [
   'E2E_TEST_MODE',
   'BETTER_AUTH_SECRET',
   'BETTER_AUTH_URL',
+  'OVIE_WEB_ORIGIN',
   'AUTH_GOOGLE_CLIENT_ID',
   'AUTH_GOOGLE_CLIENT_SECRET',
   'AUTH_APPLE_CLIENT_ID',
@@ -504,9 +514,11 @@ export const ENV_KEYS = [
   'OVIE_SUMMER_FOUNDER_APP_USER_ID',
   'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
   'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID',
+  'OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
+  'REVENUECAT_LYB_SECRET_API_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
@@ -557,6 +569,8 @@ export const ENV_KEYS = [
   'MERCURY_ACCOUNT_ID',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
+  'REDIS_URL',
+  'JOVIE_ALLOW_PRODUCTION_UPSTASH',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_PROD_SIGNUP_EMAIL_BASE',

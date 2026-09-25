@@ -41,6 +41,12 @@ const GLOBALS_CSS_SOURCE = readFileSync(
   resolve(REPO_ROOT, 'apps/web/app/globals.css'),
   'utf8'
 );
+// Canonical Tailwind theme tokens live here (JOV-2269 two-context split);
+// globals.css imports it normally so the values still emit globally.
+const FOUNDATION_CSS_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'apps/web/styles/tailwind-foundation.css'),
+  'utf8'
+);
 const DESIGN_SYSTEM_CSS_SOURCE = readFileSync(
   resolve(REPO_ROOT, 'apps/web/styles/design-system.css'),
   'utf8'
@@ -390,12 +396,12 @@ test('zero baseline sources keep their canonical token and utility contracts', (
 
 test('canonical CSS authority preserves the retired values exactly', () => {
   assert.match(
-    GLOBALS_CSS_SOURCE,
+    FOUNDATION_CSS_SOURCE,
     /--animate-progress-indeterminate:\s*progress-indeterminate 1\.5s ease-in-out\s+infinite;/
   );
   assert.match(GLOBALS_CSS_SOURCE, /@keyframes progress-indeterminate\s*\{/);
-  assert.match(GLOBALS_CSS_SOURCE, /--z-index-sheet:\s*65;/);
-  assert.match(GLOBALS_CSS_SOURCE, /--z-index-tooltip:\s*150;/);
+  assert.match(FOUNDATION_CSS_SOURCE, /--z-index-sheet:\s*65;/);
+  assert.match(FOUNDATION_CSS_SOURCE, /--z-index-tooltip:\s*150;/);
   assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-4:\s*1rem;/);
   assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-8:\s*2rem;/);
   assert.match(

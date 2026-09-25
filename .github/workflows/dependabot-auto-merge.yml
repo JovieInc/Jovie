@@ -5,19 +5,22 @@ name: Dependabot Auto-Merge
 # necessary-trust-boundary: pull_request_target reads trusted base policy before reconciling Dependabot-authored PR state.
 # revisit-trigger: Remove this hop when Dependabot exposes equivalent exact-head recreate and native-admission policy hooks.
 
-# Keeps safe Dependabot work durable until native merge-queue admission. The
-# event actor is not the authority: maintainer and controller synchronizations
-# must preserve policy derived from the PR author and Dependabot metadata.
+# Records native merge intent for certified patch updates and stable-version
+# minor updates. The event actor is not the authority: maintainer and
+# controller synchronizations must preserve policy derived from the PR author
+# and Dependabot metadata.
 #
 # fetch-metadata refuses heads that no longer contain only Dependabot commits
 # (maintainer rebase). That refusal must skip/succeed, never fail: a FAILURE
-# check makes mergeStateStatus UNSTABLE and blocks native autoenroll even when
+# check makes mergeStateStatus UNSTABLE and blocks native auto-merge even when
 # every required gate is green. Do not disable commit certification — uncertified
-# heads must not receive patch/minor queue-intent from this job.
+# heads must not receive patch/minor native intent from this job. A successful
+# source-CI completion is the bounded retry signal when checks were not visible
+# on the initial PR event.
 #
-# Ship now: patch/minor updates queue automatically; confirmed conflicts are
-# recreated; unmerged closes without a durable hold are reopened. Majors are
-# visible but held for migration/release review.
+# Patch updates and metadata-confirmed stable-version minors may record native
+# merge intent. Pre-1.0 minors and majors remain open for review. Confirmed
+# conflicts are recreated; unmerged closes without a durable hold are reopened.
 # Re-evaluate when: a patch/minor update with these receipts causes a rollback.
 # Then: narrow the affected package family, not the global safe-update lane
 # (JOV-5465).
@@ -27,77 +30,149 @@ on:
   # trusted base policy, never action refs proposed by the dependency PR.
   pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled, closed]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: dependabot-native-intent-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   auto-merge:
     if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]' &&
-      github.event.pull_request.base.ref == 'main'
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.user.login == 'dependabot[bot]' &&
+       github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.name == 'CI' &&
+       github.event.workflow_run.workflow_id == 178737329 &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success')
     # Metadata and queue-intent API calls must not consume a fixed test runner.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     steps:
+      - name: Checkout trusted reconciliation policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/dependabot-update-policy.mjs
+            scripts/dependabot-workflow-run-adapter.mjs
+            scripts/native-merge-intent.mjs
+            scripts/lib/source-admission-policy.mjs
+            scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/repo-hygiene-limits.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Adapt successful CI event for metadata certification
+        id: run-context
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/dependabot-workflow-run-adapter.mjs
+
       - name: Fetch Dependabot metadata
         id: meta
+        if: >-
+          github.event_name == 'pull_request_target' ||
+          steps.run-context.outputs.eligible == 'true'
         continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ github.token }}
 
       - name: Skip uncertified Dependabot head
-        if: steps.meta.outcome != 'success'
+        if: >-
+          (github.event_name == 'pull_request_target' ||
+           steps.run-context.outputs.eligible == 'true') &&
+          steps.meta.outcome != 'success'
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           echo "fetch-metadata could not certify Dependabot commits on $PR_URL."
-          echo "Expected after a maintainer rebase. Native autoenroll remains the queue writer."
+          echo "Expected after a maintainer rebase. No native merge intent is recorded for an uncertified event."
           echo "This job succeeds so mergeStateStatus is not UNSTABLE."
-
-      - name: Checkout trusted reconciliation policy
-        if: steps.meta.outcome == 'success'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 1
-          persist-credentials: false
-          sparse-checkout: scripts/dependabot-update-policy.mjs
-          sparse-checkout-cone-mode: false
 
       - name: Classify exact Dependabot event
         if: steps.meta.outcome == 'success'
         id: policy
         env:
           DEPENDABOT_UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          DEPENDABOT_UPDATED_DEPENDENCIES_JSON: ${{ steps.meta.outputs.updated-dependencies-json }}
         run: node scripts/dependabot-update-policy.mjs
 
-      - name: Leave native autoenroll as the queue writer (patch + minor)
+      - name: Generate narrowly scoped Jovie App token
+        if: >-
+          steps.policy.outputs.decision == 'queue' ||
+          steps.policy.outputs.decision == 'queue-recovered'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-checks: read
+          permission-contents: write
+          permission-pull-requests: write
+          permission-statuses: read
+
+      - name: Record exact native merge intent
         if: steps.policy.outputs.decision == 'queue'
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          DEPENDENCY_NAMES: ${{ steps.meta.outputs.dependency-names }}
-          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.run-context.outputs.pr_number || github.event.pull_request.number }}
+          PR_HEAD: ${{ steps.run-context.outputs.head_sha || github.event.pull_request.head.sha }}
+          RECEIPT_DIR: ${{ runner.temp }}/dependabot-native-merge-intent
         run: |
-          echo "Dependency: $DEPENDENCY_NAMES"
-          echo "Update type: $UPDATE_TYPE"
-          echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
+          set +e
+          result=$(node scripts/native-merge-intent.mjs \
+            --repo "$GH_REPO" \
+            --pr "$PR_NUMBER" \
+            --head "$PR_HEAD" \
+            --base main \
+            --receipt-dir "$RECEIPT_DIR" 2>&1)
+          status=$?
+          set -e
+          echo "$result"
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::Native merge intent was not confirmed for PR #$PR_NUMBER; exact-head state and native gates remain authoritative."
+          fi
 
       - name: Recreate confirmed-conflict safe update
         if: steps.policy.outputs.decision == 'recreate'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           gh pr comment "$PR_URL" --body "@dependabot recreate"
 
-      - name: Release recreated exact head to native autoenroll
+      - name: Release recreated exact head for native admission
         if: steps.policy.outputs.decision == 'queue-recovered'
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           gh pr edit --remove-label "needs-conflict-resolution" "$PR_URL"
 
@@ -105,15 +180,15 @@ jobs:
         if: steps.policy.outputs.decision == 'reopen-recreate'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           gh pr reopen "$PR_URL"
           gh pr comment "$PR_URL" --body "@dependabot recreate"
 
       - name: Note visible major for migration and release review
-        if: steps.policy.outputs.decision == 'hold-major'
+        if: steps.policy.outputs.decision == 'hold-major' && github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           gh pr comment "$PR_URL" --body "Major dependency update detected. Migration notes, targeted compatibility tests, and release/runtime proof are requested; native admission remains controlled by exact-head CI and the merge queue."

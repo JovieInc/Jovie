@@ -2,7 +2,7 @@
   "schema": "jovie.design-conformance/v1",
   "authority": {
     "profile": "jovie-founder-design-studio",
-    "canonicalPath": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen",
+    "canonicalPath": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen",
     "ciReadsLivePen": false,
     "penWritesAllowed": false,
     "verifiedExport": {
@@ -80,6 +80,21 @@
       "testSources": ["packages/ui/atoms/switch.test.tsx"],
       "penRootId": null,
       "sourceDigest": "7644089c59dad334db0e46bdf1c21fcf082ec7f9299477d1cb31b5d5f5c10b11"
+    },
+    {
+      "id": "atom.sheet",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/sheet.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/sheet.stories.tsx"],
+      "testSources": [
+        "apps/web/tests/e2e/storybook-sheet.spec.ts",
+        "packages/ui/atoms/sheet.test.tsx"
+      ],
+      "penRootId": null,
+      "sourceDigest": "26024026b935734507f62fbca31f53067d93fb7adaed217547210de05368de94"
     }
   ],
   "legacy": {

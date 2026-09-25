@@ -137,6 +137,12 @@ To publish staging from exact current `main` after its `CI` run is green:
 gh workflow run desktop-release.yml --ref main -f environment=staging
 ```
 
+The same publisher also reconciles staging daily. It verifies exact green
+`main` CI, compares desktop source with the last signed staging release, and
+publishes only when that source changed. A superseded main generation skips;
+missing or untrusted staging release provenance fails closed and requires the
+explicit manual bootstrap path above.
+
 The workflow derives the next-patch
 `X.Y.(Z+1)-staging.<run-id>.<attempt>` version, updates only the
 `desktop-staging` rolling prerelease and `staging-mac.yml`, and binds its exact

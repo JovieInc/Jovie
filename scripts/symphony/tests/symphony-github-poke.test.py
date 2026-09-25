@@ -25,6 +25,19 @@ webhook_auth = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(webhook_auth)
 
 
+def pr_candidate(number, head_sha, branch, *, state="open", head_repo="JovieInc/Jovie", base_repo="JovieInc/Jovie"):
+    return {
+        "number": number,
+        "state": state,
+        "head": {
+            "sha": head_sha,
+            "ref": branch,
+            "repo": {"full_name": head_repo},
+        },
+        "base": {"repo": {"full_name": base_repo}},
+    }
+
+
 class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
     def test_poke_targets_hyperagent_webhook_not_symphony(self):
         text = POKE.read_text(encoding="utf-8")
@@ -283,6 +296,15 @@ print(os.environ["CURL_FIXTURE_CODE"])
         workflow_runs,
         gate_now=2_000_000_000,
         force=False,
+        producer_event="pull_request",
+        fx_enabled="",
+        fx_canary_pr="",
+        head_branch="codex/gate-fixture",
+        head_repository="JovieInc/Jovie",
+        pr_associations="[]",
+        pull_requests=(),
+        pull_requests_json=None,
+        fail_pr_lookup=False,
     ):
         'Run the workflow Gate step with local GitHub API and clock fixtures.'
         workflow = POKE.read_text(encoding="utf-8")
@@ -303,6 +325,11 @@ print(os.environ["CURL_FIXTURE_CODE"])
             statuses_path.write_text(json.dumps(statuses_by_head), encoding="utf-8")
             runs_path = root / "runs.json"
             runs_path.write_text(json.dumps({"workflow_runs": workflow_runs}), encoding="utf-8")
+            pr_candidates_path = root / "pr-candidates.json"
+            pr_candidates_path.write_text(
+                pull_requests_json if pull_requests_json is not None else json.dumps(pull_requests),
+                encoding="utf-8",
+            )
             gh_log = root / "gh.jsonl"
             output_path = root / "github-output"
 
@@ -322,6 +349,11 @@ if "/pulls/" in endpoint:
         "merged": os.environ.get("GATE_PR_MERGED") == "true",
         "state": os.environ.get("GATE_PR_STATE", "open"),
     }))
+elif endpoint.endswith("/pulls"):
+    if os.environ.get("GATE_PR_LOOKUP_FAILURE") == "true":
+        raise SystemExit(1)
+    with open(os.environ["GATE_PR_CANDIDATES"], encoding="utf-8") as handle:
+        print(handle.read())
 elif "/commits/" in endpoint and "/statuses" in endpoint:
     head = endpoint.split("/commits/", 1)[1].split("/statuses", 1)[0]
     with open(os.environ["GATE_STATUS_MAP"], encoding="utf-8") as handle:
@@ -358,6 +390,8 @@ else:
                     "GH_GATE_LOG": str(gh_log),
                     "GATE_STATUS_MAP": str(statuses_path),
                     "GATE_RUNS": str(runs_path),
+                    "GATE_PR_CANDIDATES": str(pr_candidates_path),
+                    "GATE_PR_LOOKUP_FAILURE": "true" if fail_pr_lookup else "false",
                     "GATE_NOW": str(gate_now),
                     "GITHUB_OUTPUT": str(output_path),
                     "GH_TOKEN": "fixture-token",
@@ -368,6 +402,12 @@ else:
                     "RUN_ID": "999999",
                     "GATE_PR_STATE": "open",
                     "GATE_PR_MERGED": "false",
+                    "PRODUCER_EVENT": producer_event,
+                    "HEAD_BRANCH": head_branch,
+                    "HEAD_REPOSITORY": head_repository,
+                    "PR_ASSOCIATIONS": pr_associations,
+                    "FX_HOSTED_REMEDIATION_ENABLED": fx_enabled,
+                    "FX_HOSTED_REMEDIATION_CANARY_PR": fx_canary_pr,
                 }
             )
             completed = subprocess.run(
@@ -559,6 +599,171 @@ else:
             gate_now=gate_now,
         )
         self.assertEqual(isolated.returncode, 0, isolated.stderr)
+        self.assertIn("proceed=true", output)
+
+    def test_active_fx_canary_excludes_same_source_pr_even_when_forced(self):
+        head = "a" * 40
+        cases = (
+            # A direct CI failure for the canary PR.
+            {
+                "pr_number": "18003",
+                "producer_event": "pull_request",
+                "force": False,
+            },
+            # Manual force is not an escape hatch around the canary's writer.
+            {
+                "pr_number": "018003",
+                "producer_event": "workflow_dispatch",
+                "force": True,
+            },
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                completed, output, calls = self._run_gate_shell(
+                    pr_number=case["pr_number"],
+                    head_sha=head,
+                    statuses_by_head={head: []},
+                    workflow_runs=[],
+                    force=case["force"],
+                    producer_event=case["producer_event"],
+                    fx_enabled="true",
+                    fx_canary_pr="18003",
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertNotIn("proceed=true", output)
+                self.assertEqual(calls, [])
+
+    def test_active_fx_canary_resolves_empty_same_repo_association_before_hyperagent_gate(self):
+        head = "a" * 40
+        branch = "codex/fx-canary"
+        completed, output, calls = self._run_gate_shell(
+            pr_number="",
+            head_sha=head,
+            statuses_by_head={head: []},
+            workflow_runs=[],
+            producer_event="pull_request",
+            fx_enabled="true",
+            fx_canary_pr="18003",
+            head_branch=branch,
+            head_repository="JovieInc/Jovie",
+            pr_associations="[]",
+            pull_requests=[pr_candidate(18003, head, branch)],
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("proceed=true", output)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["endpoint"], "repos/JovieInc/Jovie/pulls")
+        self.assertIn("head=JovieInc:codex/fx-canary", calls[0]["args"])
+
+    def test_active_fx_canary_keeps_hyperagent_for_unique_exact_noncanary_empty_association(self):
+        head = "a" * 40
+        branch = "codex/other-pr"
+        completed, output, calls = self._run_gate_shell(
+            pr_number="",
+            head_sha=head,
+            statuses_by_head={head: []},
+            workflow_runs=[],
+            producer_event="pull_request",
+            fx_enabled="true",
+            fx_canary_pr="18003",
+            head_branch=branch,
+            head_repository="JovieInc/Jovie",
+            pr_associations="[]",
+            pull_requests=[pr_candidate(18004, head, branch)],
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("proceed=true", output)
+        self.assertTrue(any(call["endpoint"] == "repos/JovieInc/Jovie/pulls" for call in calls))
+        self.assertTrue(any("/commits/" in call["endpoint"] for call in calls))
+
+    def test_active_fx_canary_fails_closed_for_ambiguous_stale_and_malformed_empty_associations(self):
+        head = "a" * 40
+        branch = "codex/fx-canary"
+        cases = (
+            {
+                "name": "ambiguous",
+                "pull_requests": [
+                    pr_candidate(18003, head, branch),
+                    pr_candidate(18004, head, branch),
+                ],
+            },
+            {
+                "name": "stale head",
+                "pull_requests": [pr_candidate(18003, "b" * 40, branch)],
+            },
+            {
+                "name": "malformed response",
+                "pull_requests_json": '{"not":"an array"}',
+            },
+        )
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                completed, output, calls = self._run_gate_shell(
+                    pr_number="",
+                    head_sha=head,
+                    statuses_by_head={head: []},
+                    workflow_runs=[],
+                    producer_event="pull_request",
+                    fx_enabled="true",
+                    fx_canary_pr="18003",
+                    head_branch=branch,
+                    head_repository="JovieInc/Jovie",
+                    pr_associations="[]",
+                    **{key: value for key, value in case.items() if key != "name"},
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertNotIn("proceed=true", output)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0]["endpoint"], "repos/JovieInc/Jovie/pulls")
+
+    def test_active_fx_canary_fails_closed_when_empty_association_lookup_fails(self):
+        head = "a" * 40
+        completed, output, calls = self._run_gate_shell(
+            pr_number="",
+            head_sha=head,
+            statuses_by_head={head: []},
+            workflow_runs=[],
+            producer_event="pull_request",
+            fx_enabled="true",
+            fx_canary_pr="18003",
+            head_branch="codex/fx-canary",
+            head_repository="JovieInc/Jovie",
+            pr_associations="[]",
+            fail_pr_lookup=True,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertNotIn("proceed=true", output)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["endpoint"], "repos/JovieInc/Jovie/pulls")
+
+    def test_active_fx_canary_preserves_merge_group_hyperagent_lane(self):
+        head = "a" * 40
+        for pr_number in ("18004", ""):
+            with self.subTest(pr_number=pr_number):
+                completed, output, _calls = self._run_gate_shell(
+                    pr_number=pr_number,
+                    head_sha=head,
+                    statuses_by_head={head: []},
+                    workflow_runs=[],
+                    producer_event="merge_group",
+                    fx_enabled="true",
+                    fx_canary_pr="18003",
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertIn("proceed=true", output)
+
+    def test_active_fx_canary_preserves_hyperagent_for_other_pull_request_failures(self):
+        head = "a" * 40
+        completed, output, _calls = self._run_gate_shell(
+            pr_number="18004",
+            head_sha=head,
+            statuses_by_head={head: []},
+            workflow_runs=[],
+            producer_event="pull_request",
+            fx_enabled="true",
+            fx_canary_pr="18003",
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("proceed=true", output)
 
 

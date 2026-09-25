@@ -7,6 +7,10 @@ const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+const screenshotCatalogTraceIncludes = [
+  'screenshot-catalog/current/**/*',
+  'public/product-screenshots/**/*',
+];
 
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
@@ -35,6 +39,26 @@ const nextConfig = {
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
+  // These request-time readers build data paths dynamically, so NFT cannot
+  // reliably infer their files from the compiled route bundles. Keep this
+  // list limited to the data they actually read; the broad directory entries
+  // are small content and chat-topic catalogs.
+  outputFileTracingIncludes: {
+    '/*': [
+      '../../CHANGELOG.md',
+      '../../docs/FEATURE_REGISTRY.md',
+      '../../scripts/symphony/symphony-codex-account-control.py',
+      '../../apps/eve-pilot/identities/jovie/instructions.md',
+      '../../apps/eve-pilot/identities/summer/instructions.md',
+      'tests/quarantine.json',
+      'content/**/*',
+      'lib/chat/knowledge/topics/**/*',
+      'public/fonts/Satoshi-Bold.ttf',
+      'public/fonts/DMSans-Regular.ttf',
+    ],
+    '/app/admin/screenshots': screenshotCatalogTraceIncludes,
+    '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
+  },
   // Note: previously we set outputFileTracingIncludes with globs into
   // node_modules/.pnpm/node_modules/{import,require}-in-the-middle. Those
   // paths start with pnpm's virtual-store symlink layer AND the target
@@ -714,6 +738,7 @@ function exposeBaseStaticConfigForTooling(config) {
     experimental: nextConfig.experimental,
     headers: nextConfig.headers,
     images: nextConfig.images,
+    outputFileTracingIncludes: nextConfig.outputFileTracingIncludes,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,
   });

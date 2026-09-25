@@ -12,7 +12,8 @@ readonly RESTORE_RECEIPT_SCHEMA="symphony-nvme-package-cache-restore/v1"
 readonly TEARDOWN_RECEIPT_SCHEMA="symphony-nvme-package-cache-teardown/v1"
 readonly WARM_RECEIPT_SCHEMA="symphony-nvme-package-cache-warm/v1"
 readonly REQUIRED_NODE_VERSION="22.23.2"
-readonly REQUIRED_PNPM_VERSION="9.15.4"
+readonly REQUIRED_PNPM_VERSION="9.15.9"
+readonly REQUIRED_PNPM_ENGINE=">=9.15.4 <10"
 readonly DEFAULT_CACHE_ROOT="/srv/git/symphony-package-cache/jovie"
 readonly REPO="JovieInc/Jovie"
 
@@ -88,20 +89,21 @@ assert_file_value() {
 }
 
 assert_package_contract() {
-  python3 - "$REQUIRED_NODE_VERSION" "$REQUIRED_PNPM_VERSION" <<'PY'
+  python3 - "$REQUIRED_NODE_VERSION" "$REQUIRED_PNPM_VERSION" "$REQUIRED_PNPM_ENGINE" <<'PY'
 import json
 import pathlib
 import sys
 
 node = sys.argv[1]
 pnpm = sys.argv[2]
+pnpm_engine = sys.argv[3]
 package = json.loads(pathlib.Path("package.json").read_text(encoding="utf-8"))
 expected_engine = f">={node} <23"
 errors = []
 if package.get("engines", {}).get("node") != expected_engine:
     errors.append(f"engines.node expected {expected_engine!r}")
-if package.get("engines", {}).get("pnpm") != pnpm:
-    errors.append(f"engines.pnpm expected {pnpm!r}")
+if package.get("engines", {}).get("pnpm") != pnpm_engine:
+    errors.append(f"engines.pnpm expected {pnpm_engine!r}")
 if package.get("packageManager") != f"pnpm@{pnpm}":
     errors.append(f"packageManager expected pnpm@{pnpm}")
 if errors:

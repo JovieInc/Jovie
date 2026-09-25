@@ -19,10 +19,10 @@ const RequestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

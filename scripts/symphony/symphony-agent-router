@@ -121,6 +121,8 @@ launch_codex() {
     cp "$router_hotfix" "$workspace/scripts/symphony/symphony-codex-router"
     chmod 755 "$workspace/scripts/symphony/symphony-codex-router"
   fi
+  # A successful launch keeps the five-minute observation window warm for the
+  # next issue. This is not a capacity probe and must not run before route prep.
   touch "${CODEX_ACCOUNTS_STATE:-$home/.codex-accounts/state.json}"
   write_receipt codex routed-subscription "eligible-codex-account"
   export SYMPHONY_ROUTING_USE_MATERIALIZED=1
@@ -134,11 +136,76 @@ launch_codex() {
   exec "$workspace/scripts/symphony/symphony-codex-router" "$@"
 }
 
+# Symphony starts this router with a scrubbed environment. Route prep still has
+# to read and comment on Linear, using the same host file as the service unit.
+linear_tracker_key_available() {
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "${SYMPHONY_LINEAR_ENV:-$home/.config/symphony/linear.env}"
+    set +a
+    [ -n "${LINEAR_API_KEY:-}" ]
+  ) >/dev/null 2>&1
+}
+
+# readCodexRotateCapacity refuses account state older than five minutes, and
+# rejects timestamps more than a minute in the future. Refresh only then, and
+# only by a real rate-limit read. A failed refresh must not touch the file.
+codex_capacity_state_is_fresh() {
+  python3 - "${CODEX_ACCOUNTS_STATE:-$home/.codex-accounts/state.json}" <<'PY'
+import os, sys, time
+path = sys.argv[1]
+try:
+    modified = os.stat(path).st_mtime
+except OSError:
+    raise SystemExit(1)
+now = time.time()
+raise SystemExit(0 if modified <= now + 60 and now - modified <= 300 else 1)
+PY
+}
+
+refresh_codex_capacity_if_stale() {
+  if codex_capacity_state_is_fresh; then
+    return 0
+  fi
+  if [ ! -x "$codex_probe" ]; then
+    return 1
+  fi
+  CODEX_ACCOUNT_PROBE_MODE=refresh-freshness "$codex_probe" >/dev/null 2>&1
+}
+
 prepare_codex_route() {
   if [ -s "$workspace/.symphony-routing.json" ]; then
     return 0
   fi
-  node "$auto_route" >/dev/null 2>&1 && [ -s "$workspace/.symphony-routing.json" ]
+  # Load the tracker key before spending a capacity read. Keep it in this
+  # child only; the coding-agent exec still unsets LINEAR_API_KEY.
+  if ! linear_tracker_key_available; then
+    return 1
+  fi
+  if ! refresh_codex_capacity_if_stale; then
+    return 1
+  fi
+  local route_log
+  route_log="$(umask 077; mktemp)"
+  if (
+    set -a
+    # shellcheck disable=SC1090
+    . "${SYMPHONY_LINEAR_ENV:-$home/.config/symphony/linear.env}"
+    set +a
+    if [ -z "${LINEAR_API_KEY:-}" ]; then
+      exit 78
+    fi
+    node "$auto_route"
+  ) >"$route_log" 2>&1 && [ -s "$workspace/.symphony-routing.json" ]; then
+    # JSON-RPC keepalive owns stdout. The admission line is operator proof
+    # that route prep ran inside this launch, not as a hand probe.
+    grep -E '^ROUTE_ADMITTED ' "$route_log" >&2 || true
+    rm -f "$route_log"
+    return 0
+  fi
+  rm -f "$route_log"
+  return 1
 }
 
 # Codex subscription capacity is the official app-server lane. Reuse the already

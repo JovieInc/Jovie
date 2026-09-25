@@ -66,17 +66,16 @@ set -euo pipefail
 DRY_RUN="${DRY_RUN:-0}"
 if [[ "$DRY_RUN" != "1" ]]; then
   case "${DRAIN_MUTATION_AUTHORIZATION:-}" in
-    merge-queue-autoenroll | test-fixture) ;;
+    test-fixture) ;;
+    merge-queue-autoenroll)
+      echo "::error::Merge Queue Auto-Enroll is retired; refusing its live drain" >&2
+      exit 2
+      ;;
     *)
       echo "::error::Refusing live drain without recognized DRAIN_MUTATION_AUTHORIZATION" >&2
       exit 2
       ;;
   esac
-  if [[ "${DRAIN_MUTATION_AUTHORIZATION:-}" == "merge-queue-autoenroll" \
-    && -z "${GH_MUTATION_TOKEN:-}" ]]; then
-    echo "::error::Refusing live drain without GH_MUTATION_TOKEN" >&2
-    exit 2
-  fi
 fi
 if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
   resolved_gh="$(command -v gh || true)"
@@ -202,9 +201,8 @@ fi
 DRAIN_STARTED_AT="$SECONDS"
 # `queue-deferred` is a hard hold. Typed provenance now exists as
 # `jovie-queue-deferral/v1` (scripts/lib/queue-deferral-receipt.mjs), and the
-# queue-deferred release controller (scripts/release-queue-deferred.sh) owns
-# lifting mechanical holds before enrollment. This reconcile path stays
-# disabled: without a typed receipt on the exact head, main maintenance still
+# responsible PR owner verifies and releases the actual hold. This reconcile
+# path stays disabled: without a typed receipt on the exact head, maintenance
 # cannot distinguish temporary queue pressure from a current repair hold. A
 # prior main-push reconciliation removed explicit repair holds and its
 # `unlabeled` events immediately re-admitted those exact heads.
@@ -1326,40 +1324,8 @@ changelog_collision_decision_for_pr() {  # <num>
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
-deferred_state_is_releasable() {  # state json <expected head> <expected base>
-  jq -e --arg expected_head "$2" --arg expected_base "$3" '
-    .state == "OPEN"
-    and (.isDraft | not)
-    and .mergeable == "MERGEABLE"
-    and (.headRefOid // "") == $expected_head
-    and .baseRefName == "main"
-    and (.baseRefOid // "") == $expected_base
-    and .autoMergeRequest != null
-    and ([.labels[].name] | index("queue-deferred")) != null
-    and ([.labels[].name] | any(
-      . == "fast" or . == "needs-conflict-resolution"
-      or '"$MACHINE_HOLD_JQ"'
-    ) | not)
-  ' <<<"$1" >/dev/null
-}
-
-restore_deferred_hold() {  # restore_deferred_hold <num>
-  local n="$1"
-  [[ "$DRY_RUN" == "1" ]] && return 0
-  if gh_mutate_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
-    echo "    +queue-deferred on #$n (compensated changed release state)"
-    return 0
-  fi
-  echo "    !! could not compensate queue-deferred release for #$n" >&2
-  return 1
-}
-
-# Release only a previously pressure-deferred PR after main advances. This is
-# intentionally called only by Merge Queue Auto-Enroll's existing `push: main`
-# path. A candidate must be live/current, retain its auto-merge request, have
-# no stronger hold, and pass the same canonical source-gate classifier used by
-# normal enrollment. Any race restores the deferral hold rather than enrolling
-# an unproven revision.
+# Automatic queue-deferred release remains disabled. Keep this legacy call as
+# an explicit no-op so maintenance runs preserve the hold pending owner action.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
   [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]] && return 0
@@ -1367,98 +1333,6 @@ reconcile_deferred_auto_merge_after_main_push() {
   echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
   echo "  ~ no typed pressure-deferral provenance; owner release required"
   return 0
-
-  local main_oid candidates pr n expected_head before failures before_release after
-  echo "=== RECONCILE (current auto-merge deferred PRs after main push) ==="
-
-  if ! main_oid="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha' 2>/dev/null)" \
-    || [[ ! "$main_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
-    echo "  !! could not resolve exact main SHA; preserving queue-deferred holds" >&2
-    return 0
-  fi
-  main_oid="$(printf '%s' "$main_oid" | tr '[:upper:]' '[:lower:]')"
-
-  if ! candidates="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid --jq '
-      [ .[] | select(.isDraft == false) | select(.mergeable == "MERGEABLE")
-        | select(.baseRefName == "main")
-        | select([.labels[].name] | index("queue-deferred"))
-        | { n: .number, head: (.headRefOid // ""), base: (.baseRefOid // "") } ]')"; then
-    echo "  !! could not read deferred PR candidates; preserving holds" >&2
-    return 0
-  fi
-
-  while IFS= read -r pr; do
-    stop_if_budget_exhausted && break
-    n="$(jq -r '.n' <<<"$pr")"
-    expected_head="$(jq -r '.head // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    expected_base="$(jq -r '.base // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    echo "  #$n"
-
-    if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ || "$expected_base" != "$main_oid" ]]; then
-      echo "    ~ not based on current main; preserving deferral"
-      continue
-    fi
-
-    if ! before="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
-      echo "    ~ could not read live state; preserving deferral"
-      continue
-    fi
-    if ! deferred_state_is_releasable "$before" "$expected_head" "$main_oid"; then
-      echo "    ~ live state is not a current, clean auto-merge defer; preserving"
-      continue
-    fi
-
-    failures="$(check_failures_for_pr "$n")"
-    if [[ "$(jq 'length' <<<"$failures")" -ne 0 ]]; then
-      echo "    ~ canonical source gates are not green: $(jq -r 'join(", ")' <<<"$failures")"
-      continue
-    fi
-
-    # Re-read after checks so neither a new head nor a stronger hold can inherit
-    # an old source-gate result.
-    if ! before_release="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
-      echo "    ~ could not re-read live state; preserving deferral"
-      continue
-    fi
-    if ! deferred_state_is_releasable "$before_release" "$expected_head" "$main_oid"; then
-      echo "    ~ head, base, hold, or auto-merge changed; preserving deferral"
-      continue
-    fi
-
-    if [[ "$DRY_RUN" == "1" ]]; then
-      echo "    [dry-run] would -queue-deferred on #$n"
-      continue
-    fi
-    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
-      echo "    !! failed to remove queue-deferred on #$n" >&2
-      continue
-    fi
-
-    if ! after="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)" \
-      || ! jq -e --arg expected_head "$expected_head" --arg expected_base "$main_oid" '
-        .state == "OPEN"
-        and (.isDraft | not)
-        and .mergeable == "MERGEABLE"
-        and (.headRefOid // "") == $expected_head
-        and .baseRefName == "main"
-        and (.baseRefOid // "") == $expected_base
-        and .autoMergeRequest != null
-        and ([.labels[].name] | index("queue-deferred")) == null
-        and ([.labels[].name] | any(
-          . == "fast" or . == "needs-conflict-resolution"
-      or '"$MACHINE_HOLD_JQ"'
-        ) | not)
-      ' <<<"$after" >/dev/null; then
-      echo "    !! release state changed; restoring queue-deferred hold" >&2
-      restore_deferred_hold "$n" || return 1
-      continue
-    fi
-    echo "    -queue-deferred on #$n (current main + exact green head)"
-  done < <(jq -c '.[]' <<<"$candidates")
 }
 
 # Record the effective read identity without ever printing a token. The
@@ -2792,15 +2666,12 @@ fi
 # --- DEQUEUE: starved merge groups (PR #16420, 2026-09-03) ---
 # An AWAITING_CHECKS native entry whose merge group never produced a ci.yml
 # run is the 'missing evidence' gap the non-progressing pass above cannot
-# close: there is no failure receipt and there never will be one, so the entry
-# sits forever and silently blocks every follower. Recover only on proven
-# evidence: the already-fetched merge_group run inventory has NO run on this
-# PR's group branch, AND the PR's latest added_to_merge_queue timeline event
-# is older than DRAIN_GROUP_STARVED_MINUTES. Any failed read skips the entry —
-# never mutate on unproven evidence. Dequeue only; the normal ENROLL path
-# re-admits the still-green head, and the fresh group's checks_requested
-# refires CI. Capped at 2 per run so a timeline-API anomaly cannot clear the
-# whole queue in one pass.
+# close. The general churn inventory is bounded to one page and cannot prove
+# absence. Query the exact entry lifetime with pagination and a frozen upper
+# bound. Unknown, capped, malformed, or incomplete inventory leaves it queued.
+# The final mutation carries the observed PR head to native revalidation.
+# Dequeue only; normal ENROLL re-admits the still-green head and the fresh
+# group's checks_requested refires CI. Capped at 2 per pass.
 if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
   && { waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; }; then
   echo "=== DEQUEUE (starved group: AWAITING_CHECKS with no merge-group CI run) ==="
@@ -2811,30 +2682,90 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
       break
     fi
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
-    if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" '
-      any(.[]; (.headBranch // "") | startswith($prefix))
-    ' <<<"$MERGE_GROUP_RUNS_JSON" >/dev/null; then
-      continue
-    fi
+    expected_head="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    snapshot_queued_at="$(jq -r '.qa // ""' <<<"$pr")"
     if ! timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
       echo "  #$n  $t  ~ timeline read failed; leaving queued"
       continue
     fi
-    queued_at="$(jq -r '
-      [ .[][]? | select(.event == "added_to_merge_queue") | .created_at ]
-      | sort | last // empty
-    ' <<<"$timeline_json" 2>/dev/null || true)"
+    queued_at="$(jq -r '[ .[][]? | select(.event == "added_to_merge_queue") | .created_at ] | sort | last // empty' <<<"$timeline_json" 2>/dev/null || true)"
     queued_epoch="$(jq -rn --arg d "$queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
-    if [[ ! "$queued_epoch" =~ ^[0-9]+$ ]]; then
-      echo "  #$n  $t  ~ no readable added_to_merge_queue event; leaving queued"
+    snapshot_queued_epoch="$(jq -rn --arg d "$snapshot_queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$queued_epoch" =~ ^[0-9]+$ || ! "$snapshot_queued_epoch" =~ ^[0-9]+$ ]] \
+      || [[ "$queued_epoch" != "$snapshot_queued_epoch" ]]; then
+      echo "  #$n  $t  ~ queue add time does not match the native snapshot; leaving queued"
       continue
     fi
     age_seconds=$(( $(date -u +%s) - queued_epoch ))
     if (( age_seconds < DRAIN_GROUP_STARVED_MINUTES * 60 )); then
       continue
     fi
-    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with no merge-group CI run"
-    if ! dequeue_strict "$n"; then
+    if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "  #$n  $t  ~ current PR head is unreadable; leaving queued"
+      continue
+    fi
+
+    inventory_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    inventory_started_epoch="$(jq -rn --arg d "$inventory_started_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$inventory_started_epoch" =~ ^[0-9]+$ ]] || (( inventory_started_epoch < queued_epoch )); then
+      echo "  #$n  $t  ~ invalid merge-group inventory time window; leaving queued"
+      continue
+    fi
+    if ! group_runs_json="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs" \
+      -X GET -F event=merge_group -F per_page=100 \
+      -F "created=${queued_at}..${inventory_started_at}" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ merge-group run inventory read failed; leaving queued"
+      continue
+    fi
+    if ! jq -e --argjson start "$queued_epoch" --argjson finish "$inventory_started_epoch" '
+      . as $pages
+      | (type == "array" and length > 0)
+      and all($pages[]; (type == "object")
+        and (.total_count | type == "number" and floor == . and . >= 0)
+        and (.workflow_runs | type == "array"))
+      and ($pages[0].total_count as $total
+        | ($total < 1000)
+        and all($pages[]; .total_count == $total)
+        and ([$pages[].workflow_runs[]] | length == $total)
+        and all($pages[].workflow_runs[];
+          . as $run
+          | ($run.id | type == "number" and . > 0)
+          and ($run.head_branch | type == "string" and test("^gh-readonly-queue/main/pr-[1-9][0-9]*-[0-9a-fA-F]{40}$"))
+          and ($run.head_sha | type == "string" and test("^[0-9a-fA-F]{40}$"))
+          and ($run.status | IN("queued", "in_progress", "completed"))
+          and (($run.conclusion == null) or ($run.conclusion | type == "string"))
+          and ($run.created_at | type == "string"
+            and ((try fromdateiso8601 catch -1) >= $start)
+            and ((try fromdateiso8601 catch -1) <= $finish))
+        )
+      )
+    ' <<<"$group_runs_json" >/dev/null 2>&1; then
+      echo "  #$n  $t  ~ merge-group run inventory is incomplete, capped, or malformed; leaving queued"
+      continue
+    fi
+    if jq -e --arg pr "$n" '
+      any(.[].workflow_runs[];
+        (.head_branch | test("^gh-readonly-queue/main/pr-" + $pr + "-[0-9a-fA-F]{40}$")))
+    ' <<<"$group_runs_json" >/dev/null; then
+      echo "  #$n  $t  ~ exact merge-group branch has CI run evidence; leaving queued"
+      continue
+    fi
+
+    # Re-read timeline after the paginated scan. A replacement entry has not
+    # been proven starved, even when its source head is unchanged.
+    if ! confirm_timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ queue timeline confirmation failed; leaving queued"
+      continue
+    fi
+    confirmed_queued_at="$(jq -r '[ .[][]? | select(.event == "added_to_merge_queue") | .created_at ] | sort | last // empty' <<<"$confirm_timeline_json" 2>/dev/null || true)"
+    confirmed_queued_epoch="$(jq -rn --arg d "$confirmed_queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$confirmed_queued_epoch" =~ ^[0-9]+$ ]] || [[ "$confirmed_queued_epoch" != "$queued_epoch" ]]; then
+      echo "  #$n  $t  ~ queue entry changed during run inventory; leaving queued"
+      continue
+    fi
+
+    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with complete merge-group inventory and no matching run"
+    if ! dequeue_strict "$n" "$expected_head"; then
       echo "::error::Failed to prove starved-group PR #$n is outside native merge queue" >&2
       exit 1
     fi

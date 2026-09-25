@@ -1,8 +1,8 @@
 /**
  * Admin authorization and role management
  *
- * This module provides secure admin authorization with database-backed
- * role verification, caching, and audit logging.
+ * Database-backed admin authorization. `isAdmin` reads Postgres on every
+ * check so a Redis "yes" cannot grant privileges.
  */
 
 export type {

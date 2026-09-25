@@ -27,10 +27,23 @@ vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
 vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: mocks.fetchSummerShadow,
 }));
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_current',
+  })),
+  SummerPinInvalidError: class SummerPinInvalidError extends Error {
+    readonly code = 'summer_pin_invalid';
+  },
+}));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: mocks.loggerError },
 }));
 
+import {
+  resolveSummerEveCallerOrigin,
+  SummerPinInvalidError,
+} from '@/lib/ovie/summer-production-pin';
 import * as routeModule from './route';
 import { SUMMER_RECOVERY_TARGET } from './target';
 
@@ -248,11 +261,30 @@ describe('GET /api/ovie/summer/reconcile', () => {
 
   it.each([
     ['founder identity', 'OVIE_SUMMER_FOUNDER_APP_USER_ID'],
-    ['current Eve deployment', 'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID'],
     ['production origin', 'VERCEL_ENV'],
   ] as const)('fails closed when %s is unavailable', async (_name, key) => {
     vi.stubEnv(key, key === 'VERCEL_ENV' ? 'preview' : '');
     expect((await GET()).status).toBe(503);
+    expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the production alias identity is invalid', async () => {
+    vi.mocked(resolveSummerEveCallerOrigin).mockRejectedValueOnce(
+      new SummerPinInvalidError(
+        {
+          projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',
+          environment: 'production',
+          deploymentId: null,
+        },
+        { status: 404 }
+      )
+    );
+    const response = await GET();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'summer_pin_invalid',
+    });
     expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
   });
 
@@ -307,17 +339,20 @@ describe('GET /api/ovie/summer/reconcile', () => {
   it.each([
     ['unsupported session identity', { sessionId: 'run_unknown' }],
     ['empty turn identity', { turnId: '' }],
-  ])('rejects %s as an invalid result without persistence', async (_field, drift) => {
-    mocks.fetchSummerShadow.mockResolvedValue(resultResponse(drift));
+  ])(
+    'rejects %s as an invalid result without persistence',
+    async (_field, drift) => {
+      mocks.fetchSummerShadow.mockResolvedValue(resultResponse(drift));
 
-    const response = await GET();
+      const response = await GET();
 
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'invalid_summer_result',
-    });
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'invalid_summer_result',
+      });
+      expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not persist a failed terminal result', async () => {
     mocks.fetchSummerShadow.mockResolvedValue(

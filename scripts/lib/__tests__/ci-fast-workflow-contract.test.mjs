@@ -1,6 +1,7 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -10,19 +11,20 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_PATHS,
   CERTIFICATION_KERNEL_COMMAND,
+  changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
+  listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
-  RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
   selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
@@ -106,9 +108,20 @@ describe('ci-fast bounded parallel workflow', () => {
       const invoked = readFileSync(calls, 'utf8');
       if (scenario.available) {
         expect(invoked).toContain('-m coverage run --branch');
-        expect(invoked).toContain('-m pytest scripts/tests/test_gh_retry.py');
-        expect(invoked).toContain(
-          'scripts/tests/test_symphony_reconciler_runtime.py -v'
+        const pytestInvocation = invoked
+          .split('\n')
+          .find(call => call.startsWith('-m pytest '));
+        expect(pytestInvocation).toBe(
+          [
+            '-m pytest --durations=20',
+            'scripts/tests/test_gh_retry.py',
+            'scripts/tests/test_vercel_prebuilt_deploy.py',
+            'scripts/tests/test_brand_scrub.py',
+            'scripts/tests/test_agent_workflow_hygiene.py',
+            'scripts/tests/test_runner_routing.py',
+            'scripts/tests/test_symphony_ui_pilot_runtime.py',
+            'scripts/tests/test_symphony_reconciler_runtime.py -v',
+          ].join(' ')
         );
       } else {
         expect(invoked.trim()).toBe('-c import coverage, pytest');
@@ -329,6 +342,47 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const runner = remaining
+      .split('id: storybook-browser-test')[1]
+      .split('      - name: Upload Storybook browser evidence')[0];
+    const selection = runner.slice(
+      runner.indexOf('          specs=()'),
+      runner.indexOf('          pnpm exec storybook dev')
+    );
+    const chosen = spawnSync(
+      'bash',
+      ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUN_SPOTIFY: 'true',
+          RUN_KBD: 'true',
+          RUN_CRAWLER: 'false',
+        },
+      }
+    );
+    expect(chosen.status, chosen.stderr).toBe(0);
+    const specs = chosen.stdout.trim().split('\n');
+    expect(specs).toEqual([
+      'tests/e2e/storybook-spotify-connect.spec.ts',
+      'tests/e2e/storybook-kbd-motion.spec.ts',
+    ]);
+    for (const spec of specs) {
+      expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec)), spec).toBe(true);
+    }
+    expect(runner).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    const uploader = remaining
+      .split('      - name: Upload Storybook browser evidence')[1]
+      .split('      - name: Upload ci-fast lane results')[0];
+    expect(uploader).toContain("allow-markdown: 'true'");
   });
 
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
@@ -1022,6 +1076,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain(
       '&& node scripts/run-affected-tests.mjs --control'
     );
+    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/fx-remediation-lane.test.mjs');
+    expect(fxCoverage).toContain('lib/__tests__/rolling-ci-dispatch.test.mjs');
+    expect(fxCoverage).toContain(
+      'lib/{rolling-ci-fx,fx-remediation-lane,rolling-ci-dispatch,rolling-ci-fx-finish}.mjs'
+    );
+    expect(fxCoverage).toContain('--coverage.thresholds.perFile=true');
+    expect(fxCoverage).toContain('--coverage.thresholds.lines=60');
+    expect(fxCoverage).toContain('--coverage.thresholds.branches=60');
+    expect(fxCoverage).toContain('--coverage.thresholds.functions=70');
   });
 
   it('enforces external shared health contract coverage for package and test changes', () => {
@@ -1041,6 +1108,117 @@ describe('ci-fast bounded parallel workflow', () => {
       '--coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts"'
     );
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
+  });
+
+  it('selects structural coverage for native queue evidence and collector edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .join('');
+    for (const path of [
+      'scripts/native-queue-eval.mjs',
+      'scripts/lib/native-queue-eval.mjs',
+      'scripts/lib/native-queue-group-evidence.mjs',
+      'scripts/lib/native-queue-policy-evidence.mjs',
+      'scripts/lib/__tests__/native-queue-collector.test.mjs',
+      'scripts/lib/__tests__/native-queue-eval.test.mjs',
+      'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+      'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    for (const path of ['README.md', 'docs/native-queue-eval.mjs']) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(1);
+    }
+  });
+
+  it('selects the existing control lane for conflict event entrypoint and proof edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .join('');
+    for (const path of [
+      'scripts/pr-conflict-handler.mjs',
+      'scripts/lib/pr-conflict-handler.mjs',
+      'scripts/lib/pr-conflict-event.mjs',
+      'scripts/lib/github-open-prs-rest.mjs',
+      'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+      'scripts/lib/__tests__/pr-conflict-event.test.mjs',
+      'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+  });
+
+  it('runs route-prep behavior coverage for probe and router edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .find(part => part.includes('run-route-prep-coverage-gate'))
+      ?.replace(/^\|/, '');
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/codex-account-probe.sh',
+      'scripts/symphony/symphony-agent-router',
+      'scripts/symphony/tests/codex-account-probe.test.py',
+      'scripts/symphony/tests/symphony-agent-router.test.py',
+      'scripts/symphony/tests/run-route-prep-coverage-gate.py',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    for (const path of [
+      'scripts/symphony/symphony-agent-router-extra',
+      'scripts/symphony/symphony-codex-router',
+      'scripts/symphony/tests/codex-recovery-ci.sh',
+      'README.md',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(1);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
+    );
+    const coverage = WORKFLOW.slice(
+      WORKFLOW.indexOf('  ci-exact-head-coverage:'),
+      WORKFLOW.indexOf('  ci-a11y:')
+    );
+    expect(coverage).toContain("github.event_name == 'pull_request'");
+    expect(coverage).toContain("github.event_name == 'merge_group'");
+    expect(coverage).toContain('has_route_prep_coverage_changes');
+    expect(coverage).toContain(
+      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
+    );
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
   });
 
   it('runs native queue delivery regressions with coverage for executor changes', () => {
@@ -1409,11 +1587,21 @@ describe('ci-fast bounded parallel workflow', () => {
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
     )?.[1];
+    const controlPatternAdditions = Array.from(
+      remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+      match => match[1]
+    );
     const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
 
-    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
+    const selectsStructural = new RegExp(
+      [
+        controlPattern,
+        ...controlPatternAdditions.map(addition => addition.replace(/^\|/, '')),
+        uiPattern,
+      ].join('|')
+    );
     expect(
       selectsStructural.test(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
@@ -1427,6 +1615,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       selectsStructural.test('scripts/verification/admission-shadow.mjs')
     ).toBe(true);
+    for (const fxCoveragePath of [
+      'scripts/lib/fx-remediation-lane.mjs',
+      'scripts/lib/rolling-ci-dispatch.mjs',
+      'scripts/lib/rolling-ci-fx.mjs',
+      'scripts/lib/rolling-ci-fx-finish.mjs',
+      'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+      'scripts/lib/__tests__/rolling-ci-fx-finish.test.mjs',
+    ]) {
+      expect(selectsStructural.test(fxCoveragePath)).toBe(true);
+    }
     for (const mergeQueueControllerPath of [
       'scripts/automation-verify.sh',
       'scripts/run-affected-tests.mjs',
@@ -1486,20 +1686,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/test-model-router.py',
       'scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'scripts/symphony/tests/test_fleet_admission_receipt.py',
-      'scripts/lib/release-wave-admission.mjs',
-      'scripts/lib/__tests__/release-wave-admission.test.mjs',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }
-    expect(CI_FAST_SOURCE).toContain(
-      'RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,'
-    );
-    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
-      'lib/__tests__/release-wave-admission.test.mjs'
-    );
-    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
-      '--coverage.include=release-wave-admission.mjs'
-    );
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
     expect(CI_FAST_SOURCE).toContain(
@@ -1753,6 +1942,12 @@ it('runs the attestation observation coverage gate for publisher-only edits', ()
   expect(CI_FAST_SOURCE).toContain(
     'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
   );
+  expect(
+    selected.test('scripts/symphony/install-gem-service-attestation.sh')
+  ).toBe(true);
+  expect(
+    selected.test('scripts/symphony/systemd/gem-service-attestation.service')
+  ).toBe(true);
 });
 
 it('runs authenticated Summer bridge coverage for admission-only edits', () => {
@@ -1768,4 +1963,69 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   expect(CI_FAST_SOURCE).toContain(
     '--coverage.include=lib/ovie/summer-admissions.ts'
   );
+});
+
+describe('CI diff selection on a divergent PR', () => {
+  it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
+    const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+    const select = (event, base = '') => {
+      vi.stubEnv('GITHUB_EVENT_NAME', event);
+      vi.stubEnv('GITHUB_BASE_REF', 'main');
+      vi.stubEnv('TURBO_SCM_BASE', base);
+      return {
+        all: listAllChangedFiles(repository),
+        ts: changedFiles(['*.ts'], repository),
+      };
+    };
+    try {
+      git('init', '-b', 'main');
+      git('config', 'user.name', 'CI test');
+      git('config', 'user.email', 'ci-test@example.invalid');
+      writeFileSync(join(repository, 'shared.ts'), 'export const value = 1;\n');
+      git('add', '.');
+      git('commit', '-m', 'base');
+      const base = git('rev-parse', 'HEAD');
+      writeFileSync(
+        join(repository, 'main-only.ts'),
+        'export const onlyMain = true;\n'
+      );
+      git('add', '.');
+      git('commit', '-m', 'main moves ahead');
+      git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      git('checkout', '-b', 'pr', base);
+      writeFileSync(
+        join(repository, 'pr-only.ts'),
+        'export const onlyPr = true;\n'
+      );
+      writeFileSync(join(repository, 'notes.md'), 'PR note\n');
+      git('add', '.');
+      git('commit', '-m', 'PR change');
+      expect(select('pull_request')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
+        ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('push')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(select('pull_request', base)).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
+      });
+      expect(select('pull_request', 'missing-base')).toEqual({
+        all: null,
+        ts: null,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+    }
+  });
 });

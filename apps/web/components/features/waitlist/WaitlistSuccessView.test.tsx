@@ -8,6 +8,19 @@ import storyMeta, {
 } from './WaitlistSuccessView.stories';
 
 describe('WaitlistSuccessView', () => {
+  it('does not show a saved-request confirmation for an orphaned pending account', () => {
+    render(<WaitlistSuccessView outcome='receipt_unavailable' />);
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: "We Couldn't Verify Your Request",
+      })
+    ).toBeVisible();
+    expect(screen.queryByText("You're on the list")).toBeNull();
+    expect(screen.queryByTestId('waitlist-next-steps')).toBeNull();
+  });
+
   it('renders the truthful persisted-pending receipt used by /waitlist', () => {
     const { container } = render(<WaitlistSuccessView />);
 

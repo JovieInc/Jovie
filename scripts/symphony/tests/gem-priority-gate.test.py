@@ -21,7 +21,6 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 GATE = ROOT / "scripts/symphony/gem-priority-gate.py"
-AUTOENROLL_WORKFLOW = ROOT / ".github/workflows/merge-queue-autoenroll.yml"
 # Historical stub printed by the __main__ except block before JOV-5067.
 # Auto-Enroll jq fail-closed on this shape: missing observedAt, signals,
 # isolatedPromotionAdmission, and promotionMode.
@@ -659,6 +658,12 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 "completedAt": MODULE.isoformat(now),
             },
         }
+        controller_signal = {
+            "status": "green",
+            "kind": "symphony",
+            "source": "live",
+            "observedAt": MODULE.isoformat(now),
+        }
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
             args = MODULE.argparse.Namespace(
@@ -683,8 +688,8 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 mock.patch.object(
                     MODULE,
                     "observe_controller",
-                    return_value={"status": "green"},
-                ),
+                    return_value=controller_signal,
+                ) as controller_observer,
                 mock.patch.object(
                     MODULE,
                     "observe_integrity",
@@ -706,7 +711,8 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     MODULE,
                     "observe_closure_health",
                     return_value=GREEN_SIGNALS["closureHealth"],
-                ),
+                ) as closure_observer,
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
                 mock.patch.object(
                     MODULE,
                     "observe_lease",
@@ -719,6 +725,25 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 ),
             ):
                 signals = MODULE.observe_signals(args, now)
+
+        controller_observer.assert_called_once_with(
+            args.symphony_url,
+            snapshot_path=MODULE.fleet_sidecar_path(
+                state_dir, args.repo, "controller-snapshot.json"
+            ),
+            now=now,
+        )
+        closure_observer.assert_called_once_with(
+            args.repo,
+            None,
+            now,
+            controller_observation=controller_signal,
+        )
+        self.assertIs(signals["controller"], controller_signal)
+        self.assertIs(
+            closure_observer.call_args.kwargs["controller_observation"],
+            controller_signal,
+        )
 
         audit_observer.assert_called_once_with("JovieInc/Jovie", main["sha"], MODULE.gh_json,
                                               targets=GREEN_SIGNALS["closureHealth"].get("lifecycleActions", []))
@@ -2292,6 +2317,33 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_issue_blocked_and_systems_down_keep_distinct_admission_effects(self):
+        closure_blocked = dict(GREEN_SIGNALS)
+        closure_blocked["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+        issue_receipt = self.evaluate(closure_blocked)
+        self.assertEqual(issue_receipt["state"], "GREEN")
+        self.assertFalse(issue_receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(issue_receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(issue_receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(issue_receipt["remediationAdmission"]["allowed"])
+
+        systems_down = dict(GREEN_SIGNALS)
+        systems_down["controller"] = {
+            "status": "failed",
+            "kind": "symphony",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        system_receipt = self.evaluate(systems_down)
+        self.assertEqual(system_receipt["promotionMode"], "hold-intake")
+        self.assertTrue(system_receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(system_receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(system_receipt["deploymentAdmission"]["allowed"])
+
     def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
         """native-queue-empty-with-eligible is a feed signal: blocking
         admission deadlocks (queue stays empty BECAUSE admission is blocked).
@@ -3743,10 +3795,14 @@ class ScheduledFreshnessTests(unittest.TestCase):
 class WorkflowContractTests(unittest.TestCase):
     WORKFLOWS = ROOT / ".github" / "workflows"
 
-    def test_autoenroll_persists_fleet_receipt_without_dry_run(self):
-        content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
-        self.assertIn("./.github/actions/evaluate-fleet-gate", content)
-        self.assertIn("dry-run: 'false'", content)
+    def test_retired_autoenroll_cannot_write_fleet_receipts(self):
+        self.assertFalse((self.WORKFLOWS / "merge-queue-autoenroll.yml").exists())
+        refresh = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+        self.assertIn("./.github/actions/evaluate-fleet-gate", refresh)
+        self.assertIn(
+            "dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}",
+            refresh,
+        )
         wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
@@ -3776,7 +3832,6 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertNotIn("Production Marker Recovery]", content)
-        self.assertNotIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)

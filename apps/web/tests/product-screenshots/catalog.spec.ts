@@ -1,4 +1,4 @@
-import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../../lib/screenshots/types';
 import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
 import { optimizePngLosslessly } from '../../scripts/png-optimization';
+import { syncScreenshotPublicExport } from '../../scripts/sync-screenshot-public-export';
 import { replaceWithAtomicSibling } from './atomic-output';
 import {
   assertNoDevOverlays,
@@ -165,21 +166,6 @@ async function captureCatalogImage(
   });
 }
 
-async function syncPublicExport(catalogPath: string, publicExportPath: string) {
-  const exportPath = join(PUBLIC_EXPORT_DIR, publicExportPath);
-  const existingExport = await readOptionalFile(exportPath);
-  const catalogImage = await readFile(catalogPath);
-
-  if (existingExport && existingExport.equals(catalogImage)) {
-    return;
-  }
-
-  await replaceWithAtomicSibling(exportPath, async temporaryPath => {
-    await copyFile(catalogPath, temporaryPath);
-    return true;
-  });
-}
-
 async function prepareScenario(
   page: import('@playwright/test').Page,
   id: string
@@ -292,7 +278,6 @@ test.describe('Screenshot Catalog', () => {
         )
       )
     );
-
     manifestEntriesById = await readManifestEntries();
 
     for (const id of [...manifestEntriesById.keys()]) {
@@ -317,7 +302,11 @@ test.describe('Screenshot Catalog', () => {
       );
 
       if (preparedScenario.publicExportPath) {
-        await syncPublicExport(catalogPath, preparedScenario.publicExportPath);
+        await syncScreenshotPublicExport({
+          imagePath: `${preparedScenario.id}.png`,
+          publicExportPath: preparedScenario.publicExportPath,
+          webRoot: dirname(dirname(CATALOG_OUTPUT_DIR)),
+        });
       }
 
       const evidence = resolveScreenshotEvidence({

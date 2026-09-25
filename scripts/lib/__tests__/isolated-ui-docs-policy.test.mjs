@@ -425,11 +425,7 @@ describe('isolated UI/docs promotion policy', () => {
     ).toBe(false);
   });
 
-  it('keeps one native controller, freezes deploy, and never treats labels as authority', () => {
-    const queueWorkflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/merge-queue-autoenroll.yml'),
-      'utf8'
-    );
+  it('freezes deploy and never treats labels as authority', () => {
     const productionWorkflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
       'utf8'
@@ -447,19 +443,6 @@ describe('isolated UI/docs promotion policy', () => {
       'utf8'
     );
 
-    expect(queueWorkflow).toContain('fleet-policy:');
-    expect(queueWorkflow).toContain(
-      "workflows: ['CI', 'Production Controller']"
-    );
-    expect(queueWorkflow).toContain('DRAIN_PROMOTION_MODE:');
-    expect(queueWorkflow).toContain('DRAIN_RECOVER_FLEET_HOLDS:');
-    expect(queueWorkflow).toContain('merge-queue-drain-mutex');
-    expect(queueWorkflow).toContain('isolated-only');
-    expect(queueWorkflow).toContain('hold-intake');
-    expect(queueWorkflow).toContain(
-      'uses: ./.github/actions/evaluate-fleet-gate'
-    );
-    expect(queueWorkflow).toContain('steps.policy.outputs.promotion_mode');
     expect(evaluateFleetGate).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(

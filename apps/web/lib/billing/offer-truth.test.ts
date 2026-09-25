@@ -4,15 +4,22 @@ import {
   ARTIST_VISIBILITY_OFFER,
   FREE_PROFILE_TRUTH,
   formatAnnualMonthlyEquivalent,
+  formatPublicPriceDisplay,
   formatUsdAmount,
+  getContactSalesHref,
   getMaxOfferBadge,
   getMaxOfferStatus,
   getPaidPlanPriceUsd,
+  getPlanCtaHref,
   getPlanCtaLabel,
   getPlanOfferNote,
   getPlanSignupHref,
+  getPublicPriceClaim,
+  getPublicPriceClaims,
+  hasPublicAnnualOffer,
   isMaxPurchaseEnabled,
   isSelfServiceOffer,
+  PUBLIC_CUSTOM_PRICE_LABEL,
   validateBillingInterval,
 } from './offer-truth';
 
@@ -61,7 +68,7 @@ describe('Artist Visibility offer contract', () => {
     expect(isSelfServiceOffer('team')).toBe(false);
     expect(isSelfServiceOffer(null)).toBe(false);
   });
-  it('presents the free/trial and contact-sales choices without paid Max claims', () => {
+  it('preserves legacy auth helpers while public claims use limited access', () => {
     expect(getPlanSignupHref('free')).toBe('/signup?plan=free');
     expect(getPlanCtaLabel('free')).toBe('Claim your profile');
     expect(getPlanCtaLabel('pro')).toBe('Start 14-day Pro trial');
@@ -69,6 +76,7 @@ describe('Artist Visibility offer contract', () => {
     expect(getPlanOfferNote('free')).toContain('free forever');
     expect(getPlanOfferNote('pro')).toContain('No credit card');
     expect(getPlanOfferNote('enterprise')).toContain('contact sales');
+    expect(getPlanCtaHref('pro')).toBe('/signup?plan=pro&interval=month');
     expect(getMaxOfferStatus()).toBe('contact_sales');
     expect(getMaxOfferBadge()).toBe('Contact sales');
     expect(() => getPlanSignupHref('enterprise')).toThrow();
@@ -80,5 +88,56 @@ describe('Artist Visibility offer contract', () => {
     expect(validateBillingInterval('annual')).toBe('year');
     expect(validateBillingInterval('yearly')).toBe('year');
     expect(validateBillingInterval('weekly')).toBeNull();
+  });
+
+  it('owns public price and offer claims from one typed module', () => {
+    const free = getPublicPriceClaim('free');
+    const pro = getPublicPriceClaim('pro');
+    const max = getPublicPriceClaim('max');
+    const enterprise = getPublicPriceClaim('enterprise');
+
+    expect(getPublicPriceClaims().map(claim => claim.plan)).toEqual([
+      'free',
+      'pro',
+      'enterprise',
+    ]);
+    expect(free).toMatchObject({
+      priceUsd: 0,
+      annualPriceUsd: null,
+      priceLabel: '$0',
+      selfService: true,
+      ctaLabel: 'Claim my free profile',
+      ctaHref: '/signup?plan=free',
+    });
+    expect(pro).toMatchObject({
+      priceUsd: getPaidPlanPriceUsd('pro', 'month'),
+      annualPriceUsd: null,
+      priceLabel: formatUsdAmount(getPaidPlanPriceUsd('pro', 'month')),
+      cadence: '/mo',
+      selfService: false,
+      badge: 'Limited access',
+      note: 'Limited access.',
+      ctaLabel: 'Request access',
+      ctaHref: '/waitlist',
+    });
+    expect(formatPublicPriceDisplay(pro)).toBe(`${pro.priceLabel}/mo`);
+    expect(max).toMatchObject({
+      priceUsd: null,
+      annualPriceUsd: null,
+      priceLabel: PUBLIC_CUSTOM_PRICE_LABEL,
+      selfService: false,
+      ctaLabel: 'Contact sales',
+      ctaHref: getContactSalesHref(),
+    });
+    expect(enterprise).toMatchObject({
+      priceUsd: null,
+      priceLabel: PUBLIC_CUSTOM_PRICE_LABEL,
+      badge: 'Contact sales',
+      note: 'Scope by agreement.',
+      ctaLabel: 'Contact sales',
+      ctaHref: getContactSalesHref(),
+    });
+    expect(getPlanCtaHref('max')).toBe(getContactSalesHref());
+    expect(hasPublicAnnualOffer()).toBe(false);
   });
 });

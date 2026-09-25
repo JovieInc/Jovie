@@ -12,6 +12,9 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/actions/upload-safe-playwright-artifact/**'
+      - '.github/scripts/guard-playwright-artifacts.mjs'
+      - '.github/workflows/screenshots.yml'
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
@@ -27,6 +30,10 @@ on:
       - 'apps/web/features/**'
       - 'apps/web/lib/agent-os/visual-qa/**'
       - 'apps/web/lib/screenshots/**'
+      - 'apps/web/scripts/check-screenshot-catalog.ts'
+      - 'apps/web/scripts/png-optimization.ts'
+      - 'apps/web/scripts/stage-screenshot-catalog-transfer.ts'
+      - 'apps/web/scripts/sync-screenshot-public-export.ts'
       - 'apps/web/tests/product-screenshots/**'
       - 'apps/web/tests/visual-qa/**'
       - 'apps/web/tailwind.config.*'
@@ -207,6 +214,19 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      # Keep this readback before catalog.spec.ts refreshes canonical screenshots.
+      - name: Verify public screenshot exports from production build
+        timeout-minutes: 5
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/public-export-serving.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREENSHOT_BUILD_MODE: production
+
       - name: Capture screenshot catalog
         timeout-minutes: 30
         run: |
@@ -255,14 +275,17 @@ jobs:
             git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           fi
 
+      - name: Stage generated screenshot catalog for transfer
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: .
+        run: pnpm --dir apps/web exec tsx scripts/stage-screenshot-catalog-transfer.ts
+
       - name: Upload generated screenshot catalog
         if: steps.diff.outputs.changed == 'true'
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: screenshot-catalog-${{ github.sha }}
-          path: |
-            apps/web/public/product-screenshots/
-            apps/web/screenshot-catalog/current/
+          path: .artifacts/screenshot-catalog-transfer/
           if-no-files-found: error
           retention-days: 3
           allow-images: true
@@ -295,7 +318,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: screenshot-catalog-${{ github.sha }}
-          path: apps/web
+          path: .
 
       - name: Verify downloaded screenshot catalog
         working-directory: apps/web

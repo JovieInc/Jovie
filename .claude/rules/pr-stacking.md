@@ -15,9 +15,10 @@ so we cap size and stack instead.
 
 ## Size cap (enforced — `.github/workflows/pr-size-guard.yml`)
 
-- Max **800 changed lines** and **40 files** per PR, excluding lockfiles,
-  generated code, snapshots, and svg. Tunable via repo vars `PR_MAX_LINES` /
-  `PR_MAX_FILES`.
+- Max **1500 changed lines** and **75 files** per PR, excluding lockfiles,
+  generated code, snapshots, and svg. Live values come from repo vars
+  `PR_MAX_LINES` / `PR_MAX_FILES` (1500/75 as of 2026-07-08); the workflow's
+  built-in fallback defaults remain 800/40.
 - Over the cap → CI fails. **Split the work** (see below), or — only for an
   approved **mechanical codemod** (token sweep, rename, generated output) — add
   the **`big-pr`** label to bypass.

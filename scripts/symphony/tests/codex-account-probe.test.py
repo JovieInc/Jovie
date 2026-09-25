@@ -431,6 +431,122 @@ class CodexAccountProbeTests(unittest.TestCase):
         self.assertEqual(process.returncode, 0, stderr)
         self.assertEqual(stdout.strip(), b"RECOVERED account-a")
 
+    def write_ready_state(self, active="account-a"):
+        path = self.accounts / "state.json"
+        path.write_text(json.dumps({
+            "active": active,
+            "cooldowns": {"account-a": 0, "account-b": 0},
+            "last_error": {},
+        }))
+        old = time.time() - 600
+        os.utime(path, (old, old))
+        return path
+
+    def rpc_codex(self, used="10", resets_at="0"):
+        path = self.root / "rpc-codex"
+        path.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            "home = open(os.environ['HOME_LOG'], 'a', encoding='utf-8')\n"
+            "home.write(os.environ.get('CODEX_HOME', '') + '\\n')\n"
+            "home.close()\n"
+            "while True:\n"
+            "    line = sys.stdin.readline()\n"
+            "    if not line:\n"
+            "        break\n"
+            "    message = json.loads(line)\n"
+            "    method = message.get('method')\n"
+            "    if method == 'initialize':\n"
+            "        sys.stdout.write(json.dumps({'id': message['id'], 'result': {'userAgent': 'fixture'}}) + '\\n')\n"
+            "        sys.stdout.flush()\n"
+            "    elif method == 'account/rateLimits/read':\n"
+            "        sys.stdout.write(json.dumps({'id': message['id'], 'result': {'rateLimits': {'primary': {'usedPercent': float(os.environ['RATE_USED']), 'resetsAt': int(os.environ['RATE_RESETS_AT'])}}}}) + '\\n')\n"
+            "        sys.stdout.flush()\n"
+            "        break\n"
+        )
+        path.chmod(0o755)
+        return path
+
+    def test_refresh_writes_state_only_after_available_rate_limit_read(self):
+        path = self.write_ready_state(active="account-b")
+        before = path.stat().st_mtime
+        home_log = self.root / "homes"
+        result = self.run_probe(
+            CODEX_ACCOUNT_PROBE_MODE="refresh-freshness",
+            CODEX_REAL_BIN=str(self.rpc_codex()),
+            HOME_LOG=str(home_log),
+            RATE_USED="10",
+            RATE_RESETS_AT="0",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        state = json.loads(path.read_text())
+        self.assertEqual(state["capacityObservationSource"], "app_server_rate_limits_read/v1")
+        self.assertEqual(state["capacityObservedAccount"], "account-b")
+        self.assertEqual(state["cooldowns"], {"account-a": 0, "account-b": 0})
+        self.assertGreater(path.stat().st_mtime, before)
+        self.assertTrue(home_log.read_text().strip().endswith("account-b"))
+
+    def test_refresh_leaves_stale_state_untouched_when_exhausted_or_unknown(self):
+        path = self.write_ready_state()
+        before = path.read_bytes()
+        exhausted = self.run_probe(
+            CODEX_ACCOUNT_PROBE_MODE="refresh-freshness",
+            CODEX_REAL_BIN=str(self.rpc_codex()),
+            HOME_LOG=str(self.root / "exhausted-homes"),
+            RATE_USED="100",
+            RATE_RESETS_AT=str(int(time.time()) + 3600),
+        )
+        self.assertEqual(exhausted.returncode, 75, exhausted.stderr)
+        self.assertEqual(path.read_bytes(), before)
+        unknown = self.root / "unknown-codex"
+        unknown.write_text("#!/bin/sh\nexit 1\n")
+        unknown.chmod(0o755)
+        failed = self.run_probe(
+            CODEX_ACCOUNT_PROBE_MODE="refresh-freshness",
+            CODEX_REAL_BIN=str(unknown),
+        )
+        self.assertEqual(failed.returncode, 76, failed.stderr)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_refresh_fails_closed_when_the_account_lease_is_held(self):
+        path = self.write_ready_state()
+        before = path.read_bytes()
+        locks = self.accounts / "locks"
+        locks.mkdir()
+        descriptor = os.open(locks / "account-a.lock", os.O_RDWR | os.O_CREAT)
+        self.addCleanup(os.close, descriptor)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = self.run_probe(
+            CODEX_ACCOUNT_PROBE_MODE="refresh-freshness",
+            CODEX_REAL_BIN=str(self.rpc_codex()),
+            HOME_LOG=str(self.root / "busy-homes"),
+            RATE_USED="10",
+            RATE_RESETS_AT="0",
+        )
+        self.assertEqual(result.returncode, 76, result.stderr)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertFalse((self.root / "busy-homes").exists())
+
+    def test_unknown_probe_mode_does_not_recover_or_refresh(self):
+        path = self.accounts / "state.json"
+        original = self.write_state()
+        before = path.read_bytes()
+        result = self.run_probe(CODEX_ACCOUNT_PROBE_MODE="touch")
+        self.assertEqual(result.returncode, 76, result.stderr)
+        self.assertEqual(path.read_bytes(), before)
+        state = json.loads(path.read_text())
+        self.assertEqual(state["cooldowns"]["account-a"], original)
+        self.assertNotIn("capacityObservedAt", state)
+
+    def test_refresh_missing_state_does_not_exit_success_or_create_the_file(self):
+        state = self.accounts / "state.json"
+        self.assertFalse(state.exists())
+        result = self.run_probe(CODEX_ACCOUNT_PROBE_MODE="refresh-freshness")
+        self.assertEqual(result.returncode, 76, result.stderr)
+        self.assertFalse(state.exists())
+        self.assertEqual(result.stdout, "")
+
 
 HELPER = ROOT / "scripts/symphony/symphony-codex-account-control.py"
 

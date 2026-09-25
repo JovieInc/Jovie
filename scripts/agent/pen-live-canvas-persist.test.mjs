@@ -15,7 +15,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'pen-live-canvas-persist.mjs');
 const CANONICAL = join(
   homedir(),
-  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen'
+  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen'
 );
 const SECOND_FILE = join(
   homedir(),

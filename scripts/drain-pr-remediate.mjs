@@ -293,6 +293,17 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (
+    !options.dryRun &&
+    (process.env.GITHUB_WORKFLOW === 'Merge Queue Auto-Enroll' ||
+      /^JovieInc\/Jovie\/\.github\/workflows\/merge-queue-autoenroll\.yml@/.test(
+        process.env.GITHUB_WORKFLOW_REF ?? ''
+      ))
+  ) {
+    throw new Error(
+      'Merge Queue Auto-Enroll is retired; refusing its live rebase'
+    );
+  }
   const summary = await remediateBlockedPrs(options);
   if (options.json) {
     console.log(JSON.stringify(summary));

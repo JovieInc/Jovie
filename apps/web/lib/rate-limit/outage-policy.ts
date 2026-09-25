@@ -8,13 +8,13 @@ export type RedisCallerUnavailableAction = 'deny' | 'allow' | 'drop';
 export interface RedisLimiterOutagePolicy {
   readonly class: RedisOutageClass;
   readonly callerOnUnavailable: RedisCallerUnavailableAction;
-  readonly quotaContribution: 'analytics' | 'fixed-window' | 'none';
+  readonly quotaContribution: 'sliding-window' | 'fixed-window' | 'none';
 }
 
 const mandatoryDeny = {
   class: 'mandatory',
   callerOnUnavailable: 'deny',
-  quotaContribution: 'analytics',
+  quotaContribution: 'sliding-window',
 } as const satisfies RedisLimiterOutagePolicy;
 
 const mandatoryDenyFixed = {
@@ -32,7 +32,7 @@ const advisoryAllow = {
 const advisoryDeny = {
   class: 'advisory',
   callerOnUnavailable: 'deny',
-  quotaContribution: 'analytics',
+  quotaContribution: 'sliding-window',
 } as const satisfies RedisLimiterOutagePolicy;
 
 const advisoryDenyFixed = {
@@ -142,9 +142,10 @@ export interface RedisDataConsumerPolicy {
 }
 
 export const REDIS_DATA_CONSUMERS = {
-  'auth/secondary-storage': {
-    class: 'mandatory',
-    recovery: 'Postgres sessions; delete fail-closed when Redis is reachable',
+  'auth/rate-limit': {
+    class: 'advisory',
+    recovery:
+      'Degrade open when Redis is missing. Sessions stay in Postgres plus the cookie cache',
   },
   'musicfetch/budget-guard': {
     class: 'mandatory',

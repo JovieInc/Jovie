@@ -287,6 +287,7 @@ describe('generateMusicStructuredData', () => {
         ],
         releaseType: 'album',
         totalTracks: 10,
+        primaryArtists: [{ name: 'Test Artist', handle: 'testartist' }],
       },
       creator,
       [
@@ -317,6 +318,7 @@ describe('generateMusicStructuredData', () => {
         durationMs: 210000,
         isrc: 'USRC17607839',
         trackNumber: 1,
+        primaryArtists: [{ name: 'Test Artist', handle: 'testartist' }],
         inAlbum: {
           title: 'Midnight Drive',
           url: 'https://jov.ie/testartist/midnight-drive',
@@ -328,6 +330,293 @@ describe('generateMusicStructuredData', () => {
 
     expect(data).toMatchSnapshot();
     expect(validateMusicRichResults(data)).toEqual([]);
+  });
+
+  describe('byArtist credit projection (JOV-6542)', () => {
+    const ownerCreator = {
+      displayName: 'hello',
+      username: 'hello',
+      usernameNormalized: 'hello',
+      creatorType: 'artist' as const,
+      artistSameAs: ['https://open.spotify.com/artist/2o5jDhtHVPhrJdv3cEQ99Z'],
+    };
+
+    it('names the accepted credited artist, not the profile owner', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'A Town Called Paradise (Deluxe)',
+          slug: 'a-town-called-paradise-deluxe',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'Tiësto', handle: null }],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      // Incident shape: owner "hello" vs accepted credited artist "Tiësto".
+      expect(musicSchema.byArtist).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        name: 'Tiësto',
+      });
+      expect(validateMusicRichResults(data)).toEqual([]);
+    });
+
+    it('emits one entity per accepted co-primary artist', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Revival',
+          slug: 'revival',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [
+            { name: 'Tom Fall', handle: null },
+            { name: 'Tim White', handle: 'tim' },
+          ],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const byArtist = musicSchema.byArtist as Record<string, unknown>[];
+      expect(byArtist).toHaveLength(2);
+      expect(byArtist[0]).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        name: 'Tom Fall',
+      });
+      expect(byArtist[1]).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        '@id': 'https://jov.ie/tim#musicgroup',
+        name: 'Tim White',
+        url: 'https://jov.ie/tim',
+      });
+      // A co-primary with no supported destination never inherits the owner's
+      // identity links or mints a fictional combined-name entity.
+      expect(byArtist[0]).not.toHaveProperty('url');
+      expect(byArtist[1]).not.toHaveProperty('sameAs');
+      expect(validateMusicRichResults(data)).toEqual([]);
+    });
+
+    it('keeps the genuine owner-equals-artist case with entity sameAs', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Wheels Up',
+          slug: 'wheels-up',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'hello', handle: 'hello' }],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      expect(musicSchema.byArtist).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        '@id': 'https://jov.ie/hello#musicgroup',
+        name: 'hello',
+        url: 'https://jov.ie/hello',
+        sameAs: ['https://open.spotify.com/artist/2o5jDhtHVPhrJdv3cEQ99Z'],
+      });
+      expect(validateMusicRichResults(data)).toEqual([]);
+    });
+
+    it('omits byArtist when no accepted primary credit evidence exists', () => {
+      const withNoCredits = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Untitled EP',
+          slug: 'untitled-ep',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+        },
+        ownerCreator
+      );
+      const noCreditsSchema = withNoCredits['@graph'][0] as Record<
+        string,
+        unknown
+      >;
+      // Missing evidence is not verified authorship: the claim is omitted,
+      // never fabricated as the profile owner (JOV-6542 invariant 5).
+      expect(noCreditsSchema.byArtist).toBeUndefined();
+
+      // Whitespace-only/empty credit names are absent evidence, not artists.
+      const withBlankCredits = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Untitled EP',
+          slug: 'untitled-ep',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: '   ', handle: null }],
+        },
+        ownerCreator
+      );
+      const blankSchema = withBlankCredits['@graph'][0] as Record<
+        string,
+        unknown
+      >;
+      expect(blankSchema.byArtist).toBeUndefined();
+
+      // featured/producer credits are not primary artists and must not leak
+      // into byArtist: a non-primary credit group alone stays omitted —
+      // the owner is never substituted to fill the gap.
+      const withFeaturedOnly = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Untitled EP',
+          slug: 'untitled-ep',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          credits: [
+            {
+              role: 'featured_artist',
+              label: 'Featured artist',
+              entries: [
+                {
+                  artistId: 'artist-dj-nova',
+                  name: 'DJ Nova',
+                  handle: null,
+                  role: 'featured_artist',
+                  position: 0,
+                },
+              ],
+            },
+          ],
+        },
+        ownerCreator
+      );
+      const featuredSchema = withFeaturedOnly['@graph'][0] as Record<
+        string,
+        unknown
+      >;
+      expect(featuredSchema.byArtist).toBeUndefined();
+      expect(featuredSchema).toHaveProperty('contributor');
+    });
+
+    it('never links an opaque machine handle from a credited artist', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Never Say a Word',
+          slug: 'never-say-a-word',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'Tim White', handle: 'tmoc9mm7xfvx02c' }],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      // A non-owner credit carrying a machine handle stays a name-only
+      // entity — no junk /tmoc... destination is minted (JOV-6201).
+      expect(musicSchema.byArtist).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        name: 'Tim White',
+      });
+    });
+
+    it('canonicalizes an owner-credit opaque handle to the owner profile', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Never Say a Word',
+          slug: 'never-say-a-word',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'hello', handle: 'tmoc9mm7xfvx02c' }],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      // Owner-equals-artist: the opaque handle canonicalizes to the owner's
+      // handle and carries the owner's entity identity links.
+      expect(musicSchema.byArtist).toEqual({
+        '@type': ['MusicGroup', 'Person'],
+        '@id': 'https://jov.ie/hello#musicgroup',
+        name: 'hello',
+        url: 'https://jov.ie/hello',
+        sameAs: ['https://open.spotify.com/artist/2o5jDhtHVPhrJdv3cEQ99Z'],
+      });
+    });
+
+    it('points track-list recording refs at the credited artist, not the owner', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Wheels Up',
+          slug: 'wheels-up',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [
+            { name: 'Tim White', handle: null },
+            { name: 'LYNX', handle: 'lynx' },
+          ],
+        },
+        ownerCreator,
+        [
+          {
+            title: 'Wheels Up',
+            slug: 'wheels-up',
+            trackNumber: 1,
+            durationMs: 210000,
+          },
+        ]
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const track = musicSchema.track as Record<string, unknown>;
+      const firstItem = (track.itemListElement as Record<string, unknown>[])[0]
+        .item as Record<string, unknown>;
+      // The ref targets the first credited artist WITH a supported
+      // destination — never silently back to the owner's #musicgroup anchor.
+      expect(firstItem.byArtist).toEqual({
+        '@id': 'https://jov.ie/lynx#musicgroup',
+      });
+    });
+
+    it('omits track-list recording refs when no credited artist has a destination', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'A Town Called Paradise (Deluxe)',
+          slug: 'a-town-called-paradise-deluxe',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'Tiësto', handle: null }],
+        },
+        ownerCreator,
+        [
+          {
+            title: 'Red Lights',
+            slug: 'red-lights',
+            trackNumber: 1,
+            durationMs: 210000,
+          },
+        ]
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const track = musicSchema.track as Record<string, unknown>;
+      const firstItem = (track.itemListElement as Record<string, unknown>[])[0]
+        .item as Record<string, unknown>;
+      // No supported destination exists for the credited artist: the
+      // unsupported identity claim is omitted, not substituted with the owner.
+      expect(firstItem.byArtist).toBeUndefined();
+    });
   });
 });
 

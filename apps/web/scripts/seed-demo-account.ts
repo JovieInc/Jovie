@@ -25,6 +25,7 @@ import {
   type DemoPersonaTourDate,
   INTERNAL_DJ_DEMO_PERSONA,
 } from '@/lib/demo-personas';
+import { productionUpstashCredentials } from '@/lib/redis-store';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import { assertSeedDatabaseTarget } from './seed-database-guard';
 
@@ -1801,19 +1802,16 @@ async function seedDemoDspMatches(profileId: string) {
 // ---------------------------------------------------------------------------
 
 async function invalidateCache() {
-  if (
-    !process.env.UPSTASH_REDIS_REST_URL ||
-    !process.env.UPSTASH_REDIS_REST_TOKEN
-  ) {
-    console.log('  Redis credentials not set, skipping cache invalidation');
+  const credentials = productionUpstashCredentials();
+  if (!credentials) {
+    console.log(
+      '  Skipping production Upstash cache invalidation outside production'
+    );
     return;
   }
 
   try {
-    const redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    const redis = new Redis(credentials);
 
     const cacheKey = `profile:data:${DEMO_USERNAME}`;
     const deletedCount = await redis.del(cacheKey);

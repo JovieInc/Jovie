@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import importlib.util
 import io
 import json
 import pathlib
 import tempfile
 import sys
+import subprocess
 import unittest
 from datetime import datetime, timezone
 from unittest import mock
@@ -627,6 +629,235 @@ class ProducerTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "main-sha-unavailable"):
                     MODULE.resolve_main_sha({"sha": "0" * 40})
         self.assertEqual(MODULE.resolve_main_sha({"sha": MAIN_SHA}), MAIN_SHA)
+
+
+
+class UpstreamObservationTests(unittest.TestCase):
+    def evidence(self):
+        fleet, runtime = sources()
+        runtime["generated_at"] = "2026-09-05T19:29:31Z"
+        row = {"schema": "symphony-upstream-preservation/v1", "mode": "upstream-preserved",
+               "service": "symphony-elixir.service", "sourceRevision": RUNTIME_SHA,
+               "observedAt": "2026-09-05T19:29:00Z", "activation": "not-activated", "admission": "unverified",
+               "packageSha256": "a" * 64, "payloadManifestSha256": "b" * 64,
+               "configurationBindingSha256": "c" * 64, "workflowSha256": "d" * 64,
+               "invocationId": "e" * 32, "runtimeGeneration": "f" * 64}
+        before = {**row, "observedAt": "2026-09-05T19:29:30Z"}
+        after = {**row, "observedAt": "2026-09-05T19:29:40Z"}
+        evidence = MODULE.LiveUpstreamObservation({"schema": MODULE.UPSTREAM_OBSERVATION_SCHEMA, "published": row,
+                    "before": before, "after": after, "stateDigest": MODULE.digest(runtime)})
+        return fleet, runtime, evidence
+
+    def test_proven_source_and_work_count_remain_separate_from_admission(self):
+        fleet, runtime, evidence = self.evidence()
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW, attestation=evidence)
+        runner = snapshot["signals"]["runner"]
+        self.assertEqual(runner["sourceRevision"], RUNTIME_SHA)
+        self.assertEqual(runner["queuedWork"], 2)
+        self.assertEqual(runner["workSource"]["schema"], "symphony-runtime-state/v1")
+        self.assertEqual(runner["runtimeGeneration"], "f" * 64)
+        self.assertEqual(runner["runtimeInvocationId"], "e" * 32)
+        for key in ["providerEligibility", "downstreamHealth"]:
+            self.assertEqual(snapshot["signals"]["admissions"][key]["state"], "UNKNOWN")
+        self.assertEqual(evidence["published"]["admission"], "unverified")
+        self.assertIsNone(MODULE.attested_runtime_revision(fleet["signals"], runtime, NOW, evidence["published"]))
+
+    def test_stale_cross_generation_or_unbound_queue_stays_null(self):
+        fleet, runtime, original = self.evidence()
+        mutations = [
+            ("published", "observedAt", "2026-09-05T19:19:59Z"),
+            ("after", "observedAt", "2026-09-05T19:32:00Z"),
+            ("after", "observedAt", "2026-09-05T19:29:29Z"),
+            ("before", "observedAt", "2026-09-05T19:29:32Z"),
+            ("after", "invocationId", "a" * 32),
+            ("before", "runtimeGeneration", "a" * 64),
+            ("published", "configurationBindingSha256", "a" * 64),
+            ("after", "sourceRevision", "a" * 40),
+            ("after", "packageSha256", "bad"),
+            ("after", "schema", "gem-service-attestation/v1"),
+            ("before", "admission", "allowed"),
+            ("published", "invocationId", None),
+        ]
+        for section, key, value in mutations:
+            with self.subTest(section=section, key=key):
+                changed = copy.deepcopy(original)
+                changed[section][key] = value
+                self.assertIsNone(MODULE.upstream_runtime_revision(changed, runtime, NOW))
+                snapshot = MODULE.compose_snapshot(fleet, runtime, NOW, attestation=changed)
+                self.assertIsNone(snapshot["signals"]["runner"]["queuedWork"])
+        for changed in [{}, {**original, "before": None}, {**original, "stateDigest": "a" * 64}]:
+            self.assertIsNone(MODULE.upstream_runtime_revision(changed, runtime, NOW))
+        changed_runtime = {**runtime, "running": []}
+        self.assertIsNone(MODULE.upstream_runtime_revision(original, changed_runtime, NOW))
+
+    def test_live_reader_brackets_state_and_does_not_write_or_submit(self):
+        fleet, runtime, evidence = self.evidence()
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "preservation.json"
+            raw = json.dumps(evidence["published"]).encode()
+            path.write_bytes(raw)
+            env = {"SYMPHONY_UPSTREAM_BINDING": str(pathlib.Path(directory) / "approved.json"),
+                   "SYMPHONY_UPSTREAM_BINDING_SHA256": "c" * 64}
+            events = []
+            def check(command, **kwargs):
+                self.assertIn("--check", command)
+                self.assertIn("--upstream-binding-sha256", command)
+                self.assertNotIn("--submit", command)
+                events.append("check")
+                return json.dumps(evidence["before"] if len(events) == 1 else evidence["after"]).encode()
+            def read(bundle):
+                self.assertIsNone(bundle)
+                events.append("state")
+                return fleet, runtime
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=check), \
+                 mock.patch.object(MODULE, "read_sources", side_effect=read), \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.return_value = NOW
+                observed = MODULE.read_upstream_sources()
+            self.assertEqual(events, ["check", "state", "check"])
+            self.assertEqual(observed, (fleet, runtime, evidence))
+            self.assertIsInstance(observed[2], MODULE.LiveUpstreamObservation)
+            self.assertEqual(path.read_bytes(), raw)
+
+    def test_serialized_wrapper_cannot_switch_legacy_or_fixture_trust_path(self):
+        fleet, runtime, evidence = self.evidence()
+        decoded = json.loads(json.dumps(evidence))
+        self.assertIsNone(MODULE.attested_runtime_revision(fleet["signals"], runtime, NOW, decoded))
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "legacy.json"
+            path.write_text(json.dumps(evidence))
+            with mock.patch.dict(MODULE.os.environ, {}, clear=True), \
+                 mock.patch.object(sys, "argv", ["producer", "--source-bundle", "/fixture.json"]), \
+                 mock.patch.object(MODULE, "ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE, "read_sources", return_value=(fleet, runtime)), \
+                 mock.patch.object(MODULE, "read_upstream_sources") as live, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock, \
+                 mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                clock.now.return_value = NOW
+                self.assertEqual(MODULE.main(), 0)
+                runner = json.loads(output.getvalue())["signals"]["runner"]
+                self.assertIsNone(runner["sourceRevision"])
+                self.assertIsNone(runner["queuedWork"])
+                live.assert_not_called()
+
+    def test_reader_rejects_missing_mixed_or_mismatched_operator_binding(self):
+        fleet, runtime, evidence = self.evidence()
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "receipt.json"
+            path.write_text(json.dumps(evidence["published"]))
+            base = {"SYMPHONY_UPSTREAM_BINDING": "/approved.json", "SYMPHONY_UPSTREAM_BINDING_SHA256": "c" * 64}
+            cases = [{}, {**base, "SYMPHONY_UPSTREAM_BINDING_SHA256": "bad"},
+                     {**base, "JOVIE_CONFIGURATION_SOURCE_REVISION": "a" * 40}]
+            for env in cases:
+                with self.subTest(env=list(env)), mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                     mock.patch.object(MODULE.subprocess, "check_output") as check:
+                    with self.assertRaises(ValueError): MODULE.read_upstream_sources()
+                    check.assert_not_called()
+            with mock.patch.dict(MODULE.os.environ, {**base, "SYMPHONY_UPSTREAM_BINDING_SHA256": "d" * 64}, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=[json.dumps(evidence["before"]).encode(), json.dumps(evidence["after"]).encode()]), \
+                 mock.patch.object(MODULE, "read_sources", return_value=(fleet, runtime)), \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.return_value = NOW
+                with self.assertRaisesRegex(ValueError, "unverified"): MODULE.read_upstream_sources()
+
+    def test_reader_handles_second_precision_without_weakening_strict_bracket(self):
+        fleet, runtime, evidence = self.evidence()
+        evidence["before"]["observedAt"] = "2026-09-05T19:29:30.250000Z"
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "receipt.json"
+            path.write_text(json.dumps(evidence["published"]))
+            env = {"SYMPHONY_UPSTREAM_BINDING": "/approved.json", "SYMPHONY_UPSTREAM_BINDING_SHA256": "c" * 64}
+            events = []
+            def read(bundle):
+                events.append("read")
+                return fleet, runtime
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=[json.dumps(evidence["before"]).encode(), json.dumps(evidence["after"]).encode()]), \
+                 mock.patch.object(MODULE, "read_sources", side_effect=read), \
+                 mock.patch.object(MODULE.time, "sleep", side_effect=lambda delay: events.append(("wait", delay))), \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.side_effect = [datetime(2026, 9, 5, 19, 29, 30, 500000, tzinfo=timezone.utc), NOW]
+                self.assertEqual(MODULE.read_upstream_sources()[2], evidence)
+            self.assertEqual(events, [("wait", 0.5), "read"])
+            old_runtime = {**runtime, "generated_at": "2026-09-05T19:29:30Z"}
+            self.assertIsNone(MODULE.upstream_runtime_revision({**evidence, "stateDigest": MODULE.digest(old_runtime)}, old_runtime, NOW))
+            exact_second = copy.deepcopy(evidence)
+            exact_second["before"]["observedAt"] = "2026-09-05T19:29:30Z"
+            self.assertIsNone(MODULE.upstream_runtime_revision({**exact_second, "stateDigest": MODULE.digest(old_runtime)}, old_runtime, NOW))
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=[json.dumps(exact_second["before"]).encode(), json.dumps(exact_second["after"]).encode()]), \
+                 mock.patch.object(MODULE, "read_sources", return_value=(fleet, runtime)), \
+                 mock.patch.object(MODULE.time, "sleep") as sleep, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.side_effect = [datetime(2026, 9, 5, 19, 29, 30, 500000, tzinfo=timezone.utc), NOW]
+                self.assertIsInstance(MODULE.read_upstream_sources()[2], MODULE.LiveUpstreamObservation)
+                sleep.assert_called_once_with(0.5)
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", return_value=json.dumps(evidence["before"]).encode()), \
+                 mock.patch.object(MODULE, "read_sources") as read, \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock:
+                clock.now.return_value = datetime(2026, 9, 5, 19, 29, 28, tzinfo=timezone.utc)
+                with self.assertRaisesRegex(ValueError, "clock inconsistent"): MODULE.read_upstream_sources()
+                read.assert_not_called()
+
+    def test_live_reader_propagates_failed_or_oversized_checks_without_submission(self):
+        fleet, runtime, evidence = self.evidence()
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "receipt.json"
+            env = {"SYMPHONY_UPSTREAM_BINDING": "/approved.json", "SYMPHONY_UPSTREAM_BINDING_SHA256": "c" * 64}
+            for raw, output in [(b"x" * (MODULE.MAX_BYTES + 1), b"{}"),
+                                (json.dumps(evidence["published"]).encode(), b"x" * (MODULE.MAX_BYTES + 1)),
+                                (json.dumps(evidence["published"]).encode(), b"invalid-json")]:
+                path.write_bytes(raw)
+                with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                     mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                     mock.patch.object(MODULE.subprocess, "check_output", return_value=output), \
+                     mock.patch.object(MODULE, "submit") as submit:
+                    with self.assertRaises(ValueError): MODULE.read_upstream_sources()
+                    submit.assert_not_called()
+            path.write_text(json.dumps(evidence["published"]))
+            with mock.patch.dict(MODULE.os.environ, env, clear=True), \
+                 mock.patch.object(MODULE, "UPSTREAM_ATTESTATION_PATH", path), \
+                 mock.patch.object(MODULE.subprocess, "check_output", side_effect=subprocess.TimeoutExpired("check", 40)), \
+                 mock.patch.object(MODULE, "read_sources") as read:
+                with self.assertRaises(subprocess.TimeoutExpired): MODULE.read_upstream_sources()
+                read.assert_not_called()
+
+    def test_main_requires_live_mode_and_keeps_existing_submission_boundary(self):
+        fleet, runtime, evidence = self.evidence()
+        for mode, arguments in [("unknown", []), ("upstream-preservation", ["--source-bundle", "/fixture.json"])]:
+            with mock.patch.dict(MODULE.os.environ, {"GEM_SERVICE_ATTESTATION_MODE": mode}, clear=True), \
+                 mock.patch.object(sys, "argv", ["producer", *arguments]), \
+                 mock.patch.object(MODULE, "read_upstream_sources") as read, \
+                 mock.patch.object(MODULE, "submit") as submit:
+                with self.assertRaises(ValueError): MODULE.main()
+                read.assert_not_called()
+                submit.assert_not_called()
+        for should_submit in (False, True):
+            with mock.patch.dict(MODULE.os.environ, {"GEM_SERVICE_ATTESTATION_MODE": "upstream-preservation", "CRON_SECRET": "test-key"}, clear=True), \
+                 mock.patch.object(sys, "argv", ["producer", *(["--submit"] if should_submit else [])]), \
+                 mock.patch.object(MODULE, "read_upstream_sources", return_value=(fleet, runtime, evidence)), \
+                 mock.patch.object(MODULE, "load_concurrency_observation", return_value=None), \
+                 mock.patch.object(MODULE, "load_existing_repair_reference", return_value=None), \
+                 mock.patch.object(MODULE, "datetime", wraps=datetime) as clock, \
+                 mock.patch.object(MODULE, "submit", return_value={"accepted": True}) as submit, \
+                 mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                clock.now.return_value = NOW
+                self.assertEqual(MODULE.main(), 0)
+                result = json.loads(output.getvalue())
+                if should_submit:
+                    self.assertEqual(result, {"accepted": True})
+                    self.assertEqual(submit.call_args.args[0]["signals"]["runner"]["sourceRevision"], RUNTIME_SHA)
+                    self.assertEqual(submit.call_args.args[1], "test-key")
+                else:
+                    self.assertEqual(result["signals"]["runner"]["queuedWork"], 2)
+                    submit.assert_not_called()
 
 
 if __name__ == "__main__":

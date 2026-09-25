@@ -120,6 +120,7 @@ interface AuthGateRecord {
   id: string;
   email: string | null;
   userStatus: string | null;
+  waitlistEntryId: string | null;
   isAdmin: boolean | null;
   isPro: boolean | null;
   deletedAt: Date | null;
@@ -136,6 +137,7 @@ interface AuthGateDbUser {
   id: string;
   email: string | null;
   userStatus: string | null;
+  waitlistEntryId: string | null;
   isAdmin: boolean | null;
   isPro: boolean | null;
   deletedAt: Date | null;
@@ -579,6 +581,7 @@ async function loadAuthGateRecord(
         id: users.id,
         email: users.email,
         userStatus: users.userStatus,
+        waitlistEntryId: users.waitlistEntryId,
         isAdmin: users.isAdmin,
         isPro: users.isPro,
         deletedAt: users.deletedAt,
@@ -624,6 +627,7 @@ function toAuthGateDbUser(
     id: dbResult.id,
     email: dbResult.email,
     userStatus: dbResult.userStatus,
+    waitlistEntryId: dbResult.waitlistEntryId,
     isAdmin: dbResult.isAdmin,
     isPro: dbResult.isPro,
     deletedAt: dbResult.deletedAt,
@@ -745,6 +749,7 @@ async function resolveUserStateInternal(
   // 2b. If no DB user exists, create one if requested
   let dbUserId: string | null = dbUser?.id ?? null;
   let currentUserStatus = dbUser?.userStatus ?? null;
+  let currentWaitlistEntryId = dbUser?.waitlistEntryId ?? null;
   let currentDeletedAt = dbUser?.deletedAt ?? null;
 
   if (!dbUserId && canUseE2ETestAuthFallback()) {
@@ -778,12 +783,14 @@ async function resolveUserStateInternal(
     const [createdUser] = await db
       .select({
         userStatus: users.userStatus,
+        waitlistEntryId: users.waitlistEntryId,
         deletedAt: users.deletedAt,
       })
       .from(users)
       .where(eq(users.id, dbUserId))
       .limit(1);
     currentUserStatus = createdUser?.userStatus ?? null;
+    currentWaitlistEntryId = createdUser?.waitlistEntryId ?? null;
     currentDeletedAt = createdUser?.deletedAt ?? null;
     profile = null;
   }
@@ -792,6 +799,7 @@ async function resolveUserStateInternal(
     isAuthenticated: true,
     hasDbUser: Boolean(dbUserId),
     userStatus: currentUserStatus,
+    waitlistEntryId: currentWaitlistEntryId,
     deletedAt: currentDeletedAt,
     waitlistGateEnabled,
     profile,

@@ -325,37 +325,15 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(projection["promotionMode"], "normal")
         self.assertLess(len(outputs["receipt_b64"]), 32_768)
 
-    def test_queue_consumers_pass_only_the_bounded_projection(self):
+    def test_retired_queue_consumers_leave_bounded_projection_in_shared_action(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
-        autoenroll = (
-            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
-        ).read_text()
-        deferred_release = (
-            ROOT / ".github/workflows/queue-deferred-release.yml"
-        ).read_text()
+        self.assertFalse((ROOT / ".github/workflows/merge-queue-autoenroll.yml").exists())
+        self.assertFalse((ROOT / ".github/workflows/queue-deferred-release.yml").exists())
         wrapper = SCRIPT.read_text()
-        self.assertIn(
-            "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
-            autoenroll,
-        )
-        for needle in (
-            "main_sha: ${{ steps.main-head.outputs.sha }}",
-            "expected-sha: ${{ steps.main-head.outputs.sha }}",
-            "ref: ${{ needs.fleet-policy.outputs.main_sha }}",
-        ):
-            self.assertIn(needle, autoenroll)
-        for workflow in (autoenroll, deferred_release):
-            self.assertIn(
-                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
-            )
         self.assertIn("Base64 bounded admission projection", action)
         self.assertIn(
             "value: ${{ steps.evaluate.outputs.receipt_b64 }}",
             action,
-        )
-        self.assertIn(
-            'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
-            deferred_release,
         )
         self.assertIn("fleet_admission_receipt.py", wrapper)
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)
@@ -382,15 +360,10 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             self.assertIn("Capacity bounds new agent dispatch only", published)
 
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
-        autoenroll = (
-            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
-        ).read_text()
         self.assertIn("receipt_age_seconds", action)
         self.assertIn("capacity_accepted", action)
-        self.assertIn("receipt_age_seconds: ${{ steps.policy.outputs.receipt_age_seconds }}", autoenroll)
-        self.assertIn("### Auto-Enroll fleet receipt", autoenroll)
-        self.assertIn("FLEET_RECEIPT_AGE_SECONDS", autoenroll)
-        self.assertIn("FLEET_CAPACITY_ACCEPTED", autoenroll)
+        self.assertIn("value: ${{ steps.evaluate.outputs.receipt_age_seconds }}", action)
+        self.assertIn("value: ${{ steps.evaluate.outputs.capacity_accepted }}", action)
 
 
 if __name__ == "__main__":

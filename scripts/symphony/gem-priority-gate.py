@@ -2847,17 +2847,23 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         args.independent_review_receipt
         or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
-    closure = observe_closure_health(args.repo, previous_closure_health(args.state_dir), now)
+    controller = observe_controller(
+        args.symphony_url,
+        snapshot_path=fleet_sidecar_path(
+            args.state_dir, args.repo, "controller-snapshot.json"
+        ),
+        now=now,
+    )
+    closure = observe_closure_health(
+        args.repo,
+        previous_closure_health(args.state_dir),
+        now,
+        controller_observation=controller,
+    )
     return {
         "main": main,
         "production": observe_production(args.production_url),
-        "controller": observe_controller(
-            args.symphony_url,
-            snapshot_path=fleet_sidecar_path(
-                args.state_dir, args.repo, "controller-snapshot.json"
-            ),
-            now=now,
-        ),
+        "controller": controller,
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(
             args.repo,

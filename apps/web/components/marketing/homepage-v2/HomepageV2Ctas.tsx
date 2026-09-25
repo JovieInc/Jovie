@@ -5,6 +5,7 @@ import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { cn } from '@/lib/utils';
 
 export function HomepageStoryHeader({
@@ -52,6 +53,8 @@ export function HomepageStoryHeader({
 }
 
 export function HomepageV2Pricing() {
+  const proClaim = getPublicPriceClaim('pro');
+
   return (
     <section
       data-testid='homepage-v2-pricing'
@@ -64,7 +67,7 @@ export function HomepageV2Pricing() {
         <div className='homepage-pricing-shell system-b-mounted-home-pricing-shell'>
           <HomepageStoryHeader
             align='center'
-            body='Artist profiles are free forever. Pro adds the release tools when you need them.'
+            body={`Artist profiles are free forever. Artist Visibility Pro is ${proClaim.priceLabel}/month with limited access.`}
             headline={HOMEPAGE_V2_COPY.pricing.headline}
             className='homepage-pricing-copy system-b-mounted-home-pricing-copy'
           />

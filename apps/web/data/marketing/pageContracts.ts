@@ -56,6 +56,18 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'artist claims a profile',
     primaryCta: CLAIM_PROFILE_CTA,
   },
+  '(marketing)/smart-links/page.tsx': {
+    routeGlob: '(marketing)/smart-links/page.tsx',
+    url: APP_ROUTES.SMART_LINKS,
+    job: 'show artists how one release link remembers a fan streaming choice',
+    proof:
+      'interactive dial across two real release examples and a live Smart Link',
+    successEvent: 'artist starts the Smart Link creation path',
+    primaryCta: {
+      href: `${APP_ROUTES.SIGNUP}?source=smart-links`,
+      label: 'Create a Smart Link',
+    },
+  },
   '(marketing)/artist-profile/page.tsx': {
     routeGlob: '(marketing)/artist-profile/page.tsx',
     url: APP_ROUTES.ARTIST_PROFILE_LEGACY,

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
+  isPendingNativeCheckTimeoutCutover,
   isPendingNativeCohortCutoverField,
   isSupportedNativeBuildConcurrency,
   mergeNativeQueuePolicyObservations,
@@ -24,10 +25,7 @@ const DEFAULT_BASE_BRANCH = 'main';
 const DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS = 6;
 const DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS = 2_000;
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
-const NATIVE_MUTATION_AUTHORIZATIONS = new Set([
-  'merge-queue-autoenroll',
-  'test-fixture',
-]);
+const NATIVE_MUTATION_AUTHORIZATIONS = new Set(['test-fixture']);
 const REQUIRED_CHECKS = Object.freeze([
   'PR Ready',
   'Migration Guard',
@@ -349,6 +347,7 @@ export function validateNativePreflightEvidence({
         `merge_queue ${field} must be ${expected}`,
         mergeQueue[field] === expected ||
           isSupportedNativeBuildConcurrency(field, mergeQueue[field]) ||
+          isPendingNativeCheckTimeoutCutover(field, mergeQueue[field]) ||
           isPendingNativeCohortCutoverField(field),
       ])
     ),
@@ -381,7 +380,8 @@ export function validateNativePreflightEvidence({
   const blockingDrift = policyReadback.drift.filter(
     field =>
       !isPendingNativeCohortCutoverField(field) &&
-      !isSupportedNativeBuildConcurrency(field, mergeQueue[field])
+      !isSupportedNativeBuildConcurrency(field, mergeQueue[field]) &&
+      !isPendingNativeCheckTimeoutCutover(field, mergeQueue[field])
   );
   if (blockingDrift.length > 0) {
     errors.push(
@@ -1556,8 +1556,6 @@ export async function runCli(
   const repository = env.REPO ?? env.GITHUB_REPOSITORY ?? DEFAULT_REPOSITORY;
   const rulesetId = env.MERGE_QUEUE_RULESET_ID ?? DEFAULT_RULESET_ID;
   const baseBranch = env.MERGE_QUEUE_BASE_BRANCH ?? DEFAULT_BASE_BRANCH;
-  const allowUnavailableBypassActors =
-    env.MERGE_QUEUE_NATIVE_AUTHORIZATION === 'merge-queue-autoenroll';
   const resolvedMutationRunner =
     mutationRunner ??
     (typeof env.GH_MUTATION_TOKEN === 'string' &&
@@ -1567,7 +1565,7 @@ export async function runCli(
         })
       : runner);
   const options = { backend, repository, rulesetId, baseBranch, runner };
-  const preflightOptions = { ...options, allowUnavailableBypassActors };
+  const preflightOptions = options;
   const commands = {
     preflight: () => preflightMergeQueue(preflightOptions),
     'list-state': () =>
@@ -1659,7 +1657,7 @@ export async function runCli(
   ) {
     throw backendError(
       'native_mutation_unauthorized',
-      'Native CLI mutation requires MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll'
+      'Native CLI mutation requires an active authorization; Merge Queue Auto-Enroll is retired'
     );
   }
 

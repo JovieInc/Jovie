@@ -54,9 +54,9 @@ export const HOMEPAGE_LAUNCH_COPY = {
     sections: [
       {
         id: 'connected',
-        eyebrow: 'ONE LIVING PROFILE',
+        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
         headline: 'Everything about you, connected.',
-        body: 'Your work, links, and story. One living profile.',
+        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
       },
       {
         id: 'relationships',

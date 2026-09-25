@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -341,6 +342,7 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
     ) as {
       readonly packageManager: string;
+      readonly engines: { readonly pnpm: string };
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(22);
@@ -349,6 +351,8 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
     expect(`pnpm@${requirements.pnpmVersion}`).toBe(packageJson.packageManager);
+    // JOV-6603: Vercel resolves a newer pnpm 9.15 patch than an exact engines pin.
+    expect(packageJson.engines.pnpm).toBe('>=9.15.4 <10');
     expect(requirements.playwrightVersion).toBe(
       packageJson.devDependencies.playwright
     );
@@ -424,6 +428,20 @@ describe('baked runner prerequisite contract', () => {
   });
 
   it('builds a deterministic filtered context before a streamed Docker build', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
+    temporaryDirectories.push(directory);
+    const gitBinDirectory = resolve(directory, 'bin');
+    const gitWrapper = resolve(gitBinDirectory, 'git');
+    const catFileCount = resolve(directory, 'cat-file-count');
+    const gitExecutable = execFileSync('sh', ['-c', 'command -v git'], {
+      encoding: 'utf8',
+    }).trim();
+    mkdirSync(gitBinDirectory);
+    writeFileSync(
+      gitWrapper,
+      '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "cat-file" ]]; then\n  printf \'1\\n\' >> "${GIT_CAT_FILE_COUNT}"\nfi\nexec "${REAL_GIT}" "$@"\n'
+    );
+    chmodSync(gitWrapper, 0o755);
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
@@ -432,10 +450,22 @@ describe('baked runner prerequisite contract', () => {
     const listedPaths = execFileSync(
       'bash',
       [runnerBuildContextScript, buildTree, '--list'],
-      { cwd: repoRoot, encoding: 'utf8' }
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_CAT_FILE_COUNT: catFileCount,
+          PATH: `${gitBinDirectory}:${process.env.PATH ?? ''}`,
+          REAL_GIT: gitExecutable,
+        },
+      }
     )
       .trim()
       .split('\n');
+    expect(readFileSync(catFileCount, 'utf8').trim().split('\n')).toHaveLength(
+      1
+    );
     const firstArchive = execFileSync(
       'bash',
       [runnerBuildContextScript, buildTree],
@@ -469,6 +499,40 @@ describe('baked runner prerequisite contract', () => {
       expect(listedPaths).toContain(patchPath);
     }
   }, 15_000);
+
+  it('fails closed when a required filtered-context entry is missing', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
+    temporaryDirectories.push(directory);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    execFileSync('git', ['rm', '--cached', '--quiet', '.npmrc'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    const missingTree = execFileSync('git', ['write-tree'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: environment,
+    }).trim();
+
+    const result = spawnSync(
+      'bash',
+      [runnerBuildContextScript, missingTree, '--list'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'runner build context contains a missing tree entry:'
+    );
+    expect(result.stderr).toContain('.npmrc');
+  });
 
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);

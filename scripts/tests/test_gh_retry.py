@@ -95,7 +95,7 @@ def _drain_command(
             """), encoding="utf-8")
         producer_gh.chmod(producer_gh.stat().st_mode | stat.S_IXUSR)
     expected = expected_gh or (gh_path / "gh")
-    authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
+    authorization = "test-fixture"
     env_prefix = (
         f'PATH="{gh_path}:{tmp_path}:$PATH" '
         'GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 '
@@ -429,6 +429,9 @@ def _write_native_receipt_fakes(
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
+              if [[ -n "${{NATIVE_RECEIPT_TEST_TRACE:-}}" && "$*" == *"--json state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"* ]]; then
+                printf 'read\\n' >>"$NATIVE_RECEIPT_TEST_TRACE"
+              fi
               echo '{{"state":"OPEN","isDraft":{draft_json},"mergeable":"{mergeable}","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
               exit 0
             fi
@@ -446,6 +449,44 @@ def _write_native_receipt_fakes(
         encoding="utf-8",
     )
     fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+
+def _install_native_receipt_test_trace(tmp_path: Path) -> Path:
+    trace = tmp_path / "native-receipt-test-trace"
+    trace.write_text("", encoding="utf-8")
+    fake_sleep = tmp_path / "sleep"
+    fake_sleep.write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf 'sleep %s\\n' "$*" >>"${NATIVE_RECEIPT_TEST_TRACE:?}"
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_sleep.chmod(fake_sleep.stat().st_mode | stat.S_IXUSR)
+    return trace
+
+
+def _assert_native_receipt_recheck_trace(
+    result: subprocess.CompletedProcess[str], trace: Path, head: str
+) -> None:
+    expected_events: list[str] = []
+    for attempt in range(1, 7):
+        expected_events.append("read")
+        if attempt < 6:
+            expected_events.append("sleep 2")
+    assert trace.read_text(encoding="utf-8").splitlines() == expected_events
+    rechecks = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if "bounded live reread" in line
+    ]
+    assert rechecks == [
+        f"~ mergeable=UNKNOWN for #16068 at {head}; bounded live reread {attempt}/6"
+        for attempt in range(1, 6)
+    ]
 
 
 _TRUSTED_BOT_AVATAR = "https://avatars.githubusercontent.com/in/2934433?v=4"
@@ -512,7 +553,11 @@ def _write_null_creator_receipt_drain(
     front_churn: str = "forbid",
     allow_enroll: bool = False,
     merge_group_runs: list[dict[str, object]] | None = None,
+    merge_group_pages: list[dict[str, object]] | None = None,
+    merge_group_api_fails: bool = False,
+    merge_group_raw: str | None = None,
     timeline_events: list[dict[str, object]] | None = None,
+    timeline_events_after: list[dict[str, object]] | None = None,
     timeline_fails: bool = False,
 ) -> dict[str, Path]:
     logs = {
@@ -521,8 +566,10 @@ def _write_null_creator_receipt_drain(
         "front_churn": tmp_path / "front-churn",
         "enroll": tmp_path / "enroll",
         "dequeue": tmp_path / "dequeue",
+        "dequeue_args": tmp_path / "dequeue-args",
         "jobs": tmp_path / "jobs-scans",
         "timeline": tmp_path / "timeline-calls",
+        "group_runs": tmp_path / "group-runs-calls",
     }
     for path in logs.values():
         path.write_text("", encoding="utf-8")
@@ -552,19 +599,36 @@ def _write_null_creator_receipt_drain(
     merge_group_runs_json = json.dumps(
         merge_group_runs or [], separators=(",", ":")
     )
+    default_group_page = {
+        "total_count": len(merge_group_runs or []),
+        "workflow_runs": merge_group_runs or [],
+    }
+    merge_group_pages_json = merge_group_raw if merge_group_raw is not None else json.dumps(
+        merge_group_pages or [default_group_page], separators=(",", ":")
+    )
+    merge_group_fail_json = "true" if merge_group_api_fails else "false"
     # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
     timeline_json = json.dumps([timeline_events or []], separators=(",", ":"))
+    confirmation_events = timeline_events if timeline_events_after is None else timeline_events_after
+    timeline_confirmation_json = json.dumps([confirmation_events or []], separators=(",", ":"))
+    timeline_confirmation_enabled = "true" if timeline_events_after is not None else "false"
     timeline_case = (
         'echo "timeline read forced to fail" >&2; exit 95'
         if timeline_fails
-        else f"echo '{timeline_json}'; exit 0"
+        else f"if [[ '{timeline_confirmation_enabled}' == true ]] && [[ $(wc -l < '{logs['timeline']}') -gt 1 ]]; then echo '{timeline_confirmation_json}'; else echo '{timeline_json}'; fi; exit 0"
     )
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
+        queue_add_events = [
+            event.get("created_at", "")
+            for event in (timeline_events or [])
+            if event.get("event") == "added_to_merge_queue"
+        ]
+        queue_enqueued_at = max(queue_add_events, default="2026-08-28T14:20:00Z")
         list_state = (
             f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
-            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"2026-08-28T14:20:00Z","state":"{entry_state}","position":{queue_position}}}}}}}'
+            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"{queue_enqueued_at}","state":"{entry_state}","position":{queue_position}}}}}}}'
         )
     else:
         list_state = (
@@ -610,7 +674,7 @@ def _write_null_creator_receipt_drain(
               explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":{queued_json},"eligible":true,"reason":"eligible"}}' ;;
               prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
               {enroll_case}
-              dequeue|dequeue-ineligible) printf 'dequeue\\n' >>'{logs["dequeue"]}'; echo '{{"state":{{"queued":false}}}}' ;;
+              dequeue|dequeue-ineligible) printf 'dequeue\\n' >>'{logs["dequeue"]}'; printf '%s\\n' "$*" >>'{logs["dequeue_args"]}'; echo '{{"state":{{"queued":false}}}}' ;;
               max-queue-depth) echo 16 ;;
               {front_churn_case}
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -653,7 +717,16 @@ def _write_null_creator_receipt_drain(
             if [[ "$1" == "api" ]]; then
               printf '%s\\n' "$2" >>'{logs["api"]}'
               if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
-              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '{merge_group_runs_json}'; exit 0; fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                if [[ " $* " == *" created="* ]]; then
+                  printf '%s\\n' "$*" >>'{logs["group_runs"]}'
+                  [[ '{merge_group_fail_json}' == false ]] || {{ echo "merge-group inventory forced to fail" >&2; exit 95; }}
+                  echo '{merge_group_pages_json}'
+                  exit 0
+                fi
+                echo '{merge_group_runs_json}'
+                exit 0
+              fi
               if [[ "$2" == *"/issues/{pr}/timeline"* ]]; then
                 printf '%s\\n' "$2" >>'{logs["timeline"]}'
                 {timeline_case}
@@ -1415,6 +1488,8 @@ class TestStarvedGroupDequeue:
 
     def test_starved_awaiting_checks_entry_is_dequeued(self, tmp_path: Path) -> None:
         head = "8" * 40
+        queued_at = self._queued_iso(47)
+        lookalike_run = self._group_run(164201, self._queued_iso(35))
         logs = _write_null_creator_receipt_drain(
             tmp_path,
             pr=16420,
@@ -1424,12 +1499,8 @@ class TestStarvedGroupDequeue:
             run=_trusted_autoenroll_run(head=head),
             queued=True,
             front_churn="allow",
-            timeline_events=[
-                {
-                    "event": "added_to_merge_queue",
-                    "created_at": self._queued_iso(47),
-                }
-            ],
+            merge_group_runs=[lookalike_run],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
         )
 
         result = _run_bash(
@@ -1446,12 +1517,26 @@ class TestStarvedGroupDequeue:
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert logs["timeline"].read_text(encoding="utf-8") != ""
         assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue\n"
+        assert "dequeue-ineligible 16420 " + head in logs["dequeue_args"].read_text(encoding="utf-8")
         assert "starved-group" in result.stdout
-        assert "✗ starved-group: AWAITING_CHECKS" in result.stdout
+        assert "complete merge-group inventory and no matching run" in result.stdout
 
-    def test_existing_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
+    @staticmethod
+    def _group_run(pr: int, created_at: str, *, status: str = "in_progress") -> dict[str, object]:
+        return {
+            "id": 88,
+            "head_branch": f"gh-readonly-queue/main/pr-{pr}-{'9' * 40}",
+            "status": status,
+            "conclusion": "success" if status == "completed" else None,
+            "head_sha": "7" * 40,
+            "created_at": created_at,
+            "updated_at": created_at,
+        }
+
+    def test_existing_in_flight_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
         head = "8" * 40
-        base = "9" * 40
+        queued_at = self._queued_iso(47)
+        run_created_at = self._queued_iso(35)
         logs = _write_null_creator_receipt_drain(
             tmp_path,
             pr=16420,
@@ -1461,23 +1546,8 @@ class TestStarvedGroupDequeue:
             run=_trusted_autoenroll_run(head=head),
             queued=True,
             front_churn="active",
-            merge_group_runs=[
-                {
-                    "id": 88,
-                    "headBranch": f"gh-readonly-queue/main/pr-16420-{base}",
-                    "status": "in_progress",
-                    "conclusion": None,
-                    "headSha": "7" * 40,
-                    "createdAt": "2026-09-03T16:13:03Z",
-                    "updatedAt": "2026-09-03T16:15:46Z",
-                }
-            ],
-            timeline_events=[
-                {
-                    "event": "added_to_merge_queue",
-                    "created_at": self._queued_iso(47),
-                }
-            ],
+            merge_group_runs=[self._group_run(16420, run_created_at)],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
         )
 
         result = _run_bash(
@@ -1492,9 +1562,138 @@ class TestStarvedGroupDequeue:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "DEQUEUE (starved group" in result.stdout
-        # The merge-group run check must short-circuit before the timeline read.
-        assert logs["timeline"].read_text(encoding="utf-8") == ""
+        assert "exact merge-group branch has CI run evidence" in result.stdout
+        assert logs["timeline"].read_text(encoding="utf-8").count("timeline") == 1
+        scoped_query = logs["group_runs"].read_text(encoding="utf-8")
+        assert "event=merge_group" in scoped_query
+        assert f"created={queued_at}.." in scoped_query
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_matching_run_on_second_page_after_100_runs_leaves_entry_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        created_at = self._queued_iso(35)
+        other_runs = [
+            self._group_run(17000 + index, created_at, status="completed")
+            for index in range(100)
+        ]
+        matching_run = self._group_run(16420, created_at)
+        runs = other_runs + [matching_run]
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Group after a busy run window",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            merge_group_pages=[
+                {"total_count": 101, "workflow_runs": runs[:100]},
+                {"total_count": 101, "workflow_runs": runs[100:]},
+            ],
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact merge-group branch has CI run evidence" in result.stdout
+        assert logs["group_runs"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    @pytest.mark.parametrize("case", ["api-failure", "api-cap", "incomplete-page", "malformed", "unknown-status"])
+    def test_unknown_or_incomplete_run_inventory_never_dequeues(self, tmp_path: Path, case: str) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        created_at = self._queued_iso(35)
+        run = self._group_run(17001, created_at, status="completed")
+        inventory: dict[str, object] = {}
+        if case == "api-failure":
+            inventory["merge_group_api_fails"] = True
+        elif case == "api-cap":
+            inventory["merge_group_pages"] = [{"total_count": 1000, "workflow_runs": [run]}]
+        elif case == "incomplete-page":
+            inventory["merge_group_pages"] = [{"total_count": 2, "workflow_runs": [run]}]
+        elif case == "unknown-status":
+            inventory["merge_group_pages"] = [
+                {"total_count": 1, "workflow_runs": [self._group_run(17001, created_at, status="waiting")]}
+            ]
+        else:
+            inventory["merge_group_raw"] = "{\"total_count\":0}"
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Unknown run inventory",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[{"event": "added_to_merge_queue", "created_at": queued_at}],
+            **inventory,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "leaving queued" in result.stdout
+        assert logs["group_runs"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_replacement_queue_entry_during_inventory_is_left_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        queued_at = self._queued_iso(47)
+        replacement_at = self._queued_iso(1)
+        events = [{"event": "added_to_merge_queue", "created_at": queued_at}]
+        replacement_events = events + [
+            {"event": "added_to_merge_queue", "created_at": replacement_at}
+        ]
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Queue entry replaced during inventory",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=events,
+            timeline_events_after=replacement_events,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "queue entry changed during run inventory" in result.stdout
+        assert logs["timeline"].read_text(encoding="utf-8").count("timeline") == 2
         assert logs["dequeue"].read_text(encoding="utf-8") == ""
 
     def test_fresh_entry_below_threshold_is_left_alone(self, tmp_path: Path) -> None:
@@ -1996,12 +2195,18 @@ class TestExactHeadQueueReceipt:
                 "explanation": {"ok": True, "reason": "queued"},
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2009,6 +2214,7 @@ class TestExactHeadQueueReceipt:
         assert "delayed native receipt at " + head in result.stdout
         assert "state QUEUED, position 1" in result.stdout
         assert "queue-noop" not in result.stderr
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
     def test_selector_noop_fails_with_the_exact_reason(self, tmp_path: Path) -> None:
         head = "6" * 40
@@ -2039,12 +2245,18 @@ class TestExactHeadQueueReceipt:
                 },
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2055,6 +2267,7 @@ class TestExactHeadQueueReceipt:
             + " (mergeable=UNKNOWN)"
             in result.stderr
         )
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
     def test_missing_receipt_does_not_treat_auto_merge_as_membership(
         self, tmp_path: Path
@@ -2136,12 +2349,18 @@ class TestExactHeadQueueReceipt:
                 "explanation": {"ok": False, "reason": "held-by=queue-deferred"},
             },
         )
+        recheck_trace = _install_native_receipt_test_trace(tmp_path)
 
         result = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
-                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=6 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=2 "
+                    f"NATIVE_RECEIPT_TEST_TRACE={recheck_trace}"
+                ),
             )
         )
 
@@ -2152,6 +2371,7 @@ class TestExactHeadQueueReceipt:
         )
         assert "held-by=queue-deferred" in result.stderr
         assert "delayed native receipt" not in result.stdout
+        _assert_native_receipt_recheck_trace(result, recheck_trace, head)
 
 
 class TestGhRetryHelper:
@@ -2335,7 +2555,7 @@ class TestReleaseWaveAdmissionHold:
                 tmp_path,
                 backend="native",
                 extra_env=(
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_RELEASE_WAVE_HOLD=1 "
                     "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
                     f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
@@ -2414,6 +2634,67 @@ class TestReleaseWaveAdmissionHold:
 
 
 class TestDrainPrQueueWiring:
+    def test_retired_autoenroll_cannot_drain_or_rebase_before_github_calls(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "gh-called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+        env = {
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "GH_TOKEN": "read-token-fixture",
+            "GH_MUTATION_TOKEN": "writer-token-fixture",
+            "DRAIN_MUTATION_AUTHORIZATION": "merge-queue-autoenroll",
+            "MERGE_QUEUE_NATIVE_AUTHORIZATION": "merge-queue-autoenroll",
+            "DRY_RUN": "0",
+            "DRAIN_RELEASE_WAVE_HOLD": "0",
+            "GITHUB_WORKFLOW": "Merge Queue Auto-Enroll",
+            "GITHUB_WORKFLOW_REF": "JovieInc/Jovie/.github/workflows/merge-queue-autoenroll.yml@refs/pull/18220/merge",
+        }
+
+        command = ["bash", str(_DRAIN_SCRIPT)]
+        result = subprocess.run(
+            command,
+            cwd=_REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode == 2, result.stdout
+        assert "Merge Queue Auto-Enroll is retired" in result.stderr
+        assert not called.exists(), "retired drain reached gh"
+
+        rebase_command = [
+            "node",
+            str(_REPO_ROOT / "scripts" / "drain-pr-remediate.mjs"),
+            "--apply",
+        ]
+        for workflow_name, workflow_ref in (
+            ("Merge Queue Auto-Enroll", ""),
+            ("Other Workflow", env["GITHUB_WORKFLOW_REF"]),
+        ):
+            result = subprocess.run(
+                rebase_command,
+                cwd=_REPO_ROOT,
+                env={
+                    **env,
+                    "GITHUB_WORKFLOW": workflow_name,
+                    "GITHUB_WORKFLOW_REF": workflow_ref,
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            assert result.returncode != 0, result.stdout
+            assert "Merge Queue Auto-Enroll is retired" in result.stderr
+            assert not called.exists(), "retired rebase reached gh"
+
     def test_exact_admission_rereads_transient_unknown_mergeability(
         self, tmp_path: Path
     ) -> None:
@@ -3724,7 +4005,7 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRY_RUN=0 GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
@@ -3744,7 +4025,7 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRY_RUN=0 GITHUB_RUN_ID=79 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
@@ -3767,7 +4048,7 @@ JSON
                 extra_env=(
                     "DRY_RUN=0 TEST_MAIN_DRIFT_AFTER_ENROLL=1 "
                     "GITHUB_RUN_ID=78 GITHUB_RUN_ATTEMPT=1 "
-                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=test-fixture "
                     "DRAIN_PROMOTION_MODE=controller-repair-only "
                     "DRAIN_ADMISSION_PR=904 "
                     f"DRAIN_ADMISSION_HEAD={head} "
@@ -5188,7 +5469,6 @@ JSON
         ]
         assert helper_launches == [
             "return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'",
-            "return f'{env_prefix}bash \"{_RELEASE_SCRIPT}\"'",
         ]
         assert 'DRAIN_EXPECT_GH="{fake_gh}"' in source
         assert "DRAIN_MUTATION_AUTHORIZATION=test-fixture" in source
@@ -5196,8 +5476,8 @@ JSON
     def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
-        assert 'gh_retry pr list' in content
-        assert "--limit 200" in content
+        assert "inventory_native_queue_state()" in content
+        assert "node scripts/merge-queue-backend.mjs list-state" in content
         assert "statusCheckRollup" not in content
         assert "gh pr checks" in content
         assert "--json name,bucket,state,workflow,description,startedAt,completedAt" in content
@@ -5731,675 +6011,6 @@ class TestMissingCiRecovery:
             in result.stderr
         )
         assert not called.exists(), "drain invoked gh before bounded-cap preflight"
-
-
-# ---------------------------------------------------------------------------
-# Queue-deferred release (JOV-5054): mechanical `jovie-queue-deferral/v1`
-# provenance plus untyped ready holds may be lifted under a fresh GREEN
-# fleet receipt. Human-policy holds (taste, net-new, outbound) stay held.
-# The scanner covers every queue-deferred PR, not only agent branches.
-# ---------------------------------------------------------------------------
-
-_RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
-_RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "queue-deferred-release.yml"
-_FLEET_GATE_REFRESH_WORKFLOW = (
-    _REPO_ROOT / ".github" / "workflows" / "fleet-gate-refresh.yml"
-)
-
-
-def _release_command(tmp_path: Path, *, extra_env: str = "") -> str:
-    fake_gh = tmp_path / "gh"
-    assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
-    env_prefix = (
-        f'PATH="{tmp_path}:$PATH" '
-        f'FAKE_GH_LOG="{tmp_path}/gh-calls.log" '
-        f'FAKE_GH_STATE="{tmp_path}/state" '
-    )
-    if extra_env:
-        env_prefix += f"{extra_env} "
-    return f'{env_prefix}bash "{_RELEASE_SCRIPT}"'
-
-
-def _fleet_receipt(tmp_path: Path, *, state: str = "GREEN", age_minutes: int = 0) -> Path:
-    observed = datetime.now(timezone.utc) - timedelta(minutes=age_minutes)
-    receipt = tmp_path / f"fleet-{state.lower()}-{age_minutes}.json"
-    receipt.write_text(
-        json.dumps(
-            {
-                "schema": "jovie-fleet-gate/v1",
-                "observedAt": observed.isoformat(),
-                "state": state,
-                "promotionAdmission": {"allowed": state == "GREEN"},
-            }
-        ),
-        encoding="utf-8",
-    )
-    return receipt
-
-
-def _receipt_comment_body(
-    tmp_path: Path,
-    *,
-    head: str,
-    repository: str = "JovieInc/Jovie",
-    deferred_minutes: int = 120,
-    pr: int = 900,
-    author: str = "itstimwhite",
-    reason: str = "symphony-birth-hold",
-    source: str = "symphony",
-) -> None:
-    deferred = datetime.now(timezone.utc) - timedelta(minutes=deferred_minutes)
-    receipt = {
-        "schema": "jovie-queue-deferral/v1",
-        "repository": repository,
-        "pr": pr,
-        "head": head,
-        "reason": reason,
-        "source": source,
-        "deferredAt": deferred.isoformat(),
-    }
-    body = (
-        "<!-- bot-comment:queue-deferral -->\n"
-        "## Queue Deferral Receipt\n\n"
-        "```json\n"
-        + json.dumps(receipt, indent=2)
-        + "\n```\n"
-    )
-    # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
-    (tmp_path / "comments-900.json").write_text(
-        json.dumps([[{"user": {"login": author}, "body": body}]]),
-        encoding="utf-8",
-    )
-
-
-_FAKE_GH_PREAMBLE = """\
-#!/usr/bin/env bash
-set -euo pipefail
-echo "$*" >> "${FAKE_GH_LOG:?}"
-mkdir -p "${FAKE_GH_STATE:?}"
-"""
-
-_FAKE_GH_API_UNTYPED = """\
-if [[ "$1" == "api" ]]; then
-  # Attempt-marker lookup and untyped deferral lookup: no marker comments.
-  exit 0
-fi
-"""
-
-_FAKE_GH_GREEN_CHECKS = """\
-if [[ "$1 $2" == "pr checks" ]]; then
-  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
-  exit 0
-fi
-"""
-
-
-def _write_fake_gh(tmp_path: Path, body: str) -> None:
-    fake_gh = tmp_path / "gh"
-    fake_gh.write_text(body, encoding="utf-8")
-    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-
-def _run_single_candidate_release(
-    tmp_path: Path,
-    *,
-    head: str,
-    base: str = "main",
-    draft: bool = False,
-    branch: str = "symphony/JOV-900-fix",
-    labels: list[str] | None = None,
-    fleet_state: str = "GREEN",
-    fleet_age_minutes: int = 0,
-) -> subprocess.CompletedProcess[str]:
-    labels_json = json.dumps(labels or ["queue-deferred"])
-    receipt = _fleet_receipt(
-        tmp_path, state=fleet_state, age_minutes=fleet_age_minutes
-    )
-    _write_fake_gh(
-        tmp_path,
-        textwrap.dedent(
-            f"""\
-            {_FAKE_GH_PREAMBLE}
-            if [[ "$1 $2" == "pr list" ]]; then
-              echo '[{{"n":900,"t":"Deferred PR","draft":{str(draft).lower()},"m":"MERGEABLE","head":"{branch}","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":{labels_json}}}]'
-              exit 0
-            fi
-            if [[ "$1" == "api" ]]; then
-              if [[ "$*" != *"queue-deferral-release"* && -f "${{FAKE_GH_STATE}}/../comments-900.json" ]]; then
-                cat "${{FAKE_GH_STATE}}/../comments-900.json"
-              fi
-              exit 0
-            fi
-            if [[ "$1 $2" == "pr view" ]]; then
-              echo '{{"draft":{str(draft).lower()},"head":"{head}","branch":"{branch}","headOwner":"JovieInc","base":"{base}","labels":{labels_json},"mergeable":"MERGEABLE","state":"OPEN"}}'
-              exit 0
-            fi
-            {_FAKE_GH_GREEN_CHECKS}
-            echo "unexpected gh args: $*" >&2
-            exit 2
-            """
-        ),
-    )
-    return _run_bash(
-        _release_command(
-            tmp_path,
-            extra_env=(
-                "RELEASE_MODE=release DRY_RUN=1 ATTEMPT_COOLDOWN_MINUTES=0 "
-                f'FLEET_RECEIPT_FILE="{receipt}"'
-            ),
-        )
-    )
-
-
-class TestReleaseQueueDeferred:
-    def test_workflow_is_event_driven_with_no_cron(self) -> None:
-        workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
-        fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
-        assert "schedule:" not in workflow
-        assert "workflow_run:" in workflow
-        # CI and Production Controller are direct upstream semantic inputs.
-        # Marker Recovery dispatches a fresh Fleet Gate event after durable
-        # bytes so downstream release remains inside the workflow_run cap.
-        assert (
-            "workflows: [CI, Production Controller]"
-            in fleet_gate_refresh
-        )
-        assert "Production Marker Recovery]" not in fleet_gate_refresh
-        assert "Queue-Deferred Release]" not in fleet_gate_refresh
-        assert "workflows: ['Fleet Gate Refresh']" in workflow
-        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
-        assert "pull_request_target:" in fleet_gate_refresh
-        assert "\n  pull_request:\n" not in fleet_gate_refresh
-        assert "converted_to_draft" in fleet_gate_refresh
-        assert "github.event_name != 'pull_request_target'" in fleet_gate_refresh
-        assert "branches: [main]" in fleet_gate_refresh
-        assert "github.event.workflow_run.conclusion != 'cancelled'" in fleet_gate_refresh
-        assert "github.event.pull_request.merged != true" in fleet_gate_refresh
-        # The trigger allowlist owns workflow identity. Job admission must not
-        # compare `workflow_run.name`: custom `run-name` values include dynamic
-        # SHAs and caused successful Production Controller wakes to skip.
-        assert "github.event.workflow_run.name" not in workflow
-        assert "github.event.workflow_run.event == 'pull_request'" in workflow
-        assert "github.event.workflow_run.event != 'pull_request'" in workflow
-        assert "github.event.workflow_run.conclusion == 'success'" in workflow
-        assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
-        assert "pull-requests: write" in workflow
-        assert "READY_GH_TOKEN" not in workflow
-        assert "bash scripts/release-queue-deferred.sh" in workflow
-        assert "ATTEMPT_COOLDOWN_MINUTES: 5" in workflow
-        assert 'RELEASE_RETRY_FILE="$retry_file"' in workflow
-        assert 'sleep "$retry_seconds"' in workflow
-        assert "for pass in 1 2" in workflow
-        # Mutations must fire real PR events that wake the autoenroll
-        # controller; a GITHUB_TOKEN mutation would not cascade.
-        assert "steps.app-token.outputs.token" in workflow
-
-    def test_report_lists_age_and_typed_reason_with_alarm(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head, deferred_minutes=120)
-        stale_update = (
-            datetime.now(timezone.utc) - timedelta(hours=3)
-        ).isoformat()
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  cat <<'JSON'
-                [{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}},{{"n":901,"t":"Repair hold","draft":true,"m":"MERGEABLE","head":"codex/JOV-901-fix","oid":"{"d" * 40}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}}]
-JSON
-                  exit 0
-                fi
-                if [[ "$1" == "api" ]]; then
-                  if [[ "$*" == *"issues/900/"* && "$*" != *"queue-deferral-release"* ]]; then
-                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
-                  fi
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(tmp_path, extra_env="RELEASE_MODE=report")
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "#900" in result.stdout
-        assert "symphony-birth-hold" in result.stdout
-        assert "#901" in result.stdout
-        assert "untyped-ready-hold" in result.stdout
-        assert "untyped-hold-manual-release-required" not in result.stdout
-        assert "::warning::queue-deferred #900" in result.stdout
-        assert "::warning::queue-deferred #901" in result.stdout
-
-    def test_release_disabled_under_amber(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head)
-        receipt = _fleet_receipt(tmp_path, state="AMBER")
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
-                  exit 0
-                fi
-                {_FAKE_GH_API_UNTYPED}
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(
-                tmp_path,
-                extra_env=f'RELEASE_MODE=release FLEET_RECEIPT_FILE="{receipt}"',
-            )
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-releasable:AMBER" in result.stdout
-        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
-        assert "pr edit" not in log
-        assert "pr ready" not in log
-
-    def test_release_disabled_with_stale_fleet_receipt(self, tmp_path: Path) -> None:
-        receipt = _fleet_receipt(tmp_path, state="GREEN", age_minutes=30)
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[]'
-                  exit 0
-                fi
-                {_FAKE_GH_API_UNTYPED}
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(
-                tmp_path,
-                extra_env=f'RELEASE_MODE=release FLEET_RECEIPT_FILE="{receipt}"',
-            )
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-receipt-stale" in result.stdout
-
-    def test_scanner_includes_non_agent_queue_deferred_prs(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        stale_update = (
-            datetime.now(timezone.utc) - timedelta(hours=3)
-        ).isoformat()
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  cat <<'JSON'
-                [{{"n":15849,"t":"Non-agent ready PR","draft":false,"m":"MERGEABLE","head":"cursor/fix-shell-restore","oid":"{head}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}},{{"n":901,"t":"Human feat branch","draft":false,"m":"MERGEABLE","head":"feat/onboarding","oid":"{"d" * 40}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}}]
-JSON
-                  exit 0
-                fi
-                if [[ "$1" == "api" ]]; then
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(tmp_path, extra_env="RELEASE_MODE=report")
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "scanning open queue-deferred PRs" in result.stdout
-        assert "#15849" in result.stdout
-        assert "#901" in result.stdout
-        assert "untyped-ready-hold" in result.stdout
-
-    def test_untyped_hold_on_ready_green_pr_is_released_under_green_fleet(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            branch="cursor/fix-shell-restore",
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "untyped hold" in result.stdout
-        assert "releasing only after fresh controller admission" in result.stdout
-        assert "never released automatically" not in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_untyped_draft_hold_cannot_be_released(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(tmp_path, head=head, draft=True)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "live state no longer matches the releasable snapshot" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_untyped_hold_with_retired_taste_label_is_released(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            labels=["queue-deferred", "needs:taste"],
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold" not in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_untyped_hold_with_net_new_label_is_released(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            labels=["queue-deferred", "net-new"],
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold" not in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_untyped_hold_with_outbound_label_is_released(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            labels=["queue-deferred", "outbound"],
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold" not in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_untyped_hold_stays_held_when_fleet_is_red(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            fleet_state="RED",
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-releasable:RED" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_untyped_hold_stays_held_when_production_receipt_is_stale(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            fleet_state="GREEN",
-            fleet_age_minutes=30,
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-receipt-stale" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_recent_attempt_requests_bounded_in_run_retry(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head)
-        receipt = _fleet_receipt(tmp_path, state="GREEN")
-        retry_file = tmp_path / "retry-after-seconds"
-        attempted = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
-                  exit 0
-                fi
-                if [[ "$1" == "api" ]]; then
-                  if [[ "$*" == *"queue-deferral-release"* ]]; then
-                    echo '{attempted}'
-                  else
-                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
-                  fi
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(
-                tmp_path,
-                extra_env=(
-                    "RELEASE_MODE=release ATTEMPT_COOLDOWN_MINUTES=5 "
-                    f'RELEASE_RETRY_FILE="{retry_file}" '
-                    f'FLEET_RECEIPT_FILE="{receipt}"'
-                ),
-            )
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "retry requested in 180s" in result.stdout
-        assert retry_file.read_text(encoding="utf-8").strip() == "180"
-        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
-        assert "pr view" not in log
-        assert "pr edit" not in log
-        assert "pr ready" not in log
-
-    def test_untrusted_comment_is_ignored_and_ready_untyped_hold_releases(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head, author="random-contributor")
-        result = _run_single_candidate_release(tmp_path, head=head)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "untyped hold" in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_receipt_for_another_pr_is_treated_as_untyped_ready_hold(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head, pr=901)
-        result = _run_single_candidate_release(tmp_path, head=head)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "deferral-receipt-pr-mismatch (receipt=#901, live=#900)" in result.stdout
-        assert "treating as untyped ready hold" in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_receipt_for_another_repository_stays_held(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head, repository="JovieInc/LogYourBody")
-        result = _run_single_candidate_release(tmp_path, head=head)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert (
-            "deferral-receipt-repository-mismatch (receipt=JovieInc/LogYourBody, live=JovieInc/Jovie)"
-            in result.stdout
-        )
-        assert "untyped-hold-manual-release-required" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_head_stale_mechanical_receipt_is_released_against_live_head(
-        self, tmp_path: Path
-    ) -> None:
-        live_head = "e" * 40
-        _receipt_comment_body(tmp_path, head="f" * 40)
-        result = _run_single_candidate_release(tmp_path, head=live_head)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "deferral-receipt-head-stale" in result.stdout
-        assert "evaluating live head" in result.stdout
-        assert "would remove `queue-deferred` from #900" in result.stdout
-
-    def test_queue_pressure_receipt_stays_held_while_live_pressure_is_high(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(
-            tmp_path,
-            head=head,
-            reason="queue-pressure",
-            source="agent-pipeline",
-        )
-        receipt = _fleet_receipt(tmp_path, state="GREEN")
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" && "$*" == *"number,title"* ]]; then
-                  echo '[{{"n":900,"t":"Pressure hold","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"number":901,"isDraft":false,"mergeStateStatus":"CLEAN","labels":[]}}]'
-                  exit 0
-                fi
-                if [[ "$1" == "api" ]]; then
-                  if [[ "$*" != *"queue-deferral-release"* ]]; then
-                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
-                  fi
-                  exit 0
-                fi
-                {_FAKE_GH_GREEN_CHECKS}
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(
-                tmp_path,
-                extra_env=(
-                    "RELEASE_MODE=release DRY_RUN=1 ATTEMPT_COOLDOWN_MINUTES=0 "
-                    "QUEUE_READY_THRESHOLD=1 "
-                    f'FLEET_RECEIPT_FILE="{receipt}"'
-                ),
-            )
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "queue pressure remains high (1 ready, threshold 1)" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_non_main_live_target_cannot_be_released(self, tmp_path: Path) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head)
-        result = _run_single_candidate_release(
-            tmp_path,
-            head=head,
-            base="symphony/JOV-899-stack",
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "live state no longer matches the releasable snapshot" in result.stdout
-        assert "would remove" not in result.stdout
-
-    def test_draft_hold_cannot_be_released_by_non_human_controller(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head)
-        result = _run_single_candidate_release(tmp_path, head=head, draft=True)
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "live state no longer matches the releasable snapshot" in result.stdout
-        assert "would remove" not in result.stdout
-        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
-        assert "pr ready" not in log
-
-    def test_green_receipt_releases_ready_typed_birth_hold(
-        self, tmp_path: Path
-    ) -> None:
-        head = "c" * 40
-        _receipt_comment_body(tmp_path, head=head)
-        receipt = _fleet_receipt(tmp_path, state="GREEN")
-        _write_fake_gh(
-            tmp_path,
-            textwrap.dedent(
-                f"""\
-                {_FAKE_GH_PREAMBLE}
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"n":900,"t":"Symphony PR","draft":false,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
-                  exit 0
-                fi
-                if [[ "$1" == "api" ]]; then
-                  if [[ "$*" != *"queue-deferral-release"* && "$*" != *"-X PATCH"* ]]; then
-                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
-                  fi
-                  exit 0
-                fi
-                {_FAKE_GH_GREEN_CHECKS}
-                if [[ "$1 $2" == "pr view" ]]; then
-                  if [[ -f "${{FAKE_GH_STATE}}/label_removed" ]]; then
-                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
-                  else
-                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
-                  fi
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr edit" ]]; then
-                  touch "${{FAKE_GH_STATE}}/label_removed"
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr comment" ]]; then
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-        )
-
-        result = _run_bash(
-            _release_command(
-                tmp_path,
-                extra_env=(
-                    "RELEASE_MODE=release ATTEMPT_COOLDOWN_MINUTES=0 "
-                    f'FLEET_RECEIPT_FILE="{receipt}"'
-                ),
-            )
-        )
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "✓ removed `queue-deferred` from #900" in result.stdout
-        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
-        assert "--remove-label queue-deferred" in log
-        assert "pr ready" not in log
-        assert "--add-label queue-deferred" not in log, "no compensating restore expected"
 
 
 class TestNativeAdmissionReceiptReconciliation:

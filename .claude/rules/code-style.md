@@ -17,7 +17,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Auth | Better Auth (self-hosted, `/api/auth/[...all]`) |
 | Payments | Stripe |
 | Linting | Biome |
-| Package Manager | pnpm 9.15.4 |
+| Package Manager | pnpm 9.15.9 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 22 LTS |
 

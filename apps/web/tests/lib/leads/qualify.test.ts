@@ -206,6 +206,26 @@ describe('qualifyLead', () => {
     expect(result.spotifyUrl).toBe('https://open.spotify.com/artist/123');
   });
 
+  it('prefers a Spotify artist URL when an album is listed first', async () => {
+    setupDefaultMocks({
+      isVerified: true,
+      links: [
+        {
+          url: 'https://open.spotify.com/album/album123',
+          platformId: 'spotify',
+        },
+        {
+          url: 'https://open.spotify.com/artist/artist123',
+          platformId: 'spotify',
+        },
+      ],
+    });
+
+    const result = await qualifyLead('https://linktr.ee/testartist');
+
+    expect(result.spotifyUrl).toBe('https://open.spotify.com/artist/artist123');
+  });
+
   it('should return fit score from calculator', async () => {
     setupDefaultMocks({ isVerified: true });
     mockCalculateFitScore.mockReturnValue({
@@ -238,5 +258,24 @@ describe('qualifyLead', () => {
     const result = await qualifyLead('https://linktr.ee/testartist');
 
     expect(result.contactEmail).toBeNull();
+  });
+
+  it('does not read or score contact email in public-only mode', async () => {
+    setupDefaultMocks({
+      contactEmail: 'private@example.com',
+      isVerified: true,
+    });
+
+    const result = await qualifyLead('https://linktr.ee/testartist', {
+      includePrivateContact: false,
+    });
+
+    expect(result.contactEmail).toBeNull();
+    expect(mockExtractLinktree).toHaveBeenCalledWith('<html>mock</html>', {
+      includeContactEmail: false,
+    });
+    expect(mockCalculateFitScore).toHaveBeenCalledWith(
+      expect.objectContaining({ hasContactEmail: false })
+    );
   });
 });

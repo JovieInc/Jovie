@@ -41,11 +41,7 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
     status: 'canonical',
     render: () => (
       <div className='py-8 px-6'>
-        <HomeTrustSection
-          variant='default'
-          presentation='inline-strip'
-          label='Trusted by artists'
-        />
+        <HomeTrustSection variant='default' presentation='inline-strip' />
       </div>
     ),
   },

@@ -14,6 +14,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -97,6 +98,8 @@ function normalizeTrailingSlash(pathname: string): string {
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
+  const runtimeUpdate = useRuntimeUpdate();
+  const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -423,7 +426,14 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
                 prefetch={!isDemo}
-                aria-label='Inbox'
+                aria-label={
+                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
+                }
+                data-inbox-attention={
+                  hasRuntimeUpdate
+                    ? 'available'
+                    : (inboxNavigation?.state ?? 'unknown')
+                }
                 aria-current={
                   normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
                     ? 'page'
@@ -444,6 +454,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   >
                     {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
                   </span>
+                ) : hasRuntimeUpdate ? (
+                  <span
+                    aria-hidden='true'
+                    data-inbox-runtime-update
+                    className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
+                  />
                 ) : null}
               </Link>
               <Link

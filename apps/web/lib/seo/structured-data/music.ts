@@ -6,6 +6,7 @@ import {
 } from '@/lib/constants/schemas';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { generateArtworkImageObject } from '@/lib/images/seo';
+import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { msToIsoDuration, toDateOnlySafe } from '@/lib/utils/date';
 import {
   resolveArtistEntityType,
@@ -86,7 +87,7 @@ function buildTrackListSchema(
   contentType: 'release' | 'track',
   trackList: TrackListItem[] | null | undefined,
   contentUrl: string,
-  artistUrl: string
+  byArtistId: string | null
 ): Record<string, unknown> | undefined {
   if (contentType !== 'release' || !trackList || trackList.length === 0) {
     return undefined;
@@ -105,10 +106,86 @@ function buildTrackListSchema(
           t.durationMs > 0 && {
             duration: msToIsoDuration(t.durationMs),
           }),
-        byArtist: { '@id': `${artistUrl}#musicgroup` },
+        ...(byArtistId && { byArtist: { '@id': byArtistId } }),
       },
     })),
   };
+}
+
+/**
+ * Project accepted primary-artist credits (JOV-6542) into byArtist entities.
+ *
+ * Credited artists are identity data from the canonical credit collection —
+ * the profile owner is only the credited artist when an accepted credit says
+ * so. Each co-primary gets its own entity; handles are canonicalized with the
+ * same policy as the visible byline so structured data never links machine
+ * handles or substitutes the owner for a credited artist.
+ */
+function buildByArtistEntities(
+  content: {
+    primaryArtists?: ReadonlyArray<{
+      name: string;
+      handle: string | null;
+    }> | null;
+  },
+  creator: {
+    displayName: string | null;
+    username: string;
+    usernameNormalized: string;
+    creatorType?: 'artist' | 'podcaster' | 'influencer' | 'creator';
+    artistSameAs?: string[];
+  },
+  ownerName: string
+): Record<string, unknown> | Record<string, unknown>[] | null {
+  const ownerEntityType = resolveArtistEntityType(
+    creator.creatorType ?? 'artist'
+  );
+  const ownerHandle = creator.usernameNormalized;
+  const ownerUrl = `${BASE_URL}/${ownerHandle}`;
+
+  const primaryCredits = (content.primaryArtists ?? []).filter(
+    credit => credit.name.trim().length > 0
+  );
+
+  if (primaryCredits.length === 0) {
+    // Missing, blank, or non-primary credit evidence is not verified
+    // authorship: omit byArtist entirely rather than fabricating the profile
+    // owner as the performer (JOV-6542 invariant 5). The owner is emitted
+    // only when an accepted primary credit names them.
+    return null;
+  }
+
+  const entities = primaryCredits.map(credit => {
+    const handle = canonicalizeReleaseArtistHandle({
+      handle: credit.handle,
+      name: credit.name,
+      ownerHandle,
+      ownerName,
+    });
+    const isOwnerCredit = handle === ownerHandle;
+    // A credited artist without a supported public Jovie destination keeps a
+    // name-only entity — omit unsupported identity claims rather than minting
+    // a dangling @id/url (JOV-6542 invariant 4).
+    return {
+      '@type': ownerEntityType,
+      ...(handle
+        ? {
+            '@id': isOwnerCredit
+              ? `${ownerUrl}#musicgroup`
+              : `${BASE_URL}/${handle}#musicgroup`,
+            url: `${BASE_URL}/${handle}`,
+          }
+        : {}),
+      name: credit.name,
+      ...(isOwnerCredit &&
+        creator.artistSameAs &&
+        creator.artistSameAs.length > 0 && {
+          sameAs: creator.artistSameAs,
+        }),
+    };
+  });
+
+  return entities.length === 1 ? entities[0] : entities;
 }
 
 /**
@@ -127,6 +204,11 @@ export function generateMusicStructuredData(
     releaseType?: string | null;
     totalTracks?: number | null;
     credits?: SmartLinkCreditGroup[] | null;
+    /** Accepted primary-artist credits — canonical, never ownership-derived. */
+    primaryArtists?: ReadonlyArray<{
+      name: string;
+      handle: string | null;
+    }> | null;
     durationMs?: number | null;
     isrc?: string | null;
     trackNumber?: number | null;
@@ -148,9 +230,7 @@ export function generateMusicStructuredData(
 
   const sameAs = content.providerLinks.map(link => link.url);
   const schemaType = resolveMusicContentSchemaType(content.type);
-  const artistEntityType = resolveArtistEntityType(
-    creator.creatorType ?? 'artist'
-  );
+  const byArtist = buildByArtistEntities(content, creator, artistName);
 
   const imageValue = content.artworkUrl
     ? buildArtworkImageValue(content.artworkUrl, {
@@ -166,11 +246,23 @@ export function generateMusicStructuredData(
     PROVIDER_CONFIG
   );
   const flatCredits = buildFlatCredits(content.credits);
+  // Track-list recordings reference the first credited artist entity that has
+  // a supported destination — never the profile owner, and omitted entirely
+  // when no credited artist has one (JOV-6542 invariant 4).
+  const byArtistList = byArtist
+    ? Array.isArray(byArtist)
+      ? byArtist
+      : [byArtist]
+    : [];
+  const byArtistId =
+    byArtistList
+      .map(entity => entity['@id'])
+      .find(id => typeof id === 'string') ?? null;
   const trackListSchema = buildTrackListSchema(
     content.type,
     trackList,
     contentUrl,
-    artistUrl
+    byArtistId
   );
 
   const musicSchema: Record<string, unknown> = {
@@ -197,16 +289,7 @@ export function generateMusicStructuredData(
         url: content.inAlbum.url,
       },
     }),
-    byArtist: {
-      '@type': artistEntityType,
-      '@id': `${artistUrl}#musicgroup`,
-      name: artistName,
-      url: artistUrl,
-      ...(creator.artistSameAs &&
-        creator.artistSameAs.length > 0 && {
-          sameAs: creator.artistSameAs,
-        }),
-    },
+    ...(byArtist && { byArtist }),
     ...(sameAs.length > 0 && { sameAs }),
     ...(content.type === 'release' &&
       content.releaseType &&

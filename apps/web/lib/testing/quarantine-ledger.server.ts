@@ -9,7 +9,10 @@ import {
   type QuarantineLedgerSummary,
 } from '@/lib/testing/quarantine-ledger';
 
-const QUARANTINE_LEDGER_PATH = resolve(process.cwd(), 'tests/quarantine.json');
+const QUARANTINE_LEDGER_PATH = resolve(
+  /* turbopackIgnore: true */ process.cwd(),
+  'tests/quarantine.json'
+);
 
 export interface HudQuarantineMetrics {
   readonly ledgerPath: string;
@@ -27,7 +30,9 @@ export function getQuarantineLedgerPath(): string {
 export function loadQuarantineLedgerFromFile(
   filePath = QUARANTINE_LEDGER_PATH
 ): ParsedQuarantineLedger {
-  const raw = JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
+  const raw = JSON.parse(
+    readFileSync(/* turbopackIgnore: true */ filePath, 'utf8')
+  ) as unknown;
   return parseQuarantineLedger(raw);
 }
 

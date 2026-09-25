@@ -45,7 +45,7 @@ function actionErrorMessage(error: unknown, fallback: string): string {
 }
 
 async function requireAdminUserId(): Promise<string> {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
   }

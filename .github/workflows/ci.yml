@@ -177,7 +177,7 @@ jobs:
             "$IMAGE_TAG" -lc '
               set -euo pipefail
               test "$(node --version)" = v22.23.2
-              test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.4
+              test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
                 node /repo/.github/runner-image/verify-prerequisites.mjs \
@@ -306,7 +306,7 @@ jobs:
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
           assert_equal 'Node version' v22.23.2 "$(node --version)"
-          assert_equal 'pnpm version' 9.15.4 "$(pnpm --version)"
+          assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
           assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
@@ -499,6 +499,7 @@ jobs:
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       has_web_coverage_changes: ${{ steps.coverage-detect.outputs.has_web_coverage_changes || 'false' }}
+      has_route_prep_coverage_changes: ${{ steps.coverage-detect.outputs.has_route_prep_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
@@ -919,6 +920,14 @@ jobs:
           set -euo pipefail
           CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
           test -f "$CHANGED_PATHS"
+          # Route-prep capacity logic is bash plus an embedded interpreter.
+          # Exact-head coverage runs the behavior suites when these paths change.
+          ROUTE_PREP_COVERAGE_PATTERN='^(scripts/symphony/codex-account-probe\.sh|scripts/symphony/symphony-agent-router|scripts/symphony/tests/codex-account-probe\.test\.py|scripts/symphony/tests/symphony-agent-router\.test\.py|scripts/symphony/tests/run-route-prep-coverage-gate\.py)$'
+          if grep -q -E "$ROUTE_PREP_COVERAGE_PATTERN" "$CHANGED_PATHS"; then
+            echo "has_route_prep_coverage_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_route_prep_coverage_changes=false" >> "$GITHUB_OUTPUT"
+          fi
           # Promptfoo eval-infrastructure-only source PRs keep V8 on the combined head.
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
@@ -1299,6 +1308,16 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Fail-closed golden path lock
         run: node scripts/golden-path-lock.mjs merge-gate
+      - name: Upload golden-path lock helper coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: golden-path-lock-coverage
+          path: |
+            ${{ runner.temp }}/golden-path-lock-coverage/coverage-summary.json
+            ${{ runner.temp }}/golden-path-lock-coverage/coverage-final.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   ci-visual-snapshot-compare:
     name: Visual Snapshot Compare
@@ -1537,10 +1556,26 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
-          STRUCTURAL_CONTROL_PATTERN='^(scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range|release-wave-admission\.mjs)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range|release-wave-admission)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(?:\.test)?|contract\.test)\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(?:\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
+          STRUCTURAL_CONTROL_PATTERN='^(scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|emit_gem_service_attestation\.py$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(?:\.test)?|contract\.test)\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(?:\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
 
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
+
+          # Evidence collection changes must execute the existing native-queue
+          # behavioral tests and per-file coverage, including test-only edits.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
+
+          # FX remediation policy, dispatcher, and finisher must run their real
+          # per-file coverage suite when the implementation or tests change.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
+
+          # Conflict event policy, entrypoint, and proof changes always run the
+          # existing structural control selector with exact-path coverage.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/pr-conflict-handler\.mjs$|^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$|^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$'
+
+          # Route-prep capacity refresh must run both behavior suites on source
+          # PRs, including test-only edits. Merge groups already force this lane.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
@@ -1635,6 +1670,7 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
         run: |
           set -euo pipefail
@@ -1681,6 +1717,7 @@ jobs:
           if-no-files-found: error
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -2105,9 +2142,10 @@ jobs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.ci-path-changes.outputs.run_drizzle == 'true'
         with:
           fetch-depth: 0
-          # Tags are unused by the guard/skip path and can exhaust the 3m job
+          # Tags are unused by the guard and can exhaust the 3m job
           # budget on this large repo (hundreds of release tags).
           fetch-tags: false
       - name: Check for relevant changes
@@ -2265,6 +2303,19 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      # This guard permits the trusted-classifier prerequisite to land before
+      # the app. Once present, Ovie must independently build and typecheck.
+      - name: Build independent Ovie app
+        if: hashFiles('apps/ovie/package.json') != ''
+        run: |
+          pnpm --filter @jovie/ovie typecheck
+          pnpm --filter @jovie/ovie build
+          test -f apps/ovie/.next/BUILD_ID
+          test -f apps/ovie/.next/standalone/apps/ovie/server.js
+          test ! -d apps/ovie/.next/standalone/apps/docs/app
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3105
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -2357,6 +2408,7 @@ jobs:
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
+                  tests/e2e/storybook-sheet.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi
@@ -2368,7 +2420,9 @@ jobs:
           STORYBOOK_BASE_URL: http://localhost:6006
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -2376,6 +2430,7 @@ jobs:
         with:
           name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
       - name: Upload input Storybook evidence
         if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
@@ -4093,6 +4148,26 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
+      - name: Run Ovie route and private-boundary coverage
+        # One deterministic app suite, never repeated across the web shards.
+        if: >-
+          steps.check_changes.outputs.run_full_ci == 'true' &&
+          matrix.shard == '1/10' &&
+          hashFiles('apps/ovie/package.json') != ''
+        run: pnpm --filter @jovie/ovie test
+
+      - name: Preserve Ovie coverage evidence
+        if: >-
+          always() && !cancelled() &&
+          matrix.shard == '1/10' &&
+          hashFiles('apps/ovie/coverage/coverage-summary.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ovie-coverage-${{ github.sha }}-${{ github.run_attempt }}
+          path: apps/ovie/coverage/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run packages/ui unit tests
         # This suite is not sharded; running it in every web-test shard was
         # identical duplicate work. Across 15 recent full merge-group runs,
@@ -4132,7 +4207,7 @@ jobs:
     # head. Docs-only heads keep an explicit green no-code receipt without
     # spending a runner on an empty coverage pass.
     # Job timeout must fail before GitHub merge-queue
-    # check_response_timeout_minutes=20 (policy-locked in merge-queue-guard).
+    # check_response_timeout_minutes=60 after source-first ruleset cutover.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -4143,7 +4218,7 @@ jobs:
       contents: read
     steps:
       - name: Record non-applicable coverage receipt
-        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true' && needs.ci-path-changes.outputs.has_route_prep_coverage_changes != 'true'
         run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
 
       - name: Checkout exact coverage head
@@ -4224,6 +4299,33 @@ jobs:
           wait "$coverage_group"
           coverage_group=''
           trap - EXIT INT TERM
+
+      - name: Checkout exact route-prep coverage head
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact route-prep coverage head
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Setup Node for route-prep behavior suites
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run route-prep behavior coverage
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true'
+        run: python3 scripts/symphony/tests/run-route-prep-coverage-gate.py
 
   ci-a11y:
     name: A11y (axe)
@@ -4675,8 +4777,8 @@ jobs:
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
           export CHAT_LLM_FAILURE_INJECTION=1
           # GHA sets HOSTNAME to the runner machine name; Next standalone uses it for
@@ -4716,8 +4818,6 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -4883,12 +4983,10 @@ jobs:
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
-          # UPSTASH_REDIS_* MUST stay set in this lane: the anonymous onboarding
-          # chat limiters are requireRedis and fail CLOSED (429) without Redis.
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           # The loopback-IP shared-bucket OTP race is handled app-side instead —
           # deterministic +e2e test emails are exempt from the OTP send limit.
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
 
           PORT=3250 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
@@ -4925,8 +5023,6 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
@@ -5281,14 +5377,13 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           # Anonymous onboarding chat needs the same arming as the smoke/golden
           # lanes: SESSION_SECRET mints the onboarding session cookie (503
-          # SESSION_SECRET_NOT_CONFIGURED without it), UPSTASH_REDIS_* keep the
-          # requireRedis limiters from failing closed (429), E2E_TEST_MODE skips
-          # the loopback-shared-bucket anonymous limiter deterministically, and
+          # SESSION_SECRET_NOT_CONFIGURED without it). The in-memory rate limiter
+          # and cache are selected because NODE_ENV=test, CI, and E2E_TEST_MODE
+          # are set. Do not inject UPSTASH_REDIS_REST_*. E2E_TEST_MODE skips the
+          # loopback-shared-bucket anonymous limiter deterministically, and
           # CHAT_LLM_FAILURE_INJECTION honors the header-gated LLM-failure
           # fallback (inert unless a request carries x-jovie-e2e-llm-failure).
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
         run: |
@@ -5313,14 +5408,12 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           # Same anonymous-onboarding arming as the smoke/golden lanes and the
           # E2E Full step above (JOV-4179): without SESSION_SECRET the first
-          # onboarding message 503s (SESSION_SECRET_NOT_CONFIGURED), without
-          # UPSTASH_REDIS_* + E2E_TEST_MODE the requireRedis limiters fail
-          # closed (429), and without CHAT_LLM_FAILURE_INJECTION the
+          # onboarding message 503s (SESSION_SECRET_NOT_CONFIGURED). The
+          # in-memory rate limiter and cache are selected for this lane. Do not
+          # inject UPSTASH_REDIS_REST_*. Without CHAT_LLM_FAILURE_INJECTION the
           # x-jovie-e2e-llm-failure header is inert so no deterministic
           # fallback is served.
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -6312,8 +6405,8 @@ jobs:
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+          # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
+          # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           export NEXT_PUBLIC_E2E_MODE=1
           export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
@@ -6366,8 +6459,6 @@ jobs:
           TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_DISABLE_TOOLBAR: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'

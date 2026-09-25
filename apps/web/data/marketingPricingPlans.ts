@@ -1,21 +1,26 @@
-import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 /**
  * Canonical plan IDs for the marketing pricing page.
  *
- * These MUST match the canonical PlanId values in
- * apps/web/lib/entitlements/registry.ts (free / pro / max).
- * Do not add plan IDs here that don't exist in the entitlement registry.
+ * These are the public acquisition plans. Runtime entitlement IDs remain
+ * canonical in apps/web/lib/entitlements/registry.ts.
  */
-export const MARKETING_PRICING_PLAN_IDS = ['free', 'pro', 'max'] as const;
+export const MARKETING_PRICING_PLAN_IDS = [
+  'free',
+  'pro',
+  'enterprise',
+] as const;
 
 export type MarketingPricingPlanId =
   (typeof MARKETING_PRICING_PLAN_IDS)[number];
 
 const visiblePlanIds = (process.env.NEXT_PUBLIC_MARKETING_VISIBLE_PLANS ?? '')
   .split(',')
-  .map(plan => plan.trim())
+  .map(plan => {
+    const normalizedPlan = plan.trim();
+    return normalizedPlan === 'max' ? 'enterprise' : normalizedPlan;
+  })
   .filter((plan): plan is MarketingPricingPlanId =>
     (MARKETING_PRICING_PLAN_IDS as readonly string[]).includes(plan)
   );
@@ -36,75 +41,51 @@ export interface MarketingPricingPlan {
   readonly ctaHref: string;
 }
 
+const FREE_CLAIM = getPublicPriceClaim('free');
+const PRO_CLAIM = getPublicPriceClaim('pro');
+const ENTERPRISE_CLAIM = getPublicPriceClaim('enterprise');
+
 export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
   {
     id: 'free',
-    name: 'Free',
-    price: '$0',
-    badge: 'Free forever',
-    body: 'Your artist profile, smart links, and public fan path stay free.',
-    features: [
-      'Artist profile',
-      'Smart release links',
-      'Listen buttons by platform',
-      'Basic audience signal',
-      'Up to 100 contacts',
-      'Manual release creation',
-    ],
+    name: FREE_CLAIM.displayName,
+    price: FREE_CLAIM.priceLabel,
+    cadence: FREE_CLAIM.cadence ?? undefined,
+    badge: FREE_CLAIM.badge,
+    body: FREE_CLAIM.note,
+    features: ['Public artist profile and audience capture'],
     accent: 'cyan',
-    ctaLabel: 'Claim your profile',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=free`,
+    ctaLabel: FREE_CLAIM.ctaLabel,
+    ctaHref: FREE_CLAIM.ctaHref,
   },
   {
     id: 'pro',
-    name: 'Pro',
-    price: `$${PLAN_PRICES.pro.monthly}`,
-    cadence: '/mo',
-    badge: 'Recommended',
-    body: 'Fan notifications, presaves, and deeper release analytics.',
-    features: [
-      'Everything in Free',
-      'Release notifications to fans',
-      'Pre-save campaigns',
-      'Pre-release countdown pages',
-      'Extended analytics (180 days)',
-      'Unlimited contacts',
-      'Contact export',
-      'Tips & payments',
-      'Verified badge',
-      'AI assistant (70 messages/week)',
-    ],
+    name: PRO_CLAIM.displayName,
+    price: PRO_CLAIM.priceLabel,
+    cadence: PRO_CLAIM.cadence ?? undefined,
+    badge: PRO_CLAIM.badge,
+    body: PRO_CLAIM.note,
+    features: ['Public artist profile and audience capture'],
     accent: 'blue',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
+    ctaLabel: PRO_CLAIM.ctaLabel,
+    ctaHref: PRO_CLAIM.ctaHref,
   },
   {
-    id: 'max',
-    name: 'Max',
-    price: `$${PLAN_PRICES.max.monthly}`,
-    cadence: '/mo',
-    badge: 'Full stack',
-    body: 'Your entire release operation, automated end to end.',
-    features: [
-      'Everything in Pro',
-      'Release plan generation',
-      'Metadata submission agent',
-      'Unlimited analytics',
-      'Email campaigns',
-      'API access',
-      'AI assistant (250 messages/week)',
-    ],
+    id: 'enterprise',
+    name: ENTERPRISE_CLAIM.displayName,
+    price: ENTERPRISE_CLAIM.priceLabel,
+    cadence: ENTERPRISE_CLAIM.cadence ?? undefined,
+    badge: ENTERPRISE_CLAIM.badge,
+    body: ENTERPRISE_CLAIM.note,
+    features: [],
     accent: 'violet',
-    ctaLabel: ARTIST_VISIBILITY_OFFER.enterprise.cta,
-    ctaHref: ARTIST_VISIBILITY_OFFER.enterprise.href,
+    ctaLabel: ENTERPRISE_CLAIM.ctaLabel,
+    ctaHref: ENTERPRISE_CLAIM.ctaHref,
   },
 ] as const;
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
-  if (planId === 'max') {
-    return ARTIST_VISIBILITY_OFFER.enterprise.href;
-  }
-  return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
+  return getPublicPriceClaim(planId).ctaHref;
 }
 
 export function isMarketingPlanActive(
@@ -126,5 +107,5 @@ export function getVisibleMarketingPricingPlans(): readonly MarketingPricingPlan
 }
 
 export function getMarketingPlanCtaLabel(plan: MarketingPricingPlan): string {
-  return plan.ctaLabel;
+  return getPublicPriceClaim(plan.id).ctaLabel;
 }

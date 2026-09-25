@@ -90,14 +90,17 @@ finally:
         path.write_text("#!" + sys.executable + "\n" + body)
         path.chmod(0o755)
 
-    def entry(self):
+    def entry(self, extra_env=None):
         self.state.write_text(json.dumps(dict(fields=self.fields, properties=self.properties)))
         workflow = (ROOT / ".github/workflows/gem-delivery-controller-activation.yml").read_text()
         step = workflow.split("- name: Install and attest the exact controller configuration\n", 1)[1].split("\n      - name:", 1)[0]
         script = textwrap.dedent(step.split("        run: |\n", 1)[1])
         env = {**os.environ, "HOME": str(self.home), "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
                "OWNERSHIP_FIXTURE": str(self.state), "MUTATIONS": str(self.events),
-               "GITHUB_WORKSPACE": str(ROOT), "GEM_CONTROLLER_EXPECTED_REVISION": "a" * 40}
+               "GITHUB_WORKSPACE": str(ROOT), "GEM_CONTROLLER_EXPECTED_REVISION": "a" * 40,
+               "GITHUB_OUTPUT": str(self.home / "github-output"),
+               "GEM_UPSTREAM_PRESERVATION_BINDING": "", "GEM_UPSTREAM_PRESERVATION_BINDING_SHA256": ""}
+        env.update(extra_env or {})
         return subprocess.run(["/bin/bash", "-c", script], cwd=ROOT, env=env, capture_output=True, text=True, timeout=15)
 
     def test_actual_entry_holds_upstream_and_unknown_before_every_mutator(self):
@@ -136,6 +139,17 @@ finally:
         self.assertIn("--managed-controller-only", events)
         self.assertIn("daemon-reload", events)
         self.assertNotIn("healthy", result.stdout)
+
+    def test_classification_retains_legacy_guard_and_requires_approved_upstream_evidence(self):
+        import emit_gem_service_attestation as E
+        with mock.patch.object(H, "activation_ownership_preflight", return_value={"allowed": True}):
+            self.assertEqual(H.activation_classification(ROOT, None, None)["mode"], "canonical-managed")
+        with mock.patch.object(H, "activation_ownership_preflight", return_value={"allowed": False}):
+            self.assertEqual(H.activation_classification(ROOT, None, None)["mode"], "held")
+            with mock.patch.object(E, "observe_upstream_preservation", return_value={"mode": "upstream-preserved"}):
+                self.assertEqual(H.activation_classification(ROOT, "/binding", "a" * 64)["mode"], "upstream-preserved")
+            with mock.patch.object(E, "observe_upstream_preservation", side_effect=ValueError("fixture")):
+                self.assertEqual(H.activation_classification(ROOT, "/binding", "a" * 64)["mode"], "held")
 
 
     def observe(self):

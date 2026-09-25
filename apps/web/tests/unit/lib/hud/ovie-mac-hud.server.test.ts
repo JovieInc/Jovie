@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 
 const mockEnv = vi.hoisted(() => ({
   HUD_GITHUB_TOKEN: undefined as string | undefined,
@@ -46,6 +47,10 @@ vi.mock('@/lib/admin/mercury-metrics', () => ({
   getAdminMercuryMetrics: vi.fn(),
 }));
 
+vi.mock('@/lib/ovie/lyb-mrr.server', () => ({
+  getLybDailyMrr: vi.fn(),
+}));
+
 function stripeAvailable() {
   return {
     mrrUsd: 5200,
@@ -82,6 +87,18 @@ describe('getOvieMacHudSnapshot', () => {
       stripeAvailable()
     );
     vi.mocked(getAdminMercuryMetrics).mockResolvedValue(mercuryAvailable());
+    vi.mocked(getLybDailyMrr).mockResolvedValue({
+      schema: 'jovie.lyb-daily-mrr/v1',
+      product: 'logyourbody',
+      definition: 'active-paid-subscriptions-monthly-normalized-gross',
+      currency: 'USD',
+      asOfDate: null,
+      observedAt: null,
+      freshnessDeadline: null,
+      source: null,
+      state: 'unavailable',
+      mrrCents: null,
+    });
   });
 
   it('fails closed when Mercury burn telemetry is incomplete', async () => {
@@ -106,6 +123,10 @@ describe('getOvieMacHudSnapshot', () => {
     expect(snapshot.alive.weeklyBurnUsd).toBeNull();
     expect(snapshot.alive.cashUsd).toBeNull();
     expect(snapshot.inFlightPullRequests.availability).toBe('not_configured');
+    expect(snapshot.lybMrr).toMatchObject({
+      product: 'logyourbody',
+      mrrCents: null,
+    });
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 

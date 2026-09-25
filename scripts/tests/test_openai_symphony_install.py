@@ -108,6 +108,17 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertNotIn("linear-intake-changed", webhook)
         self.assertIn("Issue pickup is owned by upstream OpenAI Symphony", webhook)
 
+    def test_triage_event_only_wakes_existing_intake(self) -> None:
+        workflow = (ROOT / ".github/workflows/linear-triage-assessment.yml").read_text()
+        self.assertIn("types: [linear_triage_assess]", workflow)
+        self.assertIn("triage-event-assess.mjs", workflow)
+        self.assertIn("summer-bottleneck-signing.env", workflow)
+        self.assertIn("summer-triage-assessment-client.mjs", (ROOT / "scripts/backlog-orchestrator/triage-event-assess.mjs").read_text())
+        self.assertIn("--event-file=\"$GITHUB_EVENT_PATH\"", workflow)
+        self.assertIn("http://127.0.0.1:4041/api/v1/refresh", workflow)
+        self.assertNotIn("gate-next", workflow)
+        self.assertNotIn("admit-next", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

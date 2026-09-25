@@ -174,6 +174,51 @@ test.describe('surface elevation matrix', () => {
   });
 });
 
+test.describe('chat welcome sample matches the canonical user bubble', () => {
+  for (const theme of THEMES) {
+    for (const width of [390, 1200]) {
+      test(`sample stays legible and rounded [${theme}, ${width}]`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 760 });
+        await openStory(
+          page,
+          'chat-emptystate-composerregion--just-ask-docked',
+          theme
+        );
+        const welcome = page.getByTestId('chat-empty-state-welcome');
+        const bubble = page.getByTestId('chat-empty-state-sample-user');
+        const reply = page.getByTestId('chat-empty-state-sample-reply');
+        const composer = page.getByTestId('chat-composer-surface');
+        await expect(welcome).toBeVisible();
+        await expect(bubble).toBeVisible();
+        await expect(reply).toBeVisible();
+        await expect(composer).toBeVisible();
+        await expect(bubble).toHaveAttribute('data-bubble-shape', 'pill');
+        const bubbleStyle = await bubble.evaluate(element => {
+          const style = getComputedStyle(element);
+          return {
+            background: style.backgroundColor,
+            radius: Number.parseFloat(style.borderTopLeftRadius),
+            height: element.getBoundingClientRect().height,
+          };
+        });
+        expect(bubbleStyle.background).not.toBe('rgba(0, 0, 0, 0)');
+        expect(bubbleStyle.radius).toBeGreaterThanOrEqual(
+          bubbleStyle.height / 2
+        );
+        const sampleBox = (await welcome.boundingBox())!;
+        const composerBox = (await composer.boundingBox())!;
+        expect(sampleBox.x).toBeGreaterThanOrEqual(0);
+        expect(sampleBox.x + sampleBox.width).toBeLessThanOrEqual(width);
+        expect(composerBox.y).toBeGreaterThanOrEqual(
+          sampleBox.y + sampleBox.height
+        );
+      });
+    }
+  }
+});
+
 // The existing elevation lane exercises the actual theme CSS and portaled
 // overlays; jsdom cannot prove contrast or sidebar geometry.
 test.describe('sidebar account and tooltip regressions', () => {
@@ -459,5 +504,74 @@ test.describe('desktop header shares the traffic-light row', () => {
       '-webkit-app-region',
       'none'
     );
+  });
+});
+
+test.describe('central runtime notifications', () => {
+  test('desktop update stays pending and is actionable in Inbox', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const fixture = window as unknown as {
+        available?: () => void;
+        downloaded?: () => void;
+        installs: number;
+        electronAPI: unknown;
+      };
+      fixture.installs = 0;
+      fixture.electronAPI = {
+        platform: 'darwin',
+        electronVersion: 'fixture',
+        onUpdateAvailable: (cb: () => void) => {
+          fixture.available = cb;
+          return () => {};
+        },
+        onUpdateDownloaded: (cb: () => void) => {
+          fixture.downloaded = cb;
+          return () => {};
+        },
+        installUpdateAndRestart: () => {
+          fixture.installs++;
+        },
+      };
+    });
+    await openStory(
+      page,
+      'dashboard-navigation-customer-rail--runtime-update',
+      'light'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => typeof (window as unknown as { available?: unknown }).available
+        )
+      )
+      .toBe('function');
+    await page.evaluate(() =>
+      (window as unknown as { available: () => void }).available()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Downloading Jovie Update…' })
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', '/app');
+    await page.evaluate(() =>
+      (window as unknown as { downloaded: () => void }).downloaded()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Restart Jovie To Update' })
+    ).toBeEnabled();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(0);
+    await page.getByRole('button', { name: 'Restart Jovie To Update' }).click();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(1);
   });
 });

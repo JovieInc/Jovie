@@ -29,7 +29,7 @@ export async function GET() {
  * Update portal settings.
  */
 export async function PUT(request: Request) {
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   const body = await request.json();

@@ -16,7 +16,7 @@ export const maxDuration = 60;
  * Returns full per-keyword diagnostics so the UI can show search health.
  */
 export async function POST() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

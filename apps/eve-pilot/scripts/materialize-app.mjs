@@ -86,8 +86,6 @@ export const disabledTools = [
   'web_fetch',
   'web_search',
   'load_skill',
-  'connection_search',
-  'task_update',
   'task_cancel',
 ];
 
@@ -254,7 +252,7 @@ thresholds: {statements: 85, branches: 75, functions: 85, lines: 85}}}});\n`
   put(
     'AGENTS.md',
     `# ${identity} Eve application\n\nRead the installed Eve docs before editing. This application has one fixed identity.
-Run Node 24 and pnpm 9.15.4: install --ignore-workspace --frozen-lockfile; run typecheck;
+Run Node 24 and pnpm 9.15.9: install --ignore-workspace --frozen-lockfile; run typecheck;
 run test:coverage; run build. Preserve authentication, recipient containment, and durable replay protection.
 No credentials, logs, sessions, memory, or profiles belong in Git. No external messages for validation.
 The source export is preparatory; deployment and commissioning require separate receipts.\n`

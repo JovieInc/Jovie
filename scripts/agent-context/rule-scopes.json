@@ -7,12 +7,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "aeaf66b744e87693197d3862601e2b33c49d19100049f8ba98e7176bdc94c500"
+    "bodySha256": "b538ae4a2b72eb4f2db4c330ec18b51a25d2bbb886039ce0b120183033180914"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "a3e201248490d4f7607afb1dde495bdd8b672948cba3ee9b8143df8400df81d5"
+    "bodySha256": "c07e29830c81edefbfa03163e9e4645c0c7e393cccc901a481ef660aaab4b43b"
   },
   {
     "file": ".claude/rules/db.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "d4c714ad1d20c53284aabdcbaf63cd465a47ee30d502d867f1f62ba38f21a8c2"
+    "bodySha256": "24aea12457f61413c4674d614e8c83b1ae8334acfd6276d28366b190951f4571"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -94,7 +94,7 @@
   {
     "file": ".claude/rules/pr-stacking.md",
     "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
-    "bodySha256": "c399abcf344dc0f107c6131a3524e63d345c2cd211b627ef57ae5f522ba3cfba"
+    "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
   },
   {
     "file": ".claude/rules/release.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "f3f532b94ec106dc5b9000eeaf4347463b1848c95dc50fff2378c6d5d49e888d"
+    "bodySha256": "b73bbd897bc1ffb7ed34691539f403dbfe4aeea15076fbe749c8537cb6431ffe"
   },
   {
     "file": ".claude/rules/security.md",

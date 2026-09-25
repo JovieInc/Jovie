@@ -10,9 +10,10 @@ PR discipline, ship validation, branch strategy, deploy flow, bot-review blockin
 
 ### Size Limits
 
-- Max 40 files changed per PR (excluding lockfiles, generated files, snapshots, svg)
-- Max 800 lines of diff (additions + deletions) — enforced by `pr-size-guard.yml`
-  (repo vars `PR_MAX_LINES`/`PR_MAX_FILES`); approved mechanical codemods use `big-pr`
+- Max 75 files changed per PR (excluding lockfiles, generated files, snapshots, svg)
+- Max 1500 lines of diff (additions + deletions) — enforced by `pr-size-guard.yml`
+  (repo vars `PR_MAX_LINES`/`PR_MAX_FILES` = 1500/75; workflow fallback defaults
+  are 800/40); approved mechanical codemods use `big-pr`
 - If a task requires more, split into a native GitHub stacked-PR sequence with
   clear dependencies; push each layer normally, open children against their
   immediate parent while draft, then retarget/rebase each child onto `main`
@@ -176,7 +177,10 @@ When evidence is incomplete, keep remediation running until the relevant machine
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. Leave queue mutation to the live native controller after the PR is ready.
+6. The finishing agent requests GitHub's normal Merge when ready for the
+   qualified exact head (`gh pr merge --auto --match-head-commit <head-sha>`).
+   Do not wait for the retired Auto-Enroll controller. GitHub owns required
+   checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative
    membership is `isInMergeQueue` plus a positioned `mergeQueueEntry`.
 

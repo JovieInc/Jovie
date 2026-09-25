@@ -74,15 +74,6 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/release-queue-deferred.sh',
-    includes: [
-      '--repository "$REPO"',
-      'deferral-receipt-repository-mismatch',
-      'invalid for repository-scoped queue release',
-      'repository mismatch',
-    ],
-  },
-  {
     path: 'scripts/drain-pr-queue.sh',
     includes: ['.repository == $repo'],
   },

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
   annotateNativeMergeQueue,
@@ -10,8 +11,17 @@ import {
   fetchCompleteOpenPrSummariesRest,
   hydrateOpenPrGraphqlMetadata,
   hydrateOpenPrStatusContexts,
+  normalizeRestPullRequest,
 } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
+import {
+  hasExactWorkflowRunCanary,
+  isExactConflictCanaryPlan,
+  matchesHydratedConflictPr,
+  matchesRawConflictPr,
+  parseConflictCanary,
+  parseConflictEvent,
+} from './lib/pr-conflict-event.mjs';
 import {
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
@@ -39,6 +49,7 @@ function parseArgs(argv) {
     queuedCi: 0,
     cohortId: process.env.GITHUB_RUN_ID ?? 'local',
     planFile: '',
+    eventPayloadFile: '',
     historyIssue: 16794,
   };
 
@@ -69,6 +80,15 @@ function parseArgs(argv) {
         break;
       case '--plan-file':
         options.planFile = argv[++index];
+        break;
+      case '--event-payload-file':
+        options.eventPayloadFile = argv[++index];
+        if (
+          !options.eventPayloadFile ||
+          options.eventPayloadFile.startsWith('--')
+        ) {
+          throw new Error('--event-payload-file requires a path');
+        }
         break;
       case '--history-issue':
         options.historyIssue = Number.parseInt(argv[++index], 10);
@@ -145,6 +165,7 @@ Options:
   --queued-ci N                Current queued Actions runs (default: 0)
   --cohort-id ID               Durable cohort identifier (default: GITHUB_RUN_ID)
   --plan-file PATH             Write the machine-readable plan to PATH
+  --event-payload-file PATH    Scope this run to one authenticated PR event
   --history-issue N            Durable cohort ledger issue (default: 16794)
   --required-checks a,b,c      Required aggregate checks to use for BLOCKED classification
   --blocked-label NAME         Label for failing required checks (default: needs-ci-fix)
@@ -172,14 +193,15 @@ function logDecision(item, extra = {}) {
 
 /**
  * @param {string[]} args
- * @param {{ retries?: number; token?: string }} [options]
+ * @param {{ retries?: number; token?: string; timeoutMs?: number }} [options]
  */
-async function ghJson(args, { retries = 3, token } = {}) {
+async function ghJson(args, { retries = 3, token, timeoutMs } = {}) {
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
       const { stdout } = await execFileAsync('gh', args, {
         encoding: 'utf8',
         maxBuffer: 50 * 1024 * 1024,
+        ...(timeoutMs ? { timeout: timeoutMs, killSignal: 'SIGKILL' } : {}),
         env: token
           ? {
               ...process.env,
@@ -214,9 +236,12 @@ async function ghJson(args, { retries = 3, token } = {}) {
   throw new Error('unreachable');
 }
 
-async function fetchOpenPrs(options) {
+async function fetchOpenPrs(
+  options,
+  { ghRequest = ghJson, forCapacity = false } = {}
+) {
   const request = ({ owner, name, query }) =>
-    ghJson([
+    ghRequest([
       'api',
       'graphql',
       '-f',
@@ -226,7 +251,8 @@ async function fetchOpenPrs(options) {
       '-F',
       `name=${name}`,
     ]);
-  const restRequest = endpoint => ghJson(['api', '--method', 'GET', endpoint]);
+  const restRequest = endpoint =>
+    ghRequest(['api', '--method', 'GET', endpoint]);
   // Enumerate with REST so fleet size and large PR bodies cannot turn one
   // generated `gh pr list` GraphQL connection into a controller-wide 502.
   // REST omits mergeability and diff totals, so hydrate those exact-identity
@@ -242,15 +268,23 @@ async function fetchOpenPrs(options) {
     request,
     batchSize: 25,
   });
-  const [owner, name] = options.repo.split('/');
   const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
     prs: liveMetadata,
     request,
     includeStatuses: pr =>
-      pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY',
+      forCapacity ||
+      pr.mergeable === 'CONFLICTING' ||
+      pr.mergeStateStatus === 'DIRTY',
     batchSize: 40,
+    requireStatusContexts: forCapacity,
   });
+  if (!forCapacity) await annotateQueue(prs, options, ghRequest);
+  return { prs, degradedChecks: true };
+}
+
+async function annotateQueue(prs, options, request = ghJson) {
+  const [owner, name] = options.repo.split('/');
   const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
   const queuePositions = await fetchNativeMergeQueue({
     branches: prs.map(pr => pr.baseRefName),
@@ -270,15 +304,84 @@ async function fetchOpenPrs(options) {
         `first=${pageSize}`,
       ];
       if (cursor !== null) args.push('-F', `cursor=${cursor}`);
-      return ghJson(args, { token: queueToken });
+      return request(args, { token: queueToken });
     },
   });
   annotateNativeMergeQueue(prs, queuePositions);
-  return { prs, degradedChecks: true };
 }
 
-async function fetchCohortHistory(options) {
-  const pages = await ghJson([
+async function fetchEventPr(options, scope, request = ghJson) {
+  const restRequest = endpoint => request(['api', '--method', 'GET', endpoint]);
+  const graphqlRequest = ({ owner, name, query }) =>
+    request([
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${owner}`,
+      '-F',
+      `name=${name}`,
+    ]);
+  let detail;
+  // GitHub can initially report UNKNOWN mergeability. Only reread this exact
+  // PR; a still-unknown result is a typed nonaction, never a fleet fallback.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    detail = await restRequest(`repos/${options.repo}/pulls/${scope.number}`);
+    if (!matchesRawConflictPr(scope, detail)) {
+      return { prs: [], nonAction: 'event_live_identity_or_hold_changed' };
+    }
+    if (
+      typeof detail.mergeable === 'boolean' &&
+      typeof detail.mergeable_state === 'string' &&
+      detail.mergeable_state.toLowerCase() !== 'unknown'
+    )
+      break;
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  if (
+    typeof detail.mergeable !== 'boolean' ||
+    typeof detail.mergeable_state !== 'string' ||
+    detail.mergeable_state.toLowerCase() === 'unknown'
+  ) {
+    return { prs: [], nonAction: 'mergeability_unknown_after_exact_reread' };
+  }
+  const normalized = normalizeRestPullRequest(detail, []);
+  const [hydrated] = await hydrateOpenPrGraphqlMetadata({
+    repo: options.repo,
+    prs: [normalized],
+    request: graphqlRequest,
+  });
+  if (!matchesHydratedConflictPr(scope, hydrated)) {
+    return { prs: [], nonAction: 'hydrated_event_identity_or_hold_changed' };
+  }
+  if (
+    hydrated.mergeable !== 'CONFLICTING' &&
+    hydrated.mergeStateStatus !== 'DIRTY'
+  ) {
+    return { prs: [], nonAction: 'event_pr_not_dirty' };
+  }
+  const [pr] = await hydrateOpenPrStatusContexts({
+    repo: options.repo,
+    prs: [hydrated],
+    request: graphqlRequest,
+  });
+  if (!matchesHydratedConflictPr(scope, pr)) {
+    return { prs: [], nonAction: 'status_event_identity_or_hold_changed' };
+  }
+  await annotateQueue([pr], options, request);
+  if (pr.isInMergeQueue !== false) {
+    return { prs: [], nonAction: 'event_pr_in_native_queue' };
+  }
+  return { prs: [pr], nonAction: null };
+}
+
+async function fetchCohortHistory(
+  options,
+  request = ghJson,
+  requireComplete = false
+) {
+  const pages = await request([
     'api',
     '--method',
     'GET',
@@ -286,6 +389,16 @@ async function fetchCohortHistory(options) {
     '--slurp',
     `repos/${options.repo}/issues/${options.historyIssue}/comments?per_page=100`,
   ]);
+  if (
+    requireComplete &&
+    (!Array.isArray(pages) ||
+      pages.length === 0 ||
+      pages.some(page => !Array.isArray(page)))
+  ) {
+    throw new Error(
+      'cohort history pagination omitted complete capacity evidence'
+    );
+  }
   const comments = Array.isArray(pages) ? pages.flat() : [];
   return parseConflictFxCohortComments(comments);
 }
@@ -308,25 +421,106 @@ async function withMutationToken(run) {
   }
 }
 
-async function executePlan(plan, options) {
+async function executePlan(
+  plan,
+  options,
+  { request = ghJson, rebaseImpl = tryGitHubRebase } = {}
+) {
   if (options.dryRun) return [];
   const mutableItems = plan.items.filter(
     item => item.action === 'request_github_rebase'
   );
+  if (options.eventPayloadFile && mutableItems.length > 0) {
+    throw new Error('exact-PR event runs cannot request a GitHub rebase');
+  }
   if (mutableItems.length === 0) return [];
+
+  const readToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
+  const readRequest = (args, requestOptions = {}) =>
+    request(args, { ...requestOptions, token: readToken });
 
   return withMutationToken(async () => {
     const results = [];
     for (const item of mutableItems) {
       logDecision(item, { phase: 'execute' });
       try {
-        const result = await tryGitHubRebase({
+        const result = await rebaseImpl({
           repo: options.repo,
           pr: item.pr,
           expectedBaseRefName: item.pr.baseRefName,
           expectedBaseOid: item.pr.baseRefOid,
           expectedHeadOid: item.pr.headRefOid,
           dryRun: false,
+          preMutationCheckImpl: async ({
+            prNumber,
+            expectedBaseRefName,
+            expectedBaseOid,
+            expectedHeadOid,
+            timeoutMs,
+          }) => {
+            if (!readToken) {
+              return {
+                ok: false,
+                category: 'verification_failure',
+                observedHeadOid: null,
+                reason:
+                  'read-only GitHub token is unavailable at the rebase boundary',
+              };
+            }
+            const detail = await readRequest(
+              [
+                'api',
+                '--method',
+                'GET',
+                `repos/${options.repo}/pulls/${prNumber}`,
+              ],
+              { timeoutMs }
+            );
+            const scope = {
+              repo: options.repo,
+              number: prNumber,
+              baseRef: expectedBaseRefName,
+              headRef: item.pr.headRefName,
+              base: expectedBaseOid,
+              head: expectedHeadOid,
+            };
+            if (!matchesRawConflictPr(scope, detail)) {
+              return {
+                ok: false,
+                category: 'stale_pr',
+                observedHeadOid: detail?.head?.sha ?? null,
+                reason: 'fresh PR identity or hold check changed before rebase',
+              };
+            }
+            if (
+              detail.mergeable !== true ||
+              String(detail.mergeable_state ?? '').toLowerCase() !== 'behind'
+            ) {
+              return {
+                ok: false,
+                category: 'stale_pr',
+                observedHeadOid: detail.head.sha,
+                reason:
+                  'PR is no longer a mergeable behind branch before rebase',
+              };
+            }
+            const currentPr = normalizeRestPullRequest(detail, []);
+            await annotateQueue([currentPr], options, readRequest);
+            if (currentPr.isInMergeQueue !== false) {
+              return {
+                ok: false,
+                category: 'native_queue',
+                observedHeadOid: currentPr.headRefOid,
+                reason: 'native merge queue owns this PR before rebase',
+              };
+            }
+            return {
+              ok: true,
+              observedHeadOid: currentPr.headRefOid,
+              reason:
+                'fresh PR identity, hold, BEHIND state, and native queue revalidated before rebase',
+            };
+          },
         });
         results.push({ pr: item.number, action: item.action, ...result });
       } catch (error) {
@@ -350,13 +544,144 @@ async function executePlan(plan, options) {
   });
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const [{ prs, degradedChecks }, cohortHistory] = await Promise.all([
-    fetchOpenPrs(options),
-    fetchCohortHistory(options),
-  ]);
-  options.cohortHistory = cohortHistory;
+export async function main(
+  argv = process.argv.slice(2),
+  { request = ghJson, rebaseImpl = tryGitHubRebase } = {}
+) {
+  const options = parseArgs(argv);
+  let canary = null;
+  if (options.apply) {
+    canary = parseConflictCanary(
+      process.env.FX_HOSTED_REMEDIATION_ENABLED,
+      process.env.FX_HOSTED_REMEDIATION_CANARY_PR
+    );
+    if (canary === null) {
+      throw new Error(
+        'apply requires FX_HOSTED_REMEDIATION_ENABLED=true and one valid FX_HOSTED_REMEDIATION_CANARY_PR'
+      );
+    }
+    if (
+      process.env.GITHUB_REPOSITORY &&
+      process.env.GITHUB_REPOSITORY !== options.repo
+    ) {
+      throw new Error(
+        'apply repository does not match the hosted canary scope'
+      );
+    }
+    // The hosted conflict route has exactly one admitted PR regardless of an
+    // operator-supplied ceiling or the fleet capacity estimate.
+    options.maxConcurrent = 1;
+  }
+  if (
+    process.env.GITHUB_EVENT_NAME === 'pull_request_target' &&
+    !options.eventPayloadFile
+  ) {
+    throw new Error('pull_request_target requires --event-payload-file');
+  }
+  let prs;
+  let degradedChecks = false;
+  let nonAction = null;
+  let eventScope = null;
+  let workflowRunNonAction = null;
+  if (options.apply && process.env.GITHUB_EVENT_NAME === 'workflow_run') {
+    let payload;
+    try {
+      payload = JSON.parse(
+        readFileSync(process.env.GITHUB_EVENT_PATH ?? '', 'utf8')
+      );
+    } catch {
+      payload = null;
+    }
+    if (!hasExactWorkflowRunCanary(payload, canary)) {
+      workflowRunNonAction =
+        'workflow_run_association_missing_ambiguous_or_outside_canary';
+    }
+  }
+  if (options.eventPayloadFile) {
+    let payload;
+    try {
+      payload = JSON.parse(readFileSync(options.eventPayloadFile, 'utf8'));
+    } catch {
+      payload = null;
+    }
+    eventScope = parseConflictEvent(payload, options.repo);
+    if (options.apply && eventScope?.number !== canary) {
+      prs = [];
+      nonAction = eventScope
+        ? 'event_outside_configured_canary'
+        : 'invalid_or_unsupported_event';
+    } else if (eventScope) {
+      ({ prs, nonAction } = await fetchEventPr(options, eventScope, request));
+      degradedChecks = true;
+      if (prs.length === 1) {
+        const [inventory, history] = await Promise.all([
+          fetchOpenPrs(options, { ghRequest: request, forCapacity: true }),
+          fetchCohortHistory(options, request, true),
+        ]);
+        const observedTarget = inventory.prs.find(
+          pr => pr.number === eventScope.number
+        );
+        if (!matchesHydratedConflictPr(eventScope, observedTarget)) {
+          prs = [];
+          nonAction = 'capacity_inventory_event_identity_changed';
+        } else if (
+          observedTarget.mergeable !== 'CONFLICTING' &&
+          observedTarget.mergeStateStatus !== 'DIRTY'
+        ) {
+          prs = [];
+          nonAction = 'capacity_inventory_event_not_dirty';
+        } else {
+          await annotateQueue([observedTarget], options, request);
+          if (observedTarget.isInMergeQueue !== false) {
+            prs = [];
+            nonAction = 'capacity_inventory_event_in_native_queue';
+          } else {
+            prs = [observedTarget];
+          }
+        }
+        options.capacityPrs = inventory.prs.filter(
+          pr => pr.number !== eventScope.number
+        );
+        options.cohortHistory = history;
+      }
+    } else {
+      prs = [];
+      nonAction = 'invalid_or_unsupported_event';
+    }
+    options.cohortHistory ??= [];
+  } else if (workflowRunNonAction) {
+    prs = [];
+    options.cohortHistory = [];
+    nonAction = workflowRunNonAction;
+  } else {
+    const [inventory, cohortHistory] = await Promise.all([
+      fetchOpenPrs(options, {
+        ghRequest: request,
+        forCapacity: options.apply,
+      }),
+      fetchCohortHistory(options, request, options.apply),
+    ]);
+    if (options.apply) {
+      const target = inventory.prs.find(pr => pr.number === canary);
+      options.capacityPrs = inventory.prs.filter(pr => pr.number !== canary);
+      if (!target) {
+        prs = [];
+        nonAction = 'configured_canary_not_in_open_inventory';
+      } else {
+        await annotateQueue([target], options, request);
+        if (target.isInMergeQueue !== false) {
+          prs = [];
+          nonAction = 'configured_canary_in_native_queue';
+        } else {
+          prs = [target];
+        }
+      }
+    } else {
+      ({ prs } = inventory);
+    }
+    degradedChecks = inventory.degradedChecks;
+    options.cohortHistory = cohortHistory;
+  }
   if (degradedChecks) {
     // Without check rollups, "required check missing" is indistinguishable
     // from "not fetched" — drop required-check-based BLOCKED classification
@@ -367,6 +692,38 @@ async function main() {
     );
   }
   const plan = buildPlan(prs, options);
+  if (options.apply && !isExactConflictCanaryPlan(plan, canary)) {
+    throw new Error('apply plan escaped the exact single-PR canary scope');
+  }
+  if (options.eventPayloadFile) {
+    plan.eventNonAction = nonAction;
+    plan.eventScope = eventScope;
+    const matrices = [...plan.fxMatrix, ...plan.exceptionMatrix];
+    if (
+      plan.items.length > 1 ||
+      plan.items.some(
+        item =>
+          item.state !== 'DIRTY' ||
+          item.number !== eventScope?.number ||
+          item.pr.headRefOid !== eventScope.head ||
+          item.pr.baseRefOid !== eventScope.base ||
+          item.pr.headRefName !== eventScope.headRef ||
+          item.pr.baseRefName !== eventScope.baseRef
+      ) ||
+      matrices.some(
+        item =>
+          item.prNumber !== eventScope?.number ||
+          item.headRefOid !== eventScope.head ||
+          item.baseRefOid !== eventScope.base ||
+          item.headRefName !== eventScope.headRef ||
+          item.baseRefName !== eventScope.baseRef
+      )
+    ) {
+      throw new Error('exact-PR event plan escaped its DIRTY identity scope');
+    }
+  } else if (workflowRunNonAction || nonAction) {
+    plan.eventNonAction = nonAction;
+  }
 
   if (options.planFile) {
     writeFileSync(options.planFile, `${JSON.stringify(plan, null, 2)}\n`, {
@@ -379,7 +736,7 @@ async function main() {
   for (const item of plan.items) logDecision(item, { phase: 'plan' });
   if (options.json) console.log(JSON.stringify(plan, null, 2));
 
-  const results = await executePlan(plan, options);
+  const results = await executePlan(plan, options, { request, rebaseImpl });
   if (results.length > 0) {
     console.log(
       JSON.stringify({ ts: new Date().toISOString(), results }, null, 2)
@@ -388,13 +745,15 @@ async function main() {
   requireSuccessfulMutationResults(results);
 }
 
-main().catch(error => {
-  console.error(error);
-  // Surface subprocess stderr — `console.error(error)` alone hides the gh
-  // CLI's actual failure reason, which made the 100%-failing-runs incident
-  // (#13347) undiagnosable from the Actions UI.
-  if (error?.stderr) {
-    console.error(`stderr: ${String(error.stderr).slice(0, 4000)}`);
-  }
-  process.exitCode = 1;
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    console.error(error);
+    // Surface subprocess stderr — `console.error(error)` alone hides the gh
+    // CLI's actual failure reason, which made the 100%-failing-runs incident
+    // (#13347) undiagnosable from the Actions UI.
+    if (error?.stderr) {
+      console.error(`stderr: ${String(error.stderr).slice(0, 4000)}`);
+    }
+    process.exitCode = 1;
+  });
+}

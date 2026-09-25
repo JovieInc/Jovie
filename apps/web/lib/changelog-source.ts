@@ -10,7 +10,9 @@ import { resolveMonorepoPath } from './filesystem-paths';
 
 function resolveChangelogPath(): string | null {
   const changelogPath = resolveMonorepoPath('CHANGELOG.md');
-  return fs.existsSync(changelogPath) ? changelogPath : null;
+  return fs.existsSync(/* turbopackIgnore: true */ changelogPath)
+    ? changelogPath
+    : null;
 }
 
 const getChangelogMarkdown = unstable_cache(
@@ -18,7 +20,7 @@ const getChangelogMarkdown = unstable_cache(
     const changelogPath = resolveChangelogPath();
     if (!changelogPath) return '';
     try {
-      return fs.readFileSync(changelogPath, 'utf8');
+      return fs.readFileSync(/* turbopackIgnore: true */ changelogPath, 'utf8');
     } catch {
       return '';
     }

@@ -38,7 +38,7 @@ export async function GET() {
  * Body: { label, investorName?, email? }
  */
 export async function POST(request: Request) {
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   const body = await request.json();

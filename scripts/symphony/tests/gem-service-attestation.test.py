@@ -2,10 +2,12 @@
 """Exercise real source comparison, /proc ownership, and atomic writer fencing."""
 from datetime import datetime, timedelta, timezone
 import fcntl
+import hashlib
 import io
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -83,6 +85,100 @@ class PublisherTests(unittest.TestCase):
 
     def observe(self):
         return E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem, proc_root=self.proc, now=NOW)
+
+    def installer_fixture(self, root, *, mode, failure='none', mixed_legacy=False):
+        repo = root / 'repo'
+        source_names = [
+            'emit_gem_service_attestation.py', 'symphony_proof_context.py',
+            'gem_gate_contract.py', 'symphony_official_runtime.py',
+            'verify_upstream_burrito_payload.py', 'systemd/gem-service-attestation.service',
+        ]
+        for name in source_names:
+            path = repo / 'scripts/symphony' / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f'fixture source: {name}\n')
+
+        git_env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        git_env.update(
+            GIT_CONFIG_COUNT='3', GIT_CONFIG_KEY_0='maintenance.auto', GIT_CONFIG_VALUE_0='false',
+            GIT_CONFIG_KEY_1='gc.auto', GIT_CONFIG_VALUE_1='0',
+            GIT_CONFIG_KEY_2='maintenance.autoDetach', GIT_CONFIG_VALUE_2='false',
+        )
+        subprocess.run(['git', 'init', '-q', str(repo)], env=git_env, check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], env=git_env, check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture', '-c',
+                        'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'],
+                       env=git_env, check=True)
+
+        binding = root / 'approved-binding.json'
+        binding.write_text('{"schema":"fixture-binding"}\n')
+        binding_sha256 = hashlib.sha256(binding.read_bytes()).hexdigest()
+        config = root / '.config/symphony'
+        config.mkdir(parents=True, exist_ok=True)
+        if mode == 'upstream-preservation':
+            values = [
+                'GEM_SERVICE_ATTESTATION_MODE=upstream-preservation',
+                f'SYMPHONY_UPSTREAM_BINDING={binding}',
+                f'SYMPHONY_UPSTREAM_BINDING_SHA256={binding_sha256}',
+            ]
+            if mixed_legacy:
+                values.extend([
+                    f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}',
+                    f'JOVIE_CONFIGURATION_SOURCE_ROOT={repo}',
+                    f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}',
+                ])
+        else:
+            values = [
+                'GEM_SERVICE_ATTESTATION_MODE=legacy',
+                f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}',
+                f'JOVIE_CONFIGURATION_SOURCE_ROOT={repo}',
+                f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}',
+            ]
+        (config / 'runner-source.env').write_text('\n'.join(values) + '\n')
+
+        env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        env.update(HOME=str(root), GEM_SERVICE_ATTESTATION_VERIFY_ONLY='false', FAILURE=failure)
+        bins = root / 'bin'
+        bins.mkdir()
+        (bins / 'systemctl').write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$HOME/systemctl.log"
+case "$*" in
+  "--user is-active --quiet gem-service-attestation.timer") test -f "$HOME/timer-active" ;;
+  "--user is-active --quiet gem-service-attestation.service") exit 1 ;;
+  "--user stop gem-service-attestation.timer") rm -f "$HOME/timer-active" ;;
+  "--user start gem-service-attestation.timer")
+    touch "$HOME/timer-active"
+    if [ "$FAILURE" = timer-start ] && [ ! -f "$HOME/start-failed" ]; then
+      touch "$HOME/start-failed"; exit 2
+    fi ;;
+  "--user list-unit-files gem-service-attestation.timer") printf 'gem-service-attestation.timer enabled\\n' ;;
+  *) exit 0 ;;
+esac
+''')
+        (bins / 'python3').write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$HOME/python.log"
+case "$*" in
+  *--check*) [ "$FAILURE" != check ] || exit 2 ;;
+  *)
+    [ "$FAILURE" != publish ] || exit 2
+    case "$*" in *--upstream-binding*)
+      mkdir -p "$HOME/gem-workspace/state"
+      printf '{"schema":"symphony-upstream-preservation/v1","activation":"not-activated","admission":"unverified"}\\n' > "$HOME/gem-workspace/state/symphony-upstream-preservation.json"
+      ;;
+    esac ;;
+esac
+exit 0
+''')
+        for executable in bins.iterdir():
+            executable.chmod(0o755)
+        env['PATH'] = str(bins) + os.pathsep + env['PATH']
+        targets = [root / 'gem-workspace/scripts' / name for name in [
+            'emit-gem-service-attestation.py', 'symphony_proof_context.py',
+            'gem_gate_contract.py', 'symphony_official_runtime.py',
+            'verify_upstream_burrito_payload.py',
+        ]]
+        targets.append(root / '.config/systemd/user/gem-service-attestation.service')
+        return repo, env, binding, binding_sha256, targets
 
     def test_healthy_observation_binds_release_not_config_or_prior_receipt(self):
         dest = self.gem / "state/gem-service-attestation.json"
@@ -183,6 +279,10 @@ class PublisherTests(unittest.TestCase):
         self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
         self.assertTrue(self.bounded_observation()["healthy"])
         self.workflow.write_bytes(original)
+        router = (Path(E.__file__).parent / "profiles/governor-bounded-codex/WORKFLOW.md").read_bytes()
+        self.workflow.write_bytes(router)
+        self.assertFalse(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original)
         unit = self.root / "governor-restricted.conf"
         body = unit.read_bytes()
         for before, after in [(b"RestartSec=20", b"RestartSec=0"),
@@ -206,6 +306,82 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("Restart=always", unit)
         self.assertIn("RestartSec=20", unit)
         self.assertIn("RuntimeMaxSec=infinity", unit)
+
+    def install_codex_fixture(self):
+        source_root = Path(E.__file__).parent / "profiles"
+        workflow = (source_root / "governor-bounded-codex/WORKFLOW.md").read_bytes()
+        bounded = (source_root / "governor-bounded/WORKFLOW.md").read_bytes()
+        self.sources[E.CODEX_PROFILE + "/WORKFLOW.md"] = workflow
+        self.sources[E.BOUNDED_PROFILE + "/WORKFLOW.md"] = bounded
+        self.workflow.write_bytes(workflow)
+        paths = []
+        for name in sorted(E.BOUNDED_OVERRIDES):
+            body = (source_root / "governor-bounded/systemd" / name).read_bytes()
+            self.sources[E.BOUNDED_PROFILE + "/systemd/" + name] = body
+            target = self.root / name
+            target.write_bytes(body)
+            paths.append(str(target))
+        self.fields["DropInPaths"] = " ".join(paths)
+        return workflow
+
+    def codex_observation(self):
+        return E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem,
+                         proc_root=self.proc, now=NOW, profile="governor-bounded-codex")
+
+    def test_codex_profile_matches_governor_bounded_except_router_command(self):
+        root = Path(E.__file__).parent / "profiles"
+        bounded = (root / "governor-bounded/WORKFLOW.md").read_text()
+        codex = (root / "governor-bounded-codex/WORKFLOW.md").read_text()
+        expected = bounded.replace(
+            "  # Native Codex remains OUT. This profile grants no provider execution.\n"
+            "  command: /usr/bin/false\n",
+            "  # Native router with Codex Luna primary. Apps stay disabled.\n"
+            "  command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server\n",
+            1,
+        ).replace(
+            "Native Codex execution is disabled in this profile.",
+            "Native Codex runs through symphony-agent-router with Apps disabled.",
+            1,
+        )
+        self.assertEqual(codex, expected)
+        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', codex)
+        self.assertIn("symphony-five-pr-repair-20260908", codex)
+        self.assertIn("max_retry_attempts: 1", codex)
+        self.assertEqual(codex.count("max_concurrent_agents: 5"), 1)
+        self.assertNotIn("/usr/bin/false", codex)
+        self.assertFalse((root / "governor-bounded-codex/systemd").exists())
+
+    def test_codex_profile_attests_reviewed_install_without_a_separate_dropin_pin(self):
+        original = self.install_codex_fixture()
+        self.assertFalse(self.observe()["healthy"])
+        self.assertFalse(self.bounded_observation()["healthy"])
+        result = self.codex_observation()
+        self.assertTrue(result["healthy"])
+        self.assertEqual(result["configurationProfile"], "governor-bounded-codex")
+        self.assertEqual(result["workflow"]["codex"], "in")
+        self.assertEqual(result["workflow"]["sourceMaxConcurrentAgents"], 5)
+        self.assertEqual(result["workflow"]["installedMaxConcurrentAgents"], 5)
+        self.assertEqual(result["workflow"]["matchMode"], "exact")
+        self.assertEqual({item["name"] for item in result["unitOverrides"]}, E.BOUNDED_OVERRIDES)
+        self.assertTrue(all(item["matches"] for item in result["unitOverrides"]))
+        for path in self.fields["DropInPaths"].split():
+            with self.subTest(missing=path):
+                with mock.patch.dict(self.fields, DropInPaths=self.fields["DropInPaths"].replace(path, "")):
+                    self.assertFalse(self.codex_observation()["healthy"])
+        self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
+        lowered = self.codex_observation()
+        self.assertTrue(lowered["healthy"])
+        self.assertEqual(lowered["workflow"]["matchMode"], "bounded_concurrency_overlay")
+        self.assertEqual(lowered["workflow"]["installedMaxConcurrentAgents"], 1)
+        for replacement in (
+            original.replace(b"agents: 5", b"agents: 6"),
+            original.replace(E.CODEX_IN_COMMAND.encode(), b"command: /usr/bin/false"),
+            original.replace(b"symphony-five-pr-repair-20260908", b"symphony"),
+            original.replace(b'project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', b'project_slug: "other"'),
+        ):
+            with self.subTest(change=replacement[:80]):
+                self.workflow.write_bytes(replacement)
+                self.assertFalse(self.codex_observation()["healthy"])
 
     def test_only_existing_concurrency_overlay_is_accepted(self):
         for value in [1, 41, 128]:
@@ -366,7 +542,8 @@ class PublisherTests(unittest.TestCase):
         base = repo / 'scripts/symphony'
         (base / 'systemd').mkdir(parents=True)
         for name in ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
-                     'gem_gate_contract.py', 'systemd/gem-service-attestation.service']:
+                     'gem_gate_contract.py', 'symphony_official_runtime.py',
+                     'verify_upstream_burrito_payload.py', 'systemd/gem-service-attestation.service']:
             (base / name).write_text('fixture\n')
         subprocess.run(['git', '-C', str(repo), 'add', '.'], env=env, check=True)
         subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
@@ -391,6 +568,13 @@ class PublisherTests(unittest.TestCase):
         result = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--profile\ngovernor-bounded\n', result.stdout)
+        (config / 'runner-source.env').write_text(
+            (config / 'runner-source.env').read_text().replace(
+                'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n',
+                'JOVIE_CONFIGURATION_PROFILE=governor-bounded-codex\n'))
+        forwarded = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(forwarded.returncode, 0, forwarded.stderr)
+        self.assertIn('--profile\ngovernor-bounded-codex\n', forwarded.stdout)
         self.assertIn('--source-root\n' + str(mirror) + '\n', result.stdout)
         self.assertIn('--check\n', result.stdout)
         self.assertFalse((self.root / 'gem-workspace/scripts/emit-gem-service-attestation.py').exists())
@@ -411,7 +595,8 @@ class PublisherTests(unittest.TestCase):
                 base = repo / 'scripts/symphony'
                 (base / 'systemd').mkdir(parents=True)
                 names = ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
-                         'gem_gate_contract.py', 'systemd/gem-service-attestation.service']
+                         'gem_gate_contract.py', 'symphony_official_runtime.py',
+                         'verify_upstream_burrito_payload.py', 'systemd/gem-service-attestation.service']
                 for name in names:
                     (base / name).write_text('new fixture source\n')
                 env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -431,7 +616,8 @@ class PublisherTests(unittest.TestCase):
                     f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}\n'
                     'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n')
                 targets = [root / 'gem-workspace/scripts' / name for name in
-                           ['emit-gem-service-attestation.py', 'symphony_proof_context.py', 'gem_gate_contract.py']]
+                           ['emit-gem-service-attestation.py', 'symphony_proof_context.py', 'gem_gate_contract.py',
+                            'symphony_official_runtime.py', 'verify_upstream_burrito_payload.py']]
                 targets.append(root / '.config/systemd/user/gem-service-attestation.service')
                 for target in targets:
                     target.parent.mkdir(parents=True, exist_ok=True)
@@ -476,6 +662,204 @@ exit 0
                 self.assertIn('daemon-reload', calls)
                 self.assertNotIn('restart symphony', calls)
                 self.assertFalse((root / 'gem-workspace/state/gem-service-attestation.json').exists())
+
+    def test_upstream_installer_rejects_incomplete_wrong_or_mixed_inputs_before_writes(self):
+        installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+        cases = ('missing-binding', 'missing-digest', 'wrong-digest', 'mode-mismatch',
+                 'runner-input-mismatch', 'mixed-legacy', 'legacy-with-upstream')
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source_mode = 'legacy' if case == 'legacy-with-upstream' else 'upstream-preservation'
+                repo, env, binding, approved_sha256, targets = self.installer_fixture(
+                    root, mode=source_mode, mixed_legacy=case == 'mixed-legacy')
+                if case == 'mode-mismatch':
+                    runner_env = root / '.config/symphony/runner-source.env'
+                    runner_env.write_text(runner_env.read_text().replace(
+                        'GEM_SERVICE_ATTESTATION_MODE=upstream-preservation',
+                        'GEM_SERVICE_ATTESTATION_MODE=legacy'))
+                if case == 'runner-input-mismatch':
+                    runner_env = root / '.config/symphony/runner-source.env'
+                    runner_env.write_text(runner_env.read_text().replace(
+                        f'SYMPHONY_UPSTREAM_BINDING={binding}',
+                        f'SYMPHONY_UPSTREAM_BINDING={root / "different-binding.json"}'))
+                command = ['bash', str(installer), str(repo)]
+                if source_mode == 'upstream-preservation':
+                    command.extend(['--mode', 'upstream-preservation'])
+                    if case != 'missing-binding':
+                        command.extend(['--upstream-binding', str(binding)])
+                    if case != 'missing-digest':
+                        digest = '0' * 64 if case == 'wrong-digest' else approved_sha256
+                        command.extend(['--upstream-binding-sha256', digest])
+                else:
+                    command.extend(['--upstream-binding', str(binding),
+                                    '--upstream-binding-sha256', approved_sha256])
+                result = subprocess.run(command, env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertFalse((root / 'systemctl.log').exists())
+                self.assertTrue(all(not target.exists() for target in targets))
+
+    def test_upstream_installer_installs_separate_receipt_mode_and_keeps_legacy_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, env, binding, approved_sha256, targets = self.installer_fixture(
+                root, mode='upstream-preservation')
+            (root / 'timer-active').touch()
+            state = root / 'gem-workspace/state'
+            state.mkdir(parents=True)
+            legacy_path = state / 'gem-service-attestation.json'
+            legacy_content = '{"schema":"gem-service-attestation/v1","healthy":false}\n'
+            legacy_path.write_text(legacy_content)
+            installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+            result = subprocess.run([
+                'bash', str(installer), str(repo), '--mode', 'upstream-preservation',
+                '--upstream-binding', str(binding), '--upstream-binding-sha256', approved_sha256,
+            ], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((state / 'symphony-upstream-preservation.json').exists(),
+                            f'publisher output missing; stdout={result.stdout!r}; stderr={result.stderr!r}; '
+                            f'python calls={(root / "python.log").read_text() if (root / "python.log").exists() else "none"!r}')
+            self.assertEqual(legacy_path.read_text(), legacy_content)
+            self.assertTrue(all(target.exists() for target in targets))
+            installed_unit = targets[-1].read_text()
+            source_unit = repo / 'scripts/symphony/systemd/gem-service-attestation.service'
+            self.assertEqual(installed_unit, source_unit.read_text())
+            self.assertEqual(targets[0].stat().st_mode & 0o777, 0o755)
+            calls = (root / 'python.log').read_text().splitlines()
+            self.assertEqual(len(calls), 2)
+            self.assertIn('--upstream-binding ' + str(binding), calls[0])
+            self.assertIn('--upstream-binding-sha256 ' + approved_sha256, calls[0])
+            self.assertIn('--check', calls[0])
+            self.assertNotIn('--check', calls[1])
+            self.assertNotIn('--provenance', '\n'.join(calls))
+            systemctl_calls = (root / 'systemctl.log').read_text()
+            self.assertIn('start gem-service-attestation.timer', systemctl_calls)
+            self.assertNotIn('restart symphony', systemctl_calls)
+
+    def test_upstream_installer_verify_only_runs_check_without_install_or_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, env, binding, approved_sha256, targets = self.installer_fixture(
+                root, mode='upstream-preservation')
+            env['GEM_SERVICE_ATTESTATION_VERIFY_ONLY'] = 'true'
+            installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+            result = subprocess.run([
+                'bash', str(installer), str(repo), '--mode', 'upstream-preservation',
+                '--upstream-binding', str(binding), '--upstream-binding-sha256', approved_sha256,
+            ], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = (root / 'python.log').read_text().splitlines()
+            self.assertEqual(len(calls), 1)
+            self.assertIn('--upstream-binding ' + str(binding), calls[0])
+            self.assertIn('--upstream-binding-sha256 ' + approved_sha256, calls[0])
+            self.assertIn('--check', calls[0])
+            self.assertTrue(all(not target.exists() for target in targets))
+            self.assertFalse((root / 'gem-workspace/state/symphony-upstream-preservation.json').exists())
+            systemctl_calls = (root / 'systemctl.log').read_text()
+            self.assertIn('show-environment', systemctl_calls)
+            self.assertNotIn('start gem-service-attestation.timer', systemctl_calls)
+            self.assertNotIn('restart symphony', systemctl_calls)
+
+    def test_upstream_installer_publish_failure_restores_files_timer_and_both_receipts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, env, binding, approved_sha256, targets = self.installer_fixture(
+                root, mode='upstream-preservation', failure='publish')
+            (root / 'timer-active').touch()
+            for target in targets:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('previous installed source\n')
+                target.chmod(0o644)
+            targets[0].chmod(0o755)
+            state = root / 'gem-workspace/state'
+            state.mkdir(parents=True)
+            legacy_path = state / 'gem-service-attestation.json'
+            preservation_path = state / 'symphony-upstream-preservation.json'
+            legacy_content = '{"schema":"gem-service-attestation/v1","healthy":true}\n'
+            preservation_content = '{"schema":"symphony-upstream-preservation/v1","admission":"unverified"}\n'
+            legacy_path.write_text(legacy_content)
+            preservation_path.write_text(preservation_content)
+            installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+            result = subprocess.run([
+                'bash', str(installer), str(repo), '--mode', 'upstream-preservation',
+                '--upstream-binding', str(binding), '--upstream-binding-sha256', approved_sha256,
+            ], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertTrue((root / 'timer-active').exists())
+            self.assertTrue(all(target.read_text() == 'previous installed source\n' for target in targets))
+            self.assertEqual(targets[0].stat().st_mode & 0o777, 0o755)
+            self.assertEqual(legacy_path.read_text(), legacy_content)
+            self.assertEqual(preservation_path.read_text(), preservation_content)
+            calls = (root / 'systemctl.log').read_text()
+            self.assertIn('daemon-reload', calls)
+            self.assertNotIn('restart symphony', calls)
+
+    def test_user_unit_dispatches_exactly_one_observer_mode_and_rejects_mixing(self):
+        unit = Path(E.__file__).with_name('systemd') / 'gem-service-attestation.service'
+        exec_line = next(line.split('=', 1)[1] for line in unit.read_text().splitlines()
+                         if line.startswith('ExecStart='))
+        words = shlex.split(exec_line)
+        self.assertEqual(words[:2], ['/bin/sh', '-ec'])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake_python = root / 'python3'
+            fake_python.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$HOME/unit-args"\n')
+            fake_python.chmod(0o755)
+            script = words[2].replace('$$', '$').replace('%h', str(root))
+            script = script.replace('/usr/bin/python3', str(fake_python))
+
+            def run_unit(values):
+                (root / 'unit-args').unlink(missing_ok=True)
+                controlled = {
+                    'GEM_SERVICE_ATTESTATION_MODE', 'SYMPHONY_RELEASE_PROVENANCE',
+                    'JOVIE_CONFIGURATION_SOURCE_ROOT', 'JOVIE_CONFIGURATION_SOURCE_REVISION',
+                    'JOVIE_CONFIGURATION_PROFILE', 'SYMPHONY_UPSTREAM_BINDING',
+                    'SYMPHONY_UPSTREAM_BINDING_SHA256',
+                }
+                env = {key: value for key, value in os.environ.items() if key not in controlled}
+                env.update(HOME=str(root), **values)
+                return subprocess.run(['/bin/sh', '-ec', script], env=env, capture_output=True, text=True)
+
+            legacy = run_unit({
+                'SYMPHONY_RELEASE_PROVENANCE': '/approved/release.json',
+                'JOVIE_CONFIGURATION_SOURCE_ROOT': '/workspace/jovie',
+                'JOVIE_CONFIGURATION_SOURCE_REVISION': CONFIG,
+            })
+            self.assertEqual(legacy.returncode, 0, legacy.stderr)
+            legacy_args = (root / 'unit-args').read_text()
+            self.assertIn('--provenance\n/approved/release.json\n', legacy_args)
+            self.assertIn('--source-revision\n' + CONFIG + '\n', legacy_args)
+            self.assertNotIn('--upstream-binding', legacy_args)
+
+            preserved = run_unit({
+                'GEM_SERVICE_ATTESTATION_MODE': 'upstream-preservation',
+                'SYMPHONY_UPSTREAM_BINDING': '/approved/preservation.json',
+                'SYMPHONY_UPSTREAM_BINDING_SHA256': 'b' * 64,
+            })
+            self.assertEqual(preserved.returncode, 0, preserved.stderr)
+            preserved_args = (root / 'unit-args').read_text()
+            self.assertIn('--upstream-binding\n/approved/preservation.json\n', preserved_args)
+            self.assertIn('--upstream-binding-sha256\n' + 'b' * 64 + '\n', preserved_args)
+            self.assertNotIn('--provenance', preserved_args)
+
+            mixed = run_unit({
+                'GEM_SERVICE_ATTESTATION_MODE': 'upstream-preservation',
+                'SYMPHONY_UPSTREAM_BINDING': '/approved/preservation.json',
+                'SYMPHONY_UPSTREAM_BINDING_SHA256': 'b' * 64,
+                'SYMPHONY_RELEASE_PROVENANCE': '/legacy/release.json',
+            })
+            self.assertEqual(mixed.returncode, 78)
+            self.assertFalse((root / 'unit-args').exists())
+
+            missing_digest = run_unit({
+                'GEM_SERVICE_ATTESTATION_MODE': 'upstream-preservation',
+                'SYMPHONY_UPSTREAM_BINDING': '/approved/preservation.json',
+            })
+            self.assertEqual(missing_digest.returncode, 78)
+            self.assertFalse((root / 'unit-args').exists())
+            unknown = run_unit({'GEM_SERVICE_ATTESTATION_MODE': 'unrecognized'})
+            self.assertEqual(unknown.returncode, 78)
+            self.assertFalse((root / 'unit-args').exists())
 
 
 def load_tests(loader, tests, pattern):

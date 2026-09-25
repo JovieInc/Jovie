@@ -116,8 +116,9 @@ describe('Admin Roles', () => {
       expect(result).toBe(false);
     });
 
-    it('should read a cached denial without querying the database', async () => {
+    it('does not trust a cached Redis denial; the database decides', async () => {
       const mockUserId = 'user_cached123';
+      mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);
       mockGetRedis.mockReturnValue({
         get: mockRedisGet.mockResolvedValueOnce('0'),
         set: mockRedisSet,
@@ -126,70 +127,34 @@ describe('Admin Roles', () => {
 
       const result = await isAdmin(mockUserId);
 
-      expect(result).toBe(false);
-      expect(mockRedisGet).toHaveBeenCalledWith(`admin:role:${mockUserId}`);
-      expect(dbModule.db.select).not.toHaveBeenCalled();
+      expect(result).toBe(true);
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
+      expect(dbModule.db.select).toHaveBeenCalledTimes(1);
     });
 
     it.each([
       { userStatus: 'banned', deletedAt: null },
       { userStatus: 'suspended', deletedAt: null },
       { userStatus: 'active', deletedAt: new Date('2026-07-22T00:00:00Z') },
-    ])('denies an admin whose lifecycle is blocked: $userStatus/$deletedAt', async ({
-      userStatus,
-      deletedAt,
-    }) => {
-      const mockUserId = `blocked-${userStatus}-${deletedAt ? 'deleted' : 'live'}`;
-      mockDbResult([{ isAdmin: true, userStatus, deletedAt }]);
+    ])(
+      'denies an admin whose lifecycle is blocked: $userStatus/$deletedAt',
+      async ({ userStatus, deletedAt }) => {
+        const mockUserId = `blocked-${userStatus}-${deletedAt ? 'deleted' : 'live'}`;
+        mockDbResult([{ isAdmin: true, userStatus, deletedAt }]);
 
-      const result = await isAdmin(mockUserId);
+        const result = await isAdmin(mockUserId);
 
-      expect(result).toBe(false);
-      expect(mockCheckUserStatus).toHaveBeenCalledWith(userStatus, deletedAt);
-    });
+        expect(result).toBe(false);
+        expect(mockCheckUserStatus).toHaveBeenCalledWith(userStatus, deletedAt);
+      }
+    );
 
-    it('revalidates a cached positive against the current lifecycle state', async () => {
+    it('does not let a cached Redis yes grant admin when the database denies it', async () => {
       const mockUserId = 'user_cached_admin_now_banned';
       mockDbResult([{ isAdmin: true, userStatus: 'banned', deletedAt: null }]);
       mockGetRedis.mockReturnValue({
         get: mockRedisGet.mockResolvedValueOnce('1'),
-        set: mockRedisSet.mockResolvedValueOnce('OK'),
-        del: mockRedisDel,
-      });
-
-      const result = await isAdmin(mockUserId);
-
-      expect(result).toBe(false);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(1);
-    });
-
-    it('should query database and write redis cache on miss', async () => {
-      const mockUserId = 'user_miss123';
-      mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);
-      mockGetRedis.mockReturnValue({
-        get: mockRedisGet.mockResolvedValueOnce(null),
-        set: mockRedisSet.mockResolvedValueOnce('OK'),
-        del: mockRedisDel,
-      });
-
-      const result = await isAdmin(mockUserId);
-
-      expect(result).toBe(true);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(1);
-      expect(mockRedisSet).toHaveBeenCalledWith(
-        `admin:role:${mockUserId}`,
-        '1',
-        {
-          ex: 60,
-        }
-      );
-    });
-
-    it('should fall back to database query when redis fails', async () => {
-      const mockUserId = 'user_redis_error';
-      mockDbResult([{ isAdmin: false, userStatus: 'active', deletedAt: null }]);
-      mockGetRedis.mockReturnValue({
-        get: mockRedisGet.mockRejectedValueOnce(new Error('redis unavailable')),
         set: mockRedisSet,
         del: mockRedisDel,
       });
@@ -197,11 +162,26 @@ describe('Admin Roles', () => {
       const result = await isAdmin(mockUserId);
 
       expect(result).toBe(false);
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
       expect(dbModule.db.select).toHaveBeenCalledTimes(1);
-      expect(mockCaptureWarning).toHaveBeenCalledWith(
-        '[admin/roles] Redis cache failed, falling back to database query',
-        expect.any(Error)
-      );
+    });
+
+    it('does not write Redis after an admin database hit', async () => {
+      const mockUserId = 'user_miss123';
+      mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet,
+        set: mockRedisSet,
+        del: mockRedisDel,
+      });
+
+      const result = await isAdmin(mockUserId);
+
+      expect(result).toBe(true);
+      expect(dbModule.db.select).toHaveBeenCalledTimes(1);
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
     });
   });
 
