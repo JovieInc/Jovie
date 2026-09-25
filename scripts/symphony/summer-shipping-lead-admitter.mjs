@@ -4,6 +4,7 @@ import {
 } from './summer-shipping-lead-contract.mjs';
 
 const SCHEMA = 'symphony-shipping-lead-admission-progress/v1';
+const ACCEPTANCE_SCHEMA = 'symphony-shipping-lead-owner-acceptance/v1';
 const DIGEST = /^[a-f0-9]{64}$/u;
 const METHODS = new Set(['addComment', 'setIssueLabels', 'transitionIssue']);
 const exact = (value, fields) =>
@@ -11,6 +12,35 @@ const exact = (value, fields) =>
   typeof value === 'object' &&
   !Array.isArray(value) &&
   Object.keys(value).sort().join('\0') === [...fields].sort().join('\0');
+
+function validateOwnerAcceptance(receipt, task) {
+  if (
+    !exact(receipt, [
+      'schema',
+      'taskDigest',
+      'leaseDigest',
+      'runtime',
+      'sessionId',
+      'startedAt',
+      'observedAt',
+      'stateDigest',
+    ]) ||
+    receipt.schema !== ACCEPTANCE_SCHEMA ||
+    receipt.taskDigest !== shippingDigest(task) ||
+    !DIGEST.test(receipt.leaseDigest ?? '') ||
+    !DIGEST.test(receipt.stateDigest ?? '') ||
+    shippingDigest(receipt.runtime) !== shippingDigest(task.runtime) ||
+    typeof receipt.sessionId !== 'string' ||
+    receipt.sessionId.length < 1 ||
+    receipt.sessionId.length > 512 ||
+    !Number.isFinite(Date.parse(receipt.startedAt)) ||
+    !Number.isFinite(Date.parse(receipt.observedAt)) ||
+    Date.parse(receipt.startedAt) < Date.parse(task.createdAt) ||
+    Date.parse(receipt.startedAt) > Date.parse(receipt.observedAt)
+  )
+    throw new Error('shipping-lead-owner-acceptance-invalid');
+  return receipt;
+}
 
 /** Bind actual canonical writes to the same verified source and live generation. */
 export function createRuntimeBoundShippingAdmitter({
@@ -23,8 +53,15 @@ export function createRuntimeBoundShippingAdmitter({
     loaded ??= await loadSource();
     return loaded;
   };
-  const checkRuntime = async (task, code) => {
-    if (code.sourceRevision !== task.source.sourceVersion)
+  const checkRuntime = async (task, code, reconciliation = false) => {
+    if (
+      code.sourceRevision !== task.source.sourceVersion &&
+      !(
+        reconciliation &&
+        typeof code.canReconcileSource === 'function' &&
+        (await code.canReconcileSource(task.source.sourceVersion))
+      )
+    )
       throw new Error('shipping-lead-control-source-changed');
     const observed = await code.observeRuntime();
     const observedAt = Date.parse(observed?.observedAt);
@@ -52,6 +89,101 @@ export function createRuntimeBoundShippingAdmitter({
   const admitter = createShippingLeadAdmitter({
     journal,
     now,
+    observe: async (task, progress, { persist }) => {
+      if (!progress.admissionDigest)
+        return {
+          status: 'held',
+          reason: 'shipping-lead-mutation-outcome-unknown',
+        };
+      const code = await source();
+      if (typeof code.observeIssue !== 'function')
+        return {
+          status: 'held',
+          reason: 'shipping-lead-awaiting-owner-terminal-proof',
+        };
+      await checkRuntime(task, code, true);
+      const issue = await code.observeIssue(task);
+      const observed = await checkRuntime(task, code, true);
+      if (
+        issue?.issueId !== task.issue.id ||
+        issue?.identifier !== task.issue.identifier ||
+        !DIGEST.test(issue.leaseDigest ?? '') ||
+        !Number.isFinite(Date.parse(issue.admittedAt)) ||
+        Date.parse(issue.admittedAt) < Date.parse(task.createdAt) ||
+        Date.parse(issue.admittedAt) > Date.parse(task.expiresAt)
+      )
+        throw new Error('shipping-lead-canonical-lease-unavailable');
+      if (!progress.ownerAcceptance) {
+        const running = observed.running.filter(
+          row =>
+            row.issueId === task.issue.id &&
+            row.identifier === task.issue.identifier
+        );
+        if (
+          running.length !== 1 ||
+          Date.parse(running[0].startedAt) < Date.parse(issue.admittedAt)
+        )
+          return {
+            status: 'held',
+            reason: 'shipping-lead-awaiting-worker-acceptance',
+          };
+        const row = running[0];
+        const ownerAcceptance = validateOwnerAcceptance(
+          {
+            schema: ACCEPTANCE_SCHEMA,
+            taskDigest: shippingDigest(task),
+            leaseDigest: issue.leaseDigest,
+            runtime: task.runtime,
+            sessionId: row.sessionId,
+            startedAt: row.startedAt,
+            observedAt: observed.observedAt,
+            stateDigest: observed.stateDigest,
+          },
+          task
+        );
+        persist({ ...progress, ownerAcceptance });
+      } else if (progress.ownerAcceptance.leaseDigest !== issue.leaseDigest) {
+        throw new Error('shipping-lead-canonical-lease-changed');
+      }
+      const inactive = snapshot =>
+        ['running', 'retrying', 'blocked'].every(key =>
+          snapshot[key].every(
+            row =>
+              row &&
+              typeof row.issueId === 'string' &&
+              typeof row.identifier === 'string' &&
+              row.issueId !== task.issue.id &&
+              row.identifier !== task.issue.identifier
+          )
+        );
+      if (
+        progress.ownerAcceptance &&
+        issue.state === 'Done' &&
+        inactive(observed) &&
+        typeof code.observeWorker === 'function'
+      ) {
+        const worker = await code.observeWorker(task, progress.ownerAcceptance);
+        if (worker) {
+          const latest = await checkRuntime(task, code, true);
+          if (
+            inactive(latest) &&
+            Date.parse(latest.generatedAt) >=
+              Date.parse(worker.exited.observedAt)
+          ) {
+            // Process exit cannot establish that this exact commit shipped.
+            return {
+              status: 'held',
+              reason: 'shipping-lead-worker-stopped-awaiting-production-proof',
+            };
+          }
+        }
+      }
+      // A running session is positive acceptance, never terminal execution proof.
+      return {
+        status: 'held',
+        reason: 'shipping-lead-owner-accepted-awaiting-terminal-proof',
+      };
+    },
     admit: async (task, { beforeMutation }) => {
       const code = await source();
       await checkRuntime(task, code);
@@ -74,6 +206,9 @@ export function validateAdmissionProgress(progress, task) {
       'mutationCount',
       'lastMutation',
       'admissionDigest',
+      ...(Object.hasOwn(progress ?? {}, 'ownerAcceptance')
+        ? ['ownerAcceptance']
+        : []),
     ]) ||
     progress.schema !== SCHEMA ||
     progress.taskDigest !== shippingDigest(task) ||
@@ -94,6 +229,11 @@ export function validateAdmissionProgress(progress, task) {
     )
   ) {
     throw new Error('shipping-lead-admission-progress-invalid');
+  }
+  if (Object.hasOwn(progress, 'ownerAcceptance')) {
+    if (progress.mutationCount === 0)
+      throw new Error('shipping-lead-owner-acceptance-invalid');
+    validateOwnerAcceptance(progress.ownerAcceptance, task);
   }
   return progress;
 }
@@ -135,7 +275,7 @@ export function createShippingLeadAdmitter({
   };
   const reconcile = async (task, progress) =>
     observe
-      ? observe(task, progress)
+      ? observe(task, progress, { persist: next => persist(task, next) })
       : held(
           progress.admissionDigest
             ? 'shipping-lead-awaiting-owner-terminal-proof'

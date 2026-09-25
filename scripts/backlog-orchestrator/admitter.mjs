@@ -887,7 +887,7 @@ export function buildAdmissionReceipt(
   })} -->`;
 }
 
-function admissionLeaseReceipt(issue, body) {
+export function admissionLeaseReceipt(issue, body) {
   const raw = String(body || '');
   if (!raw.startsWith(ADMISSION_RECEIPT_PREFIX) || !raw.endsWith(' -->')) {
     return null;

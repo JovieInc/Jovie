@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { shippingDigest } from './summer-shipping-lead-contract.mjs';
 
 const EXTRA = [
   'scripts/invariants/registry.mjs',
@@ -179,11 +180,44 @@ export async function loadCanonicalShippingAdmission({
         throw new Error('shipping-lead-source-content-mismatch');
     }
     const module = await import(pathToFileURL(join(root, ENTRY)).href);
-    if (typeof module.admitShippingLeadRequest !== 'function')
+    if (
+      typeof module.admitShippingLeadRequest !== 'function' ||
+      typeof module.observeShippingLeadIssue !== 'function' ||
+      typeof module.readShippingWorkerEvidence !== 'function'
+    )
       throw new Error('shipping-lead-canonical-entry-unavailable');
     return {
       admit: module.admitShippingLeadRequest,
+      observeIssue: module.observeShippingLeadIssue,
+      observeWorker: (task, acceptance) =>
+        module.readShippingWorkerEvidence(task, acceptance, {
+          privateRoot,
+          producerSha256: shippingDigest(
+            Object.fromEntries(
+              [
+                'codex-rotate',
+                'shipping_lead_worker_evidence.py',
+                'shipping_worker_capture.py',
+              ].map(name => [
+                name,
+                sha256(git(['show', `${revision}:scripts/symphony/${name}`])),
+              ])
+            )
+          ),
+        }),
       sourceRevision: revision,
+      canReconcileSource: priorRevision => {
+        if (!/^[a-f0-9]{40}$/u.test(priorRevision ?? '')) return false;
+        try {
+          git(['merge-base', '--is-ancestor', priorRevision, revision]);
+          const path = 'scripts/symphony/summer-shipping-lead-contract.mjs';
+          return git(['rev-parse', `${priorRevision}:${path}`]).equals(
+            git(['rev-parse', `${revision}:${path}`])
+          );
+        } catch {
+          return false;
+        }
+      },
       observeRuntime: () =>
         JSON.parse(
           execFileSync(

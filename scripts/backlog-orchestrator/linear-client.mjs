@@ -1135,8 +1135,48 @@ export async function fetchIssue(identifier, options = {}) {
     children { nodes { id identifier title } }
     relations { nodes { type relatedIssue { id identifier title } } }
     state { id name type }
-    comments { nodes { id body createdAt } }
+    ${options.includeAdmissionEvidence ? '' : 'comments { nodes { id body createdAt } }'}
   `;
+  async function admissionEvidence(issue) {
+    if (!issue || !options.includeAdmissionEvidence) return issue;
+    if (!issue.id || !issue.updatedAt)
+      throw new Error('Shipping Lead issue revision is missing');
+    const comments = await collectLinearConnectionPages(
+      async (cursor, pageSize) => {
+        const data = await graphql(
+          `query($id: String!, $cursor: String, $pageSize: Int!) {
+          issue(id: $id) {
+            id updatedAt
+            comments(first: $pageSize, after: $cursor) {
+              nodes { id body createdAt }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }`,
+          { id: issue.id, cursor, pageSize },
+          options
+        );
+        if (
+          data.issue?.id !== issue.id ||
+          data.issue.updatedAt !== issue.updatedAt
+        )
+          throw new Error(
+            'Shipping Lead issue changed during comment pagination'
+          );
+        return data.issue.comments;
+      }
+    );
+    return {
+      ...issue,
+      comments: {
+        nodes: comments.issues,
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: comments.coverage.endCursor,
+        },
+      },
+    };
+  }
   const keyMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(value);
 
   // Linear removed issueSearch. Resolve human identifiers through the
@@ -1152,7 +1192,7 @@ export async function fetchIssue(identifier, options = {}) {
       { teamKey: keyMatch[1].toUpperCase(), number: Number(keyMatch[2]) },
       options
     );
-    return data.issues.nodes[0] || null;
+    return admissionEvidence(data.issues.nodes[0] || null);
   }
 
   if (
@@ -1165,7 +1205,7 @@ export async function fetchIssue(identifier, options = {}) {
       { id: value },
       options
     );
-    return data.issue || null;
+    return admissionEvidence(data.issue || null);
   }
 
   throw new Error(`Invalid Linear issue identifier: ${identifier}`);

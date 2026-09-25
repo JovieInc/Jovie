@@ -1,9 +1,22 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import {
+  readShippingWorkerEvidence,
+  validateShippingWorkerEvidence,
+} from '../backlog-orchestrator/shipping-lead-worker-observer.mjs';
 import {
   createRuntimeBoundShippingAdmitter,
   createShippingLeadAdmitter,
@@ -785,4 +798,484 @@ test('refuses unsigned extra result fields and missing host signing configuratio
   const c = cycle();
   c.deps.outcomePrivateKey = null;
   await assert.rejects(runCycle(c.deps), /signing-configuration-missing/);
+});
+
+function acceptedRuntimeFixture(context, extra = {}) {
+  const f = admissionFixture(context);
+  const runtime = runtimeFor(f.task);
+  runtime.running = [
+    {
+      issueId: f.task.issue.id,
+      identifier: f.task.issue.identifier,
+      sessionId: 'official-session-1',
+      startedAt: f.task.createdAt,
+    },
+  ];
+  const issue = {
+    issueId: f.task.issue.id,
+    identifier: f.task.issue.identifier,
+    leaseDigest: '8'.repeat(64),
+    admittedAt: f.task.createdAt,
+    state: 'In Progress',
+  };
+  let admissions = 0;
+  const adapter = () =>
+    createRuntimeBoundShippingAdmitter({
+      journal: f.open(),
+      loadSource: async () => ({
+        sourceRevision: f.task.source.sourceVersion,
+        observeRuntime: async () => runtime,
+        observeIssue: async () => issue,
+        ...extra,
+        admit: async (task, { beforeMutation }) => {
+          admissions++;
+          await beforeMutation(f.intent);
+          return { status: 'admitted', identifier: task.issue.identifier };
+        },
+      }),
+    });
+  return { ...f, adapter, runtime, issue, admissions: () => admissions };
+}
+
+test('official running worker and exact lease persist acceptance across restart without releasing the reservation', async context => {
+  const f = acceptedRuntimeFixture(context);
+  const first = await f.adapter().execute(f.task);
+  assert.equal(first.status, 'held');
+  assert.equal(
+    first.reason,
+    'shipping-lead-owner-accepted-awaiting-terminal-proof'
+  );
+  const receipt = f.open().read().active.admissionProgress.ownerAcceptance;
+  assert.equal(receipt.sessionId, 'official-session-1');
+  assert.equal(receipt.taskDigest, shippingDigest(f.task));
+  f.runtime.running = [];
+  f.issue.state = 'Done';
+  const next = await f.adapter().execute(f.task);
+  assert.equal(next.status, 'held');
+  assert.deepEqual(
+    f.open().read().active.admissionProgress.ownerAcceptance,
+    receipt
+  );
+  assert.equal(f.admissions(), 1);
+});
+
+test('missing, duplicate, mismatched or pre-admission running worker never proves acceptance', async context => {
+  for (const change of [
+    () => [],
+    rows => [...rows, ...rows],
+    rows => [{ ...rows[0], issueId: 'other' }],
+    rows => [{ ...rows[0], startedAt: '2020-01-01T00:00:00Z' }],
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    f.runtime.running = change(f.runtime.running);
+    assert.equal(
+      (await f.adapter().execute(f.task)).reason,
+      'shipping-lead-awaiting-worker-acceptance'
+    );
+    assert.equal(
+      f.open().read().active.admissionProgress.ownerAcceptance,
+      undefined
+    );
+  }
+});
+
+test('malformed worker evidence and changed canonical lease fail closed', async context => {
+  for (const patch of [
+    { sessionId: null },
+    { sessionId: '' },
+    { sessionId: 'x'.repeat(513) },
+    { startedAt: 'bad' },
+    { startedAt: '2099-01-01T00:00:00Z' },
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    Object.assign(f.runtime.running[0], patch);
+    await assert.rejects(
+      f.adapter().execute(f.task),
+      /owner-acceptance-invalid/
+    );
+    assert.equal(
+      f.open().read().active.admissionProgress.ownerAcceptance,
+      undefined
+    );
+  }
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  f.issue.leaseDigest = '9'.repeat(64);
+  await assert.rejects(f.adapter().execute(f.task), /canonical-lease-changed/);
+});
+
+test('cross-bound or malformed live lease cannot record owner acceptance', async context => {
+  for (const patch of [
+    { issueId: 'other' },
+    { identifier: 'JOV-1' },
+    { leaseDigest: 'bad' },
+    { admittedAt: 'bad' },
+    { admittedAt: '2020-01-01T00:00:00Z' },
+    { admittedAt: '2099-01-01T00:00:00Z' },
+  ]) {
+    const f = acceptedRuntimeFixture(context);
+    Object.assign(f.issue, patch);
+    await assert.rejects(
+      f.adapter().execute(f.task),
+      /canonical-lease-unavailable/
+    );
+  }
+});
+
+test('retained owner evidence is strict and bound to the signed request and recorded mutation', async context => {
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  const state = f.open().read(),
+    original = state.active.admissionProgress.ownerAcceptance;
+  for (const patch of [
+    { schema: 'unknown' },
+    { taskDigest: '0'.repeat(64) },
+    { leaseDigest: 'bad' },
+    { stateDigest: 'bad' },
+    { runtime: { ...f.task.runtime, invocationId: '0'.repeat(32) } },
+    { extra: true },
+    { startedAt: 'bad' },
+    { observedAt: 'bad' },
+    { sessionId: null },
+  ]) {
+    state.active.admissionProgress.ownerAcceptance = { ...original, ...patch };
+    assert.throws(() => f.journal.write(state), /owner-acceptance-invalid/);
+  }
+  state.active.admissionProgress.ownerAcceptance = original;
+  state.active.admissionProgress.mutationCount = 0;
+  state.active.admissionProgress.lastMutation = null;
+  state.active.admissionProgress.admissionDigest = null;
+  assert.throws(() => f.journal.write(state), /owner-acceptance-invalid/);
+});
+
+test('uncertain canonical write never becomes worker acceptance from a running row alone', async context => {
+  const f = admissionFixture(context);
+  const first = createRuntimeBoundShippingAdmitter({
+    journal: f.journal,
+    loadSource: async () => ({
+      sourceRevision: f.task.source.sourceVersion,
+      observeRuntime: async () => runtimeFor(f.task),
+      admit: async (task, { beforeMutation }) => {
+        await beforeMutation(f.intent);
+        throw new Error('lost acknowledgement');
+      },
+    }),
+  });
+  await assert.rejects(first.execute(f.task), /lost acknowledgement/);
+  const recovered = createRuntimeBoundShippingAdmitter({
+    journal: f.open(),
+    loadSource: async () => {
+      throw new Error('must not reload or redispatch');
+    },
+  });
+  assert.equal(
+    (await recovered.execute(f.task)).reason,
+    'shipping-lead-mutation-outcome-unknown'
+  );
+  assert.equal(
+    f.open().read().active.admissionProgress.ownerAcceptance,
+    undefined
+  );
+});
+
+test('a verified compatible control update can reconcile prior acceptance but never authorize fresh admission', async context => {
+  const f = acceptedRuntimeFixture(context);
+  await f.adapter().execute(f.task);
+  let compatible = true;
+  const code = {
+    sourceRevision: '4'.repeat(40),
+    canReconcileSource: async revision => {
+      assert.equal(revision, f.task.source.sourceVersion);
+      return compatible;
+    },
+    observeIssue: async () => f.issue,
+    observeRuntime: async () => f.runtime,
+    admit: async () => {
+      throw new Error('must not admit from a changed source');
+    },
+  };
+  const afterUpgrade = createRuntimeBoundShippingAdmitter({
+    journal: f.open(),
+    loadSource: async () => code,
+  });
+  assert.equal(
+    (await afterUpgrade.execute(f.task)).reason,
+    'shipping-lead-owner-accepted-awaiting-terminal-proof'
+  );
+  compatible = false;
+  await assert.rejects(afterUpgrade.execute(f.task), /control-source-changed/);
+  const fresh = admissionFixture(context);
+  compatible = true;
+  await assert.rejects(
+    createRuntimeBoundShippingAdmitter({
+      journal: fresh.journal,
+      loadSource: async () => code,
+    }).execute(fresh.task),
+    /control-source-changed/
+  );
+  assert.equal(fresh.open().read().active.admissionProgress, undefined);
+});
+
+function workerFixture(context) {
+  const task = fixture(),
+    base = Date.parse(task.createdAt);
+  const at = offset => new Date(base + offset).toISOString();
+  const acceptance = {
+    taskDigest: shippingDigest(task),
+    runtime: task.runtime,
+    sessionId: 'thread-first',
+    observedAt: at(200),
+  };
+  const binding = {
+    taskDigest: shippingDigest(task),
+    issueId: task.issue.id,
+    identifier: task.issue.identifier,
+    invocationId: task.runtime.invocationId,
+    runtimeGeneration: task.runtime.generation,
+    workspace: `/work/${task.issue.identifier}`,
+    producerSha256: '3'.repeat(64),
+  };
+  const seal = value => {
+    const { digest, ...unsigned } = value;
+    return { ...unsigned, digest: shippingDigest(unsigned) };
+  };
+  const candidate = seal({
+    schema: 'symphony-shipping-worker-candidate/v1',
+    ...binding,
+    threadId: 'thread',
+    turnId: 'second',
+    sessionId: 'thread-second',
+    sessionIds: ['thread-first', 'thread-second'],
+    threadStartedAt: at(100),
+    startedAt: at(300),
+    observedAt: at(400),
+    executionBaseHead: '4'.repeat(40),
+    executionFinalHead: '5'.repeat(40),
+    turnStatus: 'completed',
+    executionTerminated: false,
+  });
+  const exited = seal({
+    schema: 'symphony-shipping-worker-exit/v1',
+    ...binding,
+    candidateDigest: candidate.digest,
+    sessionId: candidate.sessionId,
+    processExitCode: 0,
+    launcherExitCode: 0,
+    workerProcessExited: true,
+    taskTerminal: false,
+    observedAt: at(500),
+  });
+  const privateRoot = realpathSync(
+    mkdtempSync(join(tmpdir(), 'shipping-worker-observation-'))
+  );
+  context.after(() => rmSync(privateRoot, { recursive: true, force: true }));
+  const directory = join(privateRoot, 'worker-evidence', binding.taskDigest);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const paths = [
+    join(directory, `${candidate.digest}.json`),
+    join(directory, `exit-${candidate.digest}.json`),
+  ];
+  const save = () =>
+    [candidate, exited].forEach((value, index) =>
+      writeFileSync(paths[index], JSON.stringify(value), { mode: 0o600 })
+    );
+  save();
+  const options = {
+    privateRoot,
+    producerSha256: binding.producerSha256,
+    now: base + 1000,
+  };
+  return {
+    task,
+    acceptance,
+    candidate,
+    exited,
+    options,
+    directory,
+    paths,
+    seal,
+    at,
+    save,
+    read: () => readShippingWorkerEvidence(task, acceptance, options),
+    validate: () =>
+      validateShippingWorkerEvidence(
+        task,
+        acceptance,
+        candidate,
+        exited,
+        options.producerSha256,
+        options.now
+      ),
+  };
+}
+
+test('private worker evidence binds the accepted early turn to the final continuation and preserves exit statuses', context => {
+  const f = workerFixture(context);
+  assert.deepEqual(f.read(), { candidate: f.candidate, exited: f.exited });
+  assert.equal(f.read().candidate.sessionId, 'thread-second');
+  f.exited.launcherExitCode = 75;
+  Object.assign(f.exited, f.seal(f.exited));
+  f.save();
+  assert.equal(f.read().exited.launcherExitCode, 75);
+  assert.equal(f.read().exited.taskTerminal, false);
+});
+
+test('altered identity, continuation, lifecycle, commit, clock or producer cannot become terminal evidence', context => {
+  for (const mutate of [
+    f => {
+      f.candidate.extra = true;
+    },
+    f => {
+      f.exited.schema = 'wrong';
+    },
+    f => {
+      f.candidate.digest = '0'.repeat(64);
+    },
+    f => {
+      f.candidate.taskDigest = '0'.repeat(64);
+    },
+    f => {
+      f.exited.runtimeGeneration = '0'.repeat(64);
+    },
+    f => {
+      f.options.producerSha256 = 'bad';
+    },
+    f => {
+      f.candidate.workspace = '/other/JOV-1';
+    },
+    f => {
+      f.candidate.workspace = '/work/../JOV-6586';
+    },
+    f => {
+      f.candidate.threadId = 'other';
+    },
+    f => {
+      f.exited.candidateDigest = '0'.repeat(64);
+    },
+    f => {
+      f.candidate.sessionIds = ['thread-second'];
+    },
+    f => {
+      f.candidate.sessionIds = ['thread-first', 'thread-first'];
+    },
+    f => {
+      f.candidate.sessionIds = ['thread-first', 'other-second'];
+    },
+    f => {
+      f.acceptance.taskDigest = '0'.repeat(64);
+    },
+    f => {
+      f.acceptance.runtime = {};
+    },
+    f => {
+      f.candidate.threadStartedAt = f.at(300);
+    },
+    f => {
+      f.candidate.startedAt = f.at(0);
+    },
+    f => {
+      f.candidate.observedAt = 'invalid';
+    },
+    f => {
+      f.exited.observedAt = f.at(0);
+    },
+    f => {
+      f.exited.observedAt = f.at(100000);
+    },
+    f => {
+      f.candidate.executionTerminated = true;
+    },
+    f => {
+      f.exited.workerProcessExited = false;
+    },
+    f => {
+      f.exited.taskTerminal = true;
+    },
+    f => {
+      f.exited.processExitCode = -1;
+    },
+    f => {
+      f.exited.launcherExitCode = true;
+    },
+    f => {
+      f.candidate.executionFinalHead = f.candidate.executionBaseHead;
+    },
+  ]) {
+    const f = workerFixture(context);
+    mutate(f);
+    // Most cases are correctly re-digested attacks, not merely checksum failures.
+    if (f.candidate.digest !== '0'.repeat(64))
+      Object.assign(f.candidate, f.seal(f.candidate));
+    f.exited.candidateDigest =
+      f.exited.candidateDigest === '0'.repeat(64)
+        ? f.exited.candidateDigest
+        : f.candidate.digest;
+    Object.assign(f.exited, f.seal(f.exited));
+    assert.throws(f.validate, /worker-evidence-invalid/);
+  }
+});
+
+test('missing, ambiguous or unsafe private evidence never grants completion', context => {
+  const f = workerFixture(context);
+  rmSync(f.paths[1]);
+  assert.equal(f.read(), null);
+  rmSync(f.directory, { recursive: true });
+  assert.equal(f.read(), null);
+  mkdirSync(f.directory, { mode: 0o700 });
+  f.save();
+  for (const mode of [0o644, 0o666]) {
+    chmodSync(f.paths[0], mode);
+    assert.throws(f.read);
+  }
+  chmodSync(f.paths[0], 0o600);
+  linkSync(f.paths[0], join(f.directory, '.candidate-link'));
+  assert.throws(f.read);
+  rmSync(join(f.directory, '.candidate-link'));
+  rmSync(f.paths[0]);
+  symlinkSync(f.paths[1], f.paths[0]);
+  assert.throws(f.read);
+  rmSync(f.paths[0]);
+  f.save();
+  writeFileSync(join(f.directory, `${'9'.repeat(64)}.json`), '{}', {
+    mode: 0o600,
+  });
+  assert.throws(f.read);
+  rmSync(join(f.directory, `${'9'.repeat(64)}.json`));
+  writeFileSync(f.paths[0], 'x'.repeat(1024 * 1024 + 1));
+  assert.throws(f.read);
+  f.save();
+  chmodSync(f.directory, 0o755);
+  assert.throws(f.read);
+});
+
+test('accepted worker exit is observed only after inactivity and still cannot release capacity without production proof', async context => {
+  let calls = 0;
+  const f = acceptedRuntimeFixture(context, {
+    observeWorker: async () => {
+      calls++;
+      return { exited: { observedAt: f.task.createdAt } };
+    },
+  });
+  await f.adapter().execute(f.task);
+  f.issue.state = 'Done';
+  await f.adapter().execute(f.task);
+  assert.equal(calls, 0);
+  f.runtime.running = [];
+  assert.equal(
+    (await f.adapter().execute(f.task)).reason,
+    'shipping-lead-worker-stopped-awaiting-production-proof'
+  );
+  assert.equal(calls, 1);
+  assert.equal(f.admissions(), 1);
+  for (const key of ['retrying', 'blocked']) {
+    f.runtime[key] = [
+      { issueId: f.task.issue.id, identifier: f.task.issue.identifier },
+    ];
+    assert.equal(
+      (await f.adapter().execute(f.task)).reason,
+      'shipping-lead-owner-accepted-awaiting-terminal-proof'
+    );
+    f.runtime[key] = [];
+  }
+  assert.equal(f.open().read().active.phase, 'discovered');
 });

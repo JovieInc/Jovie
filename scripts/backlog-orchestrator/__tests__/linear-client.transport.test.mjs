@@ -244,6 +244,7 @@ describe('Gem Linear transport', () => {
       const issue = await linear.fetchIssue('JOV-123', { fetchImpl });
       await linear.transitionIssue('issue-1', 'state-1', { fetchImpl });
       assert.deepEqual(issue, { id: 'issue-1' });
+      assert.doesNotMatch(requests[0].query, /pageInfo/);
       assert.match(requests[0].query, /issues\s*\(/);
       assert.doesNotMatch(requests[0].query, /issueSearch/);
       assert.deepEqual(requests[0].variables, { teamKey: 'JOV', number: 123 });
@@ -831,6 +832,168 @@ describe('durable credential budget', () => {
           error.coverage.scanned === 1 &&
           error.coverage.endCursor === 'page-one' &&
           Number.isSafeInteger(error.resetAt)
+      );
+    });
+  });
+});
+
+describe('Shipping Lead complete admission evidence', () => {
+  const id = '00000000-0000-4000-8000-000000006586';
+  const updatedAt = '2026-09-24T23:00:00.000Z';
+  const snapshot = { id, updatedAt };
+
+  it('collects every comment page for both human and stable issue identifiers', async () => {
+    await withKey('test-key-admission-observer', async () => {
+      for (const identifier of ['JOV-6586', id]) {
+        const requests = [];
+        const issue = await linear.fetchIssue(identifier, {
+          includeAdmissionEvidence: true,
+          fetchImpl: async (_url, options) => {
+            const request = JSON.parse(options.body);
+            requests.push(request);
+            if (!request.query.includes('after: $cursor'))
+              return jsonResponse({
+                data: request.variables.id
+                  ? { issue: snapshot }
+                  : { issues: { nodes: [snapshot] } },
+              });
+            const last = request.variables.cursor === 'page-one';
+            return jsonResponse({
+              data: {
+                issue: {
+                  ...snapshot,
+                  comments: {
+                    nodes: [
+                      {
+                        id: last ? 'new-lease' : 'old-lease',
+                        body: last
+                          ? 'new canonical lease'
+                          : 'old canonical lease',
+                      },
+                    ],
+                    pageInfo: {
+                      hasNextPage: !last,
+                      endCursor: last ? 'page-two' : 'page-one',
+                    },
+                  },
+                },
+              },
+            });
+          },
+        });
+        assert.deepEqual(
+          issue.comments.nodes.map(comment => comment.id),
+          ['old-lease', 'new-lease']
+        );
+        assert.equal(issue.comments.pageInfo.hasNextPage, false);
+        assert.equal(requests.length, 3);
+        assert.equal(requests[1].variables.cursor, null);
+        assert.equal(requests[2].variables.cursor, 'page-one');
+        assert.equal(requests[1].variables.id, id);
+        assert.equal(requests[1].variables.pageSize, 50);
+      }
+    });
+  });
+
+  it('rejects failed, incomplete, or changed later pages without returning partial evidence', async () => {
+    await withKey('test-key-admission-rejection', async () => {
+      for (const [failure, expectedCode] of [
+        ['transport', 'PAGE_FETCH_FAILED'],
+        ['identity', 'PAGE_FETCH_FAILED'],
+        ['revision', 'PAGE_FETCH_FAILED'],
+        ['missing', 'PAGE_FETCH_FAILED'],
+        ['cursor', 'CURSOR_STALLED'],
+        ['duplicate', 'DUPLICATE_ISSUE'],
+      ]) {
+        let pages = 0;
+        await assert.rejects(
+          linear.fetchIssue(id, {
+            includeAdmissionEvidence: true,
+            maxAttempts: 1,
+            fetchImpl: async (_url, options) => {
+              const request = JSON.parse(options.body);
+              if (!request.query.includes('after: $cursor'))
+                return jsonResponse({ data: { issue: snapshot } });
+              pages++;
+              if (pages === 2 && failure === 'transport')
+                throw new Error('provider unavailable');
+              const issue = {
+                ...snapshot,
+                comments: {
+                  nodes: [
+                    {
+                      id:
+                        pages === 1 || failure === 'duplicate'
+                          ? 'comment-one'
+                          : 'comment-two',
+                    },
+                  ],
+                  pageInfo: {
+                    hasNextPage: pages === 1 || failure === 'cursor',
+                    endCursor: 'page-one',
+                  },
+                },
+              };
+              if (pages === 2 && failure === 'identity')
+                issue.id = 'another-issue';
+              if (pages === 2 && failure === 'revision')
+                issue.updatedAt = '2026-09-24T23:01:00.000Z';
+              return jsonResponse({
+                data: {
+                  issue: pages === 2 && failure === 'missing' ? null : issue,
+                },
+              });
+            },
+          }),
+          error => {
+            assert.ok(error instanceof Error);
+            assert.ok('code' in error);
+            assert.equal(error.code, expectedCode);
+            if (['identity', 'revision', 'missing'].includes(failure)) {
+              assert.ok(error.cause instanceof Error);
+              assert.match(
+                error.cause.message,
+                /issue changed during comment pagination/
+              );
+            }
+            return true;
+          }
+        );
+        assert.equal(pages, 2);
+      }
+    });
+  });
+
+  it('preserves default reads and missing issues and rejects unversioned admission snapshots', async () => {
+    await withKey('test-key-admission-default', async () => {
+      for (const [includeAdmissionEvidence, returnedIssue] of [
+        [false, snapshot],
+        [true, null],
+      ]) {
+        let calls = 0;
+        assert.deepEqual(
+          await linear.fetchIssue(id, {
+            includeAdmissionEvidence,
+            fetchImpl: async (_url, options) => {
+              calls++;
+              if (!includeAdmissionEvidence)
+                assert.match(
+                  JSON.parse(options.body).query,
+                  /comments \{ nodes/
+                );
+              return jsonResponse({ data: { issue: returnedIssue } });
+            },
+          }),
+          returnedIssue
+        );
+        assert.equal(calls, 1);
+      }
+      await assert.rejects(
+        linear.fetchIssue(id, {
+          includeAdmissionEvidence: true,
+          fetchImpl: async () => jsonResponse({ data: { issue: { id } } }),
+        }),
+        /issue revision is missing/
       );
     });
   });
