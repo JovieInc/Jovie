@@ -39,7 +39,7 @@ const FIXTURE_PAGE_SOURCES: Record<
   '/renders': 'app/(marketing)/renders/page.tsx',
   '/renders/[state]': 'app/(marketing)/renders/[state]/page.tsx',
   '/renders/profile-admission':
-    'app/(marketing)/renders/profile-admission/page.tsx',
+    'app/(profile-admission)/renders/profile-admission/page.tsx',
   '/renders/surfaces/[surface]':
     'app/(marketing)/renders/surfaces/[surface]/page.tsx',
 };
@@ -203,7 +203,7 @@ describe('render fixture route contract (JOV-5813)', () => {
     const manifestGlobs = [
       '(marketing)/renders/page.tsx',
       '(marketing)/renders/[state]/page.tsx',
-      '(marketing)/renders/profile-admission/page.tsx',
+      '(profile-admission)/renders/profile-admission/page.tsx',
       '(marketing)/renders/surfaces/[surface]/page.tsx',
     ];
     for (const glob of manifestGlobs) {

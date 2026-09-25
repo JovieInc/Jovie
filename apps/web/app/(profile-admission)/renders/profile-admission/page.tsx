@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation';
-import { isProfileAdmissionFixtureEnabled } from '../../../(marketing)/renders/profile-admission/guard';
+import {
+  isRenderFixtureEnabled,
+  RENDER_FIXTURE_METADATA,
+} from '@/lib/render-fixture-policy';
 import { ProfileAdmissionFixtureClient } from '../../../(marketing)/renders/profile-admission/ProfileAdmissionFixtureClient';
 
 export const revalidate = false;
-export { PROFILE_ADMISSION_FIXTURE_METADATA as metadata } from '../../../(marketing)/renders/profile-admission/guard';
+export const metadata = RENDER_FIXTURE_METADATA;
 
 /** Secret-free, E2E-only public-profile admission fixture. */
 export default async function ProfileAdmissionFixturePage({
@@ -11,7 +14,7 @@ export default async function ProfileAdmissionFixturePage({
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
-  if (!isProfileAdmissionFixtureEnabled()) notFound();
+  if (!isRenderFixtureEnabled()) notFound();
   const params = await searchParams;
 
   return (

@@ -12,9 +12,9 @@ vi.mock('next/navigation', () => ({
   notFound: notFoundMock,
 }));
 
-vi.mock('../../../(marketing)/renders/profile-admission/guard', () => ({
-  isProfileAdmissionFixtureEnabled: fixtureEnabledMock,
-  PROFILE_ADMISSION_FIXTURE_METADATA: {
+vi.mock('@/lib/render-fixture-policy', () => ({
+  isRenderFixtureEnabled: fixtureEnabledMock,
+  RENDER_FIXTURE_METADATA: {
     robots: { index: false, follow: false },
   },
 }));
