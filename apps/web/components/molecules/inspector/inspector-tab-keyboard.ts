@@ -32,7 +32,7 @@ export function nextInspectorTabValue<T extends string>(
     );
   }
   if (key === 'Home') return enabled[0] ?? null;
-  if (key === 'End') return enabled[enabled.length - 1] ?? null;
+  if (key === 'End') return enabled.at(-1) ?? null;
   return null;
 }
 
