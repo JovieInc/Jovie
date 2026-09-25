@@ -73,7 +73,9 @@ describe('presentArtistStatus', () => {
 
     expect(result.label).not.toBe('Artist-managed');
     expect(result.label).not.toBe('Managed by the artist’s team');
-    expect(result.label).toBe('Jovie listing');
+    // baseFacts.availability is unknown, which outranks the listing badge.
+    expect(result.label).toBe('We couldn’t check this handle. Try again.');
+    expect(result.action).toBe('try_again');
   });
 
   it('claimed_flag_only is truthfully identical to no evidence', () => {

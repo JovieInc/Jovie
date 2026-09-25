@@ -12,6 +12,9 @@ const meta = {
         'prompt',
         'isTransitioning',
         'onConnected',
+        // Callback parameters of onConnected, not component props.
+        'releases',
+        'artistName',
         'onSkip',
         'disabled',
         'isLoading',

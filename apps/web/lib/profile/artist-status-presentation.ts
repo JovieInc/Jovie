@@ -173,15 +173,10 @@ export function presentArtistStatus(
     return presentReservedForArtist();
   }
 
-  if (
-    (management === 'claimed_flag_only' || management === 'none') &&
-    availability !== 'unknown'
-  ) {
-    return presentAvailability(availability);
-  }
-
+  // Availability outranks the plain listing, including an unknown check.
+  // Unknown must offer retry instead of a listing badge or a false Available.
   if (management === 'claimed_flag_only' || management === 'none') {
-    return presentUnmanagedListing();
+    return presentAvailability(availability);
   }
 
   // Unreachable with the current evidence union — every management value is
