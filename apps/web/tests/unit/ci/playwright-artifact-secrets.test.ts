@@ -60,7 +60,7 @@ const localTrace = Object.fromEntries(
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
@@ -69,6 +69,7 @@ const imageUploads =
   );
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -78,7 +79,7 @@ const markdownUploads = [
 const protectedJobs: Record<string, string[]> = {
   'agent-tick.yml': ['synthetic-monitoring'],
   'ci.yml':
-    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
+    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
       ' '
     ),
   'e2e-full-matrix.yml': ['e2e-full-matrix'],
@@ -817,7 +818,7 @@ describe('Playwright artifact secret boundary', () => {
 
   it('keeps every combined Storybook run on manual Axe with scanned Markdown evidence', () => {
     const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-    const job = jobBlock(source, 'ci-build-layout');
+    const job = jobBlock(source, 'ci-storybook-surfaces');
     const steps = workflowStepBlocks(job);
     const surface = steps.find(step =>
       step.startsWith(
@@ -825,7 +826,9 @@ describe('Playwright artifact secret boundary', () => {
       )
     );
     const upload = steps.find(step =>
-      step.startsWith('      - name: Upload combined layout failure evidence\n')
+      step.startsWith(
+        '      - name: Upload combined Storybook failure evidence\n'
+      )
     );
 
     expect(surface).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
@@ -890,13 +893,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(28);
+    expect(safeUploadJobs).toHaveLength(29);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(34);
+    ).toBe(35);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
