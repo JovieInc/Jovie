@@ -1,0 +1,535 @@
+{
+  "schemaVersion": 1,
+  "repository": "JovieInc/Jovie",
+  "entrypoints": ["README.md", "CLAUDE.md", "docs/DOCUMENTATION.md"],
+  "sources": [
+    {
+      "path": ".agents/skills/gstack/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/actionlint.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/actions-cache-gc.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/agent-harness-health-report.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/agent-landing-sweep.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/agent-pipeline.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/agent-tick.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/auto-fix-lint-agent-drafts.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/auto-pr-on-push.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/auto-ready-agent-drafts.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/brand-scrub.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/canary-health-gate.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ci-duration-ratchet.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ci-shard-contract-canary.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/claude-review.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/claude.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/cost-anomaly-gate.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/delivery-control-receipts.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/dependabot-auto-merge.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/design-governance.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/doc-gardening-agent.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/e2e-full-matrix.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/eval-real-model.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/eval.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/evals-periodic.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/eve-pilot.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/fixed-runner-canary.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/fleet-gate-refresh.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/fork-pr-gate.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/gem-delivery-controller-activation.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/gem-publisher-commission.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/github-ai-dispatcher.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/github-ai-orchestrator.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/golden-path-prod-autofix.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ha-ci-remediator-poke.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/help-center-recertification.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/hermes-cli-worker.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-ci.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-signing-bootstrap.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-testflight.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/jovie-agent-release.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/legacy-human-hold-scrub.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/linear-sync-on-merge.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/linear-triage-assessment.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/m2-revenue-path-canary.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/main-autofix.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/main-ci-health-monitor.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/merge-queue-ruleset-verify.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/neon-ephemeral-branch-cleanup.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/neon-scheduled-cleanup.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/nightly-testing-agent.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/nightly-tests.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/node-runtime-compatibility.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/node-runtime-freshness.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/npm-publish.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/observability-issue.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/postdeploy-probes.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-conflict-handler.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-preparation-canary.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-size-guard-label-override.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-size-guard.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-targets-main.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/pr-visual-review.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/production-continuity.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/production-controller-health.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/production-controller.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/production-marker-recovery.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/production-release.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/reusable-ci-lint.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/rolling-ci-dispatch.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/runner-autoscaler-canary.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/runner-health-monitor.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/runner-heartbeat.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/runner-isolation-smoke.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/safe-pr-remediation.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/screenshots.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/security-suppression-audit.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/security.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/sentry-autofix-recurrence.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/sentry-autofix.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/sentry-error-gate.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/slop-gate.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/sonarcloud.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/source-admission-review-signal.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/stuck-draft-autoclose.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/summer-eve-pin.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/symphony-control-release.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/synthetic-monitoring.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/taste-classifier.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/taste-label-guard.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/test-coverage-audit.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/test-flakiness-report.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ui-story-coverage-audit.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/vercel-preview-cleanup.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/visual-a11y.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/visual-regression.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".nvmrc",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/console/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/docs/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/eve-pilot/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/extension/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/macos/MenuMonitor/Package.swift",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/ovie/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/should-i-make/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/web/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/action-contracts/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/agent-transport-contracts/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/audio-contracts/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/auth-routing/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/extension-contracts/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/jovie-cli/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/ui/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "scripts/symphony/codex-cli/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "tools/shipping-menu-bar/Package.swift",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "workers/observability-ingest/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/repository-docs-shadow.yml",
+      "purpose": "Nonblocking parity qualification"
+    },
+    {
+      "path": "canon/OPERATING_SYSTEM.md",
+      "purpose": "Company canon; review portable repository contract after changes"
+    },
+    {
+      "path": "canon/ENGINEERING.md",
+      "purpose": "Company engineering canon; review portable repository contract after changes"
+    },
+    {
+      "path": "canon/FLEET.md",
+      "purpose": "Company fleet canon; review portable repository contract after changes"
+    },
+    {
+      "path": "docs/company/REPOSITORY_SOURCE_CONTRACT.md",
+      "purpose": "Portable shared source; independently update pinned consumers after review"
+    }
+  ],
+  "imports": [
+    {
+      "repository": "JovieInc/ci",
+      "revision": "285fb2e0e27e9ba8a63566e8ca71b3807479950b",
+      "path": "scripts/repository_docs.py",
+      "destination": "scripts/repository_docs.py",
+      "sha256": "578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43"
+    },
+    {
+      "repository": "JovieInc/ci",
+      "revision": "285fb2e0e27e9ba8a63566e8ca71b3807479950b",
+      "path": "tests/test_repository_docs.py",
+      "destination": "tests/test_repository_docs.py",
+      "sha256": "9cb660d8c2fa145b17cc04e522a9e692ff8131f6126e6a584527ccbc3d3fbe80"
+    },
+    {
+      "repository": "JovieInc/ci",
+      "revision": "285fb2e0e27e9ba8a63566e8ca71b3807479950b",
+      "path": "LICENSE",
+      "destination": "docs/company/CI_TOOL_LICENSE",
+      "sha256": "c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143"
+    }
+  ],
+  "output": "docs/REPOSITORY_SOURCES.md"
+}

@@ -81,7 +81,7 @@ canonical tokens and generated files as sensitive implementation surfaces.
 
 Use the real runner and test selector for changed behavior. Add meaningful
 regression/failure-path tests and current coverage evidence for executable changes.
-Documentation-only changes use policy, link, generation, and context evals; they
+Docs use [parity](docs/DOCUMENTATION.md), policy, link and context evals; they
 must not be presented as live model or UI proof. UI changes require state coverage
 and layout stability checks; see DESIGN.md for bounded disclosure exceptions.
 

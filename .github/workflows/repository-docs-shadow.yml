@@ -1,0 +1,22 @@
+name: Repository documentation shadow
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parity:
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install 'coverage>=7.6,<8'
+      - run: python3 -m coverage run --branch --include=scripts/repository_docs.py -m unittest discover -s tests -p test_repository_docs.py -v
+      - run: python3 -m coverage report --show-missing --fail-under=100
+      - run: python3 scripts/repository_docs.py
