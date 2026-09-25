@@ -1416,6 +1416,10 @@ A changed fingerprint requires review of its related documentation; it does not 
 ```
 
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
+- `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5`)
+- `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120`)
+- `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61`)
+- `docs/company/REPOSITORY_SOURCE_CONTRACT.md` — Portable shared source; independently update pinned consumers after review (SHA-256 `f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f`)
 
 ## Pinned shared sources
 

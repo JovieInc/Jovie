@@ -490,6 +490,22 @@
     {
       "path": ".github/workflows/repository-docs-shadow.yml",
       "purpose": "Nonblocking parity qualification"
+    },
+    {
+      "path": "canon/OPERATING_SYSTEM.md",
+      "purpose": "Company canon; review portable repository contract after changes"
+    },
+    {
+      "path": "canon/ENGINEERING.md",
+      "purpose": "Company engineering canon; review portable repository contract after changes"
+    },
+    {
+      "path": "canon/FLEET.md",
+      "purpose": "Company fleet canon; review portable repository contract after changes"
+    },
+    {
+      "path": "docs/company/REPOSITORY_SOURCE_CONTRACT.md",
+      "purpose": "Portable shared source; independently update pinned consumers after review"
     }
   ],
   "imports": [
