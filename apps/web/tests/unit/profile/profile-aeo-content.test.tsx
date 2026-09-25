@@ -375,6 +375,33 @@ describe('Profile AEO content', () => {
     ).toContain('description-identity-missing');
   });
 
+  it('treats a dot in the artist name as a literal character', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'A.B',
+        handle: 'ab',
+        tagline: 'Producer',
+        career_highlights: 'A.B plays clubs.',
+      },
+      now,
+    });
+
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const dottedAsAnyChar: ProfileAeoContentModel = {
+      ...content,
+      descriptionBlocks: content.descriptionBlocks.map(block => ({
+        ...block,
+        text: block.text.replaceAll('A.B', 'AxB'),
+      })),
+    };
+
+    expect(
+      validateProfileAeoContent(dottedAsAnyChar).map(issue => issue.code)
+    ).toContain('description-identity-missing');
+  });
+
   it('preserves accepted source spans around unsupported claims', () => {
     const content = buildProfileAeoContent({
       artist: {
