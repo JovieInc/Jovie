@@ -670,9 +670,14 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue(os.access(destination, os.X_OK))
         else:
             self.assertEqual(applied.returncode, 2)
-            self.assertIn("NOT_EXACT_MAIN", combined)
+            # Shallow PR checkouts have no origin/main. Both refusals
+            # exit 2 before any copy; neither may replace drifted bytes.
+            self.assertTrue(
+                "NOT_EXACT_MAIN" in combined or "ORIGIN_MAIN_UNAVAILABLE" in combined,
+                combined,
+            )
             self.assertEqual(destination.read_text(encoding="utf-8"), "drift\n")
-        self.assertNotIn(str(Path.home()), combined)
+        self.assertNotIn(str(self.real), combined)
         both = self.run_installer("--check", "--apply")
         self.assertEqual(both.returncode, 2)
 
