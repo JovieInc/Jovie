@@ -130,4 +130,42 @@ describe('resolveSummerEveCallerOrigin', () => {
     await resolveSummerEveCallerOrigin(input);
     expect(failing).toHaveBeenCalledTimes(4);
   });
+
+  it('re-reads a promoted alias once inside the TTL when refresh is set', async () => {
+    let deploymentId = 'dpl_cachedA';
+    let now = 1_000;
+    const fetchImpl = installFetch(() =>
+      Response.json(identity({ deploymentId }))
+    );
+    const input = { fetchImpl, now: () => now };
+    await expect(resolveSummerEveCallerOrigin(input)).resolves.toEqual({
+      origin: alias,
+      deploymentId: 'dpl_cachedA',
+    });
+    deploymentId = 'dpl_promotedB';
+    now += 1_000;
+    await expect(resolveSummerEveCallerOrigin(input)).resolves.toEqual({
+      origin: alias,
+      deploymentId: 'dpl_cachedA',
+    });
+    await expect(
+      resolveSummerEveCallerOrigin({ ...input, refresh: true })
+    ).resolves.toEqual({
+      origin: alias,
+      deploymentId: 'dpl_promotedB',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const init = fetchImpl.mock.calls[0]?.[1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('bounds the identity GET with a five second abort', async () => {
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(new AbortController().signal);
+    const fetchImpl = installFetch(() => Response.json(identity()));
+    await resolveSummerEveCallerOrigin({ fetchImpl });
+    expect(timeout).toHaveBeenCalledWith(5_000);
+    timeout.mockRestore();
+  });
 });

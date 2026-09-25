@@ -44,13 +44,21 @@ const PENDING_RECOVERY_TEXT =
 const BLOCKING_RECOVERY_TEXT =
   'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.';
 
-function assertExpectedEveDeployment(
+async function verifiedDeploymentId(
   response: Response,
-  expected: string
-): void {
-  if (response.headers.get('x-jovie-eve-deployment-id') !== expected) {
+  expected: string,
+  refresh: () => Promise<string>
+): Promise<string> {
+  const observed = response.headers.get('x-jovie-eve-deployment-id');
+  if (observed === expected) return expected;
+  let live: string;
+  try {
+    live = await refresh();
+  } catch {
     throw new Error('unverified_eve_deployment');
   }
+  if (observed === live) return live;
+  throw new Error('unverified_eve_deployment');
 }
 
 function boundedMigrationHistory(
@@ -108,12 +116,22 @@ export function createEveSummerSpeaker(
       try {
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
         if (!input.principalHash) throw new Error('founder_principal_required');
+        const pinnedOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
+        const pinnedDeploymentId =
+          env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
         const target = await resolveSummerEveCallerOrigin({
-          pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
-          pinnedDeploymentId:
-            env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
+          pinnedOrigin,
+          pinnedDeploymentId,
         });
-        const deploymentId = target.deploymentId;
+        let deploymentId = target.deploymentId;
+        const refreshDeploymentId = async () =>
+          (
+            await resolveSummerEveCallerOrigin({
+              pinnedOrigin,
+              pinnedDeploymentId,
+              refresh: true,
+            })
+          ).deploymentId;
         const rawBody = JSON.stringify({
           eventId,
           conversationId: 'summer-session-current',
@@ -133,7 +151,11 @@ export function createEveSummerSpeaker(
           signal: input.signal,
           body: rawBody,
         });
-        assertExpectedEveDeployment(response, deploymentId);
+        deploymentId = await verifiedDeploymentId(
+          response,
+          deploymentId,
+          refreshDeploymentId
+        );
         let admission = await body(response);
         if (response.status === 409 && admission.code === 'conversation_busy') {
           const blocking = blockingEventSchema.safeParse(
@@ -158,7 +180,11 @@ export function createEveSummerSpeaker(
               },
             }
           );
-          assertExpectedEveDeployment(blockingResponse, deploymentId);
+          deploymentId = await verifiedDeploymentId(
+            blockingResponse,
+            deploymentId,
+            refreshDeploymentId
+          );
           const blockingTerminal = await body(blockingResponse);
           if (!blockingResponse.ok) {
             yield {
@@ -181,7 +207,11 @@ export function createEveSummerSpeaker(
             signal: input.signal,
             body: rawBody,
           });
-          assertExpectedEveDeployment(response, deploymentId);
+          deploymentId = await verifiedDeploymentId(
+            response,
+            deploymentId,
+            refreshDeploymentId
+          );
           admission = await body(response);
         }
         const recoverableAdmission =
@@ -219,7 +249,11 @@ export function createEveSummerSpeaker(
             'x-jovie-summer-deployment-id': deploymentId,
           },
         });
-        assertExpectedEveDeployment(terminalResponse, deploymentId);
+        deploymentId = await verifiedDeploymentId(
+          terminalResponse,
+          deploymentId,
+          refreshDeploymentId
+        );
         const terminal = await body(terminalResponse);
         if (!terminalResponse.ok) {
           if (
