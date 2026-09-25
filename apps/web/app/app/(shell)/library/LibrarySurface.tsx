@@ -1353,6 +1353,7 @@ function LibraryImportMenu({
   onSyncSpotify,
   youtubeConnected,
   isImportingYouTube,
+  youtubeImportDisabled = false,
   onImportYouTube,
 }: {
   readonly canSyncSpotify: boolean;
@@ -1360,6 +1361,7 @@ function LibraryImportMenu({
   readonly onSyncSpotify: () => void;
   readonly youtubeConnected: boolean;
   readonly isImportingYouTube: boolean;
+  readonly youtubeImportDisabled?: boolean;
   readonly onImportYouTube?: () => void;
 }) {
   if (!onImportYouTube && !canSyncSpotify) return null;
@@ -1383,7 +1385,10 @@ function LibraryImportMenu({
         className={TOOLBAR_MENU_CONTENT_CLASS}
       >
         {onImportYouTube ? (
-          <DropdownMenuItem onSelect={() => onImportYouTube()}>
+          <DropdownMenuItem
+            disabled={youtubeImportDisabled}
+            onSelect={() => onImportYouTube()}
+          >
             {youtubeConnected ? 'Import YouTube' : 'Connect YouTube'}
           </DropdownMenuItem>
         ) : null}
@@ -1425,6 +1430,7 @@ function LibraryToolbar({
   onSyncSpotify,
   youtubeConnected,
   isImportingYouTube,
+  youtubeImportDisabled = false,
   onImportYouTube,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
@@ -1451,6 +1457,7 @@ function LibraryToolbar({
   readonly onSyncSpotify: () => void;
   readonly youtubeConnected: boolean;
   readonly isImportingYouTube: boolean;
+  readonly youtubeImportDisabled?: boolean;
   readonly onImportYouTube?: () => void;
 }) {
   return (
@@ -1491,6 +1498,7 @@ function LibraryToolbar({
             onSyncSpotify={onSyncSpotify}
             youtubeConnected={youtubeConnected}
             isImportingYouTube={isImportingYouTube}
+            youtubeImportDisabled={youtubeImportDisabled}
             onImportYouTube={onImportYouTube}
           />
           <SortDropdown sort={sort} onSort={onSort} />
@@ -2569,6 +2577,7 @@ export function LibrarySurface({
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
   youtubeConnected = false,
   isImportingYouTube = false,
+  youtubeImportDisabled = false,
   onImportYouTube,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
@@ -2580,6 +2589,7 @@ export function LibrarySurface({
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
   readonly youtubeConnected?: boolean;
   readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
   readonly onImportYouTube?: () => void;
 }) {
   const router = useRouter();
@@ -3373,6 +3383,7 @@ export function LibrarySurface({
           onSyncSpotify={handleSyncSpotify}
           youtubeConnected={youtubeConnected}
           isImportingYouTube={isImportingYouTube}
+          youtubeImportDisabled={youtubeImportDisabled}
           onImportYouTube={onImportYouTube}
         />
       }
