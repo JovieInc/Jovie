@@ -2170,6 +2170,83 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.reason).toContain('infrastructure-recovery retry');
   });
 
+  it('spends the single unclassified retry per head across bases and time', () => {
+    // Live #18287 (2026-09-24): the unchanged head failed four merge-group
+    // attempts in 40 minutes. Counting only exact-current-base failures plus a
+    // five-minute cooldown re-enqueued it after every ejection.
+    const OTHER_BASE = '40622e96bc1378fac9c9be03e225fa6102d9deac';
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T02:00:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-24T23:41:46.000Z', 'completed', [
+          'Evaluate combined-head checks',
+        ]),
+        groupRun(18287, OTHER_BASE, 'failure', '2026-09-24T23:57:01.000Z', 'completed', [
+          'Join exact lane results',
+        ]),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('retry is spent');
+    expect(decision.evidence).toMatchObject({
+      failureClass: 'retry-exhausted',
+      failedAttempts: 2,
+      baseSha: OTHER_BASE,
+    });
+  });
+
+  it('does not charge cancelled runs against the single infrastructure retry', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T02:00:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-24T23:41:46.000Z', 'completed', [
+          'Set up job',
+        ]),
+        groupRun(18287, BASE, 'cancelled', '2026-09-24T23:50:00.000Z'),
+        groupRun(18287, NEW_BASE, 'cancelled', '2026-09-24T23:55:00.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.evidence).toMatchObject({
+      failureClass: 'unclassified',
+      failedAttempts: 1,
+    });
+  });
+
+  it('classifies repeated structural ci-fast lane failures as product failures', () => {
+    // #18287's failed step: coverage 99.13% below the 100% threshold.
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T00:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-25T00:03:36.000Z', 'completed', [
+          'Run structural ci-fast lane',
+        ]),
+        groupRun(18287, BASE, 'failure', '2026-09-25T00:19:44.000Z', 'completed', [
+          'Run structural ci-fast lane',
+        ]),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+  });
+
+  it('maps an exhausted retry to the durable product-failure tombstone in drain', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain('"$failure_class" == "retry-exhausted"');
+  });
+
   it('ignores cancelled and in-progress runs and other fronts', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
