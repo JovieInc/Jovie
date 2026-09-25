@@ -58,6 +58,19 @@ describe('fail-open telemetry transport (JOV-6585)', () => {
     expect(fetchCalls).toHaveLength(0);
   });
 
+  it('stays silent when fetch throws before returning a promise', () => {
+    navigatorStub().sendBeacon = undefined;
+    setFetch((() => {
+      throw new TypeError('Failed to construct request');
+    }) as unknown as typeof fetch);
+    const onError = vi.fn();
+
+    expect(
+      postJsonBeacon('/api/profile/view', { handle: 'artist' }, onError)
+    ).toBe(false);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
   it('stays silent when sendBeacon is blocked and the keepalive fetch rejects (offline)', async () => {
     navigatorStub().sendBeacon = undefined;
     setFetch(vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
