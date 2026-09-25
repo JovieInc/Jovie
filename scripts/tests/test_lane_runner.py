@@ -429,7 +429,9 @@ class FixRedTest(unittest.TestCase):
     def test_claim_records_attempt_before_work(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
-            [self.pr(), {**self.pr(number=6), "headRefName": "claude/x"}]))
+            [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
+             {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
+             {**self.pr(number=6), "headRefName": "claude/x"}]))
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             try:

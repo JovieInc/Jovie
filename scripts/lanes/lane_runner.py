@@ -462,7 +462,9 @@ def claim_red_pr(host: Host, name: str) -> dict | None:
     """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
                  "--json", "number,title,headRefName,headRefOid,statusCheckRollup"])
-    prs = [pr for pr in json.loads(listed.stdout or "[]") if pr["headRefName"].startswith(f"{name}/")]
+    # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
+    own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
+    prs = [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     pr = red_pr(prs, attempts)
