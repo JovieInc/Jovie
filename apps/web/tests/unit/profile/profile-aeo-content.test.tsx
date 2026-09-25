@@ -990,6 +990,7 @@ describe('Profile AEO content', () => {
       artistProfileId: `profile-collaborator-${position}`,
       profileIsPublic: true,
       profileIsClaimed: false,
+      profileUsername: `collaborator-${position}`,
       creditName: null,
       role: 'main_artist' as const,
       releaseDate: new Date(`2026-0${position + 1}-01T00:00:00.000Z`),
