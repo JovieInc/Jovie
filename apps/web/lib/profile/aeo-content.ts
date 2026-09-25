@@ -1028,7 +1028,7 @@ export function buildProfileAeoFaqStructuredData(
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 function containsArtistIdentity(value: string, artistName: string): boolean {
@@ -1037,7 +1037,7 @@ function containsArtistIdentity(value: string, artistName: string): boolean {
   if (!normalizedValue || !normalizedName) return false;
 
   const identityPattern = new RegExp(
-    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\\p{L}\\p{N}])`,
+    String.raw`(^|[^\p{L}\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\p{L}\p{N}])`,
     'iu'
   );
   return identityPattern.test(normalizedValue);
