@@ -2175,11 +2175,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-name-search__submit {
-  font-family:
-    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
-  font-size: 14px;
   font-weight: 510;
-  padding-inline: var(--space-4);
 }
 
 .homepage-name-search__results {
@@ -5684,7 +5680,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Center the composer in its column: the dock's utility padding comes off so
    the surface and its caption share the same edges. */
-.homepage-opportunity-section__demo [aria-label="Jovie AI Composer Demo"]
+.homepage-opportunity-section__demo
+  [aria-label="Jovie AI Composer Demo"]
   > div:last-child {
   padding: 0;
 }
@@ -6197,7 +6194,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Deliberate hierarchy, no glow: the recommended tier gets a flat surface
    shift and a filled badge; everything else stays on surface-0. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card[data-recommended="true"] {
   background: var(--system-b-bg-surface-1);
 }
@@ -6248,7 +6246,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* Price scale: large quiet figure, hushed cadence suffix. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__price {
   margin: var(--space-5) 0 0;
   color: var(--color-text-primary-token);
@@ -6270,7 +6269,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Feature rhythm: a flat seam separates the list from the CTA, checks sit
    one tone quieter than the line copy. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__features {
   gap: var(--space-3);
   margin: var(--space-6) 0 0;

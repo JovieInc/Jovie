@@ -124,10 +124,32 @@ describe('homepage hero contract (JOV-5864)', () => {
 
   it('keeps Find me typography on the canonical marketing button contract', () => {
     const css = readHeroCss();
-
-    expect(css).toMatch(
-      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+    const buttonSource = readFileSync(
+      path.join(webRoot, '../../packages/ui/atoms/button.tsx'),
+      'utf8'
     );
+    const heroSource = readFileSync(
+      path.join(webRoot, 'components/features/home/HeroSpotifySearch.tsx'),
+      'utf8'
+    );
+    const textButtonClasses =
+      buttonSource.match(/const TEXT_BUTTON_CLASSES =\s*'([^']+)'/)?.[1] ?? '';
+    const submitBlock =
+      css.match(/\.homepage-name-search__submit\s*\{([\s\S]*?)\}/)?.[1] ?? '';
+
+    expect(textButtonClasses).toContain('min-h-7');
+    expect(textButtonClasses).toContain('px-2.5');
+    expect(textButtonClasses).toContain('text-xs');
+    expect(buttonSource).toContain('marketing: TEXT_BUTTON_CLASSES');
+    expect(buttonSource).toContain('[font-weight:var(--font-weight-medium)]');
+    expect(heroSource).toContain("size='marketing'");
+    expect(heroSource).toContain(
+      "className='homepage-name-search__submit shrink-0'"
+    );
+    expect(submitBlock).toMatch(/font-weight:\s*510;/);
+    expect(submitBlock).not.toMatch(/font-family\s*:|satoshi/i);
+    expect(submitBlock).not.toMatch(/font-size\s*:/);
+    expect(submitBlock).not.toMatch(/padding(?:-inline)?\s*:/);
   });
 
   it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
