@@ -4365,24 +4365,37 @@ jobs:
           persist-credentials: false
 
       - name: Fetch base-branch history
-        # Diff bases need only HEAD's full ancestry plus origin/<base>:
-        # pull_request origin/<base>...HEAD, merge_group base_sha, push
-        # event.before, and guardrail merge-base with origin/<base>.
-        # A full-depth checkout also fetched every branch and tag (~4k ref
-        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # Exact-head coverage reads history only through the changed-line
+        # ratchet: `git diff <base>...<head> -- apps/web` in
+        # scripts/lib/changed-test-coverage.mjs. That needs HEAD's full
+        # commit and tree ancestry (for the merge base) plus the apps/web
+        # blobs the diff touches, not every historical blob. A plain
+        # --unshallow downloaded ~1.5 GiB of history blobs (~47s on the
+        # hosted runner). --filter=blob:none keeps every commit and tree, so
+        # merge-base and diff output are identical, and fetches in ~5s.
+        # persist-credentials is false, so the ratchet's blobs are prefetched
+        # here with the one-shot auth header, then the same diff is replayed
+        # with lazy fetching disabled to prove later steps need no promisor
+        # fetch. Unit shards already run the suite on a blob:none checkout.
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
+          GIT_NO_LAZY_FETCH=1 git diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
 
       - name: Verify exact coverage head and diff base
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         env:
+          GIT_NO_LAZY_FETCH: '1'
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
