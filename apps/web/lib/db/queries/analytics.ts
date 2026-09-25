@@ -1,7 +1,21 @@
 import { and, sql as drizzleSql, eq, gte, lte } from 'drizzle-orm';
-import { computeCaptureRate } from '@/lib/analytics/metrics';
+import {
+  buildEvidenceReceiptSet,
+  buildMetricReceipt,
+  certifiedRateOrUnavailable,
+  type EvidenceAvailability,
+  type EvidenceLimitationCode,
+  type MetricReceipt,
+  measuredAvailability,
+  resolveEvidenceWindow,
+} from '@/lib/analytics/evidence-receipt';
+import {
+  computeCaptureRate,
+  METRICS_CONTRACT_VERSION,
+} from '@/lib/analytics/metrics';
 import {
   RECENT_ACTIVITY_RANGE,
+  resolveRangeStart,
   resolveRangeStartOrEpoch,
 } from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
@@ -60,8 +74,15 @@ export async function getUserDashboardAnalytics(
   {
     // Canonical window semantics: rolling N × 24h windows ending at query
     // time, resolved by @/lib/analytics/time-range so every surface agrees.
-    const startDate = resolveRangeStartOrEpoch(range);
-    const recentThreshold = resolveRangeStartOrEpoch(RECENT_ACTIVITY_RANGE);
+    // One window + one as-of per request: the SAME resolved bounds feed the
+    // SQL comparisons and the evidence receipts (JOV-6582).
+    const now = new Date();
+    const rangeStart = resolveRangeStart(range, now);
+    const startDate = rangeStart ?? resolveRangeStartOrEpoch(range, now);
+    const recentThreshold = resolveRangeStartOrEpoch(
+      RECENT_ACTIVITY_RANGE,
+      now
+    );
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );
@@ -70,21 +91,41 @@ export async function getUserDashboardAnalytics(
     // because (1) member visits predate the daily aggregate table, (2) seed scripts
     // write independent random values, and (3) other write paths (e.g. short-link
     // scans) increment member visits without daily_profile_views.
+    //
+    // Grain note (surfaced on the receipt, not silently absorbed): the lower
+    // bound is DATE-only (view_date >= startDate's UTC date) because the
+    // source table buckets per calendar day — it cannot express intraday
+    // precision. Clicks/events compare against the full timestamp. Both use
+    // the same resolved window; the receipt's `grain` + `limitation` fields
+    // carry the difference.
+    const viewsDateBound = startDate.toISOString().slice(0, 10);
     const totalViewsSelect = hasDailyProfileViews
       ? drizzleSql`(
           select coalesce(sum(${dailyProfileViews.viewCount}), 0)
           from ${dailyProfileViews}
           where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
-            and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
+            and ${dailyProfileViews.viewDate} >= ${viewsDateBound}
         )`
       : drizzleSql`0`;
+    // Missing daily_profile_views = the view source is unavailable. The value
+    // must NOT read as a measured zero (JOV-6582: missing source returns a
+    // typed state, a successfully measured zero remains zero).
+    const viewsAvailability: EvidenceAvailability = hasDailyProfileViews
+      ? 'measured_zero'
+      : 'unavailable';
+    const viewsLimitations: EvidenceLimitationCode[] = hasDailyProfileViews
+      ? ['source_grain_daily']
+      : ['source_table_missing'];
     // Consolidated dashboard analytics into one SQL round trip.
     // Bot traffic is filtered via is_bot = false (column is NOT NULL since Wave 4a migration).
     // Cities, countries, and referrers are sourced from audience_members (visit data)
     // rather than click_events, so geo data appears even when visitors don't click links.
     // Top-list aggregates are cached for 5 minutes (JOV-1270).
+    // Cache key accounts for tenant, view, range AND the metrics contract
+    // version — a definition-version bump rotates the key so cached results
+    // never serve receipts under an old definition.
     const aggregates = await cacheQuery(
-      `analytics:dashboard:${creatorProfile.id}:${range}`,
+      `analytics:dashboard:${creatorProfile.id}:${range}:${view}:${METRICS_CONTRACT_VERSION}`,
       () =>
         dashboardQuery(async () => {
           type AggRow = {
@@ -234,12 +275,95 @@ export async function getUserDashboardAnalytics(
     const uniqueViews = Number(aggregates?.unique_views ?? 0);
     const subscribers = Number(aggregates?.subscribers ?? 0);
 
+    // ─── Evidence receipts (JOV-6582) ───────────────────────────────────
+    // Built from the SAME aggregates the response fields use — receipts are
+    // a lens over the measured values, never a second computation. The
+    // window/as-of/scope are resolved once per request.
+    const totalClicks = Number(aggregates?.total_clicks ?? 0);
+    const uniqueUsers = Number(aggregates?.unique_users ?? 0);
+
+    const evidenceContext = {
+      profileId: creatorProfile.id,
+      rangeEnd: now,
+      resolvedRangeStart: rangeStart,
+      sourceWatermark: now,
+    } as const;
+    const evidenceWindow = resolveEvidenceWindow(now, rangeStart);
+
+    const viewsLimitationDetail = hasDailyProfileViews
+      ? 'Profile views come from a date-bucketed source; the window lower bound is the start date (UTC), so values are not intraday-precise.'
+      : 'daily_profile_views source is missing; profile_views cannot be measured and the reported value is NOT a measured zero.';
+
+    const metricReceipts: MetricReceipt[] = [
+      buildMetricReceipt(
+        {
+          metric: 'profile_views',
+          value: totalViews,
+          grain: 'daily_bucket',
+          availability: viewsAvailability,
+          limitations: viewsLimitations,
+          limitationDetail: viewsLimitationDetail,
+        },
+        evidenceContext,
+        evidenceWindow
+      ),
+      buildMetricReceipt(
+        {
+          metric: 'unique_users',
+          value: uniqueUsers,
+          grain: 'member_snapshot',
+          availability: measuredAvailability(uniqueUsers),
+        },
+        evidenceContext,
+        evidenceWindow
+      ),
+      buildMetricReceipt(
+        {
+          metric: 'subscribers',
+          value: subscribers,
+          grain: 'event',
+          availability: measuredAvailability(subscribers),
+        },
+        evidenceContext,
+        evidenceWindow
+      ),
+      buildMetricReceipt(
+        {
+          metric: 'total_clicks',
+          value: totalClicks,
+          grain: 'event',
+          availability: measuredAvailability(totalClicks),
+        },
+        evidenceContext,
+        evidenceWindow
+      ),
+      // Rates are certified only when both sides were measured; unknown
+      // denominators emit `unavailable` receipts, never a confident rate.
+      certifiedRateOrUnavailable(
+        'ctr',
+        totalClicks,
+        hasDailyProfileViews ? totalViews : null,
+        evidenceContext,
+        evidenceWindow
+      ),
+      certifiedRateOrUnavailable(
+        'capture_rate',
+        subscribers,
+        uniqueUsers,
+        evidenceContext,
+        evidenceWindow
+      ),
+    ];
+
+    const evidence = buildEvidenceReceiptSet(metricReceipts, evidenceContext);
+
     const base: DashboardAnalyticsResponse = {
       view,
       profile_views: totalViews,
       unique_views: uniqueViews,
       unique_users: Number(aggregates?.unique_users ?? 0),
       subscribers,
+      evidence,
       top_cities: parseJsonArray<{ city: string | null; count: number }>(
         aggregates?.top_cities ?? []
       )
@@ -275,8 +399,6 @@ export async function getUserDashboardAnalytics(
     if (view === 'traffic') {
       return base;
     }
-
-    const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
     // Canonical capture rate derivation — see lib/analytics/metrics.ts.
     const captureRate = computeCaptureRate(subscribers, uniqueUsers);
