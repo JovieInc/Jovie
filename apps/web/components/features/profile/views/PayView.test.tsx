@@ -27,7 +27,10 @@ describe('PayView', () => {
     });
     render(<PayView {...props} />);
     expect(
-      await screen.findByRole('button', { name: 'Pay $10 with Venmo' })
+      await screen.findByRole('button', { name: 'Continue with Venmo' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Enter the amount in Venmo before sending.')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('group', { name: 'Choose a payment method' })
