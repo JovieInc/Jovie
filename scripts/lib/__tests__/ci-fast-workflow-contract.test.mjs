@@ -1169,6 +1169,58 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('runs route-prep behavior coverage for probe and router edits', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = [
+      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+    ]
+      .map(match => match[1])
+      .find(part => part.includes('run-route-prep-coverage-gate'))
+      ?.replace(/^\|/, '');
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/codex-account-probe.sh',
+      'scripts/symphony/symphony-agent-router',
+      'scripts/symphony/tests/codex-account-probe.test.py',
+      'scripts/symphony/tests/symphony-agent-router.test.py',
+      'scripts/symphony/tests/run-route-prep-coverage-gate.py',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    for (const path of [
+      'scripts/symphony/symphony-agent-router-extra',
+      'scripts/symphony/symphony-codex-router',
+      'scripts/symphony/tests/codex-recovery-ci.sh',
+      'README.md',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(1);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
+    );
+    const coverage = WORKFLOW.slice(
+      WORKFLOW.indexOf('  ci-exact-head-coverage:'),
+      WORKFLOW.indexOf('  ci-a11y:')
+    );
+    expect(coverage).toContain("github.event_name == 'pull_request'");
+    expect(coverage).toContain("github.event_name == 'merge_group'");
+    expect(coverage).toContain('has_route_prep_coverage_changes');
+    expect(coverage).toContain(
+      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
+    );
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
+  });
+
   it('runs native queue delivery regressions with coverage for executor changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

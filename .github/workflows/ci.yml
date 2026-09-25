@@ -499,6 +499,7 @@ jobs:
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       has_web_coverage_changes: ${{ steps.coverage-detect.outputs.has_web_coverage_changes || 'false' }}
+      has_route_prep_coverage_changes: ${{ steps.coverage-detect.outputs.has_route_prep_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
@@ -919,6 +920,14 @@ jobs:
           set -euo pipefail
           CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
           test -f "$CHANGED_PATHS"
+          # Route-prep capacity logic is bash plus an embedded interpreter.
+          # Exact-head coverage runs the behavior suites when these paths change.
+          ROUTE_PREP_COVERAGE_PATTERN='^(scripts/symphony/codex-account-probe\.sh|scripts/symphony/symphony-agent-router|scripts/symphony/tests/codex-account-probe\.test\.py|scripts/symphony/tests/symphony-agent-router\.test\.py|scripts/symphony/tests/run-route-prep-coverage-gate\.py)$'
+          if grep -q -E "$ROUTE_PREP_COVERAGE_PATTERN" "$CHANGED_PATHS"; then
+            echo "has_route_prep_coverage_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_route_prep_coverage_changes=false" >> "$GITHUB_OUTPUT"
+          fi
           # Promptfoo eval-infrastructure-only source PRs keep V8 on the combined head.
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
@@ -1563,6 +1572,10 @@ jobs:
           # Conflict event policy, entrypoint, and proof changes always run the
           # existing structural control selector with exact-path coverage.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/pr-conflict-handler\.mjs$|^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$|^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$'
+
+          # Route-prep capacity refresh must run both behavior suites on source
+          # PRs, including test-only edits. Merge groups already force this lane.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
@@ -4205,7 +4218,7 @@ jobs:
       contents: read
     steps:
       - name: Record non-applicable coverage receipt
-        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true' && needs.ci-path-changes.outputs.has_route_prep_coverage_changes != 'true'
         run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
 
       - name: Checkout exact coverage head
@@ -4286,6 +4299,33 @@ jobs:
           wait "$coverage_group"
           coverage_group=''
           trap - EXIT INT TERM
+
+      - name: Checkout exact route-prep coverage head
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact route-prep coverage head
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Setup Node for route-prep behavior suites
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run route-prep behavior coverage
+        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true'
+        run: python3 scripts/symphony/tests/run-route-prep-coverage-gate.py
 
   ci-a11y:
     name: A11y (axe)

@@ -67,6 +67,8 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
 const SCREENSHOT_CATALOG_CONTRACT_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/screenshot-catalog-pr-workflow.test.ts';
+export const ROUTE_PREP_COVERAGE_COMMAND =
+  'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
@@ -768,6 +770,7 @@ export function runStructural(opts = {}) {
 
   const selected = selectedProductLanes();
   const operationsParts = [
+    ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
