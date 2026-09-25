@@ -279,6 +279,10 @@ exit 0
         self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
         self.assertTrue(self.bounded_observation()["healthy"])
         self.workflow.write_bytes(original)
+        router = (Path(E.__file__).parent / "profiles/governor-bounded-codex/WORKFLOW.md").read_bytes()
+        self.workflow.write_bytes(router)
+        self.assertFalse(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original)
         unit = self.root / "governor-restricted.conf"
         body = unit.read_bytes()
         for before, after in [(b"RestartSec=20", b"RestartSec=0"),
@@ -302,6 +306,82 @@ exit 0
         self.assertIn("Restart=always", unit)
         self.assertIn("RestartSec=20", unit)
         self.assertIn("RuntimeMaxSec=infinity", unit)
+
+    def install_codex_fixture(self):
+        source_root = Path(E.__file__).parent / "profiles"
+        workflow = (source_root / "governor-bounded-codex/WORKFLOW.md").read_bytes()
+        bounded = (source_root / "governor-bounded/WORKFLOW.md").read_bytes()
+        self.sources[E.CODEX_PROFILE + "/WORKFLOW.md"] = workflow
+        self.sources[E.BOUNDED_PROFILE + "/WORKFLOW.md"] = bounded
+        self.workflow.write_bytes(workflow)
+        paths = []
+        for name in sorted(E.BOUNDED_OVERRIDES):
+            body = (source_root / "governor-bounded/systemd" / name).read_bytes()
+            self.sources[E.BOUNDED_PROFILE + "/systemd/" + name] = body
+            target = self.root / name
+            target.write_bytes(body)
+            paths.append(str(target))
+        self.fields["DropInPaths"] = " ".join(paths)
+        return workflow
+
+    def codex_observation(self):
+        return E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem,
+                         proc_root=self.proc, now=NOW, profile="governor-bounded-codex")
+
+    def test_codex_profile_matches_governor_bounded_except_router_command(self):
+        root = Path(E.__file__).parent / "profiles"
+        bounded = (root / "governor-bounded/WORKFLOW.md").read_text()
+        codex = (root / "governor-bounded-codex/WORKFLOW.md").read_text()
+        expected = bounded.replace(
+            "  # Native Codex remains OUT. This profile grants no provider execution.\n"
+            "  command: /usr/bin/false\n",
+            "  # Native router with Codex Luna primary. Apps stay disabled.\n"
+            "  command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server\n",
+            1,
+        ).replace(
+            "Native Codex execution is disabled in this profile.",
+            "Native Codex runs through symphony-agent-router with Apps disabled.",
+            1,
+        )
+        self.assertEqual(codex, expected)
+        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', codex)
+        self.assertIn("symphony-five-pr-repair-20260908", codex)
+        self.assertIn("max_retry_attempts: 1", codex)
+        self.assertEqual(codex.count("max_concurrent_agents: 5"), 1)
+        self.assertNotIn("/usr/bin/false", codex)
+        self.assertFalse((root / "governor-bounded-codex/systemd").exists())
+
+    def test_codex_profile_attests_reviewed_install_without_a_separate_dropin_pin(self):
+        original = self.install_codex_fixture()
+        self.assertFalse(self.observe()["healthy"])
+        self.assertFalse(self.bounded_observation()["healthy"])
+        result = self.codex_observation()
+        self.assertTrue(result["healthy"])
+        self.assertEqual(result["configurationProfile"], "governor-bounded-codex")
+        self.assertEqual(result["workflow"]["codex"], "in")
+        self.assertEqual(result["workflow"]["sourceMaxConcurrentAgents"], 5)
+        self.assertEqual(result["workflow"]["installedMaxConcurrentAgents"], 5)
+        self.assertEqual(result["workflow"]["matchMode"], "exact")
+        self.assertEqual({item["name"] for item in result["unitOverrides"]}, E.BOUNDED_OVERRIDES)
+        self.assertTrue(all(item["matches"] for item in result["unitOverrides"]))
+        for path in self.fields["DropInPaths"].split():
+            with self.subTest(missing=path):
+                with mock.patch.dict(self.fields, DropInPaths=self.fields["DropInPaths"].replace(path, "")):
+                    self.assertFalse(self.codex_observation()["healthy"])
+        self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
+        lowered = self.codex_observation()
+        self.assertTrue(lowered["healthy"])
+        self.assertEqual(lowered["workflow"]["matchMode"], "bounded_concurrency_overlay")
+        self.assertEqual(lowered["workflow"]["installedMaxConcurrentAgents"], 1)
+        for replacement in (
+            original.replace(b"agents: 5", b"agents: 6"),
+            original.replace(E.CODEX_IN_COMMAND.encode(), b"command: /usr/bin/false"),
+            original.replace(b"symphony-five-pr-repair-20260908", b"symphony"),
+            original.replace(b'project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', b'project_slug: "other"'),
+        ):
+            with self.subTest(change=replacement[:80]):
+                self.workflow.write_bytes(replacement)
+                self.assertFalse(self.codex_observation()["healthy"])
 
     def test_only_existing_concurrency_overlay_is_accepted(self):
         for value in [1, 41, 128]:
@@ -488,6 +568,13 @@ exit 0
         result = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--profile\ngovernor-bounded\n', result.stdout)
+        (config / 'runner-source.env').write_text(
+            (config / 'runner-source.env').read_text().replace(
+                'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n',
+                'JOVIE_CONFIGURATION_PROFILE=governor-bounded-codex\n'))
+        forwarded = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(forwarded.returncode, 0, forwarded.stderr)
+        self.assertIn('--profile\ngovernor-bounded-codex\n', forwarded.stdout)
         self.assertIn('--source-root\n' + str(mirror) + '\n', result.stdout)
         self.assertIn('--check\n', result.stdout)
         self.assertFalse((self.root / 'gem-workspace/scripts/emit-gem-service-attestation.py').exists())
