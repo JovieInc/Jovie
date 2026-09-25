@@ -41,7 +41,7 @@ function getFirstForwardedHeader(value: string | null): string | null {
   return firstValue || null;
 }
 
-function resolveRequestOrigin(headerStore: Headers): string | null {
+export function resolveRequestOrigin(headerStore: Headers): string | null {
   const host =
     getFirstForwardedHeader(headerStore.get('x-forwarded-host')) ??
     getFirstForwardedHeader(headerStore.get('host'));
@@ -50,12 +50,12 @@ function resolveRequestOrigin(headerStore: Headers): string | null {
   const forwardedProto = getFirstForwardedHeader(
     headerStore.get('x-forwarded-proto')
   )?.toLowerCase();
-  const protocol =
-    forwardedProto === 'http' || forwardedProto === 'https'
-      ? forwardedProto
-      : host.startsWith('localhost') || host.startsWith('127.')
-        ? 'http'
-        : 'https';
+  let protocol = 'https';
+  if (forwardedProto === 'http' || forwardedProto === 'https') {
+    protocol = forwardedProto;
+  } else if (host.startsWith('localhost') || host.startsWith('127.')) {
+    protocol = 'http';
+  }
 
   return `${protocol}://${host}`;
 }
