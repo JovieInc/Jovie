@@ -4,6 +4,16 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: vi.fn(),
 }));
 
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_test',
+  })),
+  SummerPinInvalidError: class SummerPinInvalidError extends Error {
+    readonly code = 'summer_pin_invalid';
+  },
+}));
+
 import { MemoryOperatingStore } from './mcp/store';
 import { ovieSummerTurnId } from './summer-conversation';
 import { createEveSummerSpeaker } from './summer-eve-speaker';
@@ -161,18 +171,14 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
-  it('rejects an unconfigured or mismatched Eve deployment identity', async () => {
-    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_expected');
-    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
-    expect(fetchShadow).toHaveBeenCalledOnce();
-
+  it('rejects a response from a different Eve deployment', async () => {
     fetchShadow.mockReset().mockResolvedValueOnce(
       new Response('{}', {
-        headers: { 'x-jovie-eve-deployment-id': 'dpl_expected' },
+        headers: { 'x-jovie-eve-deployment-id': 'dpl_other' },
       })
     );
-    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', '');
     expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(fetchShadow).toHaveBeenCalledOnce();
   });
   it('fails closed on wrong event, principal, deployment, session, model, or malformed terminal response', async () => {
     for (const bad of [

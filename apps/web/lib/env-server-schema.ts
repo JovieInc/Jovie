@@ -1,6 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 import {
+  ovieSummerEveDeploymentOriginSchema,
+  ovieSummerEveExpectedDeploymentIdSchema,
+} from './ovie/summer-eve-pin-schema';
+import {
   getDatabaseUrlErrorMessage,
   isDatabaseUrlValid,
 } from './utils/database-url-validator';
@@ -133,22 +137,15 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
-  OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: z
-    .string()
-    .url()
-    .regex(
-      /^https:\/\/(?:jovie-eve-shadow|summer-operations)-[a-z0-9]+-jovie\.vercel\.app$/u,
-      'Must be an immutable Summer deployment URL in the Jovie team'
-    )
-    .optional(),
-  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: z
-    .string()
-    .regex(/^dpl_[A-Za-z0-9]+$/u)
-    .optional(),
+  /** Advisory pin. Runtime calls `https://summer.jov.ie`, not this origin. */
+  OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: ovieSummerEveDeploymentOriginSchema,
+  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID:
+    ovieSummerEveExpectedDeploymentIdSchema,
   /**
    * Protection Bypass for Automation secret from the jovie-eve-shadow
-   * project. Sent only as `x-vercel-protection-bypass` to the immutable
-   * deployment origin. This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
+   * project (the production Summer project). Sent only as
+   * `x-vercel-protection-bypass` to `https://summer.jov.ie`.
+   * This is not `VERCEL_AUTOMATION_BYPASS_SECRET`.
    */
   OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET: z.string().optional(),
 

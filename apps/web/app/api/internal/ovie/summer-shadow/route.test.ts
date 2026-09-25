@@ -44,10 +44,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv(
-      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
-    );
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://summer.jov.ie');
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue('test-vercel-oidc-token');
   });
@@ -107,7 +104,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
     expect(String(url)).toBe(
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/events'
+      'https://summer.jov.ie/ovie/v1/summer-shadow/events'
     );
     expect(init).toMatchObject({
       method: 'POST',
@@ -306,7 +303,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       typeof globalThis.fetch
     >;
     expect(String(streamUrl)).toBe(
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
+      'https://summer.jov.ie/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
     );
     expect(streamInit).toMatchObject({
       headers: {
@@ -374,7 +371,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({ consumption: 'UNKNOWN' });
     expect(String(fetch.mock.calls[0]?.[0])).toBe(
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/commercial/event-0001'
+      'https://summer.jov.ie/ovie/v1/summer-shadow/commercial/event-0001'
     );
     expect(
       (

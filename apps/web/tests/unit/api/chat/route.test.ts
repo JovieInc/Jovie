@@ -54,6 +54,13 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: hoisted.fetchSummerShadowMock,
 }));
 
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_test',
+  })),
+}));
+
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: hoisted.getOvieOperatingStoreMock,
 }));

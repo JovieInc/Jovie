@@ -9,8 +9,11 @@ import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-produ
 import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import {
+  resolveSummerEveCallerOrigin,
+  SummerPinInvalidError,
+} from '@/lib/ovie/summer-production-pin';
+import {
   eveShadowTransportHeaders,
-  getEveShadowOrigin,
   InvalidEveProtectionBypassSecretError,
 } from '@/lib/ovie/summer-shadow-client';
 import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
@@ -352,9 +355,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   let destination: URL;
   try {
-    destination = new URL(EVE_BOTTLENECK_PATH, getEveShadowOrigin());
-  } catch {
-    return json({ ok: false, code: 'eve_destination_unavailable' }, 503);
+    const target = await resolveSummerEveCallerOrigin({
+      pinnedOrigin: env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim(),
+      pinnedDeploymentId: env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim(),
+    });
+    destination = new URL(EVE_BOTTLENECK_PATH, target.origin);
+  } catch (error) {
+    if (error instanceof SummerPinInvalidError) {
+      return json({ ok: false, code: 'summer_pin_invalid' }, 503);
+    }
+    throw error;
   }
 
   const body = signSummerBottleneckSnapshot(
