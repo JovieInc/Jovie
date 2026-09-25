@@ -288,10 +288,6 @@ describe('Vercel function config', () => {
         callees: ['fs.existsSync', 'fs.readFileSync'],
       },
       {
-        file: 'apps/web/components/features/home/RecentlyShippedSection.tsx',
-        callees: ['fs.existsSync', 'fs.readFileSync'],
-      },
-      {
         file: 'apps/web/lib/testing/quarantine-ledger.server.ts',
         callees: ['resolve', 'readFileSync'],
       },
