@@ -4,10 +4,14 @@ The repository owns README/AGENTS, local manifests, runtime declarations and
 release workflows. [The portable company contract](company/REPOSITORY_SOURCE_CONTRACT.md)
 is shared source policy; it does not change the local stack or release gates.
 
-`repository-docs.json` selects source-owned entry points, local manifests and
-workflows, generated output and immutable shared imports. The generated
+`repository-docs.json` selects source-owned entry points, local manifests,
+generated output and immutable shared imports. The generated
 [repository source map](REPOSITORY_SOURCES.md) renders package facts directly and
 fingerprints other sources. Review related prose whenever a fingerprint changes.
+GitHub workflows are deliberately not fingerprinted: they are the most frequently
+edited files, so a single projection hashing all of them went stale on nearly every
+workflow merge and made concurrent CI PRs chase regeneration commits. Workflow
+prose ownership stays with `.github/workflows/README.md` and `docs/PR_FLOW.md`.
 This is source evidence, not proof of deployment, current credentials or runtime.
 
 From the repository root (Python 3.9+; no network or secrets):

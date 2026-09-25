@@ -483,6 +483,46 @@ describe('merge-group combined-tree payload policy', () => {
       `${overBudget} bytes of tracked regular files exceeds the ${HYGIENE_LIMITS.maxTrackedBytes}-byte combined-tree budget`
     );
   });
+
+  it('warns on the merge_group run when the combined tree is above 95% of budget', async () => {
+    const nearBudget = HYGIENE_LIMITS.maxTrackedBytes - 260;
+    const logs = [];
+    await runPolicy({
+      argv: ['--policy=size'],
+      env: { GH_TOKEN: 'test-token' },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: line => logs.push(line),
+      now: () => 1,
+      async request(path) {
+        if (path.endsWith(`/git/commits/${FIRST}`)) {
+          return { data: { sha: FIRST, tree: { sha: TREE } } };
+        }
+        if (path.includes('/git/trees/')) {
+          return {
+            data: treePayload([
+              treeEntry('100644', 'blob', nearBudget, 'payload.bin'),
+            ]),
+          };
+        }
+        if (path.includes('/compare/')) {
+          return { data: comparison([commit(FIRST, BASE, 101)]) };
+        }
+        if (path.endsWith('/pulls/101')) {
+          return {
+            data: {
+              number: 101,
+              state: 'open',
+              base: { ref: 'main' },
+              head: { sha: SOURCE_101, repo: { fork: false } },
+              labels: [{ name: 'big-pr' }],
+            },
+          };
+        }
+        throw new Error(`unexpected request: ${path}`);
+      },
+    });
+    expect(logs[0]).toMatch(/^::warning::Combined tree: .*0\.00 MB headroom/);
+  });
 });
 
 describe('merge-group fork policy', () => {

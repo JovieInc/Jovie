@@ -2256,7 +2256,8 @@ front_churn_disposition() {
   failure_class="$(jq -r '.evidence.failureClass // empty' <<<"$decision" 2>/dev/null || true)"
   if [[ "$action" == "block" \
     && ( "$failure_class" == "deterministic-product-check" \
-      || "$failure_class" == "repeated-product-check" ) ]]; then
+      || "$failure_class" == "repeated-product-check" \
+      || "$failure_class" == "retry-exhausted" ) ]]; then
     echo "block-product"
   elif [[ "$action" == "block" ]]; then
     echo "block-transient"

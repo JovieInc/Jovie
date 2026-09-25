@@ -976,7 +976,10 @@ jobs:
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    # Must exceed MERGE_GROUP_ADMISSION_WAIT_MS (6 min) plus setup/checkout so
+    # a still-running required check fails via the helper's diagnostic, not a
+    # hard job cancel.
+    timeout-minutes: 8
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
@@ -1522,8 +1525,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
@@ -1755,8 +1772,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -4229,8 +4260,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+
+      - name: Fetch base-branch history
+        # Diff bases need only HEAD's full ancestry plus origin/<base>:
+        # pull_request origin/<base>...HEAD, merge_group base_sha, push
+        # event.before, and guardrail merge-base with origin/<base>.
+        # A full-depth checkout also fetched every branch and tag (~4k ref
+        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
 
       - name: Verify exact coverage head and diff base
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'

@@ -33,7 +33,12 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
   'success',
   'timed_out',
 ]);
-export const MERGE_GROUP_ADMISSION_WAIT_MS = 90_000;
+// Required external checks can sit queued/in_progress on a busy runner pool for
+// well over a minute (PR Size Guard observed in_progress at attempt 20 of a
+// 90s budget). Poll for most of the job budget instead of failing a healthy
+// queue entry; concluded failures still fail immediately. Keep this below the
+// ci.yml `Merge Group Admission` job timeout with room for setup/checkout.
+export const MERGE_GROUP_ADMISSION_WAIT_MS = 360_000;
 const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 const POLL_INTERVAL_MS = 3_000;
 const MAX_API_REQUEST_MS = 10_000;
@@ -448,6 +453,14 @@ export async function waitForMergeGroupAdmission({
 
   const deadlineMs = now() + maxWaitMs;
   let attempt = 0;
+  let lastGateStatus = null;
+  const failStillPending = () => {
+    fail(
+      `required merge-group checks did not pass within ${maxWaitMs}ms${
+        lastGateStatus ? ` (still pending: ${lastGateStatus})` : ''
+      }`
+    );
+  };
   const readLiveReceipt = async () => {
     const liveEntries = await loadLiveQueueEntries({ ...evidence, deadlineMs });
     const receipt = buildLiveQueueAdmissionReceipt({
@@ -493,7 +506,7 @@ export async function waitForMergeGroupAdmission({
   while (true) {
     attempt += 1;
     if (attempt > 1 && now() >= deadlineMs) {
-      fail(`required merge-group checks did not pass within ${maxWaitMs}ms`);
+      failStillPending();
     }
 
     const liveReceipt = await readLiveReceipt();
@@ -560,13 +573,14 @@ export async function waitForMergeGroupAdmission({
       };
     }
 
-    const remainingMs = deadlineMs - now();
-    if (remainingMs <= 0) {
-      fail(`required merge-group checks did not pass within ${maxWaitMs}ms`);
-    }
     const gateStatus = REQUIRED_CHECKS.map(
       (name, index) => `${name}=${states[index].detail}`
     ).join(', ');
+    lastGateStatus = gateStatus;
+    const remainingMs = deadlineMs - now();
+    if (remainingMs <= 0) {
+      failStillPending();
+    }
     onStatus(
       `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
     );
