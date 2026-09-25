@@ -551,6 +551,38 @@ describe('generateMusicStructuredData', () => {
       });
     });
 
+    it('wraps one credited artist into the track-list recording ref', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Wheels Up',
+          slug: 'wheels-up',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'LYNX', handle: 'lynx' }],
+        },
+        ownerCreator,
+        [
+          {
+            title: 'Wheels Up',
+            slug: 'wheels-up',
+            trackNumber: 1,
+            durationMs: 210000,
+          },
+        ]
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const track = musicSchema.track as Record<string, unknown>;
+      const firstItem = (track.itemListElement as Record<string, unknown>[])[0]
+        .item as Record<string, unknown>;
+
+      expect(firstItem.byArtist).toEqual({
+        '@id': 'https://jov.ie/lynx#musicgroup',
+      });
+    });
+
     it('points track-list recording refs at the credited artist, not the owner', () => {
       const data = generateMusicStructuredData(
         {
