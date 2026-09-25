@@ -1,8 +1,5 @@
 import {
-  ovieSummerEveDeploymentOriginSchema,
-  ovieSummerEveExpectedDeploymentIdSchema,
-} from './summer-eve-pin-schema';
-import {
+  isSourceBoundProductionSummer,
   readSummerRuntimeIdentity,
   SUMMER_PRODUCTION,
 } from './summer-production-identity';
@@ -11,9 +8,10 @@ const PIN_CACHE_TTL_MS = 10 * 60 * 1000;
 const IDENTITY_FETCH_TIMEOUT_MS = 5_000;
 
 export type SummerPinExpectation = {
-  projectId: string;
+  origin: typeof SUMMER_PRODUCTION.productionOrigin;
+  projectId: typeof SUMMER_PRODUCTION.projectId;
   environment: 'production';
-  deploymentId: string | null;
+  status: 'source-bound';
 };
 
 export class SummerPinInvalidError extends Error {
@@ -53,6 +51,15 @@ export function logSummerBridgeEvent(
   process.stderr.write(`${JSON.stringify(entry)}\n`);
 }
 
+function expectation(): SummerPinExpectation {
+  return {
+    origin: SUMMER_PRODUCTION.productionOrigin,
+    projectId: SUMMER_PRODUCTION.projectId,
+    environment: 'production',
+    status: 'source-bound',
+  };
+}
+
 function rejectPin(
   expected: SummerPinExpectation,
   observed: Readonly<Record<string, unknown>>
@@ -77,59 +84,26 @@ async function readIdentityResponse(
   }
 }
 
-function readConfiguredPin(
-  origin: string | undefined,
-  deploymentId: string | undefined
-) {
-  const originText = origin?.trim() ?? '';
-  const idText = deploymentId?.trim() ?? '';
-  const parsedOrigin = ovieSummerEveDeploymentOriginSchema.safeParse(
-    originText.length > 0 ? originText : undefined
-  );
-  const parsedId = ovieSummerEveExpectedDeploymentIdSchema.safeParse(
-    idText.length > 0 ? idText : undefined
-  );
-  return {
-    present: originText.length > 0 || idText.length > 0,
-    origin:
-      parsedOrigin.success && parsedOrigin.data ? parsedOrigin.data : null,
-    deploymentId: parsedId.success && parsedId.data ? parsedId.data : null,
-  };
-}
-
-function isProductionAlias(
-  identity: ReturnType<typeof readSummerRuntimeIdentity>
-): identity is NonNullable<ReturnType<typeof readSummerRuntimeIdentity>> {
-  return (
-    identity?.id === SUMMER_PRODUCTION.serviceId &&
-    identity.projectId === SUMMER_PRODUCTION.projectId &&
-    identity.environment === 'production'
-  );
-}
-
-/** Alias target after production Summer identity. Stale pins are logged. */
+/**
+ * Production Summer after a source-bound identity check. The only origin is
+ * `https://summer.jov.ie`. A mismatch or transport error fails closed.
+ * Configured deployment pins are not read and are not a fallback.
+ */
 export async function resolveSummerEveCallerOrigin(
   input: {
-    pinnedOrigin?: string;
-    pinnedDeploymentId?: string;
     fetchImpl?: typeof fetch;
     now?: () => number;
     /** Skip the TTL cache and re-read the alias identity once. */
     refresh?: boolean;
   } = {}
 ): Promise<SummerEveCallerTarget> {
-  const pin = readConfiguredPin(input.pinnedOrigin, input.pinnedDeploymentId);
   const now = input.now?.() ?? Date.now();
-  const key = `${SUMMER_PRODUCTION.productionOrigin}\n${pin.origin ?? ''}\n${pin.deploymentId ?? ''}`;
+  const key = SUMMER_PRODUCTION.productionOrigin;
   if (!input.refresh && aliasCache?.key === key && aliasCache.expiresAt > now)
     return aliasCache.target;
 
   const fetchImpl = input.fetchImpl ?? globalThis.fetch;
-  const expected = {
-    projectId: SUMMER_PRODUCTION.projectId,
-    environment: 'production' as const,
-    deploymentId: pin.deploymentId,
-  };
+  const expected = expectation();
   let response: Response;
   try {
     response = await fetchImpl(
@@ -148,40 +122,23 @@ export async function resolveSummerEveCallerOrigin(
 
   const payload = await readIdentityResponse(response);
   const identity = readSummerRuntimeIdentity(payload.body);
-  if (!response.ok || !isProductionAlias(identity)) {
+  if (!response.ok || !isSourceBoundProductionSummer(identity)) {
     rejectPin(expected, {
       status: response.status,
       ...(identity
         ? {
+            schema: identity.schema,
             projectId: identity.projectId,
+            teamId: identity.teamId,
             environment: identity.environment,
+            target: identity.target,
+            status: identity.status,
+            sourceRevision: identity.sourceRevision,
+            productionOrigin: identity.productionOrigin,
             deploymentId: identity.deploymentId,
+            blobAuth: identity.blobAuth,
           }
         : {}),
-    });
-  }
-
-  const configuredOrigin = input.pinnedOrigin?.trim() ?? '';
-  const pinMatches =
-    pin.present &&
-    pin.deploymentId === identity.deploymentId &&
-    (configuredOrigin.length === 0 || pin.origin !== null);
-  if (pin.present && !pinMatches) {
-    logSummerBridgeEvent({
-      event: 'summer_pin_invalid',
-      expected: {
-        projectId: SUMMER_PRODUCTION.projectId,
-        environment: 'production',
-        deploymentId: pin.deploymentId,
-        origin: pin.origin,
-      },
-      observed: {
-        origin: SUMMER_PRODUCTION.productionOrigin,
-        projectId: identity.projectId,
-        environment: identity.environment,
-        deploymentId: identity.deploymentId,
-        fallback: 'production_alias',
-      },
     });
   }
 

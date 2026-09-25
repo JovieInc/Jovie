@@ -6,17 +6,21 @@ import {
   SummerPinInvalidError,
 } from './summer-production-pin';
 
-const ORIGIN = 'https://jovie-eve-shadow-abc123-jovie.vercel.app';
-const ID = 'dpl_pinned123';
 const alias = SUMMER_PRODUCTION.productionOrigin;
+const SOURCE_REVISION = 'a'.repeat(40);
 
 function identity(overrides: Record<string, unknown> = {}) {
   return {
+    schema: SUMMER_PRODUCTION.identitySchema,
     id: SUMMER_PRODUCTION.serviceId,
     projectId: SUMMER_PRODUCTION.projectId,
+    teamId: SUMMER_PRODUCTION.teamId,
     environment: 'production',
-    deploymentId: ID,
+    deploymentId: 'dpl_live',
     blobAuth: 'oidc',
+    status: SUMMER_PRODUCTION.sourceBoundStatus,
+    sourceRevision: SOURCE_REVISION,
+    productionOrigin: alias,
     ...overrides,
   };
 }
@@ -29,67 +33,58 @@ describe('resolveSummerEveCallerOrigin', () => {
   afterEach(() => {
     resetSummerProductionPinCache();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
-  it('uses the alias silently when the pin is absent or matches', async () => {
+  it('uses the production domain after a source-bound identity check', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const unpinned = installFetch(() =>
-      Response.json(identity({ deploymentId: 'dpl_live' }))
+    const fetchImpl = installFetch(() =>
+      Response.json(identity({ deploymentId: 'dpl_promoted' }))
     );
-    await expect(
-      resolveSummerEveCallerOrigin({ fetchImpl: unpinned })
-    ).resolves.toEqual({ origin: alias, deploymentId: 'dpl_live' });
-    expect(String(unpinned.mock.calls[0]?.[0])).toBe(
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'legacy-ignored');
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'legacy-ignored');
+    await expect(resolveSummerEveCallerOrigin({ fetchImpl })).resolves.toEqual({
+      origin: alias,
+      deploymentId: 'dpl_promoted',
+    });
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toBe(
       `${alias}/runtime/v1/identity`
     );
-    const matched = installFetch(() => Response.json(identity()));
-    await expect(
-      resolveSummerEveCallerOrigin({
-        pinnedOrigin: ORIGIN,
-        pinnedDeploymentId: ID,
-        fetchImpl: matched,
-      })
-    ).resolves.toEqual({ origin: alias, deploymentId: ID });
+    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  it('logs a stale or malicious pin and still returns the alias', async () => {
+  it('fails closed on a mismatch and does not accept another responder', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const stderr = vi
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(() => true);
-    const stale = installFetch(() =>
-      Response.json(identity({ deploymentId: 'dpl_promoted' }))
-    );
-    await expect(
-      resolveSummerEveCallerOrigin({
-        pinnedOrigin: ORIGIN,
-        pinnedDeploymentId: ID,
-        fetchImpl: stale,
-      })
-    ).resolves.toEqual({ origin: alias, deploymentId: 'dpl_promoted' });
+    const cases = [
+      identity({ status: 'configured-unverified' }),
+      identity({ projectId: 'prj_other' }),
+      identity({ environment: 'preview' }),
+      identity({ target: 'preview' }),
+      identity({ blobAuth: 'static' }),
+      identity({ sourceRevision: 'main' }),
+      identity({ productionOrigin: 'https://evil.test' }),
+      identity({ schema: 'other' }),
+      identity({ teamId: 'team_other' }),
+    ];
+    for (const body of cases) {
+      const fetchImpl = installFetch(() => Response.json(body));
+      await expect(
+        resolveSummerEveCallerOrigin({ fetchImpl })
+      ).rejects.toBeInstanceOf(SummerPinInvalidError);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(String(fetchImpl.mock.calls[0]?.[0])).toBe(
+        `${alias}/runtime/v1/identity`
+      );
+      resetSummerProductionPinCache();
+    }
+    expect(errorSpy).toHaveBeenCalledTimes(cases.length);
     const logged = errorSpy.mock.calls[0]?.[0] as {
       event?: string;
-      observed?: { fallback?: string; deploymentId?: string };
+      observed?: { fallback?: string };
     };
     expect(logged.event).toBe('summer_pin_invalid');
-    expect(logged.observed).toMatchObject({
-      fallback: 'production_alias',
-      deploymentId: 'dpl_promoted',
-    });
-    expect(String(stderr.mock.calls[0]?.[0])).toContain('production_alias');
-    expect(String(stale.mock.calls[0]?.[0])).not.toContain('jovie-eve-shadow');
-    const evil = installFetch(() =>
-      Response.json(identity({ deploymentId: 'dpl_live' }))
-    );
-    await resolveSummerEveCallerOrigin({
-      pinnedOrigin: 'https://evil.example.com',
-      pinnedDeploymentId: 'dpl_evil',
-      fetchImpl: evil,
-    });
-    expect(String(evil.mock.calls[0]?.[0])).toBe(
-      `${alias}/runtime/v1/identity`
-    );
+    expect(logged.observed).not.toHaveProperty('fallback');
   });
 
   it('fails closed without caching a bad alias, and memoizes a good one', async () => {
@@ -99,9 +94,7 @@ describe('resolveSummerEveCallerOrigin', () => {
       reads += 1;
       if (reads === 1) return new Response(null, { status: 404 });
       if (reads === 2) {
-        return Response.json(
-          identity({ projectId: 'prj_other', deploymentId: 'dpl_live' })
-        );
+        return Response.json(identity({ projectId: 'prj_other' }));
       }
       return Response.json(identity({ deploymentId: 'dpl_promoted' }));
     });
@@ -112,12 +105,7 @@ describe('resolveSummerEveCallerOrigin', () => {
       resolveSummerEveCallerOrigin({ fetchImpl: failing })
     ).rejects.toBeInstanceOf(SummerPinInvalidError);
     let now = 1_000;
-    const input = {
-      pinnedOrigin: ORIGIN,
-      pinnedDeploymentId: ID,
-      fetchImpl: failing,
-      now: () => now,
-    };
+    const input = { fetchImpl: failing, now: () => now };
     await expect(resolveSummerEveCallerOrigin(input)).resolves.toEqual({
       origin: alias,
       deploymentId: 'dpl_promoted',
@@ -125,7 +113,7 @@ describe('resolveSummerEveCallerOrigin', () => {
     now += 10 * 60 * 1000 - 1;
     await resolveSummerEveCallerOrigin(input);
     expect(failing).toHaveBeenCalledTimes(3);
-    expect(errorSpy).toHaveBeenCalledTimes(3);
+    expect(errorSpy).toHaveBeenCalledTimes(2);
     now += 1;
     await resolveSummerEveCallerOrigin(input);
     expect(failing).toHaveBeenCalledTimes(4);
@@ -167,5 +155,15 @@ describe('resolveSummerEveCallerOrigin', () => {
     await resolveSummerEveCallerOrigin({ fetchImpl });
     expect(timeout).toHaveBeenCalledWith(5_000);
     timeout.mockRestore();
+  });
+
+  it('fails closed when the identity endpoint is unreachable', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => {
+      throw new Error('offline');
+    });
+    await expect(
+      resolveSummerEveCallerOrigin({ fetchImpl })
+    ).rejects.toBeInstanceOf(SummerPinInvalidError);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });
