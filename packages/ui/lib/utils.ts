@@ -20,6 +20,13 @@ const mergeTailwindClasses = extendTailwindMerge({
       ],
     },
   },
+  extend: {
+    classGroups: {
+      // `border-strong` is a theme border color. Without this group it survives
+      // next to `border-(--linear-border-default)` and the keycap border flips.
+      'border-color': [{ border: ['strong'] }],
+    },
+  },
 });
 
 export function cn(...inputs: ClassValue[]) {

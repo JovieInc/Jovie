@@ -50,6 +50,7 @@ describe('Kbd', () => {
       // Deliberate-red guard: the tooltip keycap must not inherit the card surface.
       expect(kbd.className).not.toContain('bg-(--linear-bg-surface-1)');
       expect(kbd.className).toContain('border-strong');
+      expect(kbd.className).not.toContain('border-(--linear-border-default)');
       expect(kbd.className).toContain('text-tooltip-foreground');
       expect(kbd.className).toContain('rounded-(--radius-sm)');
       // Tooltip surfaces stay dark in light mode; primary text is dark there.
