@@ -91,3 +91,9 @@ Report changes, exact checks, failures, and limitations. Distinguish local sourc
 hosted CI, native merge queue, deployed build, and observed runtime. Never infer
 one from another. Preserve the original objective and user corrections across
 compaction; resume from the next unfinished step, not from the beginning.
+
+## Repository documentation
+
+See [source parity](docs/DOCUMENTATION.md) and the generated
+[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
+manifest, build, test and release instructions remain owned by this repository.
