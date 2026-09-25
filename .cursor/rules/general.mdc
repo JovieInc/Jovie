@@ -1,21 +1,10 @@
 # Cursor Rules for Jovie Project
 
-## ⚠️ CRITICAL: BRANCH PROTECTION RULES
+## ⚠️ Branch Model
 
-### **NEVER PUSH TO PREVIEW OR MAIN**
-
-- **ONLY push to `develop` branch**
-- **NEVER push directly to `preview` or `main` branches**
-- The CI/CD pipeline handles all promotions automatically
-- If pipeline is stuck, fix issues on `develop` and let CI handle the rest
-- Direct pushes to protected branches will be rejected and can break the pipeline
-
-### **Branch Protection**
-
-- `preview` and `main` are protected branches
-- All changes must go through the CI/CD pipeline
-- Auto-promote workflows handle `develop → preview → main` progression
-- Manual intervention should only be done on `develop` branch
+- Small PRs from feature branches target `main` and land through the native GitHub merge queue.
+- There is NO `develop` / `preview` / `production` branch flow. Never push directly to `main`.
+- See `docs/PR_FLOW.md` and `.github/MERGE_QUEUE.md` for how PRs actually land.
 
 ## Project Overview
 
@@ -23,8 +12,8 @@ Jovie is a Next.js application with Better Auth and Neon PostgreSQL. Clerk is re
 
 ## Technology Stack
 
-- **Frontend**: Next.js 14 (App Router)
-- **Database**: Supabase (PostgreSQL with RLS)
+- **Frontend**: Next.js (App Router)
+- **Database**: Neon PostgreSQL with Drizzle ORM (migrated from Supabase)
 - **Authentication**: Better Auth (self-hosted)
 - **Styling**: Tailwind CSS
 - **Testing**: Vitest + Playwright
@@ -48,17 +37,19 @@ const { user } = useJovieAuth();
 
 **NEVER** import `@clerk/*`, add `CLERK_*` env, or create Clerk test users.
 
-### 2. RLS Policies
+### 2. Database Access
 
-**ALWAYS use auth.jwt() for user identification:**
+**ALWAYS use Drizzle ORM** — the app migrated off Supabase. Canonical rules: `.claude/rules/db.md`.
 
-```sql
--- ✅ CORRECT: Use auth.jwt() for RLS
-create policy "User can view own data" on "users"
-for select to authenticated using (
-  auth.jwt()->>'sub' = user_id
-);
+```typescript
+// ✅ CORRECT: Drizzle via the canonical client
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+
+const rows = await db.select().from(users);
 ```
+
+**NEVER** write Supabase client code, RLS policies, or `auth.jwt()` SQL — the Supabase integration no longer exists.
 
 ### 3. Component Patterns
 
@@ -77,34 +68,34 @@ export function MyComponent() {
 
 ### 4. Error Handling
 
-**Always handle errors gracefully:**
+**Handle errors gracefully.** DB helpers wrap queries in try/catch and route
+non-fatal failures through `captureWarning` from `@/lib/error-tracking`:
 
 ```typescript
-const { data, error } = await supabase.from('table').select('*');
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { captureWarning } from '@/lib/error-tracking';
 
-if (error) {
-  console.error('Database error:', error);
-  // Handle error appropriately
-  return;
+try {
+  const rows = await db.select().from(users);
+  // Handle success
+} catch (error: unknown) {
+  captureWarning('[my-feature] query failed, returning fallback', error);
 }
 ```
 
 ### 5. TypeScript
 
-**Use proper typing:**
+**Use proper typing** — identity lives on the app `users` row (`users.id`),
+linked to Better Auth via `users.betterAuthUserId` → `ba_users.id`:
 
 ```typescript
 interface User {
-  id: string;
-  clerk_id: string;
+  id: string; // users.id — the app-level UUID
+  betterAuthUserId: string | null; // ba_users.id link (null on Clerk-era rows)
   email: string;
-  created_at: string;
+  createdAt: Date;
 }
-
-const { data: users, error } = await supabase
-  .from('users')
-  .select('*')
-  .returns<User[]>();
 ```
 
 ## File Structure
@@ -112,7 +103,7 @@ const { data: users, error } = await supabase
 - `app/` - Next.js App Router pages and layouts
 - `components/` - Reusable React components
 - `lib/` - Utility functions and configurations
-- `supabase/` - Database migrations and functions
+- `drizzle/` - Database migrations and config (Drizzle ORM, Neon PostgreSQL)
 - `types/` - TypeScript type definitions
 - `tests/` - Test files
 
@@ -137,7 +128,7 @@ SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
 
 Key tables:
 
-- `users` - User accounts (`better_auth_user_id` links to `ba_users`)
+- `users` - User accounts; `users.id` is the app identity, `better_auth_user_id` links to `ba_users` (leave `clerk_id` nullable for historical rows only)
 - `artists` - Artist profiles
 - `social_links` - Social media links
 - `releases` - Music releases
@@ -147,7 +138,7 @@ Key tables:
 
 1. **Unit Tests**: Use Vitest for component testing
 2. **E2E Tests**: Use Playwright for end-to-end testing
-3. **Database Tests**: Test RLS policies with multiple users
+3. **Database Tests**: Test query and migration behavior against the Neon test database
 4. **Authentication Tests**: Use `E2E_USE_TEST_AUTH_BYPASS=1` and `/api/dev/test-auth/enter`
 
 ## Code Style
@@ -160,11 +151,10 @@ Key tables:
 
 ## Security Guidelines
 
-1. **Always enable RLS** on user data tables
-2. **Use auth.jwt()** for user identification in policies
-3. **Validate user permissions** before database operations
-4. **Never expose sensitive data** in client-side code
-5. **Use environment variables** for all secrets
+1. **Use Drizzle ORM** for all database access (`.claude/rules/db.md`)
+2. **Validate user permissions** before database operations
+3. **Never expose sensitive data** in client-side code
+4. **Use environment variables** for all secrets
 
 ## Auth Guidelines
 
@@ -177,54 +167,36 @@ When changing auth:
 
 ## Common Patterns
 
-### Form Handling
+### Server Identity (server-only)
+
+`getCachedAuth()` is `server-only` — never call it from client components.
+`userId` is the app `users.id` UUID:
 
 ```typescript
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState<string | undefined>();
+import { getCachedAuth } from '@/lib/auth/cached';
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(undefined);
-
-  try {
-    const { userId } = await getCachedAuth();
-    if (!userId) throw new Error('Unauthorized');
-
-    if (error) throw error;
-    // Handle success
-  } catch (error) {
-    setError('Failed to save data');
-  } finally {
-    setLoading(false);
-  }
-};
+const { userId } = await getCachedAuth();
+if (!userId) {
+  // unauthenticated — render sign-in state or return 401
+}
 ```
 
-### Data Fetching
+### Data Fetching (React Query)
+
+Client components fetch through the canonical query hooks in
+`apps/web/lib/queries/` (TanStack Query + `fetchWithTimeout` from
+`lib/queries/fetch`) — never ad-hoc `useEffect` fetch chains or raw `fetch`.
+Canonical example, from `apps/web/lib/queries/usePublicProfileQuery.ts`:
 
 ```typescript
-const [data, setData] = useState<User[]>([]);
-const [loading, setLoading] = useState(true);
+const { data, isLoading, error } = usePublicProfileQuery({
+  username: params.username as string,
+});
 
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const { userId } = await getCachedAuth();
-      void userId;
+if (isLoading) return <Spinner />;
+if (error) return <ErrorMessage />;
 
-      if (error) throw error;
-      setData(data || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchData();
-}, []);
+return <SubscribeForm artistId={data.id} />;
 ```
 
 ## Resources
@@ -262,7 +234,7 @@ See `AGENTS.md` at repo root for full infrastructure guardrails.
 Before suggesting code changes, verify:
 
 1. ✅ Uses Better Auth (`useJovieAuth` / `getCachedAuth`)
-2. ✅ Implements proper RLS policies
+2. ✅ Uses Drizzle ORM via `@/lib/db` (never Supabase)
 3. ✅ Handles errors gracefully
 4. ✅ Uses TypeScript types
 5. ✅ Follows existing patterns
