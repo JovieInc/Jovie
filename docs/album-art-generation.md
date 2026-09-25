@@ -2,29 +2,31 @@
 
 Album art generation is implemented as a paid Jovie chat skill. Release action menus launch chat with a stored prompt, the `generateAlbumArt` tool creates three candidates, and the user explicitly applies one candidate to a release.
 
-## AI SDK And xAI
+## AI SDK And Vercel AI Gateway
 
-The xAI provider lives in `apps/web/lib/services/album-art/provider-xai.ts` and uses AI SDK image generation:
+Album art backgrounds are generated in `apps/web/lib/services/album-art/provider-xai.ts` with AI SDK image generation through the Vercel AI Gateway. The call uses the same Gateway provider as the rest of the app (`apps/web/lib/ai/sdk.ts`): `AI_GATEWAY_API_KEY` when set, otherwise Vercel OIDC on deployed runtimes. A direct `XAI_API_KEY` is not required.
 
 ```ts
 const result = await generateImage({
-  model: xai.image(modelId),
+  model: gateway.image(modelId),
   prompt,
   aspectRatio: '1:1',
   n: 3,
 });
 ```
 
+The model id lives in `ALBUM_ART_GATEWAY_IMAGE_MODEL` (`spacexai/grok-imagine-image`). Gateway catalog price on 2026-09-25 is $0.02 per image. Each generation requests three images.
+
 Runtime configuration:
 
 ```txt
-XAI_API_KEY
-ALBUM_ART_IMAGE_MODEL=grok-imagine-image
+AI_GATEWAY_API_KEY          # local/CI only; Vercel production uses OIDC
+ALBUM_ART_IMAGE_MODEL       # optional provider/model override
 ALBUM_ART_GENERATION_DAILY_LIMIT=6
 ALBUM_ART_GENERATION_BURST_LIMIT=2
 ```
 
-If `ALBUM_ART_IMAGE_MODEL` is unset, Jovie uses `grok-imagine-image`.
+If `ALBUM_ART_IMAGE_MODEL` is unset, or set to a legacy bare id such as `grok-imagine-image`, Jovie uses `spacexai/grok-imagine-image`. An override is used only when it contains a provider prefix (`provider/model`).
 
 ## Backgrounds Only
 
@@ -99,7 +101,7 @@ Rate limits are dedicated to this skill because one chat tool call generates thr
 
 ## Troubleshooting
 
-If generation fails immediately, verify `XAI_API_KEY` is present in Doppler/dev and that the configured xAI image model supports AI SDK `generateImage`. If candidates render but apply fails, verify Blob auth (Vercel OIDC via `BLOB_STORE_ID` in deployed envs, or the static `BLOB_READ_WRITE_TOKEN` in local dev) and that the generated manifest exists under the expected Blob prefix.
+If generation fails immediately, verify Gateway auth: on Vercel, OIDC is injected automatically (`VERCEL=1`); off Vercel, `AI_GATEWAY_API_KEY` must be set. Confirm the configured Gateway image model supports AI SDK `generateImage`. If candidates render but apply fails, verify Blob auth (Vercel OIDC via `BLOB_STORE_ID` in deployed envs, or the static `BLOB_READ_WRITE_TOKEN` in local dev) and that the generated manifest exists under the expected Blob prefix.
 
 ## Known Limitations
 

@@ -39,8 +39,8 @@ describe('tool-errors', () => {
   it('classifies thrown provider errors without rethrowing semantics', () => {
     const failure = classifyThrownToolError(
       'generateAlbumArt',
-      Object.assign(new Error('XAI_API_KEY is not configured'), {
-        code: 'XAI_API_KEY_MISSING',
+      Object.assign(new Error('AI Gateway authentication is not configured'), {
+        code: 'ALBUM_ART_GATEWAY_UNCONFIGURED',
       })
     );
 
