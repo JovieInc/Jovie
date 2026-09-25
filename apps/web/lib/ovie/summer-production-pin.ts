@@ -8,6 +8,7 @@ import {
 } from './summer-production-identity';
 
 const PIN_CACHE_TTL_MS = 10 * 60 * 1000;
+const IDENTITY_FETCH_TIMEOUT_MS = 5_000;
 
 export type SummerPinExpectation = {
   projectId: string;
@@ -113,12 +114,14 @@ export async function resolveSummerEveCallerOrigin(
     pinnedDeploymentId?: string;
     fetchImpl?: typeof fetch;
     now?: () => number;
+    /** Skip the TTL cache and re-read the alias identity once. */
+    refresh?: boolean;
   } = {}
 ): Promise<SummerEveCallerTarget> {
   const pin = readConfiguredPin(input.pinnedOrigin, input.pinnedDeploymentId);
   const now = input.now?.() ?? Date.now();
   const key = `${SUMMER_PRODUCTION.productionOrigin}\n${pin.origin ?? ''}\n${pin.deploymentId ?? ''}`;
-  if (aliasCache?.key === key && aliasCache.expiresAt > now)
+  if (!input.refresh && aliasCache?.key === key && aliasCache.expiresAt > now)
     return aliasCache.target;
 
   const fetchImpl = input.fetchImpl ?? globalThis.fetch;
@@ -135,6 +138,7 @@ export async function resolveSummerEveCallerOrigin(
         method: 'GET',
         redirect: 'error',
         headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(IDENTITY_FETCH_TIMEOUT_MS),
       }
     );
   } catch {
