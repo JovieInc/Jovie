@@ -67,10 +67,25 @@ describe('RevenueLiftDashboardView', () => {
       'rounded-xl',
       'border-(--app-shell-border)'
     );
+    expect(
+      screen.getByTestId('revenue-lift-irpaa-hero').className
+    ).not.toContain('p-5');
+    expect(
+      screen.getByTestId('revenue-lift-irpaa-hero').firstElementChild
+    ).toHaveClass('p-5');
     expect(screen.getByTestId('revenue-lift-kpi-gmv-lift')).toHaveClass(
       'rounded-lg',
       'border-(--app-shell-border)'
     );
+    expect(
+      screen.getByTestId('revenue-lift-kpi-gmv-lift').className
+    ).not.toContain('p-4');
+    expect(
+      screen.getByTestId('revenue-lift-kpi-gmv-lift').firstElementChild
+    ).toHaveClass('p-4');
+    expect(
+      screen.getByRole('heading', { name: 'Creator Outcomes' })
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('table')).toHaveLength(3);
     expect(screen.getByTestId('revenue-lift-map-gmv-lift')).toHaveTextContent(
       'Revenue attributed through automations.'

@@ -40,20 +40,25 @@ function KpiTile({
   return (
     <ContentSurfaceCard
       surface='nested'
-      className='p-4'
       data-testid={`revenue-lift-kpi-${tile.id}`}
     >
-      <div className='flex items-start justify-between gap-2'>
-        <p className='text-xs font-medium text-secondary-token'>{tile.label}</p>
-        <span className='rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'>
-          Tier {tile.tier}
-        </span>
+      <div className='p-4'>
+        <div className='flex items-start justify-between gap-2'>
+          <p className='text-xs font-medium text-secondary-token'>
+            {tile.label}
+          </p>
+          <span className='rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'>
+            Tier {tile.tier}
+          </span>
+        </div>
+        <p className='mt-2 min-h-8 text-2xl font-semibold tracking-tight text-primary-token'>
+          {tile.valueLabel}
+        </p>
+        <p className='mt-1 min-h-8 text-xs text-secondary-token'>
+          {tile.signal}
+        </p>
+        <SourceLine source={tile.source} />
       </div>
-      <p className='mt-2 min-h-8 text-2xl font-semibold tracking-tight text-primary-token'>
-        {tile.valueLabel}
-      </p>
-      <p className='mt-1 min-h-8 text-xs text-secondary-token'>{tile.signal}</p>
-      <SourceLine source={tile.source} />
     </ContentSurfaceCard>
   );
 }
@@ -75,39 +80,40 @@ export function RevenueLiftDashboardView({
       {/* North Star hero */}
       <ContentSurfaceCard
         as='section'
-        className='p-5'
         data-testid='revenue-lift-irpaa-hero'
         aria-labelledby='revenue-lift-irpaa-heading'
       >
-        <p className='text-xs font-medium text-secondary-token'>
-          North Star · Tier A
-        </p>
-        <h2
-          id='revenue-lift-irpaa-heading'
-          className='mt-1 text-sm font-medium text-primary-token line-clamp-2'
-        >
-          Incremental Revenue Per Active Artist (IRPAA)
-        </h2>
-        <p className='mt-3 min-h-10 text-4xl font-semibold tracking-tight text-primary-token'>
-          {irpaa ? formatAmount(irpaa.irpaaCents) : '—'}
-        </p>
-        <p className='mt-1 min-h-5 text-sm text-secondary-token'>
-          {deltaLabel ?? 'Prior-window comparison unavailable'}
-          {irpaa
-            ? ` · ${irpaa.activeArtists} active artists · ${irpaa.runCount} automation runs`
-            : null}
-        </p>
-        <p className='mt-2 text-xs text-secondary-token'>
-          Blended total{' '}
-          {irpaa ? formatAmount(irpaa.totalRevenueLiftCents) : '—'} over the
-          rolling 30-day window. Weights {irpaa?.weights.version ?? '—'}
-          {irpaa?.weights.lastValidatedAt
-            ? ` (validated ${irpaa.weights.lastValidatedAt})`
-            : ''}
-          . IRPAA mixes verified GMV with engagement proxies. It is not verified
-          money and it is not causal lift.
-        </p>
-        <SourceLine source={data.irpaaSource} />
+        <div className='p-5'>
+          <p className='text-xs font-medium text-secondary-token'>
+            North Star · Tier A
+          </p>
+          <h2
+            id='revenue-lift-irpaa-heading'
+            className='mt-1 text-sm font-medium text-primary-token line-clamp-2'
+          >
+            Incremental Revenue Per Active Artist (IRPAA)
+          </h2>
+          <p className='mt-3 min-h-10 text-4xl font-semibold tracking-tight text-primary-token'>
+            {irpaa ? formatAmount(irpaa.irpaaCents) : '—'}
+          </p>
+          <p className='mt-1 min-h-5 text-sm text-secondary-token'>
+            {deltaLabel ?? 'Prior-window comparison unavailable'}
+            {irpaa
+              ? ` · ${irpaa.activeArtists} active artists · ${irpaa.runCount} automation runs`
+              : null}
+          </p>
+          <p className='mt-2 text-xs text-secondary-token'>
+            Blended total{' '}
+            {irpaa ? formatAmount(irpaa.totalRevenueLiftCents) : '—'} over the
+            rolling 30-day window. Weights {irpaa?.weights.version ?? '—'}
+            {irpaa?.weights.lastValidatedAt
+              ? ` (validated ${irpaa.weights.lastValidatedAt})`
+              : ''}
+            . IRPAA mixes verified GMV with engagement proxies. It is not
+            verified money and it is not causal lift.
+          </p>
+          <SourceLine source={data.irpaaSource} />
+        </div>
       </ContentSurfaceCard>
 
       <section aria-labelledby='creator-outcomes-heading'>
@@ -115,30 +121,31 @@ export function RevenueLiftDashboardView({
           id='creator-outcomes-heading'
           className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
         >
-          Creator outcomes
+          Creator Outcomes
         </h2>
         <div className='grid gap-3 sm:grid-cols-3'>
           {data.creatorOutcomes.layers.map(layer => (
             <ContentSurfaceCard
               key={layer.id}
               surface='nested'
-              className='p-4'
               data-testid={`revenue-lift-${layer.id}`}
             >
-              <div className='flex items-start justify-between gap-2'>
-                <p className='text-xs font-medium text-secondary-token'>
-                  {layer.label}
+              <div className='p-4'>
+                <div className='flex items-start justify-between gap-2'>
+                  <p className='text-xs font-medium text-secondary-token'>
+                    {layer.label}
+                  </p>
+                  <span className='rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'>
+                    {layer.statusLabel}
+                  </span>
+                </div>
+                <p className='mt-2 min-h-8 text-2xl font-semibold tracking-tight text-primary-token'>
+                  {layer.valueLabel}
                 </p>
-                <span className='rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'>
-                  {layer.statusLabel}
-                </span>
+                <p className='mt-1 min-h-8 text-xs text-secondary-token'>
+                  {layer.disclosure}
+                </p>
               </div>
-              <p className='mt-2 min-h-8 text-2xl font-semibold tracking-tight text-primary-token'>
-                {layer.valueLabel}
-              </p>
-              <p className='mt-1 min-h-8 text-xs text-secondary-token'>
-                {layer.disclosure}
-              </p>
             </ContentSurfaceCard>
           ))}
         </div>
@@ -228,43 +235,53 @@ export function RevenueLiftDashboardView({
           Per Artist Cohort
         </h2>
         <div className='mb-3 grid gap-3 sm:grid-cols-2'>
-          <ContentSurfaceCard surface='nested' className='p-4'>
-            <p className='text-xs font-medium text-secondary-token'>
-              Jovie Active
-            </p>
-            <p className='mt-1 text-2xl font-semibold text-primary-token'>
-              {data.cohorts.activeCount}
-            </p>
-            <p className='mt-1 text-xs text-secondary-token'>
-              Median blended signal{' '}
-              {data.cohorts.activeMedianLiftCents != null
-                ? formatAmount(data.cohorts.activeMedianLiftCents)
-                : '—'}
-            </p>
-            <p className='mt-1 text-xs text-secondary-token'>
-              Median verified-money lift{' '}
-              {data.cohorts.activeMedianVerifiedMoneyLiftCents != null
-                ? formatAmount(data.cohorts.activeMedianVerifiedMoneyLiftCents)
-                : '—'}
-            </p>
+          <ContentSurfaceCard surface='nested'>
+            <div className='p-4'>
+              <p className='text-xs font-medium text-secondary-token'>
+                Jovie Active
+              </p>
+              <p className='mt-1 text-2xl font-semibold text-primary-token'>
+                {data.cohorts.activeCount}
+              </p>
+              <p className='mt-1 text-xs text-secondary-token'>
+                Median blended signal{' '}
+                {data.cohorts.activeMedianLiftCents != null
+                  ? formatAmount(data.cohorts.activeMedianLiftCents)
+                  : '—'}
+              </p>
+              <p className='mt-1 text-xs text-secondary-token'>
+                Median verified-money lift{' '}
+                {data.cohorts.activeMedianVerifiedMoneyLiftCents != null
+                  ? formatAmount(
+                      data.cohorts.activeMedianVerifiedMoneyLiftCents
+                    )
+                  : '—'}
+              </p>
+            </div>
           </ContentSurfaceCard>
-          <ContentSurfaceCard surface='nested' className='p-4'>
-            <p className='text-xs font-medium text-secondary-token'>Control</p>
-            <p className='mt-1 text-2xl font-semibold text-primary-token'>
-              {data.cohorts.controlCount}
-            </p>
-            <p className='mt-1 text-xs text-secondary-token'>
-              Median blended signal{' '}
-              {data.cohorts.controlMedianLiftCents != null
-                ? formatAmount(data.cohorts.controlMedianLiftCents)
-                : '—'}
-            </p>
-            <p className='mt-1 text-xs text-secondary-token'>
-              Median verified-money lift{' '}
-              {data.cohorts.controlMedianVerifiedMoneyLiftCents != null
-                ? formatAmount(data.cohorts.controlMedianVerifiedMoneyLiftCents)
-                : '—'}
-            </p>
+          <ContentSurfaceCard surface='nested'>
+            <div className='p-4'>
+              <p className='text-xs font-medium text-secondary-token'>
+                Control
+              </p>
+              <p className='mt-1 text-2xl font-semibold text-primary-token'>
+                {data.cohorts.controlCount}
+              </p>
+              <p className='mt-1 text-xs text-secondary-token'>
+                Median blended signal{' '}
+                {data.cohorts.controlMedianLiftCents != null
+                  ? formatAmount(data.cohorts.controlMedianLiftCents)
+                  : '—'}
+              </p>
+              <p className='mt-1 text-xs text-secondary-token'>
+                Median verified-money lift{' '}
+                {data.cohorts.controlMedianVerifiedMoneyLiftCents != null
+                  ? formatAmount(
+                      data.cohorts.controlMedianVerifiedMoneyLiftCents
+                    )
+                  : '—'}
+              </p>
+            </div>
           </ContentSurfaceCard>
         </div>
         <SourceLine source={data.cohorts.source} />
