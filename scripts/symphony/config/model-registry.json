@@ -19,6 +19,12 @@
       "no_on_demand_overage"
     ],
     "api_burn_fraction_of_sub": 0.15,
+    "min_samples": 5,
+    "prior_weight": 2,
+    "minute_value_usd": 0,
+    "min_quality": {
+      "review-verify": 75
+    },
     "job_token_estimates": {
       "mechanical": {
         "input": 20000,
@@ -35,6 +41,10 @@
       "review": {
         "input": 60000,
         "output": 20000
+      },
+      "review-verify": {
+        "input": 8000,
+        "output": 300
       },
       "semantic": {
         "input": 60000,
@@ -224,7 +234,13 @@
       "quality": 65,
       "list_price_in": 0.15,
       "list_price_out": 0.6,
-      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic",
+        "review-verify"
+      ],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
@@ -253,6 +269,54 @@
       "cooldown_seconds": 1800,
       "strengths": ["cheapest-capable-api", "post-included-fallback"],
       "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"]
+    },
+    {
+      "id": "gateway-deepseek-v4.1-flash",
+      "provider": "vercel-ai-gateway",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "family": "deepseek",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 65,
+      "list_price_in": 0.3,
+      "list_price_out": 1.2,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["per-call-review-route"],
+      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
+      "notes": "PR review kernel only. Peak list price; quality provisional until replay outcomes exist."
+    },
+    {
+      "id": "gateway-glm-5.3",
+      "provider": "vercel-ai-gateway",
+      "model": "z-ai/glm-5.3",
+      "family": "glm",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 82,
+      "list_price_in": 0.3,
+      "list_price_out": 1.2,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["per-call-review-route"],
+      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
+      "notes": "PR review kernel only. Prices and quality mirror hyperagent-glm-5.3."
+    },
+    {
+      "id": "gateway-glm-5.3-flash",
+      "provider": "vercel-ai-gateway",
+      "model": "z-ai/glm-5.3-flash",
+      "family": "glm",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 68,
+      "list_price_in": 0.1,
+      "list_price_out": 0.4,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["per-call-review-route"],
+      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
+      "notes": "PR review kernel only. Prices and quality mirror hyperagent-glm-5.3-flash."
     },
     {
       "id": "cursor-luna",

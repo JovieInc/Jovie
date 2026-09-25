@@ -30,6 +30,9 @@ ALLOWED_UPDATE_FIELDS = (
     "sub_monthly_usd",
     "sub_included_multiplier",
     "notes",
+    "promo",
+    "effective_price_multiplier",
+    "price_basis",
 )
 SNAPSHOT_SCHEMA = "model-research/v1"
 
@@ -82,6 +85,11 @@ def apply_snapshot(registry, snapshot, now=None):
             if models[mid].get(field) != value:
                 changes[field] = value
         else:
+            try:
+                model_router._validate_economics(mid, {**models[mid], **changes})
+            except ValueError:
+                rejected.append({"id": mid, "reason": "invalid_economics"})
+                continue
             if changes:
                 models[mid].update(changes)
                 applied.append({"id": mid, "changes": sorted(changes)})

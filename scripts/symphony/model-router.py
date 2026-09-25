@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime
 
 QUOTA_RE = re.compile(
     r"(429|402|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
@@ -107,6 +108,7 @@ def validate_registry(data):
         for price in ("list_price_in", "list_price_out"):
             if not isinstance(model[price], (int, float)) or model[price] < 0:
                 raise ValueError(f"{mid}: {price} must be >= 0")
+        _validate_economics(mid, model)
         ids.append(mid)
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate model ids")
@@ -114,6 +116,38 @@ def validate_registry(data):
         if not isinstance(chain, list) or any(item not in ids for item in chain):
             raise ValueError("route chain references unknown model")
     return data
+
+
+def _timestamp(value):
+    """Epoch seconds from a number or an ISO-8601 string; None when invalid."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    return None
+
+
+def _validate_economics(mid, model):
+    """Optional pricing fields: promos with an end date and credit multipliers."""
+    promo = model.get("promo")
+    if promo is not None:
+        if not isinstance(promo, dict) or _timestamp(promo.get("until")) is None:
+            raise ValueError(f"{mid}: promo needs an until date")
+        for price in ("price_in", "price_out"):
+            value = promo.get(price)
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"{mid}: promo.{price} must be >= 0")
+    if "effective_price_multiplier" in model:
+        value = model["effective_price_multiplier"]
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1:
+            raise ValueError(f"{mid}: effective_price_multiplier must be 0-1")
+        if not str(model.get("price_basis") or "").strip():
+            raise ValueError(f"{mid}: effective_price_multiplier needs price_basis")
 
 
 def load(path=None):
@@ -350,6 +384,70 @@ def _family_sub(models, family):
     return None
 
 
+def effective_prices(model, now):
+    """Per-1M-token prices after an active promo and any credit multiplier."""
+    price_in = float(model.get("list_price_in") or 0)
+    price_out = float(model.get("list_price_out") or 0)
+    basis = "list"
+    promo = model.get("promo")
+    if isinstance(promo, dict) and (_timestamp(promo.get("until")) or 0) > now:
+        price_in = float(promo.get("price_in") or 0)
+        price_out = float(promo.get("price_out") or 0)
+        basis = "promo"
+    multiplier = float(model.get("effective_price_multiplier", 1))
+    if multiplier != 1:
+        price_in *= multiplier
+        price_out *= multiplier
+        basis += "+credits"
+    return price_in, price_out, basis
+
+
+def _outcome(st, model_id, capability):
+    return ((st.get("outcomes") or {}).get(model_id) or {}).get(capability) or {}
+
+
+def expected_cost_per_success(cfg, model, st, capability, now):
+    """Expected USD to get one successful result for this capability.
+
+    Cost of one attempt (tokens at the effective price plus valued minutes)
+    divided by the success probability. Success is a Beta-smoothed blend of
+    observed outcomes and the registry quality prior; observed tokens and
+    minutes replace the job estimate once there are enough samples.
+    """
+    policy = cfg.get("routing_policy") or {}
+    min_samples = int(policy.get("min_samples") or 5)
+    prior_weight = float(policy.get("prior_weight") or 2)
+    minute_value = float(policy.get("minute_value_usd") or 0)
+    prior_p = min(0.99, max(0.01, float(model.get("quality") or 0) / 100.0))
+    observed = _outcome(st, model["id"], capability)
+    attempts = max(0, int(observed.get("attempts") or 0))
+    successes = min(attempts, max(0, int(observed.get("successes") or 0)))
+    p_success = (successes + prior_weight * prior_p) / (attempts + prior_weight)
+    if attempts >= min_samples:
+        tokens_in = float(observed.get("tokens_in") or 0) / attempts
+        tokens_out = float(observed.get("tokens_out") or 0) / attempts
+        minutes = float(observed.get("minutes") or 0) / attempts
+    else:
+        tokens_in, tokens_out = _job_tokens(cfg, capability)
+        minutes = 0.0
+    price_in, price_out, basis = effective_prices(model, now)
+    if model.get("channel") in {"subscription", "local"}:
+        # Subsidy: a subscription buys a multiple of its price in list usage.
+        included = float(model.get("sub_included_multiplier") or 1)
+        price_in /= included
+        price_out /= included
+        basis = "subscription-included"
+    token_cost = (tokens_in * price_in + tokens_out * price_out) / 1_000_000.0
+    attempt_cost = token_cost + minutes * minute_value
+    return {
+        "expected_cost_per_success": attempt_cost / p_success,
+        "attempt_token_cost": token_cost,
+        "p_success": p_success,
+        "samples": attempts,
+        "price_basis": basis,
+    }
+
+
 def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
     """Return (ok, reason, rank, extra). Lower rank wins."""
     policy = cfg.get("routing_policy") or {}
@@ -361,11 +459,22 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
     family = model.get("family")
     uses = int(_pool_state(st, model.get("pool")).get("uses") or 0)
     quality = int(model.get("quality") or 0)
-    extra = {"marginal_usd": 0.0, "list_cost_usd": round(list_cost, 4), "channel": channel}
+    economics = expected_cost_per_success(cfg, model, st, capability, now)
+    extra = {
+        "marginal_usd": 0.0,
+        "list_cost_usd": round(list_cost, 4),
+        "channel": channel,
+        "expected_cost_per_success_usd": round(economics["expected_cost_per_success"], 6),
+        "p_success": round(economics["p_success"], 4),
+        "price_basis": economics["price_basis"],
+    }
+    floor = (policy.get("min_quality") or {}).get(capability)
+    if isinstance(floor, (int, float)) and quality < floor:
+        return False, "below_quality_floor", None, extra
 
     if channel in {"subscription", "local"}:
         extra["marginal_usd"] = 0.0
-        return True, "included", (0, -quality, uses, model["id"]), extra
+        return True, "included", (0, -economics["p_success"], uses, model["id"]), extra
 
     if _family_has_included(cfg["models"], st, family, now, exclude_pools):
         return False, "family_sub_remaining", None, extra
@@ -375,7 +484,7 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
         fraction = float(policy.get("api_burn_fraction_of_sub") or 0.15)
         cap = float(sub.get("sub_monthly_usd") or 0) * fraction
         spent = float((st.get("api_spend") or {}).get(family) or 0)
-        if spent + list_cost > cap:
+        if spent + economics["attempt_token_cost"] > cap:
             extra["renew_subscription"] = {
                 "family": family,
                 "sub_monthly_usd": sub.get("sub_monthly_usd"),
@@ -387,8 +496,13 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
             }
             return False, "renew_sub_not_api", None, extra
 
-    extra["marginal_usd"] = round(list_cost, 4)
-    return True, "api", (route_priority(model), list_cost, -quality, model["id"]), extra
+    extra["marginal_usd"] = round(economics["attempt_token_cost"], 4)
+    return True, "api", (
+        route_priority(model),
+        economics["expected_cost_per_success"],
+        -quality,
+        model["id"],
+    ), extra
 
 
 def record_api_spend(st, family, amount):
@@ -469,12 +583,105 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
         return _selection_document(workflow, capability, config_path, mid, model, selected_executor, candidates, extra)
     return {"schema_version": 1, "workflow": workflow, "capability": capability, "deterministic_first": True, "config": str(config_path), "selected": None, "candidates": candidates}
 
+def record_outcome(st, model_id, capability, success, tokens_in=0, tokens_out=0, minutes=0.0):
+    """Add one observed attempt; the router learns cost per success from these."""
+    def mutate(latest):
+        entry = latest.setdefault("outcomes", {}).setdefault(model_id, {}).setdefault(capability, {})
+        entry["attempts"] = int(entry.get("attempts") or 0) + 1
+        entry["successes"] = int(entry.get("successes") or 0) + (1 if success else 0)
+        entry["tokens_in"] = float(entry.get("tokens_in") or 0) + max(0.0, float(tokens_in))
+        entry["tokens_out"] = float(entry.get("tokens_out") or 0) + max(0.0, float(tokens_out))
+        entry["minutes"] = float(entry.get("minutes") or 0) + max(0.0, float(minutes))
+    update_state(st, mutate)
+
+
+def rank(capability, path=None, provider=None, channel=None, min_quality=None,
+         exclude_families=(), st=None, now=None):
+    """Score every registry model for a capability without chains or probes.
+
+    For callers outside Symphony (for example the PR review kernel) that pick
+    a model per call instead of launching an agent executor.
+    """
+    cfg, config_path = load(path)
+    st = state() if st is None else st
+    now = time.time() if now is None else now
+    ready, refused = [], []
+    for model in cfg["models"]:
+        mid = model["id"]
+        if capability not in model["capabilities"]:
+            continue
+        if provider and model.get("provider") != provider:
+            continue
+        if channel and model.get("channel") != channel:
+            continue
+        reason = None
+        if model.get("family") in exclude_families:
+            reason = "excluded_family"
+        elif min_quality is not None and float(model.get("quality") or 0) < min_quality:
+            reason = "below_min_quality"
+        elif pool_exhausted(st, model.get("pool"), now):
+            reason = "pool_exhausted"
+        elif float((st.get("cooldowns") or {}).get(mid, 0)) > now:
+            reason = "cooldown"
+        if reason:
+            refused.append({"id": mid, "reason": reason})
+            continue
+        ok, score_reason, key, extra = score_candidate(cfg, model, st, capability, now)
+        if not ok:
+            refused.append({"id": mid, "reason": score_reason})
+            continue
+        ready.append((key, {
+            "id": mid,
+            "model": model["model"],
+            "provider": model["provider"],
+            "family": model.get("family"),
+            "quality": model.get("quality"),
+            "list_price_in": model["list_price_in"],
+            "list_price_out": model["list_price_out"],
+            **extra,
+        }))
+    ready.sort(key=lambda item: item[0])
+    return {
+        "schema_version": 1,
+        "capability": capability,
+        "config": str(config_path),
+        "ranked": [row for _key, row in ready],
+        "refused": refused,
+    }
+
+
+def mark_model_exhausted(model_id, seconds=3600, path=None, st=None):
+    cfg, _config_path = load(path)
+    model = model_map(cfg).get(model_id)
+    if model is None:
+        raise KeyError(model_id)
+    st = state() if st is None else st
+    mark_pool_exhausted(st, model.get("pool"), seconds)
+    return model.get("pool")
+
+
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--config")
     p = sub.add_parser("probe"); p.add_argument("--config")
     v = sub.add_parser("validate"); v.add_argument("--config")
+    r = sub.add_parser("rank"); r.add_argument("--capability", required=True); r.add_argument("--provider"); r.add_argument("--channel", choices=["subscription", "api", "local"]); r.add_argument("--min-quality", type=float); r.add_argument("--exclude-family", action="append", default=[]); r.add_argument("--config")
+    o = sub.add_parser("record-outcome"); o.add_argument("--model-id", required=True); o.add_argument("--capability", required=True); o.add_argument("--success", type=int, choices=[0, 1], required=True); o.add_argument("--tokens-in", type=float, default=0); o.add_argument("--tokens-out", type=float, default=0); o.add_argument("--minutes", type=float, default=0); o.add_argument("--config")
+    x = sub.add_parser("mark-exhausted"); x.add_argument("--model-id", required=True); x.add_argument("--reason", default=""); x.add_argument("--seconds", type=int, default=3600); x.add_argument("--config")
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
+    if args.cmd == "rank":
+        print(json.dumps(rank(args.capability, args.config, args.provider, args.channel, args.min_quality, tuple(args.exclude_family)), indent=2)); return 0
+    if args.cmd == "record-outcome":
+        if args.model_id not in model_map(cfg):
+            print(json.dumps({"ok": False, "reason": "unknown_model"})); return 2
+        record_outcome(state(), args.model_id, args.capability, bool(args.success), args.tokens_in, args.tokens_out, args.minutes)
+        print(json.dumps({"ok": True})); return 0
+    if args.cmd == "mark-exhausted":
+        try:
+            pool = mark_model_exhausted(args.model_id, args.seconds, args.config)
+        except KeyError:
+            print(json.dumps({"ok": False, "reason": "unknown_model"})); return 2
+        print(json.dumps({"ok": True, "pool": pool, "reason": args.reason})); return 0
     if args.cmd == "probe":
         results = {}
         for model in cfg["models"]:

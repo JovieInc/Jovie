@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, os, pathlib, subprocess, tempfile, time, unittest
+import json, os, pathlib, subprocess, sys, tempfile, time, unittest
 import importlib.util
 import multiprocessing
 from unittest import mock
@@ -882,5 +882,138 @@ class RegistryTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("forbidden model id", result.stderr)
+
+
+class EffectiveCostTests(unittest.TestCase):
+    """Route on expected cost per successful task, not raw token price."""
+
+    def cfg(self):
+        return json.loads(CONFIG.read_text())
+
+    def model(self, cfg, mid):
+        return dict(next(m for m in cfg["models"] if m["id"] == mid))
+
+    def test_included_order_is_unchanged_without_observations(self):
+        cfg = self.cfg()
+        luna = self.model(cfg, "codex-luna")
+        ok, reason, rank, extra = MODULE.score_candidate(cfg, luna, {}, "review", 1000)
+        self.assertEqual((ok, reason), (True, "included"))
+        self.assertAlmostEqual(-rank[1], luna["quality"] / 100)
+        self.assertEqual(extra["price_basis"], "subscription-included")
+
+    def test_subscription_subsidy_divides_list_price(self):
+        cfg = self.cfg()
+        luna = self.model(cfg, "codex-luna")
+        subsidized = MODULE.expected_cost_per_success(cfg, luna, {}, "review", 1000)
+        luna.pop("sub_included_multiplier", None)
+        luna["channel"] = "api"
+        list_priced = MODULE.expected_cost_per_success(cfg, luna, {}, "review", 1000)
+        self.assertLess(subsidized["attempt_token_cost"], list_priced["attempt_token_cost"])
+
+    def test_pricier_model_that_finishes_more_often_wins_the_paid_path(self):
+        cfg = self.cfg()
+        cheap = self.model(cfg, "gateway-glm-5.3-flash")
+        strong = self.model(cfg, "gateway-glm-5.3")
+        st = {"outcomes": {
+            cheap["id"]: {"review": {"attempts": 40, "successes": 2, "tokens_in": 40 * 60000, "tokens_out": 40 * 20000}},
+            strong["id"]: {"review": {"attempts": 40, "successes": 38, "tokens_in": 40 * 30000, "tokens_out": 40 * 8000}},
+        }}
+        cheap_rank = MODULE.score_candidate(cfg, cheap, st, "review", 1000)[2]
+        strong_rank = MODULE.score_candidate(cfg, strong, st, "review", 1000)[2]
+        self.assertLess(strong_rank, cheap_rank)
+        self.assertLess(MODULE.score_candidate(cfg, cheap, {}, "review", 1000)[2], MODULE.score_candidate(cfg, strong, {}, "review", 1000)[2])
+
+    def test_beta_prior_holds_until_samples_then_observations_dominate(self):
+        cfg = self.cfg()
+        model = self.model(cfg, "gateway-glm-5.3")
+        prior = MODULE.expected_cost_per_success(cfg, model, {}, "review", 1000)
+        self.assertAlmostEqual(prior["p_success"], 0.82)
+        few = {"outcomes": {model["id"]: {"review": {"attempts": 2, "successes": 0, "tokens_in": 10, "tokens_out": 10}}}}
+        early = MODULE.expected_cost_per_success(cfg, model, few, "review", 1000)
+        self.assertAlmostEqual(early["p_success"], (0 + 2 * 0.82) / 4)
+        self.assertEqual(early["attempt_token_cost"], prior["attempt_token_cost"])
+        many = {"outcomes": {model["id"]: {"review": {"attempts": 10, "successes": 10, "tokens_in": 10 * 1000, "tokens_out": 0, "minutes": 50}}}}
+        cfg["routing_policy"]["minute_value_usd"] = 1
+        late = MODULE.expected_cost_per_success(cfg, model, many, "review", 1000)
+        self.assertAlmostEqual(late["attempt_token_cost"], 1000 * 0.3 / 1_000_000)
+        self.assertGreater(late["expected_cost_per_success"], 5 / late["p_success"] - 1e-9)
+
+    def test_active_promo_is_used_and_expired_promo_is_ignored(self):
+        model = {"list_price_in": 1, "list_price_out": 2, "promo": {"price_in": 0, "price_out": 0, "until": "2026-10-09T00:00:00Z"}}
+        before = MODULE._timestamp("2026-10-01T00:00:00Z")
+        after = MODULE._timestamp("2026-10-10T00:00:00Z")
+        self.assertEqual(MODULE.effective_prices(model, before), (0.0, 0.0, "promo"))
+        self.assertEqual(MODULE.effective_prices(model, after), (1.0, 2.0, "list"))
+
+    def test_credit_multiplier_discounts_price(self):
+        model = {"list_price_in": 1, "list_price_out": 2, "effective_price_multiplier": 0.25, "price_basis": "prepaid credits"}
+        self.assertEqual(MODULE.effective_prices(model, 0), (0.25, 0.5, "list+credits"))
+
+    def test_quality_floor_refuses(self):
+        cfg = self.cfg()
+        flash = self.model(cfg, "gateway-glm-5.3-flash")
+        self.assertEqual(MODULE.score_candidate(cfg, flash, {}, "review-verify", 1000)[1], "below_quality_floor")
+
+    def test_economic_fields_are_validated(self):
+        for field, value in (
+            ("promo", {"price_in": 0, "price_out": 0}),
+            ("promo", {"price_in": -1, "price_out": 0, "until": "2026-10-09"}),
+            ("promo", "free"),
+            ("effective_price_multiplier", 1.5),
+        ):
+            with self.subTest(field=field, value=value):
+                cfg = self.cfg()
+                cfg["models"][0][field] = value
+                with self.assertRaises(ValueError):
+                    MODULE.validate_registry(cfg)
+        cfg = self.cfg()
+        cfg["models"][0]["effective_price_multiplier"] = 0.5
+        with self.assertRaisesRegex(ValueError, "price_basis"):
+            MODULE.validate_registry(cfg)
+        cfg["models"][0]["price_basis"] = "prepaid credits"
+        cfg["models"][0]["promo"] = {"price_in": 0, "price_out": 0, "until": 1893456000}
+        MODULE.validate_registry(cfg)
+        self.assertIsNone(MODULE._timestamp(True))
+        self.assertIsNone(MODULE._timestamp("not-a-date"))
+        self.assertIsNone(MODULE._timestamp(None))
+
+    def test_rank_and_record_outcome_round_trip_through_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = {"GEM_MODEL_ROUTER_STATE": str(pathlib.Path(root) / "state.json")}
+            with mock.patch.dict(os.environ, env):
+                ranked = MODULE.rank("review-verify", provider="vercel-ai-gateway")
+                self.assertEqual([row["id"] for row in ranked["ranked"]], ["gateway-glm-5.3"])
+                self.assertIn({"id": "gateway-glm-5.3-flash", "reason": "below_quality_floor"}, ranked["refused"])
+                st = MODULE.state()
+                for _ in range(6):
+                    MODULE.record_outcome(st, "gateway-glm-5.3-flash", "review", False, 60000, 20000, 1)
+                entry = MODULE.state()["outcomes"]["gateway-glm-5.3-flash"]["review"]
+                self.assertEqual((entry["attempts"], entry["successes"]), (6, 0))
+                after = MODULE.rank("review", provider="vercel-ai-gateway")
+                self.assertNotEqual(after["ranked"][0]["id"], "gateway-glm-5.3-flash")
+                filtered = MODULE.rank("review", provider="vercel-ai-gateway", channel="api", min_quality=70, exclude_families=("deepseek",))
+                self.assertEqual([row["id"] for row in filtered["ranked"]], ["gateway-glm-5.3"])
+                reasons = {row["reason"] for row in filtered["refused"]}
+                self.assertTrue({"excluded_family", "below_min_quality"} <= reasons)
+                MODULE.mark_model_exhausted("gateway-glm-5.3", 600)
+                MODULE.update_state(MODULE.state(), lambda s: s.setdefault("cooldowns", {}).update({"deepseek-v4-flash": time.time() + 600}))
+                blocked = {row["id"]: row["reason"] for row in MODULE.rank("review", provider="vercel-ai-gateway")["refused"]}
+                self.assertEqual(blocked["gateway-glm-5.3"], "pool_exhausted")
+                with self.assertRaises(KeyError):
+                    MODULE.mark_model_exhausted("no-such-model")
+
+    def test_cli_rank_record_outcome_and_mark_exhausted(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = {**os.environ, "GEM_MODEL_ROUTER_STATE": str(pathlib.Path(root) / "state.json")}
+            run = lambda *args: subprocess.run([sys.executable, str(ROUTER), *args], capture_output=True, text=True, env=env)
+            ranked = run("rank", "--capability", "review", "--provider", "vercel-ai-gateway")
+            self.assertEqual(ranked.returncode, 0)
+            self.assertTrue(json.loads(ranked.stdout)["ranked"])
+            ok = run("record-outcome", "--model-id", "gateway-glm-5.3", "--capability", "review", "--success", "1", "--tokens-in", "10")
+            self.assertEqual(json.loads(ok.stdout), {"ok": True})
+            self.assertEqual(run("record-outcome", "--model-id", "nope", "--capability", "review", "--success", "1").returncode, 2)
+            marked = run("mark-exhausted", "--model-id", "gateway-glm-5.3", "--reason", "quota")
+            self.assertEqual(json.loads(marked.stdout)["pool"], "vercel-gateway")
+            self.assertEqual(run("mark-exhausted", "--model-id", "nope").returncode, 2)
 
 if __name__ == "__main__": unittest.main()
