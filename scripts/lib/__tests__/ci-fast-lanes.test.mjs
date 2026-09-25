@@ -929,6 +929,52 @@ describe('failure annotation helpers', () => {
     expect(failureAnnotationMessage({ id: 'typecheck' }, '')).toBe('');
   });
 
+  it('keeps the newest diagnostics when the annotation header exceeds its budget', () => {
+    const early = Array.from(
+      { length: 4 },
+      (_, index) => `Error: early ${index} ${'x'.repeat(150)}`
+    );
+    const output = [...early, 'Error: final root cause'].join('\n');
+    const annotation = failureAnnotationMessage(
+      { id: 'typecheck' },
+      laneFailureExcerpt('typecheck', output)
+    );
+    expect(annotation.startsWith('Diagnostics: | ')).toBe(true);
+    expect(annotation.endsWith('Error: final root cause')).toBe(true);
+    expect(annotation).not.toContain('early 0');
+    expect(annotation.length).toBeLessThanOrEqual(400);
+  });
+
+  it('keeps the last occurrence of a repeated diagnostic line', () => {
+    const text = [
+      'Error: root cause',
+      'Error: b',
+      'Error: c',
+      'Error: d',
+      'Error: e',
+      'Error: f',
+      'Error: root cause',
+    ].join('\n');
+    expect(extractDiagnosticLines(text)).toEqual([
+      'Error: c',
+      'Error: d',
+      'Error: e',
+      'Error: f',
+      'Error: root cause',
+    ]);
+  });
+
+  it('matches lowercase TypeScript compiler errors but not error-count summaries', () => {
+    const text = [
+      "src/a.ts(1,2): error TS2532: Object is possibly 'undefined'.",
+      'errors: 0',
+      'Found 0 errors.',
+    ].join('\n');
+    expect(extractDiagnosticLines(text)).toEqual([
+      "src/a.ts(1,2): error TS2532: Object is possibly 'undefined'.",
+    ]);
+  });
+
   it('keeps the structural header as the annotation for structural failures', () => {
     const excerpt = laneFailureExcerpt(
       'structural',

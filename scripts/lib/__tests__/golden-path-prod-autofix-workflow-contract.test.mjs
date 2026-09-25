@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { buildProdProbeReceipt } from '../golden-path-lock.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -57,7 +60,7 @@ describe('Golden Path prod autofix workflow contract', () => {
     expect(cursorGuard).toBeGreaterThan(successGuard);
   });
 
-  it('fails visibly without autofix when chat verification stops at Turnstile', () => {
+  it('warns visibly without autofix when chat verification stops at Turnstile', () => {
     const inconclusiveGuard = WORKFLOW.indexOf(
       '.inconclusive == true and ([.checks[] | select(.ok == false and .inconclusive != true)] | length == 0)'
     );
@@ -75,6 +78,8 @@ describe('Golden Path prod autofix workflow contract', () => {
     expect(WORKFLOW).toContain(
       'The post-challenge first-message path was not exercised'
     );
+    expect(WORKFLOW).toContain('::warning title=Golden path unverified::');
+    expect(WORKFLOW).not.toContain('::error title=Golden path unverified::');
   });
 
   it('probes the anonymous UIMessage stream and reports only a completed stream as pass', () => {
@@ -124,6 +129,141 @@ describe('Golden Path prod autofix workflow contract', () => {
     expect(postdeploy).toContain('Read-only evidence');
     expect(postdeploy).not.toContain('golden-path-lock.mjs');
     expect(postdeploy).not.toContain('CURSOR_API_KEY');
+  });
+});
+
+const CLASSIFY_STEP_NAME = 'Classify the prod probe before any autofix';
+const RECEIPT_PATH = '/tmp/golden-path-lock/receipt.json';
+
+function classifyStepScript() {
+  const start = WORKFLOW.indexOf(`- name: ${CLASSIFY_STEP_NAME}`);
+  expect(start).toBeGreaterThan(-1);
+  const runStart = WORKFLOW.indexOf('run: |\n', start);
+  expect(runStart).toBeGreaterThan(start);
+  const lines = WORKFLOW.slice(runStart + 'run: |\n'.length).split('\n');
+  const body = [];
+  for (const line of lines) {
+    if (line.trim() !== '' && !line.startsWith('          ')) break;
+    body.push(line.slice(10));
+  }
+  return body.join('\n');
+}
+
+const PASSING_CHECKS = [
+  { id: 'homepage', ok: true, reason: 'ok' },
+  { id: 'waitlist-unauth', ok: true, reason: 'ok' },
+  { id: 'claim-unauth', ok: true, reason: 'ok' },
+  { id: 'billing-health', ok: true, reason: 'ok' },
+  { id: 'stripe-webhook-liveness', ok: true, reason: 'ok' },
+];
+const TURNSTILE_CHECK = {
+  id: 'logged-out-first-message',
+  ok: false,
+  inconclusive: true,
+  reason:
+    'probe reached Turnstile but supplied no valid token; post-challenge first-message path was not exercised',
+};
+
+function runClassifyStep({ probeOutcome, receipt }) {
+  const dir = mkdtempSync(join(tmpdir(), 'golden-path-classify-'));
+  try {
+    const receiptPath = join(dir, 'receipt.json');
+    const summaryPath = join(dir, 'summary.md');
+    writeFileSync(summaryPath, '');
+    if (receipt) writeFileSync(receiptPath, JSON.stringify(receipt));
+    const script = classifyStepScript().replaceAll(RECEIPT_PATH, receiptPath);
+    const result = spawnSync('bash', ['-c', script], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        PROBE_OUTCOME: probeOutcome,
+        GITHUB_STEP_SUMMARY: summaryPath,
+        CURSOR_API_KEY: '',
+      },
+    });
+    return {
+      status: result.status,
+      stdout: result.stdout,
+      summary: readFileSync(summaryPath, 'utf8'),
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const hasJq = spawnSync('jq', ['--version']).status === 0;
+
+// Regression: Golden Path Prod Autofix failed 16/16 on main because a
+// Turnstile-blocked (inconclusive) probe still exited 1 after #18229.
+describe.skipIf(!hasJq)('Golden Path prod classify step behavior', () => {
+  it('exits 0 with a warning when the only non-pass is the Turnstile inconclusive', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: false,
+      checks: [TURNSTILE_CHECK, ...PASSING_CHECKS],
+    });
+    expect(receipt.inconclusive).toBe(true);
+    const result = runClassifyStep({ probeOutcome: 'failure', receipt });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('::warning title=Golden path unverified::');
+    expect(result.stdout).not.toContain('::error');
+    expect(result.summary).toContain('Golden path status: inconclusive');
+  });
+
+  it('still fails when an actionable check fails alongside the Turnstile inconclusive', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: false,
+      checks: [
+        TURNSTILE_CHECK,
+        { id: 'billing-health', ok: false, reason: 'billing 500' },
+        ...PASSING_CHECKS.filter(check => check.id !== 'billing-health'),
+      ],
+    });
+    const result = runClassifyStep({ probeOutcome: 'failure', receipt });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('CURSOR_API_KEY is missing');
+    expect(result.stdout).not.toContain('::warning');
+  });
+
+  it('still fails on a genuine probe failure without Turnstile', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: false,
+      checks: [
+        {
+          id: 'logged-out-first-message',
+          ok: false,
+          reason: 'logged-out /start first message returned 401',
+        },
+        ...PASSING_CHECKS,
+      ],
+    });
+    const result = runClassifyStep({ probeOutcome: 'failure', receipt });
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('::warning');
+  });
+
+  it('fails closed when the probe wrote no receipt', () => {
+    const result = runClassifyStep({ probeOutcome: 'failure', receipt: null });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('wrote no receipt');
+  });
+
+  it('passes a clean all-pass probe', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: true,
+      checks: [
+        {
+          id: 'logged-out-first-message',
+          ok: true,
+          reason:
+            'logged-out first-message stream reached a clean finish event',
+        },
+        ...PASSING_CHECKS,
+      ],
+    });
+    const result = runClassifyStep({ probeOutcome: 'success', receipt });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Live golden-path probe passed');
   });
 });
 
