@@ -82,8 +82,17 @@ export function outcomeWindowClosed(
 }
 
 const REVERT_TITLE_RE = /^revert\b/i;
-const REVERT_BODY_RE =
-  /(?:^|\n)\s*(?:reverts\s+[\w.-]+\/[\w.-]+#\d+|this reverts commit\b)/i;
+const REVERT_LINE_RE = /^reverts\s+\S+\/\S+#\d+/i;
+const GITHUB_REVERT_COMMIT_RE = /^this reverts commit\b/i;
+const REVERT_PR_RE =
+  /reverts?\s+(?:pull\s+(?:request\s+)?)?[\w.-]+\/[\w.-]+#(\d+)/i;
+const REVERT_LINE_NUMBER_RE = /^revert\b[^#]*#(\d+)/i;
+const GITHUB_PR_URL_RE = /github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/i;
+
+function lineIsRevertBody(line: string): boolean {
+  const trimmed = line.trim();
+  return REVERT_LINE_RE.test(trimmed) || GITHUB_REVERT_COMMIT_RE.test(trimmed);
+}
 
 /**
  * Detect a GitHub revert PR. A later PR that merely mentions the word
@@ -99,7 +108,7 @@ export function isRevertOfPr(candidate: {
   const head = candidate.headRefName ?? '';
   return (
     REVERT_TITLE_RE.test(title) ||
-    REVERT_BODY_RE.test(body) ||
+    body.split('\n').some(lineIsRevertBody) ||
     /^revert[-/]/i.test(head)
   );
 }
@@ -110,12 +119,12 @@ export function revertTargetPrNumber(candidate: {
   body?: string | null;
 }): number | null {
   const haystack = `${candidate.title ?? ''}\n${candidate.body ?? ''}`;
-  const direct = haystack.match(
-    /reverts?\s+(?:pull\s+(?:request\s+)?)?[\w.-]+\/[\w.-]+#(\d+)/i
-  );
-  if (direct) return Number(direct[1]);
-  const titled = haystack.match(/(?:^|\n)\s*revert\b[^\n]*#(\d+)/i);
-  if (titled) return Number(titled[1]);
+  const direct = REVERT_PR_RE.exec(haystack);
+  if (direct?.[1]) return Number(direct[1]);
+  for (const line of haystack.split('\n')) {
+    const titled = REVERT_LINE_NUMBER_RE.exec(line.trim());
+    if (titled?.[1]) return Number(titled[1]);
+  }
   return null;
 }
 
@@ -135,7 +144,7 @@ export function ingestionWatermark(
   const floors = incompleteIsos.filter(
     (value): value is string => typeof value === 'string' && value.length > 0
   );
-  floors.sort();
+  floors.sort((left, right) => left.localeCompare(right));
   return floors[0] ?? nowIso;
 }
 
@@ -169,7 +178,7 @@ export function readBackfillDays(
 export function normalizeRepoPath(p: string): string {
   return p
     .trim()
-    .replace(/\\/g, '/')
+    .replaceAll('\\', '/')
     .replace(/^\.\/+/, '')
     .replace(/^\/+/, '');
 }
@@ -213,9 +222,9 @@ export function parseGithubPrUrl(
   url: string | null | undefined
 ): { owner: string; repo: string; number: number } | null {
   if (!url) return null;
-  const m = url.match(/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/i);
-  if (!m) return null;
-  return { owner: m[1], repo: m[2], number: Number(m[3]) };
+  const matched = GITHUB_PR_URL_RE.exec(url);
+  if (!matched?.[1] || !matched[2] || !matched[3]) return null;
+  return { owner: matched[1], repo: matched[2], number: Number(matched[3]) };
 }
 
 /** sha256 hex digest — used for prompt_digest (never store prompt text). */
