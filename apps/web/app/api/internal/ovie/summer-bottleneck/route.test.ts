@@ -24,6 +24,7 @@ import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
 import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
+import * as summerShadowClient from '@/lib/ovie/summer-shadow-client';
 import { POST } from './route';
 
 const NOW = '2026-09-04T20:00:00.000Z';
@@ -1037,6 +1038,25 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       code: 'eve_protection_bypass_invalid',
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('propagates unexpected transport-header errors without delivering the snapshot', async () => {
+    const error = new Error('Unexpected transport-header failure');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const transportHeaders = vi
+      .spyOn(summerShadowClient, 'eveShadowTransportHeaders')
+      .mockImplementationOnce(() => {
+        throw error;
+      });
+
+    try {
+      await expect(POST(request(validSnapshot()))).rejects.toBe(error);
+      expect(transportHeaders).toHaveBeenCalledWith(oidcToken());
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      transportHeaders.mockRestore();
+    }
   });
 
   it('accepts main ahead of the deployed bridge and preserves explicit unknown authorities', async () => {
