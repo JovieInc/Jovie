@@ -270,7 +270,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `apps/eve-pilot/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a89fbe8cb8d91a3cd1febb7e34a36379eadd320ffecc4d4c415d6b4b9fd2340c`)
+- `apps/eve-pilot/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ef82ddae777ecc9718e2867ef93ce0da362cecdcf1834371a55f96c093c13032`)
 
 ### `apps/eve-pilot/package.json`: packageManager
 
@@ -314,7 +314,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "braintrust": "3.34.0",
   "eve": "0.63.0",
   "just-bash": "3.4.2",
-  "microsandbox": "0.5.5",
+  "microsandbox": "0.7.2",
   "zod": "4.6.5"
 }
 ```

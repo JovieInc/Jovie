@@ -22,13 +22,13 @@ importers:
         version: 3.34.0(zod@4.6.5)
       eve:
         specifier: 0.63.0
-        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.5.5)
+        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
       microsandbox:
-        specifier: 0.5.5
-        version: 0.5.5
+        specifier: 0.7.2
+        version: 0.7.2
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -534,6 +534,9 @@ packages:
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@microsandbox/types@0.7.2':
+    resolution: {integrity: sha512-K02/NyT4VaC14fXUlC6cC3qBYHMzfkhTEibOzJMh7P99wlbA+SxungRpZqPAm4tOzmClZEoBlC8es52Y7ipUtQ==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -1177,23 +1180,35 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.5.5':
-    resolution: {integrity: sha512-Yy7b2Ak+/WT+Ho3yRrcKclSl+hNVwcEAqtrWFLIQoGIjSCYEsL30r9S21zKFgd7z5o/FMdaGt/sNqWsV47Ar5g==}
+  '@superradcompany/microsandbox-darwin-arm64@0.7.2':
+    resolution: {integrity: sha512-i6XkuEaWM0IPGK9pWg4CGegxQ3pFrobLLc7C3C4ImjMdAwCUOzYCAqKQUcsuKQmIJixbWRVpIccQOJe/sYkexA==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.5.5':
-    resolution: {integrity: sha512-rOTT9yv81gEExbu8FDIyVQtN4wUk734jqWVNSXnMOk8CqLlIHZzLw0wRzkvWvuMUQ59B9GHG7jOzIinIkmnlsw==}
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.2':
+    resolution: {integrity: sha512-gU15ar5FtNXfQGiKktdgJdkba5dW5+yDv7gx38sD6QrgqhSOgVsC17yvrPOD+AAdBbj6GTntlbL3ENn/rx7MKQ==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [linux]
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.5.5':
-    resolution: {integrity: sha512-ZCrZskoX5wR6nQ42AqDXrJXE2t+2+/N3hb522Wudif+09Sr8OXFB3U2NA2YzN6yvzeL4PFga/DX/BT5jtsRjdg==}
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.2':
+    resolution: {integrity: sha512-5gmMDYjyGXtx+13rWKeI0/f6x7ecDg6aMFVCupgr23IQODQLuGsbvn70LyXUrT0bOlYhle6i4uum2+AwVKTU8Q==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [linux]
+
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.2':
+    resolution: {integrity: sha512-Vhn6POQS6MKuSnthhOHppt8FAS9Lb2TqPr59q/NtBk2AXC4uK5tiUwKQCA/H7E1irzE8YHhT/rvMHufHkYXo7A==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.2':
+    resolution: {integrity: sha512-B33UPd8Tfk+Q7r1w+QmDmwO3e16x7n0wr2c+ynssJRxjoD4llLF+LBN2WeseTtEb32IuOM+nVgeFAFuyL7q4Mg==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [win32]
 
   '@tokenizer/inflate@0.4.1':
     resolution: {integrity: sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA==}
@@ -2311,8 +2326,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  microsandbox@0.5.5:
-    resolution: {integrity: sha512-AJBFSIK4TYEO6pNfuXfceq3BcqOj2hxBEQjiXYNv6C4UtGDE2CNSzLwGzT2CCkuucRy+9EWvO8KS/zSZMgd/CA==}
+  microsandbox@0.7.2:
+    resolution: {integrity: sha512-SKrNTnnOzhLofhDRQAXmXeO5QEkBYzK9e0o+B8WD5FkIONjGks/y/GVcupdsFzZVJXNsusMAfImSFbBzL5E0xw==}
     engines: {node: '>= 22'}
     hasBin: true
 
@@ -3556,6 +3571,8 @@ snapshots:
       - encoding
       - supports-color
 
+  '@microsandbox/types@0.7.2': {}
+
   '@mixmark-io/domino@2.2.0': {}
 
   '@mongodb-js/zstd@7.0.0':
@@ -3939,13 +3956,19 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.5.5':
+  '@superradcompany/microsandbox-darwin-arm64@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.5.5':
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.2':
     optional: true
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.5.5':
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.2':
+    optional: true
+
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.2':
+    optional: true
+
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.2':
     optional: true
 
   '@tokenizer/inflate@0.4.1':
@@ -4842,7 +4865,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.5.5):
+  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.34.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.2):
     dependencies:
       ai: 7.0.107(zod@4.6.5)
       nitro: 3.0.260903-beta
@@ -4851,7 +4874,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       braintrust: 3.34.0(zod@4.6.5)
       just-bash: 3.4.2
-      microsandbox: 0.5.5
+      microsandbox: 0.7.2
 
   events-intercept@2.0.0: {}
 
@@ -5308,11 +5331,15 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  microsandbox@0.5.5:
+  microsandbox@0.7.2:
+    dependencies:
+      '@microsandbox/types': 0.7.2
     optionalDependencies:
-      '@superradcompany/microsandbox-darwin-arm64': 0.5.5
-      '@superradcompany/microsandbox-linux-arm64-gnu': 0.5.5
-      '@superradcompany/microsandbox-linux-x64-gnu': 0.5.5
+      '@superradcompany/microsandbox-darwin-arm64': 0.7.2
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.2
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.2
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.2
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.2
 
   mime-db@1.52.0: {}
 
