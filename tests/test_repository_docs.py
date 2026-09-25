@@ -100,6 +100,62 @@ class DocumentationParity(unittest.TestCase):
         self.save()
         with self.assertRaises(ValueError): docs.run(self.root, True)
 
+    def test_entrypoints_and_aliases_cannot_be_overwritten(self):
+        original = (self.root / "README.md").read_bytes()
+        (self.root / "readme-alias").symlink_to("README.md")
+        for destination in ("README.md", "readme-alias"):
+            with self.subTest(destination=destination):
+                self.config["imports"] = []
+                self.config["output"] = destination
+                self.save()
+                with self.assertRaises(ValueError): docs.run(self.root, True)
+                self.config["output"] = "docs/SOURCES.md"
+                self.config["imports"] = [{"repository": "x/y", "revision": "a" * 40, "path": "p", "destination": destination, "sha256": docs.digest(original)}]
+                self.save()
+                with self.assertRaises(ValueError): docs.run(self.root, True)
+                self.assertEqual((self.root / "README.md").read_bytes(), original)
+                self.assertFalse((self.root / "docs/SOURCES.md").exists())
+
+    def test_imported_sources_use_pending_bytes_before_any_mutation(self):
+        upstream = self.root / "upstream"
+        upstream.mkdir()
+        def git(*args):
+            return subprocess.run(["git", "-C", str(upstream), *args], check=True, capture_output=True).stdout.decode().strip()
+        git("init")
+        git("config", "user.email", "test@example.invalid")
+        git("config", "user.name", "Test")
+        old = (self.root / "package.json").read_bytes()
+        (upstream / "package.json").write_bytes(old)
+        git("add", ".")
+        git("commit", "-m", "old manifest")
+        first = git("rev-parse", "HEAD")
+        item = {"repository": "x/y", "revision": first, "path": "package.json", "destination": "package.json", "sha256": docs.digest(old)}
+        self.config["imports"] = [item]
+        self.save()
+        mapping = {"x/y": upstream}
+        docs.run(self.root, True, mapping)
+        original_projection = (self.root / "docs/SOURCES.md").read_bytes()
+        for content in (b'{"dependencies":{"eve":"2.0.0"}}', b'{'):
+            (upstream / "package.json").write_bytes(content)
+            git("commit", "-am", "update manifest")
+            item.update(revision=git("rev-parse", "HEAD"), sha256=docs.digest(content))
+            self.save()
+            before = (self.root / "package.json").read_bytes()
+            projection = (self.root / "docs/SOURCES.md").read_bytes()
+            if content == b'{':
+                with self.assertRaises(ValueError): docs.run(self.root, True, mapping)
+                self.assertEqual((self.root / "package.json").read_bytes(), before)
+                self.assertEqual((self.root / "docs/SOURCES.md").read_bytes(), projection)
+            else:
+                self.assertEqual(docs.run(self.root, True, mapping), [])
+                self.assertEqual(docs.run(self.root), [])
+                self.assertIn('"eve": "2.0.0"', (self.root / "docs/SOURCES.md").read_text())
+        item.update(revision=first, sha256=docs.digest(old))
+        self.save()
+        self.assertEqual(docs.run(self.root, True, mapping), [])
+        self.assertEqual(docs.run(self.root), [])
+        self.assertEqual((self.root / "docs/SOURCES.md").read_bytes(), original_projection)
+
     def test_cli_entrypoint_and_non_json_source_are_measured(self):
         self.config["sources"].append({"path": "README.md", "purpose": "Local guidance"})
         self.save()

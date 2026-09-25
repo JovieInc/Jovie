@@ -511,21 +511,21 @@
   "imports": [
     {
       "repository": "JovieInc/ci",
-      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "revision": "f4dd7982b527a94bab3581c7507a4094d6b47bdf",
       "path": "scripts/repository_docs.py",
       "destination": "scripts/repository_docs.py",
-      "sha256": "645470f1bb531ed57d1c668b3eb1049cf0db6354d0319c9a4ca3745738956ebc"
+      "sha256": "e30513e859bba4e86d878aeec9a72c4f300567679901f72aad72030a4e0b1c9b"
     },
     {
       "repository": "JovieInc/ci",
-      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "revision": "f4dd7982b527a94bab3581c7507a4094d6b47bdf",
       "path": "tests/test_repository_docs.py",
       "destination": "tests/test_repository_docs.py",
-      "sha256": "bb7206733b1e5fd370bf82bae4786355f787e82b7c04b6a28699252a1d1628cc"
+      "sha256": "f62877c3a34176b3eb1d914a7f6a1cf876cb7d53b2233fc9f43e5649910888fc"
     },
     {
       "repository": "JovieInc/ci",
-      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "revision": "f4dd7982b527a94bab3581c7507a4094d6b47bdf",
       "path": "LICENSE",
       "destination": "docs/company/CI_TOOL_LICENSE",
       "sha256": "c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143"
