@@ -44,7 +44,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["scripts/hermes/**", "docs/hermes/**"],
-    "bodySha256": "a8e1c32a2b612b5c3757357e063442b173513929642771fb228cab8796fbceb6"
+    "bodySha256": "45aec3a578146f0d15427afa86a6ae65ca32301e791bf67e77e3df467aa242c5"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -68,7 +68,7 @@
       "scripts/hermes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "73e61f1035f4d715e08422a99a0577f72f3f9f84c87d43554a7b9a7c9bdc53ee"
+    "bodySha256": "134b8c995a8ed17caed87e8986515ffdd239033bb2cb40798f47254cf705cad4"
   },
   {
     "file": ".claude/rules/macos.md",
