@@ -637,7 +637,11 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       expect(String(fetch.mock.calls[0]?.[0])).toBe(
         'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
       );
-      expect(String(fetch.mock.calls[0]?.[0])).not.toContain('evil');
+      if (origin === 'https://evil.test') {
+        expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith(
+          expect.objectContaining({ pinnedOrigin: origin })
+        );
+      }
     }
   );
 
@@ -1210,30 +1214,6 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     }
   );
 
-  it('does not request a malicious configured Eve origin', async () => {
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://evil.example.com');
-    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-      Response.json(
-        {
-          ok: true,
-          receipt: { eventId: validSnapshot().eventId, decision: 'accepted' },
-        },
-        { status: 202 }
-      )
-    );
-    vi.stubGlobal('fetch', fetch);
-
-    const response = await POST(request(validSnapshot()));
-
-    expect(response.status).toBe(202);
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
-      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
-    );
-    expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith(
-      expect.objectContaining({ pinnedOrigin: 'https://evil.example.com' })
-    );
-  });
-
   it('rejects an all-zero source SHA before signing', async () => {
     const response = await POST(
       request({ ...validSnapshot(), sourceVersion: '0'.repeat(40) })
@@ -1350,75 +1330,6 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
-
-  it.each([
-    'bottleneck_runtime_unavailable',
-    'bottleneck_processing_failed',
-  ] as const)(
-    'logs Eve error code %s without the response body',
-    async code => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () =>
-          Response.json({ code, detail: 'secret-blob-token' }, { status: 503 })
-        )
-      );
-      const response = await POST(request(validSnapshot()));
-      expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({
-        ok: false,
-        code: 'eve_bottleneck_rejected',
-      });
-      const logged = JSON.stringify(errorSpy.mock.calls);
-      expect(logged).toContain(code);
-      expect(logged).not.toContain('secret-blob-token');
-      errorSpy.mockRestore();
-    }
-  );
-
-  it.each([
-    ['unreadable', new Response('{', { status: 500 })],
-    ['non-object', Response.json(['nope'], { status: 500 })],
-    [
-      'declared oversized',
-      new Response('{}', {
-        status: 500,
-        headers: { 'content-length': '5000' },
-      }),
-    ],
-    [
-      'streamed oversized',
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(4097));
-            controller.close();
-          },
-        }),
-        { status: 500 }
-      ),
-    ],
-  ])(
-    'logs Eve status without a code for a %s error body',
-    async (_name, body) => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => body)
-      );
-      const response = await POST(request(validSnapshot()));
-      expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({
-        ok: false,
-        code: 'eve_bottleneck_rejected',
-      });
-      const logged = JSON.stringify(errorSpy.mock.calls);
-      expect(logged).toContain('eve_bottleneck_error');
-      expect(logged).not.toContain('"code"');
-      errorSpy.mockRestore();
-    }
-  );
 
   it('maps replay without retrying or exposing Eve response details', async () => {
     const fetch = vi.fn(async () =>

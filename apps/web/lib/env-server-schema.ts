@@ -137,11 +137,7 @@ export const ServerEnvSchema = z.object({
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
   OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
-  /**
-   * Optional advisory pin for `check:summer-eve-pin`. The runtime caller
-   * targets `https://summer.jov.ie` and compares this id with the alias
-   * identity. A stale pin is logged; it is not the request URL.
-   */
+  /** Advisory pin. Runtime calls `https://summer.jov.ie`, not this origin. */
   OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: ovieSummerEveDeploymentOriginSchema,
   OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID:
     ovieSummerEveExpectedDeploymentIdSchema,

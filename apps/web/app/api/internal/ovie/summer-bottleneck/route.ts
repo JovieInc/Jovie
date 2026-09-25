@@ -9,7 +9,6 @@ import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-produ
 import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import {
-  logSummerBridgeEvent,
   resolveSummerEveCallerOrigin,
   SummerPinInvalidError,
 } from '@/lib/ovie/summer-production-pin';
@@ -300,51 +299,6 @@ function hasExpectedProductionClaims(token: string): boolean {
   }
 }
 
-const EVE_ERROR_CODE = /^[a-z][a-z0-9_]{0,63}$/u;
-
-async function readEveErrorCode(
-  response: Response
-): Promise<string | undefined> {
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > 4096) return undefined;
-  const reader = response.body?.getReader();
-  if (!reader) return undefined;
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let text = '';
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > 4096) {
-        await reader.cancel();
-        return undefined;
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-    text += decoder.decode();
-    const parsed: unknown = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return undefined;
-    }
-    const code = (parsed as { code?: unknown }).code;
-    return typeof code === 'string' && EVE_ERROR_CODE.test(code)
-      ? code
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function logEveError(status: number, code: string | undefined): void {
-  logSummerBridgeEvent({
-    event: 'eve_bottleneck_error',
-    status,
-    ...(code ? { code } : {}),
-  });
-}
-
 function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
   if (!Number.isFinite(nowMs)) return false;
   const timestamps = [
@@ -470,16 +424,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   if (upstream.status === 409) {
-    logEveError(upstream.status, await readEveErrorCode(upstream));
     return json({ ok: false, code: 'replay_rejected' }, 409);
   }
   if (!upstream.ok) {
-    const code = await readEveErrorCode(upstream);
     logger.error('[ovie-summer-bottleneck] Eve rejected the snapshot', {
       status: upstream.status,
-      ...(code ? { code } : {}),
     });
-    logEveError(upstream.status, code);
     return json({ ok: false, code: 'eve_bottleneck_rejected' }, 502);
   }
 

@@ -50,10 +50,7 @@ export function eveShadowTransportHeaders(
   return headers;
 }
 
-/**
- * Stable production Summer alias. Exact deployment pins are not the caller
- * target; `resolveSummerEveCallerOrigin` checks them and falls back here.
- */
+/** Stable production Summer alias. Exact pins are checked, not requested. */
 export function getEveShadowOrigin(): string {
   return SUMMER_PRODUCTION.productionOrigin;
 }

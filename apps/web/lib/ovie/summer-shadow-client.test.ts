@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_live',
+  })),
+}));
 
 vi.mock('server-only', () => ({}));
 vi.mock('@vercel/oidc', () => ({
@@ -7,45 +14,32 @@ vi.mock('@vercel/oidc', () => ({
 vi.mock('@/lib/http/bounded-fetch', () => ({
   boundedFetch: vi.fn(async () => Response.json({ ok: true })),
 }));
+vi.mock('./summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: mocks.resolveSummerEveCallerOrigin,
+  SummerPinInvalidError: class SummerPinInvalidError extends Error {
+    readonly code = 'summer_pin_invalid';
+  },
+}));
 
 import { getVercelOidcToken } from '@vercel/oidc';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
-import { SUMMER_PRODUCTION } from './summer-production-identity';
-import * as summerProductionPin from './summer-production-pin';
+import {
+  resolveSummerEveCallerOrigin,
+  SummerPinInvalidError,
+} from './summer-production-pin';
 import { fetchSummerShadow } from './summer-shadow-client';
 
 const PINNED_ORIGIN = 'https://jovie-eve-shadow-abc123-jovie.vercel.app';
-const PINNED_ID = 'dpl_testpin';
-
-function identityResponse(status = 200, body: Record<string, unknown> = {}) {
-  return Response.json(
-    {
-      id: SUMMER_PRODUCTION.serviceId,
-      projectId: SUMMER_PRODUCTION.projectId,
-      environment: 'production',
-      deploymentId: PINNED_ID,
-      blobAuth: 'oidc',
-      ...body,
-    },
-    { status }
-  );
-}
-
-beforeEach(() => {
-  summerProductionPin.resetSummerProductionPinCache();
-  vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', PINNED_ID);
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => identityResponse())
-  );
-});
 
 afterEach(() => {
-  summerProductionPin.resetSummerProductionPinCache();
   vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   vi.clearAllMocks();
+  mocks.resolveSummerEveCallerOrigin.mockResolvedValue({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_live',
+  });
 });
+
 describe('Summer production OIDC transport', () => {
   it('rejects non-production callers and paths outside the shadow channel', async () => {
     vi.stubEnv('VERCEL_ENV', 'preview');
@@ -59,18 +53,17 @@ describe('Summer production OIDC transport', () => {
     expect(boundedFetch).not.toHaveBeenCalled();
   });
 
-  it('targets the production alias when the exact pin is unset', async () => {
+  it('uses the production alias, short-lived OIDC, no redirects and no mutation retries', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', '');
     vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', '');
     await fetchSummerShadow('/ovie/v1/summer-shadow/events');
-    expect(String(vi.mocked(boundedFetch).mock.calls[0]?.[0])).toBe(
-      'https://summer.jov.ie/ovie/v1/summer-shadow/events'
-    );
-  });
-
-  it('uses the production alias, short-lived OIDC, no redirects and no mutation retries', async () => {
-    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(resolveSummerEveCallerOrigin).toHaveBeenCalledWith({
+      pinnedOrigin: '',
+      pinnedDeploymentId: '',
+    });
+    vi.mocked(boundedFetch).mockClear();
+    vi.mocked(getVercelOidcToken).mockClear();
     vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
     await fetchSummerShadow('/ovie/v1/summer-shadow/events', {
       method: 'POST',
@@ -98,10 +91,7 @@ describe('Summer production OIDC transport', () => {
 
   it('sends the eve-shadow automation bypass secret only as a header', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv(
-      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
-    );
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
     vi.stubEnv('VERCEL_AUTOMATION_BYPASS_SECRET', 'jovie-project-secret');
     vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'eve-shadow-secret');
     await fetchSummerShadow('/ovie/v1/summer-shadow/events', {
@@ -125,10 +115,7 @@ describe('Summer production OIDC transport', () => {
 
   it('ignores a blank bypass secret and rejects a header-unsafe one before fetch', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv(
-      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
-    );
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
     vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', '   ');
     await fetchSummerShadow('/ovie/v1/summer-shadow/events');
     const blankHeaders = vi.mocked(boundedFetch).mock.calls[0]?.[1]?.headers as
@@ -143,30 +130,17 @@ describe('Summer production OIDC transport', () => {
     expect(boundedFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('propagates unexpected pin checker failures before OIDC', async () => {
+  it('returns 503 and rethrows unexpected pin failures before OIDC', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
-    const failure = new Error('pin checker crashed');
-    const assertPin = vi
-      .spyOn(summerProductionPin, 'resolveSummerEveCallerOrigin')
-      .mockRejectedValueOnce(failure);
-    try {
-      await expect(
-        fetchSummerShadow('/ovie/v1/summer-shadow/events')
-      ).rejects.toBe(failure);
-      expect(boundedFetch).not.toHaveBeenCalled();
-      expect(getVercelOidcToken).not.toHaveBeenCalled();
-    } finally {
-      assertPin.mockRestore();
-    }
-  });
-
-  it('returns 503 summer_pin_invalid when runtime identity is 404', async () => {
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(null, { status: 404 }))
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(
+      new SummerPinInvalidError(
+        {
+          projectId: 'prj_test',
+          environment: 'production',
+          deploymentId: null,
+        },
+        { status: 404 }
+      )
     );
     const response = await fetchSummerShadow('/ovie/v1/summer-shadow/events');
     expect(response.status).toBe(503);
@@ -174,30 +148,12 @@ describe('Summer production OIDC transport', () => {
       ok: false,
       code: 'summer_pin_invalid',
     });
+    const failure = new Error('pin checker crashed');
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(failure);
+    await expect(
+      fetchSummerShadow('/ovie/v1/summer-shadow/events')
+    ).rejects.toBe(failure);
     expect(boundedFetch).not.toHaveBeenCalled();
     expect(getVercelOidcToken).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the alias and logs when the pinned deployment is stale', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', PINNED_ORIGIN);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => identityResponse(200, { deploymentId: 'dpl_promoted' }))
-    );
-    const response = await fetchSummerShadow('/ovie/v1/summer-shadow/events');
-    expect(response.status).toBe(200);
-    expect(String(vi.mocked(boundedFetch).mock.calls[0]?.[0])).toBe(
-      'https://summer.jov.ie/ovie/v1/summer-shadow/events'
-    );
-    expect(JSON.stringify(errorSpy.mock.calls)).toContain('production_alias');
-    expect(
-      vi
-        .mocked(fetch)
-        .mock.calls.every(call =>
-          String(call[0]).startsWith('https://summer.jov.ie/')
-        )
-    ).toBe(true);
   });
 });
