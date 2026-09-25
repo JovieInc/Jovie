@@ -52,8 +52,7 @@ export function toContentRevisionDate(
   value: Date | string | number | null | undefined
 ): Date | undefined {
   if (value == null || value === '') return undefined;
-  const date =
-    value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  const date = value instanceof Date ? new Date(value) : new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date;
 }
