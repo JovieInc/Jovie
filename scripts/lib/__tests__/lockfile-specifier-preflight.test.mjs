@@ -124,9 +124,7 @@ describe('lockfile importer specifier preflight', () => {
       join(root, 'package.json'),
       JSON.stringify({ pnpm: { overrides: { jsdom: '30.1.0' } } })
     );
-    expect(compareWorkspaceSpecifiers({ root, lockfile: drifted })).toEqual(
-      []
-    );
+    expect(compareWorkspaceSpecifiers({ root, lockfile: drifted })).toEqual([]);
   });
 
   it('honors negated workspace package paths like !apps/eve-pilot', () => {
