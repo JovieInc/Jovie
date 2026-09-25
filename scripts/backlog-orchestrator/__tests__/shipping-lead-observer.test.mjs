@@ -166,7 +166,7 @@ test('truncated, missing or malformed pagination cannot hide a superseding lease
     { hasNextPage: 'false' },
   ]) {
     const f = setup();
-    f.issue.comments.pageInfo = pageInfo;
+    Reflect.set(f.issue.comments, 'pageInfo', pageInfo);
     await assert.rejects(readShippingLeadIssue(f.task, f), /lease-incomplete/);
   }
 });

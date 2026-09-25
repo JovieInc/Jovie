@@ -946,12 +946,16 @@ describe('Shipping Lead complete admission evidence', () => {
             },
           }),
           error => {
+            assert.ok(error instanceof Error);
+            assert.ok('code' in error);
             assert.equal(error.code, expectedCode);
-            if (['identity', 'revision', 'missing'].includes(failure))
+            if (['identity', 'revision', 'missing'].includes(failure)) {
+              assert.ok(error.cause instanceof Error);
               assert.match(
                 error.cause.message,
                 /issue changed during comment pagination/
               );
+            }
             return true;
           }
         );
