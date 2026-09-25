@@ -17,13 +17,9 @@ const mockHookReturn = {
   clear: mockClear,
 };
 
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
-  return {
-    ...actual,
-    useArtistSearchQuery: () => mockHookReturn,
-  };
-});
+vi.mock('@/lib/queries', () => ({
+  useArtistSearchQuery: () => mockHookReturn,
+}));
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
