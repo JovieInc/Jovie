@@ -49,6 +49,9 @@ import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
 import { gateShippingLeadRequest } from './shipping-lead-gate.mjs';
 import { readShippingLeadIssue } from './shipping-lead-observer.mjs';
+
+export { readShippingWorkerEvidence } from './shipping-lead-worker-observer.mjs';
+
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import {
   buildRoutingReceipt,

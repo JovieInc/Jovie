@@ -145,6 +145,39 @@ export function createRuntimeBoundShippingAdmitter({
       } else if (progress.ownerAcceptance.leaseDigest !== issue.leaseDigest) {
         throw new Error('shipping-lead-canonical-lease-changed');
       }
+      const inactive = snapshot =>
+        ['running', 'retrying', 'blocked'].every(key =>
+          snapshot[key].every(
+            row =>
+              row &&
+              typeof row.issueId === 'string' &&
+              typeof row.identifier === 'string' &&
+              row.issueId !== task.issue.id &&
+              row.identifier !== task.issue.identifier
+          )
+        );
+      if (
+        progress.ownerAcceptance &&
+        issue.state === 'Done' &&
+        inactive(observed) &&
+        typeof code.observeWorker === 'function'
+      ) {
+        const worker = await code.observeWorker(task, progress.ownerAcceptance);
+        if (worker) {
+          const latest = await checkRuntime(task, code, true);
+          if (
+            inactive(latest) &&
+            Date.parse(latest.generatedAt) >=
+              Date.parse(worker.exited.observedAt)
+          ) {
+            // Process exit cannot establish that this exact commit shipped.
+            return {
+              status: 'held',
+              reason: 'shipping-lead-worker-stopped-awaiting-production-proof',
+            };
+          }
+        }
+      }
       // A running session is positive acceptance, never terminal execution proof.
       return {
         status: 'held',

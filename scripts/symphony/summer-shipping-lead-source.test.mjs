@@ -282,3 +282,9 @@ test('reconciliation accepts only an ancestor with the same signed contract, nev
   assert.equal(loaded.canReconcileSource(f.git('rev-parse', 'HEAD')), false);
   assert.equal(typeof loaded.observeIssue, 'function');
 });
+
+test('worker observation refuses a verified source generation without the capture producer files', async t => {
+  const loaded = await loadCanonicalShippingAdmission(fixture(t));
+  t.after(loaded.cleanup);
+  assert.throws(() => loaded.observeWorker({}, {}), /Command failed/);
+});

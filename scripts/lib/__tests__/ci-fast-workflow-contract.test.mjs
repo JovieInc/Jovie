@@ -910,10 +910,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-(gate|observer)|ownership-inventory|symphony-(routing|official-runtime))'
+      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-(gate|observer|worker-observer)|ownership-inventory|symphony-(routing|official-runtime))'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-(gate|observer)|ownership-inventory|symphony-(routing|official-runtime))\\.test\\.mjs$'
+      'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-(gate|observer|worker-observer)|ownership-inventory|symphony-(routing|official-runtime))\\.test\\.mjs$'
     );
     expect(structuralDecision).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
@@ -1210,7 +1210,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-observer.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/backlog-orchestrator/__tests__/shipping-lead-observer.test.mjs'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-admitter.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-source.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs scripts/symphony/summer-shipping-lead-source.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
+      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-admitter.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-source.mjs --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-worker-observer.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs scripts/symphony/summer-shipping-lead-source.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
@@ -1617,6 +1617,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/symphony-nvme-package-cache.sh',
       'scripts/symphony/symphony-reconciler.py',
       'scripts/backlog-orchestrator/shipping-lead-observer.mjs',
+      'scripts/backlog-orchestrator/shipping-lead-worker-observer.mjs',
       'scripts/backlog-orchestrator/__tests__/shipping-lead-observer.test.mjs',
       'scripts/symphony/summer-symphony-outbox-consumer.mjs',
       'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
