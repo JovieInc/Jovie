@@ -177,7 +177,10 @@ describe('Artist Visibility billing startup contract', () => {
     validateStripeBillingConfig();
 
     // Recovered (a fix landed between retries).
-    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', 'price_visibility');
+    vi.stubEnv(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
+      'price_visibility'
+    );
     expect(validateStripeBillingConfig().healthy).toBe(true);
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
 
