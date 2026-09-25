@@ -2958,6 +2958,7 @@ describe('linear sync on merge selection', () => {
     'scripts/lib/linear-sync-on-merge.mjs',
     'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
     'docs/REPOSITORY_SOURCES.md',
+    'scripts/agent-context/rule-scopes.json',
     'scripts/run-affected-tests.mjs',
   ];
 

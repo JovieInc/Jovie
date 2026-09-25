@@ -1203,6 +1203,7 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'docs/AUTOMATION_AUDIT.md',
   'docs/PR_WORKFLOW_GUIDE.md',
   'docs/REPOSITORY_SOURCES.md',
+  'scripts/agent-context/rule-scopes.json',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ]);
