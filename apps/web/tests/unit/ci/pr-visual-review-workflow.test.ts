@@ -28,6 +28,13 @@ describe('PR visual review workflow', () => {
     );
   });
 
+  it('runs the lane on changes to its own workflow and scripts', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain("- '.github/workflows/pr-visual-review.yml'");
+    expect(workflow).toContain("- '.github/scripts/pr-visual-*.mjs'");
+  });
+
   it('retires automatic paid model review and keeps capture plus uploads (JOV-6232)', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 

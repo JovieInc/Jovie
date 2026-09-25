@@ -27,6 +27,9 @@ on:
       - '**/*.scss'
       - 'DESIGN.md'
       - 'canon/DESIGN.md'
+      # Exercise the lane itself when its own workflow or scripts change.
+      - '.github/workflows/pr-visual-review.yml'
+      - '.github/scripts/pr-visual-*.mjs'
 
 permissions: {}
 
