@@ -829,9 +829,14 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
       const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-      expect(fetchScript, jobId).toContain(
-        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
-      );
+      // Exact-head Coverage reads history only through the ratchet diff, so
+      // it skips historical blobs (pinned separately below). Jobs whose
+      // guards read historical blobs keep the full unshallow.
+      const expectedFetch =
+        jobId === 'ci-exact-head-coverage'
+          ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+          : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
+      expect(fetchScript, jobId).toContain(expectedFetch);
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
       );
@@ -842,6 +847,73 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
+    const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+    const ratchetSource = readFileSync(
+      join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
+      'utf8'
+    );
+    // The ratchet's diff arguments; the prefetch must replay the same diff so
+    // every blob it reads is local before persist-credentials: false steps.
+    for (const arg of [
+      "'diff'",
+      "'--unified=0'",
+      "'--diff-filter=ACMR'",
+      "'--no-renames'",
+      '`${base}...${head}`',
+      "'apps/web'",
+    ]) {
+      expect(ratchetSource).toContain(arg);
+    }
+    const ratchetDiff =
+      'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
+    const lines = fetchScript.split('\n');
+    const fetchLine = lines.findIndex(line =>
+      line.includes('fetch --no-tags --unshallow --filter=blob:none')
+    );
+    const baseLine = lines.findIndex(
+      line =>
+        line ===
+        'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
+    );
+    const prefetchLine = lines.findIndex(
+      line =>
+        line.startsWith(
+          'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
+        ) && line.endsWith(ratchetDiff)
+    );
+    const offlineLine = lines.findIndex(
+      line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
+    );
+    expect(fetchLine).toBeGreaterThanOrEqual(0);
+    expect(baseLine).toBeGreaterThan(fetchLine);
+    expect(prefetchLine).toBeGreaterThan(baseLine);
+    expect(offlineLine).toBeGreaterThan(prefetchLine);
+    expect(fetchScript).toContain('set -euo pipefail');
+    const fetchStep = job.slice(
+      job.indexOf('      - name: Fetch base-branch history'),
+      job.indexOf('      - name: Verify exact coverage head and diff base')
+    );
+    expect(fetchStep).toContain(
+      "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+    );
+    expect(fetchStep).toContain(
+      "COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    );
+    // The base-commit check must not be satisfiable by a promisor fetch.
+    const verifyStep = job.slice(
+      job.indexOf('      - name: Verify exact coverage head and diff base'),
+      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
+    );
+    expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+    expect(verifyStep).toContain('git cat-file -e "${COVERAGE_BASE}^{commit}"');
+    // Credentials stay step-scoped: no checkout-level blob filter or persisted
+    // token that later test code could reuse.
+    expect(job).not.toContain('filter: blob:none');
+    expect(job).toContain('persist-credentials: false');
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
