@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { extractSwitchContrastPairs } from '../../component-live-storybook-browser.mjs';
 import {
   CANONICAL_LIVE_STORIES,
@@ -57,6 +57,12 @@ const LIFECYCLE_MODULE_URL = pathToFileURL(
   resolve(import.meta.dirname, '../../component-live-storybook-lifecycle.mjs')
 ).href;
 const LIFECYCLE_TEST_TIMEOUT_MS = 30_000;
+// Chromium cold start is process startup, not certification behavior. In CI
+// this file runs inside the structural lane beside the profile-admission
+// Playwright lane on a 2-CPU runner, where launch alone has outrun Vitest's 5s
+// per-test budget. Launch once in a hook with the same process-startup budget
+// the lifecycle tests use, so the test body times only render + extraction.
+const BROWSER_LAUNCH_TIMEOUT_MS = LIFECYCLE_TEST_TIMEOUT_MS;
 const ownedPids = [];
 const lifecycleIt = process.platform === 'win32' ? it.skip : it;
 
@@ -328,6 +334,17 @@ afterEach(() => {
 });
 
 describe('live Storybook component certification', () => {
+  /** @type {import('playwright').Browser | undefined} */
+  let browser;
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+  }, BROWSER_LAUNCH_TIMEOUT_MS);
+
+  afterAll(async () => {
+    await browser?.close();
+  });
+
   it('qualifies exact Node 22 and rejects other majors', () => {
     expect(qualifyNode22('22.23.2').ok).toBe(true);
     expect(qualifyNode22('22.13.0').ok).toBe(true);
@@ -523,9 +540,9 @@ describe('live Storybook component certification', () => {
   });
 
   it('extracts low-contrast thumb and track paints from a rendered Switch fixture', async () => {
-    const browser = await chromium.launch({ headless: true });
+    if (!browser) throw new Error('Chromium was not launched for this suite');
+    const page = await browser.newPage();
     try {
-      const page = await browser.newPage();
       await page.setContent(`
         <div id="switch-fixture">
           <button role="switch" aria-label="Checked toggle" data-state="checked" style="background: rgb(32, 32, 32)">
@@ -571,7 +588,7 @@ describe('live Storybook component certification', () => {
       expect(evaluation.ok).toBe(false);
       expect(details(evaluation)).toMatch(/below WCAG AA/);
     } finally {
-      await browser.close();
+      await page.close();
     }
   });
 
