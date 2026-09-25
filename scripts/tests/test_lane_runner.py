@@ -305,7 +305,9 @@ class RunIssueTest(unittest.TestCase):
 
 class WorkerTest(unittest.TestCase):
     def setUp(self):
-        self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers)
+        self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
+                      lane.fix_red_pr)
+        lane.claim_red_pr = lambda host, name: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         self.linear = FakeLinear([issue("JOV-3")])
@@ -315,7 +317,8 @@ class WorkerTest(unittest.TestCase):
         lane.os.execv = lambda exe, args: self.execs.append(args)
 
     def tearDown(self):
-        lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers = self.saved
+        (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
+         lane.fix_red_pr) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -350,6 +353,14 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
         self.assertEqual(self.execs, [])
 
+    def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
+        fixed = []
+        lane.claim_red_pr = lambda host, name: {"number": 5}
+        lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
+        lane.worker(self.host, "devin")
+        self.assertEqual((fixed, self.linear.moves), ([5], []))
+        self.assertEqual(len(self.execs), 1)
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -383,6 +394,75 @@ class DispatchTest(unittest.TestCase):
         self.assertTrue(lane.provider_healthy({"health": ok, "healthy": "Logged in"}))
         self.assertFalse(lane.provider_healthy({"health": ok, "healthy": "Not logged"}))
         self.assertFalse(lane.provider_healthy({"health": ["/nonexistent/binary"]}))
+
+
+class FixRedTest(unittest.TestCase):
+    def pr(self, number=5, sha="h1", checks=None):
+        return {"number": number, "title": "t", "headRefName": "devin/jov-1", "headRefOid": sha,
+                "statusCheckRollup": checks if checks is not None else [
+                    {"name": "ci-fast (remaining)", "status": "COMPLETED", "conclusion": "FAILURE",
+                     "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
+
+    def test_red_pr_waits_for_settled_checks_and_caps_attempts(self):
+        pending = self.pr(checks=[{"status": "IN_PROGRESS"}, {"conclusion": "FAILURE"}])
+        green = self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.assertIsNone(lane.red_pr([pending, green], {}))
+        self.assertEqual(lane.red_pr([self.pr()], {})["number"], 5)
+        self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1}}))
+        self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
+        self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
+
+    def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
+        real = lane.sh
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(
+            "job\tstep\tall good\njob\tstep\t[component-ship-gate] FAIL - needs stories\n"))
+        try:
+            excerpt = lane.failure_excerpt(self.pr())
+        finally:
+            lane.sh = real
+        self.assertIn("component-ship-gate] FAIL", excerpt)
+        self.assertNotIn("all good", excerpt)
+        prompt = lane.render_fix_prompt(self.pr(), excerpt)
+        self.assertIn("Do not open a new PR", prompt)
+        self.assertIn("devin/jov-1", prompt)
+
+    def test_claim_records_attempt_before_work(self):
+        real = lane.sh
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
+            [self.pr(), {**self.pr(number=6), "headRefName": "claude/x"}]))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            try:
+                self.assertEqual(lane.claim_red_pr(host, "devin")["number"], 5)
+                self.assertIsNone(lane.claim_red_pr(host, "devin"))
+            finally:
+                lane.sh = real
+            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
+                             {"5": {"sha": "h1", "count": 1}})
+
+    def test_fix_run_reports_a_pushed_head_and_leaves_a_receipt(self):
+        real, real_excerpt = lane.sh, lane.failure_excerpt
+        lane.failure_excerpt = lambda pr: "err"
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h2\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            finally:
+                lane.sh, lane.failure_excerpt = real, real_excerpt
+            self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
+            self.assertIn("fix-red", (host.state / "runs/ledger.jsonl").read_text())
+
+    def test_component_changes_add_the_ship_gate(self):
+        commands = lane.check_commands(["apps/web/components/a/B.tsx"])
+        self.assertIn("component-ship-gate", commands[-1])
 
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")

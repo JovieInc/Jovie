@@ -40,6 +40,8 @@ EXCLUDED_LABELS = frozenset({
     "type:epic", "codex-blocked",
 })
 MAX_FAILURES = 3
+MAX_FIX_ATTEMPTS = 2
+RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Generated files do not count toward the reviewable-size cap.
@@ -202,6 +204,10 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     if web:
         commands.append(["pnpm", "--filter", "@jovie/web", "exec", "vitest", "related", "--run",
                          "--passWithNoTests", *web])
+    if any(p.startswith("apps/web/components/") for p in paths):
+        # CI's component-ship-gate (tests + stories); server-backed certification stays in CI.
+        commands.append(["pnpm", "component-ship-gate", "--diff-base=origin/main",
+                         "--skip-live-storybook", "--skip-rendered-cert"])
     return commands
 
 
@@ -369,6 +375,104 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
 
 
+# ---------------------------------------------------------------- fix red first
+
+def red_pr(prs: list[dict], attempts: dict) -> dict | None:
+    """A lane PR whose checks have settled red at a head we have not tried twice."""
+    for pr in sorted(prs, key=lambda item: item["number"]):
+        checks = pr.get("statusCheckRollup") or []
+        if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            continue
+        if not any(check.get("conclusion") in RED for check in checks):
+            continue
+        record = attempts.get(str(pr["number"]), {})
+        if record.get("sha") == pr["headRefOid"] or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+            continue
+        return pr
+    return None
+
+
+def failure_excerpt(pr: dict, limit: int = 6000) -> str:
+    """The failing jobs' own error lines, so the fixer works from evidence, not guesses."""
+    parts = []
+    for check in pr.get("statusCheckRollup") or []:
+        found = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
+        if check.get("conclusion") not in RED or not found:
+            continue
+        log = sh(["gh", "run", "view", "--repo", REPO_SLUG, "--job", found.group(1), "--log-failed"], timeout=120)
+        lines = [line.split("\t")[-1] for line in log.stdout.splitlines()
+                 if re.search(r"(?i)error|fail|expected|received|missing|✗|×", line)]
+        parts.append(f"### {check.get('name')}\n" + "\n".join(lines[-40:]))
+    return "\n\n".join(parts)[:limit]
+
+
+def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    return "\n".join([
+        f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
+        "",
+        f"You are on its branch `{pr['headRefName']}`. Required CI failed with:",
+        "",
+        excerpt or "(no excerpt; run the failing checks named on the PR)",
+        "",
+        "## Contract",
+        "- Fix the root cause on this branch; push to the same branch. Do not open a new PR.",
+        "- Repo gates are real requirements (e.g. component-ship-gate needs tests + stories for",
+        "  shipped UI components). Never skip, weaken or --no-verify a check.",
+        "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
+        "  `NOT-SHIPPABLE: <reason>`.",
+    ])
+
+
+def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
+    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    worktree = host.state / "worktrees" / run_id
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "fix-red",
+               "pr": pr["number"], "headBefore": pr["headRefOid"], "startedAt": now_iso()}
+    with open(runs / f"{run_id}.log", "w") as log:
+        try:
+            sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
+            sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
+                f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
+            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            prompt = render_fix_prompt(pr, failure_excerpt(pr))
+            prompt_file = runs / f"{run_id}.prompt.md"
+            prompt_file.write_text(prompt)
+            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file)}),
+                                   cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
+                                   timeout=host.agent_timeout)
+            head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
+            after = head[0] if head else ""
+            receipt.update(agentExit=agent.returncode, headAfter=after,
+                           verdict="fix-pushed" if after and after != pr["headRefOid"] else "fix-no-change")
+        except subprocess.TimeoutExpired:
+            receipt.update(verdict="failed", reasons=["timeout"])
+        except Exception as error:
+            receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
+        finally:
+            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    receipt["endedAt"] = now_iso()
+    with open(runs / "ledger.jsonl", "a") as ledger:
+        ledger.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
+def claim_red_pr(host: Host, name: str) -> dict | None:
+    """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
+                 "--json", "number,title,headRefName,headRefOid,statusCheckRollup"])
+    prs = [pr for pr in json.loads(listed.stdout or "[]") if pr["headRefName"].startswith(f"{name}/")]
+    path = host.state / "fix-attempts.json"
+    attempts = json.loads(path.read_text()) if path.exists() else {}
+    pr = red_pr(prs, attempts)
+    if pr:
+        record = attempts.get(str(pr["number"]), {})
+        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
+        path.write_text(json.dumps(attempts))
+    return pr
+
+
 # ---------------------------------------------------------------- worker / dispatch / update
 
 def failures_path(host: Host) -> Path:
@@ -388,12 +492,20 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-        issue = pick_issue(linear.lane_issues(spec["label"]), failures)
-        if issue:
-            linear.move(issue.id, "In Progress")
+        # Finish before starting: this lane's red PRs come before new issues.
+        red = claim_red_pr(host, name)
+        issue = None
+        if red is None:
+            failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures)
+            if issue:
+                linear.move(issue.id, "In Progress")
     finally:
         claim.release()
+    if red is not None:
+        fix_red_pr(host, name, spec, red)
+        slot.release()
+        return reexec(host, name)
     if issue is None:
         return 0
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
@@ -429,7 +541,11 @@ def worker(host: Host, name: str) -> int:
         linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
                                  + ("Returned to Triage after 3 attempts." if exhausted else "Back to Todo."))
     slot.release()
-    # Slot free -> pull the next issue now, on whatever release is current (drain-safe update).
+    return reexec(host, name)
+
+
+def reexec(host: Host, name: str) -> int:
+    """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
     current = host.state / "current" / "lane_runner.py"
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
                               "worker", "--provider", name])
