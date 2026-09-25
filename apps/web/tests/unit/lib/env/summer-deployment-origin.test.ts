@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ServerEnvSchema } from '@/lib/env-server-schema';
-import { SUMMER_PRODUCTION } from '@/lib/ovie/summer-production-identity';
+import { SUMMER_ORIGIN_ENV_ACCEPTED } from '@/lib/ovie/summer-eve-pin-schema';
 
 const origin = ServerEnvSchema.shape.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN;
 const deploymentId =
@@ -14,8 +14,13 @@ describe('deprecated Summer deployment pin env', () => {
     expect(deploymentId.parse('')).toBe('');
     expect(origin.parse('legacy-ignored')).toBe('legacy-ignored');
     expect(deploymentId.parse('legacy-ignored')).toBe('legacy-ignored');
-    expect(origin.parse(SUMMER_PRODUCTION.productionOrigin)).toBe(
-      SUMMER_PRODUCTION.productionOrigin
+  });
+
+  it('accepts https://summer.jov.ie, which the immutable-deployment regex rejected', () => {
+    expect(SUMMER_ORIGIN_ENV_ACCEPTED).toBe('https://summer.jov.ie');
+    expect(origin.parse('https://summer.jov.ie')).toBe('https://summer.jov.ie');
+    expect(origin.parse(SUMMER_ORIGIN_ENV_ACCEPTED)).toBe(
+      'https://summer.jov.ie'
     );
   });
 

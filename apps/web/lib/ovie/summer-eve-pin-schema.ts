@@ -1,10 +1,19 @@
 import { z } from 'zod';
+import { SUMMER_PRODUCTION } from './summer-production-identity';
 
 /**
- * Deprecated and ignored. Production Summer is `https://summer.jov.ie`.
- * Delete `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` from Vercel production.
- * A leftover per-deployment URL must not choose the caller and must not
- * fail boot.
+ * Production Summer origin. The deprecated env parses when set to this
+ * value. The caller does not read the env. Admission is
+ * `GET /runtime/v1/identity` on this origin. The previous regex accepted
+ * only an immutable `jovie-eve-shadow-<hash>` host and rejected this domain.
+ */
+export const SUMMER_ORIGIN_ENV_ACCEPTED = SUMMER_PRODUCTION.productionOrigin;
+
+/**
+ * Deprecated and ignored, whether set or unset.
+ * `https://summer.jov.ie` parses. A leftover per-deployment URL also parses
+ * so production boot does not fail before the variable is deleted. Neither
+ * value selects the caller.
  */
 export const ovieSummerEveDeploymentOriginSchema = z.string().optional();
 

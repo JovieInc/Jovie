@@ -7,7 +7,8 @@ Legacy snapshots remain valid. The product-owned validator in
 claims, execution authority, and the decision loop in its private repository.
 
 The bridge calls `https://summer.jov.ie`. `getEveShadowOrigin` returns that
-domain. `resolveSummerEveCallerOrigin` reads `GET /runtime/v1/identity` and
+domain. The deprecated origin env accepts that domain and still does not
+select the caller. `resolveSummerEveCallerOrigin` reads `GET /runtime/v1/identity` and
 admits the call only when the responder is source-bound production Summer
 (project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`, environment `production`) before
 signing or obtaining OIDC credentials. A deployment id in that document is
