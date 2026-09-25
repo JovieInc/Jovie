@@ -35,10 +35,7 @@ function toScriptArgs(args: readonly unknown[]): string[] {
   return args.map(arg => (typeof arg === 'string' ? arg : String(arg)));
 }
 
-async function getClient(url: string): Promise<RedisClientType> {
-  if (clientPromise && clientUrl === url) return clientPromise;
-
-  clientUrl = url;
+async function openLocalRedisClient(url: string): Promise<RedisClientType> {
   const { createClient } = (await import(
     'redis'
   )) as unknown as LocalRedisModule;
@@ -49,15 +46,38 @@ async function getClient(url: string): Promise<RedisClientType> {
       error instanceof Error ? error.message : String(error)
     );
   });
-  clientPromise = client.connect().then(
-    () => client,
-    error => {
+  await client.connect();
+  return client;
+}
+
+function getClient(url: string): Promise<RedisClientType> {
+  if (clientPromise && clientUrl === url) return clientPromise;
+
+  clientUrl = url;
+  const settlement: {
+    resolve: (client: RedisClientType) => void;
+    reject: (error: unknown) => void;
+  } = {
+    resolve: () => undefined,
+    reject: () => undefined,
+  };
+  const pending = new Promise<RedisClientType>((resolve, reject) => {
+    settlement.resolve = resolve;
+    settlement.reject = reject;
+  });
+  // Publish before the dynamic import. Concurrent first callers must share
+  // this promise; assigning it after `await import('redis')` connects twice.
+  clientPromise = pending;
+
+  void openLocalRedisClient(url).then(settlement.resolve, (error: unknown) => {
+    if (clientPromise === pending) {
       clientPromise = null;
       clientUrl = null;
-      throw error;
     }
-  );
-  return clientPromise;
+    settlement.reject(error);
+  });
+
+  return pending;
 }
 
 export function createLocalRedisClient(url: string) {
