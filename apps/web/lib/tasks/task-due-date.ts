@@ -71,7 +71,7 @@ export function computeTaskDueDate(
   if (!base) return null;
   if (base.getUTCFullYear() < MIN_VALID_RELEASE_YEAR) return null;
 
-  const due = new Date(base.getTime());
+  const due = new Date(base);
   due.setDate(due.getDate() + offsetDays);
 
   const now = options?.now ?? new Date();
