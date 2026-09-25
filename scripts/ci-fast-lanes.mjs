@@ -183,6 +183,13 @@ const LANES = [
     run: runDesignExceptionRegistry,
   },
   {
+    id: 'design-governance-enforcement',
+    name: 'Design governance enforcement',
+    nextLocalCommand:
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+    run: runDesignGovernanceEnforcement,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -241,6 +248,7 @@ export const LANE_GROUPS = Object.freeze({
     'guardrails',
     'design-system-source-ratchet',
     'design-exception-registry',
+    'design-governance-enforcement',
     'design-conformance',
     'ios-fast',
     'profile-admission',
@@ -806,6 +814,27 @@ function runDesignExceptionRegistry() {
     };
   }
   return shell(LANE_COMMANDS['design-exception-registry']);
+}
+
+function runDesignGovernanceEnforcement() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Design governance enforcement skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const selected = selectedProductLanes();
+  if (!selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No web product lane selected\n',
+      skipped: true,
+    };
+  }
+  return shell(LANE_COMMANDS['design-governance-enforcement']);
 }
 
 /**
