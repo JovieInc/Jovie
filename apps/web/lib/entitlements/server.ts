@@ -174,9 +174,9 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     });
   }
 
-  // Check admin status independently of billing using the dedicated admin
-  // role check (Redis-cached, 60s TTL). This avoids losing admin status when
-  // the billing query fails due to transient DB/connection issues.
+  // Check admin status independently of billing. Postgres is the source of
+  // truth; `isAdmin` does not read Redis. This avoids losing admin status
+  // when the billing query fails due to transient DB/connection issues.
   const [hasAdminRole, billing] = await Promise.all([
     checkAdminRole(userId),
     getUserBillingInfo(),
