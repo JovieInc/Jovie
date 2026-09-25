@@ -1569,6 +1569,9 @@ jobs:
           # per-file coverage suite when the implementation or tests change.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
 
+          # Codex intake selection must execute the pinned Symphony scheduler.
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/tests/run-governor-bounded-codex-selector\.sh$|^scripts/symphony/tests/governor_bounded_codex_intake_test\.exs$'
+
           # Conflict event policy, entrypoint, and proof changes always run the
           # existing structural control selector with exact-path coverage.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/pr-conflict-handler\.mjs$|^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$|^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$'

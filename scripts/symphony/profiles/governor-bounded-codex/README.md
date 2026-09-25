@@ -17,14 +17,26 @@ The workflow matches `governor-bounded` except:
 - the fleet installer verification requires Codex IN
 
 Switching from a Codex OUT workflow adopts that reviewed ceiling of 5. Reinstalling
-this profile still retains a lower pressure-controller ceiling. Pilot scope stays
-project `symphony-ui-pilot-96d6b9c5b2d5` and label
-`symphony-five-pr-repair-20260908`. The one-retry ceiling, hooks, workspace,
-sandbox, and service port stay as they are.
+this profile still retains a lower pressure-controller ceiling. Intake is team-wide
+on JOV. The required label is the existing `agent-ready` dispatch label, including
+`Todo`. `ready-for-intake` stays an alternate orchestrator mark and is not a second
+required label, because Symphony `required_labels` is conjunctive. Active states
+stay `Todo`, `In Progress`, `Rework`, and `Merging`.
+
+`excluded_labels` keeps `no-symphony` and adds the existing deploy, permissions,
+billing, and spend labels: `vercel`, `infra`, `area:infra`, `infrastructure`,
+`blocked:auth`, `auth`, `area:auth`, `billing`, `blocked:payments`, `stripe`, and
+`cost-monitoring`. Linear has no pull-number label, and the scheduler has no
+identifier denylist. JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 stay
+outside intake only while those issues lack `agent-ready`. Adding `agent-ready`
+without an excluded label selects them. Legacy human-review
+labels are not exclusions. The one-retry ceiling, hooks, workspace, sandbox, and
+service port stay as they are.
 
 Drop-ins stay the five reviewed `governor-bounded` units. Attestation compares
 those installed files with `scripts/symphony/profiles/governor-bounded/systemd`
 at the selected revision. No separate drop-in pin is required.
 
-The agent prompt no longer says native Codex execution is disabled. Every other
-instruction matches `governor-bounded`.
+The agent prompt no longer says native Codex execution is disabled. The tracker
+and intake paragraph are the team-wide `agent-ready` filter above. Hooks, sandbox,
+port, retry ceiling, and the rest of the worker instructions match `governor-bounded`.

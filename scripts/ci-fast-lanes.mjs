@@ -795,6 +795,7 @@ export function runStructural(opts = {}) {
     'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
     'python3 scripts/symphony/tests/run-safe-restart-gate.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
+    'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage run --branch scripts/symphony/tests/upstream-burrito-payload.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage report --include="*/scripts/symphony/verify_upstream_burrito_payload.py" --show-missing --precision=2 --fail-under=90',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
     'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',

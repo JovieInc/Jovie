@@ -1936,6 +1936,30 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 });
 
+it('runs the pinned Symphony selector for governor-bounded-codex intake edits', () => {
+  const remaining = jobBlock(
+    'ci-fast-remaining',
+    'ci-profile-admission-browser'
+  );
+  const pattern = [
+    ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+  ]
+    .map(match => match[1])
+    .join('');
+  for (const path of [
+    'scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
+    'scripts/symphony/tests/governor_bounded_codex_intake_test.exs',
+  ]) {
+    const selected = spawnSync('grep', ['-qE', pattern], {
+      input: `${path}\n`,
+    });
+    expect(selected.status, path).toBe(0);
+  }
+  expect(CI_FAST_SOURCE).toContain(
+    'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh'
+  );
+});
+
 it('runs the attestation observation coverage gate for publisher-only edits', () => {
   const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
   const selected = new RegExp(pattern);
