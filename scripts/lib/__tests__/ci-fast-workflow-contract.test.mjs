@@ -1146,7 +1146,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
       'copy-gate': COPY_GATE_COMMAND,
       structural:
@@ -1687,7 +1687,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('overlaps structural setup with cheap lanes; structural awaits them', () => {
+  it('overlaps structural setup and the structural lane with cheap lanes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -1724,11 +1724,28 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
       at('- name: Start ci-fast lanes')
     );
-    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
       at('- name: Restore Symphony selector cache')
     );
-    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+    // Structural runs while the cheap lanes finish; the await follows it and
+    // runs even after a structural failure, so both results gate the job.
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Run structural ci-fast lane')
+    );
+    expect(at('- name: Run selected Storybook browser proof')).toBeGreaterThan(
       at('- name: Await ci-fast lanes')
+    );
+    const stepBody = name =>
+      remaining.split(`- name: ${name}\n`)[1].split('\n      - ')[0];
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      "if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}"
+    );
+    // Fail-fast: a red cheap-lane status stops new structural commands.
+    expect(stepBody('Run structural ci-fast lane')).toContain(
+      'CI_FAST_STRUCTURAL_ABORT_STATUS_FILE: ${{ runner.temp }}/ci-fast-lanes-bg/status'
+    );
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'LANES_DIR: ${{ runner.temp }}/ci-fast-lanes-bg\n'
     );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
