@@ -29,10 +29,10 @@ import type {
   JovieWorkOutcome,
   JovieWorkPhase,
 } from '@/lib/activity/jovie-work-feed';
+import { describeCreatorWorkOutcome } from '@/lib/metrics/creator-outcomes';
 import { useJovieWorkFeedQuery } from '@/lib/queries/useJovieWorkFeedQuery';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import { formatAmount } from '@/lib/utils/format-number';
 import type { JovieWorkFeedProps } from './types';
 
 const JOVIE_WORK_ICONS: Record<JovieWorkIcon, typeof Sparkles> = {
@@ -54,7 +54,6 @@ const PHASE_STYLES: Record<JovieWorkPhase, string> = {
 
 const OUTCOME_SLOT_CLASS_NAME =
   'mt-1 grid min-h-10 grid-cols-2 content-start gap-x-3 text-2xs leading-5 text-tertiary-token sm:grid-cols-4';
-const countFormatter = new Intl.NumberFormat('en-US');
 
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
@@ -93,58 +92,56 @@ function JovieWorkOutcomeSlot({
     displayState = outcome.state;
     content = (
       <span className='col-span-full'>
-        Measuring attributed results for 30 days.
+        Measuring verified money and attributed engagement for 30 days. Causal
+        lift stays inconclusive until a comparable baseline exists.
       </span>
     );
   } else if (outcome.state === 'measured_zero') {
     displayState = outcome.state;
     content = (
       <span className='col-span-full'>
-        No attributed results in the 30-day window.
+        No verified money or attributed engagement in the 30-day window. Causal
+        lift is inconclusive.
       </span>
     );
   } else if (outcome.state === 'unavailable' || !outcome.metrics) {
     displayState = 'unavailable';
     content = (
-      <span className='col-span-full'>Attributed results are unavailable.</span>
+      <span className='col-span-full'>Creator outcomes are unavailable.</span>
     );
   } else {
     displayState = outcome.state;
-    const metrics = [
-      {
-        key: 'gmv',
-        value: outcome.metrics.gmvDeltaCents,
-        valueLabel: formatAmount(outcome.metrics.gmvDeltaCents),
-        label: 'GMV',
-      },
-      {
-        key: 'clicks',
-        value: outcome.metrics.clickDelta,
-        valueLabel: countFormatter.format(outcome.metrics.clickDelta),
-        label: 'Clicks',
-      },
-      {
-        key: 'dsp-clicks',
-        value: outcome.metrics.dspClickDelta,
-        valueLabel: countFormatter.format(outcome.metrics.dspClickDelta),
-        label: 'DSP Clicks',
-      },
-      {
-        key: 'new-fans',
-        value: outcome.metrics.newFansDelta,
-        valueLabel: countFormatter.format(outcome.metrics.newFansDelta),
-        label: 'New Fans',
-      },
-    ].filter(metric => metric.value > 0);
-
-    content = metrics.map(metric => (
-      <span key={metric.key} className='inline-flex min-w-0 gap-1'>
-        <span className='tabular-nums text-primary-token'>
-          {metric.valueLabel}
+    const lines = describeCreatorWorkOutcome(outcome.metrics);
+    content = (
+      <>
+        <span
+          className='inline-flex min-w-0 gap-1'
+          data-testid='jovie-work-outcome-verified-money'
+        >
+          <span className='tabular-nums text-primary-token'>
+            {lines.verifiedMoneyValue}
+          </span>
+          <span>{lines.verifiedMoneyLabel}</span>
         </span>
-        <span>{metric.label}</span>
-      </span>
-    ));
+        <span
+          className='inline-flex min-w-0 gap-1'
+          data-testid='jovie-work-outcome-engagement'
+        >
+          <span className='tabular-nums text-primary-token'>
+            {lines.engagementValue}
+          </span>
+          <span>{lines.engagementLabel}</span>
+        </span>
+        <span
+          className='inline-flex min-w-0 gap-1'
+          data-testid='jovie-work-outcome-causal-lift'
+          title={lines.causalLiftDisclosure}
+        >
+          <span className='text-primary-token'>{lines.causalLiftValue}</span>
+          <span>{lines.causalLiftLabel}</span>
+        </span>
+      </>
+    );
   }
 
   return (
