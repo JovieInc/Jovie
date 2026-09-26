@@ -8,6 +8,14 @@ const meta = {
   args: {
     onSelect: fn(),
   },
+  parameters: {
+    // `disabled` belongs to the private SuggestionPill helper, not to
+    // SuggestedPrompts' own props; the AlbumArtUnavailable story below
+    // exercises the disabled pill through `albumArtCapability` instead.
+    jovie: {
+      uncoveredProps: ['disabled'],
+    },
+  },
 } satisfies Meta<typeof SuggestedPrompts>;
 
 export default meta;
@@ -24,5 +32,15 @@ export const Grid: Story = {
 export const FirstSession: Story = {
   args: {
     isFirstSession: true,
+  },
+};
+
+export const AlbumArtUnavailable: Story = {
+  args: {
+    albumArtCapability: {
+      availability: 'unavailable',
+      reason: 'Album art needs a Pro plan.',
+      reasonCode: 'PLAN_UNAVAILABLE',
+    },
   },
 };

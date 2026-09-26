@@ -55,6 +55,13 @@ const meta = {
     report: REPORT,
     isConnected: true,
   },
+  parameters: {
+    // `video` belongs to the private RankedVideoRowProps helper, not to
+    // ChannelIntelligencePanel's own props; it is exercised through `report`.
+    jovie: {
+      uncoveredProps: ['video'],
+    },
+  },
 } satisfies Meta<typeof ChannelIntelligencePanel>;
 
 export default meta;
