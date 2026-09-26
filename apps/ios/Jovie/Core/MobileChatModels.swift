@@ -74,9 +74,11 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   var handoffURL: URL?
   var turnId: String? = nil
   var eveWorkId: String? = nil
-  /// Server timestamp (ISO-8601) carried so the cache round-trip in
-  /// `persistCache` does not rewrite history to `Date()`; `nil` for locally
-  /// composed rows that have no server row yet (JOV-6210).
+  /// Server timestamp (ISO-8601) for fetched messages, stamped once at append
+  /// for local turns. Persisted through the cache round-trip in `persistCache`
+  /// so the load-earlier cursor still points at older history after an app
+  /// restart; `nil` only for locally composed rows with no server row yet
+  /// (JOV-6210).
   var createdAt: String? = nil
 }
 
@@ -85,6 +87,10 @@ struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let messagesByConversationID: [String: [MobileConversationMessage]]
   let cachedAt: Date
   var activeConversationID: String? = nil
+  /// Optional so snapshots written before this field existed still decode.
+  /// Without it, a restarted session could never offer load-earlier for a
+  /// cached window at or under the fetch limit (JOV-6210).
+  var hasMoreOlderByConversationID: [String: Bool]? = nil
 }
 
 /// Newest-first transcript window. Numbers match `CHAT_TRANSCRIPT_WINDOW`
