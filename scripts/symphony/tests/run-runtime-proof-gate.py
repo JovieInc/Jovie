@@ -33,6 +33,19 @@ sys.argv = [str(SUITE)]
 child_coverage = tempfile.TemporaryDirectory(prefix="symphony-runtime-coverage-")
 os.environ["SYMPHONY_RUNTIME_COVERAGE_DIR"] = child_coverage.name
 tracer = trace.Trace(count=True, trace=False)
+# Only target-file lines are reported, so skip line callbacks everywhere else
+# (suites, stdlib); counts for the target files are unchanged.
+TARGET_FILES = {str(ROOT / "scripts/symphony" / name) for name in TARGETS}
+_count_lines = tracer.globaltrace
+
+
+def _trace_targets(frame, why, arg):
+    if frame.f_code.co_filename not in TARGET_FILES:
+        return None
+    return _count_lines(frame, why, arg)
+
+
+tracer.globaltrace = _trace_targets
 status = 0
 for suite in SUITES:
     sys.argv = [str(suite)]

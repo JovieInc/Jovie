@@ -109,6 +109,9 @@ def _runtime_command(args, *, established_clock=False):
         return [sys.executable, "-c", launcher, *args]
     launcher += (
         "tracer = trace.Trace(count=True, trace=False)\n"
+        # Only helper lines are merged into the report; skip the rest.
+        "count_lines = tracer.globaltrace\n"
+        f"tracer.globaltrace = lambda frame, why, arg: count_lines(frame, why, arg) if frame.f_code.co_filename == {str(HELPER_PATH)!r} else None\n"
         "try:\n"
         f" tracer.runfunc(runpy.run_path, {str(HELPER_PATH)!r}, run_name='__main__')\n"
         "finally:\n"
