@@ -60,21 +60,19 @@ Two layers:
 5. If the data also lives in Next.js data cache (public profiles, etc.), add or call a helper in `lib/cache/`.
 6. Export from `index.ts`.
 
-Example skeleton:
+Canonical, compiled examples live in [`examples.ts`](./examples.ts) and are
+exercised by `examples.test.ts`. Copy from there rather than inventing new
+wiring — it covers parameterized reads, paginated reads
+(`infiniteQueryOptions`), search+pacing, mutations with invalidation, and
+autosave-scoped invalidation. SSR hydration uses `HydrateClient.tsx` +
+`server.ts` prefetch helpers; error boundaries use `QueryErrorBoundary.tsx`.
 
-```ts
-import { useQuery } from '@tanstack/react-query';
-import { createQueryFn } from './fetch';
-import { queryKeys } from './keys';
-import { STANDARD_CACHE } from './cache-strategies';
+Key contract points the fixtures demonstrate:
 
-const fetchFoo = createQueryFn<Foo>('/api/foo');
-
-export function useFooQuery(id: string) {
-  return useQuery({
-    queryKey: queryKeys.foo.item(id),
-    queryFn: () => fetchFoo({ id }),
-    ...STANDARD_CACHE,
-  });
-}
-```
+- Bind the resource id into **both** the request URL and the query key.
+- `queryFn` receives `({ signal })` — forward it so cancellation works.
+  `createQueryFn(url)` results are queryFns themselves (`queryFn: fetchFoo`),
+  not functions you call with `{ id }`.
+- Pass a `schema` decoder at the fetch boundary for validated responses.
+- Mutations invalidate the matching `queryKeys.*` scope in `onSuccess`;
+  autosave scopes invalidation to the entity it writes.
