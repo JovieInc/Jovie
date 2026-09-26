@@ -12,7 +12,10 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import {
+  createReleaseCacheTag,
+  createSmartLinkContentTag,
+} from '@/lib/cache/tags';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -443,7 +446,7 @@ export async function connectOnboardingSpotifyArtist(
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+    revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     revalidatePath(APP_ROUTES.RELEASES);
 
