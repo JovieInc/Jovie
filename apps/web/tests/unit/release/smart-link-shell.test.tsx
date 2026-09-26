@@ -101,9 +101,9 @@ describe('SmartLinkShell', () => {
     expect(img).toHaveAttribute('alt', 'Test Artwork');
   });
 
-  it('renders ArtworkFallback (Disc3 icon) when artworkUrl is null', () => {
+  it('renders ArtworkFallback (AudioLines icon) when artworkUrl is null', () => {
     render(<SmartLinkShell {...defaultProps} artworkUrl={null} />);
-    expect(screen.getByTestId('icon-Disc3')).toBeInTheDocument();
+    expect(screen.getByTestId('icon-AudioLines')).toBeInTheDocument();
     expect(screen.queryByTestId('next-image')).toBeNull();
   });
 

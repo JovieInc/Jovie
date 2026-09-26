@@ -1241,11 +1241,12 @@ html[data-profile-initial-mode]
   --color-bg-tooltip: #101012;
   --color-bg-paper: #f7f8f8;
 
-  /* Text hierarchy - contrast-aware */
+  /* Text hierarchy - contrast-aware. Cinematic depth ramp (Tim, 2026-09-25):
+     one big step from primary, then a compressed ordered tail. */
   --color-text-primary-token: lch(9.894% 0 282);
-  --color-text-secondary-token: lch(19.788% 1.25 282);
-  --color-text-tertiary-token: lch(34% 1.25 282);
-  --color-text-quaternary-token: lch(65.3% 1.25 282);
+  --color-text-secondary-token: #5a606a;
+  --color-text-tertiary-token: #666c76;
+  --color-text-quaternary-token: #6a7078;
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -1470,9 +1471,11 @@ html[data-profile-initial-mode]
   --noir-ion-floating: #232427;
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
-  --noir-ion-text-secondary: #d7dce8;
-  --noir-ion-text-muted: #a8b0c3;
-  --noir-ion-text-tertiary: #7d879d;
+  /* Cinematic depth ramp (Tim, 2026-09-25): one big step from primary, then a
+     compressed ordered tail. */
+  --noir-ion-text-secondary: #a0a5af;
+  --noir-ion-text-muted: #8f95a0;
+  --noir-ion-text-tertiary: #858b96;
   --noir-ion-text-disabled: #525d75;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
@@ -2624,9 +2627,9 @@ html[data-profile-initial-mode]
   --color-surface-input: var(--color-bg-input);
   --color-surface-active: var(--color-bg-active);
   --color-text-primary-token: #f5f7fb;
-  --color-text-secondary-token: #d7dce8;
-  --color-text-tertiary-token: #a8b0c3;
-  --color-text-quaternary-token: #7d879d;
+  --color-text-secondary-token: #a0a5af;
+  --color-text-tertiary-token: #8f95a0;
+  --color-text-quaternary-token: #858b96;
   --color-primary-token: var(--color-text-primary-token);
   --color-secondary-token: var(--color-text-secondary-token);
   --color-tertiary-token: var(--color-text-tertiary-token);

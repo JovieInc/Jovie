@@ -588,6 +588,27 @@ describe('Onboarding screen performance budgets', () => {
     expect(screen.getByRole('button', { name: /Try again/i })).toBeEnabled();
   });
 
+  it('uses the banned-icon-safe AudioLines glyph for a release with no artwork', async () => {
+    mockDiscoveryResponse(createDiscoverySnapshot());
+
+    const { container } = render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='releases'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', { name: 'Your release preview' });
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
+
   it('lets creators continue when Spotify import completed without releases', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
