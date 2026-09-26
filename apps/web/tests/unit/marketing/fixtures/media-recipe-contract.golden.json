@@ -26,8 +26,8 @@
     "blurPx": 20,
     "saturatePercent": 165,
     "backdropFilter": "blur(20px) saturate(165%)",
-    "darkShellHex": "#06080D",
-    "darkCanvasHex": "#030407"
+    "darkShellHex": "#07080A",
+    "darkCanvasHex": "#030406"
   },
   "flowingAccent": {
     "viewBox": "0 0 1200 24",
@@ -70,27 +70,15 @@
     "underlightBlurPx": 48
   },
   "sourceMatrix": {
-    "dark-glass": [
-      "real-capture",
-      "registered-live-presentation"
-    ],
-    "compact-glass": [
-      "real-capture",
-      "registered-live-presentation"
-    ],
-    "soft-editorial-background": [
-      "real-capture",
-      "generated-artwork"
-    ],
-    "flowing-accent": [
-      "real-capture",
-      "generated-artwork"
-    ]
+    "dark-glass": ["real-capture", "registered-live-presentation"],
+    "compact-glass": ["real-capture", "registered-live-presentation"],
+    "soft-editorial-background": ["real-capture", "generated-artwork"],
+    "flowing-accent": ["real-capture", "generated-artwork"]
   },
   "accents": {
     "dark-glass": {
       "token": "--noir-ion-shell",
-      "hex": "#06080D"
+      "hex": "#07080A"
     },
     "compact-glass": {
       "token": "--system-b-cinematic-black",
@@ -118,21 +106,9 @@
     "flowing-accent": "static-glow-only"
   },
   "outputProfiles": {
-    "dark-glass": [
-      "marketing-web",
-      "email",
-      "social-card"
-    ],
-    "compact-glass": [
-      "marketing-web",
-      "social-card"
-    ],
-    "soft-editorial-background": [
-      "marketing-web"
-    ],
-    "flowing-accent": [
-      "marketing-web",
-      "social-card"
-    ]
+    "dark-glass": ["marketing-web", "email", "social-card"],
+    "compact-glass": ["marketing-web", "social-card"],
+    "soft-editorial-background": ["marketing-web"],
+    "flowing-accent": ["marketing-web", "social-card"]
   }
 }
