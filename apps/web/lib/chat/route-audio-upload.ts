@@ -4,7 +4,10 @@ import {
   resolveAudioUploadMime,
   validateAudioFile,
 } from '@/lib/audio/constants';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import {
+  createReleaseCacheTag,
+  createSmartLinkContentTag,
+} from '@/lib/cache/tags';
 import {
   type AudioEntityInference,
   buildAudioUploadPrompt,
@@ -274,7 +277,10 @@ export async function routeChatAudioUpload(
     releaseTitle = created.releaseTitle;
   }
 
-  revalidateTag(`releases:${input.clerkUserId}:${input.profileId}`, 'max');
+  revalidateTag(
+    createReleaseCacheTag(input.clerkUserId, input.profileId),
+    'max'
+  );
   revalidateTag(createSmartLinkContentTag(input.profileId), 'max');
 
   const prompt = buildAudioUploadPrompt({
