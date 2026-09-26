@@ -117,7 +117,11 @@ final class ChatRepository {
         limit: ChatTranscriptWindow.initialMessageLimit,
         before: nil
       )
-      await persistCache(messages: detail.messages, conversationID: conversationID)
+      await persistCache(
+        messages: detail.messages,
+        conversationID: conversationID,
+        hasMoreOlder: detail.hasMore
+      )
       // The user may have moved on while this fetch was in flight; never paint
       // a stale thread over the one they are looking at now.
       guard activeConversationID == conversationID else { return }
@@ -221,6 +225,9 @@ final class ChatRepository {
   private func performSend(text: String, generation: Int) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
+    // Stamp once here (not in persistCache) so the cached createdAt stays
+    // stable across rewrites and restart pagination uses it as-is.
+    let sentAt = ISO8601DateFormatter().string(from: Date())
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
@@ -229,7 +236,8 @@ final class ChatRepository {
         status: .completed,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: sentAt
       )
     )
     timeline.append(
@@ -240,7 +248,8 @@ final class ChatRepository {
         status: .queued,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: sentAt
       )
     )
 
@@ -322,6 +331,7 @@ final class ChatRepository {
     }
 
     let clientMessageId = "\(idempotencyKey):msg"
+    let sentAt = ISO8601DateFormatter().string(from: Date())
     timeline.removeAll { $0.clientTurnId == idempotencyKey }
     timeline.append(
       MobileChatTimelineItem(
@@ -331,7 +341,8 @@ final class ChatRepository {
         status: .completed,
         clientTurnId: idempotencyKey,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: sentAt
       )
     )
     timeline.append(
@@ -342,7 +353,8 @@ final class ChatRepository {
         status: .sending,
         clientTurnId: idempotencyKey,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: sentAt
       )
     )
 
@@ -615,7 +627,7 @@ final class ChatRepository {
       ChatTranscriptWindow.visibleTail(cachedMessages),
       hasMore: ChatTranscriptWindow.hasOlderHistory(
         cachedCount: cachedMessages.count,
-        fetchedHasMore: false
+        fetchedHasMore: loaded?.hasMoreOlderByConversationID?[conversationID] ?? false
       )
     )
     return true
@@ -658,10 +670,12 @@ final class ChatRepository {
 
   private func persistCache(
     messages: [MobileConversationMessage]? = nil,
-    conversationID: String? = nil
+    conversationID: String? = nil,
+    hasMoreOlder: Bool? = nil
   ) async {
-    var messagesByConversationID =
-      (await cache.load(for: userID, workspace: workspace))?.messagesByConversationID ?? [:]
+    let existing = await cache.load(for: userID, workspace: workspace)
+    var messagesByConversationID = existing?.messagesByConversationID ?? [:]
+    var hasMoreOlderByConversationID = existing?.hasMoreOlderByConversationID ?? [:]
 
     // Bound the persisted snapshot (JOV-5144): the cache is re-encoded whole
     // on every persist and loaded resident at launch, so unbounded history
@@ -671,16 +685,19 @@ final class ChatRepository {
     if let messages, let conversationID {
       messagesByConversationID[conversationID] =
         ChatTranscriptWindow.persistedTail(messages)
+      hasMoreOlderByConversationID[conversationID] = hasMoreOlder ?? self.hasMoreOlder
     } else if let activeConversationID {
       messagesByConversationID[activeConversationID] =
         ChatTranscriptWindow.persistedTail(timeline.map(Self.message(from:)))
+      hasMoreOlderByConversationID[activeConversationID] = hasMoreOlder ?? self.hasMoreOlder
     }
 
     let snapshot = CachedChatSnapshot(
       conversations: conversations,
       messagesByConversationID: messagesByConversationID,
       cachedAt: Date(),
-      activeConversationID: activeConversationID
+      activeConversationID: activeConversationID,
+      hasMoreOlderByConversationID: hasMoreOlderByConversationID
     )
     await cache.store(snapshot, for: userID, workspace: workspace)
   }
@@ -706,7 +723,8 @@ final class ChatRepository {
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
       handoffURL: handoffURL,
-      turnId: message.turnId
+      turnId: message.turnId,
+      createdAt: message.createdAt
     )
   }
 
@@ -735,7 +753,7 @@ final class ChatRepository {
         default: return "completed"
         }
       }(),
-      createdAt: ISO8601DateFormatter().string(from: Date()),
+      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }
