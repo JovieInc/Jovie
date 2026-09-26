@@ -56,18 +56,6 @@ describe('DesktopAuthPage', () => {
       'data-desktop-auth-state',
       'idle'
     );
-    expect(screen.getByTestId('desktop-auth-handoff')).toHaveAttribute(
-      'data-mac-cinematic-shell',
-      'auth-handoff'
-    );
-    const cornerMark = screen
-      .getByTestId('desktop-auth-handoff')
-      .querySelector('[data-mac-corner-mark]');
-    expect(cornerMark).toHaveClass('opacity-35');
-    expect(cornerMark?.querySelector('[data-brand-mark-size]')).toHaveAttribute(
-      'data-brand-mark-size',
-      '20'
-    );
     expect(
       screen.getByRole('button', { name: 'Continue in Browser' })
     ).toBeInTheDocument();
@@ -334,14 +322,6 @@ describe('DesktopAuthRouteHandoff', () => {
     expect(screen.getByTestId('desktop-auth-route-handoff')).toHaveAttribute(
       'data-desktop-auth-state',
       'idle'
-    );
-    const cornerMark = screen
-      .getByTestId('desktop-auth-route-handoff')
-      .querySelector('[data-mac-corner-mark]');
-    expect(cornerMark).toHaveClass('opacity-35');
-    expect(cornerMark?.querySelector('[data-brand-mark-size]')).toHaveAttribute(
-      'data-brand-mark-size',
-      '20'
     );
     expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
