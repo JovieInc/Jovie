@@ -55,18 +55,11 @@ const TEMPORARY_ALLOWLIST = [
   // TODO(#18551): remove once the desktop-auth handoff PR swaps its tokens.
   'app/(auth)/DesktopAuthRouteHandoff.tsx',
   'app/desktop-auth/',
-  // TODO: these files carry unrelated pre-existing ESLint debt
-  // (canonical-ui-label-casing, shadcn/no-restyle) that blocks any staged
-  // edit. Swap ring-offset-background -> ring-offset-base and
-  // text-background -> text-(--color-bg-base) when that debt is cleared.
+  // TODO: DropdownMenuItem rows restyle to a 44px touch target (min-h-11,
+  // py-2, text-sm), which trips shadcn/no-restyle on any staged edit and has
+  // no supported @jovie/ui size. Swap ring-offset-background ->
+  // ring-offset-base once DropdownMenuItem ships a touch-size variant.
   'components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx',
-  'components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx',
-  // TODO: these are in-scope screens without a screen-certification
-  // registration, so any edit trips screen-registration-gate (JOV-INV-018).
-  // Swap bg-background -> bg-base in the follow-up that registers them.
-  'app/account/layout.tsx',
-  'app/billing/layout.tsx',
-  'app/waitlist/error.tsx',
 ] as const;
 
 function walk(dir: string, out: string[]): void {
