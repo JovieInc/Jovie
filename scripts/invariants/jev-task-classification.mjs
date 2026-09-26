@@ -118,6 +118,7 @@ export function prepareTaskClusterRequest(input) {
   if (typeof input?.taskText !== 'string' || !input.taskText.trim()) {
     throw new Error('non-empty task text required');
   }
+  /** @type {Record<string, string>} */
   const criteria = {};
   for (const cluster of allowlist.clusters) {
     criteria[cluster.slug] =

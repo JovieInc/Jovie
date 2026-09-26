@@ -363,7 +363,7 @@ export function buildPilotReceipt({
   corpus,
   config,
   thresholds,
-  calibration,
+  calibration = null,
   metrics,
   baselineMetrics = null,
 }) {
@@ -501,6 +501,8 @@ export function buildPilotReceipt({
  * Run the corpus through the classifier seam. The caller supplies per-example
  * admission options (approval, fingerprints, transport); without them every
  * example is a non-admitted shadow observation and no paid call is made.
+ * @param {ReturnType<typeof loadTaskCorpus>} corpus
+ * @param {{optionsFor?: (example: {id: string}) => Parameters<typeof classifyReleaseTaskCluster>[1], classify?: typeof classifyReleaseTaskCluster, now?: () => number}} [options]
  */
 export async function runCorpusEvaluation(
   corpus,

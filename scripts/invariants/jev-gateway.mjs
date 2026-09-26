@@ -139,18 +139,25 @@ export function prepareJevBoundedRequest(input, fields) {
  * Bounded label-choice request for a separately admitted decision surface.
  * Only `choice` questions with non-empty labelled criteria are allowed, so the
  * provider answer can never invent a label outside the frozen criteria keys.
+ * @param {Parameters<typeof prepareJevBoundedRequest>[0]} input
+ * @param {{questions?: Record<string, {type?: string, instructions?: string, criteria?: Record<string, string>}>, schema?: string, stage?: string | null, extra?: Record<string, unknown>}} [fields]
  */
 export function prepareJevChoiceRequest(
   input,
   { questions, schema, stage, extra } = {}
 ) {
-  if (!isObject(questions) || Object.keys(questions).length === 0) {
+  if (
+    !questions ||
+    !isObject(questions) ||
+    Object.keys(questions).length === 0
+  ) {
     throw new Error('typed questions required');
   }
   for (const question of Object.values(questions)) {
     if (
       !isObject(question) ||
       question.type !== 'choice' ||
+      !question.criteria ||
       !isObject(question.criteria) ||
       Object.keys(question.criteria).length === 0
     ) {

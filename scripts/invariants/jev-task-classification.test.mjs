@@ -71,7 +71,10 @@ test('cluster allowlist is frozen, deduped, sorted and validated', () => {
   ]);
   assert.match(allowlist.sha256, /^[0-9a-f]{64}$/);
   assert.throws(() => {
-    allowlist.clusters.push({ slug: 'x', displayName: 'x' });
+    /** @type {any} */ (allowlist.clusters).push({
+      slug: 'x',
+      displayName: 'x',
+    });
   });
   const deduped = freezeClusterAllowlist([...CLUSTERS, CLUSTERS[0]]);
   assert.equal(deduped.slugs.length, 3);
@@ -149,7 +152,10 @@ test('empty task text and zero clusters never reach the evaluator', async () => 
     { ...baseInput, clusters: [{ slug: 'BAD', displayName: 'x' }] },
     { ...baseInput, sourceSha: 'not-a-sha' },
   ]) {
-    const receipt = await classifyReleaseTaskCluster(input, options);
+    const receipt = await classifyReleaseTaskCluster(
+      /** @type {any} */ (input),
+      options
+    );
     assert.equal(receipt.status, 'skipped');
     assert.equal(receipt.evaluatorCalls, 0);
     assert.equal(receipt.decision.clusterSlug, null);
@@ -354,7 +360,9 @@ test('concentration thresholds reject legacy confidence cutoffs and gate actions
     { assign: 1.2, review: 0.2 },
     { assign: '0.8', review: 0.3 },
   ]) {
-    assert.throws(() => validateTaskClusterThresholds(bad));
+    assert.throws(() =>
+      validateTaskClusterThresholds(/** @type {any} */ (bad))
+    );
   }
   const thresholds = validateTaskClusterThresholds({
     assign: 0.55,

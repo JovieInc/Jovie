@@ -380,7 +380,10 @@ test('bounded choice requests freeze labelled criteria and reject overrides', ()
     prepareJevChoiceRequest({ ...input }, { questions, schema: ' ' })
   );
   assert.throws(() =>
-    prepareJevChoiceRequest({ ...input }, { questions, extra: 'nope' })
+    prepareJevChoiceRequest(
+      { ...input },
+      /** @type {any} */ ({ questions, extra: 'nope' })
+    )
   );
   for (const key of ['route', 'state', 'questions', 'fingerprint', 'schema']) {
     assert.throws(() =>
