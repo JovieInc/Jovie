@@ -126,7 +126,19 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
 
-    if (!gitSucceeds(['merge-base', '--is-ancestor', sha, 'HEAD'])) {
+    // A commit-graph written while the checkout was shallow can record HEAD
+    // without parents; ancestry must walk real commit objects or merge-base
+    // reports false "not an ancestor" findings for receipt SHAs.
+    if (
+      !gitSucceeds([
+        '-c',
+        'core.commitGraph=false',
+        'merge-base',
+        '--is-ancestor',
+        sha,
+        'HEAD',
+      ])
+    ) {
       for (const story of stories) {
         add(
           story.file,

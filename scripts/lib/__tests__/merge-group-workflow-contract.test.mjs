@@ -912,7 +912,7 @@ describe('merge_group workflow contract', () => {
     expect(start).toContain('set -euo pipefail');
     // The exit status is published atomically only after git fetch returns.
     expect(start).toMatch(
-      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+      /echo "\$fetch_rc" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
     );
     expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
     // The awaiting step holds no token and fails closed on every failure mode.

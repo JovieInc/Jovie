@@ -1619,7 +1619,17 @@ jobs:
           (
             set +e
             git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-            echo "$?" > "$BASE_FETCH_DIR/status.tmp"
+            fetch_rc=$?
+            # The depth-1 checkout leaves the pull/*/merge commit at the shallow
+            # boundary: its second parent (the PR head) is unreachable from
+            # <base> and stays unfetched, so HEAD keeps no usable ancestry and
+            # `merge-base --is-ancestor <sha> HEAD` fails closed for every pinned
+            # story sourceSha. Complete HEAD's own ancestry too.
+            if [[ "$fetch_rc" == "0" && "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+              git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "$(git rev-parse HEAD)"
+              fetch_rc=$?
+            fi
+            echo "$fetch_rc" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
