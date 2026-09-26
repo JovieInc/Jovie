@@ -5,6 +5,7 @@ import type { TrackViewModel } from '@/lib/discography/types';
 import { STANDARD_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { createClassifiedRetry } from './retry-policy';
 
 export type ReleaseTrack = Pick<
   TrackViewModel,
@@ -44,6 +45,6 @@ export function useReleaseTracksQuery(releaseId: string, enabled = true) {
     queryFn: ({ signal }) => fetchReleaseTracks(releaseId, signal),
     ...STANDARD_CACHE,
     enabled: enabled && Boolean(releaseId),
-    retry: 1,
+    retry: createClassifiedRetry(1),
   });
 }

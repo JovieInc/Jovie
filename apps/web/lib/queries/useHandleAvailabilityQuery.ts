@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { createClassifiedRetry } from './retry-policy';
 
 /**
  * Response from the handle availability check API.
@@ -91,7 +92,7 @@ export function useHandleAvailabilityQuery({
     // Don't refetch aggressively - user is actively typing
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    retry: 1, // Single retry for transient failures
+    retry: createClassifiedRetry(1), // Single retry for transient failures
   });
 }
 
