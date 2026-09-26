@@ -141,21 +141,48 @@ describe('approveLead', () => {
     );
   });
 
-  it('skips Instantly push when instantlyLeadId already set (idempotency)', async () => {
-    mockDb._selectLimit.mockResolvedValue([
-      makeLead({ instantlyLeadId: 'existing-instantly-id' }),
-    ]);
+  it('never calls pushLeadToInstantly — enrollment delegates to the guarded outreach batch', async () => {
+    mockRouteLead.mockResolvedValueOnce({
+      route: 'both',
+      claimUrl: 'https://app/claim/tok',
+    });
 
     const lead = makeLead();
     const result = await approveLead(lead);
 
+    expect(mockRouteLead).toHaveBeenCalledWith('lead-1');
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(mockPipelineLog).toHaveBeenCalledWith(
+    expect(result.routing?.route).toBe('both');
+  });
+
+  it('holds lead for review and skips routing when ingestion fails', async () => {
+    mockIngestLeadAsCreator.mockResolvedValueOnce({
+      success: false,
+      error: 'Profile construction failed',
+    });
+
+    const lead = makeLead();
+    const result = await approveLead(lead);
+
+    expect(mockRouteLead).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+    expect(result.routing).toBeNull();
+    expect(mockPipelineWarn).toHaveBeenCalledWith(
       'approve',
-      expect.stringContaining('Already pushed to Instantly'),
+      expect.stringContaining('holding lead for review'),
       expect.any(Object)
     );
-    expect(result.routing?.route).toBe('email');
+  });
+
+  it('holds lead for review when ingestion throws', async () => {
+    mockIngestLeadAsCreator.mockRejectedValueOnce(new Error('Ingest exploded'));
+
+    const lead = makeLead();
+    const result = await approveLead(lead);
+
+    expect(result.ingestion?.success).toBe(false);
+    expect(mockRouteLead).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
   });
 
   it('captures error and returns result when routing fails', async () => {
