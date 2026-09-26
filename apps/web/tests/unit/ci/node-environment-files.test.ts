@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as jestDomMatchers from '@testing-library/jest-dom/matchers';
 import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,12 @@ const DOM_OR_REACT_REFERENCE = new RegExp(
   ].join('|')
 );
 
+// tests/setup-optimized.ts registers jest-dom matchers only when a DOM
+// exists, so node-environment files must not call any of them.
+const JEST_DOM_MATCHER_CALL = new RegExp(
+  `\\.(${Object.keys(jestDomMatchers).join('|')})\\(`
+);
+
 function files(): string[] {
   expect(Array.isArray(listedFiles)).toBe(true);
   return listedFiles as string[];
@@ -102,6 +109,37 @@ describe('tests/node-environment-files.json', () => {
       return match ? [`${entry} (references "${match[0]}")`] : [];
     });
     expect(domBound).toEqual([]);
+  });
+
+  it('lists only files that use no jest-dom matchers', () => {
+    expect(Object.keys(jestDomMatchers)).toContain('toBeInTheDocument');
+    const matcherUsers = files().flatMap(entry => {
+      const path = resolve(webRoot, entry);
+      if (!existsSync(path)) return [];
+      const match = readFileSync(path, 'utf8').match(JEST_DOM_MATCHER_CALL);
+      return match ? [`${entry} (calls "${match[1]}")`] : [];
+    });
+    expect(matcherUsers).toEqual([]);
+  });
+
+  it('loads DOM testing setup only when a DOM exists', () => {
+    const setup = readFileSync(
+      resolve(webRoot, 'tests/setup-optimized.ts'),
+      'utf8'
+    );
+    // No static import: node-environment files must not pay for jest-dom or
+    // React Testing Library at setup time.
+    expect(setup).not.toMatch(/^import[^;]*'@testing-library\//m);
+    const guard = setup.indexOf("if (typeof window !== 'undefined') {");
+    expect(guard).toBeGreaterThanOrEqual(0);
+    for (const snippet of [
+      "import('@testing-library/jest-dom/matchers')",
+      "import('@testing-library/react')",
+      'expect.extend(matchers);',
+      'cleanup();',
+    ]) {
+      expect(setup.indexOf(snippet)).toBeGreaterThan(guard);
+    }
   });
 
   it('is wired into the unit config as a node-environment project', () => {
