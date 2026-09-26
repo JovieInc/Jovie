@@ -180,6 +180,7 @@ export function AdminProfileSidebar({
             ariaLabel='Creator profile sidebar view'
           />
         }
+        contentClassName='pt-2'
       >
         {selectedCategory === 'about' ? (
           <ProfileAboutTab
