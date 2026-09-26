@@ -388,6 +388,8 @@ describe('runStructural screenshot contract discovery', () => {
     const [all, only] = [await run(''), await run('only')];
     expect(only).toEqual(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1));
     expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
   });
 
   it('uses the default executor on the structural skip path', async () => {

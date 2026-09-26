@@ -1841,7 +1841,10 @@ export async function runStructural(opts = {}) {
     ...(selected.has('mac') ? macParts : []),
   ];
   // ci-fast (structural python) runs `only` the pytest shards; remaining skips.
+  // Consume the split mode so nested contract suites (which rebuild this
+  // list) don't inherit it and see a filtered pool.
   const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
+  delete process.env.CI_FAST_STRUCTURAL_PYTEST;
   const parts = allParts.filter(
     part => mode !== (STRUCTURAL_PYTEST_PARTS.includes(part) ? 'skip' : 'only')
   );
