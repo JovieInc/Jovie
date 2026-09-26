@@ -602,7 +602,15 @@ def reexec(host: Host, name: str) -> int:
     return 0
 
 
+def ensure_full_history(host: Host) -> None:
+    """Repo gates check git ancestry (e.g. story provenance); a shallow clone fails them for
+    every PR. Clones made with --reference to a shallow mirror inherit that, so repair it."""
+    if sh(["git", "rev-parse", "--is-shallow-repository"], cwd=host.repo).stdout.strip() == "true":
+        sh(["git", "fetch", "-q", "--unshallow", "origin"], cwd=host.repo, timeout=1800)
+
+
 def dispatch(host: Host) -> int:
+    ensure_full_history(host)
     prune_worktrees(host)
     for name, spec in load_providers().items():
         if not spec.get("enabled", True) or cooling(host, name) or not provider_healthy(spec):
