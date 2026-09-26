@@ -10,15 +10,18 @@ name: Merge Queue Green Enroll
 #
 # Enqueues open, non-draft, same-repo PRs into main whose mergeStateStatus is
 # CLEAN (required checks green, no conflicts), that carry no hold/gated/incident
-# label and were not updated in the last 10 minutes (owner still pushing).
+# label. Event-driven, no timer: it runs when a required-check workflow finishes
+# on a PR, or a PR becomes ready / loses a hold label.
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# ponytail: 100-PR scan per tick; page if open non-draft PRs routinely exceed it.
-# clock-class: temporal-resource
+# ponytail: scans 100 open PRs per event; page if open non-draft PRs routinely exceed it.
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
+  workflow_run:
+    workflows: [CI, Fork PR Gate, PR Size Guard]
+    types: [completed]
+  pull_request_target:
+    types: [ready_for_review, unlabeled]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -35,6 +38,10 @@ concurrency:
 jobs:
   enroll:
     name: Enqueue green PRs
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -55,7 +62,6 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
-            const QUIET_MS = 10 * 60 * 1000;
             const { owner, repo } = context.repo;
             const { repository } = await github.graphql(`
               query($owner: String!, $repo: String!) {
@@ -63,7 +69,7 @@ jobs:
                   pullRequests(states: OPEN, baseRefName: "main", first: 100,
                                orderBy: { field: UPDATED_AT, direction: ASC }) {
                     nodes {
-                      id number isDraft updatedAt headRefOid mergeStateStatus
+                      id number isDraft headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
                       labels(first: 30) { nodes { name } }
                     }
@@ -76,7 +82,6 @@ jobs:
               if (pr.mergeStateStatus !== 'CLEAN') continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
               if (labels.some(l => BLOCKING.has(l))) continue;
-              if (Date.now() - Date.parse(pr.updatedAt) < QUIET_MS) continue;
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
