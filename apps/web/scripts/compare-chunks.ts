@@ -17,8 +17,8 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -74,11 +74,12 @@ export function isTelemetryChunk(
   // Match the raw path (webpack may keep `/` and `.`) and the sanitized name
   // (Turbopack). The 'web-vitals'/'gtag' markers intentionally match either
   // spelling; no non-telemetry module path contains these substrings.
-  const normalized = normalizeChunkName(chunkPath).replaceAll('-', '_');
-  return markers.some(marker => {
-    const markerNormalized = normalizeChunkName(marker).replaceAll('-', '_');
-    return chunkPath.includes(marker) || normalized.includes(markerNormalized);
-  });
+  const normalized = normalizeChunkName(chunkPath);
+  return markers.some(
+    marker =>
+      chunkPath.includes(marker) ||
+      normalized.includes(normalizeChunkName(marker))
+  );
 }
 
 interface TelemetryBudgets {
@@ -158,11 +159,8 @@ export function measureTelemetryContribution(
   const chunks: Record<string, { raw: number; gzip: number }> = {};
   let rawBytes = 0;
   let gzipBytes = 0;
-  const seen = new Set<string>();
 
   for (const chunkPath of chunkPaths) {
-    if (seen.has(chunkPath)) continue;
-    seen.add(chunkPath);
     if (!isTelemetryChunk(chunkPath)) continue;
     const bytes = readChunkBytes(chunkPath);
     if (!bytes) continue;
@@ -522,10 +520,14 @@ function compare(): void {
   }
 }
 
-// CLI. Importing the budget helpers must not exit the process.
-const invokedPath = process.argv[1];
-if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
-  if (process.argv.includes('--snapshot')) {
+// CLI — guarded so importing this module (tests, coverage runners) never
+// executes the gate: process.exit in a vitest worker would kill the run.
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const isSnapshot = process.argv.includes('--snapshot');
+  if (isSnapshot) {
     captureSnapshot();
   } else {
     compare();
