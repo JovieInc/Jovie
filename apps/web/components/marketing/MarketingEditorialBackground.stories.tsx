@@ -4,7 +4,15 @@ import { MarketingEditorialBackground } from './MarketingEditorialBackground';
 const meta: Meta<typeof MarketingEditorialBackground> = {
   title: 'Marketing/Primitives/MarketingEditorialBackground',
   component: MarketingEditorialBackground,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    jovie: {
+      // No disabled/loading state exists; the props doc comment mentions
+      // motion being disabled under prefers-reduced-motion, which trips
+      // the state-matrix hint on a prop the component does not have.
+      uncoveredProps: ['disabled'],
+    },
+  },
   decorators: [
     Story => (
       <div className='relative min-h-screen overflow-hidden bg-base text-primary-token'>
