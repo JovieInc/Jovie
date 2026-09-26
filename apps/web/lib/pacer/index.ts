@@ -25,6 +25,7 @@ export {
   withPacerErrorHandling,
 } from './errors';
 export type {
+  AutoSaveAttemptMeta,
   UseAsyncValidationOptions,
   UseAsyncValidationReturn,
   UseAutoSaveOptions,

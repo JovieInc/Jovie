@@ -55,4 +55,3 @@ back-compat barrel have no importers; treat deep imports as canonical.
   same-scope dedupe is already owned by TanStack Query. Retirement is a
   ~1,200-line deletion that exceeds the standard PR size cap — split into a
   follow-up slice (owner `big-pr`/`codemod` label or a stacked retirement).
-
