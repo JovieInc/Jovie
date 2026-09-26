@@ -10,6 +10,8 @@
  */
 
 // Time constants
+import { defaultQueryRetryPolicy } from './retry-policy';
+
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
@@ -167,11 +169,13 @@ export const FREQUENT_BACKGROUND_CACHE: CacheStrategyOptions = {
 // =============================================================================
 
 /**
- * Reusable retry config: 3 retries with exponential backoff capped at 30s.
+ * Reusable classified retry config (JOV-6185): transient failures retry with
+ * bounded attempts, a wall-clock budget, and backoff with jitter; auth,
+ * validation, schema, and cancellation failures stop immediately.
  * Use for: analytics, DSP enrichment, and other queries that benefit from
  * retrying transient failures.
  */
 export const RETRY_BACKOFF = {
-  retry: 3,
-  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000),
+  retry: defaultQueryRetryPolicy.retry,
+  retryDelay: defaultQueryRetryPolicy.retryDelay,
 } as const;

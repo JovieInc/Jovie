@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defaultQueryRetryPolicy } from '@/lib/queries/retry-policy';
 import { QueryProvider } from './QueryProvider';
 
 const chrome = vi.hoisted(() => ({ disabled: false }));
@@ -79,5 +81,27 @@ describe('QueryProvider devtools hydration', () => {
       </QueryProvider>
     );
     expect(screen.queryByTestId('query-devtools')).toBeNull();
+  });
+});
+
+describe('QueryProvider classified retry policy (JOV-6185)', () => {
+  it('wires the shared classified retry policy into query defaults', () => {
+    let defaults:
+      | ReturnType<ReturnType<typeof useQueryClient>['getDefaultOptions']>
+      | undefined;
+    function DefaultsProbe() {
+      defaults = useQueryClient().getDefaultOptions();
+      return null;
+    }
+    render(
+      <QueryProvider>
+        <DefaultsProbe />
+      </QueryProvider>
+    );
+    expect(defaults?.queries?.retry).toBe(defaultQueryRetryPolicy.retry);
+    expect(defaults?.queries?.retryDelay).toBe(
+      defaultQueryRetryPolicy.retryDelay
+    );
+    expect(defaults?.mutations?.retry).toBe(0);
   });
 });
