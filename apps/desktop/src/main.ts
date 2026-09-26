@@ -73,6 +73,12 @@ import {
   isHudRoutePath,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
+import {
+  type MainLivenessMonitor,
+  createMainLivenessMonitor,
+  spawnMainLivenessWorker,
+  summarizeUnhandledRejection,
+} from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
@@ -305,6 +311,43 @@ let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
+let mainLivenessMonitor: MainLivenessMonitor | null = null;
+
+// Observe async rejections in the main process instead of letting Node's
+// default warning be the only trace. The summary is bounded and redacted;
+// observing a rejection never marks the app healthy — the liveness probe
+// below is the only responsiveness verdict.
+process.on('unhandledRejection', reason => {
+  console.error('[Jovie Desktop] Unhandled rejection', {
+    reason: summarizeUnhandledRejection(reason),
+  });
+});
+
+// JOV-6192: a blocked main process must be detected by a scheduler outside
+// the blocked loop. The probe Worker owns the deadline on its own thread; a
+// timer scheduled on the main loop could never fire to report the block.
+function startMainLivenessMonitor(): void {
+  if (mainLivenessMonitor) return;
+  mainLivenessMonitor = createMainLivenessMonitor({
+    spawnProbe: () => spawnMainLivenessWorker(),
+    onVerdict: message => {
+      if (message.verdict === 'blocked') {
+        console.error('[Jovie Desktop] Main process unresponsive', {
+          pongLagMs: message.pongLagMs,
+        });
+      } else {
+        console.info('[Jovie Desktop] Main process responsive again', {
+          pongLagMs: message.pongLagMs,
+        });
+      }
+    },
+    onProbeError: error => {
+      console.error('[Jovie Desktop] Main liveness probe failed to start', {
+        reason: summarizeUnhandledRejection(error),
+      });
+    },
+  });
+}
 
 /**
  * Per-webContents boot-watchdog controllers (JOV-3595). The hosted web app
@@ -2622,6 +2665,8 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  mainLivenessMonitor?.dispose();
+  mainLivenessMonitor = null;
   summerRuntimeBridge?.stop();
   summerRuntimeBridge = null;
   if (windowStateQuitFlushed || !windowStateStore.needsFlush()) return;
@@ -2902,6 +2947,10 @@ app.whenReady().then(async () => {
     nightlyTimeout.unref?.();
     return;
   }
+
+  // Detection lives on the probe worker's own timers, so this stays correct
+  // even while the main loop is blocked — start before any window work.
+  startMainLivenessMonitor();
 
   // The first window paints the boot splash, so the cached wordmark must be
   // resolved before createWindow runs. Start it alongside window-state
