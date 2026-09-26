@@ -1177,6 +1177,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.state, 'GREEN');
     assert.equal(fleetGate.promotionAdmission.allowed, true);
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
     assert.equal(
       fleetGate.reasons.some(reason => reason.code === 'queue-above-target'),
       false
@@ -1195,6 +1196,13 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
     assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(oneLanded.state, 'GREEN');
+    assert.equal(oneLanded.promotionMode, 'normal');
+    assert.equal(oneLanded.isolatedPromotionAdmission.allowed, true);
+    assert.equal(
+      oneLanded.isolatedPromotionAdmission.deploymentsAllowed,
+      false
+    );
   });
 
   it('fails lane admission closed when the scoped receipt disagrees with queue evidence', () => {
@@ -1700,10 +1708,13 @@ describe('deterministic Symphony admission boundary', () => {
       { now }
     );
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    // Capacity evidence governs dispatch seats, not Linear-child intake:
+    // a GREEN fleet with greenReadyPrs below target still admits leases.
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(gate.concurrency.gem.maxConcurrent, 0);
+    assert.equal(gate.concurrency.gem.newMutationAllowed, false);
     assert.ok(
-      !gate.workAdmission.activities.includes('isolated-implementation')
+      gate.workAdmission.activities.includes('isolated-implementation')
     );
   });
 
