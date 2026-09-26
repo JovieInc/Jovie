@@ -364,6 +364,16 @@ function applyLocalChromiumLoopbackResolver(): void {
 
 applyLocalChromiumLoopbackResolver();
 
+function applyMacGraphiteCompositorWorkaround(): void {
+  if (process.platform !== 'darwin') return;
+  // JOV-5289: Skia Graphite leaves stale compositor tiles after idle on
+  // Electron 43 / Chromium 150, even with the out-of-order-recording fix.
+  // Ganesh keeps the sandbox and feature set; must run before whenReady.
+  app.commandLine.appendSwitch('disable-skia-graphite');
+}
+
+applyMacGraphiteCompositorWorkaround();
+
 const nightlyUpdateLaunch =
   hasNightlyUpdateFlag(process.argv) ||
   app.commandLine.hasSwitch('jovie-nightly-update');
@@ -1080,7 +1090,6 @@ function showDesktopAuthHandoff(
     backgroundColor: APP_BACKGROUND_COLOR,
     modal: false,
     webPreferences: {
-      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -1544,7 +1553,6 @@ function showPublicProfilePreview(urlString: string): boolean {
     backgroundColor: APP_BACKGROUND_COLOR,
     webPreferences: {
       session: previewSession,
-      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
