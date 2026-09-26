@@ -280,7 +280,7 @@
     "copy:judge": "doppler run --project jovie-web --config dev -- tsx packages/copy/cli.ts judge"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.127.0",
+    "@anthropic-ai/sdk": "^0.128.0",
     "@biomejs/biome": "^2.5.14",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
