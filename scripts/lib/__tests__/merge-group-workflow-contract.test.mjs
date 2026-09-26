@@ -745,6 +745,22 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
+    // Build tail: no discarded turbo cache write; web-free checks run in the
+    // parallel Storybook job, which shares this job's gating and aggregates.
+    expect(buildLayout).toContain(
+      "TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:r' || env.TURBO_CACHE }}"
+    );
+    expect(buildLayout).not.toContain('@jovie/extension');
+    const surfaces = getJobBlock(CI_WORKFLOW, 'ci-storybook-surfaces');
+    for (const check of [
+      '@jovie/extension typecheck',
+      '@jovie/extension test',
+      '@jovie/extension build',
+      '@jovie/observability-ingest typecheck',
+      '@jovie/observability-ingest test',
+    ]) {
+      expect(surfaces).toContain(`pnpm --filter ${check}`);
+    }
     expect(unitTests).toContain(
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
     );
