@@ -2,6 +2,7 @@ import { Head, Search } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
 import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
+import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import {
