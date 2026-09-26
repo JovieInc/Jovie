@@ -15,13 +15,21 @@
  *   4. No avg-view-duration regression > 5% — retention floor
  *   5. Min swap cooldown (default 7 days) — no rapid re-swaps
  *
- * Bayesian winner:
- *   P(treatment > control) computed via Gaussian approximation of rate difference.
- *   Swap when P ≥ winThreshold (default 0.90).
- *   Rollback when P ≤ loseThreshold (default 0.10).
+ * Bayesian winner (confidence currently unavailable — see JOV-6469):
+ *   computeBayesianProbBOverA returns `null`. Its prior Gaussian-approximation
+ *   modeled aggregate watch minutes as a Poisson rate (SE² = rate/impressions),
+ *   which treats continuous duration as a discrete event count and is not
+ *   invariant to the unit chosen for that duration — rescaling minutes to
+ *   seconds (×60) scaled the resulting z-score by √60, which could flip a
+ *   `continue` into a `swap_treatment` purely from unit choice (see the
+ *   "units invariance" tests). A valid estimator needs the variance of
+ *   per-impression watch time, which VariantMetrics does not carry. Until a
+ *   validated estimator ships, every evaluation retains control — decisions
+ *   never auto-swap or auto-rollback on confidence alone.
  *
  * Auto-swap is gated behind autoPublishEnabled. When false, decision kind is
  * 'awaiting_approval' and a human must confirm before the swap executes.
+ * (Currently unreachable for the same reason as above — see JOV-6469.)
  *
  * Pure functions only — DB / API side-effects are the caller's concern.
  */
@@ -130,8 +138,8 @@ export interface ExperimentGuardrailViolation {
 
 export interface ExperimentDecision {
   readonly kind: ExperimentDecisionKind;
-  /** P(treatment watch_minutes_per_impression > control). */
-  readonly probTreatmentWins: number;
+  /** P(treatment watch_minutes_per_impression > control), or `null` when unavailable (see JOV-6469). */
+  readonly probTreatmentWins: number | null;
   readonly watchMinutesPerImpressionControl: number;
   readonly watchMinutesPerImpressionTreatment: number;
   readonly guardrailViolations: readonly ExperimentGuardrailViolation[];
@@ -188,35 +196,45 @@ export function watchMinutesPerImpression(m: VariantMetrics): number {
 }
 
 /**
- * P(treatment watch_minutes_per_impression > control) via Gaussian approximation.
+ * P(treatment watch_minutes_per_impression > control) — or `null` when no
+ * statistically valid estimate can be produced.
  *
- * Models each variant as a Poisson rate:
- *   rate = watchMinutes / impressions
- *   SE²  = rate / impressions   (Poisson rate standard error)
- *
- * P(B > A) = Φ((rate_B - rate_A) / sqrt(SE_A² + SE_B²))
- *
- * Returns 0.5 when either variant has zero impressions (no information).
+ * The prior implementation modeled aggregate watch minutes as a Poisson rate
+ * (SE² = rate / impressions), treating a continuous, real-valued duration as
+ * a count of discrete unit-rate events. That model is not invariant to the
+ * arbitrary unit chosen for the duration: rescaling the same underlying
+ * observation from minutes to seconds (×60) scales the resulting z-score by
+ * √60, which can flip a `continue` decision into `swap_treatment` (or vice
+ * versa) purely because of unit choice — see the "units invariance" tests.
+ * A statistically valid estimator needs the variance of per-impression watch
+ * time, which `VariantMetrics` does not carry (only aggregate impressions,
+ * aggregate watch minutes, and average view duration). Until that moment is
+ * available, this returns `null`; callers MUST retain control rather than
+ * substitute a guess (e.g. the previous 0.5 "no information" sentinel, which
+ * looked like a valid probability but wasn't).
  */
 export function computeBayesianProbBOverA(
-  control: VariantMetrics,
-  treatment: VariantMetrics
-): number {
-  if (control.impressions === 0 || treatment.impressions === 0) return 0.5;
+  _control: VariantMetrics,
+  _treatment: VariantMetrics
+): number | null {
+  return null;
+}
 
-  const rateA = watchMinutesPerImpression(control);
-  const rateB = watchMinutesPerImpression(treatment);
+/** Formats a win-probability for rationale text, honoring `null` (unavailable). */
+function formatProbPct(prob: number | null): string {
+  return prob === null ? 'unavailable' : `${(prob * 100).toFixed(1)}%`;
+}
 
-  // Poisson SE²: guard against zero rates to avoid NaN
-  const seA2 =
-    rateA > 0 ? rateA / control.impressions : 1 / control.impressions;
-  const seB2 =
-    rateB > 0 ? rateB / treatment.impressions : 1 / treatment.impressions;
-
-  const pooledSE = Math.sqrt(seA2 + seB2);
-  if (pooledSE === 0) return rateB > rateA ? 1 : rateB < rateA ? 0 : 0.5;
-
-  return normalCdf((rateB - rateA) / pooledSE);
+/** True when a variant's metrics are safe to use in arithmetic (finite, non-negative). */
+function isValidMetrics(m: VariantMetrics): boolean {
+  return (
+    Number.isFinite(m.impressions) &&
+    m.impressions >= 0 &&
+    Number.isFinite(m.watchMinutes) &&
+    m.watchMinutes >= 0 &&
+    Number.isFinite(m.avgViewDurationSeconds) &&
+    m.avgViewDurationSeconds >= 0
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +334,29 @@ export function evaluatePackagingExperiment(
   const now = state.nowIso ? new Date(state.nowIso) : new Date();
   const decidedAt = now.toISOString();
 
+  // Reject NaN/negative/non-finite metrics before any arithmetic uses them —
+  // holds pending valid data instead of silently propagating NaN into rates,
+  // guardrail comparisons, or the decision log.
+  if (!isValidMetrics(state.control) || !isValidMetrics(state.treatment)) {
+    return {
+      kind: 'continue',
+      probTreatmentWins: null,
+      watchMinutesPerImpressionControl: 0,
+      watchMinutesPerImpressionTreatment: 0,
+      guardrailViolations: [
+        {
+          rule: 'invalid_metrics',
+          detail:
+            'control or treatment metrics contain NaN, negative, or non-finite values; holding until valid data is available.',
+        },
+      ],
+      rationale:
+        'Continuing: invalid metrics input (NaN/negative/non-finite) — holding pending valid data.',
+      decidedAt,
+      requiresApproval: false,
+    };
+  }
+
   const rateControl = watchMinutesPerImpression(state.control);
   const rateTreatment = watchMinutesPerImpression(state.treatment);
   const prob = computeBayesianProbBOverA(state.control, state.treatment);
@@ -363,7 +404,7 @@ export function evaluatePackagingExperiment(
       watchMinutesPerImpressionControl: rateControl,
       watchMinutesPerImpressionTreatment: rateTreatment,
       guardrailViolations: [],
-      rationale: `Test exceeded max duration (${Math.round(elapsedMs / (24 * MS_PER_HOUR))}d) without a clear winner. P(treatment wins) = ${(prob * 100).toFixed(1)}%.`,
+      rationale: `Test exceeded max duration (${Math.round(elapsedMs / (24 * MS_PER_HOUR))}d) without a clear winner. P(treatment wins) = ${formatProbPct(prob)}.`,
       decidedAt,
       requiresApproval: false,
     };
@@ -384,7 +425,32 @@ export function evaluatePackagingExperiment(
     };
   }
 
-  // Bayesian decision
+  // Confidence unavailable: the estimator can't be statistically validated
+  // against the current metrics contract (see computeBayesianProbBOverA).
+  // Retain control instead of guessing — no automatic winner without evidence.
+  if (prob === null) {
+    return {
+      kind: 'continue',
+      probTreatmentWins: null,
+      watchMinutesPerImpressionControl: rateControl,
+      watchMinutesPerImpressionTreatment: rateTreatment,
+      guardrailViolations: [
+        {
+          rule: 'confidence_unavailable',
+          detail:
+            'Bayesian win-probability requires per-impression watch-time variance, which the current metrics contract does not provide; automatic swap/rollback decisions are disabled until a validated estimator ships.',
+        },
+      ],
+      rationale:
+        'Continuing: confidence unavailable — the estimator cannot be statistically validated with the current metrics, so control is retained.',
+      decidedAt,
+      requiresApproval: false,
+    };
+  }
+
+  // Bayesian decision — currently unreachable because computeBayesianProbBOverA
+  // always returns null above; kept so a future validated estimator only
+  // needs to return a real number to re-enable automatic decisions.
   if (prob >= cfg.winThreshold) {
     const liftPct = computeRatePercent(
       rateTreatment - rateControl,
@@ -401,8 +467,8 @@ export function evaluatePackagingExperiment(
       guardrailViolations: [],
       rationale:
         kind === 'swap_treatment'
-          ? `Swapping to treatment: P(treatment wins) = ${(prob * 100).toFixed(1)}%, lift +${liftPct}% watch-min/impression.`
-          : `Treatment wins (P=${(prob * 100).toFixed(1)}%, lift +${liftPct}%) but auto-publish is disabled. Queued for approval.`,
+          ? `Swapping to treatment: P(treatment wins) = ${formatProbPct(prob)}, lift +${liftPct}% watch-min/impression.`
+          : `Treatment wins (P=${formatProbPct(prob)}, lift +${liftPct}%) but auto-publish is disabled. Queued for approval.`,
       decidedAt,
       requiresApproval: !state.autoPublishEnabled,
     };
@@ -419,7 +485,7 @@ export function evaluatePackagingExperiment(
       watchMinutesPerImpressionControl: rateControl,
       watchMinutesPerImpressionTreatment: rateTreatment,
       guardrailViolations: [],
-      rationale: `Rolling back: P(treatment wins) = ${(prob * 100).toFixed(1)}%, treatment underperforms by ${Math.abs(Number(liftPct)).toFixed(1)}%.`,
+      rationale: `Rolling back: P(treatment wins) = ${formatProbPct(prob)}, treatment underperforms by ${Math.abs(Number(liftPct)).toFixed(1)}%.`,
       decidedAt,
       requiresApproval: false,
     };
@@ -431,7 +497,7 @@ export function evaluatePackagingExperiment(
     watchMinutesPerImpressionControl: rateControl,
     watchMinutesPerImpressionTreatment: rateTreatment,
     guardrailViolations: [],
-    rationale: `Continuing: P(treatment wins) = ${(prob * 100).toFixed(1)}% — neither win nor lose threshold reached.`,
+    rationale: `Continuing: P(treatment wins) = ${formatProbPct(prob)} — neither win nor lose threshold reached.`,
     decidedAt,
     requiresApproval: false,
   };
