@@ -308,7 +308,14 @@ subjects file cards under `company` until that enum grows an `ovie` value.
   fail-closed behavior on missing, stale, or ambiguous receipts.
 - At most one Taste Inbox card per subject.
 
-## 12. Research basis
+## 12. Customer certification
+
+Customer certification runs on the same kernel: a prospect's built profile is
+the test, product defects it exposes are fixed and re-checked, Tim approves each
+prospect, and outbound is card-approved until a message type earns auto-send.
+Spec: [CERTIFICATION_V2_CUSTOMERS.md](CERTIFICATION_V2_CUSTOMERS.md).
+
+## 13. Research basis
 
 - Meta ships to employees first, then 2% of production, then 100%, with
   Gatekeeper flags as the rollback
