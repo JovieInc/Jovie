@@ -2418,6 +2418,25 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   );
 });
 
+it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
+  const pattern = [
+    ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+  ]
+    .map(match => match[1])
+    .join('');
+  const selects = path =>
+    spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status === 0;
+  for (const path of [
+    '.github/workflows/ci.yml',
+    '.github/actions/setup-playwright/action.yml',
+    'scripts/lib/playwright-png.mjs',
+    'apps/web/playwright.config.ts',
+  ]) {
+    expect(selects(path), path).toBe(true);
+  }
+  expect(selects('README.md')).toBe(false);
+});
+
 describe('invariant-scanned PR structural selection', () => {
   // #18182 changed apps/desktop/src/main.ts (JOV-INV-031 scope) without any
   // invariant run; PR structural selection must derive from the scan roots.
