@@ -699,7 +699,8 @@ final class ChatRepository {
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
       handoffURL: handoffURL,
-      turnId: message.turnId
+      turnId: message.turnId,
+      createdAt: message.createdAt
     )
   }
 
@@ -728,7 +729,7 @@ final class ChatRepository {
         default: return "completed"
         }
       }(),
-      createdAt: ISO8601DateFormatter().string(from: Date()),
+      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }

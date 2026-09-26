@@ -74,6 +74,10 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   var handoffURL: URL?
   var turnId: String? = nil
   var eveWorkId: String? = nil
+  /// Server timestamp (ISO-8601) carried so the cache round-trip in
+  /// `persistCache` does not rewrite history to `Date()`; `nil` for locally
+  /// composed rows that have no server row yet (JOV-6210).
+  var createdAt: String? = nil
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
