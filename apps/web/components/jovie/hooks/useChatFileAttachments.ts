@@ -252,6 +252,36 @@ function formatAggregateEta(
 
 type UploadFileUpdater = (id: string, patch: Partial<PendingFile>) => void;
 
+/**
+ * Verifies a non-audio Blob upload server-side (ownership + magic-byte sniff)
+ * before it can be attached to a message. Throws with the server's message on
+ * rejection (JOV-5872: chat image/video/document uploads previously skipped
+ * this and went straight to `ready`).
+ */
+async function confirmChatFileUpload(
+  blobPathname: string,
+  fileName: string,
+  fileMimeType: string
+): Promise<{ blobUrl: string; contentType: string }> {
+  const response = await fetch('/api/chat/files/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blobPathname, fileName, fileMimeType }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    readonly blobUrl?: string;
+    readonly contentType?: string;
+    readonly error?: string;
+  };
+  if (!response.ok || !body.blobUrl) {
+    throw new Error(body.error ?? 'File verification failed');
+  }
+  return {
+    blobUrl: body.blobUrl,
+    contentType: body.contentType ?? fileMimeType,
+  };
+}
+
 async function uploadImageAttachment(
   file: File,
   id: string,
@@ -289,12 +319,18 @@ async function uploadImageAttachment(
         contentType: uploadMime,
       }
     );
+    updateFile(id, { status: 'processing' });
+    const confirmed = await confirmChatFileUpload(
+      blob.pathname,
+      processedFile.name,
+      uploadMime
+    );
     updateFile(id, {
       status: 'ready',
       progress: 100,
-      blobUrl: blob.url,
+      blobUrl: confirmed.blobUrl,
       previewUrl,
-      mediaType: uploadMime,
+      mediaType: confirmed.contentType,
     });
   } catch (err) {
     if (previewUrl?.startsWith('blob:')) {
@@ -404,11 +440,17 @@ async function uploadGenericAttachment(
         contentType: uploadMime,
       }
     );
+    updateFile(id, { status: 'processing' });
+    const confirmed = await confirmChatFileUpload(
+      blob.pathname,
+      file.name,
+      uploadMime
+    );
     updateFile(id, {
       status: 'ready',
       progress: 100,
-      blobUrl: blob.url,
-      mediaType: uploadMime,
+      blobUrl: confirmed.blobUrl,
+      mediaType: confirmed.contentType,
     });
   } catch (err) {
     updateFile(id, {
