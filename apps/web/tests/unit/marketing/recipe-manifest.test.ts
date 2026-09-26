@@ -722,7 +722,7 @@ describe('marketing route manifest integrity', () => {
   it('keeps source-verified route bodies explicit even when recipe parity is incomplete', () => {
     for (const [url, expectedParity] of [
       ['/pay', false],
-      ['/support', true],
+      ['/support', false],
       ['/waitlist', false],
     ] as const) {
       const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);

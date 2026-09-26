@@ -1,11 +1,8 @@
-import { FaqSection, MarketingHero } from '@/components/marketing';
-import { SUPPORT_FAQ_ITEMS } from '@/data/supportCopy';
+import { MarketingHero } from '@/components/marketing';
 import {
   SupportChannels,
   SupportCta,
 } from '../../app/(marketing)/support/SupportContent';
-
-export { SUPPORT_FAQ_ITEMS } from '@/data/supportCopy';
 
 export function SupportPageContent() {
   return (
@@ -23,15 +20,11 @@ export function SupportPageContent() {
           We&apos;re Here To Help.
         </h1>
         <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Browse our docs or reach out to our team.
+          Browse the Help Center or reach out to our team.
         </p>
       </MarketingHero>
 
       <SupportChannels />
-      <FaqSection
-        items={[...SUPPORT_FAQ_ITEMS]}
-        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
-      />
       <SupportCta />
     </>
   );

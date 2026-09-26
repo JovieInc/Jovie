@@ -197,7 +197,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     copyScope: 'shared',
     url: APP_ROUTES.SUPPORT,
     job: 'help visitors find support and answers',
-    proof: 'support channels and FAQ content',
+    proof: 'Help Center entry and contact support fallback',
     successEvent: 'visitor resolves a support path',
     primaryCta: START_CTA,
   },

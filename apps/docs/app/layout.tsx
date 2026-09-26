@@ -4,6 +4,7 @@ import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { ContactSupportLink } from '@/components/ContactSupportLink';
 import {
   filterNavigationPageMap,
   loadArticleRegistry,
@@ -50,13 +51,18 @@ export default async function RootLayout({
                   Jovie Docs
                 </span>
               }
-            />
+            >
+              <a href='/contact'>Contact support</a>
+            </Navbar>
           }
           pageMap={pageMap}
-          docsRepositoryBase='https://github.com/ArtistFirst/Jovie/tree/main/apps/docs'
+          docsRepositoryBase='https://github.com/JovieInc/Jovie/tree/main/apps/docs'
           editLink='Edit this page on GitHub'
           footer={
-            <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
+            <Footer>
+              Copyright {new Date().getFullYear()} Jovie Inc.{' '}
+              <ContactSupportLink />
+            </Footer>
           }
           search={<Search />}
         >

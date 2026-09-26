@@ -4,4 +4,5 @@ export default {
   'plans-pricing': 'Plans & Pricing',
   'api-reference': 'API Reference',
   'self-serve-guide': 'Guides',
+  'manage-jovie': 'Manage Jovie',
 };

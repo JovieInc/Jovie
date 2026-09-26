@@ -7,4 +7,8 @@ export default {
     title: 'Documentation',
     type: 'page',
   },
+  contact: {
+    title: 'Contact support',
+    type: 'page',
+  },
 };
