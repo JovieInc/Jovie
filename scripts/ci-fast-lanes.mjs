@@ -1156,7 +1156,7 @@ function runTypecheck() {
       };
     }
   }
-  return shell('pnpm turbo typecheck --affected --force');
+  return shellAsync('pnpm turbo typecheck --affected --force');
 }
 
 function runWebTestsTypecheck() {
@@ -1193,7 +1193,10 @@ function runWebTestsTypecheck() {
       };
     }
   }
-  return shell(WEB_TESTS_TYPECHECK_COMMAND);
+  // Own lock so it overlaps app tsc instead of queueing behind it.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
 }
 
 function runScriptsTypecheck() {
@@ -1730,7 +1733,8 @@ export async function runStructural(opts = {}) {
     SCRIPT_CONTRACT_VITEST_COMMAND,
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
+    // merge-group-workflow-contract runs in ci:control:test's Vitest run.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1979,10 +1983,20 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
+    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    const started = new Map();
+    for (const lane of selectedLanes.filter(l =>
+      LANE_GROUPS.typecheck.includes(l.id)
+    )) {
+      const run = Promise.resolve().then(() => lane.run());
+      run.catch(() => {});
+      started.set(lane.id, [Date.now(), run]);
+    }
+
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
-      const laneStartedAt = Date.now();
+      const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
@@ -2001,7 +2015,7 @@ async function main() {
 
       let outcome;
       try {
-        outcome = await lane.run();
+        outcome = await (run ?? lane.run());
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);
