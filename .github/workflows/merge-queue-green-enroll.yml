@@ -72,6 +72,10 @@ jobs:
                       id number isDraft headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
                       labels(first: 30) { nodes { name } }
+                      commits(last: 1) { nodes { commit { committedDate } } }
+                      timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
+                        nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
+                      }
                     }
                   }
                 }
@@ -82,6 +86,10 @@ jobs:
               if (pr.mergeStateStatus !== 'CLEAN') continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
               if (labels.some(l => BLOCKING.has(l))) continue;
+              // The queue already rejected this exact head; wait for a new push.
+              const removedAt = pr.timelineItems.nodes[0]?.createdAt;
+              const committedAt = pr.commits.nodes[0]?.commit.committedDate;
+              if (removedAt && committedAt && removedAt > committedAt) continue;
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
