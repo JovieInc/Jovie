@@ -11,6 +11,11 @@ import { BaseSequencer } from 'vitest/node';
 // each file lands in exactly one shard. A stale or missing map only degrades
 // balance toward equal counts; it never drops a file.
 
+// Cost of non-Vitest CI work pinned to a shard (.github/workflows/ci.yml:
+// packages/ui ~41s on 4/10, Ovie ~4s on 1/10) in map cost units (~1.3x wall),
+// preloaded so LPT offsets it.
+export const CI_RESERVED_MS = { '1/10': 5000, '4/10': 55_000 };
+
 export const DEFAULT_DURATIONS_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../tests/unit-shard-durations.json'
@@ -42,7 +47,7 @@ export function loadDurations(file = DEFAULT_DURATIONS_PATH) {
 }
 
 /** Greedy LPT partition of unique keys into `count` buckets (shard i = [i-1]). */
-export function partitionByDuration(keys, count, durations) {
+export function partitionByDuration(keys, count, durations, reserved = {}) {
   if (!Number.isInteger(count) || count < 1) {
     throw new Error(`shard count must be a positive integer, got ${count}`);
   }
@@ -53,7 +58,7 @@ export function partitionByDuration(keys, count, durations) {
     }))
     .sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : 1));
   const buckets = Array.from({ length: count }, () => []);
-  const loads = new Array(count).fill(0);
+  const loads = buckets.map((_, i) => reserved[`${i + 1}/${count}`] ?? 0);
   for (const { key, weight } of weighted) {
     let target = 0;
     for (let i = 1; i < count; i++) if (loads[i] < loads[target]) target = i;
@@ -87,10 +92,12 @@ export default class DurationShardSequencer extends BaseSequencer {
       const cost = this.durations.files.get(this.fileOf(spec));
       if (cost !== undefined) costs.set(key, cost);
     }
-    const buckets = partitionByDuration([...specs.keys()], count, {
-      files: costs,
-      defaultMs: this.durations.defaultMs,
-    });
+    const buckets = partitionByDuration(
+      [...specs.keys()],
+      count,
+      { files: costs, defaultMs: this.durations.defaultMs },
+      CI_RESERVED_MS
+    );
     return buckets[index - 1].map(key => specs.get(key));
   }
 

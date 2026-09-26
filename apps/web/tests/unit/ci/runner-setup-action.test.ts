@@ -121,7 +121,7 @@ describe('self-hosted runner setup action', () => {
       // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
       // workspace, patches and .npmrc, and no prefix match may restore.
       expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+        "key: pnpm-node-modules-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
       );
       expect(restoreStep).not.toContain('restore-keys');
     });
@@ -184,16 +184,27 @@ describe('self-hosted runner setup action', () => {
       const saveIf = saveStep.match(/if: >-\n[\s\S]*?\)\)/)?.[0] ?? '';
       expect(saveIf).not.toBe('');
       expect(prune).toContain(saveIf.replace('if: >-\n', ''));
-      expect(prune.match(/rm -rf.*\n.*/)?.[0]).toBe(
-        'rm -rf onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v*/{darwin,win32} \\\n' +
-          '          app-builder-bin@*/node_modules/app-builder-bin/{mac,win}'
-      );
+      expect(prune.match(/rm -rf.*/g)).toEqual([
+        'rm -rf app-builder-bin@*/node_modules/app-builder-bin/{mac,win}',
+      ]);
       // Hollow musl builds but keep package.json, so a restored tree stays
       // "Already up to date" instead of refetching them on every hit.
+      const hollow =
+        '          -exec find {}/node_modules -type f ! -name package.json -delete \\;';
       expect(prune).toContain(
         "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
-          '          -exec find {}/node_modules -type f ! -name package.json -delete \\;'
+          hollow
       );
+      // Promptfoo-only native payloads hollow the same way. These exact
+      // patterns leave the SDK wrappers (codex-sdk, claude-agent-sdk) and
+      // onnxruntime-common intact.
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \\\n" +
+          "          -o -name '@openai+codex@*-linux-*' \\\n" +
+          "          -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \\) \\\n" +
+          hollow
+      );
+      expect(prune.match(/-exec find /g)).toHaveLength(2);
     });
   });
 

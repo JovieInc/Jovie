@@ -305,6 +305,18 @@ describe('UnifiedSidebar library route', () => {
     expect(linearTokens).not.toMatch(/--linear-app-frame-seam/);
   });
 
+  it('uses the single unified header-height token for route/operator sidebar headers (founder lock 2026-09-25)', () => {
+    const source = readFileSync(
+      join(__dirname, '../../../..', 'components/organisms/UnifiedSidebar.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'h-(--app-shell-header-height) py-0.5'");
+    expect(source).not.toContain(
+      "'h-(--app-shell-header-height-compact) py-0.5'"
+    );
+  });
+
   it('preserves the generic route-override contract for legitimate consumers', async () => {
     renderUnifiedSidebar({
       overrideContent: <button type='button'>Needs Assets</button>,

@@ -1,0 +1,13 @@
+{
+  "schema": "symphony-protected-items/v1",
+  "pull_requests": [17453, 17156, 18299, 17511],
+  "issues": ["JOV-5914", "JOV-6519"],
+  "branches": [
+    "kimi/JOV-5914-fix",
+    "cursor/symphony-cursor-capacity-5844",
+    "cursor/gem-gate-issue-blocked-intake-c699",
+    "codex/homepage-canonical-sizing-20260909"
+  ],
+  "labels": ["hold", "protected", "human-only"],
+  "label_patterns": ["zz-upstream*"]
+}

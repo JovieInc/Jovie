@@ -477,7 +477,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>
             </div>
-            <SidebarGroupContent className='pb-2 pt-4'>
+            <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>
                   {renderSection(section.items)}
@@ -488,7 +488,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
         )}
 
         {threadsVisible ? (
-          <div className='pt-4'>
+          <div className='pt-5'>
             <SidebarThreadsSection
               threads={sidebarThreads}
               activeThreadId={activeThreadId}

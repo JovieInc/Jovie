@@ -2,7 +2,10 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
   @moduledoc """
   Runs the pinned Symphony checkout `dae31f823850c9ef2dea121433e5b60f09af26fa`.
   It does not execute the host's installed openai/symphony `1c0fb6c8` binary.
-  Protected issues are omitted only while they lack `agent-ready`.
+  Exact protected labels are scheduler exclusions. Identifier, pull-request,
+  branch, and `zz-upstream*` refusals come from the Jovie pre-intake check,
+  which runs before workspace creation. The pinned scheduler still has no
+  identifier denylist.
   """
   use SymphonyElixir.TestSupport
 
@@ -156,33 +159,182 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
     refute sha == host
   end
 
-  test "excludes JOV-5914, JOV-6519, PR #17453, and PR #17156 only while they lack agent-ready" do
-    {:ok, issues} =
-      Client.fetch_issues_by_states_for_test(@active_states, {:team, "JOV"}, fn _query, variables ->
-        assert variables.teamKey == "JOV"
-        {:ok, poll_page(protected_fixture_nodes())}
-      end)
-
-    by_identifier = Map.new(issues, &{&1.identifier, &1})
-    state = state_from_loaded_config()
+  test "does not select protected labels, including agent-ready issues" do
     settings = Config.settings!()
+    excluded = MapSet.new(settings.tracker.excluded_labels)
+    state = state_from_loaded_config()
 
-    for identifier <- ["JOV-5914", "JOV-6519", "JOV-PR-17453", "JOV-PR-17156"] do
-      issue = Map.fetch!(by_identifier, identifier)
-      refute "agent-ready" in issue.labels
+    for label <- ["hold", "protected", "human-only"] do
+      assert MapSet.member?(excluded, label)
 
-      refute Issue.routable?(
-               issue,
-               settings.tracker.required_labels,
-               settings.tracker.excluded_labels
-             )
-
-      refute Orchestrator.should_dispatch_issue_for_test(issue, state)
-
-      labeled = %{issue | labels: Enum.uniq(issue.labels ++ ["agent-ready"])}
-      assert "agent-ready" in labeled.labels
-      assert Orchestrator.should_dispatch_issue_for_test(labeled, state)
+      blocked = ready_issue("JOV-7601", "Todo", ["agent-ready", label])
+      refute Orchestrator.should_dispatch_issue_for_test(blocked, state)
     end
+
+    refute "human-review-required" in settings.tracker.excluded_labels
+    refute "needs-human" in settings.tracker.excluded_labels
+
+    legacy = ready_issue("JOV-7602", "Todo", ["agent-ready", "human-review-required"])
+    assert Orchestrator.should_dispatch_issue_for_test(legacy, state)
+
+    prefixed = ready_issue("JOV-7603", "Todo", ["agent-ready", "zz-upstream-cutover"])
+    # dae31f8 matches excluded labels exactly, so the prefix stays routable there.
+    assert Orchestrator.should_dispatch_issue_for_test(prefixed, state)
+
+    {status, decision} =
+      run_gate!([
+        gate_issue("JOV-7601", ["agent-ready", "hold"], [], nil),
+        gate_issue("JOV-7603", ["agent-ready", "zz-upstream-cutover"], [], nil),
+        gate_issue("JOV-7602", ["agent-ready", "human-review-required"], [], nil)
+      ])
+
+    assert status == 0
+    assert decision["blocked"] == nil
+    refute "JOV-7601" in decision["admitted"]
+    refute "JOV-7603" in decision["admitted"]
+    assert "JOV-7602" in decision["admitted"]
+    refute intake_selected?("JOV-7601", decision, ready_issue("JOV-7601", "Todo", ["agent-ready", "hold"]), state)
+    refute intake_selected?("JOV-7603", decision, prefixed, state)
+    assert intake_selected?("JOV-7602", decision, legacy, state)
+  end
+
+  test "does not select protected agent-ready issues by identifier, pull request, or branch" do
+    state = state_from_loaded_config()
+    by_id = ready_issue("JOV-5914", "In Progress", ["agent-ready"])
+    by_pr = ready_issue("JOV-7701", "Todo", ["agent-ready"])
+    by_branch = ready_issue("JOV-7702", "Todo", ["agent-ready"])
+    open_issue = ready_issue("JOV-7703", "Todo", ["agent-ready"])
+
+    # The pinned scheduler would claim these. Intake must not.
+    assert Orchestrator.should_dispatch_issue_for_test(by_id, state)
+    assert Orchestrator.should_dispatch_issue_for_test(by_pr, state)
+    assert Orchestrator.should_dispatch_issue_for_test(by_branch, state)
+
+    {status, decision} =
+      run_gate!([
+        gate_issue("JOV-5914", ["agent-ready"], [], nil),
+        gate_issue("JOV-6519", ["agent-ready"], [], nil),
+        gate_issue("JOV-7701", ["agent-ready"], [17453], nil),
+        gate_issue("JOV-7702", ["agent-ready"], [], "cursor/symphony-cursor-capacity-5844"),
+        gate_issue("JOV-7704", ["agent-ready"], [17156], nil),
+        gate_issue("JOV-7705", ["agent-ready"], [18299], nil),
+        gate_issue("JOV-7706", ["agent-ready"], [17511], nil),
+        gate_issue("JOV-7707", ["agent-ready"], [], "kimi/JOV-5914-fix"),
+        gate_issue("JOV-7708", ["agent-ready"], [], "cursor/gem-gate-issue-blocked-intake-c699"),
+        gate_issue("JOV-7709", ["agent-ready"], [], "codex/homepage-canonical-sizing-20260909"),
+        gate_issue("JOV-7703", ["agent-ready"], [], nil)
+      ])
+
+    assert status == 0
+    assert decision["blocked"] == nil
+    assert decision["admitted"] == ["JOV-7703"]
+
+    for {identifier, issue} <- [
+          {"JOV-5914", by_id},
+          {"JOV-7701", by_pr},
+          {"JOV-7702", by_branch}
+        ] do
+      refute intake_selected?(identifier, decision, issue, state)
+    end
+
+    assert intake_selected?("JOV-7703", decision, open_issue, state)
+  end
+
+  test "a missing or malformed protected list blocks selection" do
+    state = state_from_loaded_config()
+    issue = ready_issue("JOV-7201", "Todo", ["agent-ready"])
+    assert Orchestrator.should_dispatch_issue_for_test(issue, state)
+    payload = [gate_issue("JOV-7201", ["agent-ready"], [], nil)]
+
+    missing = Path.join(System.tmp_dir!(), "missing-protected-list-#{System.unique_integer([:positive])}.json")
+    {missing_status, missing_decision} = run_gate!(payload, list: missing)
+    assert missing_status != 0
+    assert missing_decision["blocked"] == "protected-list-unavailable"
+    assert missing_decision["admitted"] == []
+    refute intake_selected?("JOV-7201", missing_decision, issue, state)
+
+    malformed =
+      Path.join(System.tmp_dir!(), "malformed-protected-list-#{System.unique_integer([:positive])}.json")
+
+    File.write!(malformed, "{")
+
+    {malformed_status, malformed_decision} = run_gate!(payload, list: malformed)
+    File.rm(malformed)
+    assert malformed_status != 0
+    assert malformed_decision["blocked"] == "protected-list-unavailable"
+    assert malformed_decision["admitted"] == []
+    refute intake_selected?("JOV-7201", malformed_decision, issue, state)
+  end
+
+  test "unresolved linkage blocks every candidate, including unprotected agent-ready issues" do
+    state = state_from_loaded_config()
+    issue = ready_issue("JOV-7201", "Todo", ["agent-ready"])
+    assert Orchestrator.should_dispatch_issue_for_test(issue, state)
+
+    {status, decision} =
+      run_gate!([
+        %{
+          "identifier" => "JOV-7801",
+          "labels" => ["agent-ready"],
+          "linkage" => "unresolved"
+        },
+        gate_issue("JOV-7201", ["agent-ready"], [], nil)
+      ])
+
+    assert status != 0
+    assert decision["blocked"] == "linkage-unresolved"
+    assert decision["admitted"] == []
+    refute intake_selected?("JOV-7201", decision, issue, state)
+  end
+
+  defp intake_selected?(identifier, decision, issue, state) do
+    decision["blocked"] == nil and identifier in decision["admitted"] and
+      Orchestrator.should_dispatch_issue_for_test(issue, state)
+  end
+
+  defp gate_issue(identifier, labels, pull_requests, branch) do
+    %{
+      "identifier" => identifier,
+      "labels" => labels,
+      "pull_requests" => pull_requests,
+      "branch" => branch,
+      "linkage" => "resolved"
+    }
+  end
+
+  defp run_gate!(issues, opts \\ []) do
+    list_path = Keyword.get(opts, :list, protected_list_path())
+    directory = Path.join(System.tmp_dir!(), "codex-intake-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(directory)
+    issues_path = Path.join(directory, "issues.json")
+    File.write!(issues_path, JSON.encode!(%{"issues" => issues}))
+
+    try do
+      {output, status} =
+        System.cmd(
+          "python3",
+          [
+            protected_check_path(),
+            "--issues-file",
+            issues_path,
+            "--list",
+            list_path
+          ],
+          stderr_to_stdout: false
+        )
+
+      {status, JSON.decode!(output)}
+    after
+      File.rm_rf(directory)
+    end
+  end
+
+  defp protected_check_path do
+    Path.join(Path.dirname(profile_workflow_path()), "protected-intake-check.py")
+  end
+
+  defp protected_list_path do
+    Path.join(Path.dirname(profile_workflow_path()), "protected-items.json")
   end
 
   defp load_profile! do
@@ -278,15 +430,6 @@ defmodule SymphonyElixir.GovernorBoundedCodexIntakeTest do
         "Backlog issue inside symphony-ui-pilot-96d6b9c5b2d5"
       ),
       linear_node("JOV-7203", "Todo", [], "Unlabeled Todo on the JOV team")
-    ]
-  end
-
-  defp protected_fixture_nodes do
-    [
-      linear_node("JOV-5914", "In Progress", [], "Work tied to GitHub PR #17156"),
-      linear_node("JOV-6519", "In Progress", ["devin"], "Rebase PR #17156"),
-      linear_node("JOV-PR-17453", "Todo", [], "Work tied to GitHub PR #17453"),
-      linear_node("JOV-PR-17156", "Todo", ["ready-for-intake"], "Work tied to pull/17156")
     ]
   end
 
