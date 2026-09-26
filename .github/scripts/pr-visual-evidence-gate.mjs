@@ -3,13 +3,29 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const EXACT_SHA = /^[0-9a-f]{40}$/;
+
 /**
  * JOV-5459: Visual ENOENT is FAIL, not advisory.
  * Missing routing/manifest or a failed capture stage fails the job.
  * A `cancelled` stage is also a failure: fail-closed means only `success`
  * (or a legitimately `skipped` lane) may pass — never an interrupted stage.
+ *
+ * When `expectedHeadSha` is supplied, the routing record must be bound to that
+ * exact 40-hex PR head SHA; a malformed expectation or a mismatched/missing
+ * `head_sha` is missing evidence, not a pass.
+ *
+ * @param {{
+ *   artifactDir: string,
+ *   stages: Record<string, string>,
+ *   expectedHeadSha?: string,
+ * }} input
  */
-export function evaluateVisualEvidence({ artifactDir, stages }) {
+export function evaluateVisualEvidence({
+  artifactDir,
+  stages,
+  expectedHeadSha,
+}) {
   const failedStages = Object.entries(stages)
     .filter(([, outcome]) => outcome === 'failure' || outcome === 'cancelled')
     .map(([stage]) => stage);
@@ -17,6 +33,10 @@ export function evaluateVisualEvidence({ artifactDir, stages }) {
   const missingEvidence = [];
   const routingPath = join(artifactDir, 'routing.json');
   const manifestPath = join(artifactDir, 'manifest.json');
+  const bindHead = expectedHeadSha !== undefined;
+  if (bindHead && !EXACT_SHA.test(String(expectedHeadSha))) {
+    missingEvidence.push('expected-head-sha');
+  }
 
   let shouldReview = false;
   if (!existsSync(routingPath)) {
@@ -25,6 +45,13 @@ export function evaluateVisualEvidence({ artifactDir, stages }) {
     try {
       const routing = JSON.parse(readFileSync(routingPath, 'utf8'));
       shouldReview = Boolean(routing.shouldReview);
+      if (
+        bindHead &&
+        EXACT_SHA.test(String(expectedHeadSha)) &&
+        routing.head_sha !== expectedHeadSha
+      ) {
+        missingEvidence.push('routing.json#head_sha');
+      }
     } catch {
       missingEvidence.push('routing.json');
     }
@@ -58,7 +85,13 @@ function main() {
     server: process.env.SERVER_OUTCOME || 'skipped',
     capture: process.env.CAPTURE_OUTCOME || 'skipped',
   };
-  const result = evaluateVisualEvidence({ artifactDir, stages });
+  // The CLI always binds evidence to the exact PR head; an unset expectation
+  // is malformed evidence (fail closed), never an unbound pass.
+  const result = evaluateVisualEvidence({
+    artifactDir,
+    stages,
+    expectedHeadSha: process.env.PR_VISUAL_EXPECTED_HEAD_SHA ?? '',
+  });
   writeFileSync(
     join(artifactDir, 'advisory-outcome.json'),
     `${JSON.stringify(

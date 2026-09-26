@@ -147,40 +147,40 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     { plan: 'pro', allowed: false },
     { plan: 'max', allowed: true },
     { plan: 'growth', allowed: true },
-  ])('enforces double opt-in authority for $plan', async ({
-    plan,
-    allowed,
-  }) => {
-    mocks.parseJsonBody.mockResolvedValue({
-      ok: true,
-      data: {
-        profileId: PROFILE_ID,
+  ])(
+    'enforces double opt-in authority for $plan',
+    async ({ plan, allowed }) => {
+      mocks.parseJsonBody.mockResolvedValue({
+        ok: true,
+        data: {
+          profileId: PROFILE_ID,
+          updates: { settings: { require_double_opt_in: false } },
+        },
+      });
+      mocks.validateUpdatesPayload.mockReturnValue({
+        ok: true,
         updates: { settings: { require_double_opt_in: false } },
-      },
-    });
-    mocks.validateUpdatesPayload.mockReturnValue({
-      ok: true,
-      updates: { settings: { require_double_opt_in: false } },
-    });
-    mocks.parseProfileUpdates.mockReturnValue({
-      ok: true,
-      parsed: { settings: { require_double_opt_in: false } },
-    });
-    mocks.getCurrentUserEntitlements.mockResolvedValue({ plan });
+      });
+      mocks.parseProfileUpdates.mockReturnValue({
+        ok: true,
+        parsed: { settings: { require_double_opt_in: false } },
+      });
+      mocks.getCurrentUserEntitlements.mockResolvedValue({ plan });
 
-    const { PUT } = await import('@/app/api/dashboard/profile/route');
-    const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
-    );
+      const { PUT } = await import('@/app/api/dashboard/profile/route');
+      const response = await PUT(
+        new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+      );
 
-    expect(response.status).toBe(allowed ? 200 : 403);
-    if (allowed) {
-      expect(mocks.updateProfileRecords).toHaveBeenCalledOnce();
-    } else {
-      expect(mocks.withDbSessionTx).not.toHaveBeenCalled();
-      expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+      expect(response.status).toBe(allowed ? 200 : 403);
+      if (allowed) {
+        expect(mocks.updateProfileRecords).toHaveBeenCalledOnce();
+      } else {
+        expect(mocks.withDbSessionTx).not.toHaveBeenCalled();
+        expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+      }
     }
-  });
+  );
 
   it('returns the transaction CAS conflict without post-commit effects', async () => {
     const { NextResponse } = await import('next/server');
@@ -199,47 +199,47 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
   it.each([
     { status: 403, error: 'Forbidden' },
     { status: 404, error: 'Profile not found' },
-  ])('returns $status before deriving a theme for an inaccessible exact profile', async ({
-    status,
-    error,
-  }) => {
-    const { NextResponse } = await import('next/server');
-    const avatarUrl = 'https://example.com/avatar.png';
-    mocks.parseJsonBody.mockResolvedValue({
-      ok: true,
-      data: {
-        profileId: PROFILE_ID,
-        expectedVersion: 3,
+  ])(
+    'returns $status before deriving a theme for an inaccessible exact profile',
+    async ({ status, error }) => {
+      const { NextResponse } = await import('next/server');
+      const avatarUrl = 'https://example.com/avatar.png';
+      mocks.parseJsonBody.mockResolvedValue({
+        ok: true,
+        data: {
+          profileId: PROFILE_ID,
+          expectedVersion: 3,
+          updates: { avatarUrl },
+        },
+      });
+      mocks.validateUpdatesPayload.mockReturnValue({
+        ok: true,
         updates: { avatarUrl },
-      },
-    });
-    mocks.validateUpdatesPayload.mockReturnValue({
-      ok: true,
-      updates: { avatarUrl },
-    });
-    mocks.parseProfileUpdates.mockReturnValue({
-      ok: true,
-      parsed: { avatarUrl },
-    });
-    mocks.buildProfileUpdateContext.mockReturnValue({
-      dbProfileUpdates: { avatarUrl },
-      displayNameForUserUpdate: undefined,
-      avatarUrl,
-      usernameUpdate: undefined,
-    });
-    mocks.getProfileUpdatePreflight.mockResolvedValue(
-      NextResponse.json({ error }, { status })
-    );
+      });
+      mocks.parseProfileUpdates.mockReturnValue({
+        ok: true,
+        parsed: { avatarUrl },
+      });
+      mocks.buildProfileUpdateContext.mockReturnValue({
+        dbProfileUpdates: { avatarUrl },
+        displayNameForUserUpdate: undefined,
+        avatarUrl,
+        usernameUpdate: undefined,
+      });
+      mocks.getProfileUpdatePreflight.mockResolvedValue(
+        NextResponse.json({ error }, { status })
+      );
 
-    const { PUT } = await import('@/app/api/dashboard/profile/route');
-    const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
-    );
+      const { PUT } = await import('@/app/api/dashboard/profile/route');
+      const response = await PUT(
+        new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+      );
 
-    expect(response.status).toBe(status);
-    expect(mocks.buildThemeWithProfileAccent).not.toHaveBeenCalled();
-    expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(status);
+      expect(mocks.buildThemeWithProfileAccent).not.toHaveBeenCalled();
+      expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not derive a theme when the avatar URL is unchanged', async () => {
     const avatarUrl = 'https://example.com/avatar.png';

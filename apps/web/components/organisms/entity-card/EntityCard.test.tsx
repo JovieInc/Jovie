@@ -206,6 +206,56 @@ describe('EntityCard', () => {
     );
   });
 
+  it('keeps the shell padding for compact, big, landscape media, and landscape alerts', () => {
+    const alerts: EntityCardModel = {
+      id: 'a1',
+      kind: 'alerts',
+      title: 'Alerts',
+      imageAlt: 'Alerts',
+    };
+
+    const compact = render(
+      <EntityCard model={merchModel} treatment='compact' />
+    );
+    expect(compact.getByTestId('entity-card-merch').className).toContain(
+      'gap-3'
+    );
+    expect(compact.getByTestId('entity-card-merch').className).toContain('p-3');
+    compact.unmount();
+
+    const big = render(<EntityCard model={merchModel} treatment='big' />);
+    expect(big.getByTestId('entity-card-merch').className).toContain(
+      'gap-0 overflow-hidden p-0'
+    );
+    big.unmount();
+
+    const landscape = render(
+      <EntityCard
+        model={merchModel}
+        treatment='detailed'
+        anatomy='profile-landscape'
+      />
+    );
+    expect(landscape.getByTestId('entity-card-merch').className).toContain(
+      'gap-0 overflow-hidden p-1.5'
+    );
+    landscape.unmount();
+
+    const alertCard = render(
+      <EntityCard
+        model={alerts}
+        treatment='detailed'
+        anatomy='profile-landscape'
+      />
+    );
+    expect(alertCard.getByTestId('entity-card-alerts').className).toContain(
+      'gap-0 overflow-hidden p-0'
+    );
+    expect(alertCard.getByTestId('entity-card-alerts').className).not.toContain(
+      'p-1.5'
+    );
+  });
+
   it('keeps legacy content-driven sizing when no shape is provided', () => {
     render(<EntityCard model={merchModel} treatment='compact' />);
     const card = screen.getByTestId('entity-card-merch');
