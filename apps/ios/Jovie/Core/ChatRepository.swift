@@ -685,9 +685,14 @@ final class ChatRepository {
       hasMoreOlderByConversationID[activeConversationID] = hasMoreOlder ?? self.hasMoreOlder
     }
 
+    // Bound the persisted snapshot (JOV-5144): the cache is re-encoded whole
+    // on every persist and loaded resident at launch, so unbounded history
+    // (load-earlier pages accumulate into the timeline) grows RAM without
+    // limit. Keep only the newest window per conversation; older rows remain
+    // reachable via load-earlier.
     let snapshot = CachedChatSnapshot(
       conversations: conversations,
-      messagesByConversationID: messagesByConversationID,
+      messagesByConversationID: messagesByConversationID.mapValues(ChatTranscriptWindow.persistedTail),
       cachedAt: Date(),
       activeConversationID: activeConversationID,
       hasMoreOlderByConversationID: hasMoreOlderByConversationID
