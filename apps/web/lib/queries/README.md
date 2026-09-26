@@ -60,7 +60,10 @@ Two layers:
 5. If the data also lives in Next.js data cache (public profiles, etc.), add or call a helper in `lib/cache/`.
 6. Export from `index.ts`.
 
-Example skeleton:
+Canonical example: `fixtures/example-release-detail.ts` — a compiled, tested
+fixture covering a parameterized read (decoder + cancellation + retry
+ownership) and a mutation with scoped invalidation. Copy its shape, not the
+snippet below, which is kept minimal for readability:
 
 ```ts
 import { useQuery } from '@tanstack/react-query';
@@ -68,12 +71,16 @@ import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { STANDARD_CACHE } from './cache-strategies';
 
-const fetchFoo = createQueryFn<Foo>('/api/foo');
+// createQueryFn binds the URL at creation; its result only accepts
+// `{ signal }`. Resource ids go in the URL — build the fetcher per id.
+const fetchFoo = (id: string) =>
+  createQueryFn<Foo>(`/api/foo/${encodeURIComponent(id)}`);
 
 export function useFooQuery(id: string) {
   return useQuery({
     queryKey: queryKeys.foo.item(id),
-    queryFn: () => fetchFoo({ id }),
+    queryFn: ({ signal }) => fetchFoo(id)({ signal }),
+    enabled: Boolean(id),
     ...STANDARD_CACHE,
   });
 }
