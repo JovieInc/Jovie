@@ -36,14 +36,26 @@ class SelectionTest(unittest.TestCase):
         ], {})
         self.assertEqual(picked.identifier, "JOV-1")
 
-    def test_skips_symphony_excluded_and_exhausted_work(self):
+    def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([
-            issue("JOV-1", labels=["agent-ready"]),
+            issue("JOV-1", labels=["no-symphony"]),
             issue("JOV-2", labels=["Area:Auth"]),
-            issue("JOV-3"),
+            issue("JOV-3", labels=[lane.SHARED_LABEL]),
             issue("JOV-4", priority=1),
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
+
+    def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
+        picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
+                                 in_flight=frozenset({"JOV-1"}))
+        self.assertEqual(picked.identifier, "JOV-2")
+        self.assertIsNone(lane.pick_issue([issue("JOV-1")], {}, in_flight=frozenset({"jov-1"})))
+
+    def test_lane_branches_name_their_issue_and_lane(self):
+        found = lane.LANE_BRANCH.match("codex/jov-6544-20260926t123210")
+        self.assertEqual((found.group("lane"), found.group("issue")), ("codex", "jov-6544"))
+        self.assertIsNone(lane.LANE_BRANCH.match("tim/jov-6544-fix"))
+        self.assertIsNone(lane.LANE_BRANCH.match("devin/other-work"))
 
     def test_recent_failures_back_off_before_retry(self):
         failures = {"JOV-1": {"count": 1, "at": 1000.0}}
@@ -86,6 +98,13 @@ class GateTest(unittest.TestCase):
                                           self.change("apps/web/lib/a.test.ts")]), [])
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
 
+    def test_xcode_tests_directory_counts_as_test(self):
+        changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
+                   self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
+        self.assertEqual(lane.gate_rules(changes), [])
+        self.assertEqual(lane.gate_rules([self.change("apps/ios/Jovie/Core/A.swift")]),
+                         ["code-change-without-test"])
+
     def test_secrets_lockfile_and_size_guards(self):
         self.assertIn("secret-like-file-changed", lane.gate_rules([self.change("apps/web/.env.local")]))
         self.assertIn("lockfile-without-manifest", lane.gate_rules([self.change("pnpm-lock.yaml")]))
@@ -118,9 +137,11 @@ class FakeShell:
                  failing=()):
         self.prs, self.numstat, self.ahead, self.failing, self.calls = prs, numstat, ahead, failing, []
 
-    def __call__(self, args, cwd=None, timeout=600, env=None, log=None):
+    def __call__(self, args, cwd=None, timeout=600, env=None, log=None, stream=False):
         self.calls.append(args)
         out, code = "", 0
+        if any(token in args for token in getattr(self, "hanging", ())):
+            raise subprocess.TimeoutExpired(args, timeout)
         if args[:3] == ["gh", "pr", "list"]:
             out = json.dumps(self.prs)
         elif args[:2] == ["git", "diff"]:
@@ -160,6 +181,28 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertTrue(any(r.startswith("check-failed") for r in result["reasons"]))
         self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
 
+    def test_gate_timeout_is_transient_until_it_repeats(self):
+        fake = FakeShell([self.pr])
+        fake.hanging = ("scripts/hooks/pre-push-gate.sh",)
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.sh = fake
+            verdicts = [lane.gate_pr(host, self.pr, Path("/tmp"), None)["verdict"]
+                        for _ in range(lane.MAX_GATE_TIMEOUTS)]
+        self.assertEqual(verdicts, ["gate-timeout"] * (lane.MAX_GATE_TIMEOUTS - 1) + ["held"])
+        self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
+        # every attempt released its gate seat, so the seat is free again
+        seat = lane.Locked(host.state / "slots" / "gate.0.lock", blocking=False)
+        self.assertTrue(seat.held)
+        seat.release()
+
+    def test_a_new_head_resets_the_timeout_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            self.assertEqual(lane.gate_timeouts(host, self.pr, change=1), 1)
+            self.assertEqual(lane.gate_timeouts(host, self.pr, change=1), 2)
+            self.assertEqual(lane.gate_timeouts(host, {**self.pr, "headRefOid": "new"}), 0)
+
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
         self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
@@ -177,6 +220,10 @@ class ProviderAndLockTest(unittest.TestCase):
             self.assertTrue(any("{prompt" in arg for arg in spec["cmd"]), name)
             self.assertTrue(spec["health"])
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
+        # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
+        enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
+        self.assertTrue(enabled <= {"devin", "codex"}, enabled)
+        self.assertIn("devin", enabled)
         # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
         cmd = providers["devin"]["cmd"]
         self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
@@ -238,9 +285,15 @@ class LinearClientTest(unittest.TestCase):
                 def read(self):
                     return json.dumps(self.body).encode()
 
-            lane.urllib.request.urlopen = lambda request, timeout: Response(payload)
+            seen = []
+
+            def capture(request, timeout):
+                seen.append(json.loads(request.data))
+                return Response(payload)
+            lane.urllib.request.urlopen = capture
             try:
                 [found] = client.lane_issues("devin")
+                self.assertEqual(seen[0]["variables"]["labels"], ["devin", lane.SHARED_LABEL])
                 self.assertEqual((found.identifier, found.description, found.labels), ("JOV-5", "", ["devin"]))
                 lane.urllib.request.urlopen = lambda request, timeout: Response({"errors": [{"message": "nope"}]})
                 with self.assertRaises(RuntimeError):
@@ -374,6 +427,13 @@ class WorkerTest(unittest.TestCase):
         lane.worker(self.host, "devin")
         self.assertEqual((adopted, self.linear.moves), ([8], []))
 
+    def test_a_held_pr_keeps_its_issue_instead_of_retrying_a_new_pr(self):
+        lane.run_issue = lambda *a: {"verdict": "held", "pr": 7, "prUrl": "u", "reasons": ["check-failed:x"]}
+        lane.worker(self.host, "devin")
+        self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+        self.assertIn("will fix it on that branch", self.linear.comments[-1][1])
+        self.assertFalse((self.host.state / "failures.json").exists())
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -401,6 +461,26 @@ class DispatchTest(unittest.TestCase):
                 lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh = saved
             self.assertFalse(old.exists())
         self.assertEqual(spawned, ["a", "a"])
+
+    def test_prune_survives_a_worktree_removed_mid_scan(self):
+        real = lane.sh
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "worktrees"
+            (root / "gone").mkdir(parents=True)
+            real_iterdir = Path.iterdir
+
+            def vanishing(self):
+                entries = list(real_iterdir(self))
+                for entry in entries:
+                    if entry.name == "gone":
+                        entry.rmdir()
+                return iter(entries)
+            Path.iterdir = vanishing
+            try:
+                lane.prune_worktrees(lane.Host(state=Path(tmp), repo=Path(tmp)))
+            finally:
+                Path.iterdir, lane.sh = real_iterdir, real
 
     def test_shallow_clones_are_unshallowed_before_gating(self):
         calls = []
@@ -439,6 +519,22 @@ class FixRedTest(unittest.TestCase):
         self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1}}))
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
+
+    def test_gate_held_prs_go_to_the_fix_loop_with_the_gate_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.record_held(host, 5, "h1", ["check-failed:pnpm", "[component-ship-gate] FAIL - needs stories"])
+            green = self.pr(checks=[{"status": "IN_PROGRESS"}])
+            real = lane.sh
+            lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+            try:
+                claimed = lane.claim_red_pr(host, "devin", [{**green, "headRefName": "devin/jov-1-20260925204809"}])
+            finally:
+                lane.sh = real
+            self.assertEqual(claimed["number"], 5)
+            self.assertIn("component-ship-gate", lane.render_fix_prompt(claimed, ""))
+            moved = {**green, "headRefOid": "h2", "headRefName": "devin/jov-1-20260925204809"}
+            self.assertIsNone(lane.red_pr([moved], {}, json.loads((host.state / "held.json").read_text())))
 
     def test_merge_conflicts_count_as_stuck_even_with_green_checks(self):
         dirty = {**self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}]),
@@ -521,6 +617,23 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.gate_pr = real_sh, real_gate
             self.assertEqual((receipt["kind"], receipt["verdict"]), ("adopt", "landing"))
 
+    def test_a_timed_out_adopt_is_not_counted_as_verified(self):
+        real_sh, real_gate = lane.sh, lane.gate_pr
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.gate_pr = lambda host, pr, worktree, log: {"verdict": "gate-timeout", "pr": pr["number"],
+                                                        "reasons": ["gate-timeout:2400s:x1"]}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                draft = {**self.pr(), "isDraft": True}
+                claimed = lane.claim_adoptable_pr(host, "devin", [draft])
+                self.assertEqual(claimed["number"], 5)
+                lane.adopt_pr(host, "devin", claimed)
+                self.assertEqual(json.loads((host.state / "verified.json").read_text()), {})
+                self.assertEqual(lane.claim_adoptable_pr(host, "devin", [draft])["number"], 5)
+            finally:
+                lane.sh, lane.gate_pr = real_sh, real_gate
+
     def test_fix_run_reports_a_pushed_head_and_leaves_a_receipt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         lane.failure_excerpt = lambda pr: "err"
@@ -576,6 +689,28 @@ class UpdateTest(unittest.TestCase):
                     os.environ.pop("LANES_SELFTEST", None)
                 else:
                     os.environ["LANES_SELFTEST"] = old_env
+
+
+class RequeueTest(unittest.TestCase):
+    def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "requeue.json"
+            path.write_text(json.dumps({"5": "h1", "6": "h1", "7": "h1"}))
+            calls = []
+            def fake_sh(cmd, **kwargs):
+                calls.append(cmd)
+                # PR 6 is still rate-limited; everything else enqueues.
+                return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0, stdout="", stderr="")
+            real, lane.sh = lane.sh, fake_sh
+            try:
+                lane.requeue_verified(host, [{"number": 5, "headRefOid": "h1"}, {"number": 6, "headRefOid": "h1"},
+                                             {"number": 7, "headRefOid": "h2"}])
+            finally:
+                lane.sh = real
+            self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
+            self.assertNotIn("7", [c[3] for c in calls])
+            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
 
 if __name__ == "__main__":

@@ -31,7 +31,8 @@
       "sonnet",
       "--dangerously-skip-permissions",
       "{prompt}"
-    ]
+    ],
+    "enabled": false
   },
   "hyperagent": {
     "label": "hyperagent",
@@ -39,6 +40,7 @@
     "slots": 2,
     "health": ["hyperagent", "models", "--json"],
     "healthy": "glm-5\\.3",
-    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"]
+    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"],
+    "enabled": false
   }
 }

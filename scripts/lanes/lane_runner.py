@@ -33,20 +33,25 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_SLUG = "JovieInc/Jovie"
-# Symphony owns agent-ready; the rest stay with humans or other lanes.
+# `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
+# the rest stay with humans.
+SHARED_LABEL = "agent-ready"
 EXCLUDED_LABELS = frozenset({
-    "agent-ready", "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
+    "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
     "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
     "type:epic", "codex-blocked",
 })
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
+MAX_GATE_TIMEOUTS = 3
+LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
-TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/tests?/|/__tests__/|(^|/)test_[^/]+\.py$)")
+# Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
+TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?$|^docs/|^canon/|\.txt$)")
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
@@ -63,7 +68,10 @@ class Host:
     repo: Path = Path(os.environ.get("LANES_REPO", Path.home() / "devin-sweep/Jovie"))
     linear_env: Path = Path(os.environ.get("LANES_LINEAR_ENV", Path.home() / ".config/symphony/linear.env"))
     agent_timeout: int = int(os.environ.get("LANES_AGENT_TIMEOUT_S", 5400))
-    gate_timeout: int = int(os.environ.get("LANES_GATE_TIMEOUT_S", 1500))
+    gate_timeout: int = int(os.environ.get("LANES_GATE_TIMEOUT_S", 2400))
+    # Gates (typecheck, vitest, component contracts) are CPU-bound; more than a couple at
+    # once only makes all of them time out.
+    gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
     def slots(self, provider: str, default: int) -> int:
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
@@ -90,10 +98,13 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
-def pick_issue(issues: list[Issue], failures: dict, now: float | None = None) -> Issue | None:
+def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
+               in_flight: frozenset[str] = frozenset()) -> Issue | None:
     """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
-    3x failures, and issues still inside their retry backoff."""
+    3x failures, issues still inside their retry backoff, and issues that already have an
+    open lane PR anywhere (one PR per issue: the fix/adopt loop owns those)."""
     now = time.time() if now is None else now
+    in_flight = {identifier.lower() for identifier in in_flight}
 
     def retryable(identifier: str) -> bool:
         record = failure_record(failures.get(identifier))
@@ -102,6 +113,7 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None) ->
     eligible = [
         issue for issue in issues
         if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
+        and issue.identifier.lower() not in in_flight
     ]
     eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
     return eligible[0] if eligible else None
@@ -207,11 +219,31 @@ def check_commands(paths: list[str]) -> list[list[str]]:
 
 # ---------------------------------------------------------------- plumbing
 
-def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None):
+def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False):
+    """Run and record. `stream=True` writes output to the log as it happens, so a timeout
+    shows where the command was, instead of losing everything it printed."""
+    if stream and log is not None:
+        log.write(f"$ {' '.join(args)[:300]}\n")
+        log.flush()
+        result = subprocess.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+                                timeout=timeout, env=env)
+        log.flush()
+        return subprocess.CompletedProcess(args, result.returncode, "", "")
     result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}\n")
     return result
+
+
+def log_tail(log, limit: int = 12000) -> str:
+    """What a streamed command wrote, for evidence extraction."""
+    try:
+        log.flush()
+        with open(log.name, errors="replace") as handle:
+            handle.seek(max(0, os.path.getsize(log.name) - limit))
+            return handle.read()
+    except (AttributeError, OSError):
+        return ""
 
 
 class Linear:
@@ -237,10 +269,11 @@ class Linear:
         return payload["data"]
 
     def lane_issues(self, label: str) -> list[Issue]:
+        """Todo issues carrying the lane's own label or the shared pool label."""
         data = self.gql(
-            'query($label:String!){issues(first:50,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
-            'labels:{name:{eq:$label}}}){nodes{id identifier title description priority createdAt '
-            'labels{nodes{name}}}}}', {"label": label})
+            'query($labels:[String!]!){issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
+            'labels:{name:{in:$labels}}}){nodes{id identifier title description priority createdAt '
+            'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
@@ -351,6 +384,29 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, max(prs, key=lambda item: item["createdAt"]), worktree, log)
 
 
+def gate_slot(host: Host) -> Locked:
+    """One of `gate_slots` host-wide gate seats; waits (polling) until one is free."""
+    while True:
+        for index in range(host.gate_slots):
+            lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
+            if lock.held:
+                return lock
+            lock.release()
+        time.sleep(15)
+
+
+def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
+    """Consecutive gate timeouts for this PR head; a new head resets the count."""
+    path = host.state / "gate-timeouts.json"
+    data = json.loads(path.read_text()) if path.exists() else {}
+    entry = data.get(str(pr["number"]), {})
+    count = (entry.get("count", 0) if entry.get("sha") == pr["headRefOid"] else 0) + change
+    if change:
+        data[str(pr["number"])] = {"sha": pr["headRefOid"], "count": count}
+        path.write_text(json.dumps(data))
+    return count
+
+
 def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
@@ -358,30 +414,95 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes)
-    if not reasons:
-        for command in check_commands([change.path for change in changes]):
-            if sh(command, cwd=worktree, timeout=host.gate_timeout, log=log).returncode != 0:
-                reasons.append(f"check-failed:{' '.join(command[:6])}")
+    evidence = []
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
+    if not reasons:
+        commands = check_commands([change.path for change in changes])
+        seat = gate_slot(host) if commands else None
+        try:
+            for command in commands:
+                try:
+                    ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+                except subprocess.TimeoutExpired:
+                    # A slow gate is the host's problem, not the PR's: leave the head unverified so
+                    # the adopt loop retries it, and only hold after repeated timeouts.
+                    count = gate_timeouts(host, pr, change=1)
+                    if count < MAX_GATE_TIMEOUTS:
+                        return {**result, "verdict": "gate-timeout",
+                                "reasons": [f"gate-timeout:{host.gate_timeout}s:x{count}"]}
+                    reasons.append(f"gate-timeout:x{count}")
+                    evidence.append(f"gate timed out {count} times at {host.gate_timeout}s per attempt")
+                    break
+                if ran.returncode != 0:
+                    reasons.append(f"check-failed:{' '.join(command[:6])}")
+                    evidence += [line for line in log_tail(log).splitlines()
+                                 if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
+        finally:
+            if seat is not None:
+                seat.release()
+        result["reasons"] = reasons
     if reasons:
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body",
             "Lane gate held this PR (it stays draft):\n" + "\n".join(f"- `{r}`" for r in reasons)], log=log)
+        record_held(host, pr["number"], pr["headRefOid"], reasons + evidence)
         return {**result, "verdict": "held"}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
     queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    if queued.returncode != 0:
+        # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
+        # would strand a green PR; each worker pass retries it via requeue_verified.
+        update_json(host.state / "requeue.json", lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
+
+
+def update_json(path: Path, change) -> None:
+    data = json.loads(path.read_text()) if path.exists() else {}
+    change(data)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+
+
+def requeue_verified(host: Host, prs: list[dict]) -> None:
+    """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
+    path = host.state / "requeue.json"
+    if not path.exists():
+        return
+    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    def retry(requeue: dict) -> None:
+        for number, head in list(requeue.items()):
+            if heads.get(number) != head:
+                del requeue[number]  # merged, closed, or a new head that the gate owns again
+                continue
+            sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+                del requeue[number]
+    update_json(path, retry)
 
 
 # ---------------------------------------------------------------- fix red first
 
-def red_pr(prs: list[dict], attempts: dict) -> dict | None:
+def held_path(host: Host) -> Path:
+    return host.state / "held.json"
+
+
+def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None:
+    """The gate held this head; the lane's fix loop owns it next, on the same branch."""
+    path = held_path(host)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    held = json.loads(path.read_text()) if path.exists() else {}
+    held[str(number)] = {"sha": head, "evidence": evidence[-60:]}
+    path.write_text(json.dumps(held))
+
+
+def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(prs, key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
-        if not conflicted:
+        gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
+        if not conflicted and not gate_held:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
@@ -408,6 +529,9 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    if pr.get("gateEvidence"):
+        excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
+            ("\n\n" + excerpt if excerpt else "")
     if pr.get("mergeStateStatus") == "DIRTY":
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
@@ -497,6 +621,9 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    if receipt.get("verdict") in ("gate-timeout", "failed"):
+        # Not verified: forget the claim so the next adopt pass retries this head.
+        update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
@@ -509,6 +636,15 @@ def lane_prs(name: str) -> list[dict]:
     # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
     own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     return [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+
+
+def in_flight_issues() -> frozenset[str]:
+    """Issues that already have an open lane PR from any lane on any host (GitHub is the
+    shared truth, so two hosts cannot both open a PR for one issue)."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "300",
+                 "--json", "headRefName"])
+    found = (LANE_BRANCH.match(pr["headRefName"]) for pr in json.loads(listed.stdout or "[]"))
+    return frozenset(match.group("issue").upper() for match in found if match)
 
 
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
@@ -526,8 +662,12 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     prs = lane_prs(name) if prs is None else prs
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
-    pr = red_pr(prs, attempts)
+    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    pr = red_pr(prs, attempts, held)
     if pr:
+        entry = held.get(str(pr["number"]), {})
+        if entry.get("sha") == pr["headRefOid"]:
+            pr = {**pr, "gateEvidence": entry.get("evidence", [])}
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
         path.write_text(json.dumps(attempts))
@@ -555,12 +695,13 @@ def worker(host: Host, name: str) -> int:
     try:
         # Finish before starting: red PRs, then ungated drafts, then new issues.
         prs = lane_prs(name)
+        requeue_verified(host, prs)
         red = claim_red_pr(host, name, prs)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
         if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures)
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
             if issue:
                 linear.move(issue.id, "In Progress")
     finally:
@@ -593,6 +734,14 @@ def worker(host: Host, name: str) -> int:
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
                                  f"queued; required checks and the merge queue decide.")
+    elif verdict == "held" and receipt.get("pr"):
+        # One PR per issue: the fix loop repairs it on the same branch instead of a fresh attempt.
+        linear.comment(issue.id, f"🤖 lane `{name}`: the lane gate held PR {receipt.get('prUrl')} "
+                                 f"({', '.join(receipt.get('reasons', []))}); the lane will fix it on that branch.")
+    elif verdict == "gate-timeout" and receipt.get("pr"):
+        # The PR exists and the issue stays In Progress; the adopt loop re-gates the head.
+        linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} is open; the lane gate timed out "
+                                 f"on this host ({', '.join(receipt.get('reasons', []))}) and will retry.")
     else:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try:
@@ -652,7 +801,11 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
     if not root.exists():
         return
     for path in root.iterdir():
-        if time.time() - path.stat().st_mtime > max_age_s:
+        try:
+            stale = time.time() - path.stat().st_mtime > max_age_s
+        except FileNotFoundError:
+            continue  # a worker removed it between listing and stat
+        if stale:
             sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo)
             shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
@@ -695,7 +848,20 @@ def update(host: Host) -> int:
     return 0
 
 
+def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env") -> None:
+    """A host-specific GitHub token (GH_TOKEN=...) so each host spends its own API budget
+    instead of everyone sharing one user's 5000/hr."""
+    try:
+        for line in path.read_text().splitlines():
+            key, _, value = line.strip().removeprefix("export ").partition("=")
+            if key in ("GH_TOKEN", "GITHUB_TOKEN") and value:
+                os.environ["GH_TOKEN"] = value.strip().strip('"').strip("'")
+    except OSError:
+        return
+
+
 def main(argv: list[str] | None = None) -> int:
+    load_github_env()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")

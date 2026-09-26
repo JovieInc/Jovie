@@ -4,8 +4,10 @@ import {
   evaluateThroughGateway,
   JEV_ROUTE,
   JEV_RUBRICS,
+  prepareJevChoiceRequest,
   prepareJevRequest,
   runJevEvaluation,
+  runPreparedJevEvaluation,
 } from './jev-gateway.mjs';
 
 const input = {
@@ -42,7 +44,13 @@ const options = (extra = {}) => ({
 
 test('binds every stage, artifact, scope, text and rubric to immutable request', () => {
   for (const stage of Object.keys(JEV_RUBRICS))
-    assert.ok(prepareJevRequest({ ...input, stage }).fingerprint);
+    assert.ok(
+      prepareJevRequest({
+        ...input,
+        stage,
+        labels: stage === 'task-cluster' ? ['lyrics'] : undefined,
+      }).fingerprint
+    );
   for (const delta of [
     { sourceSha: 'c'.repeat(40) },
     { artifactSha256: 'd'.repeat(64) },
@@ -332,6 +340,136 @@ test('abort before and during I/O, timeout and provider failure fail closed with
   assert.ok(!JSON.stringify(failed).includes('private-secret'));
 });
 
+test('bounded choice requests freeze labelled criteria and reject overrides', () => {
+  const questions = {
+    classification: {
+      type: 'choice',
+      instructions: 'pick exactly one',
+      criteria: { alpha: 'first option', unclassified: 'no option fits' },
+    },
+  };
+  const choice = prepareJevChoiceRequest(
+    { ...input },
+    {
+      questions,
+      schema: 'jev-task-cluster/v1',
+      stage: 'task-cluster',
+      extra: { allowlistSha256: 'e'.repeat(64) },
+    }
+  );
+  assert.equal(choice.schema, 'jev-task-cluster/v1');
+  assert.equal(choice.stage, 'task-cluster');
+  assert.equal(choice.allowlistSha256, 'e'.repeat(64));
+  assert.notEqual(choice.fingerprint, request.fingerprint);
+  assert.throws(() => {
+    choice.questions.classification.criteria.beta = 'injected';
+  });
+  assert.throws(() => {
+    choice.questions.classification.type = 'boolean';
+  });
+  const noStage = prepareJevChoiceRequest({ ...input }, { questions });
+  assert.equal(noStage.stage, null);
+  assert.equal(noStage.schema, undefined);
+  for (const bad of [
+    null,
+    {},
+    { q: { type: 'score' } },
+    { q: { type: 'choice', criteria: {} } },
+    { q: { type: 'choice', criteria: { '': 'no label' } } },
+    { q: { type: 'choice', criteria: { ok: '' } } },
+  ]) {
+    assert.throws(() =>
+      prepareJevChoiceRequest({ ...input }, { questions: bad })
+    );
+  }
+  assert.throws(() =>
+    prepareJevChoiceRequest({ ...input }, { questions, schema: ' ' })
+  );
+  assert.throws(() =>
+    prepareJevChoiceRequest(
+      { ...input },
+      /** @type {any} */ ({ questions, extra: 'nope' })
+    )
+  );
+  for (const key of ['route', 'state', 'questions', 'fingerprint', 'schema']) {
+    assert.throws(() =>
+      prepareJevChoiceRequest(
+        { ...input },
+        { questions, extra: { [key]: 'x' } }
+      )
+    );
+  }
+});
+
+test('prepared-choice evaluations reuse admission, timeout and interpret seams', async () => {
+  const choice = prepareJevChoiceRequest(
+    { ...input },
+    {
+      questions: {
+        classification: {
+          type: 'choice',
+          instructions: 'pick exactly one',
+          criteria: { alpha: 'first option', unclassified: 'no option fits' },
+        },
+      },
+      schema: 'jev-task-cluster/v1',
+      stage: 'task-cluster',
+    }
+  );
+  const opts = extra => ({
+    approval: {
+      fingerprint: choice.fingerprint,
+      dataApproved: true,
+      fundingApproved: true,
+      expiresAt: 2000,
+      authorityRef: 'test-only',
+      availableUsd: 1,
+      maxUsd: 0.01,
+      estimatedUpperBoundUsd: 0.001,
+    },
+    readCurrentFingerprint: () => choice.fingerprint,
+    transport: async () => ({
+      answers: { classification: { type: 'choice', choice: 'alpha' } },
+      response: { modelId: JEV_ROUTE.model, headers: {} },
+      usage: {},
+      warnings: [],
+    }),
+    now: () => 1000,
+    ...extra,
+  });
+  const picked = await runPreparedJevEvaluation(choice, opts(), res => ({
+    detail: { picked: res.answers.classification.choice },
+  }));
+  assert.equal(picked.status, 'evaluated');
+  assert.equal(picked.schema, 'jev-task-cluster/v1');
+  assert.equal(picked.picked, 'alpha');
+  assert.equal(picked.certified, false);
+  for (const interpret of [() => null, () => ({ invalid: true })]) {
+    assert.equal(
+      (await runPreparedJevEvaluation(choice, opts(), interpret)).status,
+      'invalid-response'
+    );
+  }
+  let calls = 0;
+  assert.equal(
+    (
+      await runPreparedJevEvaluation(
+        choice,
+        opts({
+          approval: null,
+          transport: async () => {
+            calls += 1;
+            return {};
+          },
+        }),
+        () => ({ detail: {} })
+      )
+    ).status,
+    'not-admitted'
+  );
+  assert.equal(calls, 0);
+});
+
 test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and no hidden retry', async () => {
   let calls = 0;
   const fetch = async (url, init) => {
@@ -365,4 +503,50 @@ test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and 
     })
   );
   assert.equal(calls, 1);
+});
+
+const clusterInput = {
+  ...input,
+  stage: 'task-cluster',
+  state: 'Task: "register splits with PRO"',
+  labels: ['rights-royalty-registration', 'editorial-pitching'],
+};
+
+test('task-cluster freezes a bounded label choice and rejects forged labels', async () => {
+  const req = prepareJevRequest(clusterInput);
+  assert.throws(() => /** @type {any} */ (req).labels.push('late'));
+  const criteria = req.questions.alignment.criteria;
+  for (const slug of [...clusterInput.labels, 'unclassified'])
+    assert.ok(Object.hasOwn(criteria, slug));
+  assert.ok(!Object.hasOwn(criteria, 'supported'));
+  assert.notEqual(
+    prepareJevRequest({ ...clusterInput, labels: ['lyrics'] }).fingerprint,
+    req.fingerprint
+  );
+  for (const labels of [
+    undefined,
+    'lyrics',
+    [],
+    Array.from({ length: 65 }, (_, i) => `cluster-${i}`),
+    ['Not A Slug'],
+    ['unclassified'],
+    ['lyrics', 'lyrics'],
+  ])
+    assert.throws(() => prepareJevRequest({ ...clusterInput, labels }));
+  const opt = choice => ({
+    ...options(),
+    approval: { ...options().approval, fingerprint: req.fingerprint },
+    readCurrentFingerprint: () => req.fingerprint,
+    transport: async () => result(choice),
+  });
+  assert.equal(
+    (await runJevEvaluation(clusterInput, opt('lyrics'))).status,
+    'invalid-response'
+  );
+  for (const choice of ['editorial-pitching', 'unclassified']) {
+    assert.equal(
+      (await runJevEvaluation(clusterInput, opt(choice))).alignment,
+      choice
+    );
+  }
 });
