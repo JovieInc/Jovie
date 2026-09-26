@@ -1,0 +1,175 @@
+/* Marketing editorial backgrounds (JOV-6249) — the soft and flowing editorial
+   background masters as one shared system. Every value is copied from a
+   current production source; none are invented:
+
+   - soft: .homepage-editorial-hero__light-well in apps/web/app/(home)/home.css
+   - flowing: .homepage-poster-hero__electric-seam tokens + MarketingElectricSeam
+     seam geometry + .homepage-poster-hero__media::before bloom B
+     (gbrain:design/jovie-newer-hero-bloom-b-founder-locked-2026-09-17)
+
+   The static master renders with no motion; optional bounded motion follows
+   the same directional flow and is disabled under prefers-reduced-motion. */
+
+:root {
+  --marketing-editorial-light: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 5%,
+    transparent
+  );
+  --marketing-editorial-light-soft: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 2%,
+    transparent
+  );
+  --marketing-editorial-seam-base: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 72%,
+    transparent
+  );
+  --marketing-editorial-seam-glow: color-mix(
+    in oklab,
+    var(--system-b-accent-cyan) 72%,
+    transparent
+  );
+  --marketing-editorial-seam-spark: color-mix(
+    in oklab,
+    var(--system-b-accent-cyan) 84%,
+    transparent
+  );
+  --marketing-editorial-seam-core: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 92%,
+    var(--system-b-accent-cyan)
+  );
+}
+
+.marketing-editorial-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--system-b-bg-page);
+  border: 0;
+}
+
+/* Soft variant — broad low-contrast transitions with gentle depth. The
+   off-center illumination and dark negative space of the homepage
+   editorial-hero light well, parameterized so the focal location can sit
+   away from center without centring the light geometrically. */
+.marketing-editorial-background__field {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  width: min(80rem, 120vw);
+  height: min(42rem, 62vw);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    var(--marketing-editorial-light) 0%,
+    var(--marketing-editorial-light-soft) 42%,
+    transparent 74%
+  );
+  opacity: 0.5;
+  filter: blur(var(--space-8));
+}
+
+.marketing-editorial-background__field::after {
+  position: absolute;
+  inset: 42% 14% auto;
+  height: 48%;
+  content: "";
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--system-b-text-primary) 1.5%, transparent),
+    transparent 88%
+  );
+  filter: blur(var(--space-12));
+  transform: none;
+}
+
+/* Focal location is declared per instance; the soft field never crosses its
+   own boundary or adds a second competing bright center. */
+.marketing-editorial-background[data-focal-x='left'] .marketing-editorial-background__field {
+  left: 32%;
+}
+
+.marketing-editorial-background[data-focal-x='right'] .marketing-editorial-background__field {
+  left: 68%;
+}
+
+.marketing-editorial-background[data-focal-y='top'] .marketing-editorial-background__field {
+  top: 38%;
+}
+
+.marketing-editorial-background[data-focal-y='bottom'] .marketing-editorial-background__field {
+  top: 62%;
+}
+
+/* Flowing variant — one dominant sweep with subordinate curves. The seam
+   curves all flow along the same left-to-right direction (the Tim
+   correction on the #24 reference); the bloom follows the same flow. */
+.marketing-editorial-background__sweep {
+  position: absolute;
+  inset: -18% 8% auto;
+  height: 52%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-blue-subtle);
+  filter: blur(80px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.marketing-editorial-background__sweep--raised {
+  top: -26%;
+}
+
+.marketing-editorial-background__sweep--lowered {
+  top: -10%;
+}
+
+.marketing-editorial-background__seam {
+  position: absolute;
+  right: 0;
+  bottom: 12%;
+  left: 0;
+}
+
+.marketing-editorial-background__seam svg {
+  display: block;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--system-b-text-primary) 18%,
+    var(--system-b-text-primary) 82%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--system-b-text-primary) 18%,
+    var(--system-b-text-primary) 82%,
+    transparent
+  );
+}
+
+/* Safe areas: content receives the large calm dark regions. Mobile crops
+   the same field geometry the homepage mobile hero already uses, so the
+   intended light flow and contrast are preserved at every width. */
+@media (max-width: 767px) {
+  .marketing-editorial-background__field {
+    width: 150vw;
+    height: 60vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-editorial-background,
+  .marketing-editorial-background__field,
+  .marketing-editorial-background__sweep,
+  .marketing-editorial-background__seam svg {
+    animation: none;
+  }
+}
