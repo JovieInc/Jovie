@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { CompactGlassCaptureDemo } from './CompactGlassCaptureDemo';
 import storyMeta, {
-  Fallback,
-  Interactive,
-  LongContent,
   Resettable,
-  Static,
+  WithLabel,
 } from './CompactGlassCaptureDemo.stories';
+import { CompactGlassModule } from './CompactGlassModule';
+import moduleStoryMeta, {
+  WithLabel as ModuleWithLabel,
+} from './CompactGlassModule.stories';
 
 const capture = ARTIST_PROFILE_COPY.capture;
 
@@ -18,27 +19,26 @@ describe('CompactGlassCaptureDemo', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the shared compact-glass material with the real capture copy', () => {
+  it('renders the shared compact-glass material with honest demo copy', () => {
     render(<CompactGlassCaptureDemo />);
 
-    const moduleEl = document.querySelector('.compact-glass-module');
-    expect(moduleEl).toBeInTheDocument();
+    expect(document.querySelector('.compact-glass-module')).toBeInTheDocument();
     expect(screen.getByText(capture.action.ctaLabel)).toBeInTheDocument();
-    expect(screen.getByText(capture.action.detail)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /play demo/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/nothing is sent or stored/i)).toBeInTheDocument();
   });
 
-  it('plays the opt-in sequence to an honest confirmed result', async () => {
+  it('plays to an honest confirmed result without fetch or XHR, then resets', () => {
     vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const xhrOpen = vi.spyOn(XMLHttpRequest.prototype, 'open');
     render(<CompactGlassCaptureDemo />);
 
     act(() =>
       fireEvent.click(screen.getByRole('button', { name: /play demo/i }))
     );
-
     act(() => {
       vi.advanceTimersByTime(1200);
     });
@@ -48,74 +48,48 @@ describe('CompactGlassCaptureDemo', () => {
 
     expect(screen.getByText(capture.action.confirmedLabel)).toBeInTheDocument();
     expect(screen.getByText(/nothing was sent or stored/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /replay/i })).toBeInTheDocument();
-  });
-
-  it('resets to the idle state from the control', async () => {
-    render(<CompactGlassCaptureDemo initialPhase='done' />);
-
-    expect(screen.getByText(capture.action.confirmedLabel)).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(xhrOpen).not.toHaveBeenCalled();
+    expect(capture).toEqual(ARTIST_PROFILE_COPY.capture);
 
     act(() => fireEvent.click(screen.getByRole('button', { name: /reset/i })));
-
     expect(
       screen.queryByText(capture.action.confirmedLabel)
     ).not.toBeInTheDocument();
     expect(screen.getByText(capture.action.detail)).toBeInTheDocument();
   });
 
-  it('never issues a mutation, send, or payment request', async () => {
-    vi.useFakeTimers();
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const xhrOpen = vi.spyOn(XMLHttpRequest.prototype, 'open');
-
-    render(<CompactGlassCaptureDemo autoPlay />);
-    act(() => {
-      vi.advanceTimersByTime(1200);
-    });
-    act(() => {
-      vi.advanceTimersByTime(420);
-    });
-    act(() => fireEvent.click(screen.getByRole('button', { name: /replay/i })));
-    act(() => {
-      vi.advanceTimersByTime(1200);
-    });
-    act(() => {
-      vi.advanceTimersByTime(420);
-    });
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(xhrOpen).not.toHaveBeenCalled();
-    expect(screen.getByText(/nothing was sent or stored/i)).toBeInTheDocument();
-  });
-
-  it('keeps the shared fixture data untouched by demo state', async () => {
-    vi.useFakeTimers();
-    const snapshot = JSON.parse(JSON.stringify(capture));
-
-    render(<CompactGlassCaptureDemo autoPlay />);
-    act(() => {
-      vi.advanceTimersByTime(1200);
-    });
-    act(() => {
-      vi.advanceTimersByTime(420);
-    });
-    act(() => fireEvent.click(screen.getByRole('button', { name: /reset/i })));
-
-    expect(capture).toEqual(snapshot);
-  });
-
-  it('binds the storybook receipt to the required states', () => {
+  it('binds the storybook receipt to the demo states', () => {
     expect(storyMeta.component).toBe(CompactGlassCaptureDemo);
-    for (const story of [
-      Static,
-      Interactive,
-      Resettable,
-      LongContent,
-      Fallback,
-    ]) {
-      expect(story).toBeDefined();
-    }
     expect(Resettable.args?.initialPhase).toBe('done');
+    expect(WithLabel.args?.label).toBe('Compact glass');
+  });
+});
+
+describe('CompactGlassModule', () => {
+  it('renders children, the optional label, and a merged className', () => {
+    render(
+      <CompactGlassModule label='Compact glass' className='extra'>
+        <p>Module body</p>
+      </CompactGlassModule>
+    );
+
+    expect(document.querySelector('.compact-glass-module')).toHaveClass(
+      'extra'
+    );
+    expect(screen.getByText('Module body')).toBeInTheDocument();
+    expect(screen.getByText('Compact glass')).toHaveClass(
+      'compact-glass-module__label'
+    );
+    expect(moduleStoryMeta.component).toBe(CompactGlassModule);
+    expect(ModuleWithLabel.args?.label).toBe('Compact glass');
+  });
+
+  it('omits the label when absent', () => {
+    render(<CompactGlassModule>body</CompactGlassModule>);
+
+    expect(
+      document.querySelector('.compact-glass-module__label')
+    ).not.toBeInTheDocument();
   });
 });

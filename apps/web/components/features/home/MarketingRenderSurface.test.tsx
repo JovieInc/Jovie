@@ -6,9 +6,7 @@ import {
 } from './MarketingRenderSurface';
 
 vi.mock('./HomeProfileShowcase', () => ({
-  HomeProfileShowcase: ({ stateId }: Readonly<{ stateId: string }>) => (
-    <div data-testid='home-profile-showcase' data-state-id={stateId} />
-  ),
+  HomeProfileShowcase: () => <div data-testid='home-profile-showcase' />,
 }));
 vi.mock('./HomeNotificationCard', () => ({
   HomeNotificationCard: () => <div data-testid='home-notification-card' />,

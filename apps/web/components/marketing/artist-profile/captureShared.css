@@ -12,10 +12,8 @@
   );
 }
 
-/* Shared compact-glass material — the `compact-glass` media recipe approved
-   in JOV-6246 (reference #23). The audience pill and the marketing compact
-   glass module share this single owner; do not fork the shell mix, washes,
-   hairlines, or blur. */
+/* Shared compact-glass material (JOV-6246 #23): single owner for the
+   audience pill and the compact glass module — do not fork the mix. */
 .artist-profile-audience-pill,
 .compact-glass-module {
   position: relative;
@@ -51,9 +49,7 @@
   line-height: 1.3;
 }
 
-/* Compact glass module (JOV-6248): the shared material at module scale.
-   Geometry scales through existing tokens; fine edge highlight stays
-   asymmetric (upper-left transmission, near-black lower-right). */
+/* Compact glass module (JOV-6248): shared material at module scale. */
 .compact-glass-module {
   display: flex;
   flex-direction: column;
@@ -81,12 +77,17 @@
   z-index: 1;
 }
 
-.compact-glass-module__label {
+.compact-glass-module__label,
+.compact-glass-module__status {
   font-size: 12.5px;
+  line-height: 1.3;
+  color: color-mix(in oklab, var(--color-text-primary-token) 60%, transparent);
+}
+
+.compact-glass-module__label {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--color-text-primary-token) 60%, transparent);
 }
 
 .compact-glass-module__demo {
@@ -136,12 +137,6 @@
   outline: 2px solid
     color-mix(in oklab, var(--color-text-primary-token) 35%, transparent);
   outline-offset: 2px;
-}
-
-.compact-glass-module__status {
-  font-size: 12.5px;
-  line-height: 1.3;
-  color: color-mix(in oklab, var(--color-text-primary-token) 60%, transparent);
 }
 
 @supports not (

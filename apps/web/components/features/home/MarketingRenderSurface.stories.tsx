@@ -13,7 +13,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[26rem] max-w-full bg-page p-6'>
+      <div className='w-104 max-w-full bg-page p-6'>
         <Story />
       </div>
     ),

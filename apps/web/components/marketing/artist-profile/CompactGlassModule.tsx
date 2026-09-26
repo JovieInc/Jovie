@@ -11,9 +11,9 @@ export interface CompactGlassModuleProps {
 
 /**
  * Compact glass module (JOV-6248) — marketing presentation variant of the
- * `compact-glass` media recipe approved in JOV-6246 (reference #23).
- * The audience-pill material at module scale; shares captureShared.css as the
- * single material owner with `.artist-profile-audience-pill`.
+ * `compact-glass` media recipe (JOV-6246 #23). Shares captureShared.css as
+ * the single material owner with `.artist-profile-audience-pill`.
+ * @coverage-via ./CompactGlassCaptureDemo.test.tsx
  */
 export function CompactGlassModule({
   label,
