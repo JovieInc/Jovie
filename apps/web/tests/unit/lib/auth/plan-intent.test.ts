@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_UPSELL_PLAN,
+  getOfferIntentFromCookies,
   MAX_FOLLOWER_THRESHOLD,
   recommendPlan,
   validatePlan,
@@ -55,5 +56,22 @@ describe('validatePlan', () => {
   it('rejects unknown plan intents', () => {
     expect(validatePlan('agency')).toBeNull();
     expect(validatePlan(null)).toBeNull();
+  });
+});
+
+describe('offer interval cookies', () => {
+  it('reads plan and interval together', () => {
+    expect(
+      getOfferIntentFromCookies(
+        'jovie_plan_intent=pro; jovie_billing_interval=year'
+      )
+    ).toEqual({ plan: 'pro', interval: 'year' });
+  });
+
+  it('defaults paid interval to month when missing', () => {
+    expect(getOfferIntentFromCookies('jovie_plan_intent=max')).toEqual({
+      plan: 'max',
+      interval: 'month',
+    });
   });
 });

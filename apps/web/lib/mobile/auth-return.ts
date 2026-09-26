@@ -1,5 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import {
+  applyPreservedAuthOfferParams,
+  buildAuthRouteUrl,
+} from '@/lib/auth/build-auth-route-url';
 import { sanitizeDesktopReturnRoute } from '@/lib/desktop/auth-return';
 
 export const MOBILE_RETURN_PARAM = 'mobile_return';
@@ -50,6 +53,8 @@ export function buildAuthRouteUrlWithMobileReturn(
   if (mobileReturn) {
     routeUrl.searchParams.set(MOBILE_RETURN_PARAM, mobileReturn);
   }
+
+  applyPreservedAuthOfferParams(routeUrl, searchParams);
 
   return routeUrl.pathname + routeUrl.search;
 }

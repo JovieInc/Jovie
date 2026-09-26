@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { AuthOfferSummary } from '@/components/features/auth/AuthOfferSummary';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import {
   HOMEPAGE_PROMPT_HINT_TRUNCATE,
@@ -76,6 +77,7 @@ export function SignupModalClient() {
         statusRow={statusRow}
         backButtonLabel={promptHint ? 'Back to chat' : 'Back to homepage'}
       >
+        <AuthOfferSummary mode='sign-up' />
         <AuthShell
           mode='sign-up'
           compact

@@ -6,7 +6,12 @@ import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import {
+  AuthLayout,
+  AuthOfferSummary,
+  AuthRoutePrefetch,
+  AuthShell,
+} from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
@@ -55,8 +60,9 @@ function SignUpClaimDataPersistence() {
       parseAuthOfferArtist(searchParams.get('artist')) ??
       parseAuthOfferArtist(searchParams.get('artist_name'));
     const plan = searchParams.get('plan');
+    const interval = searchParams.get('interval');
 
-    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
+    // Capture plan + interval from pricing CTA (e.g., /signup?plan=pro&interval=year)
     if (plan) {
       const validatedPlan = validatePlan(plan);
       if (validatedPlan) {
@@ -67,7 +73,11 @@ function SignUpClaimDataPersistence() {
         let source = 'pricing';
         if (spotifyUrl) source = 'hero_spotify';
         else if (handle) source = 'hero_claim';
-        track('plan_intent_captured', { plan: validatedPlan, source });
+        track('plan_intent_captured', {
+          plan: validatedPlan,
+          interval: interval ?? 'month',
+          source,
+        });
       }
     }
 
@@ -298,6 +308,7 @@ export function SignUpPageClient() {
         <AuthRoutePrefetch href={signInUrl} />
         <SignUpOauthErrorBanner signInUrl={signInUrl} />
         <SignUpClaimDataPersistence />
+        <AuthOfferSummary mode='sign-up' />
         <AuthShell
           mode='sign-up'
           forceOppositeModeHardNavigation

@@ -73,6 +73,39 @@ describe('access route matrix (JOV-3087)', () => {
       ).toBe(APP_ROUTES.DASHBOARD);
     });
 
+    it('sends existing subscribers with paid offer intent to billing', () => {
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.ACTIVE, {
+          plan: 'pro',
+        })
+      ).toBe(APP_ROUTES.SETTINGS_BILLING);
+    });
+
+    it('does not send new paid-intent signups to billing from the client guard', () => {
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams('plan=pro&interval=year')
+        )
+      ).toBe(APP_ROUTES.DASHBOARD);
+    });
+
+    it('keeps onboarding users on the start path instead of a new-trial billing pitch', () => {
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.NEEDS_ONBOARDING, {
+          plan: 'pro',
+        })
+      ).toBe('/start?fresh_signup=true');
+    });
+
+    it('does not override an explicit in-app redirect with the billing offer', () => {
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.ACTIVE, {
+          plan: 'pro',
+          redirectUrl: '/app/settings',
+        })
+      ).toBe('/app/settings');
+    });
+
     it('preserves safe redirect_url values for client auth-entry redirects', () => {
       expect(
         getClientAuthenticatedAuthEntryRedirect(
