@@ -151,18 +151,37 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
 
-    if (
-      !ancestryRoots.some(root =>
-        gitSucceeds(['merge-base', '--is-ancestor', sha, root])
-      )
-    ) {
+    let isAncestor = false;
+    const ancestryErrors = [];
+    for (const ancestryRoot of ancestryRoots) {
+      try {
+        execFileSync(
+          'git',
+          ['merge-base', '--is-ancestor', sha, ancestryRoot],
+          { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] }
+        );
+        isAncestor = true;
+        break;
+      } catch (err) {
+        // Exit code 1 means "not an ancestor"; anything else is a git error
+        // worth surfacing so shallow-checkout failures are diagnosable.
+        if (err.status !== 1) {
+          const detail = (err.stderr || err.message || '').toString().trim();
+          ancestryErrors.push(`${ancestryRoot}: ${detail}`);
+        }
+      }
+    }
+    if (!isAncestor) {
+      const suffix = ancestryErrors.length
+        ? ` (git errors: ${ancestryErrors.join('; ')})`
+        : '';
       for (const story of stories) {
         add(
           story.file,
           'story-provenance-ancestor',
           `sourceSha ${sha} is not an ancestor of ${ancestryRoots.join(
             ' or '
-          )}; update the receipt to a commit containing this story.`
+          )}${suffix}; update the receipt to a commit containing this story.`
         );
       }
       continue;
