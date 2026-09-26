@@ -1528,6 +1528,9 @@ const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
 const OPAQUE_ENTRY_LOCKS = Object.freeze([
   // Runs scripts Vitest suites with the default scripts/coverage directory.
   ['scripts/run-affected-tests.mjs --control', 'coverage:scripts'],
+  // Walks apps/web/** and lstat()s each listed file; a concurrent coverage
+  // run in apps/web deletes files under apps/web/coverage mid-walk (ENOENT).
+  [PLAYWRIGHT_RECEIPT_CI_TEST, 'coverage:apps/web'],
 ]);
 
 function packageScripts(dir) {

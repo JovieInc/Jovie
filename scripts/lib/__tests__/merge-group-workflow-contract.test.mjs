@@ -412,7 +412,22 @@ describe('merge_group workflow contract', () => {
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
     expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
-    expect(sizeGuard).toContain('timeout-minutes: 1');
+    // External admission producers: the job clock includes runner
+    // provisioning (observed 69s), so a sub-3-minute budget can cancel a
+    // passing run and fail admission closed on a CANCELLED required check.
+    // Each producer must still conclude before admission stops polling.
+    for (const [producerName, producer] of [
+      ['PR Size Guard', sizeGuard],
+      ['Fork PR Gate', getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')],
+    ]) {
+      const producerTimeoutMinutes = Number(
+        producer.match(/timeout-minutes:\s*(\d+)/)?.[1]
+      );
+      expect(producerTimeoutMinutes, producerName).toBeGreaterThanOrEqual(3);
+      expect(producerTimeoutMinutes * 60_000, producerName).toBeLessThanOrEqual(
+        MERGE_GROUP_ADMISSION_WAIT_MS / 2
+      );
+    }
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');

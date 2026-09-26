@@ -1270,6 +1270,20 @@ describe('structural command pool', () => {
     ]);
   });
 
+  it('serializes the Playwright receipt walk with apps/web coverage runs', () => {
+    // The receipt lstat()s every apps/web file it lists; a concurrent coverage
+    // run deleted apps/web/coverage/block-navigation.js mid-walk (ENOENT,
+    // merge_group job 108496163540).
+    expect(
+      structuralLocks(
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+      )
+    ).toContain('coverage:apps/web');
+    expect(structuralLocks(MARKETING_CERTIFICATION_COMMAND)).toContain(
+      'coverage:apps/web'
+    );
+  });
+
   it('derives locks for coverage dirs, package aliases, coverage.py, and pytest', () => {
     // Relative reportsDirectory nests inside the cleaned default directory.
     expect(structuralLocks(ACQUISITION_CERTIFICATION_COMMAND)).toEqual([
