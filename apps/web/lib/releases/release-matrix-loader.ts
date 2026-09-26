@@ -7,7 +7,7 @@ import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions/d
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TTL } from '@/lib/cache/tags';
+import { CACHE_TTL, createReleasesTag } from '@/lib/cache/tags';
 import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
   getReleaseForProfileById,
@@ -15,7 +15,6 @@ import {
 } from '@/lib/discography/queries';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { buildProviderLabels } from '@/lib/discography/view-models';
-import { requireOwnedReleaseProfile } from './owned-profile';
 import type { ReleaseProfileContext } from './release-types';
 import { mapReleaseToViewModel } from './release-view-models';
 
@@ -44,6 +43,23 @@ async function requireProfile(profileId?: string): Promise<{
     id: profile.id,
     spotifyId: profile.spotifyId ?? null,
     handle: profile.usernameNormalized ?? profile.username,
+  };
+}
+
+/**
+ * Release matrix/entity server-cache key family (JOV-6272).
+ *
+ * Keyed by (userId, profileId, scope) only. The profile handle NEVER
+ * participates in the key: the same logical data must share one cache entry
+ * across handle renames, and mutations invalidate the family by
+ * (userId, profileId) regardless of handle changes.
+ */
+function releaseCacheKeys(userId: string, profileId: string) {
+  return {
+    matrix: ['releases-matrix', userId, profileId] as const,
+    matrixArchived: ['releases-matrix-archived', userId, profileId] as const,
+    entity: (releaseId: string) =>
+      ['release-entity', userId, profileId, releaseId] as const,
   };
 }
 
@@ -102,10 +118,10 @@ async function resolveReleaseMatrix(
 
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.id, profile.handle),
-    ['releases-matrix', userId, profile.id],
+    releaseCacheKeys(userId, profile.id).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleasesTag(userId, profile.id)],
     }
   )();
 }
@@ -132,10 +148,10 @@ async function resolveReleaseEntity(params: {
 
   return unstable_cache(
     () => fetchReleaseEntityCore(profile.id, profile.handle, params.releaseId),
-    ['release-entity', userId, profile.id, params.releaseId],
+    releaseCacheKeys(userId, profile.id).entity(params.releaseId),
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleasesTag(userId, profile.id)],
     }
   )();
 }
@@ -152,14 +168,17 @@ export async function loadReleaseEntity(params: {
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const owned = await requireOwnedReleaseProfile(profile.profileId);
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
 
   return unstable_cache(
-    () => fetchReleaseMatrixCore(owned.profileId, profile.profileHandle),
-    ['releases-matrix', owned.userId, owned.profileId, profile.profileHandle],
+    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
+    releaseCacheKeys(profile.userId, profile.profileId).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleasesTag(profile.userId, profile.profileId)],
     }
   )();
 }
@@ -167,24 +186,22 @@ export async function loadReleaseMatrixForProfile(
 export async function loadArchivedReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const owned = await requireOwnedReleaseProfile(profile.profileId);
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
 
   return unstable_cache(
     () =>
       fetchReleaseMatrixCore(
-        owned.profileId,
+        profile.profileId,
         profile.profileHandle,
         'archived'
       ),
-    [
-      'releases-matrix-archived',
-      owned.userId,
-      owned.profileId,
-      profile.profileHandle,
-    ],
+    releaseCacheKeys(profile.userId, profile.profileId).matrixArchived,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleasesTag(profile.userId, profile.profileId)],
     }
   )();
 }

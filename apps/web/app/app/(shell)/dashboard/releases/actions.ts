@@ -1,15 +1,11 @@
 'use server';
 
 import { and, eq, inArray, ne } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
@@ -68,7 +64,6 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
-import { requireOwnedReleaseProfile } from '@/lib/releases/owned-profile';
 import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
 import {
   archiveRelease,
@@ -290,10 +285,8 @@ export async function saveProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache tag so next server fetch returns fresh data
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    // Invalidate the release cache family so the next server fetch is fresh
+    invalidateReleaseCaches(userId, profile.id);
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
     // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -355,10 +348,8 @@ export async function resetProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache tag so next server fetch returns fresh data
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    // Invalidate the release cache family so the next server fetch is fresh
+    invalidateReleaseCaches(userId, profile.id);
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
     // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -405,8 +396,7 @@ async function mutateRelease(
     throw new TypeError('Release not found');
   }
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
 
   return mapReleaseToViewModel(
     updated,
@@ -493,11 +483,11 @@ export async function saveReleaseMetadata(params: {
   });
 }
 
-const EDITABLE_RELEASE_STATUSES = new Set<ReleaseViewModel['status']>([
+const EDITABLE_RELEASE_STATUSES: ReadonlyArray<ReleaseViewModel['status']> = [
   'draft',
   'scheduled',
   'released',
-]);
+];
 
 /** Update a release's lifecycle status (draft / scheduled / released) inline. */
 export async function saveReleaseStatus(params: {
@@ -505,7 +495,7 @@ export async function saveReleaseStatus(params: {
   releaseId: string;
   status: ReleaseViewModel['status'];
 }): Promise<ReleaseViewModel> {
-  if (!EDITABLE_RELEASE_STATUSES.has(params.status)) {
+  if (!EDITABLE_RELEASE_STATUSES.includes(params.status)) {
     throw new TypeError('Invalid release status');
   }
 
@@ -838,13 +828,11 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
   const providerLabels = buildProviderLabels();
 
   // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
-  await trackServerEvent('release_isrc_rescan', {
+  void trackServerEvent('release_isrc_rescan', {
     profileId: profile.id,
     releaseId: params.releaseId,
     linksFound,
@@ -944,12 +932,10 @@ export async function rescanAppleMusicLinks(): Promise<{
   });
 
   // Invalidate cache
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
 
-  await trackServerEvent('apple_music_rescan', {
+  void trackServerEvent('apple_music_rescan', {
     profileId: profile.id,
     linksFound: result.releasesEnriched,
   });
@@ -1003,13 +989,11 @@ export async function syncFromSpotify(): Promise<{
   );
 
   // Invalidate cache and revalidate path
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
-    await trackServerEvent('releases_synced', {
+    void trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',
@@ -1162,7 +1146,11 @@ export async function checkSpotifyConnectionForProfile(
 }> {
   noStore();
 
-  const owned = await requireOwnedReleaseProfile(profile.profileId);
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
 
   const settings = profile.settings;
   const artistName = (settings?.spotifyArtistName as string) ?? null;
@@ -1187,7 +1175,7 @@ export async function checkSpotifyConnectionForProfile(
       '[checkSpotifyConnectionForProfile] Spotify state inconsistency: artistName set but spotifyId is null',
       new Error('Spotify state inconsistency'),
       {
-        profileId: owned.profileId,
+        profileId: profile.profileId,
         artistName,
         spotifyImportStatus: spotifyImportStatus ?? 'none',
       }
@@ -1203,7 +1191,7 @@ export async function checkSpotifyConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, owned.profileId),
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
         eq(dspArtistMatches.providerId, 'spotify')
       )
     )
@@ -1443,13 +1431,11 @@ export async function connectSpotifyArtist(params: {
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(userId, profile.id);
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (result.success) {
-      await trackServerEvent('releases_synced', {
+      void trackServerEvent('releases_synced', {
         profileId: profile.id,
         imported: result.imported,
         source: 'spotify',
@@ -1702,7 +1688,11 @@ export async function checkAppleMusicConnectionForProfile(
 }> {
   noStore();
 
-  const owned = await requireOwnedReleaseProfile(profile.profileId);
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
 
   const [match] = await db
     .select({
@@ -1713,7 +1703,7 @@ export async function checkAppleMusicConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, owned.profileId),
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
         eq(dspArtistMatches.providerId, 'apple_music')
       )
     )
@@ -1964,12 +1954,10 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
   }
 
   // Invalidate cache and revalidate path
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
 
-  await trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
+  void trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2010,12 +1998,11 @@ export async function archiveLibraryRelease(
     creatorProfileId: profile.id,
   });
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  await trackServerEvent('release_archived', {
+  void trackServerEvent('release_archived', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2049,12 +2036,11 @@ export async function restoreRelease(params: DeleteReleaseParams): Promise<{
     creatorProfileId: profile.id,
   });
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  await trackServerEvent('release_restored', {
+  void trackServerEvent('release_restored', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2109,9 +2095,7 @@ export async function uploadReleaseArtwork(
   const result = await response.json();
 
   // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
   // and a path revalidation resets client-side state (closing the sidebar).
 
@@ -2212,9 +2196,7 @@ export async function revertReleaseArtwork(
     })
     .where(eq(discogReleases.id, releaseId));
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(userId, profile.id);
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
   // and a path revalidation resets client-side state (closing the sidebar).
 
@@ -2251,6 +2233,11 @@ export async function createRelease(formData: {
   release?: ReleaseViewModel;
 }> {
   noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
 
   const profile = await requireProfile();
 
@@ -2301,7 +2288,7 @@ export async function createRelease(formData: {
     const providerLabels = buildProviderLabels();
 
     revalidatePath(APP_ROUTES.RELEASES);
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(userId, profile.id);
 
     if (insertedRelease == null) {
       return {

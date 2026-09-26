@@ -4,13 +4,14 @@
  * Helper functions for building profile API responses.
  */
 
+import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import {
   invalidateHomepageCache,
   invalidateProfileCache,
   invalidateUsernameChange,
 } from '@/lib/cache/profile';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
-import { trackServerEvent } from '@/lib/server-analytics';
 import { logger } from '@/lib/utils/logger';
 
 export function addAvatarCacheBust(
@@ -68,12 +69,14 @@ export async function finalizeProfileResponse({
     await invalidateHomepageCache();
   }
 
-  const delivery = await trackServerEvent(
-    'dashboard_profile_updated',
-    { profileId: updatedProfile.id },
-    clerkUserId
+  // Release caches (JOV-6272): the unified release key family is keyed by
+  // (userId, profileId) only — the handle never participates — so a rename
+  // no longer self-heals through a handle-keyed fork. Invalidate the family
+  // explicitly on every profile mutation, rename or not, so the matrix and
+  // entity caches never serve rows built from the stale handle.
+  invalidateReleaseCaches(clerkUserId, updatedProfile.id);
+
+  trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(
+    error => logger.warn('Analytics tracking failed:', error)
   );
-  if (!delivery.ok) {
-    logger.warn('Analytics tracking failed', { error: delivery.error });
-  }
 }

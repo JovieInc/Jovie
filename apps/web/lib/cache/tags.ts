@@ -40,9 +40,6 @@ export const CACHE_TAGS = {
   // Featured creators list
   FEATURED_CREATORS: 'featured-creators',
 
-  // Public /artists directory catalog
-  ARTISTS_DIRECTORY: 'artists-directory',
-
   // Billing/subscription data
   BILLING_DATA: 'billing-data',
 
@@ -99,6 +96,19 @@ export function createAvatarTag(userId: string): string {
 
 export function createSmartLinkContentTag(profileId: string): string {
   return `smartlink-content:${profileId}`;
+}
+
+/**
+ * Release matrix / entity server-cache tag (JOV-6272).
+ *
+ * One query-key family: release lists and entities are keyed by
+ * (userId, profileId) only — the profile handle never participates, so a
+ * handle rename never forks the cache. Every mutation site must build this
+ * tag through this helper; inline `releases:${...}` template strings are
+ * banned (pinned by the JOV-6272 contract test).
+ */
+export function createReleasesTag(userId: string, profileId: string): string {
+  return `releases:${userId}:${profileId}`;
 }
 
 /**
