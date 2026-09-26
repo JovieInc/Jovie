@@ -1226,28 +1226,35 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+// Read once, off the main thread, at startup: the splash paints on the main process's
+// latency-sensitive path, so it must never block on disk (latency-sensitive invariant).
+let desktopWordmarkDataUrl: string | null = null;
+const desktopWordmarkLoaded = fs.promises
+  .readFile(
+    app.isPackaged
+      ? path.join(process.resourcesPath, 'Jovie-Wordmark-Cream.svg')
+      : path.join(
+          __dirname,
+          '..',
+          '..',
+          'web',
+          'public',
+          'brand',
+          'Jovie-Wordmark-Cream.svg'
+        )
+  )
+  .then(wordmark => {
+    desktopWordmarkDataUrl = `data:image/svg+xml;base64,${wordmark.toString('base64')}`;
+  })
+  .catch(() => {
+    // Keep first paint usable if a development or damaged package lacks the asset.
+  });
+
 function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
   const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
   const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
-  const wordmarkPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'Jovie-Wordmark-Cream.svg')
-    : path.join(
-        __dirname,
-        '..',
-        '..',
-        'web',
-        'public',
-        'brand',
-        'Jovie-Wordmark-Cream.svg'
-      );
-  let wordmarkDataUrl: string | null = null;
-  try {
-    const wordmark = fs.readFileSync(wordmarkPath);
-    wordmarkDataUrl = `data:image/svg+xml;base64,${wordmark.toString('base64')}`;
-  } catch {
-    // Keep first paint usable if a development or damaged package lacks the asset.
-  }
+  const wordmarkDataUrl = desktopWordmarkDataUrl;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -2806,6 +2813,8 @@ if (gotSingleInstanceLock) {
 }
 
 app.whenReady().then(async () => {
+  // Wordmark preload started at module load; waiting here never blocks the thread.
+  await desktopWordmarkLoaded;
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
   void persistDesktopBuildIdentityEvidence();

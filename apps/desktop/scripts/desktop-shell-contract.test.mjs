@@ -340,9 +340,12 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
   assert.match(splashFn, /data-desktop-splash="cinematic"/);
   assert.match(splashFn, /aria-label="Jovie for Mac is loading"/);
-  assert.match(splashFn, /data:image\/svg\+xml;base64/);
-  assert.match(splashFn, /app\.isPackaged/);
-  assert.match(splashFn, /process\.resourcesPath/);
+  // The wordmark is preloaded asynchronously at startup; the splash never blocks on disk.
+  assert.match(mainSource, /data:image\/svg\+xml;base64/);
+  assert.match(mainSource, /app\.isPackaged[\s\S]*?process\.resourcesPath[\s\S]*?Jovie-Wordmark-Cream\.svg/);
+  assert.match(mainSource, /fs\.promises[\s\S]*?\.readFile\(/);
+  assert.match(splashFn, /desktopWordmarkDataUrl/);
+  assert.doesNotMatch(splashFn, /readFileSync/);
   assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
   assert.doesNotMatch(splashFn, /180px/);
   assert.doesNotMatch(splashFn, /<h1>/);
@@ -380,17 +383,13 @@ test('Mac cinematic splash renders the static final lockup', async () => {
     process: { resourcesPath: '/app/resources' },
     SYSTEM_B_DESKTOP_TOKENS: tokens,
   };
-  let loadedPath;
+  // The startup preload (asserted above) supplies the wordmark; the splash only reads it.
   const html = runInNewContext(compiled, {
     ...context,
-    fs: {
-      readFileSync: path => {
-        loadedPath = path;
-        return Buffer.from('<svg>canonical wordmark</svg>');
-      },
-    },
+    desktopWordmarkDataUrl: `data:image/svg+xml;base64,${Buffer.from(
+      '<svg>canonical wordmark</svg>'
+    ).toString('base64')}`,
   });
-  assert.equal(loadedPath, '/app/resources/Jovie-Wordmark-Cream.svg');
   assert.match(html, /data-desktop-splash="cinematic"/);
   assert.match(html, /opacity: 0\.35/);
   assert.match(html, /width: min\(40px, 1\.786vw\)/);
@@ -398,13 +397,10 @@ test('Mac cinematic splash renders the static final lockup', async () => {
   assert.match(html, /class="suffix">for Mac<\/span>/);
   assert.match(html, /data:image\/svg\+xml;base64/);
 
+  // A failed preload leaves no data URL; the splash falls back to the drawn mark.
   const fallback = runInNewContext(compiled, {
     ...context,
-    fs: {
-      readFileSync: () => {
-        throw new Error('wordmark unavailable');
-      },
-    },
+    desktopWordmarkDataUrl: null,
   });
   assert.match(fallback, /class="fallback-mark"/);
   assert.doesNotMatch(fallback, /src="data:image\/svg\+xml;base64/);
