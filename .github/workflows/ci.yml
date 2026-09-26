@@ -2594,8 +2594,11 @@ jobs:
         # Any value, even empty, sets read-only.
         run: |
           [ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1
-          pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
+          pnpm turbo build --filter=@jovie/web
         env:
+          # Nothing reads this job's turbo cache; writing .next outputs to it
+          # held turbo's exit ~8s after the build finished.
+          TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:r' || env.TURBO_CACHE }}
           # Merge-group code is PR-controlled. This deterministic mock key is
           # intentionally public and keeps the combined lane secret-free.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
@@ -2790,6 +2793,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      # Web-independent checks ride here, off the Build + Layout tail.
+      - name: Check extension and observability ingest
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
