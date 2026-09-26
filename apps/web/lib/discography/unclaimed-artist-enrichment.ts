@@ -227,8 +227,13 @@ function resolveEvidence(evidence: readonly IdentityEvidence[]): {
   }
 
   const merged = [...byIdentity.values()].map(group => {
-    const sources = [...new Set(group.map(item => item.source))].sort();
-    const best = group.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+    const sources = [...new Set(group.map(item => item.source))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+    const best = group.reduce(
+      (a, b) => (b.confidence > a.confidence ? b : a),
+      group[0]
+    );
     return {
       platform: best.platform,
       platformType: best.platformType,
@@ -257,10 +262,10 @@ function resolveEvidence(evidence: readonly IdentityEvidence[]): {
     if (platform !== 'website' && group.length > 1) {
       conflicts.push({
         platform,
-        urls: group.map(d => d.url).sort(),
-        sources: [
-          ...new Set(group.flatMap(d => d.sources)),
-        ].sort() as IdentityEnrichmentSource[],
+        urls: group.map(d => d.url).sort((a, b) => a.localeCompare(b)),
+        sources: [...new Set(group.flatMap(d => d.sources))].sort((a, b) =>
+          a.localeCompare(b)
+        ) as IdentityEnrichmentSource[],
       });
       continue;
     }
