@@ -61,7 +61,14 @@ describe('retired queue release and retained fleet refresh', () => {
     expect(fleetGateRefreshWorkflow).toContain(
       'github.event.pull_request.merged != true'
     );
-    expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
+    // JOV-5467: the only permitted schedule is the hourly classify-only
+    // missed-event pass; it can never reach the refresh or assess jobs.
+    expect(fleetGateRefreshWorkflow).not.toContain('gate-next');
+    expect(fleetGateRefreshWorkflow).not.toContain('admit-next');
+    expect(fleetGateRefreshWorkflow).toContain("github.event_name != 'schedule'");
+    expect(fleetGateRefreshWorkflow).toContain("github.event_name == 'schedule'");
+    expect(fleetGateRefreshWorkflow).toContain('intake-readiness');
+    expect(fleetGateRefreshWorkflow).toContain('mutations == 0');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
       'utf8'
