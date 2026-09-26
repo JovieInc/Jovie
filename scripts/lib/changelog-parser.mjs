@@ -43,6 +43,7 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
     ? FEATURED_SECTION_HEADING_RE
     : SECTION_HEADING_RE;
   const lines = markdown.split('\n');
+  /** @type {Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]>, kind: 'daily' | 'release' }>} */
   const releases = [];
   const unreleased = {
     raw: '',
