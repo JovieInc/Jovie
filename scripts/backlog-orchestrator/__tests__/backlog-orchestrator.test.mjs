@@ -1197,6 +1197,39 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
   });
 
+  it('admits the isolated UI/docs lane on GREEN', () => {
+    // JOV-5340: isolation is not reserved for production-red; GREEN also
+    // advertises the source-bound isolated lane while normal promotion
+    // remains the fleet mode.
+    const fleetGate = greenFleetGate();
+    assert.equal(fleetGate.state, 'GREEN');
+    assert.equal(fleetGate.promotionMode, 'normal');
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, true);
+    assert.equal(
+      fleetGate.isolatedPromotionAdmission.deploymentsAllowed,
+      false
+    );
+  });
+
+  it('keys leases off greenReadyPrs, not eligiblePrs', () => {
+    // JOV-5340 measured miss: eligiblePrs at/above target must not hold
+    // leases; a missing green count is an observation gap, and a missing
+    // lane-capacity receipt falls back to the queue's own ready<target.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 28,
+          target: 15,
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
+  });
+
   it('fails lane admission closed when the scoped receipt disagrees with queue evidence', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
@@ -1699,11 +1732,13 @@ describe('deterministic Symphony admission boundary', () => {
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
+    // JOV-5340: capacity evidence governs dispatch seats, not issue leases.
+    // Below queue target the lease still admits; maxConcurrent stays 0.
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(gate.concurrency.gem.maxConcurrent, 0);
     assert.ok(
-      !gate.workAdmission.activities.includes('isolated-implementation')
+      gate.workAdmission.activities.includes('isolated-implementation')
     );
   });
 

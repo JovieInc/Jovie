@@ -148,13 +148,7 @@ function capacityRecord(value) {
   );
 }
 
-function laneCapacityFailureForQueue(queue, greenReadyPrs, queueTarget) {
-  const repository = repositoryName(queue?.repository);
-  const laneCapacity = queue?.laneCapacity;
-  const repositoryCapacity = laneCapacity?.repositories?.[repository];
-  if (!repository) {
-    return 'queue repository is missing or malformed';
-  }
+function laneCapacityReceiptFailure(laneCapacity) {
   if (
     !laneCapacity ||
     typeof laneCapacity !== 'object' ||
@@ -177,7 +171,25 @@ function laneCapacityFailureForQueue(queue, greenReadyPrs, queueTarget) {
     !Object.values(laneCapacity.lanes).every(capacityRecord) ||
     !laneCapacity.sharedResources ||
     typeof laneCapacity.sharedResources !== 'object' ||
-    Array.isArray(laneCapacity.sharedResources) ||
+    Array.isArray(laneCapacity.sharedResources)
+  ) {
+    return 'lane capacity evidence is not scoped to the queue repository/count/target';
+  }
+  return null;
+}
+
+function laneCapacityFailureForQueue(queue, greenReadyPrs, queueTarget) {
+  const repository = repositoryName(queue?.repository);
+  const laneCapacity = queue?.laneCapacity;
+  const repositoryCapacity = laneCapacity?.repositories?.[repository];
+  if (!repository) {
+    return 'queue repository is missing or malformed';
+  }
+  const receiptFailure = laneCapacityReceiptFailure(laneCapacity);
+  if (receiptFailure) {
+    return receiptFailure;
+  }
+  if (
     !capacityRecord(repositoryCapacity) ||
     repositoryCapacity.ready !== greenReadyPrs ||
     repositoryCapacity.budget !== queueTarget
@@ -650,8 +662,11 @@ export function evaluateFleetGate(
     now,
   });
   const queueStatus = evidence?.queue?.status || 'unknown';
-  const greenReadyPrs =
-    evidence?.queue?.greenReadyPrs ?? evidence?.queue?.eligiblePrs;
+  // JOV-5340: leases key off greenReadyPrs, never eligiblePrs. A missing
+  // green count is an observation gap (0), not a full queue.
+  const greenReadyPrs = Number.isInteger(evidence?.queue?.greenReadyPrs)
+    ? evidence.queue.greenReadyPrs
+    : 0;
   const queueTarget = evidence?.queue?.target;
   const queueShapeValid =
     queueStatus === 'known' &&
@@ -678,22 +693,30 @@ export function evaluateFleetGate(
     queueRepositoryCapacity &&
       queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
   );
+  // JOV-5340: a healthy queue below target admits new leases without
+  // capacity_fresh. A missing lane-capacity receipt falls back to the
+  // queue's own ready<target; a present but inconsistent receipt still
+  // fails closed.
   const newMutationAllowed =
-    concurrency.newMutationAllowed &&
     queueShapeValid &&
-    queueRepositoryCapacityAvailable;
-  const isolatedPromotionAllowed =
-    state === FLEET_GATE_STATE.AMBER &&
-    reviewAdmission.allowed &&
-    controllerFresh &&
-    controllerStatus === 'green' &&
-    mainStatus === 'green' &&
-    productionStatus === 'red' &&
-    ['clear', 'resolved'].includes(integrityStatus) &&
     queueBelowBackpressure &&
-    reasons.every(
-      reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
-    );
+    (queueRepositoryCapacityAvailable ||
+      laneCapacityReceiptFailure(evidence?.queue?.laneCapacity) !== null);
+  const isolatedPromotionAllowed =
+    // JOV-5340: a GREEN fleet also admits the source-bound isolated UI/docs
+    // lane; isolation is not reserved for production-red.
+    state === FLEET_GATE_STATE.GREEN ||
+    (state === FLEET_GATE_STATE.AMBER &&
+      reviewAdmission.allowed &&
+      controllerFresh &&
+      controllerStatus === 'green' &&
+      mainStatus === 'green' &&
+      productionStatus === 'red' &&
+      ['clear', 'resolved'].includes(integrityStatus) &&
+      queueBelowBackpressure &&
+      reasons.every(
+        reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+      ));
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]
@@ -745,19 +768,22 @@ export function evaluateFleetGate(
         FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
       ].includes(reason)
     );
-  const promotionMode = isolatedPromotionAllowed
-    ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
-    : state === FLEET_GATE_STATE.GREEN
-      ? FLEET_PROMOTION_MODE.NORMAL
-      : state === FLEET_GATE_STATE.AMBER &&
-          mainStatus === 'red' &&
-          ['clear', 'resolved'].includes(integrityStatus)
-        ? FLEET_PROMOTION_MODE.DRAFT_ONLY
-        : holdIntakeAllowed
-          ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : controllerRepairAllowed
-            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
-            : FLEET_PROMOTION_MODE.BLOCKED;
+  const promotionMode =
+    state === FLEET_GATE_STATE.GREEN
+      ? // Normal promotion stays the mode; the isolated UI/docs lane is an
+        // additional admission on GREEN, not a replacement mode (JOV-5340).
+        FLEET_PROMOTION_MODE.NORMAL
+      : isolatedPromotionAllowed
+        ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
+        : state === FLEET_GATE_STATE.AMBER &&
+            mainStatus === 'red' &&
+            ['clear', 'resolved'].includes(integrityStatus)
+          ? FLEET_PROMOTION_MODE.DRAFT_ONLY
+          : holdIntakeAllowed
+            ? FLEET_PROMOTION_MODE.HOLD_INTAKE
+            : controllerRepairAllowed
+              ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+              : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort

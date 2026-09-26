@@ -1702,7 +1702,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "promotion is frozen while isolated implementation continues.",
                 )
             )
-        green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
+        green_ready_prs = queue.get("greenReadyPrs")
         queue_target = queue.get("target")
         queue_shape_valid = (
             queue.get("status") == "known"
@@ -1797,7 +1797,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     unbound_repair_max_concurrent = unbound_repair_slots(
         fallback_seats, gem_concurrency
     )
-    green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
+    green_ready_prs = queue.get("greenReadyPrs")
     queue_target = queue.get("target")
     queue_shape_valid = (
         queue.get("status") == "known"
