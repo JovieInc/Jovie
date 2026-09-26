@@ -4593,7 +4593,8 @@ jobs:
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run Ovie route and private-boundary coverage
-        # One deterministic app suite, never repeated across the web shards.
+        # One deterministic app suite, never repeated across the web shards
+        # (cost preloaded on 1/10 by CI_RESERVED_MS in the duration sequencer).
         if: >-
           steps.check_changes.outputs.run_full_ci == 'true' &&
           matrix.shard == '1/10' &&
@@ -4613,14 +4614,9 @@ jobs:
           retention-days: 7
 
       - name: Run packages/ui unit tests
-        # This suite is not sharded; running it in every web-test shard was
-        # identical duplicate work. Across 15 recent full merge-group runs,
-        # moving it to shard 4 projected a 393s -> 378s median matrix tail
-        # (10 better, 4 equal, 1 worse). Main/manual runs retain shard 1.
-        if: >-
-          steps.check_changes.outputs.run_full_ci == 'true' &&
-          ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
-          (github.event_name != 'merge_group' && matrix.shard == '1/10'))
+        # Not sharded: one shard runs it, not all ten. Its cost is preloaded
+        # on 4/10 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/10'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Preserve failed unit-shard diagnosis
