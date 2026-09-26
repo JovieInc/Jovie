@@ -66,7 +66,7 @@ describe('classify/extract url-rels', () => {
   it('dedupes canonical identities and conflicts distinct ones', () => {
     const clean = extractLinks(
       mbArtist([
-        rel('official homepage', `https://www.feddelegrand.com/`),
+        rel('official homepage', 'https://www.feddelegrand.com/'),
         rel('instagram', IG),
         rel('twitter', 'https://twitter.com/feddelegrand'),
       ])
