@@ -4,13 +4,26 @@ name: Fleet Gate Refresh
 # necessary-trust-boundary: Protected Gem reads live state; pull_request_target checks out exact main, excluding candidate code.
 # revisit-trigger: Remove when Symphony emits this atomic receipt natively.
 
-# Event-driven one-writer refresh for the canonical Gem receipt. Work pickup is
-# owned by upstream OpenAI Symphony polling Linear directly; this workflow has
-# no issue admission or worker-dispatch path.
+# Event-driven one-writer refresh for the canonical Gem receipt (JOV-5467:
+# the sole automatic issue-admission writer). Work pickup is owned by upstream
+# OpenAI Symphony polling Linear directly; the assess job below only rereads
+# the exact signed Linear event, applies the existing reconciler's Triage ->
+# Todo/Backlog disposition, and wakes the already-running Symphony picker. The
+# hourly schedule is a classify-only missed-event pass and cannot admit.
+#
+# Rollback: one revert restores linear-triage-assessment.yml and removes its
+# repository_dispatch/schedule events from this file. Never run both writers.
 
 on:
   pull_request_target:
     types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
+  repository_dispatch:
+    # Signed JOV Triage events bridged by /api/webhooks/linear. Serialized with
+    # every other event under the single fleet-gate-event-refresh group below.
+    types: [linear_triage_assess]
+  schedule:
+    # Hourly missed-event pass: classify changed intake work only, never admit.
+    - cron: '23 * * * *'
   workflow_run:
     # Marker Recovery dispatches after durable bytes to stay within GitHub's
     # three-level workflow_run chain ceiling.
@@ -31,8 +44,11 @@ jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
     # Skip cancelled runs and merged-close duplicates. Label events matter only
-    # when they change green-ready depth or a queue/area hold.
+    # when they change green-ready depth or a queue/area hold. Linear dispatch
+    # and scheduled events are owned by the assess/classify jobs below.
     if: >-
+      github.event_name != 'repository_dispatch' &&
+      github.event_name != 'schedule' &&
       (github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'cancelled') &&
       (github.event_name != 'pull_request_target' ||
@@ -112,3 +128,112 @@ jobs:
             export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
           fi
           timeout 90s node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/backlog-orchestrator.mjs" remediate
+
+  # Retired linear-triage-assessment.yml; signed Linear Issue events are bridged
+  # by /api/webhooks/linear. This job rereads the exact current issue on Gem,
+  # records its disposition, and wakes official Symphony only after the existing
+  # reconciler moves it to Todo. It does not select workers or bypass
+  # Summer/fleet gates. Per-issue ordering is provided by the shared
+  # fleet-gate-event-refresh concurrency group.
+  assess:
+    name: Assess exact Linear Triage event
+    if: github.event_name == 'repository_dispatch'
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact main assessment code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Assess latest Linear Triage issue
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          test -n "${LINEAR_API_KEY:-}"
+          summer_env="${HOME}/.config/symphony/summer-bottleneck.env"
+          signing_env="${HOME}/.config/symphony/summer-bottleneck-signing.env"
+          test -r "$summer_env" && test -r "$signing_env"
+          set -a
+          # Host-owned files already used by the Gem service; no new credential.
+          # shellcheck disable=SC1090
+          source "$summer_env"
+          # shellcheck disable=SC1090
+          source "$signing_env"
+          set +a
+          timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
+            --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
+          jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
+      - name: Wake the existing Symphony picker after Todo transition
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          if jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
+            curl --fail --silent --show-error --max-time 5 \
+              -H 'content-type: application/json' -d '{}' \
+              http://127.0.0.1:4041/api/v1/refresh
+          fi
+      - name: Preserve exact assessment receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linear-triage-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linear-triage-assessment.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Escalate urgent unowned intake
+        shell: bash
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
+        run: |
+          set -euo pipefail
+          if jq -e '.requiresImmediateInvestigation == true' "$RECEIPT_FILE" >/dev/null; then
+            echo "::error::Urgent Triage issue still needs an acknowledged investigation: $(jq -r '.issue' "$RECEIPT_FILE")"
+            exit 1
+          fi
+
+  # Missed Linear webhook events are recovered on this hourly clock. The pass
+  # runs intake-readiness, whose only mode is a dry-run classification receipt
+  # (mutations: 0 is enforced by the CLI and re-verified here); real admission
+  # stays on the signed repository_dispatch path above.
+  classify:
+    name: Classify missed Linear intake events
+    if: github.event_name == 'schedule'
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact main intake code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Classify changed intake work without admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          test -n "${LINEAR_API_KEY:-}"
+          timeout 60s node scripts/backlog-orchestrator/backlog-orchestrator.mjs \
+            intake-readiness \
+            | jq -e '.mode == "dry-run" and .mutations == 0'
