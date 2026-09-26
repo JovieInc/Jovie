@@ -2,7 +2,9 @@
  * 3-tier surface elevation system (verified against Linear.app/demo 2026-04-05).
  *
  * Tier 0 — Page bg / sidebar: bg-base / bg-surface-0 (no chrome)
- * Tier 1 — Main content area: bg-(--app-shell-content-surface) (shell border + shadow)
+ * Tier 1 — Main content area: bg-(--app-shell-content-surface), flat — the
+ *   shell panel itself (AppShellFrame's <main>) owns the one rounded,
+ *   borderless inset; nested content containers add no fill/border/shadow.
  * Tier 2 — Elevated cards: bg-surface-1 + border-subtle + shadow-card (10px radius)
  * Tier 3 — Floating UI: bg-surface-1 + shadow-popover
  *
@@ -11,9 +13,11 @@
  * In dark mode, surface-1 (#101216) IS distinct from the content surface (#0a0c0f).
  */
 export const LINEAR_SURFACE = {
-  // Tier 1 — content containers inside <main>
-  contentContainer:
-    'rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface) shadow-none',
+  // Tier 1 — content containers inside <main>. Founder lock 2026-09-25:
+  // <main> is the one rounded, borderless panel — route surfaces inside it
+  // stay flat (no nested card fill/border/radius/shadow); the background
+  // matches the shell panel exactly, so this is a layout wrapper only.
+  contentContainer: 'bg-(--app-shell-content-surface) shadow-none',
   stickyHeader:
     'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
   toolbar: 'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',

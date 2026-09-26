@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 
 describe('AppShellContentPanel', () => {
-  it('renders a framed full-width content container by default', () => {
+  it('renders a flat full-width content container by default', () => {
     const { container } = render(
       <AppShellContentPanel data-testid='shell-panel'>
         <div>Panel content</div>
@@ -15,7 +15,13 @@ describe('AppShellContentPanel', () => {
     expect(container.querySelector('[data-testid="shell-panel"]')).toHaveClass(
       'overflow-hidden'
     );
-    expect(container.querySelector('.rounded-xl.border')).toBeTruthy();
+    // Founder lock 2026-09-25: AppShellFrame's <main> owns the one rounded,
+    // borderless panel; nested content containers stay flat (no card
+    // fill/border/radius/shadow of their own).
+    const contentContainer = container.querySelector('[class*="shadow-none"]');
+    expect(contentContainer).toBeTruthy();
+    expect(contentContainer).not.toHaveClass('rounded-xl');
+    expect(contentContainer).not.toHaveClass('border');
   });
 
   it('supports unframed form layouts with page scrolling', () => {

@@ -101,10 +101,12 @@ export function getSidebarNavRowClassName({
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
     getToneClassName({ active, nested, tone }),
+    // Founder lock 2026-09-25 (Linear-scale density): 28px calm rows. Active
+    // state is the shared neutral tint from getToneClassName above — no
+    // border, so resting and active rows share the same row geometry.
     calm &&
       !collapsed &&
-      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
-    calm && active && 'border-subtle font-semibold',
+      'h-7 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
     className
   );
 }

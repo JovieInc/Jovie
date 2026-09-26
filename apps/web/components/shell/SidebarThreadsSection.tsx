@@ -209,7 +209,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     }),
     'text-left',
     calm &&
-      'h-9 grid-cols-(--app-shell-sidebar-history-grid) gap-2 rounded-lg text-(length:--app-shell-sidebar-history-font-size)',
+      // Founder lock 2026-09-25 (Linear-scale density): 28px history rows.
+      'h-7 grid-cols-(--app-shell-sidebar-history-grid) gap-2 rounded-lg text-(length:--app-shell-sidebar-history-font-size)',
     active ? undefined : unread ? 'text-primary-token' : 'text-secondary-token'
   );
   const rowContent = (
@@ -257,7 +258,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     <div
       className={cn(
         'group/thread relative flex items-center',
-        calm ? 'h-9' : tight ? 'h-6' : 'h-7'
+        calm ? 'h-7' : tight ? 'h-6' : 'h-7'
       )}
     >
       <Tooltip label={thread.title} side='right' block>
@@ -377,7 +378,9 @@ export function SidebarThreadsSection({
         <span
           className={
             calm
-              ? 'text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'
+              ? // Founder lock 2026-09-25: sentence case, no letterspacing,
+                // 11px medium, quiet color.
+                'text-(length:--text-2xs) font-medium text-sidebar-muted'
               : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
           }
         >
@@ -385,8 +388,8 @@ export function SidebarThreadsSection({
             ? visible.some(
                 thread => new Date(thread.updatedAt).toDateString() === today
               )
-              ? 'TODAY'
-              : 'EARLIER'
+              ? 'Today'
+              : 'Earlier'
             : 'Recent'}
         </span>
         {calm ? (
@@ -495,8 +498,8 @@ export function SidebarThreadsSection({
               new Date(t.updatedAt).toDateString() !== today &&
               new Date(visible[index - 1].updatedAt).toDateString() ===
                 today ? (
-                <div className='px-(--space-2-5) pb-2 pt-6 text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'>
-                  EARLIER
+                <div className='px-(--space-2-5) pb-2 pt-5 text-(length:--text-2xs) font-medium text-sidebar-muted'>
+                  Earlier
                 </div>
               ) : null}
               <SidebarThreadRow
@@ -521,7 +524,7 @@ export function SidebarThreadsSection({
                 tight,
               }),
               calm
-                ? 'mt-3 h-9 flex justify-end text-(length:--app-shell-sidebar-history-font-size)'
+                ? 'mt-3 h-7 flex justify-end text-(length:--app-shell-sidebar-history-font-size)'
                 : 'text-left'
             )}
           >

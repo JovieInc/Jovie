@@ -395,7 +395,7 @@ export function UnifiedSidebar({
         className={cn(
           'relative justify-center gap-0 px-(--space-2-5)',
           isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height-compact) py-0.5'
+            ? 'h-(--app-shell-header-height) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
         )}
       >

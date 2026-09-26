@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from './DashboardHeader';
@@ -26,6 +28,15 @@ describe('DashboardHeader', () => {
       screen.getByRole('heading', { name: 'New Chat' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Jovie')).not.toBeInTheDocument();
+  });
+
+  it('uses the single unified header-height token (founder lock 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('sm:h-(--app-shell-header-height)');
+    expect(source).not.toContain('sm:h-(--app-shell-header-height-compact)');
   });
 
   it('exposes the header row as an Electron drag region', () => {
