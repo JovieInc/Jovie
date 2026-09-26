@@ -22,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -44,6 +45,8 @@ EXCLUDED_LABELS = frozenset({
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
+CLAIM_TTL_S = 2 * 3600
+HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -485,6 +488,30 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
 
 # ---------------------------------------------------------------- fix red first
 
+# ---------------------------------------------------------------- cross-host claims
+
+def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None) -> bool:
+    """True when another host recorded a live claim for this exact head and kind on the PR.
+    Local state files are per host; the PR's comments are the truth every host can see."""
+    now = time.time() if now is None else now
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments", "--paginate",
+                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"])
+    for line in (listed.stdout or "").splitlines():
+        fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
+        try:
+            age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if fields.get("sha") == sha and fields.get("kind") == kind and fields.get("host") != HOST and age < CLAIM_TTL_S:
+            return True
+    return False
+
+
+def post_claim(number: int, sha: str, kind: str) -> None:
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body",
+        f"🤖 lane claim kind={kind} sha={sha} host={HOST} at={now_iso()}"])
+
+
 def held_path(host: Host) -> Path:
     return host.state / "held.json"
 
@@ -657,6 +684,9 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     if pr:
         verified[str(pr["number"])] = pr["headRefOid"]
         path.write_text(json.dumps(verified))
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+            return None  # another host is gating this head; our local mark keeps us off it
+        post_claim(pr["number"], pr["headRefOid"], "gate")
     return pr
 
 
@@ -674,6 +704,9 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
         path.write_text(json.dumps(attempts))
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            return None  # another host is already fixing this head
+        post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
 
 
