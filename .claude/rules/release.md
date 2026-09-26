@@ -40,8 +40,16 @@ pnpm --filter @jovie/web run test:bug-to-test
 ```
 
 - **Pass:** continue to `/ship`.
-- **Fail:** add/update the smallest regression test, or document `bug-to-test: waived — <reason>` in the PR body for copy-only/config-only fixes.
+- **Fail:** add/update the smallest executable regression test. A rare exception
+  must name bounded scope, rationale, independent approval, expiry, review
+  trigger, and residual count; `bug-to-test: satisfied` or a one-line waiver is
+  not evidence.
 - `/ship` Step 3.35 re-runs this gate and blocks PR creation when evidence is missing.
+
+Sonar repairs additionally follow JOV-INV-036 in
+`.claude/commands/sonar-fix.md`: source finding keys and root cause map to a
+detector, original-defect-failing proof, exact-head CI, protected merge, and a
+fresh post-merge analysis. `opened`, `merged`, and `scan-confirmed` are distinct.
 
 **IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 

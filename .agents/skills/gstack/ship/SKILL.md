@@ -837,11 +837,21 @@ gh pr view --json body --jq '.body // ""' | pnpm --filter @jovie/web exec tsx sc
 ```
 
 **IRON RULE:** Bug fixes (`fix:` commits/title, `fix/` branch, or PR template bug-fix checkbox) require regression test evidence:
-- a changed `*.test.*` / `*.spec.*` file, OR
-- `bug-to-test: satisfied` / `Regression test: <path>` in the PR body, OR
-- `bug-to-test: waived — <reason>` for copy-only/config-only fixes.
+- a changed `*.test.*` / `*.spec.*` file, or a `Regression test: <path>`
+  reference to a test changed by this PR; OR
+- a bounded exception with scope, rationale, independent approval, expiry,
+  review trigger, and visible residual count.
 
-If the command exits non-zero, **STOP**. Add the regression test or document the waiver in the PR body, then re-run the gate.
+`bug-to-test: satisfied` text alone is not executable evidence. A one-line waiver
+never closes a bug.
+
+For Sonar repairs, also require the mapped source finding key(s), root cause,
+detector proof command, original-defect-failing proof, repaired output, and exact
+head hosted check. Report `opened`, `merged`, and `scan-confirmed` separately;
+only a fresh post-merge analysis is scan-confirmed.
+
+If the command exits non-zero, **STOP**. Add executable regression evidence or a
+fully bounded exception, then re-run the gate.
 
 If the script is absent, print "Bug-to-test gate skipped — checker not present in repo." and continue.
 
