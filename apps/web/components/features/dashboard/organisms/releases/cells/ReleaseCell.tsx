@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/releases/ReleaseCell.test.tsx
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';

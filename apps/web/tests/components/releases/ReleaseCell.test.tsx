@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ReleaseCell } from '@/features/dashboard/organisms/releases/cells/ReleaseCell';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
@@ -25,10 +26,6 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
     <span>{children}</span>
   ),
 }));
-
-const { ReleaseCell } = await import(
-  '@/features/dashboard/organisms/releases/cells/ReleaseCell'
-);
 
 const baseRelease: ReleaseViewModel = {
   profileId: 'profile-1',
