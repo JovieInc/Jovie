@@ -125,7 +125,7 @@ export function OvieActivityFeed({
 
   return (
     <ContentSurfaceCard data-testid='ovie-activity-feed'>
-      <div className='flex min-h-40 flex-col p-3.5'>
+      <div className='flex min-h-40 flex-col p-4'>
         <div className='flex min-h-6 items-center justify-between gap-3'>
           <p className='truncate text-2xs font-semibold tracking-normal text-tertiary-token'>
             Company activity
