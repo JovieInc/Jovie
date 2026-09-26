@@ -93,6 +93,14 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'discogReleases.creatorProfileId',
     id: 'discogReleases.id',
   },
+  discogRecordings: {
+    id: 'discogRecordings.id',
+    isrc: 'discogRecordings.isrc',
+  },
+  discogReleaseTracks: {
+    recordingId: 'discogReleaseTracks.recordingId',
+    releaseId: 'discogReleaseTracks.releaseId',
+  },
   releaseArtists: {
     artistId: 'releaseArtists.artistId',
     releaseId: 'releaseArtists.releaseId',
@@ -127,7 +135,12 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: hoisted.captureWarning,
 }));
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: hoisted.loggerInfo },
+  logger: { info: hoisted.loggerInfo, warn: vi.fn() },
+}));
+
+vi.mock('@/lib/discography/artist-identity-enrichment', () => ({
+  applyArtistIdentityEnrichment: vi.fn(async () => ({ inserted: 0 })),
+  enrichArtistIdentity: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/profile/public-release-eligibility', () => ({
   publicReleaseEligibilitySqlPredicate: vi.fn(() => 'public-release-only'),
@@ -176,6 +189,7 @@ describe('credited artist profile reconciliation', () => {
           creatorProfileId: null,
         },
       ],
+      [],
       [{ usernameNormalized: 'austinleeds' }]
     );
     hoisted.txSelectResults.push(

@@ -14,7 +14,9 @@ import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import {
   artists,
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -27,6 +29,10 @@ import { buildStructuredCreditProfileMarker } from '@/lib/profile/unclaimed-arti
 import { buildSpotifyArtistUrl, getSpotifyArtistsBatch } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import { PUBLIC_ARTIST_COLLABORATOR_ROLES } from './artist-credit-policy';
+import {
+  applyArtistIdentityEnrichment,
+  enrichArtistIdentity,
+} from './artist-identity-enrichment';
 import { buildUnclaimedArtistHandle } from './artist-profile-routing';
 import {
   buildCreditedArtistReconciliationPlan,
@@ -123,6 +129,43 @@ async function getCreditedArtistCandidates(
   };
 }
 
+// Identity enrichment for a provider-ID-backed candidate (JOV-6529), run
+// outside the serializable transaction; ISRCs of credited releases are the
+// shared-ISRC evidence. Failures degrade to `undefined`, never block ingest.
+async function enrichCandidateIdentity(candidate: CreditedArtistCandidate) {
+  try {
+    const rows = await db
+      .selectDistinct({ isrc: discogRecordings.isrc })
+      .from(releaseArtists)
+      .innerJoin(
+        discogReleaseTracks,
+        eq(releaseArtists.releaseId, discogReleaseTracks.releaseId)
+      )
+      .innerJoin(
+        discogRecordings,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(
+        and(
+          eq(releaseArtists.artistId, candidate.artistId),
+          isNotNull(discogRecordings.isrc)
+        )
+      )
+      .limit(8);
+    return await enrichArtistIdentity({
+      spotifyId: candidate.spotifyId,
+      spotifyUrl: buildSpotifyArtistUrl(candidate.spotifyId),
+      isrcs: rows.flatMap(row => (row.isrc ? [row.isrc] : [])),
+    });
+  } catch (error) {
+    logger.warn('Artist identity enrichment failed closed', {
+      artistId: candidate.artistId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 async function bindOwnerRegistryArtist(
   tx: DbOrTransaction,
   creatorProfileId: string,
@@ -195,7 +238,8 @@ async function markArtistProfileConflict(
 
 async function reconcileCandidate(
   candidate: CreditedArtistCandidate,
-  spotifyArtist: SpotifyArtistProfileData | undefined
+  spotifyArtist: SpotifyArtistProfileData | undefined,
+  identityEnrichment?: Awaited<ReturnType<typeof enrichArtistIdentity>>
 ): Promise<CandidateOutcome> {
   return withSystemIngestionSession(
     async tx => {
@@ -378,6 +422,15 @@ async function reconcileCandidate(
         })
         .onConflictDoNothing();
 
+      // JOV-6529: insert artist-controlled links + write the evidence record.
+      if (identityEnrichment) {
+        await applyArtistIdentityEnrichment(
+          tx,
+          createdProfile.id,
+          identityEnrichment
+        );
+      }
+
       const [boundArtist] = await tx
         .update(artists)
         .set({
@@ -446,16 +499,19 @@ export async function ensureUnclaimedArtistProfileForEntity(
   }
 
   const [spotifyArtist] = await getSpotifyArtistsBatch([candidate.spotifyId]);
+  const credited: CreditedArtistCandidate = {
+    artistId: candidate.artistId,
+    name: candidate.name,
+    spotifyId: candidate.spotifyId,
+    imageUrl: candidate.imageUrl,
+  };
+  const identityEnrichment = await enrichCandidateIdentity(credited);
   let outcome: CandidateOutcome;
   try {
     outcome = await reconcileCandidate(
-      {
-        artistId: candidate.artistId,
-        name: candidate.name,
-        spotifyId: candidate.spotifyId,
-        imageUrl: candidate.imageUrl,
-      },
-      spotifyArtist
+      credited,
+      spotifyArtist,
+      identityEnrichment
     );
   } catch (error) {
     await captureWarning(
@@ -528,10 +584,12 @@ async function reconcileCandidatePlan(
   for (const { candidate, spotifyArtist } of plan) {
     if (!spotifyArtist) state.metadataUnavailable += 1;
 
+    const identityEnrichment = await enrichCandidateIdentity(candidate);
+
     try {
       recordCandidateOutcome(
         state,
-        await reconcileCandidate(candidate, spotifyArtist)
+        await reconcileCandidate(candidate, spotifyArtist, identityEnrichment)
       );
     } catch (error) {
       state.conflicted += 1;
