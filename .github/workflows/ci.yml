@@ -1795,6 +1795,8 @@ jobs:
       # Hex/rebar and recompiles deps on every structural run. The exact-key
       # cache holds only outputs derived from the selector pin, OTP/Elixir
       # versions and platform; the selector re-verifies them before reuse.
+      # This job only restores. Queue-proven main pushes skip this job, so
+      # symphony-selector-cache-warm.yml writes the entry from trusted main.
       - name: Resolve Symphony selector cache key
         id: selector-cache-key
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
@@ -1822,35 +1824,6 @@ jobs:
           MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix
           HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex
         run: node scripts/ci-fast-lanes.mjs
-      - name: Check Symphony selector cache outputs
-        id: selector-cache-ready
-        if: ${{ success() && steps.structural.outputs.skip != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.selector-cache.outputs.cache-hit != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ready=true
-          for output in \
-            "$RUNNER_TEMP/symphony-selector-beam/otp/bin/erl" \
-            "$RUNNER_TEMP/symphony-selector-beam/bin/elixir" \
-            "$RUNNER_TEMP/symphony-selector-mix-home/mix" \
-            "$RUNNER_TEMP/symphony-selector-src/elixir/deps" \
-            "$RUNNER_TEMP/symphony-selector-src/elixir/_build/test"; do
-            [[ -e "$output" ]] || ready=false
-          done
-          echo "ready=$ready" >> "$GITHUB_OUTPUT"
-      # Only trusted main pushes write the cache. PR and merge-group runs
-      # restore main's entry and never spend their deadline on an upload.
-      - name: Save Symphony selector cache
-        if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}
-        continue-on-error: true
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ runner.temp }}/symphony-selector-beam
-            ${{ runner.temp }}/symphony-selector-mix-home
-            ${{ runner.temp }}/symphony-selector-src/elixir/deps
-            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
-          key: ${{ steps.selector-cache.outputs.cache-primary-key }}
       - name: Run selected Storybook browser proof
         id: storybook-browser-test
         if: ${{ success() && steps.storybook-browser.outputs.run == 'true' }}
