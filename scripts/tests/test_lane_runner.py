@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -165,7 +166,8 @@ class VerifyAndLandTest(unittest.TestCase):
 
     def run_gate(self, fake):
         lane.sh = fake
-        return lane.verify_and_land(lane.Host(), issue(), "devin/jov-1", Path("/tmp"), None, self.started)
+        with tempfile.TemporaryDirectory() as tmp:  # never this host's live gate seats
+            return lane.verify_and_land(lane.Host(state=Path(tmp)), issue(), "devin/jov-1", Path("/tmp"), None, self.started)
 
     def test_green_diff_is_marked_ready_and_queued(self):
         fake = FakeShell([self.pr])
@@ -255,6 +257,9 @@ class FakeLinear:
 
     def move(self, issue_id, state):
         self.moves.append((issue_id, state))
+
+    def state_of(self, issue_id):
+        return getattr(self, "states", {}).get(issue_id, "Todo")
 
     def comment(self, issue_id, body):
         self.comments.append((issue_id, body))
@@ -363,10 +368,11 @@ class RunIssueTest(unittest.TestCase):
 class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr)
+                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues)
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name: []
+        lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         self.linear = FakeLinear([issue("JOV-3")])
@@ -377,7 +383,7 @@ class WorkerTest(unittest.TestCase):
 
     def tearDown(self):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr) = self.saved
+         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -434,6 +440,13 @@ class WorkerTest(unittest.TestCase):
         self.assertIn("will fix it on that branch", self.linear.comments[-1][1])
         self.assertFalse((self.host.state / "failures.json").exists())
 
+    def test_an_issue_taken_by_another_host_meanwhile_is_not_started(self):
+        started = []
+        lane.run_issue = lambda *a, **k: started.append(a) or {"verdict": "landing"}
+        self.linear.states = {"id-JOV-3": "In Progress"}
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual((self.linear.moves, started), ([], []))
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -441,6 +454,24 @@ class WorkerTest(unittest.TestCase):
         self.linear.issues = []
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
+
+
+class RunAgentTest(unittest.TestCase):
+    def test_run_agent_kills_the_whole_process_group_on_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
+            script = Path(tmp) / "agent.sh"
+            script.write_text("#!/bin/sh\nsleep 30 &\necho $! > child.pid\nwait\n")
+            script.chmod(0o755)
+            with self.assertRaises(lane.subprocess.TimeoutExpired):
+                lane.run_agent([str(script)], Path(tmp), log, timeout=1)
+            child = int((Path(tmp) / "child.pid").read_text())
+            time.sleep(0.3)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child, 0)
+
+    def test_run_agent_returns_the_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
+            self.assertEqual(lane.run_agent(["sh", "-c", "echo hi; exit 3"], Path(tmp), log, timeout=10).returncode, 3)
 
 
 class DispatchTest(unittest.TestCase):
@@ -600,6 +631,10 @@ class FixRedTest(unittest.TestCase):
             self.assertFalse(lane.claimed_elsewhere(5, "h1", "fix"), "our own claim never blocks us")
             comments[:] = ["🤖 lane claim kind=fix sha=h1 host=other at=2020-01-01T00:00:00Z"]
             self.assertFalse(lane.claimed_elsewhere(5, "h1", "fix"), "stale claims expire")
+            broken = lane.sh
+            lane.sh = lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="HTTP 502")
+            self.assertTrue(lane.claimed_elsewhere(5, "h1", "fix"), "an unreadable claim list fails closed")
+            lane.sh = broken
             with tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp))
                 draft = {**self.pr(), "isDraft": True}
@@ -609,7 +644,9 @@ class FixRedTest(unittest.TestCase):
                 host2 = lane.Host(state=Path(tmp) / "b")
                 host2.state.mkdir()
                 self.assertIsNone(lane.claim_adoptable_pr(host2, "devin", [draft]))
-                self.assertIsNone(lane.claim_adoptable_pr(host2, "devin", [draft]), "not retried locally")
+                self.assertFalse((host2.state / "verified.json").exists(), "a head another host owns is not marked ours")
+                comments[:] = []
+                self.assertEqual(lane.claim_adoptable_pr(host2, "devin", [draft])["number"], 5, "retried once the claim is gone")
         finally:
             lane.sh = real
 

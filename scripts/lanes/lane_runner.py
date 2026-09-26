@@ -283,6 +283,10 @@ class Linear:
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
 
+    def state_of(self, issue_id: str) -> str:
+        data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
+        return data["issue"]["state"]["name"]
+
     def move(self, issue_id: str, state_name: str) -> None:
         states = self.gql('query($id:String!){issue(id:$id){team{states{nodes{id name}}}}}', {"id": issue_id})
         target = next((s["id"] for s in states["issue"]["team"]["states"]["nodes"] if s["name"] == state_name), None)
@@ -324,6 +328,28 @@ def template(args: list[str], values: dict) -> list[str]:
     return [arg.format(**{"here": str(HERE), **values}) for arg in args]
 
 
+def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.CompletedProcess:
+    """The provider and every child it spawns live in one process group, so a timeout kills
+    all of them instead of leaving an agent editing a worktree the runner already gave up on."""
+    import signal
+    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        code = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                break
+            try:
+                proc.wait(timeout=grace)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        raise subprocess.TimeoutExpired(cmd, timeout)
+    return subprocess.CompletedProcess(cmd, code)
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -344,9 +370,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                                   cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
-                                   timeout=host.agent_timeout)
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
+                              worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
             log.flush()
@@ -494,8 +519,10 @@ def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
     now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments", "--paginate",
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
                  "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"])
+    if listed.returncode != 0:
+        return True  # fail closed: an unreadable claim list is not permission to take the head
     for line in (listed.stdout or "").splitlines():
         fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
         try:
@@ -603,9 +630,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             prompt = render_fix_prompt(pr, failure_excerpt(pr))
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                                   cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
-                                   timeout=host.agent_timeout)
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
+                              worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
@@ -682,10 +708,10 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
     if pr:
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+            return None  # another host is gating this head; we look again next pass
         verified[str(pr["number"])] = pr["headRefOid"]
         path.write_text(json.dumps(verified))
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
-            return None  # another host is gating this head; our local mark keeps us off it
         post_claim(pr["number"], pr["headRefOid"], "gate")
     return pr
 
@@ -701,11 +727,11 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
         path.write_text(json.dumps(attempts))
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
-            return None  # another host is already fixing this head
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
 
@@ -738,6 +764,8 @@ def worker(host: Host, name: str) -> int:
         if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
+            if issue and linear.state_of(issue.id) != "Todo":
+                issue = None  # another host claimed it between our read and now
             if issue:
                 linear.move(issue.id, "In Progress")
     finally:
@@ -851,9 +879,28 @@ def needs_update(current_tree: str | None, main_tree: str) -> bool:
     return bool(main_tree) and current_tree != main_tree
 
 
+def read_marker(host: Host) -> str | None:
+    try:
+        return (host.state / "current" / ".tree").read_text().strip()[:7]
+    except OSError:
+        return None
+
+
 def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
-    Only the `current` symlink moves; running workers finish on their release."""
+    Only the `current` symlink moves; running workers finish on their release. The outcome is
+    written to update.json so a refused release is an alert, not a traceback in a journal."""
+    try:
+        code = install_release(host)
+        error = None if code == 0 else "release tests failed"
+    except Exception as failure:
+        code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+    update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host))))
+    return code
+
+
+def install_release(host: Host) -> int:
     sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
     tree = sh(["git", "rev-parse", "origin/main:scripts/lanes"], cwd=host.repo).stdout.strip()
     current = host.state / "current"
@@ -868,9 +915,12 @@ def update(host: Host) -> int:
         archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        # The self-test must never touch this host's live state: point it at a scratch dir.
+        scratch = staging / ".selftest-state"
+        scratch.mkdir(exist_ok=True)
         test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                               cwd=staging, capture_output=True, text=True, timeout=300,
-                              env={**os.environ, "LANES_SELFTEST": "1"})
+                              env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
         if test.returncode != 0:
             print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
             return 1
