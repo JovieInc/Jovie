@@ -185,7 +185,7 @@ describe('GrowthIntakeComposer', () => {
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
 
     const resultsPanel = screen.getByRole('button', {
-      name: 'Phoebe Bridgers Use',
+      name: segmentedAccessibleName('Phoebe Bridgers', 'Use'),
     }).parentElement;
     expect(resultsPanel).toHaveClass('bg-surface-elevated');
     expect(resultsPanel).not.toHaveClass('bg-background-elevated');
