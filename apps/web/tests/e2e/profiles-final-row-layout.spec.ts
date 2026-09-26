@@ -9,7 +9,7 @@
  *     tests/e2e/profiles-final-row-layout.spec.ts --project=chromium
  */
 
-import type { Locator } from '@playwright/test';
+import type { APIResponse, Locator, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
@@ -103,6 +103,47 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
   });
 }
 
+/**
+ * Captures the first real `/api/suggestions` response body in the test
+ * process. Reading it later through `Response.json()` asks Chromium for the
+ * body, which it evicts once the page navigates or reloads (the auth redirect
+ * chain lands on /app/profiles), failing with `Network.getResponseBody: No data
+ * found`. The request still reaches the real server; the response is passed
+ * through unchanged.
+ */
+async function captureFirstSuggestionsResponse(
+  page: Page
+): Promise<Promise<{ readonly status: number; readonly body: string }>> {
+  let resolveCapture: (value: {
+    readonly status: number;
+    readonly body: string;
+  }) => void = () => {};
+  const captured = new Promise<{
+    readonly status: number;
+    readonly body: string;
+  }>(resolve => {
+    resolveCapture = resolve;
+  });
+  await page.route(
+    url => url.pathname === '/api/suggestions',
+    async route => {
+      let fetched: { response: APIResponse; body: string };
+      try {
+        const response = await route.fetch();
+        fetched = { response, body: await response.text() };
+      } catch {
+        // The page tore the request down (navigation/close) before the body
+        // arrived; let a later /api/suggestions request provide the capture.
+        await route.continue().catch(() => {});
+        return;
+      }
+      resolveCapture({ status: fetched.response.status(), body: fetched.body });
+      await route.fulfill({ response: fetched.response, body: fetched.body });
+    }
+  );
+  return captured;
+}
+
 function logMetrics(label: string, metrics: FinalRowMetrics) {
   console.log(`[profiles-final-row-layout] ${label}`, JSON.stringify(metrics));
 }
@@ -183,16 +224,14 @@ test('keeps page identity and review status readable at narrow widths', async ({
 }) => {
   test.setTimeout(120_000);
   await setTestAuthBypassSession(page, 'creator-ready');
-  const suggestionsResponse = page.waitForResponse(
-    response => new URL(response.url()).pathname === '/api/suggestions'
-  );
+  const suggestionsResponse = await captureFirstSuggestionsResponse(page);
   await page.goto(
     `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`
   );
   await page.waitForURL(/\/app\/profiles(?:$|\?)/);
   const response = await suggestionsResponse;
-  expect(response.status()).toBe(200);
-  expect(await response.json()).toMatchObject({
+  expect(response.status).toBe(200);
+  expect(JSON.parse(response.body)).toMatchObject({
     success: true,
     suggestions: expect.any(Array),
   });
