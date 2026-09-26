@@ -4,11 +4,14 @@
  * Helper functions for building profile API responses.
  */
 
+import { revalidateTag } from 'next/cache';
+
 import {
   invalidateHomepageCache,
   invalidateProfileCache,
   invalidateUsernameChange,
 } from '@/lib/cache/profile';
+import { createReleaseCacheTag } from '@/lib/cache/tags';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { logger } from '@/lib/utils/logger';
@@ -58,6 +61,14 @@ export async function finalizeProfileResponse({
   oldUsernameNormalized,
   clerkUserId,
 }: FinalizeProfileResponseParams) {
+  // JOV-6272: release view models embed handle-derived smart-link paths. The
+  // releases cache family is keyed on (userId, profileId) — invariant under a
+  // handle change — so one tag revalidation clears both the old-handle and
+  // new-handle cached projections. Do this on EVERY profile save: a cached
+  // value is never authorization, and stale handle-derived paths must not
+  // survive any profile mutation.
+  revalidateTag(createReleaseCacheTag(clerkUserId, updatedProfile.id), 'max');
+
   if (updatedProfile.usernameNormalized !== oldUsernameNormalized) {
     await invalidateUsernameChange(
       updatedProfile.usernameNormalized,
