@@ -46,9 +46,12 @@ describe('OperationalTasksPanelView', () => {
     expect(screen.getByText('JOV-5544')).toBeInTheDocument();
     expect(screen.getByText('Running')).toBeInTheDocument();
     expect(screen.getByText('Attempt 2')).toBeInTheDocument();
-    expect(screen.getByTestId('ovie-operational-tasks')).toHaveTextContent(
+    const panel = screen.getByTestId('ovie-operational-tasks');
+    expect(panel).toHaveTextContent(
       'Linear canonical · local reconciled cache'
     );
+    expect(panel.className).toContain('overflow-hidden');
+    expect(panel.className.split(/\s+/)).not.toContain('p-0');
   });
 
   it('makes a running-to-retrying transition visually explicit', () => {

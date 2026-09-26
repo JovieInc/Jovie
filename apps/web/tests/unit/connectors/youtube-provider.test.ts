@@ -311,6 +311,81 @@ describe('YouTube Library provider', () => {
     ]);
   });
 
+  it('keeps each analytics window on its inclusive range', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({
+        columnHeaders: [{ name: 'video' }, { name: 'views' }],
+        rows: [['video-1', 1]],
+      })
+    );
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      now: () => new Date('2026-08-28T12:00:00.000Z'),
+      fetcher,
+    });
+
+    const metrics = await provider.fetchVideoMetrics(
+      'channel-1',
+      ['video-1'],
+      ['day_1', 'day_7', 'day_28', 'experiment', 'day_90', 'lifetime']
+    );
+
+    expect(
+      metrics.map(metric => ({
+        window: metric.window,
+        start: metric.windowStart.toISOString(),
+        end: metric.windowEnd.toISOString(),
+      }))
+    ).toEqual([
+      {
+        window: 'day_1',
+        start: '2026-08-27T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+      {
+        window: 'day_7',
+        start: '2026-08-21T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+      {
+        window: 'day_28',
+        start: '2026-07-31T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+      {
+        window: 'experiment',
+        start: '2026-07-31T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+      {
+        window: 'day_90',
+        start: '2026-05-30T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+      {
+        window: 'lifetime',
+        start: '2005-02-14T00:00:00.000Z',
+        end: '2026-08-27T00:00:00.000Z',
+      },
+    ]);
+    expect(
+      fetcher.mock.calls.map(([input]) => {
+        const params = new URL(String(input)).searchParams;
+        return {
+          start: params.get('startDate'),
+          end: params.get('endDate'),
+        };
+      })
+    ).toEqual([
+      { start: '2026-08-27', end: '2026-08-27' },
+      { start: '2026-08-21', end: '2026-08-27' },
+      { start: '2026-07-31', end: '2026-08-27' },
+      { start: '2026-07-31', end: '2026-08-27' },
+      { start: '2026-05-30', end: '2026-08-27' },
+      { start: '2005-02-14', end: '2026-08-27' },
+    ]);
+  });
+
   it('bounds lifetime batches by the Analytics report cell limit', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

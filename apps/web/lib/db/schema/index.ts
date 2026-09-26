@@ -181,6 +181,14 @@ export {
   selectChatMessageSchema,
   selectChatTurnSchema,
 } from './chat';
+// Coding Agent Run Ingestion (JOV-6508)
+export {
+  type CodingAgentRun,
+  codingAgentRuns,
+  insertCodingAgentRunSchema,
+  type NewCodingAgentRun,
+  selectCodingAgentRunSchema,
+} from './coding-agent-runs';
 // AI Connectors (v1)
 export {
   type AgentRun,
@@ -393,6 +401,9 @@ export {
   catalogScanStatusEnum,
   chatMessageRoleEnum,
   claimInviteStatusEnum,
+  codingAgentCostSourceEnum,
+  codingAgentOutcomeEnum,
+  codingAgentSourceEnum,
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,

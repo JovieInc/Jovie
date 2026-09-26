@@ -146,11 +146,7 @@ export function PublicProfileLayoutShell({
                 {desktopBanner}
               </div>
             ) : null}
-            {isDesktopLayout ? (
-              desktopSurface
-            ) : (
-              <ProfileDesktopLoadingPlaceholder />
-            )}
+            {embedded ? <ProfileDesktopLoadingPlaceholder /> : desktopSurface}
           </div>
           {showClaimFooter && claimFooterHref ? (
             <ProfileClaimFooter
