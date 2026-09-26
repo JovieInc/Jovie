@@ -38,6 +38,10 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export const WEB_TESTS_TYPECHECK_COMMAND =
+  'pnpm --filter=@jovie/web run typecheck:tests';
+const WEB_TESTS_TYPECHECK_BASELINE = 'apps/web/typecheck-tests-baseline.json';
+
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
   '--experimental-test-coverage',
@@ -286,6 +290,12 @@ const LANES = [
     run: runTypecheck,
   },
   {
+    id: 'web-tests-typecheck',
+    name: 'Web Tests Typecheck (shrink-only baseline)',
+    nextLocalCommand: WEB_TESTS_TYPECHECK_COMMAND,
+    run: runWebTestsTypecheck,
+  },
+  {
     id: 'scripts-typecheck',
     name: 'Scripts Typecheck (shrink-only baseline)',
     nextLocalCommand: 'pnpm run typecheck:scripts',
@@ -368,7 +378,7 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * selector to retain the historical all-lanes behavior.
  */
 export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze(['typecheck']),
+  typecheck: Object.freeze(['typecheck', 'web-tests-typecheck']),
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
@@ -854,6 +864,53 @@ function runTypecheck() {
     }
   }
   return shell('pnpm turbo typecheck --affected --force');
+}
+
+/**
+ * apps/web/tsconfig.test.json also compiles JS helpers (allowJs) such as
+ * .github/scripts/*.mjs, and its ratchet reads the committed baseline.
+ */
+export function affectsWebTestTypecheck(file) {
+  const normalized = String(file || '').trim();
+  if (affectsJovieTypecheck(normalized)) return true;
+  if (normalized === WEB_TESTS_TYPECHECK_BASELINE) return true;
+  return /\.(?:js|jsx|mjs|cjs)$/i.test(normalized);
+}
+
+function runWebTestsTypecheck() {
+  // The shrink-only apps/web test graph (tests/, scripts/, allowJs helpers)
+  // rotted while nothing in CI ran it. Library type changes break test types,
+  // so it follows the product typecheck selection plus JS/baseline inputs.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Web tests typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
+  if (event === 'pull_request') {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsWebTestTypecheck(file))) {
+      return {
+        code: 0,
+        output: 'No web test typecheck inputs changed\n',
+        skipped: true,
+      };
+    }
+  }
+  return shell(WEB_TESTS_TYPECHECK_COMMAND);
 }
 
 function runScriptsTypecheck() {

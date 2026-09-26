@@ -291,8 +291,9 @@ function collectLocalAliases(
       if (ts.isVariableDeclaration(node) && node.initializer) {
         const initializer = unwrap(node.initializer);
         if (ts.isIdentifier(node.name)) {
+          const variableName = node.name.text;
           record(
-            node.name.text,
+            variableName,
             componentFromExpression(initializer, aliases, sourceFile)
           );
           if (ts.isObjectLiteralExpression(initializer)) {
@@ -309,7 +310,7 @@ function collectLocalAliases(
                 : property.name;
               if (name) {
                 record(
-                  `${node.name.text}.${name}`,
+                  `${variableName}.${name}`,
                   componentFromExpression(expression, aliases, sourceFile)
                 );
               }
@@ -318,7 +319,7 @@ function collectLocalAliases(
           if (ts.isArrayLiteralExpression(initializer)) {
             initializer.elements.forEach((element, index) => {
               record(
-                `${node.name.text}.${index}`,
+                `${variableName}.${index}`,
                 componentFromExpression(element, aliases, sourceFile)
               );
             });
@@ -852,10 +853,7 @@ function finalCanvasProps(
   node: ts.JsxOpeningLikeElement,
   sourceFile: ts.SourceFile
 ): CanvasPropState {
-  const state = { frame: null, surfaceMode: null } satisfies {
-    frame: CanvasPropValue;
-    surfaceMode: CanvasPropValue;
-  };
+  const state: CanvasPropState = { frame: null, surfaceMode: null };
   for (const property of node.attributes.properties) {
     if (ts.isJsxSpreadAttribute(property)) {
       if (!applyCanvasSpread(property.expression, state)) {
@@ -885,7 +883,7 @@ function finalCanvasProps(
 function createElementCanvasProps(
   expression: ts.Expression | undefined
 ): CanvasPropState {
-  const state = { frame: null, surfaceMode: null } satisfies CanvasPropState;
+  const state: CanvasPropState = { frame: null, surfaceMode: null };
   if (!expression) return state;
   const current = unwrap(expression);
   if (

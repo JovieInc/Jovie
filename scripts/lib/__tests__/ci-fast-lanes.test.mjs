@@ -593,7 +593,8 @@ exit 0
         expect(result.status, result.stderr).toBe(1);
         const report = JSON.parse(readFileSync(output, 'utf8'));
         expect(report.setupError).toBeNull();
-        expect(report.lanes).toHaveLength(1);
+        // The typecheck group also runs the web tests ratchet after typecheck.
+        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 2 : 1);
         expect(report.lanes[0].status).toBe('failure');
         const diagnostic = report.lanes[0].logExcerpt;
         expect(diagnostic.length).toBeLessThanOrEqual(1200);

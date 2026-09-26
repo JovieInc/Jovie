@@ -81,6 +81,7 @@ import {
   RateLimiter,
   resetRedisCircuitBreaker,
 } from '@/lib/rate-limit/rate-limiter';
+import type { RateLimitConfig } from '@/lib/rate-limit/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const baseConfig = {
@@ -89,9 +90,9 @@ const baseConfig = {
   window: '1m',
   prefix: 'test',
   analytics: false,
-  algorithm: 'fixed-window' as const,
-  trafficClass: 'internal' as const,
-};
+  algorithm: 'fixed-window',
+  trafficClass: 'internal',
+} as const satisfies RateLimitConfig;
 
 // ── Tests ──────────────────────────────────────────────────────────────
 describe('rate-limiter.ts', () => {
@@ -708,7 +709,7 @@ describe('rate-limiter.ts', () => {
     });
 
     it('preserves analytics field', () => {
-      const configWithAnalytics = { ...baseConfig, analytics: false };
+      const configWithAnalytics = { ...baseConfig, analytics: false as const };
       const limiter = new RateLimiter(configWithAnalytics);
       expect(limiter.getConfig().analytics).toBe(false);
     });

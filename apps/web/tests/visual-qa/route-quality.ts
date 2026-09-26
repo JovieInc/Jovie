@@ -170,14 +170,12 @@ export async function assertRegisteredQualityChecks(
       const activeAnimations = document
         .getAnimations()
         .filter(
-          animation =>
-            animation.playState === 'pending' ||
-            animation.playState === 'running'
+          animation => animation.pending || animation.playState === 'running'
         )
         .map(animation => {
-          const timing = animation.effect?.getComputedTiming();
+          const duration = animation.effect?.getComputedTiming().duration;
           return {
-            duration: timing?.duration ?? 0,
+            duration: typeof duration === 'number' ? duration : 0,
             playState: animation.playState,
           };
         })

@@ -67,7 +67,7 @@ function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
 
 export function buildClaimProfileStartHref(
   handle?: string,
-  waitlistEnabled = FEATURE_FLAGS.WAITLIST_ENABLED
+  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
 ): string {
   const trimmed = handle?.trim().replace(/^@/, '') ?? '';
   if (!waitlistEnabled) {
@@ -90,7 +90,7 @@ export function buildClaimProfileStartHref(
 }
 
 export function getClaimProfileIntent(
-  waitlistEnabled = FEATURE_FLAGS.WAITLIST_ENABLED
+  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
 ): ClaimProfileCtaIntent {
   return waitlistEnabled
     ? CLAIM_PROFILE_WAITLIST_INTENT
