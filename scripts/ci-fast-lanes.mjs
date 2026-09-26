@@ -1752,6 +1752,7 @@ export async function runStructural(opts = {}) {
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
