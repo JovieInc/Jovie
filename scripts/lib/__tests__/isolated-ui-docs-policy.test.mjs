@@ -95,6 +95,27 @@ describe('isolated UI/docs promotion policy', () => {
     });
   });
 
+  it('allows the same isolated lane when the fleet is GREEN', () => {
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15819,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files: atomFiles(),
+      checks: greenChecks(),
+      fleetGate: fleetGate({
+        state: 'GREEN',
+        signals: {
+          ...fleetGate().signals,
+          production: { status: 'green' },
+        },
+      }),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.authority.deploymentAllowed).toBe(false);
+  });
+
   it('allows rendered docs without pretending visual component tests ran', () => {
     const result = evaluateIsolatedUiDocsDelta({
       prNumber: 15811,
@@ -133,7 +154,7 @@ describe('isolated UI/docs promotion policy', () => {
       fleetGate({
         signals: { ...fleetGate().signals, production: { status: 'unknown' } },
       }),
-      'production is not explicitly red',
+      'production is not explicitly green or red',
     ],
     [
       'integrity unknown',

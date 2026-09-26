@@ -1787,14 +1787,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and repository_capacity.get("ready") < repository_capacity.get("budget")
     )
     isolated_promotion_allowed = (
-        state == "AMBER"
-        and review_allowed
-        and controller.get("status") == "green"
-        and main.get("status") == "green"
-        and production.get("status") == "red"
-        and integrity.get("status") in {"clear", "resolved"}
-        and queue_below_backpressure
-        and all(reason["code"] == "production-not-green" for reason in reasons)
+        # merge-speed-fast-ui-lanes-v1: when the fleet is GREEN the same
+        # exact-head, source-bound isolated UI/docs lane stays open so a
+        # bounded UI fix can merge without waiting behind the full-suite
+        # cohort. Queue backpressure still applies; deployments stay frozen.
+        (state == "GREEN" and queue_below_backpressure)
+        or (
+            state == "AMBER"
+            and review_allowed
+            and controller.get("status") == "green"
+            and main.get("status") == "green"
+            and production.get("status") == "red"
+            and integrity.get("status") in {"clear", "resolved"}
+            and queue_below_backpressure
+            and all(reason["code"] == "production-not-green" for reason in reasons)
+        )
     )
     hold_intake_allowed = (
         state == "AMBER"
@@ -1843,10 +1850,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             {"controller-failure", "production-deployment-unbound"},
         )
     )
-    if isolated_promotion_allowed:
-        promotion_mode = "isolated-only"
-    elif state == "GREEN":
+    if state == "GREEN":
         promotion_mode = "normal"
+    elif isolated_promotion_allowed:
+        promotion_mode = "isolated-only"
     elif (
         state == "AMBER"
         and main.get("status") == "red"
@@ -1884,7 +1891,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # Capacity evidence governs mutation seats, not Linear-child intake.
         # Missing useful-turn proofs must not freeze Eve's v2 projection.
         # Queue backpressure (ready >= budget) still holds new leases.
-        new_implementation_allowed = queue_shape_valid and repository_capacity_available
+        # A snapshot without a lane-capacity receipt is an observation gap,
+        # not a hold: greenReadyPrs below target still admits new leases.
+        new_implementation_allowed = queue_shape_valid and (
+            repository_capacity_available
+            or (queue.get("laneCapacity") is None and queue_below_backpressure)
+        )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [

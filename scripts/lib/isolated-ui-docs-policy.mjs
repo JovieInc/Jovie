@@ -396,8 +396,8 @@ export function evaluateIsolatedUiDocsDelta({
     blockers.push('fleet gate main SHA does not match exact PR base');
   if (fleetGate?.signals?.main?.status !== 'green')
     blockers.push('main is not explicitly green');
-  if (fleetGate?.signals?.production?.status !== 'red')
-    blockers.push('production is not explicitly red');
+  if (!['red', 'green'].includes(fleetGate?.signals?.production?.status))
+    blockers.push('production is not explicitly green or red');
   if (!['clear', 'resolved'].includes(fleetGate?.signals?.integrity?.status))
     blockers.push('integrity is not explicitly clear');
 

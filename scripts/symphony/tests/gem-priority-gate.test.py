@@ -3253,6 +3253,36 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["promotionMode"], "blocked")
         self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
+    def test_green_fleet_keeps_the_isolated_ui_lane_open(self):
+        # merge-speed-fast-ui-lanes-v1: GREEN must not code the isolated
+        # lane only for production-red. A bounded UI fix merges on
+        # source-bound gates while normal promotion continues and
+        # deployments stay separately gated.
+        receipt = self.evaluate(dict(GREEN_SIGNALS))
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_green_isolated_lane_still_respects_queue_backpressure(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            **GREEN_SIGNALS["queue"],
+            "eligiblePrs": 40,
+            "greenReadyPrs": 15,
+            "laneCapacity": lane_capacity(15),
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertFalse(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
     def test_red_production_keeps_the_isolated_exception(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "red"}
