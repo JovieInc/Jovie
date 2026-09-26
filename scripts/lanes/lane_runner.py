@@ -44,6 +44,8 @@ EXCLUDED_LABELS = frozenset({
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
+# Every file a release must pass before `current` moves to it.
+LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
@@ -308,14 +310,15 @@ class Locked:
 
 def provider_healthy(spec: dict) -> bool:
     try:
-        result = subprocess.run(spec["health"], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr) is not None
 
 
 def template(args: list[str], values: dict) -> list[str]:
-    return [arg.format(**values) for arg in args]
+    """`{here}` is the release directory, so lane-owned helpers resolve on every host."""
+    return [arg.format(**{"here": str(HERE), **values}) for arg in args]
 
 
 # ---------------------------------------------------------------- one run
@@ -338,7 +341,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file)}),
+            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                                    cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
                                    timeout=host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
@@ -573,7 +576,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             prompt = render_fix_prompt(pr, failure_excerpt(pr))
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file)}),
+            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                                    cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
                                    timeout=host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
@@ -829,10 +832,10 @@ def update(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", "scripts/tests/test_lane_runner.py"],
+        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        test = subprocess.run([sys.executable, "-m", "unittest", "-q", "scripts/tests/test_lane_runner.py"],
+        test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                               cwd=staging, capture_output=True, text=True, timeout=300,
                               env={**os.environ, "LANES_SELFTEST": "1"})
         if test.returncode != 0:
