@@ -19,24 +19,10 @@ export interface ClerkEmailAddressResource {
   destroy: () => Promise<void>;
 }
 
-export type ClerkSessionActivity = {
-  browserName?: string | null;
-  city?: string | null;
-  country?: string | null;
-};
-
-export interface ClerkSessionResource {
-  id: string;
-  latestActivity?: ClerkSessionActivity | null;
-  lastActiveAt?: Date | null;
-  revoke: () => Promise<void>;
-}
-
 export interface ClerkUserResource {
   primaryEmailAddressId: string | null;
   emailAddresses: ClerkEmailAddressResource[];
   externalAccounts: ClerkExternalAccountResource[];
-  getSessions: () => Promise<ClerkSessionResource[]>;
   createEmailAddress: (args: {
     email: string;
   }) => Promise<ClerkEmailAddressResource>;

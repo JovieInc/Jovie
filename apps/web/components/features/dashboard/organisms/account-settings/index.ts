@@ -13,8 +13,6 @@ export type {
   ClerkEmailAddressResource,
   ClerkEmailVerification,
   ClerkExternalAccountResource,
-  ClerkSessionActivity,
-  ClerkSessionResource,
   ClerkUserResource,
   EmailStatus,
 } from './types';

@@ -3,41 +3,38 @@
 /**
  * SessionManagementCard Component
  *
- * Displays and manages active user sessions.
- * Allows users to view and revoke sessions on other devices.
+ * Displays the current user's active Better Auth sessions and lets them end
+ * an individual session or sign out of every other device.
  */
 
 import { Badge, Button, ConfirmDialog } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { fetchWithTimeout } from '@/lib/queries';
 
-import type { ClerkSessionResource, ClerkUserResource } from './types';
-import {
-  extractErrorMessage,
-  formatRelativeDate,
-  formatSessionDeviceName,
-} from './utils';
+import { extractErrorMessage, formatRelativeDate } from './utils';
 
-export interface SessionManagementCardProps {
-  readonly user: ClerkUserResource;
-  readonly activeSessionId: string | null | undefined;
+interface AccountSessionDTO {
+  readonly id: string;
+  readonly ipAddress: string | null;
+  readonly userAgent: string | null;
+  readonly lastActiveAt: string;
+  readonly isCurrent: boolean;
 }
 
-export function SessionManagementCard({
-  user,
-  activeSessionId,
-}: SessionManagementCardProps) {
+export function SessionManagementCard() {
   const notifications = useNotifications();
-  const [sessions, setSessions] = useState<ClerkSessionResource[]>([]);
+  const [sessions, setSessions] = useState<AccountSessionDTO[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
-  const [sessionToEnd, setSessionToEnd] = useState<ClerkSessionResource | null>(
+  const [sessionToEnd, setSessionToEnd] = useState<AccountSessionDTO | null>(
     null
   );
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
+  const [confirmSignOutOthers, setConfirmSignOutOthers] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,9 +44,11 @@ export function SessionManagementCard({
       setSessionsError(null);
 
       try {
-        const userSessions = await user.getSessions();
+        const { sessions: rows } = await fetchWithTimeout<{
+          sessions: AccountSessionDTO[];
+        }>('/api/account/sessions');
         if (!cancelled) {
-          setSessions(userSessions ?? []);
+          setSessions(rows);
         }
       } catch (error) {
         if (!cancelled) {
@@ -70,121 +69,129 @@ export function SessionManagementCard({
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, []);
 
-  const handleEndSession = async (session: ClerkSessionResource) => {
+  const handleEndSession = async (session: AccountSessionDTO) => {
     setEndingSessionId(session.id);
     try {
-      await session.revoke();
+      await fetchWithTimeout(
+        `/api/account/sessions/${encodeURIComponent(session.id)}`,
+        { method: 'DELETE' }
+      );
       setSessions(prev => prev.filter(item => item.id !== session.id));
       notifications.success('Session ended');
     } catch (error) {
-      const message = extractErrorMessage(error);
-      notifications.error(message);
+      notifications.error(extractErrorMessage(error));
     } finally {
       setEndingSessionId(null);
     }
   };
 
+  const handleSignOutOthers = async () => {
+    setSigningOutOthers(true);
+    try {
+      await fetchWithTimeout('/api/account/sessions/revoke-others', {
+        method: 'POST',
+      });
+      setSessions(prev => prev.filter(item => item.isCurrent));
+      notifications.success('Signed out of all other sessions');
+    } catch (error) {
+      notifications.error(extractErrorMessage(error));
+    } finally {
+      setSigningOutOthers(false);
+    }
+  };
+
   if (sessionsLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='divide-y divide-subtle/60 overflow-hidden'
+      <div
+        className='space-y-3 px-4 py-3 sm:px-5'
+        data-testid='sessions-loading'
       >
-        <div className='px-4 py-3 sm:px-5'>
-          <LoadingSkeleton height='h-10' />
-        </div>
-        <div className='px-4 py-3 sm:px-5'>
-          <LoadingSkeleton height='h-10' />
-        </div>
-      </DashboardCard>
+        <LoadingSkeleton height='h-10' />
+        <LoadingSkeleton height='h-10' />
+      </div>
     );
   }
 
   if (sessionsError) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <div className='px-4 py-3 sm:px-5'>
-          <p className='text-app text-destructive'>{sessionsError}</p>
-        </div>
-      </DashboardCard>
+      <div className='px-4 py-3 sm:px-5'>
+        <p className='text-app text-destructive'>{sessionsError}</p>
+      </div>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <div className='px-4 py-3 sm:px-5'>
-          <p className='text-app text-secondary-token'>
-            No other active sessions.
-          </p>
-        </div>
-      </DashboardCard>
+      <div className='px-4 py-3 sm:px-5'>
+        <p className='text-app text-secondary-token'>No active sessions.</p>
+      </div>
     );
   }
 
+  const otherSessionCount = sessions.filter(
+    session => !session.isCurrent
+  ).length;
+
   return (
     <>
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='divide-y divide-subtle/60 overflow-hidden'
-      >
-        {sessions.map(session => {
-          const isCurrent = session.id === activeSessionId;
-          const activity = session.latestActivity;
-
-          return (
-            <div
-              key={session.id}
-              className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
-            >
-              <div className='min-w-0'>
-                <div className='flex flex-wrap items-center gap-1.5'>
-                  <p className='text-app font-caption text-primary-token'>
-                    {isCurrent
-                      ? 'This device'
-                      : formatSessionDeviceName(activity?.browserName)}
-                  </p>
-                  {isCurrent ? (
-                    <Badge variant='secondary' size='sm'>
-                      Current Session
-                    </Badge>
-                  ) : null}
-                </div>
-                <p className='mt-0.5 text-2xs text-secondary-token'>
-                  Last active {formatRelativeDate(session.lastActiveAt)}
-                  {activity?.city && activity?.country
-                    ? ` · ${activity.city}, ${activity.country}`
-                    : ''}
+      <div className='divide-y divide-subtle/60' data-testid='sessions-list'>
+        {sessions.map(session => (
+          <div
+            key={session.id}
+            className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
+          >
+            <div className='min-w-0'>
+              <div className='flex flex-wrap items-center gap-1.5'>
+                <p className='text-app font-caption text-primary-token'>
+                  {session.isCurrent ? 'This device' : 'Other device'}
                 </p>
+                {session.isCurrent ? (
+                  <Badge variant='secondary' size='sm'>
+                    Current Session
+                  </Badge>
+                ) : null}
               </div>
-
-              {isCurrent ? null : (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  disabled={endingSessionId === session.id}
-                  onClick={() => setSessionToEnd(session)}
-                  className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
-                >
-                  {endingSessionId === session.id ? 'Ending…' : 'End session'}
-                </Button>
-              )}
+              <p className='mt-0.5 text-2xs text-secondary-token'>
+                Last active {formatRelativeDate(new Date(session.lastActiveAt))}
+                {session.ipAddress ? ` · ${session.ipAddress}` : ''}
+              </p>
             </div>
-          );
-        })}
-      </DashboardCard>
+
+            {session.isCurrent ? null : (
+              <Button
+                variant='ghost'
+                destructive
+                size='sm'
+                disabled={endingSessionId === session.id}
+                onClick={() => setSessionToEnd(session)}
+                className='shrink-0'
+              >
+                {endingSessionId === session.id ? 'Ending…' : 'End session'}
+              </Button>
+            )}
+          </div>
+        ))}
+        {otherSessionCount > 0 ? (
+          <div className='flex justify-end px-4 py-3 sm:px-5'>
+            <Button
+              variant='ghost'
+              destructive
+              size='sm'
+              disabled={signingOutOthers}
+              onClick={() => setConfirmSignOutOthers(true)}
+              className='shrink-0'
+            >
+              {signingOutOthers
+                ? 'Signing out…'
+                : `Sign out ${otherSessionCount} other session${
+                    otherSessionCount === 1 ? '' : 's'
+                  }`}
+            </Button>
+          </div>
+        ) : null}
+      </div>
 
       <ConfirmDialog
         open={Boolean(sessionToEnd)}
@@ -192,12 +199,22 @@ export function SessionManagementCard({
           if (!open) setSessionToEnd(null);
         }}
         title='End session?'
-        description='This will sign out the device. If you don&#39;t recognise this session, consider changing your password too.'
+        description="This will sign out the device. If you don't recognise this session, consider changing your password too."
         confirmLabel='End session'
         variant='destructive'
         onConfirm={async () => {
           if (sessionToEnd) await handleEndSession(sessionToEnd);
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmSignOutOthers}
+        onOpenChange={setConfirmSignOutOthers}
+        title='Sign out other sessions?'
+        description='This will sign out every device except this one.'
+        confirmLabel='Sign out other sessions'
+        variant='destructive'
+        onConfirm={handleSignOutOthers}
       />
     </>
   );
