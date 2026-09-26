@@ -56,6 +56,15 @@ export function normalizeClusters(clusters) {
   return Object.freeze(out);
 }
 
+/**
+ * @param {{
+ *   taskText?: unknown,
+ *   clusters?: unknown,
+ *   sourceSha?: string,
+ *   artifactSha256?: string,
+ *   scope?: string,
+ * } | null} [task]
+ */
 export function buildReleaseTaskInput({
   taskText,
   clusters,
@@ -106,6 +115,9 @@ export function decisionFromReceipt(receipt, clusters) {
   });
 }
 
+/**
+ * @param {Parameters<typeof buildReleaseTaskInput>[0]} [task]
+ */
 export async function classifyReleaseTask(task, options = {}) {
   const input = buildReleaseTaskInput(task ?? {});
   if (!input) return decisionFromReceipt({ status: 'skipped' }, task?.clusters);
@@ -244,6 +256,7 @@ export function summarizeEvalRows(rows) {
     if (row.expected && row.predicted !== row.expected)
       mark(row.expected).fn += 1;
   }
+  /** @type {Record<string, {tp: number, fp: number, fn: number, support: number, precision: number | null, recall: number | null}>} */
   const classes = {};
   let ps = 0;
   let rs = 0;
@@ -277,6 +290,14 @@ export function summarizeEvalRows(rows) {
   });
 }
 
+/**
+ * @param {any} corpus
+ * @param {{
+ *   classify?: (input: {text: string, clusters: any, example: any}) => Promise<any>,
+ *   now?: () => number,
+ *   limits?: typeof PREDECLARED_LIMITS,
+ * }} [options]
+ */
 export async function evaluateReleaseTaskCorpus(
   corpus,
   { classify, now = Date.now, limits = PREDECLARED_LIMITS } = {}
