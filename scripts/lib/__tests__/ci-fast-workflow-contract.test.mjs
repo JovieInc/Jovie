@@ -14,10 +14,12 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  affectsWebTestTypecheck,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_PATHS,
   CERTIFICATION_KERNEL_COMMAND,
+  COPY_GATE_COMMAND,
   changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
@@ -456,6 +458,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...laneIds].sort()).toEqual([
       'billing-coverage',
       'biome',
+      'copy-gate',
       'design-conformance',
       'design-exception-registry',
       'design-governance-enforcement',
@@ -468,6 +471,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'structural',
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
     expect(() =>
@@ -488,6 +492,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'files.some(file => affectsJovieTypecheck(file))'
     );
+  });
+
+  it('gates the web test typecheck ratchet on its compiled inputs', () => {
+    for (const file of [
+      'apps/web/tests/unit/chat/turns.test.ts',
+      'apps/web/lib/rate-limit/types.ts',
+      'apps/web/tsconfig.test.json',
+      'apps/web/typecheck-tests-baseline.json',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+    ]) {
+      expect(affectsWebTestTypecheck(file), file).toBe(true);
+    }
+    for (const file of ['docs/PR_FLOW.md', 'apps/web/app/globals.css']) {
+      expect(affectsWebTestTypecheck(file), file).toBe(false);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'files.some(file => affectsWebTestTypecheck(file))'
+    );
+    expect(LANE_GROUPS.typecheck).toContain('web-tests-typecheck');
   });
 
   it('preselects source-PR typecheck before dependency hydration', () => {
@@ -539,10 +562,14 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'skipped' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'skipped',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toContain(
-        'ci-path-changes preselection'
-      );
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toContain('ci-path-changes preselection');
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -688,8 +715,14 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'failure' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'failure',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toMatch(/pnpm.*not found/i);
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -883,6 +916,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'shadcn-lint-contracts',
       'typecheck',
+      'web-tests-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -892,10 +926,12 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'billing-coverage',
+      'copy-gate',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -913,6 +949,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts':
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
+      'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
@@ -923,6 +960,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
+      'copy-gate': COPY_GATE_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +

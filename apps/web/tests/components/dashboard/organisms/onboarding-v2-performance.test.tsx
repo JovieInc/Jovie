@@ -3,6 +3,7 @@ import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
+import type { ArtistSearchState } from '@/lib/queries/useArtistSearchQuery';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -27,7 +28,7 @@ const mockArtistSearch = {
   }>,
   search: mockSearch,
   searchImmediate: mockSearch,
-  state: 'idle' as const,
+  state: 'idle' as ArtistSearchState,
 };
 
 const DISCOVERY_SNAPSHOT = {
@@ -73,7 +74,7 @@ const DISCOVERY_SNAPSHOT = {
     username: 'perf-budget',
   },
   readiness: {
-    blockingReason: null,
+    blockingReason: null as string | null,
     canProceedToDashboard: true,
     phase: 'ready',
   },
@@ -106,11 +107,19 @@ const DISCOVERY_SNAPSHOT = {
       version: 1,
     },
   ],
-} as const;
+};
 
-function createDiscoverySnapshot(
-  overrides: Partial<typeof DISCOVERY_SNAPSHOT> = {}
-) {
+type DiscoverySnapshotFixture = typeof DISCOVERY_SNAPSHOT;
+/** Nested sections merge field-by-field; arrays replace wholesale. */
+type DiscoverySnapshotOverrides = {
+  [K in keyof DiscoverySnapshotFixture]?: DiscoverySnapshotFixture[K] extends readonly unknown[]
+    ? DiscoverySnapshotFixture[K]
+    : DiscoverySnapshotFixture[K] extends object
+      ? Partial<DiscoverySnapshotFixture[K]>
+      : DiscoverySnapshotFixture[K];
+};
+
+function createDiscoverySnapshot(overrides: DiscoverySnapshotOverrides = {}) {
   const releaseCount =
     overrides.importState?.releaseCount ??
     overrides.counts?.releaseCount ??

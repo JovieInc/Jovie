@@ -37,8 +37,14 @@ import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
   affectsJovieTypecheck,
+  affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+
+export { affectsWebTestTypecheck };
+
+export const WEB_TESTS_TYPECHECK_COMMAND =
+  'pnpm --filter=@jovie/web run typecheck:tests';
 
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
@@ -65,6 +71,16 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+/** Customer-facing copy surfaces gated by @jovie/copy (policy: canon/VOICE.md). */
+export const COPY_GATE_PATHS = Object.freeze([
+  'apps/web/content/**',
+  'apps/web/data/*Copy.ts',
+  'apps/web/lib/email/templates/**',
+  'apps/web/lib/chat/onboarding-script/**',
+]);
+export const COPY_GATE_COMMAND =
+  'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
+
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -295,6 +311,12 @@ const LANES = [
     run: runTypecheck,
   },
   {
+    id: 'web-tests-typecheck',
+    name: 'Web Tests Typecheck (shrink-only baseline)',
+    nextLocalCommand: WEB_TESTS_TYPECHECK_COMMAND,
+    run: runWebTestsTypecheck,
+  },
+  {
     id: 'scripts-typecheck',
     name: 'Scripts Typecheck (shrink-only baseline)',
     nextLocalCommand: 'pnpm run typecheck:scripts',
@@ -351,6 +373,12 @@ const LANES = [
     run: runBillingCoverage,
   },
   {
+    id: 'copy-gate',
+    name: 'Copy gate (changed customer-facing lines)',
+    nextLocalCommand: COPY_GATE_COMMAND,
+    run: runCopyGate,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -377,7 +405,7 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * selector to retain the historical all-lanes behavior.
  */
 export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze(['typecheck']),
+  typecheck: Object.freeze(['typecheck', 'web-tests-typecheck']),
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
@@ -391,6 +419,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'profile-admission',
     'billing-coverage',
+    'copy-gate',
     'structural',
   ]),
 });
@@ -586,6 +615,36 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+/**
+ * Delta copy gate: only lines this change adds are judged, so legacy copy debt
+ * stays advisory while new slop, harm, legal, or ToS violations cannot land.
+ * An unreadable diff fails closed.
+ */
+export function runCopyGate() {
+  const files = changedFiles(COPY_GATE_PATHS);
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Copy gate: changed-file diff unreadable; failing closed\n',
+    };
+  }
+  if (files.length === 0) {
+    return {
+      code: 0,
+      output: 'Copy gate skipped (no customer-facing copy changed)\n',
+      skipped: true,
+    };
+  }
+  const base = process.env.GITHUB_BASE_REF || 'main';
+  const diffBase =
+    shell(`git rev-parse --verify origin/${base}`).code === 0
+      ? `origin/${base}`
+      : process.env.TURBO_SCM_BASE || 'HEAD^1';
+  return shell(
+    `pnpm exec tsx packages/copy/cli.ts check --diff-base ${diffBase} ${files.map(file => `'${file}'`).join(' ')}`
+  );
 }
 
 export function listAllChangedFiles(cwd = REPO_ROOT) {
@@ -863,6 +922,43 @@ function runTypecheck() {
     }
   }
   return shell('pnpm turbo typecheck --affected --force');
+}
+
+function runWebTestsTypecheck() {
+  // The shrink-only apps/web test graph (tests/, scripts/, allowJs helpers)
+  // rotted while nothing in CI ran it. Source-PR preselection
+  // (run_jovie_typecheck) already counts its JS and baseline inputs via
+  // affectsWebTestTypecheck, so a 'false' receipt means none changed.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Web tests typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
+  if (event === 'pull_request') {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsWebTestTypecheck(file))) {
+      return {
+        code: 0,
+        output: 'No web test typecheck inputs changed\n',
+        skipped: true,
+      };
+    }
+  }
+  return shell(WEB_TESTS_TYPECHECK_COMMAND);
 }
 
 function runScriptsTypecheck() {

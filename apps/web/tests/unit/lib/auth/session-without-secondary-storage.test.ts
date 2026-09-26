@@ -1,4 +1,4 @@
-import { betterAuth } from 'better-auth';
+import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { describe, expect, it } from 'vitest';
 
@@ -43,8 +43,9 @@ function headersFromSetCookie(response: Response): Headers {
 describe('Better Auth sessions without Redis secondary storage', () => {
   it('keeps sessions in the database adapter and does not configure secondary storage', () => {
     const auth = createSessionAuth();
+    const options: BetterAuthOptions = auth.options;
 
-    expect(auth.options.secondaryStorage).toBeUndefined();
+    expect(options.secondaryStorage).toBeUndefined();
     expect(auth.options.session?.storeSessionInDatabase).toBe(true);
     expect(auth.options.session?.cookieCache).toMatchObject({
       enabled: true,

@@ -196,9 +196,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(searches).toHaveLength(1);
     expect(document.getElementById('homepage-name-search')).toBe(searches[0]);
 
-    expect(
-      screen.getAllByRole('button', { name: 'Find me', exact: true })
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Find me' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
     expect(screen.queryByText('Get started')).toBeNull();
 

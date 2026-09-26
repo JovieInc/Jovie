@@ -349,9 +349,12 @@ describe('marketing recipe integrity', () => {
       }
     }
     expect(
-      MARKETING_RECIPES.filter(
-        recipe => recipe.status === 'proven' && recipe.referenceRoute
-      ).every(recipe => matchesManifest(recipe.referenceRoute))
+      MARKETING_RECIPES.every(
+        recipe =>
+          recipe.status !== 'proven' ||
+          !recipe.referenceRoute ||
+          matchesManifest(recipe.referenceRoute)
+      )
     ).toBe(true);
   });
 
@@ -473,8 +476,9 @@ describe('marketing route manifest integrity', () => {
       }
     }
     expect(
-      MARKETING_ROUTE_MANIFEST.filter(entry => entry.exempt).every(
-        entry => exemptionMetadataIssues(entry.exempt).length === 0
+      MARKETING_ROUTE_MANIFEST.every(
+        entry =>
+          !entry.exempt || exemptionMetadataIssues(entry.exempt).length === 0
       )
     ).toBe(true);
   });

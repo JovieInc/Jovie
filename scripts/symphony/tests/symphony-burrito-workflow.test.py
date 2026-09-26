@@ -582,6 +582,10 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     f"pathlib.Path({str(gate)!r}).write_text({json.dumps(_fleet_gate_payload(status='red', intake=False))!r})\n"
                     "print('scheduler-tick', flush=True)\n"
                 )
+            # The runtime SIGSTOPs the child during the hold and SIGCONTs it on
+            # shutdown, so SIGTERM can land while the announcement print is still
+            # inside sys.stdout's BufferedWriter. Drain with raw os.write so the
+            # handler never re-enters that writer ("reentrant call" RuntimeError).
             child = (
                 "import os, pathlib, signal, sys, time\n"
                 "def stop(sig, frame):\n"
