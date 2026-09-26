@@ -18,6 +18,21 @@ import {
 export const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 export const GITHUB_API_URL = 'https://api.github.com';
 
+/**
+ * Gem-resident authorities (Symphony runtime state, workspace task receipt,
+ * lease-guard capacity, and the typed fleet receipt) live on the Gem host.
+ * When `gemAuthorityUrl` is configured the publisher reads them through the
+ * bounded authenticated Gem bridge instead of this host's loopback/home
+ * directory, which would silently observe the wrong machine.
+ */
+const GEM_AUTHORITY_PATH = '/api/v1/shipping-authorities';
+const GEM_RESIDENT_SOURCES = new Set<ShippingSourceId>([
+  'symphony-runtime',
+  'symphony-task',
+  'lease-guard-capacity',
+  'fleet-receipt',
+]);
+
 export const NAMED_AUTHORITY_PATHS = {
   'fleet-receipt': '~/gem-workspace/state/gem-priority-gate/latest.json',
 } as const;
@@ -40,6 +55,10 @@ export type LiveIo = {
   readonly githubToken?: string;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
+  /** Base URL of the authenticated Gem shipping-authority bridge. */
+  readonly gemAuthorityUrl?: string;
+  /** Bearer token for the Gem shipping-authority bridge. */
+  readonly gemAuthorityToken?: string;
 };
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
@@ -189,30 +208,32 @@ async function readNamedJson(
   }
 }
 
-async function readNamedUrl(
+async function fetchAuthorityPayload(
   io: LiveIo,
   sourceId: ShippingSourceId,
   url: string,
+  label: string,
+  headers: Record<string, string>,
   timeoutMs: number
 ): Promise<AuthorityRead> {
   try {
     const response = await io.fetch(url, {
       method: 'GET',
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.status === 401 || response.status === 403) {
       return failedRead(
         sourceId,
         'unauthorized',
-        `named authority returned ${response.status}`
+        `${label} returned ${response.status}`
       );
     }
     if (!response.ok) {
       return failedRead(
         sourceId,
         'unavailable',
-        `named authority returned ${response.status}`,
+        `${label} returned ${response.status}`,
         { errorCode: `http-${response.status}` }
       );
     }
@@ -221,7 +242,7 @@ async function readNamedUrl(
       return failedRead(
         sourceId,
         'error',
-        'named authority payload was not an object',
+        `${label} payload was not an object`,
         { errorCode: 'malformed' }
       );
     }
@@ -229,9 +250,52 @@ async function readNamedUrl(
   } catch (error) {
     return disconnectedRead(
       sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
+      error instanceof Error ? error.message : `${label} unreachable`
     );
   }
+}
+
+async function readNamedUrl(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number
+): Promise<AuthorityRead> {
+  return fetchAuthorityPayload(
+    io,
+    sourceId,
+    url,
+    'named authority',
+    {},
+    timeoutMs
+  );
+}
+
+/**
+ * Read a Gem-resident authority through the bounded authenticated bridge.
+ * Returns null when no bridge is configured so callers can fall back to the
+ * Gem-local read (used when the publisher itself runs on Gem).
+ */
+export async function readGemAuthority(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  timeoutMs: number
+): Promise<AuthorityRead | null> {
+  const base = io.gemAuthorityUrl;
+  if (!base || !GEM_RESIDENT_SOURCES.has(sourceId)) return null;
+  let trimmedBase = base;
+  while (trimmedBase.endsWith('/')) trimmedBase = trimmedBase.slice(0, -1);
+  const url = `${trimmedBase}${GEM_AUTHORITY_PATH}/${sourceId}`;
+  return fetchAuthorityPayload(
+    io,
+    sourceId,
+    url,
+    'Gem authority bridge',
+    io.gemAuthorityToken
+      ? { authorization: `Bearer ${io.gemAuthorityToken}` }
+      : {},
+    timeoutMs
+  );
 }
 
 async function githubFetch(
@@ -667,12 +731,14 @@ export function createLiveShippingStateReaders(
 ): NamedAuthorityReaders {
   return {
     'symphony-runtime': async () => {
-      const live = await readNamedUrl(
-        io,
-        'symphony-runtime',
-        NAMED_AUTHORITY_URLS['symphony-runtime'],
-        750
-      );
+      const live =
+        (await readGemAuthority(io, 'symphony-runtime', 750)) ??
+        (await readNamedUrl(
+          io,
+          'symphony-runtime',
+          NAMED_AUTHORITY_URLS['symphony-runtime'],
+          750
+        ));
       if (live.status !== 'ok') return live;
       if (
         !live.payload ||
@@ -691,6 +757,25 @@ export function createLiveShippingStateReaders(
       return { ...live, schema: 'symphony-runtime-state/v1' };
     },
     'symphony-task': async () => {
+      const remote = await readGemAuthority(io, 'symphony-task', 2500);
+      if (remote) {
+        if (remote.status !== 'ok') return remote;
+        const payload = remote.payload;
+        if (
+          !payload ||
+          !Array.isArray(payload.running) ||
+          !Array.isArray(payload.retrying) ||
+          !Array.isArray(payload.blocked)
+        ) {
+          return failedRead(
+            'symphony-task',
+            'unavailable',
+            'Official Symphony task receipt was malformed',
+            { errorCode: 'malformed' }
+          );
+        }
+        return remote;
+      }
       return failedRead(
         'symphony-task',
         'unavailable',
@@ -699,15 +784,29 @@ export function createLiveShippingStateReaders(
       );
     },
     'lease-guard-capacity': async () => {
-      const fleet = await readNamedJson(io, 'fleet-receipt');
+      const fleet =
+        (await readGemAuthority(io, 'lease-guard-capacity', 2500)) ??
+        (await readNamedJson(io, 'fleet-receipt'));
       const signals =
         fleet?.status === 'ok' &&
         fleet.payload &&
         isRecord(fleet.payload.signals)
           ? fleet.payload.signals
           : null;
-      if (fleet?.status === 'ok' && signals && isRecord(signals.lease)) {
-        const lease = signals.lease;
+      // The bridge serves the lease signal directly; the fleet receipt file
+      // nests it under signals.lease.
+      const fleetCapacityPayload =
+        fleet?.status === 'ok' &&
+        fleet.payload &&
+        isRecord(fleet.payload.capacity)
+          ? fleet.payload
+          : null;
+      const leasePayload =
+        signals && isRecord(signals.lease)
+          ? signals.lease
+          : fleetCapacityPayload;
+      if (fleet?.status === 'ok' && leasePayload) {
+        const lease = leasePayload;
         const capacity = isRecord(lease.capacity) ? lease.capacity : null;
         const observedAt = parseTimestamp(lease.observedAt);
         if (
@@ -756,6 +855,7 @@ export function createLiveShippingStateReaders(
       ),
     'fleet-receipt': async () => {
       const fleet =
+        (await readGemAuthority(io, 'fleet-receipt', 2500)) ??
         (await readNamedJson(io, 'fleet-receipt')) ??
         disconnectedRead('fleet-receipt', 'fleet receipt missing');
       if (fleet.status === 'ok' && fleet.sourceTimestamp == null) {
@@ -778,5 +878,7 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
     githubToken: overrides.githubToken,
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
+    gemAuthorityUrl: overrides.gemAuthorityUrl,
+    gemAuthorityToken: overrides.gemAuthorityToken,
   };
 }

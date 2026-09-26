@@ -30,6 +30,7 @@ import {
 import {
   createLiveShippingStateReaders,
   isAllowlistedAuthorityPath,
+  type LiveIo,
   NAMED_AUTHORITY_PATHS,
   readMergeQueue,
   readWorkflow,
@@ -1621,6 +1622,243 @@ describe('live GitHub shipping reader', () => {
       expect(read).toMatchObject({
         sourceId: 'production-controller',
         status: 'unavailable',
+      });
+    }
+  );
+});
+
+describe('Gem authority transport (JOV-5248 reopened repair)', () => {
+  function gemIo(
+    fetchMock: ReturnType<typeof vi.fn<LiveIo['fetch']>>,
+    extra: Partial<Parameters<typeof createLiveShippingStateReaders>[0]> = {}
+  ) {
+    return {
+      readFile: vi.fn(async () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }),
+      fetch: fetchMock,
+      gemAuthorityUrl: 'http://gem.tailnet:4043',
+      gemAuthorityToken: 'bridge-token',
+      ...extra,
+    };
+  }
+
+  it('reads Gem-resident authorities through the authenticated bridge', async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schema: 'symphony-runtime-state/v1',
+            generated_at: T0,
+            running: [],
+            retrying: [],
+            blocked: [],
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders(gemIo(fetchMock));
+    const read = await readers['symphony-runtime']();
+    expect(read).toMatchObject({
+      sourceId: 'symphony-runtime',
+      status: 'ok',
+      schema: 'symphony-runtime-state/v1',
+    });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe(
+      'http://gem.tailnet:4043/api/v1/shipping-authorities/symphony-runtime'
+    );
+    expect((init?.headers as Record<string, string>).authorization).toBe(
+      'Bearer bridge-token'
+    );
+  });
+
+  it('reports bridge auth failure as unauthorized without local fallback', async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(
+      async () => new Response('{}', { status: 401 })
+    );
+    const readFile = vi.fn(async () => {
+      throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+    });
+    const readers = createLiveShippingStateReaders(gemIo(fetchMock));
+    for (const sourceId of [
+      'symphony-runtime',
+      'symphony-task',
+      'lease-guard-capacity',
+      'fleet-receipt',
+    ] as const) {
+      expect((await readers[sourceId]()).status).toBe('unauthorized');
+    }
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('reports an unreachable bridge as disconnected', async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(async () => {
+      throw new Error('offline');
+    });
+    const readers = createLiveShippingStateReaders(gemIo(fetchMock));
+    expect((await readers['symphony-runtime']()).status).toBe('disconnected');
+  });
+
+  it('reads the symphony task receipt through the bridge', async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schema: 'symphony-workspace-revision/v1',
+            observedAt: T0,
+            running: [{ issue_identifier: 'JOV-5248', head: SHA }],
+            retrying: [],
+            blocked: [],
+            failed: [],
+            revisions: { 'JOV-5248': SHA },
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders(gemIo(fetchMock));
+    const read = await readers['symphony-task']();
+    expect(read).toMatchObject({
+      sourceId: 'symphony-task',
+      status: 'ok',
+      schema: 'symphony-workspace-revision/v1',
+    });
+    const projection = await publish({ 'symphony-task': read });
+    expect(projection.sources['symphony-task'].state).toBe('fresh');
+  });
+
+  it('reads lease-guard capacity from the bridge payload', async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schema: 'symphony-lease-guard-report/v1',
+            observedAt: T0,
+            capacity: { available: 2 },
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders(gemIo(fetchMock));
+    expect(await readers['lease-guard-capacity']()).toMatchObject({
+      status: 'ok',
+      payload: { capacity: { available: 2 } },
+    });
+  });
+});
+
+describe('repaired semantics (JOV-5248 reopened repair)', () => {
+  it('does not alias blocked work as terminal failures', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [
+            { issue_identifier: 'JOV-1' },
+            { issue_identifier: 'JOV-2' },
+          ],
+          failed: [{ issue_identifier: 'JOV-9' }],
+        }),
+      })
+    );
+    expect(projection.blocked).toEqual({ state: 'measured-nonzero', value: 2 });
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+    expect(projection.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+    expect(
+      projection.sources['symphony-runtime'].counts.terminalFailures
+    ).toEqual({ state: 'measured-nonzero', value: 1 });
+  });
+
+  it('keeps terminal failures not-measured when no authority reports them', async () => {
+    const projection = await publish(baseline());
+    expect(projection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+    expect(projection.blocked).toEqual({ state: 'measured-zero', value: 0 });
+  });
+
+  it('measures ship time only when start and end share the exact SHA', async () => {
+    const matched = await publish(
+      baseline({
+        'fleet-receipt': ok(
+          'fleet-receipt',
+          { state: 'GREEN', signals: { main: { sha: SHA } } },
+          {
+            sourceTimestamp: T0,
+            correlation: { sha: SHA },
+            measuredMeanings: { merged: false },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA, buildId: 'b1' },
+          {
+            sourceTimestamp: '2026-08-22T00:04:00.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+            measuredMeanings: { exactLiveBuild: true },
+          }
+        ),
+      })
+    );
+    expect(matched.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 240,
+    });
+  });
+
+  it.each([
+    {
+      label: 'mismatched SHAs',
+      startSha: SHA,
+      endSha: SHA_B,
+    },
+    {
+      label: 'a missing start identity',
+      startSha: null,
+      endSha: SHA,
+    },
+  ])(
+    'does not subtract unmatched source timestamps for $label',
+    async ({ startSha, endSha }) => {
+      const projection = await publish(
+        baseline({
+          'fleet-receipt': ok(
+            'fleet-receipt',
+            { state: 'GREEN' },
+            {
+              sourceTimestamp: T0,
+              correlation: { sha: startSha },
+            }
+          ),
+          'live-build-info': ok(
+            'live-build-info',
+            { commitSha: endSha },
+            {
+              sourceTimestamp: '2026-08-22T00:04:00.000Z',
+              correlation: { sha: endSha, buildId: 'b1' },
+            }
+          ),
+          'production-controller': ok(
+            'production-controller',
+            { conclusion: 'success' },
+            {
+              sourceTimestamp: '2026-08-22T00:03:00.000Z',
+              correlation: { sha: endSha, deploymentId: '2' },
+            }
+          ),
+        })
+      );
+      expect(projection.timeToShipSeconds).toEqual({
+        state: 'not-measured',
+        value: null,
       });
     }
   );
