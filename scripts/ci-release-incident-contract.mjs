@@ -140,7 +140,11 @@ export function validateIncidentLedger(ledger) {
       !/^(node|pnpm|pytest|test|\.\/)/.test(regression.command)
     )
       errors.push(`${id}: regression.command is required`);
-    requireExistingPath(regression?.path, `${id}: regression.path`, errors);
+    // Regressions owned by another repo (e.g. JovieInc/symphony-control) are checked there.
+    if (!regression?.repo || regression.repo === 'JovieInc/Jovie')
+      requireExistingPath(regression?.path, `${id}: regression.path`, errors);
+    else if (!nonEmptyString(regression.path))
+      errors.push(`${id}: regression.path is required`);
 
     if (!REQUIRED_STAGES.has(incident.ciStageOwner?.stage)) {
       errors.push(`${id}: ciStageOwner.stage is not a supported CI stage`);
