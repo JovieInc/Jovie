@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   affectsJovieTypecheck,
+  affectsWebTestTypecheck,
   CI_LANES,
   classifyChangedFile,
   classifyCiRepoLanes,
@@ -74,7 +75,9 @@ describe('JOV-5288 CI repo lanes', () => {
     ]);
     expect(plan.runJovieProduct).toBe(true);
     expect(plan.runSymphonyControl).toBe(true);
-    expect(plan.runJovieTypecheck).toBe(false);
+    // apps/web tests import scripts/*.mjs (allowJs), so JS changes preselect
+    // the typecheck job for the web test-graph ratchet.
+    expect(plan.runJovieTypecheck).toBe(true);
     expect(plan.runSummerOps).toBe(false);
     expect(plan.lanes).toEqual([
       CI_LANES.JOVIE_PRODUCT,
@@ -89,7 +92,9 @@ describe('JOV-5288 CI repo lanes', () => {
     ]);
     expect(plan.runJovieProduct).toBe(true);
     expect(plan.runSymphonyControl).toBe(true);
-    expect(plan.runJovieTypecheck).toBe(false);
+    // apps/web tests import scripts/*.mjs (allowJs), so JS changes preselect
+    // the typecheck job for the web test-graph ratchet.
+    expect(plan.runJovieTypecheck).toBe(true);
     expect(plan.runSummerOps).toBe(false);
     expect(plan.lanes).toEqual([
       CI_LANES.JOVIE_PRODUCT,
@@ -136,6 +141,22 @@ describe('JOV-5288 CI repo lanes', () => {
       classifyCiRepoLanes(['apps/ovie/scripts/routes.mjs']).runJovieTypecheck
     ).toBe(true);
     expect(classifyCiRepoLanes(['README.md']).runJovieTypecheck).toBe(false);
+  });
+
+  it('preselects typecheck for JS-only and baseline-only web test graph inputs', () => {
+    for (const path of [
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      'apps/web/scripts/lint-contrast-ratchet.mjs',
+      'apps/web/tests/e2e/vercel-protected-origin.cjs',
+      'apps/web/typecheck-tests-baseline.json',
+    ]) {
+      expect(affectsWebTestTypecheck(path), path).toBe(true);
+      expect(classifyCiRepoLanes([path]).runJovieTypecheck, path).toBe(true);
+    }
+    for (const path of ['docs/PR_FLOW.md', 'apps/web/app/globals.css']) {
+      expect(affectsWebTestTypecheck(path), path).toBe(false);
+      expect(classifyCiRepoLanes([path]).runJovieTypecheck, path).toBe(false);
+    }
   });
 
   it('keeps Jovie product files off Symphony and Summer/ops suites', () => {

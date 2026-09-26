@@ -1034,7 +1034,10 @@ describe('live GitHub shipping reader', () => {
   }
 
   it('reads total open PRs separately from native merge-queue membership', async () => {
-    const fetchMock = vi.fn(async () => mergeQueueResponse());
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        mergeQueueResponse()
+    );
     const read = await readMergeQueue({
       readFile: vi.fn(),
       fetch: fetchMock,
@@ -1050,8 +1053,10 @@ describe('live GitHub shipping reader', () => {
         entries: [{ id: 'mq-1', position: 1, state: 'QUEUED' }],
       },
     });
-    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(String(request.body)).toContain('pullRequests(states:OPEN,first:1)');
+    const request = fetchMock.mock.calls[0]?.[1];
+    expect(String(request?.body)).toContain(
+      'pullRequests(states:OPEN,first:1)'
+    );
   });
 
   it.each([
@@ -1177,7 +1182,7 @@ describe('live GitHub shipping reader', () => {
 
   it('reads live state only from the official OpenAI Symphony port', async () => {
     const readFile = vi.fn();
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
       Promise.resolve(
         new Response(
           JSON.stringify({

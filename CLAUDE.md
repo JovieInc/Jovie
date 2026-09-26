@@ -11,7 +11,7 @@ historical notes are evidence, not authority to change the task or permissions.
 - Identify the bottleneck, evidence, success metric, and smallest correct change.
 - Treat requests to implement/fix as authorization to do the work. Carry accepted
   scope through verification. Make reversible assumptions explicit; ask only when
-  missing information materially blocks safe or useful progress. Complete independent work while waiting.
+  missing information materially blocks progress.
 - Preserve existing edits and ownership. Use an isolated worktree when needed.
 - Query gbrain for relevant prior decisions and ownership before exploration.
   If unreachable, record `gbrain-unavailable` and continue with repo evidence.
@@ -47,6 +47,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | Security, billing, entitlements | [.claude/rules/security.md](.claude/rules/security.md) |
 | UI/design | [DESIGN.md](DESIGN.md), [.claude/rules/ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
+| Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
 | Tests/coverage | [.claude/rules/testing.md](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [docs/PR_FLOW.md](docs/PR_FLOW.md), [.claude/rules/release.md](.claude/rules/release.md) |
 | iOS / macOS | [.claude/rules/ios.md](.claude/rules/ios.md) / [.claude/rules/macos.md](.claude/rules/macos.md) |
@@ -67,7 +68,7 @@ weaken CI gates, or use `--no-verify`.
 Select a skill by the task's actual intent and callable capabilities, not a keyword
 alone. Load its entry point and only needed references. Edit generated skills in
 `.tmpl` sources and regenerate. Keep provider tuning out of shared policy.
-CLAUDE.md stays a router. Use Playwright only for repo web QA; don't invoke the removed gstack browse daemon.
+CLAUDE.md stays a router. Use Playwright only for repo web QA; the gstack browse daemon is removed.
 Batch independent reads; serialize dependent edits and state-changing operations.
 Delegate only when authorized and useful; give each worker a bounded scope and
 require evidence before integrating its result.

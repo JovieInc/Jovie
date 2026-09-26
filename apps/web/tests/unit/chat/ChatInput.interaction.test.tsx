@@ -146,6 +146,7 @@ function ControlledComposer(props: Partial<ComponentProps<typeof ChatInput>>) {
     <ChatInput
       onSubmit={vi.fn()}
       isLoading={false}
+      isSubmitting={false}
       {...props}
       value={value}
       onChange={setValue}

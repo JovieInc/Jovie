@@ -68,7 +68,7 @@ describe('post-onboarding side effects', () => {
     });
 
     schedulePostOnboardingWork(task);
-    await new Promise(resolve => queueMicrotask(resolve));
+    await new Promise<void>(resolve => queueMicrotask(resolve));
 
     expect(task).toHaveBeenCalledTimes(1);
   });
@@ -80,7 +80,7 @@ describe('post-onboarding side effects', () => {
     });
 
     schedulePostOnboardingWork(task);
-    await new Promise(resolve => queueMicrotask(resolve));
+    await new Promise<void>(resolve => queueMicrotask(resolve));
 
     expect(task).toHaveBeenCalledTimes(1);
   });

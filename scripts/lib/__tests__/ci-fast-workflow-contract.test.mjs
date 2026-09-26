@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  affectsWebTestTypecheck,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_PATHS,
@@ -27,8 +28,13 @@ import {
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  STRUCTURAL_PYTEST_FILES,
+  STRUCTURAL_PYTEST_SHARD_COMMANDS,
+  STRUCTURAL_PYTEST_SHARD_EXPRESSION,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   selectBillingCoverageCommands,
   selectLanes,
+  structuralLocks,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
@@ -69,17 +75,17 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
-  it.each([
-    { ci: 'true', available: false, suiteExit: 0, expected: 1 },
-    { ci: '', available: false, suiteExit: 0, expected: 0 },
-    { ci: 'true', available: true, suiteExit: 0, expected: 0 },
-    { ci: 'true', available: true, suiteExit: 37, expected: 37 },
-  ])('executes structural Python dependency policy %j', scenario => {
-    const command = CI_FAST_SOURCE.match(
-      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
-    )?.[1];
-    expect(command).toBeTruthy();
-    if (!command) throw new Error('missing structural Python command');
+  it.each(
+    STRUCTURAL_PYTHON_REGRESSION_COMMANDS.flatMap((command, index) =>
+      [
+        { ci: 'true', available: false, suiteExit: 0, expected: 1 },
+        { ci: '', available: false, suiteExit: 0, expected: 0 },
+        { ci: 'true', available: true, suiteExit: 0, expected: 0 },
+        { ci: 'true', available: true, suiteExit: 37, expected: 37 },
+      ].map(scenario => ({ ...scenario, index, command }))
+    )
+  )('executes structural Python dependency policy %j', scenario => {
+    const { command } = scenario;
     const root = mkdtempSync(join(tmpdir(), 'structural-python-policy-'));
     const calls = join(root, 'calls');
     try {
@@ -105,25 +111,37 @@ describe('ci-fast bounded parallel workflow', () => {
           POLICY_CALLS: calls,
           POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
           POLICY_SUITE_EXIT: String(scenario.suiteExit),
+          RUNNER_TEMP: tmpdir(),
         },
       });
-      expect(result.status, result.stderr).toBe(scenario.expected);
       const invoked = readFileSync(calls, 'utf8');
-      if (scenario.available) {
+      const pytestInvocation = invoked
+        .split('\n')
+        .find(call => call.startsWith('-m pytest '));
+      if (scenario.index === 0) {
+        // The coverage-gated command has no bare `-m pytest` step, so the
+        // stubbed suite exit never applies to it.
+        expect(result.status, result.stderr).toBe(
+          scenario.expected === 37 ? 0 : scenario.expected
+        );
+      } else {
+        expect(result.status, result.stderr).toBe(scenario.expected);
+      }
+      if (scenario.available && scenario.index === 0) {
         expect(invoked).toContain('-m coverage run --branch');
-        const pytestInvocation = invoked
-          .split('\n')
-          .find(call => call.startsWith('-m pytest '));
+        expect(pytestInvocation).toBeUndefined();
+      } else if (scenario.available) {
+        const shard = scenario.index === 1 ? 'a' : 'b';
+        const expression =
+          scenario.index === 1
+            ? STRUCTURAL_PYTEST_SHARD_EXPRESSION
+            : `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`;
         expect(pytestInvocation).toBe(
           [
-            '-m pytest --durations=20',
-            'scripts/tests/test_gh_retry.py',
-            'scripts/tests/test_vercel_prebuilt_deploy.py',
-            'scripts/tests/test_brand_scrub.py',
-            'scripts/tests/test_agent_workflow_hygiene.py',
-            'scripts/tests/test_runner_routing.py',
-            'scripts/tests/test_symphony_ui_pilot_runtime.py',
-            'scripts/tests/test_symphony_reconciler_runtime.py -v',
+            '-m pytest --durations=20 -v -p no:cacheprovider',
+            `--basetemp=${tmpdir()}/jovie-structural-pytest-${shard}`,
+            `-k ${expression}`,
+            ...STRUCTURAL_PYTEST_FILES,
           ].join(' ')
         );
       } else {
@@ -137,6 +155,66 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('partitions the structural pytest suite into exactly complementary shards', () => {
+    // The original single invocation ran these files once; the shards must
+    // select the identical files with complementary -k expressions so every
+    // collected test runs in exactly one shard (never zero, never twice).
+    expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_vercel_prebuilt_deploy.py',
+      'scripts/tests/test_brand_scrub.py',
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_symphony_ui_pilot_runtime.py',
+      'scripts/tests/test_symphony_reconciler_runtime.py',
+    ]);
+    const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
+      const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
+      return { command, keyword, files: files?.split(' ') };
+    });
+    expect(shards).toHaveLength(2);
+    expect(shards[0].keyword).toBe(STRUCTURAL_PYTEST_SHARD_EXPRESSION);
+    expect(shards[1].keyword).toBe(
+      `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`
+    );
+    for (const shard of shards) {
+      expect(shard.files).toEqual([...STRUCTURAL_PYTEST_FILES]);
+      expect(shard.command).toContain('--durations=20 -v');
+      // Shards overlap in the pool: no shared .pytest_cache or basetemp.
+      expect(shard.command).toContain('-p no:cacheprovider');
+      expect(structuralLocks(shard.command)).toEqual([]);
+    }
+    expect(
+      new Set(
+        shards.map(shard => /--basetemp="([^"]+)"/u.exec(shard.command)?.[1])
+      ).size
+    ).toBe(2);
+    // Both shards run in the operations structural lane, wrapped in the same
+    // hosted dependency policy as the other structural Python regressions.
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1)).toEqual(
+      STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command =>
+        expect.stringContaining(`then ${command}; elif`)
+      )
+    );
+  });
+
+  it('runs the latency invariant suite outside the V8-coverage node --test batch', () => {
+    // Coverage instrumentation made this in-process scanner ~6x slower
+    // (18s -> 118s locally) while contributing nothing to the batch's
+    // --test-coverage-include files. It must still run exactly once.
+    const segments = PACKAGE_JSON.scripts['invariants:check'].split(' && ');
+    const latency = 'scripts/invariants/latency-sensitive-execution.test.mjs';
+    const running = segments.filter(segment => segment.includes(latency));
+    expect(running).toEqual([`node --test ${latency}`]);
+    const coverageBatch = segments.find(segment =>
+      segment.includes(
+        '--test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs'
+      )
+    );
+    expect(coverageBatch).toBeDefined();
+    expect(coverageBatch).not.toContain(latency);
   });
 
   it('runs desktop release regressions with measured coverage for mac changes', () => {
@@ -470,6 +548,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'structural',
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
     expect(() =>
@@ -490,6 +569,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'files.some(file => affectsJovieTypecheck(file))'
     );
+  });
+
+  it('gates the web test typecheck ratchet on its compiled inputs', () => {
+    for (const file of [
+      'apps/web/tests/unit/chat/turns.test.ts',
+      'apps/web/lib/rate-limit/types.ts',
+      'apps/web/tsconfig.test.json',
+      'apps/web/typecheck-tests-baseline.json',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+    ]) {
+      expect(affectsWebTestTypecheck(file), file).toBe(true);
+    }
+    for (const file of ['docs/PR_FLOW.md', 'apps/web/app/globals.css']) {
+      expect(affectsWebTestTypecheck(file), file).toBe(false);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'files.some(file => affectsWebTestTypecheck(file))'
+    );
+    expect(LANE_GROUPS.typecheck).toContain('web-tests-typecheck');
   });
 
   it('preselects source-PR typecheck before dependency hydration', () => {
@@ -541,10 +639,14 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'skipped' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'skipped',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toContain(
-        'ci-path-changes preselection'
-      );
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toContain('ci-path-changes preselection');
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -690,8 +792,14 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'failure' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'failure',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toMatch(/pnpm.*not found/i);
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -885,6 +993,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'shadcn-lint-contracts',
       'typecheck',
+      'web-tests-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -899,6 +1008,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -916,6 +1026,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts':
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
+      'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',

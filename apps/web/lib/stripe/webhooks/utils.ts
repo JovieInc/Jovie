@@ -157,7 +157,9 @@ export function isFullyRefundedCharge(
  */
 export function isLatestSubscriptionInvoice(
   invoice: Pick<Stripe.Invoice, 'id'>,
-  subscription: Pick<Stripe.Subscription, 'latest_invoice'>
+  subscription: {
+    readonly latest_invoice: string | Pick<Stripe.Invoice, 'id'> | null;
+  }
 ): boolean {
   const latestInvoiceId = extractStripeObjectId(subscription.latest_invoice);
   return latestInvoiceId !== null && latestInvoiceId === invoice.id;

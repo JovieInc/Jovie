@@ -198,9 +198,18 @@ describe('deriveOvieCompanyOverview', () => {
   ])(
     'surfaces execution exceptions without counting them as ships',
     testCase => {
-      const metrics = buildMetrics();
-      metrics.aiOps.counts.blocked = testCase.blocked;
-      metrics.aiOps.counts.failed = testCase.failed;
+      const base = buildMetrics();
+      const metrics: HudMetrics = {
+        ...base,
+        aiOps: {
+          ...base.aiOps,
+          counts: {
+            ...base.aiOps.counts,
+            blocked: testCase.blocked,
+            failed: testCase.failed,
+          },
+        },
+      };
 
       const shipping = deriveOvieCompanyOverview(metrics, NOW).metrics[2];
       expect(shipping.state).toBe('disconnected');
