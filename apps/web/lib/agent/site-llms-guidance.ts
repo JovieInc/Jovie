@@ -24,7 +24,7 @@ import {
  */
 function buildFeatureAvailabilityLines(): string {
   const lines = Object.keys(ROUTE_CAPABILITY_BINDINGS)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map(path => {
       const record = getRouteCapability(path);
       if (!record || !isPublicationPermitted(record)) return null;
