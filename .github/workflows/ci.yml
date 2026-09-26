@@ -4607,6 +4607,14 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
+          # Isolated forks start a fresh process per test file, so each jsdom
+          # file re-parses jsdom's ~1,000 modules (the jsdom environment is
+          # ~35% of shard worker time). Vitest flushes each fork's V8 compile
+          # cache on stop, so later forks load bytecode instead of re-parsing.
+          # Entries failing Node's source-hash check recompile, and Vitest
+          # drops the cache itself under v8 coverage. The quarantine and
+          # packages/ui steps below reuse this per-job directory.
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: |
@@ -4648,6 +4656,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/10'
         continue-on-error: true
         env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
@@ -4676,6 +4685,8 @@ jobs:
       - name: Run packages/ui unit tests
         # Not sharded: one shard runs it, not all ten. Its cost is preloaded
         # on 4/10 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/10'
         run: pnpm turbo test --filter=@jovie/ui
 

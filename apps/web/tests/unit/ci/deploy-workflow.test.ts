@@ -2255,6 +2255,21 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
     );
+    // Each isolated fork re-parses the DOM environment and other externals;
+    // the shared V8 compile cache lets later forks load bytecode instead.
+    const compileCacheEnv =
+      'NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache';
+    for (const stepName of [
+      'Run unit tests',
+      'Run quarantined unit tests (retries)',
+      'Run packages/ui unit tests',
+    ]) {
+      const start = unitJob.indexOf(`- name: ${stepName}\n`);
+      expect(start, stepName).toBeGreaterThan(-1);
+      const next = unitJob.indexOf('\n      - ', start + 1);
+      const step = unitJob.slice(start, next === -1 ? undefined : next);
+      expect(step, stepName).toContain(compileCacheEnv);
+    }
   });
 });
 
