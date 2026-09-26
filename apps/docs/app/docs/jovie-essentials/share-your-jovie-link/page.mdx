@@ -1,11 +1,14 @@
 ---
 id: share-your-jovie-link
 title: Share your Jovie link
-description: "Share your Jovie link: copy your public jov.ie profile URL from the profile action menu."
-documentType: landing
+description: "Copy your public jov.ie profile URL from the dashboard profile menu and share it anywhere."
+documentType: guide
 category: jovie-essentials
-productBacked: false
-status: published
+productBacked: true
+featureId: public-profile-pages
+additionalFeatureIds: []
+productRoute: /app
+status: uncertified
 lastVerifiedAt: null
 verifiedBy: unverified
 keywords:
@@ -13,17 +16,95 @@ keywords:
   - copy profile url
   - jovie link
 redirectAliases: []
-visualProofRefs: []
-uiLabels: []
+visualProofRefs:
+  - proof/share-your-jovie-link-copy.png
+uiLabels:
+  - Copy Link
+  - Open Profile
+  - Copied
+  - Failed to copy
+  - View as Visitor
 productSourceRefs:
-  - docs/help-center/MIGRATION_MAP.md
-launchPath: false
+  - apps/web/components/features/dashboard/dashboard-nav/ProfileMenuActions.tsx
+  - apps/web/app/[username]/page.tsx
+launchPath: true
+searchable: false
 ---
+
+<HelpArticle id="share-your-jovie-link">
 
 # Share your Jovie link
 
-Your public profile lives at `jov.ie/yourname`.
+<HelpOutcome>
+Copy your public profile URL — `jov.ie/yourname` — and share it with fans.
+</HelpOutcome>
 
-- Open the profile action menu in your dashboard and use `Copy Link`; `Open Profile` previews the live page.
-- Paste the URL anywhere: socials, bios, emails, or messages.
-- To share a specific release instead, use the release-level `Copy Link` covered under [Releases and smart links](/docs/build-your-presence/releases-and-smart-links).
+<HelpPrerequisites>
+
+- A published profile. If yours is not live yet, [publish your profile](/docs/jovie-essentials/publish-your-profile) first.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Open the profile menu">
+In your dashboard sidebar, hover over or open your profile entry to reveal
+the action menu.
+</HelpStep>
+
+<HelpStep title="Copy your link">
+Choose **Copy Link**. Jovie copies your full public URL
+(`https://jov.ie/yourname`) and confirms with a **Copied** notification. If
+copying fails, a **Failed to copy** notification appears instead — try again
+or use the address bar method below.
+
+<HelpScreenshot
+  src="/proof/share-your-jovie-link-copy.png"
+  alt="The dashboard profile action menu with Copy Link selected and the Copied confirmation"
+  caption="Copy Link in the profile action menu copies your public URL."
+/>
+</HelpStep>
+
+<HelpStep title="Check what recipients see">
+Choose **Open Profile** in the same menu to open your live page in a new tab,
+exactly as fans see it. On mobile the same menu is available from your
+profile entry in the sidebar.
+</HelpStep>
+
+<HelpStep title="Share it">
+Paste the URL anywhere: social bios, messages, emails, or a link-in-bio slot.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Anyone with the link sees your public profile. To share one release instead,
+use the release-level link covered in
+[Add a release or create its link](/docs/build-your-presence/releases-and-smart-links/add-release-or-smart-link).
+
+<HelpTroubleshooting>
+
+### The copied link opens the wrong or an old page
+
+Your URL follows your username. If you recently changed it, copy the link
+again — the menu always copies the current URL. Profiles you no longer own at
+old handles are deactivated automatically.
+
+### Copy Link reports a failure
+
+Browser clipboard permission can block the copy. Allow clipboard access and
+retry, or open the profile with **Open Profile** and copy the address bar.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides
+  articleId="share-your-jovie-link"
+  ids={["publish-your-profile", "edit-profile", "add-release-or-smart-link"]}
+/>
+
+<HelpContactPanel />
+
+<HelpFeedback articleId="share-your-jovie-link" />
+
+</HelpArticle>

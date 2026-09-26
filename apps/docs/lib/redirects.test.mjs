@@ -24,11 +24,11 @@ const MIGRATED_URLS = [
   ],
   [
     '/docs/self-serve-guide/set-up-profile',
-    '/docs/build-your-presence/profile-and-identity/edit-profile',
+    '/docs/build-your-presence/profile-and-identity',
   ],
   [
     '/docs/self-serve-guide/share-first-link',
-    '/docs/build-your-presence/releases-and-smart-links/add-release-or-smart-link',
+    '/docs/build-your-presence/releases-and-smart-links',
   ],
   [
     '/docs/self-serve-guide/set-up-tipping',

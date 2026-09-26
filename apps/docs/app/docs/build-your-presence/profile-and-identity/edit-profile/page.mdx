@@ -1,30 +1,140 @@
 ---
 id: edit-profile
 title: Edit your name, bio, images, and links
-description: Edit your Jovie profile name, bio, images, and links from the Artist Profile section in settings.
-documentType: landing
+description: Change your display name, username, photo, location, and career highlights in Settings, then preview the public result.
+documentType: guide
 category: build-your-presence
-productBacked: false
-status: published
+productBacked: true
+featureId: artist-bio-social-links
+additionalFeatureIds: []
+productRoute: /app/settings/artist-profile
+status: uncertified
 lastVerifiedAt: null
 verifiedBy: unverified
 keywords:
   - edit profile
   - change photo
-  - bio images links
-redirectAliases:
-  - /docs/self-serve-guide/set-up-profile
-visualProofRefs: []
-uiLabels: []
+  - change username
+  - artist bio
+# Legacy alias /docs/self-serve-guide/set-up-profile temporarily lands on the
+# profile-and-identity category page until this guide is human-certified.
+redirectAliases: []
+visualProofRefs:
+  - proof/edit-profile-artist-settings.png
+uiLabels:
+  - Settings
+  - Artist Profile
+  - Artist
+  - Profile
+  - Profile picture
+  - Display name
+  - Username
+  - Current location
+  - Hometown
+  - Career highlights
+  - View as Visitor
+  - Links, music & more
+  - Saving…
+  - Saved
 productSourceRefs:
-  - docs/help-center/MIGRATION_MAP.md
-launchPath: false
+  - apps/web/app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx
+  - apps/web/components/features/dashboard/organisms/settings-profile-section/SettingsProfileSection.tsx
+  - apps/web/components/features/dashboard/organisms/settings-profile-section/useSettingsProfile.ts
+launchPath: true
+searchable: false
 ---
+
+<HelpArticle id="edit-profile">
 
 # Edit your name, bio, images, and links
 
-Profile editing lives at **Settings → Artist Profile** (`/app/settings/artist-profile`).
+<HelpOutcome>
+Update the identity details fans see on your public Jovie profile from the
+Artist Profile section of Settings.
+</HelpOutcome>
 
-- The sidebar section is `Artist Profile`; the page is `Artist` with a `Profile` panel.
-- Use `Links, music & more` to manage the links shown on your public page.
-- Use `View as Visitor` to preview the public result before sharing.
+<HelpPrerequisites>
+
+- A Jovie account with a claimed profile.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Open Artist Profile">
+From your dashboard, open **Settings** and choose **Artist Profile**
+(`/app/settings/artist-profile`). The page opens on the **Artist** section
+with the **Profile** panel.
+</HelpStep>
+
+<HelpStep title="Update your photo and identity fields">
+Select **Profile picture** to upload a new image — JPEG, PNG, WebP, AVIF,
+HEIC, or TIFF up to 25 MB. Jovie profiles look best at 512×512 or higher; a
+low-resolution photo shows a warning with its current dimensions. Edit
+**Display name**, **Username**, **Current location**, **Hometown**, and
+**Career highlights** (up to 2,000 characters) in place. Your username sets
+your profile URL, shown next to the field.
+</HelpStep>
+
+<HelpStep title="Let each field save">
+Fields save automatically when you leave them. The panel header shows
+**Saving…** while a change is in flight and **Saved** when it completes. If a
+field cannot be saved, an error notification explains why.
+
+<HelpScreenshot
+  src="/proof/edit-profile-artist-settings.png"
+  alt="The Artist section in Settings showing the Profile panel with Display name, Username, location fields, and a Saved status"
+  caption="The Profile panel in Settings → Artist Profile after edits save."
+/>
+</HelpStep>
+
+<HelpStep title="Manage links and extras">
+Use **Links, music &amp; more** to manage the social links, music, tips, and
+about info shown on your public page.
+</HelpStep>
+
+<HelpStep title="Preview the public page">
+Select **View as Visitor** at the top of the **Artist** section to open your
+live profile at `jov.ie/yourname` in a new tab.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Saved changes appear on your public profile at `jov.ie/yourname`. Some
+details — like your photo and display name — may have been prefilled from a
+connected music account; your edits in **Profile** take precedence. When your
+profile looks right, [share your Jovie link](/docs/jovie-essentials/share-your-jovie-link).
+
+<HelpTroubleshooting>
+
+### A field will not save
+
+**Display name** and **Username** are required — empty values are not saved.
+**Hometown** must differ from **Current location**; fix the values and leave
+the field again to retry the save.
+
+### The photo upload fails
+
+Check that the file is a supported image type (JPEG, PNG, WebP, AVIF, HEIC,
+or TIFF) and under 25 MB, then try again. If the failure repeats, contact
+support.
+
+### Your changes do not show on the public page
+
+Reload `jov.ie/yourname`. The public page is cached briefly, so a fresh save
+can take a moment to appear.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides
+  articleId="edit-profile"
+  ids={["publish-your-profile", "share-your-jovie-link", "add-release-or-smart-link"]}
+/>
+
+<HelpContactPanel />
+
+<HelpFeedback articleId="edit-profile" />
+
+</HelpArticle>

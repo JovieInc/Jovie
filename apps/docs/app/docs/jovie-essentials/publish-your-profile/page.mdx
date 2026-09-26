@@ -1,11 +1,14 @@
 ---
 id: publish-your-profile
 title: Publish your profile
-description: "Publish your Jovie profile: publication follows claiming and completing your profile, not a separate toggle."
-documentType: landing
+description: "Take your Jovie profile live: publication follows claiming your profile and completing onboarding, not a separate toggle."
+documentType: guide
 category: jovie-essentials
-productBacked: false
-status: published
+productBacked: true
+featureId: public-profile-pages
+additionalFeatureIds: []
+productRoute: /start
+status: uncertified
 lastVerifiedAt: null
 verifiedBy: unverified
 keywords:
@@ -13,17 +16,93 @@ keywords:
   - publish profile
   - go live
 redirectAliases: []
-visualProofRefs: []
-uiLabels: []
+visualProofRefs:
+  - proof/publish-your-profile-live.png
+uiLabels:
+  - Settings
+  - Find yourself
+  - Claim Profile
+  - View as Visitor
 productSourceRefs:
-  - docs/help-center/MIGRATION_MAP.md
-launchPath: false
+  - apps/web/app/onboarding/actions/helpers.ts
+  - apps/web/app/onboarding/actions/profile-setup.ts
+  - apps/web/app/[username]/_lib/public-profile-loader.ts
+launchPath: true
+searchable: false
 ---
+
+<HelpArticle id="publish-your-profile">
 
 # Publish your profile
 
-A Jovie profile goes public once it is claimed and complete enough to publish — there is no standalone `Public` toggle.
+<HelpOutcome>
+Make your Jovie profile publicly available at `jov.ie/yourname`.
+</HelpOutcome>
 
-- Finish onboarding at [jov.ie/start](https://jov.ie/start) and complete the required profile fields.
-- Once publishable, your profile is live at `jov.ie/yourname`.
-- If something blocks publication, complete the remaining onboarding steps first, then check [troubleshooting](/docs/manage-jovie/troubleshooting).
+<HelpPrerequisites>
+
+- A Jovie account.
+- A profile with a username and a display name.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Claim or create your profile">
+Start at [jov.ie/start](https://jov.ie/start) and use **Find yourself** to
+claim an existing profile with **Claim Profile**, or sign up and create a new
+one. Claiming a profile marks it public — there is no separate `Public`
+toggle to find.
+</HelpStep>
+
+<HelpStep title="Finish onboarding">
+Complete the onboarding steps through to the end. A profile becomes
+publishable once it has a username, a display name, and completed onboarding.
+</HelpStep>
+
+<HelpStep title="Verify the live page">
+Open `jov.ie/yourname` in a private or signed-out browser window. If your
+profile loads, it is published. You can also use **View as Visitor** from
+**Settings → Artist Profile** to open the same page.
+
+<HelpScreenshot
+  src="/proof/publish-your-profile-live.png"
+  alt="A public Jovie profile loading at jov.ie/yourname in a signed-out browser window"
+  caption="The published profile viewed like a visitor sees it."
+/>
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Your profile stays live at `jov.ie/yourname` and updates as you edit it.
+Next, [share your Jovie link](/docs/jovie-essentials/share-your-jovie-link)
+or [add a release](/docs/build-your-presence/releases-and-smart-links/add-release-or-smart-link)
+so fans have something to listen to.
+
+<HelpTroubleshooting>
+
+### Your profile URL shows a not-found page
+
+The profile is not publishable yet. Return to `/start` or your dashboard and
+finish any remaining onboarding steps, then confirm your profile has both a
+username and a display name under **Settings → Artist Profile**.
+
+### You claimed a profile but cannot edit it
+
+Make sure you are signed in with the same account you used to claim it. If
+the problem continues, contact support.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides
+  articleId="publish-your-profile"
+  ids={["edit-profile", "share-your-jovie-link", "add-release-or-smart-link"]}
+/>
+
+<HelpContactPanel />
+
+<HelpFeedback articleId="publish-your-profile" />
+
+</HelpArticle>

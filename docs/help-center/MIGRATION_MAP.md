@@ -484,3 +484,17 @@ default.
   semantic query timed out. Recorded as `gbrain-unavailable` /
   `context-no-results`; mutable product claims were verified from current
   tracked source instead.
+
+## Interim redirect destinations for uncertified guides (2026-09-26, JOV-5902)
+
+Until `edit-profile` and `add-release-or-smart-link` receive human
+certification, their locked legacy sources redirect to the published category
+landings, per the policy above that uncertified detail pages resolve to
+category landings:
+
+- `/docs/self-serve-guide/set-up-profile` → `/docs/build-your-presence/profile-and-identity`
+- `/docs/self-serve-guide/share-first-link` → `/docs/build-your-presence/releases-and-smart-links`
+
+When each guide is certified, move its `redirectAliases` entry from the
+landing back to the guide and restore the locked destination in
+`apps/docs/lib/redirects.test.mjs`.

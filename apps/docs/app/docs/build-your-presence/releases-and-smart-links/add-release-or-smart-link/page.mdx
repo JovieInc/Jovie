@@ -1,29 +1,130 @@
 ---
 id: add-release-or-smart-link
 title: Add a release or create its link
-description: Add a release to Jovie in Library and copy its smart link to share with fans.
-documentType: landing
+description: Add a release to your Jovie library by connecting a music account or creating it manually, then copy its smart link.
+documentType: guide
 category: build-your-presence
-productBacked: false
-status: published
+productBacked: true
+featureId: auto-sync-from-spotify
+additionalFeatureIds:
+  - auto-dsp-detection-linking
+  - manual-release-creation
+  - smart-link-editing-and-customization
+productRoute: /app/library
+status: uncertified
 lastVerifiedAt: null
 verifiedBy: unverified
 keywords:
   - add release
   - smart link
   - missing release
-redirectAliases:
-  - /docs/self-serve-guide/share-first-link
-visualProofRefs: []
-uiLabels: []
+# Legacy alias /docs/self-serve-guide/share-first-link temporarily lands on the
+# releases-and-smart-links category page until this guide is human-certified.
+redirectAliases: []
+visualProofRefs:
+  - proof/add-release-or-smart-link-library.png
+uiLabels:
+  - Library
+  - Releases
+  - Connect Spotify
+  - Sync from Spotify
+  - New release
+  - Add release
+  - Create Release
+  - Title
+  - Release Type
+  - Release Date
+  - Reveal Date
+  - Genres
+  - Explicit
 productSourceRefs:
-  - docs/help-center/MIGRATION_MAP.md
-launchPath: false
+  - apps/web/app/app/(shell)/library/LibraryPageClient.tsx
+  - apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx
+  - apps/web/components/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar.tsx
+  - apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx
+launchPath: true
+searchable: false
 ---
+
+<HelpArticle id="add-release-or-smart-link">
 
 # Add a release or create its link
 
-Manage releases from **Library → Releases** (`/app/library?view=releases`).
+<HelpOutcome>
+Get a release into your Jovie library and copy the smart link fans use to
+listen on their own service.
+</HelpOutcome>
 
-- Import releases by connecting Spotify, Apple Music, or YouTube, or add a release manually in Library.
-- Open a release and use `Copy Link` to copy its smart link for sharing.
+<HelpPrerequisites>
+
+- A Jovie account with a claimed profile.
+- For manual creation, the manual release capability on your plan.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Open Library → Releases">
+From your dashboard, open **Library** and select the **Releases** view
+(`/app/library?view=releases`).
+</HelpStep>
+
+<HelpStep title="Import from a music account">
+With no releases yet, choose **Connect Spotify** to import your catalog.
+Once Spotify is connected, the header shows **Sync from Spotify** to pull in
+new releases. Jovie matches each release to other music services
+automatically.
+</HelpStep>
+
+<HelpStep title="Or add the release manually">
+Choose **New release** in the Releases header to open the **Add release**
+panel. Enter the **Title** (required), **Release Type**, **Release Date**,
+and optional **Reveal Date**, **Genres**, **Explicit** marker, and artwork —
+then select **Create Release**.
+
+<HelpScreenshot
+  src="/proof/add-release-or-smart-link-library.png"
+  alt="The Releases view in Library with the New release action and the Add release panel showing Title, Release Type, and Release Date"
+  caption="The Add release panel in Library → Releases."
+/>
+</HelpStep>
+
+<HelpStep title="Copy the smart link">
+Open the release in Library and use its copy-link control to copy the smart
+link — with or without UTM tracking. The public release page lives at
+`jov.ie/yourname/release-name` and lists each available music service.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+The release appears in **Releases** and on your public profile. Share the
+smart link anywhere — fans pick their own service on the release page.
+
+<HelpTroubleshooting>
+
+### A release is missing from Library
+
+Select **Sync from Spotify** to refresh the import. If the release still does
+not appear — for example it is not on Spotify yet — create it with **New
+release** instead.
+
+### A smart link points at the wrong service or page
+
+Open the release in Library and check its details and linked services. Fix
+the release data and copy the link again; if a matched destination is wrong,
+contact support to correct it.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides
+  articleId="add-release-or-smart-link"
+  ids={["share-your-jovie-link", "edit-profile", "publish-your-profile"]}
+/>
+
+<HelpContactPanel />
+
+<HelpFeedback articleId="add-release-or-smart-link" />
+
+</HelpArticle>
