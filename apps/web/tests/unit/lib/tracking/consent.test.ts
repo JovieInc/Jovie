@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearConsentState,
   getConsentState,
   getOrCreateSessionId,
   isDNTEnabled,
   isGPCEnabled,
+  isMarketingAllowed,
   isTrackingAllowed,
   setConsentState,
 } from '@/lib/tracking/consent';
@@ -135,6 +136,116 @@ describe('tracking consent', () => {
       setCookie('jv_tracking_consent=accepted');
       expect(getConsentState()).toBe('rejected');
     });
+  });
+
+  describe('isMarketingAllowed', () => {
+    const affirmativeConsent = JSON.stringify({
+      essential: true,
+      analytics: false,
+      marketing: true,
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('preserves the default allow behavior where consent is not required', () => {
+      expect(isMarketingAllowed()).toBe(true);
+    });
+
+    it('blocks marketing until affirmative consent in a required region', () => {
+      setCookie('jv_cc_required=1');
+
+      expect(isMarketingAllowed()).toBe(false);
+    });
+
+    it('allows marketing after a valid affirmative choice in a required region', () => {
+      setCookie('jv_cc_required=1');
+      localStorage.setItem('jv_cc', affirmativeConsent);
+
+      expect(isMarketingAllowed()).toBe(true);
+    });
+
+    it('blocks an explicit marketing rejection in a required region', () => {
+      setCookie('jv_cc_required=1');
+      localStorage.setItem(
+        'jv_cc',
+        JSON.stringify({ essential: true, analytics: true, marketing: false })
+      );
+
+      expect(isMarketingAllowed()).toBe(false);
+    });
+
+    it.each([
+      ['malformed JSON', '{'],
+      ['null', 'null'],
+      ['array', '[]'],
+      [
+        'missing a consent category',
+        JSON.stringify({ essential: true, marketing: true }),
+      ],
+      [
+        'non-boolean marketing choice',
+        JSON.stringify({ essential: true, analytics: true, marketing: 'yes' }),
+      ],
+    ])('blocks %s in a required region', (_description, rawConsent) => {
+      setCookie('jv_cc_required=1');
+      localStorage.setItem('jv_cc', rawConsent);
+
+      expect(isMarketingAllowed()).toBe(false);
+    });
+
+    it('blocks when consent storage throws in a required region', () => {
+      setCookie('jv_cc_required=1');
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(key => {
+        if (key === 'jv_cc') throw new Error('storage unavailable');
+        return null;
+      });
+
+      expect(isMarketingAllowed()).toBe(false);
+    });
+
+    it('preserves the non-required-region default for malformed consent data', () => {
+      localStorage.setItem('jv_cc', '{');
+
+      expect(isMarketingAllowed()).toBe(true);
+    });
+
+    it.each([
+      [
+        'GPC',
+        () => {
+          Object.defineProperty(navigator, 'globalPrivacyControl', {
+            configurable: true,
+            value: true,
+          });
+        },
+      ],
+      [
+        'DNT',
+        () => {
+          Object.defineProperty(navigator, 'doNotTrack', {
+            configurable: true,
+            value: '1',
+          });
+        },
+      ],
+      [
+        'legacy rejection',
+        () => {
+          localStorage.setItem('jovie_tracking_consent', 'rejected');
+        },
+      ],
+    ])(
+      'still blocks affirmative marketing consent when %s applies',
+      (_signal, applySignal) => {
+        setCookie('jv_cc_required=1');
+        localStorage.setItem('jv_cc', affirmativeConsent);
+        applySignal();
+
+        expect(isMarketingAllowed()).toBe(false);
+      }
+    );
   });
 
   describe('isTrackingAllowed', () => {
