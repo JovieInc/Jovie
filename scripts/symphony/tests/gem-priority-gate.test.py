@@ -3961,8 +3961,14 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_refresh_is_event_driven_without_homemade_symphony_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-        self.assertNotIn("schedule:", content)
-        self.assertNotIn("cron:", content)
+        # JOV-5467: the only permitted schedule is the hourly classify-only
+        # missed-event pass; it can never reach the refresh or assess jobs.
+        self.assertNotIn("gate-next", content)
+        self.assertNotIn("admit-next", content)
+        self.assertIn("github.event_name != 'schedule'", content)
+        self.assertIn("github.event_name == 'schedule'", content)
+        self.assertIn("intake-readiness", content)
+        self.assertIn("mutations == 0", content)
         self.assertIn("pull_request_target:", content)
         self.assertIn("workflow_run:", content)
         self.assertIn(

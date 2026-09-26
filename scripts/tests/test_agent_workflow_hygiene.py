@@ -1638,7 +1638,10 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
-    assert "schedule:" not in trigger
+    # JOV-5467: the hourly schedule is a classify-only missed-event pass owned
+    # by the `classify` job; the refresh job itself stays schedule-free.
+    assert "schedule:" in trigger
+    assert "github.event_name != 'schedule'" in block
     assert "workflows: [CI, Production Controller]" in trigger
     assert "opened" in trigger
     assert "edited" in trigger
@@ -1712,6 +1715,23 @@ def test_one_workflow_owns_automatic_issue_admission() -> None:
     assert workflow.count("concurrency:") == 1
     assert "group: fleet-gate-event-refresh" in workflow
     assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_scheduled_intake_pass_classifies_only_and_cannot_admit() -> None:
+    """The hourly missed-event pass may classify but never mutate admission."""
+    block = _job_block("fleet-gate-refresh.yml", "classify")
+    assert "github.event_name == 'schedule'" in block
+    assert "intake-readiness" in block
+    for forbidden in (
+        "triage-event-assess",
+        "remediate",
+        "reconcileIssues",
+        "api/v1/refresh",
+        "gate-next",
+        "admit-next",
+    ):
+        assert forbidden not in block, forbidden
+    assert "mutations == 0" in block
 
 
 def test_symphony_wake_requires_verified_admitted_receipt() -> None:
