@@ -97,6 +97,7 @@ UNIT
   systemctl --user enable --now jovie-lanes.timer
   if [ "${LANES_HUD:-0}" = "1" ]; then
     systemctl --user enable jovie-hud.service
+    touch "$state/hud.expected"   # the doctor raises hud-stale when the console stops updating
   fi
 fi
 echo "lanes installed: $(readlink "$state/current")"
