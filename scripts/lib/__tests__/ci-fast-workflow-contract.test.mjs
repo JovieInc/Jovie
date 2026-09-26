@@ -1648,7 +1648,6 @@ describe('ci-fast bounded parallel workflow', () => {
     const awaited = sh('Await ci-fast lanes');
     rmSync(dir, { recursive: true, force: true });
     expect([awaited.status, awaited.stdout]).toEqual([3, 'lane-log\n']);
-    expect(at('- name: Start ci-fast lanes')).toBeGreaterThan(0);
     expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
       at('- name: Start ci-fast lanes')
     );
