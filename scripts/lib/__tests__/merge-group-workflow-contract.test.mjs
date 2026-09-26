@@ -520,6 +520,16 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('runs unsharded quarantine retries in exactly one unit shard', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const step = units.slice(
+      units.indexOf('- name: Run quarantined unit tests (retries)'),
+      units.indexOf('- name: Run Ovie route')
+    );
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).not.toContain('--shard');
+  });
+
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');

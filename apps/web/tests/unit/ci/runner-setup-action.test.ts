@@ -84,7 +84,7 @@ describe('self-hosted runner setup action', () => {
     expect(setupNodeStep).toContain('uses: actions/setup-node@');
     expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
     expect(setupNodeStep).toContain(
-      "runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
+      "runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' &&"
     );
     expect(setupNodeStep).toContain(
       "cache-dependency-path: '**/pnpm-lock.yaml'"

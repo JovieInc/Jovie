@@ -4513,7 +4513,8 @@ jobs:
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction" $OUTPUT_FLAG
           fi
       - name: Run quarantined unit tests (retries)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        # Unsharded: one shard (median-shortest) runs it, not all ten (~12s each).
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/10'
         continue-on-error: true
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
