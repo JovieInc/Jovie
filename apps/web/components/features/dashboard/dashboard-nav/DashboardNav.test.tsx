@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +23,19 @@ vi.mock('next/link', () => ({
     return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
   }),
 }));
+
+describe('Linear-scale density (founder lock 2026-09-25)', () => {
+  it('gives the nav sections and threads block the wider pt-5 top gap', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardNav.tsx'),
+      'utf8'
+    );
+    expect(source).not.toContain("SidebarGroupContent className='pb-2 pt-4'");
+    expect(source).toContain("SidebarGroupContent className='pb-2 pt-5'");
+    expect(source).not.toContain("<div className='pt-4'>");
+    expect(source).toContain("<div className='pt-5'>");
+  });
+});
 
 describe('DashboardNav route warming', () => {
   afterEach(() => {
