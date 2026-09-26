@@ -21,8 +21,88 @@ import {
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { UnclaimedIdentityEnrichmentReceipt } from '@/lib/profile/unclaimed-artist-profile';
 import type { Contact } from '@/types';
 import { AlgorithmHealthPanel } from './AlgorithmHealthPanel';
+
+const SOURCE_LABELS = { musicfetch: 'MusicFetch', musicbrainz: 'MusicBrainz' };
+const SOURCE_STATUS_LABELS = {
+  verified: 'Verified',
+  not_found: 'Not found',
+  not_checked: 'Not checked',
+};
+
+function EnrichmentRow({
+  label,
+  value,
+  warning = false,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly warning?: boolean;
+}) {
+  return (
+    <div className='flex items-center justify-between gap-2 text-xs leading-[18px]'>
+      <span className='text-secondary-token'>{label}</span>
+      <span
+        className={
+          warning
+            ? 'font-medium text-warning'
+            : 'font-medium text-primary-token'
+        }
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** JOV-6529: receipt states so an empty Social pane is not ambiguous. */
+function IdentityEnrichmentPanel({
+  receipt,
+}: {
+  readonly receipt: UnclaimedIdentityEnrichmentReceipt | null | undefined;
+}) {
+  const sources = receipt?.sources ?? {
+    musicfetch: 'not_checked' as const,
+    musicbrainz: 'not_checked' as const,
+  };
+
+  return (
+    <section
+      className='flex flex-col gap-1.5 border-t border-subtle px-1 pt-3'
+      data-testid='identity-enrichment-panel'
+    >
+      <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        Identity enrichment
+      </p>
+      <EnrichmentRow
+        label='Status'
+        value={receipt ? receipt.status : 'not_checked'}
+      />
+      <EnrichmentRow
+        label='Share Readiness'
+        value={receipt?.shareReady ? 'Share-ready' : 'Not ready — low evidence'}
+        warning={!receipt?.shareReady}
+      />
+      {Object.entries(sources).map(([source, status]) => (
+        <EnrichmentRow
+          key={source}
+          label={SOURCE_LABELS[source as keyof typeof SOURCE_LABELS]}
+          value={SOURCE_STATUS_LABELS[status]}
+        />
+      ))}
+      {(receipt?.conflicts ?? []).map(conflict => (
+        <EnrichmentRow
+          key={conflict.platform}
+          label={`${conflict.platform} destinations`}
+          value={`Conflicted (${conflict.urls.length})`}
+          warning
+        />
+      ))}
+    </section>
+  );
+}
 
 const PROFILE_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
@@ -180,7 +260,6 @@ export function AdminProfileSidebar({
             ariaLabel='Creator profile sidebar view'
           />
         }
-        contentClassName='pt-2'
       >
         {selectedCategory === 'about' ? (
           <ProfileAboutTab
@@ -206,6 +285,9 @@ export function AdminProfileSidebar({
             selectedCategory={selectedCategory as CategoryOption}
             surface='plain'
           />
+        ) : null}
+        {selectedCategory === 'social' && !profile.isClaimed ? (
+          <IdentityEnrichmentPanel receipt={profile.identityEnrichment} />
         ) : null}
       </DrawerTabbedCard>
     </EntitySidebarShell>
