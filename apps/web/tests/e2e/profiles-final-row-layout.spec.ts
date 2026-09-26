@@ -111,9 +111,15 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
  * found`. The request still reaches the real server; the response is passed
  * through unchanged.
  */
-async function captureFirstSuggestionsResponse(
-  page: Page
-): Promise<Promise<{ readonly status: number; readonly body: string }>> {
+async function captureFirstSuggestionsResponse(page: Page): Promise<{
+  // Wrapped in an object: an async function that returns a bare promise
+  // adopts it, so awaiting the route registration would wait for the capture
+  // itself and deadlock before the navigation that triggers the request.
+  readonly captured: Promise<{
+    readonly status: number;
+    readonly body: string;
+  }>;
+}> {
   let resolveCapture: (value: {
     readonly status: number;
     readonly body: string;
@@ -141,7 +147,7 @@ async function captureFirstSuggestionsResponse(
       await route.fulfill({ response: fetched.response, body: fetched.body });
     }
   );
-  return captured;
+  return { captured };
 }
 
 function logMetrics(label: string, metrics: FinalRowMetrics) {
@@ -224,7 +230,8 @@ test('keeps page identity and review status readable at narrow widths', async ({
 }) => {
   test.setTimeout(120_000);
   await setTestAuthBypassSession(page, 'creator-ready');
-  const suggestionsResponse = await captureFirstSuggestionsResponse(page);
+  const { captured: suggestionsResponse } =
+    await captureFirstSuggestionsResponse(page);
   await page.goto(
     `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`
   );
