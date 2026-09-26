@@ -6,6 +6,7 @@ import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
+import { OvieActivityFeed } from '@/components/features/admin/hud/OvieActivityFeed';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { SymphonyCodexAccountControl } from '@/components/features/admin/hud/SymphonyCodexAccountControl';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
@@ -132,7 +133,8 @@ function InFlightPullRequestsPanel({
 export function OvieMacHud({
   snapshot,
 }: Readonly<{ readonly snapshot: OvieMacHudSnapshot }>) {
-  const { alive, growth, inFlightPullRequests, shipping } = snapshot;
+  const { alive, growth, inFlightPullRequests, shipping, activitySources } =
+    snapshot;
   const growthValue = growth.available ? formatPercent(growth.rate) : '\u2014';
   const shippingValue = shipping.available
     ? shipping.shipsThisWeek.toLocaleString('en-US')
@@ -235,6 +237,7 @@ export function OvieMacHud({
           </div>
           <InFlightPullRequestsPanel pullRequests={inFlightPullRequests} />
         </section>
+        <OvieActivityFeed sources={activitySources} />
         <DesignProposalReviewPanel />
       </main>
     </div>

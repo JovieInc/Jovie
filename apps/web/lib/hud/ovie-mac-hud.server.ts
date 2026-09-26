@@ -3,9 +3,18 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import type { ChangelogSection } from '@/lib/changelog-parser';
+import { getChangelogSnapshot } from '@/lib/changelog-source';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
+import {
+  type OvieActivityDigestEntry,
+  type OvieActivityLandedPullRequest,
+  type OvieActivityReceiptedShip,
+  type OvieActivitySources,
+  parseLandedPullRequest,
+} from '@/lib/hud/company-activity';
 import {
   composeOvieMacHudInFlightPullRequests,
   composeOvieMacHudSnapshot,
@@ -13,6 +22,7 @@ import {
   monthlyToWeeklyUsd,
   type OvieMacHudInFlightPullRequests,
   type OvieMacHudSnapshot,
+  parseReceiptedShip,
   weeklyGrowthFromPeriodRate,
   windowToWeeklyUsd,
 } from '@/lib/hud/ovie-mac-hud';
@@ -77,30 +87,91 @@ fragment OvieMacHudPrFields on PullRequest {
 
 function readShippingEntries(): {
   readonly entries: readonly unknown[];
+  readonly activityEntries: readonly unknown[];
   readonly available: boolean;
 } {
   if (!existsSync(WHAT_SHIPPED_STATE_PATH)) {
-    return { entries: [], available: false };
+    return { entries: [], activityEntries: [], available: false };
   }
   try {
     const parsed = JSON.parse(readFileSync(WHAT_SHIPPED_STATE_PATH, 'utf8'));
     const record = parsed as { entries?: unknown; items?: unknown };
-    const rawEntries = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(record.entries)
-        ? record.entries
-        : Array.isArray(record.items)
-          ? record.items
-          : [];
-    return { entries: rawEntries, available: true };
+    if (Array.isArray(parsed)) {
+      return { entries: parsed, activityEntries: parsed, available: true };
+    }
+    const entries = Array.isArray(record.entries) ? record.entries : [];
+    const items = Array.isArray(record.items) ? record.items : [];
+    return {
+      entries: entries.length > 0 ? entries : items,
+      activityEntries: [...entries, ...items],
+      available: true,
+    };
   } catch (error) {
     captureError('Ovie Mac HUD shipping receipts unreadable', error);
-    return { entries: [], available: false };
+    return { entries: [], activityEntries: [], available: false };
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function firstSectionEntry(sections: ChangelogSection): string | null {
+  for (const key of [
+    'featured',
+    'added',
+    'changed',
+    'fixed',
+    'removed',
+  ] as const) {
+    const first = sections[key][0];
+    if (typeof first === 'string' && first.trim().length > 0) {
+      return first.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Curated public What's New rows (JOV-5762 projection): the public changelog
+ * snapshot already filters internal entries, so a release only appears here
+ * once it is genuinely published. Never synthesizes entries for empty slots.
+ */
+async function readPublicDigest(): Promise<readonly OvieActivityDigestEntry[]> {
+  try {
+    const snapshot = await getChangelogSnapshot();
+    return snapshot.releases.slice(0, 3).map(release => ({
+      version: release.version,
+      date: release.date,
+      title:
+        release.summary ||
+        firstSectionEntry(release.sections) ||
+        `Release ${release.version}`,
+      url: `/changelog/${release.version}`,
+    }));
+  } catch (error) {
+    await captureError('Ovie Mac HUD public digest failed', error, {
+      context: 'ovie_mac_hud_public_digest',
+    });
+    return [];
+  }
+}
+
+function readActivitySources(
+  shippingEntries: readonly unknown[]
+): OvieActivitySources {
+  const receiptedShips: OvieActivityReceiptedShip[] = [];
+  const landedPullRequests: OvieActivityLandedPullRequest[] = [];
+  for (const entry of shippingEntries) {
+    const ship = parseReceiptedShip(entry);
+    if (ship) {
+      receiptedShips.push(ship);
+      continue;
+    }
+    const landed = parseLandedPullRequest(entry);
+    if (landed) landedPullRequests.push(landed);
+  }
+  return { landedPullRequests, receiptedShips, publicDigest: [] };
 }
 
 function nodesFromConnection(value: unknown): readonly unknown[] {
@@ -211,14 +282,24 @@ export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
-    await Promise.all([
-      getAdminStripeOverviewMetrics(),
-      getAdminMercuryMetrics(),
-      getOvieMacHudInFlightPullRequests(),
-      getLybDailyMrr(new Date(nowMs)),
-    ]);
+  const [
+    stripeMetrics,
+    mercuryMetrics,
+    inFlightPullRequests,
+    lybMrr,
+    publicDigest,
+  ] = await Promise.all([
+    getAdminStripeOverviewMetrics(),
+    getAdminMercuryMetrics(),
+    getOvieMacHudInFlightPullRequests(),
+    getLybDailyMrr(new Date(nowMs)),
+    readPublicDigest(),
+  ]);
   const shipping = readShippingEntries();
+  const activitySources = {
+    ...readActivitySources(shipping.activityEntries),
+    publicDigest,
+  };
   const financialAvailable =
     stripeMetrics.isAvailable &&
     mercuryMetrics.isAvailable &&
@@ -257,6 +338,7 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    activitySources,
     lybMrr,
     generatedAtIso,
     nowMs,
