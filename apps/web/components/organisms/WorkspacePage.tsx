@@ -14,5 +14,9 @@ export interface WorkspacePageProps extends Omit<PageShellProps, 'toolbar'> {
  * header, one route toolbar, then the shared workspace panel.
  */
 export function WorkspacePage({ toolbar, ...panelProps }: WorkspacePageProps) {
-  return <PageShell {...panelProps} toolbar={toolbar} />;
+  if (panelProps.surfaceMode === 'table') {
+    return <PageShell {...panelProps} surfaceMode='table' toolbar={toolbar} />;
+  }
+
+  return <PageShell {...panelProps} frame='none' toolbar={toolbar} />;
 }

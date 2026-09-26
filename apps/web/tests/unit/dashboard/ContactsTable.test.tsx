@@ -7,7 +7,7 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
-import { ContactsTable } from '@/features/dashboard/organisms/contacts-table/ContactsTable';
+import { ContactsTable } from '../../../components/features/dashboard/organisms/contacts-table/ContactsTable';
 
 const setHeaderActions = vi.fn();
 const setTableMeta = vi.fn();

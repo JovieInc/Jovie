@@ -728,6 +728,7 @@ export function LibraryLoadingState() {
       aria-label='Loading Library'
       frame='content-container'
       contentPadding='none'
+      surfaceMode='table'
       data-testid='library-surface-loading'
       toolbar={
         <PageToolbar
