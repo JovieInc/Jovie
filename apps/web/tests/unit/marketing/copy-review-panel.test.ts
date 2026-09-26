@@ -10,6 +10,11 @@ import {
   type MarketingCopyPageDraft,
   type MarketingCopyPanelReview,
 } from '@/data/marketing';
+import {
+  auditRenderedCopyCertification,
+  certifiedLinesFromDraft,
+  certifyRenderedCopySurface,
+} from '@/lib/copy/rendered-surface';
 
 const brief: MarketingCopyPageBrief = {
   pageId: 'artist-profiles',
@@ -134,6 +139,46 @@ describe('marketing copy adversarial panel and taste inbox', () => {
     expect(next.appliedDecisionIds).toEqual(['artist-profiles-hero-1']);
     expect(next.signals.direct.approved).toBe(1);
     expect(next.signals.specific.approved).toBe(1);
+  });
+
+  it('binds a rendered-surface certification to the panel review digest', () => {
+    const surface = {
+      route: draft.route,
+      stateId: 'default',
+      sourceVersion: 'test-source',
+      lines: [
+        {
+          lineId: 'hero/headline',
+          role: 'headline' as const,
+          value: draft.sections[0].headline,
+        },
+      ],
+    };
+    const expectation = {
+      route: draft.route,
+      stateId: 'default',
+      sourceVersion: 'test-source',
+      register: 'jovie-marketing' as const,
+      lines: certifiedLinesFromDraft(draft),
+    };
+    const certification = certifyRenderedCopySurface({
+      surface,
+      expectation,
+      certifiedAt: '2026-08-04T20:02:00.000Z',
+      reviewDigest: createMarketingCopyReviewDigest(brief, draft),
+    });
+    expect(certification.reviewDigest).toBe(panelReviews()[0]?.reviewDigest);
+    // A rendered-word change voids the receipt even though the panel receipt
+    // for the draft is still valid.
+    const drifted = {
+      ...surface,
+      lines: [{ ...surface.lines[0], value: 'A different rendered headline.' }],
+    };
+    expect(
+      auditRenderedCopyCertification(certification, drifted, expectation).some(
+        entry => entry.code === 'stale-rendered-digest'
+      )
+    ).toBe(true);
   });
 
   it('rejects a duplicate decision receipt instead of double-counting taste', () => {
