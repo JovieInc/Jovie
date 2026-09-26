@@ -39,8 +39,7 @@ export interface FriendlyArtistHandleCandidate {
   readonly source:
     | 'registry_artist_name'
     | 'provider_display_name'
-    | 'primary_name_token'
-    | 'enriched_identity';
+    | 'primary_name_token';
 }
 
 /** Why a proposed candidate was rejected by the deterministic policy. */
@@ -88,13 +87,6 @@ export function normalizeArtistNameToHandleBase(name: string): string {
 export function composeFriendlyArtistHandleCandidates(input: {
   readonly registryName: string | null | undefined;
   readonly providerArtist: SpotifyArtistProfileData | undefined;
-  // Artist-controlled destinations from identity enrichment (JOV-6529):
-  // official domains and verified social handles propose handle tokens;
-  // the deterministic contract below still validates and ranks them.
-  readonly identityLinks?: readonly {
-    readonly platform: string;
-    readonly url: string;
-  }[];
 }): ComposedFriendlyArtistHandles {
   const accepted: FriendlyArtistHandleCandidate[] = [];
   const rejected: RejectedFriendlyHandleCandidate[] = [];
@@ -105,12 +97,6 @@ export function composeFriendlyArtistHandleCandidates(input: {
   }> = [
     { source: 'registry_artist_name', name: input.registryName },
     { source: 'provider_display_name', name: input.providerArtist?.name },
-    // Enriched artist-controlled identity from exact provider/entity
-    // matches (e.g. MusicBrainz url-rels on an ISRC-matched artist).
-    ...enrichedIdentityNames(input.identityLinks).map(name => ({
-      source: 'enriched_identity' as const,
-      name,
-    })),
   ];
 
   const seen = new Set<string>();
@@ -165,51 +151,7 @@ export function composeFriendlyArtistHandleCandidates(input: {
   return { accepted, rejected };
 }
 
-const SOCIAL_HANDLE_PLATFORMS = new Set([
-  'instagram',
-  'twitter',
-  'tiktok',
-  'facebook',
-  'youtube',
-  'twitch',
-  'soundcloud',
-  'bandcamp',
-]);
-
-// Website links contribute the second-level domain label; social links the
-// handle segment. Malformed inputs are ignored.
-function enrichedIdentityNames(
-  links:
-    | readonly { readonly platform: string; readonly url: string }[]
-    | undefined
-): string[] {
-  const names: string[] = [];
-  for (const link of links ?? []) {
-    try {
-      const parsed = new URL(link.url);
-      const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
-      if (link.platform === 'website') {
-        const label = host.split('.').slice(0, -1).join('.');
-        if (label) names.push(label);
-      } else if (SOCIAL_HANDLE_PLATFORMS.has(link.platform)) {
-        const segment = parsed.pathname.split('/').filter(Boolean)[0];
-        if (segment) names.push(segment.replace(/^@/, ''));
-      }
-    } catch {
-      continue;
-    }
-  }
-  return names;
-}
-
 function rankOf(candidate: FriendlyArtistHandleCandidate): number {
-  // Enriched artist-controlled identity ranks last as a supplementary signal.
-  switch (candidate.source) {
-    case 'registry_artist_name':
-      return 0;
-    case 'provider_display_name':
-      return 1;
-    default:
-      return 2;
-  }
+  // Registry name outranks provider display name at equal specificity.
+  return candidate.source === 'registry_artist_name' ? 0 : 1;
 }

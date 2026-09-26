@@ -1,13 +1,8 @@
 /**
  * Identity enrichment for provider-ID-backed unclaimed artists (JOV-6529),
- * run inside structured-credit reconciliation before a profile is treated
- * as share-ready. MusicBrainz artist entities are matched by shared ISRCs —
- * never display-name similarity; url-rels plus the exact Spotify URL are
- * normalized and deduped by canonical identity; two sources agreeing raise
- * confidence while distinct identities for one platform are `conflicted`.
- * Per-platform evidence (`verified | not_found | not_checked | conflicted`)
- * persists on the profile so Ovie can render it. Apply is insert-only and
- * idempotent: claimed or user-locked rows are never updated or removed.
+ * run inside structured-credit reconciliation before a profile is share-ready.
+ * MusicBrainz artists are matched by shared ISRCs — never display-name
+ * similarity. Apply is insert-only and idempotent.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -43,15 +38,14 @@ export interface ArtistIdentityLink {
   readonly canonicalIdentity: string;
   readonly confidence: number;
   readonly source: IdentityLinkSource;
-  /** Exact provider entity that produced the link (spotify id / MBID). */
-  readonly sourceEntityId: string;
+  readonly sourceEntityId: string; // spotify id / MBID
 }
+
+type ExtractedLink = Omit<ArtistIdentityLink, 'source' | 'sourceEntityId'>;
 
 export interface IdentityPlatformStatus {
   readonly status: ArtistIdentityLinkStatus;
   readonly observedAt: string;
-  readonly sources: readonly IdentityLinkSource[];
-  readonly conflicts?: readonly string[];
 }
 
 export interface ArtistIdentityEnrichment {
@@ -63,64 +57,35 @@ export interface ArtistIdentityEnrichment {
 }
 
 export type MusicBrainzMatchOutcome =
-  | {
-      readonly kind: 'matched';
-      readonly mbid: string;
-      readonly isrcCount: number;
-    }
-  | { readonly kind: 'conflicted'; readonly candidates: readonly string[] }
-  | { readonly kind: 'not_found' }
-  | { readonly kind: 'not_checked'; readonly reason: string };
+  | { kind: 'matched'; mbid: string; isrcCount: number }
+  | { kind: 'conflicted'; candidates: readonly string[] }
+  | { kind: 'not_found' }
+  | { kind: 'not_checked'; reason: string };
 
-// Platforms enrichment can attest; `not_checked` distinguishes an unchecked
-// source from a real negative for Ovie.
-export const IDENTITY_ENRICHMENT_PLATFORMS = [
-  'website',
-  'instagram',
-  'twitter',
-  'tiktok',
-  'youtube',
-  'facebook',
-  'bandcamp',
-  'soundcloud',
-  'twitch',
-  'discord',
-] as const;
+const IDENTITY_ENRICHMENT_PLATFORMS =
+  'website instagram twitter tiktok youtube facebook bandcamp soundcloud twitch discord'.split(
+    ' '
+  );
 
-/** Minimum distinct ISRCs backing one MB artist before it counts. */
-const MIN_ISRC_SUPPORT = 2;
-/** Bounded fetch cost per candidate (MusicBrainz is ~1 req/sec). */
-const MAX_ISRCS_FOR_MATCHING = 8;
-/** Minimum verified artist-controlled destinations for share readiness. */
-const MIN_VERIFIED_DESTINATIONS = 2;
-
+const MIN_ISRC_SUPPORT = 2; // distinct ISRCs before an MB artist counts
+const MAX_ISRCS_FOR_MATCHING = 8; // bounded fetch cost (~1 req/sec)
+const MIN_VERIFIED_DESTINATIONS = 2; // for share readiness
 const MB_REL_TYPE_CONFIDENCE = 0.9;
 const MB_SOCIAL_NETWORK_CONFIDENCE = 0.85;
 const SPOTIFY_IDENTITY_CONFIDENCE = 1.0;
-/** Two sources agreeing on one canonical identity bump confidence. */
-const MULTI_SOURCE_BONUS = 0.05;
+const MULTI_SOURCE_BONUS = 0.05; // two sources agreeing on one identity
 
-const SOCIAL_NETWORK_HOST_PLATFORMS = new Set([
-  'instagram',
-  'twitter',
-  'x',
-  'tiktok',
-  'facebook',
-  'youtube',
-  'twitch',
-  'discord',
-  'bandcamp',
-  'soundcloud',
-]);
+const SOCIAL_NETWORK_HOST_PLATFORMS = new Set(
+  'instagram twitter x tiktok facebook youtube twitch discord bandcamp soundcloud'.split(
+    ' '
+  )
+);
 
-// Canonical dedupe identity for a platform + URL pair; falls back to
-// host+path for ids outside the detection registry (e.g. `website`).
+// Canonical dedupe identity; falls back to host+path for unregistered ids.
 export function identityKeyForLink(platformId: string, url: string): string {
   const platform = getPlatform(platformId);
   const normalizedUrl = normalizeUrl(url);
-  if (platform) {
-    return canonicalIdentity({ platform, normalizedUrl });
-  }
+  if (platform) return canonicalIdentity({ platform, normalizedUrl });
   try {
     const parsed = new URL(normalizedUrl);
     const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
@@ -130,9 +95,7 @@ export function identityKeyForLink(platformId: string, url: string): string {
   }
 }
 
-// Map a url-rel to platform + normalized URL. Typed relations are trusted;
-// generic `social network` rels classify by host (facebook.com → facebook).
-// Unrecognized social-network hosts become websites, not platform guesses.
+// Map a url-rel to platform + normalized URL; unmapped hosts → website.
 export function classifyMusicBrainzRelation(
   relationType: string,
   resource: string
@@ -145,15 +108,10 @@ export function classifyMusicBrainzRelation(
   const mapped = MUSICBRAINZ_URL_TYPE_MAP[relationType];
   if (!mapped) return null;
 
-  const hostClassified =
-    detected && SOCIAL_NETWORK_HOST_PLATFORMS.has(detected.id)
-      ? { platform: detected.id, platformType: detected.category, url }
-      : null;
-
   if (relationType === 'social network' || mapped === 'website') {
-    return (
-      hostClassified ?? { platform: 'website', platformType: 'websites', url }
-    );
+    return detected && SOCIAL_NETWORK_HOST_PLATFORMS.has(detected.id)
+      ? { platform: detected.id, platformType: detected.category, url }
+      : { platform: 'website', platformType: 'websites', url };
   }
   return {
     platform: mapped,
@@ -162,117 +120,78 @@ export function classifyMusicBrainzRelation(
   };
 }
 
-interface ExtractedLink {
-  readonly platform: string;
-  readonly platformType: string;
-  readonly url: string;
-  readonly canonicalIdentity: string;
-  readonly confidence: number;
-}
-
 export function extractMusicBrainzIdentityLinks(artist: MusicBrainzArtist): {
   readonly links: readonly ExtractedLink[];
-  readonly conflicts: Readonly<Record<string, readonly string[]>>;
+  readonly conflictedPlatforms: ReadonlySet<string>;
 } {
   const byIdentity = new Map<string, ExtractedLink>();
   const platformIdentities = new Map<string, Set<string>>();
 
   for (const relation of artist.relations ?? []) {
-    if (relation.ended === true) continue;
     const resource = relation.url?.resource;
-    if (!resource) continue;
-
+    if (relation.ended === true || !resource) continue;
     const classified = classifyMusicBrainzRelation(relation.type, resource);
     if (!classified) continue;
 
-    const confidence =
-      relation.type === 'social network'
-        ? MB_SOCIAL_NETWORK_CONFIDENCE
-        : MB_REL_TYPE_CONFIDENCE;
     const identity = identityKeyForLink(classified.platform, classified.url);
-
-    const identities =
-      platformIdentities.get(classified.platform) ?? new Set<string>();
-    identities.add(identity);
-    platformIdentities.set(classified.platform, identities);
+    platformIdentities.set(
+      classified.platform,
+      (platformIdentities.get(classified.platform) ?? new Set<string>()).add(
+        identity
+      )
+    );
     if (!byIdentity.has(identity)) {
       byIdentity.set(identity, {
         ...classified,
         canonicalIdentity: identity,
-        confidence,
+        confidence:
+          relation.type === 'social network'
+            ? MB_SOCIAL_NETWORK_CONFIDENCE
+            : MB_REL_TYPE_CONFIDENCE,
       });
     }
   }
 
-  const conflicts: Record<string, readonly string[]> = {};
+  const conflictedPlatforms = new Set<string>();
   const links: ExtractedLink[] = [];
   for (const link of byIdentity.values()) {
-    const identities = platformIdentities.get(link.platform);
-    if (identities && identities.size > 1) {
-      conflicts[link.platform] = [...identities].sort();
-    } else {
-      links.push(link);
-    }
+    if ((platformIdentities.get(link.platform)?.size ?? 0) > 1)
+      conflictedPlatforms.add(link.platform);
+    else links.push(link);
   }
-  return { links, conflicts };
+  return { links, conflictedPlatforms };
 }
 
-// Exact entity pick: winner needs >= MIN_ISRC_SUPPORT distinct ISRCs plus a
-// strict plurality; a tie is `conflicted`. Names are never consulted.
-export function pickMusicBrainzArtistByIsrcSupport(
-  recordings: readonly {
-    readonly isrc: string;
-    readonly artistIds: readonly string[];
-  }[]
+// Exact pick: strict plurality of distinct ISRCs; a tie is `conflicted`.
+function pickMusicBrainzArtistByIsrcSupport(
+  recordings: readonly { isrc: string; artistIds: readonly string[] }[]
 ): MusicBrainzMatchOutcome {
   const support = new Map<string, Set<string>>();
-  for (const recording of recordings) {
-    for (const artistId of recording.artistIds) {
-      const isrcs = support.get(artistId) ?? new Set<string>();
-      isrcs.add(recording.isrc);
-      support.set(artistId, isrcs);
+  for (const { isrc, artistIds } of recordings) {
+    for (const id of artistIds) {
+      support.set(id, (support.get(id) ?? new Set<string>()).add(isrc));
     }
   }
-
   const ranked = [...support.entries()]
     .map(([mbid, isrcs]) => ({ mbid, count: isrcs.size }))
-    .filter(entry => entry.count >= MIN_ISRC_SUPPORT)
+    .filter(e => e.count >= MIN_ISRC_SUPPORT)
     .sort((a, b) => b.count - a.count);
 
   if (ranked.length === 0) return { kind: 'not_found' };
-  const top = ranked[0];
-  const tied = ranked.filter(entry => entry.count === top.count);
+  const tied = ranked.filter(e => e.count === ranked[0].count);
   if (tied.length > 1) {
-    return {
-      kind: 'conflicted',
-      candidates: tied.map(entry => entry.mbid).sort(),
-    };
+    return { kind: 'conflicted', candidates: tied.map(e => e.mbid).sort() };
   }
-  return { kind: 'matched', mbid: top.mbid, isrcCount: top.count };
+  return { kind: 'matched', mbid: ranked[0].mbid, isrcCount: ranked[0].count };
 }
 
-export function deriveShareReadiness(
-  platformStatus: Readonly<Record<string, IdentityPlatformStatus>>
-): 'ready' | 'limited' {
-  const statuses = Object.values(platformStatus);
-  const verified = statuses.filter(s => s.status === 'verified').length;
-  const conflicted = statuses.some(s => s.status === 'conflicted');
-  if (conflicted) return 'limited';
-  return verified >= MIN_VERIFIED_DESTINATIONS ? 'ready' : 'limited';
-}
+const asRecord = (v: unknown) =>
+  v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : null;
 
-const SETTINGS_KEY = 'identityEnrichment';
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object'
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-export function readArtistIdentityEnrichment(
+function readArtistIdentityEnrichment(
   settings: unknown
 ): ArtistIdentityEnrichment | null {
-  const record = asRecord(asRecord(settings)?.[SETTINGS_KEY]);
+  const record = asRecord(asRecord(settings)?.identityEnrichment);
   if (
     !record ||
     typeof record.observedAt !== 'string' ||
@@ -285,23 +204,24 @@ export function readArtistIdentityEnrichment(
   return record as unknown as ArtistIdentityEnrichment;
 }
 
-/** Freshness guard: a record observed at/after `enrichedAfter` is kept. */
+/** A record observed at/after `enrichedAfter` is kept. */
 export function needsIdentityEnrichment(
   settings: unknown,
   enrichedAfter?: Date
 ): boolean {
   const existing = readArtistIdentityEnrichment(settings);
   if (!existing) return true;
-  if (!enrichedAfter) return false;
-  return new Date(existing.observedAt) < enrichedAfter;
+  return enrichedAfter ? new Date(existing.observedAt) < enrichedAfter : false;
 }
 
-export interface EnrichArtistIdentityInput {
-  readonly spotifyId: string;
-  readonly spotifyUrl: string;
-  /** ISRCs from releases the registry artist is credited on. */
-  readonly isrcs: readonly string[];
-  readonly now?: Date;
+// Lazy import keeps the server-only provider out of this static import graph.
+async function musicBrainzProvider() {
+  try {
+    const provider = await import('@/lib/dsp-enrichment/providers/musicbrainz');
+    return provider.isMusicBrainzAvailable() ? provider : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function matchMusicBrainzArtistForIsrcs(
@@ -311,16 +231,8 @@ export async function matchMusicBrainzArtistForIsrcs(
   if (bounded.length < MIN_ISRC_SUPPORT) {
     return { kind: 'not_checked', reason: 'insufficient_isrcs' };
   }
-
-  // Lazy import keeps the server-only provider (rate limiter, circuit
-  // breaker) out of this module's static graph.
-  let provider: typeof import('@/lib/dsp-enrichment/providers/musicbrainz');
-  try {
-    provider = await import('@/lib/dsp-enrichment/providers/musicbrainz');
-  } catch {
-    return { kind: 'not_checked', reason: 'musicbrainz_unavailable' };
-  }
-  if (!provider.isMusicBrainzAvailable()) {
+  const provider = await musicBrainzProvider();
+  if (!provider) {
     return { kind: 'not_checked', reason: 'musicbrainz_unavailable' };
   }
 
@@ -328,10 +240,12 @@ export async function matchMusicBrainzArtistForIsrcs(
   try {
     for (const isrc of bounded) {
       const results = await provider.lookupMusicBrainzByIsrc(isrc);
-      const artistIds = (results[0]?.['artist-credit'] ?? [])
-        .map(credit => credit.artist?.id)
-        .filter((id): id is string => Boolean(id));
-      recordings.push({ isrc, artistIds });
+      recordings.push({
+        isrc,
+        artistIds: (results[0]?.['artist-credit'] ?? [])
+          .map(credit => credit.artist?.id)
+          .filter((id): id is string => Boolean(id)),
+      });
     }
   } catch (error) {
     logger.warn('MusicBrainz identity match failed', {
@@ -339,25 +253,32 @@ export async function matchMusicBrainzArtistForIsrcs(
     });
     return { kind: 'not_checked', reason: 'musicbrainz_error' };
   }
-
   return pickMusicBrainzArtistByIsrcSupport(recordings);
 }
 
-export async function enrichArtistIdentity(
-  input: EnrichArtistIdentityInput
-): Promise<ArtistIdentityEnrichment> {
+export async function enrichArtistIdentity(input: {
+  readonly spotifyId: string;
+  readonly spotifyUrl: string;
+  /** ISRCs from releases the registry artist is credited on. */
+  readonly isrcs: readonly string[];
+  readonly now?: Date;
+}): Promise<ArtistIdentityEnrichment> {
   const observedAt = (input.now ?? new Date()).toISOString();
-  const links: ArtistIdentityLink[] = [];
-  const perPlatformSources = new Map<string, Set<IdentityLinkSource>>();
-
+  const deduped = new Map<string, ArtistIdentityLink>();
   const addLink = (link: ArtistIdentityLink) => {
-    links.push(link);
-    const sources = perPlatformSources.get(link.platform) ?? new Set();
-    sources.add(link.source);
-    perPlatformSources.set(link.platform, sources);
+    const existing = deduped.get(link.canonicalIdentity);
+    if (!existing) deduped.set(link.canonicalIdentity, link);
+    else if (link.source !== existing.source) {
+      deduped.set(link.canonicalIdentity, {
+        ...existing,
+        confidence: Math.min(
+          1,
+          Math.max(existing.confidence, link.confidence) + MULTI_SOURCE_BONUS
+        ),
+      });
+    }
   };
 
-  // Spotify: exact provider identity, always verified.
   addLink({
     platform: 'spotify',
     platformType: 'dsp',
@@ -368,18 +289,16 @@ export async function enrichArtistIdentity(
     sourceEntityId: input.spotifyId,
   });
 
-  // MusicBrainz: exact-entity match by shared ISRCs.
   const match = await matchMusicBrainzArtistForIsrcs(input.isrcs);
   let musicBrainzArtistId: string | null = null;
-  const mbConflicts: Record<string, readonly string[]> = {};
-  let mbChecked = false;
+  let mbConflicted: ReadonlySet<string> = new Set<string>();
+  let mbChecked = match.kind === 'not_found' || match.kind === 'conflicted';
 
   if (match.kind === 'matched') {
     try {
-      const provider = await import(
-        '@/lib/dsp-enrichment/providers/musicbrainz'
-      );
-      const artist = await provider.getMusicBrainzArtist(match.mbid);
+      const provider = await musicBrainzProvider();
+      const artist =
+        provider && (await provider.getMusicBrainzArtist(match.mbid));
       if (artist) {
         musicBrainzArtistId = artist.id;
         const extracted = extractMusicBrainzIdentityLinks(artist);
@@ -390,7 +309,7 @@ export async function enrichArtistIdentity(
             sourceEntityId: artist.id,
           });
         }
-        Object.assign(mbConflicts, extracted.conflicts);
+        mbConflicted = extracted.conflictedPlatforms;
       }
       mbChecked = true;
     } catch (error) {
@@ -399,62 +318,26 @@ export async function enrichArtistIdentity(
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  } else if (match.kind === 'not_found' || match.kind === 'conflicted') {
-    mbChecked = true;
-  }
-
-  // Dedupe by canonical identity; cross-source agreement raises confidence.
-  const deduped = new Map<string, ArtistIdentityLink>();
-  for (const link of links) {
-    const existing = deduped.get(link.canonicalIdentity);
-    if (!existing) {
-      deduped.set(link.canonicalIdentity, link);
-    } else if (link.source !== existing.source) {
-      deduped.set(link.canonicalIdentity, {
-        ...existing,
-        confidence: Math.min(
-          1,
-          Math.max(existing.confidence, link.confidence) + MULTI_SOURCE_BONUS
-        ),
-      });
-    }
   }
 
   const verifiedPlatforms = new Set(
     [...deduped.values()].map(link => link.platform)
   );
   const platformStatus: Record<string, IdentityPlatformStatus> = {
-    spotify: { status: 'verified', observedAt, sources: ['spotify'] },
+    spotify: { status: 'verified', observedAt },
   };
-
   for (const platform of IDENTITY_ENRICHMENT_PLATFORMS) {
-    if (verifiedPlatforms.has(platform)) {
-      platformStatus[platform] = {
-        status: 'verified',
-        observedAt,
-        sources: [...(perPlatformSources.get(platform) ?? [])],
-      };
-    } else if (mbConflicts[platform]) {
-      platformStatus[platform] = {
-        status: 'conflicted',
-        observedAt,
-        sources: ['musicbrainz'],
-        conflicts: mbConflicts[platform],
-      };
-    } else {
-      platformStatus[platform] = mbChecked
-        ? { status: 'not_found', observedAt, sources: ['musicbrainz'] }
-        : { status: 'not_checked', observedAt, sources: [] };
-    }
+    const status: ArtistIdentityLinkStatus = verifiedPlatforms.has(platform)
+      ? 'verified'
+      : mbConflicted.has(platform)
+        ? 'conflicted'
+        : mbChecked
+          ? 'not_found'
+          : 'not_checked';
+    platformStatus[platform] = { status, observedAt };
   }
-
   if (match.kind === 'conflicted') {
-    platformStatus.musicbrainz = {
-      status: 'conflicted',
-      observedAt,
-      sources: ['musicbrainz'],
-      conflicts: match.candidates,
-    };
+    platformStatus.musicbrainz = { status: 'conflicted', observedAt };
   }
 
   return {
@@ -466,9 +349,17 @@ export async function enrichArtistIdentity(
   };
 }
 
-// Insert-only, idempotent apply inside the identity-bound transaction:
-// existing canonical identities are skipped and jsonb_set preserves other
-// settings keys.
+function deriveShareReadiness(
+  platformStatus: Readonly<Record<string, IdentityPlatformStatus>>
+): 'ready' | 'limited' {
+  const statuses = Object.values(platformStatus);
+  const verified = statuses.filter(s => s.status === 'verified').length;
+  if (statuses.some(s => s.status === 'conflicted')) return 'limited';
+  return verified >= MIN_VERIFIED_DESTINATIONS ? 'ready' : 'limited';
+}
+
+// Insert-only, idempotent apply: existing canonical identities are skipped;
+// jsonb_set preserves other settings keys.
 export async function applyArtistIdentityEnrichment(
   tx: DbOrTransaction,
   profileId: string,
@@ -483,7 +374,6 @@ export async function applyArtistIdentityEnrichment(
     existing.map(row => identityKeyForLink(row.platform, row.url))
   );
 
-  const now = new Date();
   let inserted = 0;
   let sortOrder = existing.length;
   for (const link of enrichment.links) {
@@ -495,10 +385,7 @@ export async function applyArtistIdentityEnrichment(
         platform: link.platform,
         platformType: link.platformType,
         url: link.url,
-        displayText: '',
         sortOrder,
-        isActive: true,
-        state: 'active',
         confidence: link.confidence.toFixed(2),
         sourcePlatform: link.source,
         sourceType: 'ingested',
@@ -506,9 +393,6 @@ export async function applyArtistIdentityEnrichment(
           sources: ['artist_identity_enrichment', link.source],
           signals: [link.sourceEntityId, link.canonicalIdentity],
         },
-        verificationStatus: 'unverified',
-        createdAt: now,
-        updatedAt: now,
       })
       .onConflictDoNothing();
     existingIdentities.add(link.canonicalIdentity);
@@ -516,19 +400,17 @@ export async function applyArtistIdentityEnrichment(
     sortOrder += 1;
   }
 
-  // jsonb_set touches only the identityEnrichment key; claimed markers and
-  // unrelated settings are preserved.
-  await tx.execute(drizzleSql`
-    UPDATE ${creatorProfiles}
-    SET
-      settings = jsonb_set(
-        COALESCE(settings, '{}'::jsonb),
-        '{${drizzleSql.raw(SETTINGS_KEY)}}',
-        ${drizzleSql.raw(`'${JSON.stringify(enrichment).replaceAll("'", "''")}'`)}::jsonb
-      ),
-      updated_at = NOW()
-    WHERE id = ${profileId}
-  `);
+  await tx
+    .update(creatorProfiles)
+    .set({
+      settings: drizzleSql`jsonb_set(
+        COALESCE(${creatorProfiles.settings}, '{}'::jsonb),
+        '{identityEnrichment}',
+        ${JSON.stringify(enrichment)}::jsonb
+      )`,
+      updatedAt: drizzleSql`now()`,
+    })
+    .where(eq(creatorProfiles.id, profileId));
 
   return { inserted };
 }

@@ -8,7 +8,6 @@ import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
-import { readArtistIdentityEnrichment } from '@/lib/discography/artist-identity-enrichment';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -73,29 +72,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [rows, profileRows] = await Promise.all([
-      db
-        .select({
-          id: socialLinks.id,
-          label: socialLinks.displayText,
-          url: socialLinks.url,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-        })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, profileId),
-            not(eq(socialLinks.state, 'rejected'))
-          )
+    const rows = await db
+      .select({
+        id: socialLinks.id,
+        label: socialLinks.displayText,
+        url: socialLinks.url,
+        platform: socialLinks.platform,
+        platformType: socialLinks.platformType,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          not(eq(socialLinks.state, 'rejected'))
         )
-        .orderBy(asc(socialLinks.sortOrder)),
-      db
-        .select({ settings: creatorProfiles.settings })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .limit(1),
-    ]);
+      )
+      .orderBy(asc(socialLinks.sortOrder));
 
     const mapped: SocialLinkRow[] = rows.map(row => ({
       id: row.id,
@@ -105,24 +97,8 @@ export async function GET(request: NextRequest) {
       platformType: row.platformType,
     }));
 
-    // JOV-6529: per-platform identity evidence written by the
-    // unclaimed-artist enrichment stage; null when it has never run.
-    const identityEnrichment = readArtistIdentityEnrichment(
-      profileRows[0]?.settings
-    );
-
     return NextResponse.json(
-      {
-        success: true,
-        links: mapped,
-        identityEnrichment: identityEnrichment
-          ? {
-              observedAt: identityEnrichment.observedAt,
-              shareReadiness: identityEnrichment.shareReadiness,
-              platformStatus: identityEnrichment.platformStatus,
-            }
-          : null,
-      },
+      { success: true, links: mapped },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

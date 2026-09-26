@@ -216,16 +216,12 @@ export function AdminCreatorProfilesUnified({
     });
   }, []);
 
-  const {
-    setDraftContact,
-    effectiveContact,
-    refetchSocialLinks,
-    identityEnrichment,
-  } = useContactHydration({
-    profiles: filteredProfiles,
-    selectedId,
-    enabled: sidebarOpen,
-  });
+  const { setDraftContact, effectiveContact, refetchSocialLinks } =
+    useContactHydration({
+      profiles: filteredProfiles,
+      selectedId,
+      enabled: sidebarOpen,
+    });
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
     selectedId,
@@ -456,7 +452,6 @@ export function AdminCreatorProfilesUnified({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         onClose={handleSidebarClose}
         contextMenuItems={sidebarContextMenuItems}
-        identityEnrichment={identityEnrichment}
       />
     ),
     [
@@ -465,7 +460,6 @@ export function AdminCreatorProfilesUnified({
       effectiveContact,
       handleSidebarClose,
       sidebarContextMenuItems,
-      identityEnrichment,
     ]
   );
 

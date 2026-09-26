@@ -1,203 +1,242 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { DbOrTransaction } from '@/lib/db';
 import {
+  applyArtistIdentityEnrichment,
   classifyMusicBrainzRelation,
-  deriveShareReadiness,
+  enrichArtistIdentity,
   extractMusicBrainzIdentityLinks,
-  needsIdentityEnrichment,
-  pickMusicBrainzArtistByIsrcSupport,
-  readArtistIdentityEnrichment,
+  identityKeyForLink,
+  matchMusicBrainzArtistForIsrcs,
 } from '@/lib/discography/artist-identity-enrichment';
+import {
+  getMusicBrainzArtist,
+  isMusicBrainzAvailable,
+  lookupMusicBrainzByIsrc,
+} from '@/lib/dsp-enrichment/providers/musicbrainz';
 import type { MusicBrainzArtist } from '@/lib/dsp-enrichment/types';
 
-function rel(
-  type: string,
-  resource: string,
-  overrides: Record<string, unknown> = {}
-) {
-  return {
-    type,
-    'type-id': `${type}-id`,
-    url: { id: `url-${resource}`, resource },
-    ...overrides,
-  };
-}
+vi.mock('@/lib/dsp-enrichment/providers/musicbrainz', () => ({
+  isMusicBrainzAvailable: vi.fn(() => true),
+  lookupMusicBrainzByIsrc: vi.fn(),
+  getMusicBrainzArtist: vi.fn(),
+}));
 
-function mbArtist(relations: ReturnType<typeof rel>[]): MusicBrainzArtist {
-  return {
-    id: 'mbid-1',
-    name: 'Fedde Le Grand',
-    relations,
-  } as MusicBrainzArtist;
-}
+const lookup = vi.mocked(lookupMusicBrainzByIsrc);
+const getArtist = vi.mocked(getMusicBrainzArtist);
+const available = vi.mocked(isMusicBrainzAvailable);
 
-describe('classifyMusicBrainzRelation', () => {
-  it('maps typed relations to their platform', () => {
+beforeEach(() => {
+  vi.clearAllMocks();
+  available.mockReturnValue(true);
+});
+
+const recording = (id: string) =>
+  [{ 'artist-credit': [{ artist: { id } }] }] as never;
+const rel = (type: string, resource: string, over: object = {}) => ({
+  type,
+  url: { resource },
+  ...over,
+});
+const mbArtist = (relations: ReturnType<typeof rel>[]) =>
+  ({ id: 'mbid-1', name: 'Fedde Le Grand', relations }) as MusicBrainzArtist;
+const IG = 'https://instagram.com/feddelegrand';
+const SITE = 'https://feddelegrand.com';
+
+describe('classify/extract url-rels', () => {
+  it('maps typed relations and host-classifies generic social networks', () => {
     expect(
-      classifyMusicBrainzRelation(
-        'official homepage',
-        'https://feddelegrand.com'
-      )
+      classifyMusicBrainzRelation('official homepage', SITE)
     ).toMatchObject({ platform: 'website' });
     expect(
       classifyMusicBrainzRelation('youtube', 'https://youtube.com/@fedde')
     ).toMatchObject({ platform: 'youtube' });
-  });
-
-  it('classifies generic social-network relations by host', () => {
+    expect(classifyMusicBrainzRelation('social network', IG)).toMatchObject({
+      platform: 'instagram',
+    });
     expect(
-      classifyMusicBrainzRelation(
-        'social network',
-        'https://instagram.com/feddelegrand'
-      )
-    ).toMatchObject({ platform: 'instagram' });
-    expect(
-      classifyMusicBrainzRelation(
-        'social network',
-        'https://feddelegrand.example.com'
-      )
+      classifyMusicBrainzRelation('social network', 'https://fedde.example.com')
     ).toMatchObject({ platform: 'website' });
-  });
-
-  it('rejects unsafe or unmapped relations', () => {
     expect(
       classifyMusicBrainzRelation('official homepage', 'javascript:alert(1)')
     ).toBeNull();
-    expect(
-      classifyMusicBrainzRelation(
-        'streaming music',
-        'https://open.spotify.com/artist/x'
-      )
-    ).toBeNull();
+    expect(classifyMusicBrainzRelation('streaming music', SITE)).toBeNull();
   });
-});
 
-describe('extractMusicBrainzIdentityLinks', () => {
-  it('extracts and normalizes artist-controlled links', () => {
-    const { links, conflicts } = extractMusicBrainzIdentityLinks(
+  it('dedupes canonical identities and conflicts distinct ones', () => {
+    const clean = extractMusicBrainzIdentityLinks(
       mbArtist([
-        rel('official homepage', 'https://www.feddelegrand.com/'),
-        rel('instagram', 'https://instagram.com/feddelegrand'),
+        rel('official homepage', `https://www.feddelegrand.com/`),
+        rel('instagram', IG),
         rel('twitter', 'https://twitter.com/feddelegrand'),
       ])
     );
-    expect(conflicts).toEqual({});
-    const platforms = links.map(l => l.platform).sort();
-    expect(platforms).toEqual(['instagram', 'twitter', 'website']);
-  });
+    expect(clean.conflictedPlatforms.size).toBe(0);
+    expect(
+      clean.links
+        .map(l => l.platform)
+        .sort()
+        .join()
+    ).toBe('instagram,twitter,website');
 
-  it('dedupes same-identity URLs and conflicts distinct identities per platform', () => {
-    // e.g. an official handle plus a fan/label page both listed
-    const { links, conflicts } = extractMusicBrainzIdentityLinks(
+    const dupes = extractMusicBrainzIdentityLinks(
       mbArtist([
         rel('instagram', 'https://instagram.com/@FeddeLeGrand/'),
         rel('social network', 'https://www.instagram.com/feddelegrand'),
-        rel('instagram', 'https://instagram.com/feddelegrand_fanclub'),
+        rel('instagram', 'https://instagram.com/fedde_fanclub'),
         rel('official homepage', 'https://old-fan-site.example.com', {
           ended: true,
         }),
       ])
     );
-    // Same canonical identity collapses; the fanclub handle conflicts; the
-    // ended relation is ignored.
-    expect(links.filter(l => l.platform === 'instagram')).toHaveLength(0);
-    expect(conflicts.instagram).toHaveLength(2);
-    expect(links.filter(l => l.platform === 'website')).toHaveLength(0);
+    expect(dupes.links.filter(l => l.platform === 'instagram')).toHaveLength(0);
+    expect(dupes.conflictedPlatforms.has('instagram')).toBe(true);
+    expect(dupes.links.filter(l => l.platform === 'website')).toHaveLength(0);
   });
 });
 
-describe('pickMusicBrainzArtistByIsrcSupport', () => {
-  it('selects the artist backed by the most distinct ISRCs', () => {
-    const outcome = pickMusicBrainzArtistByIsrcSupport([
-      { isrc: 'A', artistIds: ['mb-1', 'mb-label'] },
-      { isrc: 'B', artistIds: ['mb-1'] },
-      { isrc: 'C', artistIds: ['mb-1'] },
-      { isrc: 'D', artistIds: ['mb-label'] },
-    ]);
-    expect(outcome).toEqual({ kind: 'matched', mbid: 'mb-1', isrcCount: 3 });
-  });
-
-  it('reports conflicted on a support tie — never resolves by name', () => {
-    const outcome = pickMusicBrainzArtistByIsrcSupport([
-      { isrc: 'A', artistIds: ['mb-1'] },
-      { isrc: 'B', artistIds: ['mb-1'] },
-      { isrc: 'C', artistIds: ['mb-2'] },
-      { isrc: 'D', artistIds: ['mb-2'] },
-    ]);
-    expect(outcome).toEqual({
-      kind: 'conflicted',
-      candidates: ['mb-1', 'mb-2'],
+describe('matchMusicBrainzArtistForIsrcs', () => {
+  it('short-circuits without enough ISRCs or a provider', async () => {
+    await expect(matchMusicBrainzArtistForIsrcs(['A'])).resolves.toEqual({
+      kind: 'not_checked',
+      reason: 'insufficient_isrcs',
+    });
+    available.mockReturnValue(false);
+    await expect(matchMusicBrainzArtistForIsrcs(['A', 'B'])).resolves.toEqual({
+      kind: 'not_checked',
+      reason: 'musicbrainz_unavailable',
     });
   });
 
-  it('returns not_found below the minimum ISRC support', () => {
-    expect(
-      pickMusicBrainzArtistByIsrcSupport([{ isrc: 'A', artistIds: ['mb-1'] }])
-    ).toEqual({ kind: 'not_found' });
+  it('matches the exact artist shared across ISRCs', async () => {
+    lookup
+      .mockResolvedValueOnce(recording('mb-1'))
+      .mockResolvedValueOnce(recording('mb-1'));
+    await expect(matchMusicBrainzArtistForIsrcs(['A', 'B'])).resolves.toEqual({
+      kind: 'matched',
+      mbid: 'mb-1',
+      isrcCount: 2,
+    });
+    lookup.mockRejectedValue(new Error('rate limited'));
+    await expect(matchMusicBrainzArtistForIsrcs(['A', 'B'])).resolves.toEqual({
+      kind: 'not_checked',
+      reason: 'musicbrainz_error',
+    });
   });
 });
 
-describe('deriveShareReadiness', () => {
-  it('requires two verified destinations and no conflicts', () => {
-    const base = { observedAt: 'now', sources: [] };
+describe('enrichArtistIdentity', () => {
+  const input = {
+    spotifyId: 'sp-1',
+    spotifyUrl: 'https://open.spotify.com/artist/sp-1',
+    isrcs: ['A', 'B'],
+    now: new Date('2026-09-26T00:00:00Z'),
+  };
+
+  it('merges Spotify identity with matched MusicBrainz url-rels', async () => {
+    lookup.mockResolvedValue(recording('mb-1'));
+    getArtist.mockResolvedValue(
+      mbArtist([rel('instagram', IG), rel('official homepage', SITE)]) as never
+    );
+    const result = await enrichArtistIdentity(input);
+    expect(result.musicBrainzArtistId).toBe('mbid-1');
     expect(
-      deriveShareReadiness({
-        spotify: { ...base, status: 'verified' },
-        website: { ...base, status: 'verified' },
-      })
-    ).toBe('ready');
-    expect(
-      deriveShareReadiness({
-        spotify: { ...base, status: 'verified' },
-        website: { ...base, status: 'not_found' },
-      })
-    ).toBe('limited');
-    expect(
-      deriveShareReadiness({
-        spotify: { ...base, status: 'verified' },
-        website: { ...base, status: 'verified' },
-        instagram: { ...base, status: 'conflicted' },
-      })
-    ).toBe('limited');
+      result.links
+        .map(l => l.platform)
+        .sort()
+        .join()
+    ).toBe('instagram,spotify,website');
+    expect(result.platformStatus.instagram.status).toBe('verified');
+    expect(result.platformStatus.tiktok.status).toBe('not_found');
+    expect(result.shareReadiness).toBe('ready');
+  });
+
+  it('marks unchecked, conflicted, and degraded platforms distinctly', async () => {
+    const unchecked = await enrichArtistIdentity({ ...input, isrcs: ['A'] });
+    expect(unchecked.musicBrainzArtistId).toBeNull();
+    expect(unchecked.platformStatus.website.status).toBe('not_checked');
+    expect(unchecked.platformStatus.spotify.status).toBe('verified');
+    expect(unchecked.shareReadiness).toBe('limited');
+    expect(unchecked.links).toHaveLength(1);
+
+    lookup.mockResolvedValue([
+      {
+        'artist-credit': [
+          { artist: { id: 'mb-1' } },
+          { artist: { id: 'mb-2' } },
+        ],
+      },
+    ] as never);
+    const tied = await enrichArtistIdentity(input);
+    expect(tied.platformStatus.musicbrainz.status).toBe('conflicted');
+
+    lookup.mockResolvedValue(recording('mb-1'));
+    getArtist.mockRejectedValue(new Error('mb down'));
+    const degraded = await enrichArtistIdentity(input);
+    expect(degraded.platformStatus.website.status).toBe('not_checked');
+    expect(degraded.shareReadiness).toBe('limited');
   });
 });
 
-describe('identityEnrichment settings roundtrip', () => {
+describe('applyArtistIdentityEnrichment', () => {
+  const link = (platform: string, url: string) => ({
+    platform,
+    platformType: 'social',
+    url,
+    canonicalIdentity: identityKeyForLink(platform, url),
+    confidence: 1,
+    source: 'spotify' as const,
+    sourceEntityId: 'sp-1',
+  });
   const enrichment = {
     observedAt: '2026-09-26T00:00:00.000Z',
     musicBrainzArtistId: 'mb-1',
-    links: [],
-    platformStatus: {
-      spotify: {
-        status: 'verified',
-        observedAt: '2026-09-26T00:00:00.000Z',
-        sources: ['spotify'],
-      },
-    },
-    shareReadiness: 'limited' as const,
+    links: [
+      link('spotify', 'https://open.spotify.com/artist/sp-1'),
+      link('instagram', IG),
+    ],
+    platformStatus: {},
+    shareReadiness: 'ready' as const,
   };
 
-  it('reads back a stored record and reports it as fresh', () => {
-    const settings = { identityEnrichment: enrichment };
-    expect(readArtistIdentityEnrichment(settings)).toEqual(enrichment);
-    expect(needsIdentityEnrichment(settings)).toBe(false);
-  });
+  function fakeTx(existing: { url: string; platform: string }[]) {
+    const inserted: Record<string, unknown>[] = [];
+    const tx = {
+      select: () => ({ from: () => ({ where: async () => existing }) }),
+      insert: () => ({
+        values: (v: Record<string, unknown>) => (
+          inserted.push(v), { onConflictDoNothing: async () => {} }
+        ),
+      }),
+      update: () => ({ set: () => ({ where: async () => {} }) }),
+    } as unknown as DbOrTransaction;
+    return { tx, inserted };
+  }
 
-  it('treats missing or malformed records as needing enrichment', () => {
-    expect(readArtistIdentityEnrichment({})).toBeNull();
-    expect(
-      readArtistIdentityEnrichment({ identityEnrichment: { junk: true } })
-    ).toBeNull();
-    expect(needsIdentityEnrichment({})).toBe(true);
-  });
+  it('inserts only new canonical identities, idempotently', async () => {
+    const existing = [
+      { url: 'https://open.spotify.com/artist/sp-1', platform: 'spotify' },
+    ];
+    const first = fakeTx(existing);
+    const applied = await applyArtistIdentityEnrichment(
+      first.tx,
+      'prof-1',
+      enrichment
+    );
+    expect(applied.inserted).toBe(1);
+    expect(first.inserted[0]).toMatchObject({
+      creatorProfileId: 'prof-1',
+      platform: 'instagram',
+      sourceType: 'ingested',
+    });
 
-  it('re-enriches records older than the freshness cutoff', () => {
-    const settings = { identityEnrichment: enrichment };
-    expect(
-      needsIdentityEnrichment(settings, new Date('2026-09-27T00:00:00Z'))
-    ).toBe(true);
-    expect(
-      needsIdentityEnrichment(settings, new Date('2026-09-25T00:00:00Z'))
-    ).toBe(false);
+    const second = fakeTx([...existing, { url: IG, platform: 'instagram' }]);
+    const reapplied = await applyArtistIdentityEnrichment(
+      second.tx,
+      'prof-1',
+      enrichment
+    );
+    expect(reapplied.inserted).toBe(0);
+    expect(second.inserted).toHaveLength(0);
   });
 });

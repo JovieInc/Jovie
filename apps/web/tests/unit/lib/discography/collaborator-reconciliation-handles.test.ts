@@ -62,8 +62,6 @@ vi.mock('drizzle-orm', () => {
 vi.mock('@/lib/db/schema/content', () => ({
   artists: { _: { name: 'artists' } },
   discogReleases: { _: { name: 'discogReleases' } },
-  discogRecordings: { _: { name: 'discogRecordings' } },
-  discogReleaseTracks: { _: { name: 'discogReleaseTracks' } },
   releaseArtists: { _: { name: 'releaseArtists' } },
 }));
 vi.mock('@/lib/db/schema/links', () => ({
@@ -104,13 +102,6 @@ vi.mock('@/lib/spotify', () => ({
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-// Identity enrichment (JOV-6529) is covered in its own suite; stubbed here
-// so handle-selection assertions stay focused.
-vi.mock('@/lib/discography/artist-identity-enrichment', () => ({
-  applyArtistIdentityEnrichment: vi.fn(async () => ({ inserted: 0 })),
-  enrichArtistIdentity: vi.fn(async () => undefined),
-  needsIdentityEnrichment: vi.fn(() => false),
-}));
 
 let mockTx: Record<string, unknown>;
 
@@ -128,11 +119,10 @@ const ARTIST_SPOTIFY_ID = 'sp-fedde';
  *  1. tx owner exact-profile check (bindOwnerRegistryArtist)
  *  2. tx owner registry-binding check (bindOwnerRegistryArtist)
  *  3. db.selectDistinct credited-artist candidates
- *  4. db.selectDistinct artist-credit ISRCs for identity enrichment (JOV-6529)
- *  5. tx artist lock select
- *  6. tx exact-ID profiles
- *  7. tx friendly-candidate taken batch (JOV-6528)
- *  8. tx chosen-handle owner
+ *  4. tx artist lock select
+ *  5. tx exact-ID profiles
+ *  6. tx friendly-candidate taken batch (JOV-6528)
+ *  7. tx chosen-handle owner
  */
 function seedCreatedPath(friendlyTaken: Row[]) {
   hoisted.selectResults = [
@@ -147,7 +137,6 @@ function seedCreatedPath(friendlyTaken: Row[]) {
         imageUrl: null,
       },
     ],
-    [], // ISRC sample for identity enrichment
     [
       {
         id: ARTIST_ID,
