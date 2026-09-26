@@ -23,6 +23,7 @@ import {
   changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
+  formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
   listAllChangedFiles,
@@ -53,10 +54,20 @@ const PACKAGE_JSON = JSON.parse(
 );
 
 const HOSTED_GROUP_JOBS = [
-  { jobId: 'ci-fast-typecheck', nextJobId: 'ci-fast-remaining' },
+  {
+    jobId: 'ci-fast-typecheck',
+    nextJobId: 'ci-fast-remaining',
+    jobName: 'ci-fast (typecheck)',
+  },
   {
     jobId: 'ci-fast-remaining',
     nextJobId: 'ci-profile-admission-browser',
+    jobName: 'ci-fast (remaining)',
+  },
+  {
+    jobId: 'ci-fast-structural-web',
+    nextJobId: 'ci-knip',
+    jobName: 'ci-fast (structural web)',
   },
 ];
 
@@ -1074,23 +1085,38 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
-    const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
-      const block = jobBlock(jobId, nextJobId);
-      const selector = block.match(/CI_FAST_LANE_GROUP:\s*([^\s]+)/)?.[1];
-      expect(selector, `missing hosted selector in ${jobId}`).toBeDefined();
-      expect(block).toContain(`name: ci-fast (${selector})`);
-      expect(block).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
-      );
-      expect(block).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
-      expect(block).not.toContain('always()');
-      expect(block).toMatch(/needs\.ci-path-changes\.result == 'success'/);
-      expect(block).toMatch(/github\.event_name != 'merge_group'/);
-      expect(block).toMatch(
-        /needs\.ci-merge-group-admission\.result == 'success'/
-      );
-      return selector;
-    });
+    const hostedSelectors = HOSTED_GROUP_JOBS.map(
+      ({ jobId, nextJobId, jobName }) => {
+        const block = jobBlock(jobId, nextJobId);
+        const selectors = [
+          ...new Set(
+            [...block.matchAll(/CI_FAST_LANE_GROUP:\s*([^\s]+)/g)].map(
+              match => match[1]
+            )
+          ),
+        ];
+        // One hosted group per job (web's structural step uses the aliased
+        // remaining structural env, which never appears textually here).
+        expect(selectors, `hosted selectors in ${jobId}`).toHaveLength(1);
+        const [selector] = selectors;
+        expect(block).toContain(`name: ${jobName}`);
+        expect(block).toMatch(
+          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+        );
+        expect(block).not.toContain('always()');
+        // Aliased gate jobs share remaining's anchored condition verbatim.
+        const gate = block.includes('if: *ci-fast-gate\n')
+          ? WORKFLOW.slice(WORKFLOW.indexOf('if: &ci-fast-gate >-'))
+          : block;
+        expect(gate).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
+        expect(gate).toMatch(/needs\.ci-path-changes\.result == 'success'/);
+        expect(gate).toMatch(/github\.event_name != 'merge_group'/);
+        expect(gate).toMatch(
+          /needs\.ci-merge-group-admission\.result == 'success'/
+        );
+        return selector;
+      }
+    );
 
     expect(new Set(hostedSelectors).size).toBe(hostedSelectors.length);
     expect([...hostedSelectors].sort()).toEqual(
@@ -1174,10 +1200,10 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
-    expect(LANE_GROUPS.remaining).toContain('design-conformance');
+    expect(LANE_GROUPS.web).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
     expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
@@ -1267,7 +1293,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
     for (const requiredPath of [
@@ -1712,7 +1738,7 @@ describe('ci-fast bounded parallel workflow', () => {
           '-c',
           remaining
             .split(`name: ${name}`)[1]
-            .split('run: |\n')[1]
+            .split(/run: (?:&[\w-]+ )?\|\n/)[1]
             .split('\n      - ')[0],
         ],
         { env, encoding: 'utf8', timeout: 9000 }
@@ -1836,6 +1862,12 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(failed.length).toBeGreaterThan(1);
       expect(skippedByFailFast.map(lane => lane.id)).toEqual(['structural']);
       expect(payload.lanes.at(-1).id).toBe('structural');
+      // Per-lane wall time is in the job log, not only the artifact.
+      for (const lane of payload.lanes) {
+        expect(result.stdout).toContain(
+          `[ci-fast] ${lane.id}: ${lane.status} (${formatLaneDuration(lane.durationMs)})`
+        );
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -1892,9 +1924,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).not.toMatch(
       /run-actionlint\.sh|rhysd\/actionlint|actions\/setup-python|python -m pip install/
     );
+    // actionlint reads only checked-out workflows, so it runs unconditionally
+    // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- name: Run actionlint \(structural\)\n\s+if: \$\{\{ success\(\) && steps\.structural\.outputs\.skip != 'true' \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
+    expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
     expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');
@@ -1956,7 +1991,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
     const aliases = web.match(/(?<= \*)[\w-]+/g);
-    expect(aliases).toHaveLength(8);
+    expect(aliases).toHaveLength(11);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_WEB: skip');
     expect(web).toContain('CI_FAST_STRUCTURAL_WEB: only');
@@ -1968,8 +2003,79 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('moves the slowest cheap lanes into a background web group without dropping any', () => {
+    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const at = marker => web.indexOf(marker);
+    const stepBody = name =>
+      web.split(`- name: ${name}\n`)[1].split('\n      - ')[0];
+
+    // Partition: every lane runs in exactly one hosted group.
+    expect(LANE_GROUPS.web).toEqual([
+      'design-conformance',
+      'profile-admission',
+    ]);
+    for (const laneId of LANE_GROUPS.web) {
+      expect(LANE_GROUPS.remaining).not.toContain(laneId);
+      expect(LANE_GROUPS.typecheck).not.toContain(laneId);
+    }
+    const hosted = [
+      ...LANE_GROUPS.typecheck,
+      ...LANE_GROUPS.remaining,
+      ...LANE_GROUPS.web,
+    ];
+    expect(hosted).toHaveLength(selectLanes().length);
+    expect([...hosted].sort()).toEqual(
+      selectLanes()
+        .map(lane => lane.id)
+        .sort()
+    );
+    expect(selectLanes('web').map(lane => lane.id)).toEqual(LANE_GROUPS.web);
+    expect(LANE_GROUPS.web).not.toContain('structural');
+
+    // Unconditional background start once history exists, awaited after the
+    // structural web step even when it fails, and gated like remaining.
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'CI_FAST_LANE_GROUP: web'
+    );
+    expect(stepBody('Start ci-fast lanes')).not.toContain('if:');
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'run: *ci-fast-lanes-start'
+    );
+    expect(remaining).toContain('run: &ci-fast-lanes-start |');
+    expect(remaining).toContain('run: &ci-fast-lanes-await |');
+    expect(at('- name: Start ci-fast lanes')).toBeGreaterThan(
+      at('- name: Fetch base-branch history')
+    );
+    expect(at('- name: Start ci-fast lanes')).toBeLessThan(
+      at('- name: Setup Playwright (Chromium)')
+    );
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Run structural web commands')
+    );
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      "if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}"
+    );
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      'run: *ci-fast-lanes-await'
+    );
+    // Fail-fast: the aliased structural env reads this job's lane status.
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'LANES_DIR: ${{ runner.temp }}/ci-fast-lanes-bg\n'
+    );
+    expect(stepBody('Run structural web commands')).toContain(
+      'env: *structural-run-env'
+    );
+    expect(web).toContain(
+      'name: ci-fast-lanes-web-${{ github.run_id }}-${{ github.run_attempt }}'
+    );
+  });
+
   it('runs a bounded public-profile admission subset on source and merge-group heads', () => {
-    expect(LANE_GROUPS.remaining).toContain('profile-admission');
+    expect(LANE_GROUPS.web).toContain('profile-admission');
     expect(LANE_COMMANDS['profile-admission']).toContain(
       'tests/unit/api/profile/capture-dismissal.test.ts'
     );
@@ -2265,7 +2371,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
