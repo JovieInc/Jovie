@@ -333,3 +333,84 @@ describe('uses where a stale event base SHA is acceptable', () => {
     }
   });
 });
+
+describe('base-branch fetch await (ci.yml &base-fetch-await)', () => {
+  /** The anchored await script shared by the ci-fast jobs. */
+  function awaitScript() {
+    const body = workflow('ci.yml').match(
+      /\n {8}run: &base-fetch-await \|\n((?: {10}.*\n?|\n)+?)(?= {6}- )/u
+    )?.[1];
+    if (!body) throw new Error('ci.yml: &base-fetch-await is missing');
+    return body.replace(/^ {10}/gmu, '');
+  }
+
+  /**
+   * origin/main: root -> base-at-checkout -> merged-after-checkout
+   * checkout:    merge(base-at-checkout, feature-work), like refs/pull/N/merge
+   * The background fetch lands origin/main at merged-after-checkout.
+   */
+  function racedCheckout() {
+    const root = mkdtempSync(join(tmpdir(), 'raced-pr-base-'));
+    dirs.push(root);
+    const origin = join(root, 'origin');
+    const clone = join(root, 'clone');
+    execFileSync('git', ['init', '-q', '-b', 'main', origin]);
+    git(origin, ['config', 'user.email', 'ci@example.com']);
+    git(origin, ['config', 'user.name', 'ci']);
+    commit(origin, 'root');
+    git(origin, ['checkout', '-q', '-b', 'feature']);
+    commit(origin, 'feature-work');
+    git(origin, ['checkout', '-q', 'main']);
+    const baseAtCheckout = commit(origin, 'base-at-checkout');
+    execFileSync('git', ['clone', '-q', `file://${origin}`, clone]);
+    git(clone, ['config', 'user.email', 'ci@example.com']);
+    git(clone, ['config', 'user.name', 'ci']);
+    git(clone, ['checkout', '-q', '--detach', baseAtCheckout]);
+    git(clone, ['merge', '-q', '--no-edit', 'origin/feature']);
+    const head = git(clone, ['rev-parse', 'HEAD']);
+    commit(origin, 'merged-after-checkout');
+    git(clone, [
+      'fetch',
+      '-q',
+      'origin',
+      '+refs/heads/main:refs/remotes/origin/main',
+    ]);
+    const fetchDir = join(root, 'fetch');
+    execFileSync('mkdir', ['-p', fetchDir]);
+    writeFileSync(join(fetchDir, 'status'), '0\n');
+    return { clone, fetchDir, head, baseAtCheckout };
+  }
+
+  it('pins origin/<base> to the pull_request merge base so later merges are not counted as PR changes', () => {
+    const repo = racedCheckout();
+    expect(
+      git(repo.clone, ['diff', '--name-only', 'origin/main', 'HEAD']).split(
+        '\n'
+      )
+    ).toContain('merged-after-checkout.txt');
+    const result = runStep(awaitScript(), repo.clone, {
+      BASE_BRANCH: 'main',
+      BASE_FETCH_DIR: repo.fetchDir,
+      EVENT_NAME: 'pull_request',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(repo.clone, ['rev-parse', 'origin/main'])).toBe(
+      repo.baseAtCheckout
+    );
+    expect(
+      git(repo.clone, ['diff', '--name-only', 'origin/main', 'HEAD'])
+    ).toBe('feature-work.txt');
+  });
+
+  it('leaves origin/<base> at the fetched tip outside pull_request events', () => {
+    const repo = racedCheckout();
+    const fetched = git(repo.clone, ['rev-parse', 'origin/main']);
+    const result = runStep(awaitScript(), repo.clone, {
+      BASE_BRANCH: 'main',
+      BASE_FETCH_DIR: repo.fetchDir,
+      EVENT_NAME: 'merge_group',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(repo.clone, ['rev-parse', 'origin/main'])).toBe(fetched);
+  });
+});
