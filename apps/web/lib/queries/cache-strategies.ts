@@ -8,6 +8,10 @@
  * - Public profiles: Use Next.js SSR (unstable_cache + ISR) for fast TTFB
  * - App data: Use these TanStack Query strategies for client caching
  */
+import {
+  classifiedQueryRetry,
+  classifiedQueryRetryDelay,
+} from './retry-policy';
 
 // Time constants
 const SECOND = 1000;
@@ -167,11 +171,13 @@ export const FREQUENT_BACKGROUND_CACHE: CacheStrategyOptions = {
 // =============================================================================
 
 /**
- * Reusable retry config: 3 retries with exponential backoff capped at 30s.
+ * Reusable retry config: the shared classified retry policy (JOV-6185).
+ * Transient failures retry with bounded backoff/jitter and Retry-After
+ * honoring; cancellation, auth, and decode failures never retry.
  * Use for: analytics, DSP enrichment, and other queries that benefit from
  * retrying transient failures.
  */
 export const RETRY_BACKOFF = {
-  retry: 3,
-  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000),
+  retry: classifiedQueryRetry,
+  retryDelay: classifiedQueryRetryDelay,
 } as const;

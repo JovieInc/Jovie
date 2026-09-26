@@ -430,6 +430,15 @@ export const queryKeys = {
     all: ['earnings'] as const,
     stats: () => [...queryKeys.earnings.all, 'stats'] as const,
   },
+
+  // HUD ops metrics (admin dashboard + kiosk TV). The scope segment is the
+  // access mode only — raw kiosk tokens are secrets and must never appear in
+  // query keys (JOV-6185).
+  hud: {
+    all: ['hud'] as const,
+    metrics: (access: 'admin' | 'kiosk') =>
+      [...queryKeys.hud.all, 'metrics', access] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

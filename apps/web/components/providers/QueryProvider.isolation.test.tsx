@@ -7,6 +7,10 @@ import {
 } from '@/lib/queries/cache-isolation';
 import { queryKeys } from '@/lib/queries/keys';
 import {
+  classifiedQueryRetry,
+  classifiedQueryRetryDelay,
+} from '@/lib/queries/retry-policy';
+import {
   fenceBrowserQueryClient,
   getBrowserQueryClientForTests,
   QueryProvider,
@@ -15,9 +19,20 @@ import {
 
 function RetryProbe() {
   const queryClient = useQueryClient();
+  const retry = queryClient.getDefaultOptions().queries?.retry;
   return (
     <span data-testid='query-retry'>
-      {String(queryClient.getDefaultOptions().queries?.retry)}
+      {retry === classifiedQueryRetry ? 'classified' : String(retry)}
+    </span>
+  );
+}
+
+function RetryDelayProbe() {
+  const queryClient = useQueryClient();
+  const retryDelay = queryClient.getDefaultOptions().queries?.retryDelay;
+  return (
+    <span data-testid='query-retry-delay'>
+      {retryDelay === classifiedQueryRetryDelay ? 'classified' : 'other'}
     </span>
   );
 }
@@ -43,15 +58,17 @@ describe('QueryProvider cache isolation (JOV-6186)', () => {
     resetBrowserQueryClientForTests();
   });
 
-  it('keeps TanStack Query retry defaults for JOV-6185', () => {
+  it('uses the shared classified retry policy and keeps mutations at zero', () => {
     const { getByTestId } = render(
       <QueryProvider>
         <RetryProbe />
+        <RetryDelayProbe />
         <MutationRetryProbe />
       </QueryProvider>
     );
 
-    expect(getByTestId('query-retry').textContent).toBe('3');
+    expect(getByTestId('query-retry').textContent).toBe('classified');
+    expect(getByTestId('query-retry-delay').textContent).toBe('classified');
     expect(getByTestId('mutation-retry').textContent).toBe('0');
   });
 
@@ -94,6 +111,6 @@ describe('QueryProvider cache isolation (JOV-6186)', () => {
       sessionId: 'sess-b',
     });
 
-    expect(getByTestId('query-retry').textContent).toBe('3');
+    expect(getByTestId('query-retry').textContent).toBe('classified');
   });
 });
