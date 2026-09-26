@@ -6,6 +6,7 @@ import {
   defineConfig,
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
+import { readCliExcludePatterns } from '../../scripts/lib/ci-web-vitest-fast-args.mjs';
 import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
 
@@ -108,6 +109,13 @@ const flakyOutputFile = junitOutputFile.replace(
   '.flaky.json'
 );
 
+// Vitest drops CLI `--exclude` for `test.projects` (it only reaches the root
+// config), so the quarantine ledger's `--exclude=<path>` flags stopped
+// excluding anything once the node/jsdom projects landed and quarantined files
+// ran blocking in the sharded unit run. Fold them into the root exclude that
+// both projects inherit (`extends: true`).
+const cliExcludePatterns = readCliExcludePatterns(process.argv);
+
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
 // Keep this mode deterministic by running in a single long-lived fork with
@@ -192,6 +200,7 @@ export default defineConfig({
       ...(isCoverageRun
         ? ['tests/unit/ci/playwright-artifact-secrets.test.ts']
         : []),
+      ...cliExcludePatterns,
     ],
 
     // Performance optimizations
