@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { existsSync, readFileSync } from 'node:fs';
+import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { env } from '@/lib/env-server';
@@ -211,12 +212,13 @@ export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
+  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr, funnel] =
     await Promise.all([
       getAdminStripeOverviewMetrics(),
       getAdminMercuryMetrics(),
       getOvieMacHudInFlightPullRequests(),
       getLybDailyMrr(new Date(nowMs)),
+      getFounderFunnelData('30d').catch(() => null),
     ]);
   const shipping = readShippingEntries();
   const financialAvailable =
@@ -257,6 +259,7 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    decisionExtras: { funnel },
     lybMrr,
     generatedAtIso,
     nowMs,
