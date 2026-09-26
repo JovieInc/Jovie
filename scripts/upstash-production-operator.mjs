@@ -118,9 +118,10 @@ export function createUpstashProductionOperator({
     async quota() {
       const database = await request('database');
       const identity = verifyJovieProductionDatabase(database);
-      const stats = /** @type {{ total_monthly_requests?: number } | undefined} */ (
-        await request('stats')
-      );
+      const stats =
+        /** @type {{ total_monthly_requests?: number } | undefined} */ (
+          await request('stats')
+        );
       const headroom = evaluateQuotaHeadroom(stats?.total_monthly_requests);
       return { identity, headroom };
     },
