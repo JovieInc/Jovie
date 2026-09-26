@@ -28,7 +28,9 @@ test('ignores non-deprecation lines and echoed shell source', () => {
 
 test('normalizes runner paths so fingerprints are stable', () => {
   assert.equal(
-    normalizeWarning('(node:1) warn /home/runner/work/Jovie/Jovie/x.js deprecated'),
+    normalizeWarning(
+      '(node:1) warn /home/runner/work/Jovie/Jovie/x.js deprecated'
+    ),
     '(node) warn <path> deprecated'
   );
 });

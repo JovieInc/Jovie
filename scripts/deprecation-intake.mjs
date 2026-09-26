@@ -49,6 +49,7 @@ async function resolveLabelId(name, apiKey) {
       variables: { teamId: JOVIE_TEAM_ID, name },
     }),
   });
+  /** @type {{ data?: { team?: { labels?: { nodes?: Array<{ id: string }> } } } }} */
   const body = await response.json();
   return body?.data?.team?.labels?.nodes?.[0]?.id ?? null;
 }
@@ -87,7 +88,9 @@ async function main() {
       createLabelIds: [devinLabel],
       apiKey,
     });
-    console.log(`[deprecation-intake] ${fingerprint}: ${JSON.stringify({ ok: result.ok, action: result.action, id: result.identifier, reason: result.reason })}`);
+    console.log(
+      `[deprecation-intake] ${fingerprint}: ${JSON.stringify({ ok: result.ok, action: result.action, id: result.identifier, reason: result.reason })}`
+    );
     if (!result.ok) process.exitCode = 1;
   }
 }
