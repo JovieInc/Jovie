@@ -67,7 +67,7 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--app-shell-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
+      /:root\.dark[\s\S]*--linear-bg-page:\s*#07080a;/
     );
     expect(designSystem).toMatch(
       /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*6 8 13;/

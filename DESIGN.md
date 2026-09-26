@@ -148,7 +148,7 @@ Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these n
 
 | Surface | Dark value |
 |---|---|
-| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
 
 ## Spacing
 

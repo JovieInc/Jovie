@@ -1174,12 +1174,13 @@ html[data-profile-initial-mode]
 */
 
 :root {
-  /* Noir Ion ziawi lock (2026-09-09–10) — light 5-step ladder + 6 accents. */
-  --noir-ion-canvas: #f8fafd;
-  --noir-ion-shell: #f3f5f8;
-  --noir-ion-card: #eaedf1;
-  --noir-ion-elevated: #dfe3e8;
-  --noir-ion-floating: #d4d9e0;
+  /* Noir Ion ziawi lock (2026-09-09–10, re-locked 2026-09-25: raised = lighter) —
+     light 5-step ladder + 6 accents. */
+  --noir-ion-canvas: #f3f4f6;
+  --noir-ion-shell: #f9fafc;
+  --noir-ion-card: #ffffff;
+  --noir-ion-elevated: #ffffff;
+  --noir-ion-floating: #ffffff;
   --noir-ion-ion: #11afff;
   --noir-ion-ion-solid: #11afff;
   --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
@@ -1231,7 +1232,9 @@ html[data-profile-initial-mode]
   --color-bg-hover: rgba(0, 0, 0, 0.04);
   --color-bg-elevated: var(--noir-ion-elevated);
   --color-bg-input: var(--noir-ion-card);
-  --color-bg-active: var(--noir-ion-elevated);
+  /* Raised = lighter (ZiaWI re-lock 2026-09-25): card/elevated/floating are all
+     white, so the active state uses a tint instead of a surface step. */
+  --color-bg-active: rgba(0, 0, 0, 0.06);
   --color-bg-primary: var(--noir-ion-card);
   --color-bg-secondary: var(--noir-ion-shell);
   --color-bg-button: var(--noir-ion-elevated);
@@ -1460,11 +1463,11 @@ html[data-profile-initial-mode]
 /* Dark mode — Jovie Noir Ion ziawi lock (2026-09-09–10).
    Exactly 5 surfaces. Focus = ion. Aqua/gold/flare alias mint/orange/red. */
 :root.dark {
-  --noir-ion-canvas: #030407;
-  --noir-ion-shell: #06080d;
-  --noir-ion-card: #0f1420;
-  --noir-ion-elevated: #151b2a;
-  --noir-ion-floating: #1b2436;
+  --noir-ion-canvas: #030406;
+  --noir-ion-shell: #07080a;
+  --noir-ion-card: #131417;
+  --noir-ion-elevated: #1a1b1e;
+  --noir-ion-floating: #232427;
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
   --noir-ion-text-secondary: #d7dce8;
@@ -1503,7 +1506,7 @@ html[data-profile-initial-mode]
   --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
-  --app-shell-content-surface: #0f1420;
+  --app-shell-content-surface: #131417;
   --app-shell-card-shadow: none;
   --app-shell-border: rgba(168, 176, 195, 0.12);
   --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
@@ -2594,16 +2597,16 @@ html[data-profile-initial-mode]
 
 .system-b-marketing.dark,
 :root.dark .system-b-marketing {
-  --color-bg-base: #030407;
-  --color-bg-surface-0: #06080d;
-  --color-bg-surface-1: #0f1420;
-  --color-bg-surface-2: #151b2a;
-  --color-bg-surface-3: #1b2436;
-  --color-bg-page: #030407;
+  --color-bg-base: #030406;
+  --color-bg-surface-0: #07080a;
+  --color-bg-surface-1: #131417;
+  --color-bg-surface-2: #1a1b1e;
+  --color-bg-surface-3: #232427;
+  --color-bg-page: #030406;
   --color-bg-hover: rgba(168, 176, 195, 0.06);
   --color-bg-elevated: #0a0d16;
-  --color-bg-input: #0f1420;
-  --color-bg-active: #151b2a;
+  --color-bg-input: #131417;
+  --color-bg-active: #1a1b1e;
   --color-base: var(--color-bg-base);
   --color-surface-0: var(--color-bg-surface-0);
   --color-surface-1: var(--color-bg-surface-1);

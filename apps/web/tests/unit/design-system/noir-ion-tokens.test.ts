@@ -81,11 +81,11 @@ describe('Noir Ion — approved dark anchors', () => {
   });
 
   it('defines exactly five Noir Ion surfaces and maps product tokens to them', () => {
-    expect(dsDark).toContain('--noir-ion-canvas: #030407;');
-    expect(dsDark).toContain('--noir-ion-shell: #06080d;');
-    expect(dsDark).toContain('--noir-ion-card: #0f1420;');
-    expect(dsDark).toContain('--noir-ion-elevated: #151b2a;');
-    expect(dsDark).toContain('--noir-ion-floating: #1b2436;');
+    expect(dsDark).toContain('--noir-ion-canvas: #030406;');
+    expect(dsDark).toContain('--noir-ion-shell: #07080a;');
+    expect(dsDark).toContain('--noir-ion-card: #131417;');
+    expect(dsDark).toContain('--noir-ion-elevated: #1a1b1e;');
+    expect(dsDark).toContain('--noir-ion-floating: #232427;');
     expect(dsDark).not.toMatch(/--noir-ion-panel\s*:/);
 
     expect(dsDark).toContain('--color-bg-base: var(--noir-ion-canvas);');
@@ -95,21 +95,21 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark).toContain('--color-bg-surface-2: var(--noir-ion-elevated);');
     expect(dsDark).toContain('--color-bg-surface-3: var(--noir-ion-floating);');
     expect(dsDark).toContain('--color-bg-elevated: var(--noir-ion-elevated);');
-    expect(dsDark).toContain('--app-shell-content-surface: #0f1420;');
+    expect(dsDark).toContain('--app-shell-content-surface: #131417;');
   });
 
   it('locks the light five-step ladder', () => {
-    expect(dsLight).toContain('--noir-ion-canvas: #f8fafd;');
-    expect(dsLight).toContain('--noir-ion-shell: #f3f5f8;');
-    expect(dsLight).toContain('--noir-ion-card: #eaedf1;');
-    expect(dsLight).toContain('--noir-ion-elevated: #dfe3e8;');
-    expect(dsLight).toContain('--noir-ion-floating: #d4d9e0;');
+    expect(dsLight).toContain('--noir-ion-canvas: #f3f4f6;');
+    expect(dsLight).toContain('--noir-ion-shell: #f9fafc;');
+    expect(dsLight).toContain('--noir-ion-card: #ffffff;');
+    expect(dsLight).toContain('--noir-ion-elevated: #ffffff;');
+    expect(dsLight).toContain('--noir-ion-floating: #ffffff;');
     expect(dsLight).not.toMatch(/--noir-ion-panel\s*:/);
   });
 
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
-    expect(linearDark).toContain('--linear-bg-page: #06080d;');
-    expect(linearDark).toContain('--linear-bg-surface-1: #0f1420;');
+    expect(linearDark).toContain('--linear-bg-page: #07080a;');
+    expect(linearDark).toContain('--linear-bg-surface-1: #131417;');
     expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 6 8 13;');
   });
 
@@ -133,7 +133,7 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(linearDark).toContain(
       '--linear-row-selected: rgba(17, 175, 255, 0.1);'
     );
-    expect(linearDark).toContain('--linear-panel-bg: #0f1420;');
+    expect(linearDark).toContain('--linear-panel-bg: #131417;');
     expect(linearDark).not.toContain('--linear-panel-bg: #0a0d16;');
   });
 
