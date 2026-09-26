@@ -103,7 +103,7 @@ describe('discoverUnclaimedArtistIdentity', () => {
   });
 
   it('keys lookups on exact provider IDs, never display-name similarity', async () => {
-    const fetchMusicfetchArtist = vi.fn(async () => null);
+    const fetchMusicfetchArtist = vi.fn(async (_url: string) => null);
     const fetchers = { fetchMusicfetchArtist, fetchMusicbrainzArtist: vi.fn() };
     await discoverUnclaimedArtistIdentity({ spotifyId: 'sp-a' }, fetchers);
     await discoverUnclaimedArtistIdentity({ spotifyId: 'sp-b' }, fetchers);
