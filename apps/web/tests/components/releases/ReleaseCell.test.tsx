@@ -123,6 +123,7 @@ describe('ReleaseCell', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'release-1',
       title: 'Skyline Dreams',
+      releaseId: 'release-1',
       audioUrl: 'https://cdn.example.com/preview.mp3',
       releaseTitle: 'Skyline Dreams',
       artistName: undefined,

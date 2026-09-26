@@ -1,5 +1,6 @@
 'use client';
 
+import { QueryClientContext } from '@tanstack/react-query';
 import {
   Clock,
   ExternalLink,
@@ -14,6 +15,7 @@ import {
   type MouseEvent,
   memo,
   useCallback,
+  useContext,
   useMemo,
   useState,
 } from 'react';
@@ -38,6 +40,7 @@ import { TypeBadge } from '@/components/shell/TypeBadge';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatStreams } from '@/lib/format-streams';
+import { prefetchReleaseDetailData } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
@@ -103,6 +106,7 @@ function useArtworkPlayback(release: ReleaseViewModel) {
       toggleTrack({
         id: release.id,
         title: release.title,
+        releaseId: release.id,
         audioUrl: previewUrl,
         isrc: release.primaryIsrc ?? null,
         releaseTitle: release.title,
@@ -323,6 +327,15 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const { playbackState } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
   const [actionsOpen, setActionsOpen] = useState(false);
+  // Optional context read: rows also render in stories/tests without a
+  // QueryClientProvider — prefetch is a no-op there.
+  const queryClient = useContext(QueryClientContext);
+
+  // Warm the drawer's only cold fetch (the track list) on genuine
+  // hover/focus intent so row-to-detail opens feel immediate.
+  const prefetchDetail = useCallback(() => {
+    if (queryClient) prefetchReleaseDetailData(queryClient, release);
+  }, [queryClient, release]);
 
   const releaseEntity: EntityPopoverData = {
     kind: 'release',
@@ -353,6 +366,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
+      onPointerEnter={prefetchDetail}
+      onFocus={prefetchDetail}
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}

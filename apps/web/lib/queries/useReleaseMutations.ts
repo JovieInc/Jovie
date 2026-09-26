@@ -1,6 +1,10 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   deleteRelease,
   formatReleaseLyrics,
@@ -15,8 +19,55 @@ import {
   saveReleaseStatus,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
+import { updateNowPlayingForRelease } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
+
+/**
+ * Converge every cached view of a mutated release — the matrix row, the
+ * detail query behind entity panels/drawers, the open track list, and the
+ * now-playing bar's display metadata. Scoped to the affected release and
+ * profile only; playback state and other profiles' caches are untouched.
+ */
+function applyReleaseUpdate(
+  queryClient: QueryClient,
+  profileId: string,
+  release: ReleaseViewModel
+): void {
+  const matrixKey = queryKeys.releases.matrix(profileId);
+  const current = queryClient.getQueryData<ReleaseViewModel[]>(matrixKey);
+  if (current) {
+    queryClient.setQueryData(
+      matrixKey,
+      current.map(r => (r.id === release.id ? release : r))
+    );
+  }
+  queryClient.setQueryData(
+    queryKeys.releases.detail(profileId, release.id),
+    release
+  );
+  // Track-level fields (lyrics, previews, providers) can change without a
+  // matrix shape change — invalidate so an open track list refetches just
+  // this release's key.
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.releases.tracks(release.id),
+  });
+  updateNowPlayingForRelease(release);
+}
+
+/** Drop all cached views of a deleted release. */
+function removeReleaseCaches(
+  queryClient: QueryClient,
+  profileId: string,
+  releaseId: string
+): void {
+  queryClient.removeQueries({
+    queryKey: queryKeys.releases.detail(profileId, releaseId),
+  });
+  queryClient.removeQueries({
+    queryKey: queryKeys.releases.tracks(releaseId),
+  });
+}
 
 /**
  * Optimistically update a release's provider URL in the cache.
@@ -123,6 +174,16 @@ export function useSaveProviderOverrideMutation() {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
+      // Keep the detail view + open track list in sync with the matrix.
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.releases.detail(
+          variables.profileId,
+          variables.releaseId
+        ),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.releases.tracks(variables.releaseId),
+      });
     },
   });
 }
@@ -183,6 +244,15 @@ export function useResetProviderOverrideMutation() {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.releases.detail(
+          variables.profileId,
+          variables.releaseId
+        ),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.releases.tracks(variables.releaseId),
+      });
     },
   });
 }
@@ -212,16 +282,7 @@ export function useRefreshReleaseMutation(profileId: string) {
     mutationFn: refreshRelease,
     onSuccess: async result => {
       if (!result.rateLimited) {
-        // Update just this release in the matrix cache
-        const current = queryClient.getQueryData<ReleaseViewModel[]>(
-          queryKeys.releases.matrix(profileId)
-        );
-        if (current) {
-          queryClient.setQueryData(
-            queryKeys.releases.matrix(profileId),
-            current.map(r => (r.id === result.release.id ? result.release : r))
-          );
-        }
+        applyReleaseUpdate(queryClient, profileId, result.release);
       }
     },
   });
@@ -237,16 +298,7 @@ export function useRescanIsrcLinksMutation(profileId: string) {
     mutationFn: rescanIsrcLinks,
     onSuccess: async result => {
       if (!result.rateLimited) {
-        // Update this release in the matrix cache
-        const current = queryClient.getQueryData<ReleaseViewModel[]>(
-          queryKeys.releases.matrix(profileId)
-        );
-        if (current) {
-          queryClient.setQueryData(
-            queryKeys.releases.matrix(profileId),
-            current.map(r => (r.id === result.release.id ? result.release : r))
-          );
-        }
+        applyReleaseUpdate(queryClient, profileId, result.release);
       }
     },
   });
@@ -289,7 +341,8 @@ export function useDeleteReleaseMutation(profileId: string) {
       }
     },
 
-    onSettled: async () => {
+    onSettled: async (_data, _error, variables) => {
+      removeReleaseCaches(queryClient, profileId, variables.releaseId);
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(profileId),
       });
@@ -307,15 +360,7 @@ function useReleaseMutation<T>(
   return useMutation({
     mutationFn,
     onSuccess: async updated => {
-      const current = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(profileId)
-      );
-      if (current) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(profileId),
-          current.map(r => (r.id === updated.id ? updated : r))
-        );
-      }
+      applyReleaseUpdate(queryClient, profileId, updated);
     },
   });
 }
@@ -346,15 +391,7 @@ export function useFormatReleaseLyricsMutation(profileId: string) {
   return useMutation({
     mutationFn: formatReleaseLyrics,
     onSuccess: async ({ release }) => {
-      const current = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(profileId)
-      );
-      if (current) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(profileId),
-          current.map(r => (r.id === release.id ? release : r))
-        );
-      }
+      applyReleaseUpdate(queryClient, profileId, release);
     },
   });
 }

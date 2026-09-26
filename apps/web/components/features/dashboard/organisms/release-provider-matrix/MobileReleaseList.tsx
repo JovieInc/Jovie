@@ -2,7 +2,8 @@
 
 // @coverage-via apps/web/tests/components/release-provider-matrix/MobileReleaseList.test.tsx
 
-import { memo, useCallback, useMemo } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
+import { memo, useCallback, useContext, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   SwipeToReveal,
@@ -18,6 +19,7 @@ import { mobileReleaseTokens } from '@/features/dashboard/tokens';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { prefetchReleaseDetailData } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { shellReleaseRowTypography } from './shell-releases/ShellReleaseRow';
 
@@ -232,6 +234,15 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
+  // Optional context read: rows may render without a QueryClientProvider
+  // (tests/stories) — prefetch is a no-op there.
+  const queryClient = useContext(QueryClientContext);
+
+  // Warm the drawer's track list on focus intent (keyboard/touch focus fires
+  // before the tap opens the drawer).
+  const prefetchDetail = useCallback(() => {
+    if (queryClient) prefetchReleaseDetailData(queryClient, release);
+  }, [queryClient, release]);
 
   return (
     <SwipeToReveal
@@ -255,6 +266,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
       <ShellListRowButton
         type='button'
         onClick={() => onEdit(release)}
+        onPointerEnter={prefetchDetail}
+        onFocus={prefetchDetail}
         density='spacious'
         className='flex w-full items-center gap-3 px-4 text-left'
         data-testid={`mobile-release-row-${release.id}`}

@@ -37,6 +37,7 @@ export const ReleaseCell = memo(function ReleaseCell({
       toggleTrack({
         id: release.id,
         title: release.title,
+        releaseId: release.id,
         audioUrl: release.previewUrl,
         releaseTitle: release.title,
         artistName: primaryArtist,

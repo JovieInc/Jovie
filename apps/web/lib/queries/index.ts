@@ -109,6 +109,8 @@ export {
   handleMutationSuccess,
   type MutationCallbackOptions,
 } from './mutation-utils';
+// Release detail intent prefetch (row hover/focus)
+export { prefetchReleaseDetailData } from './prefetch-release';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
 // Account mutations (GDPR)

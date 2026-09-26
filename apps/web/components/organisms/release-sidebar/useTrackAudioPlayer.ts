@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 export interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
+  /** Owning release id — lets catalog mutations refresh now-playing metadata. */
+  readonly releaseId?: string;
   /** Required when loading a new track; omit when resuming the same track. */
   readonly audioUrl?: string;
   /** ISRC code for the track — used to fetch a fresh preview URL if the stored one expires. */
@@ -55,6 +57,8 @@ let _audio: HTMLAudioElement | null = null;
 let _playToken = 0;
 /** ISRC of the currently active track — used for preview URL refresh on expiration. */
 let _activeTrackIsrc: string | null = null;
+/** Release id of the currently active track — used to sync now-playing metadata on catalog mutations. */
+let _activeTrackReleaseId: string | null = null;
 /** Whether we already attempted a preview URL refresh for this track. Prevents infinite retry loops. */
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
@@ -273,6 +277,7 @@ function handlePlaybackFailure(
     audio.pause();
     audio.src = '';
   }
+  _activeTrackReleaseId = null;
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -304,6 +309,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
 
   const token = ++_playToken;
   _activeTrackIsrc = track.isrc ?? null;
+  _activeTrackReleaseId = track.releaseId ?? null;
   _hasRetriedRefresh = false;
   audio.pause();
   audio.src = track.audioUrl;
@@ -497,6 +503,39 @@ export function resumePlaybackAfterInterruption(
   });
 }
 
+/**
+ * Refresh now-playing metadata when a catalog mutation updates the release
+ * the active track belongs to. Only display fields change — the audio
+ * element, source URL, position, and queue are untouched, so playback never
+ * resets. Source replacement is intentionally out of scope (JOV-3689).
+ */
+export function updateNowPlayingForRelease(release: {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string | null;
+  readonly artistNames?: readonly string[];
+  readonly lyrics?: string;
+}): void {
+  if (!state.activeTrackId) return;
+  const isActiveRelease =
+    state.activeTrackId === release.id || _activeTrackReleaseId === release.id;
+  if (!isActiveRelease) return;
+
+  setState({
+    // Release-level previews use the release id as the track id and the
+    // release title as the track label — only they pick up the new title.
+    trackTitle:
+      state.activeTrackId === release.id ? release.title : state.trackTitle,
+    releaseTitle: release.title,
+    artistName: release.artistNames?.[0] ?? state.artistName,
+    artworkUrl: release.artworkUrl ?? state.artworkUrl,
+    hasLyrics:
+      release.lyrics !== undefined
+        ? Boolean(release.lyrics.trim())
+        : state.hasLyrics,
+  });
+}
+
 export function useTrackAudioPlayer() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
 
@@ -570,6 +609,7 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    _activeTrackReleaseId = null;
     clearPlaybackQueue();
     setState({
       activeTrackId: null,

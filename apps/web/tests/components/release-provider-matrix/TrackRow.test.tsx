@@ -126,6 +126,7 @@ describe('TrackRow', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Open Skies',
+      releaseId: 'release-1',
       audioUrl: 'https://cdn.example.com/track.mp3',
       artistName: undefined,
       artworkUrl: undefined,

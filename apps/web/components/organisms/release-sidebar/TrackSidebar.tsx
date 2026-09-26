@@ -284,6 +284,7 @@ export function TrackSidebar({
     toggleTrack({
       id: track.id,
       title: track.title,
+      releaseId: track.releaseId,
       audioUrl: playableUrl,
       releaseTitle: track.releaseTitle,
       artworkUrl: track.releaseArtworkUrl,

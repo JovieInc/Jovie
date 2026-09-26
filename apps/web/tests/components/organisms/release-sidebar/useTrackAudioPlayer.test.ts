@@ -548,4 +548,75 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
     expect(result.current.playbackState.trackTitle).toBe('Second Song');
   });
+
+  it('syncs now-playing metadata for the active track’s release without resetting playback', async () => {
+    const mod = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => mod.useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-9',
+        title: 'Old Song',
+        releaseId: 'release-1',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        releaseTitle: 'Old Album',
+        artworkUrl: 'https://cdn.example.com/old.jpg',
+      });
+    });
+    act(() => {
+      fireAudioEvent('play');
+    });
+
+    act(() => {
+      mod.updateNowPlayingForRelease({
+        id: 'release-1',
+        title: 'New Album',
+        artworkUrl: 'https://cdn.example.com/new.jpg',
+        artistNames: ['New Artist'],
+      });
+    });
+
+    // Metadata converges; source, position and playback are untouched.
+    expect(result.current.playbackState.releaseTitle).toBe('New Album');
+    expect(result.current.playbackState.artworkUrl).toBe(
+      'https://cdn.example.com/new.jpg'
+    );
+    expect(result.current.playbackState.artistName).toBe('New Artist');
+    // Track-level title is preserved — only release-level previews (id ===
+    // release.id) adopt the release title as their label.
+    expect(result.current.playbackState.trackTitle).toBe('Old Song');
+    expect(result.current.playbackState.activeTrackId).toBe('track-9');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(mockAudio.src).toBe('https://cdn.example.com/song.mp3');
+    expect(mockAudio.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores now-playing updates for a different release', async () => {
+    const mod = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => mod.useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-9',
+        title: 'Old Song',
+        releaseId: 'release-1',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        releaseTitle: 'Old Album',
+      });
+    });
+
+    act(() => {
+      mod.updateNowPlayingForRelease({
+        id: 'release-2',
+        title: 'Unrelated',
+      });
+    });
+
+    expect(result.current.playbackState.releaseTitle).toBe('Old Album');
+    expect(result.current.playbackState.trackTitle).toBe('Old Song');
+  });
 });

@@ -107,6 +107,7 @@ export const TrackRow = memo(function TrackRow({
       toggleTrack({
         id: track.id,
         title: track.title,
+        releaseId: release?.id ?? track.releaseId,
         audioUrl: previewUrl,
         releaseTitle: release?.title,
         artistName: release?.artistNames?.[0],
@@ -120,6 +121,8 @@ export const TrackRow = memo(function TrackRow({
       track.id,
       track.title,
       track.lyrics,
+      track.releaseId,
+      release?.id,
       release?.title,
       release?.artistNames,
       release?.artworkUrl,
@@ -169,7 +172,7 @@ export const TrackRow = memo(function TrackRow({
         {track.isExplicit ? (
           <Badge
             variant='secondary'
-            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
+            className='shrink-0'
             title='Explicit content'
             aria-label='Explicit Content'
           >
@@ -297,7 +300,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
+                    className='shrink-0'
                     title='Explicit content'
                     aria-label='Explicit Content'
                   >

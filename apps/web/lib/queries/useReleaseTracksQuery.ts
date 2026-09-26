@@ -28,7 +28,7 @@ export type ReleaseTrack = Pick<
   | 'providers'
 >;
 
-async function fetchReleaseTracks(
+export async function fetchReleaseTracks(
   releaseId: string,
   signal?: AbortSignal
 ): Promise<ReleaseTrack[]> {

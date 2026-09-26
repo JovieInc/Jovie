@@ -207,6 +207,7 @@ describe('ShellReleaseRow audio affordance', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'r1',
       title: 'Lost in the Light',
+      releaseId: 'r1',
       audioUrl: 'https://cdn.example.com/preview.mp3',
       isrc: 'USX9P2400001',
       releaseTitle: 'Lost in the Light',
