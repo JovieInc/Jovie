@@ -601,5 +601,27 @@ class UpdateTest(unittest.TestCase):
                     os.environ["LANES_SELFTEST"] = old_env
 
 
+class RequeueTest(unittest.TestCase):
+    def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "requeue.json"
+            path.write_text(json.dumps({"5": "h1", "6": "h1", "7": "h1"}))
+            calls = []
+            def fake_sh(cmd, **kwargs):
+                calls.append(cmd)
+                # PR 6 is still rate-limited; everything else enqueues.
+                return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0, stdout="", stderr="")
+            real, lane.sh = lane.sh, fake_sh
+            try:
+                lane.requeue_verified(host, [{"number": 5, "headRefOid": "h1"}, {"number": 6, "headRefOid": "h1"},
+                                             {"number": 7, "headRefOid": "h2"}])
+            finally:
+                lane.sh = real
+            self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
+            self.assertNotIn("7", [c[3] for c in calls])
+            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+
+
 if __name__ == "__main__":
     unittest.main()

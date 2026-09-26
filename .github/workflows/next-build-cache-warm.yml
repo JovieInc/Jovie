@@ -11,10 +11,13 @@ name: Next Build Cache Warm
 # seed compiler state that the merge queue restores. No secrets are used; the
 # build env is the same public mock env the combined job builds with.
 #
-# Cost: at most one real (always cold) build per UTC day per dependency hash,
-# once its save succeeds. Every other main push exits after a lookup-only probe
-# of the exact primary key. A new warmer never cancels one that is mid-build;
-# it replaces a pending one.
+# Cost: at most one real (always cold, ~4 min) build per UTC hour per
+# dependency hash, once its save succeeds. Hourly (was daily) so merge groups
+# compile against a recent main: a <1h-old entry compiled in 1.6-2.0 min, a
+# day-drifted one 2.2-2.8 min. Superseded entries are pruned per family.
+# Every other main push exits after a lookup-only probe of the exact primary
+# key. A new warmer never cancels one that is mid-build; it replaces a pending
+# one.
 on:
   push:
     branches: [main]
@@ -40,22 +43,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Same day and key scheme as ci.yml's "Restore Next build cache
-      # (read-only)" step. The day is resolved once so lookup, restore and
-      # save can never straddle UTC midnight with different keys.
-      - name: Resolve Next build cache day
-        id: next-build-cache-day
-        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
-      - name: Look up today's Next build cache
+      # Same hour and key scheme as ci.yml's "Restore Next build cache
+      # (read-only)" step. The hour is resolved once so lookup and save can
+      # never straddle an hour boundary with different keys.
+      - name: Resolve Next build cache hour
+        id: next-build-cache-hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Look up this hour's Next build cache
         id: next-build-cache-lookup
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
-          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
           lookup-only: true
       - name: Report existing Next build cache
         if: ${{ steps.next-build-cache-lookup.outputs.cache-hit == 'true' }}
-        run: echo "::notice::Next build cache for today already exists; nothing to warm."
+        run: echo "::notice::Next build cache for this hour already exists; nothing to warm."
       - uses: ./.github/actions/setup-node-pnpm
         if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
       # Always compile cold. Restoring an older entry (the previous day's, or

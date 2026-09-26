@@ -389,7 +389,7 @@ describe('runStructural screenshot contract discovery', () => {
     ]);
   });
 
-  it('splits the structural pytest shards between two hosted jobs', async () => {
+  it('splits the structural python job parts between two hosted jobs', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
     const run = async mode => {
@@ -399,7 +399,13 @@ describe('runStructural screenshot contract discovery', () => {
       return execute.mock.calls.map(([command]) => command);
     };
     const [all, only] = [await run(''), await run('only')];
-    expect(only).toEqual(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1));
+    expect(only.sort()).toEqual(
+      [
+        'pnpm ci:control:test',
+        'pnpm invariants:check',
+        ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1),
+      ].sort()
+    );
     expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
     // Consumed, so nested lane suites see the unsplit pool.
     expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();

@@ -207,6 +207,16 @@ export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
 const STRUCTURAL_PYTEST_PARTS = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(
   structuralPythonRegression
 );
+/**
+ * Commands ci-fast (structural python) runs instead of remaining: the pytest
+ * shards plus the two longest node-only suites (55s + 46s wall of remaining's
+ * CPU-bound pool, which the python job finished ~145s ahead of).
+ */
+const STRUCTURAL_PYTHON_JOB_PARTS = new Set([
+  ...STRUCTURAL_PYTEST_PARTS,
+  'pnpm invariants:check',
+  'pnpm ci:control:test',
+]);
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -273,6 +283,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
+  'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
@@ -1798,13 +1809,13 @@ export async function runStructural(opts = {}) {
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
   ];
-  // ci-fast (structural python) runs `only` the pytest shards; remaining skips.
+  // ci-fast (structural python) runs `only` its parts; remaining skips them.
   // Consume the split mode so nested contract suites (which rebuild this
   // list) don't inherit it and see a filtered pool.
   const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
   delete process.env.CI_FAST_STRUCTURAL_PYTEST;
   const parts = allParts.filter(
-    part => mode !== (STRUCTURAL_PYTEST_PARTS.includes(part) ? 'skip' : 'only')
+    part => mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only')
   );
   if (parts.length === 0) {
     return {

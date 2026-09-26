@@ -1523,7 +1523,7 @@ ${selectedGateScript}`,
     expect(restore).not.toMatch(/^\s+if:/m);
     expect(restore).toContain('path: apps/web/.next/cache/turbopack');
     expect(restore).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}"
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
     );
     expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
 
@@ -1609,7 +1609,7 @@ ${selectedGateScript}`,
       buildLayout,
       'Restore Next build cache (read-only)'
     );
-    const lookup = stepIn(warm, "Look up today's Next build cache");
+    const lookup = stepIn(warm, "Look up this hour's Next build cache");
     expect(keyLines(ciRestore)).toHaveLength(3);
     expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
 
@@ -1620,8 +1620,13 @@ ${selectedGateScript}`,
     expect(warm).not.toContain('restore-keys:');
     const dayRun = step =>
       step.split('\n').find(line => line.trim().startsWith('run:'));
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache day'))).toBe(
-      dayRun(stepIn(buildLayout, 'Resolve Next build cache day'))
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toBe(
+      dayRun(stepIn(buildLayout, 'Resolve Next build cache hour'))
+    );
+    // Hourly keys keep merge groups on a recent main; older hours still
+    // restore through the hash prefix.
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toContain(
+      'hour=$(date -u +%Y%m%d%H)'
     );
     expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
 
@@ -1630,7 +1635,9 @@ ${selectedGateScript}`,
     expect(lookup).not.toMatch(/^\s+if:/m);
     const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
     const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
-    expect(stepAt("Look up today's Next build cache")).toBeLessThan(setupAt);
+    expect(stepAt("Look up this hour's Next build cache")).toBeLessThan(
+      setupAt
+    );
     expect(
       warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
     ).toContain(miss);
