@@ -1,16 +1,25 @@
 /**
  * Bayesian winner detection for packaging swap experiments (JovieInc/Jovie#10919).
  *
- * Model: Poisson-Gamma conjugate over watch_minutes_per_impression.
- *   - Prior: Gamma(1, 0) = improper flat prior on rate
- *   - Posterior A: Gamma(watchMinA + 1, impressA)
- *   - Posterior B: Gamma(watchMinB + 1, impressB)
+ * JOV-6469 finding: the Poisson-Gamma model this module used to run treated
+ * `watchMinutes` — a continuous, aggregated duration total — as if it were a
+ * Poisson event count (Var[rate] = rate / impressions). That assumption is
+ * invalid for a continuous outcome and is not unit invariant: expressing the
+ * same underlying watch time in seconds instead of minutes rescales the
+ * implied variance and changes the resulting confidence (see
+ * bayesian.test.ts, "units invariance"). A valid test of the difference
+ * between two continuous-duration means requires the per-observation
+ * variance of watch time, which `VariantMetrics` does not carry (only the
+ * aggregate total and the mean). The sample mean alone is consistent with
+ * any true variance from zero to unbounded, so no statistically valid
+ * confidence can be derived from this contract today.
  *
- * P(λ_B > λ_A) derived via the normal approximation to the Poisson rate
- * difference, which is accurate for impressions >= 100 and exact in the
- * limit. At the issue's MIN_IMPRESSIONS_PER_VARIANT = 500 this is tight.
+ * `probTreatmentBeatsControl` therefore always returns `null` ("insufficient
+ * evidence"), and `selectWinner` always holds at 'inconclusive' — retaining
+ * control rather than fabricating a winner — until the metrics contract
+ * carries the missing moment (e.g. sum of squared per-view durations).
  *
- * Guardrails applied before Bayesian eval:
+ * Guardrails applied before Bayesian eval (unaffected by the above):
  *   1. min impressions per variant
  *   2. min experiment wall-clock duration
  *   3. avg-view-duration regression (AVD of treatment >= 95% of control)
@@ -21,58 +30,38 @@ import type { VariantMetrics } from './types';
 import { MIN_AVD_RATIO, MIN_HOURS_BETWEEN_SWAPS } from './types';
 
 // ---------------------------------------------------------------------------
-// Normal CDF approximation (for P(z) where z is standard normal)
-// Abramowitz & Stegun 26.2.17 — max error 7.5e-8.
-// ---------------------------------------------------------------------------
-
-function normCdf(z: number): number {
-  const t = 1 / (1 + 0.2316419 * Math.abs(z));
-  const poly =
-    t *
-    (0.31938153 +
-      t *
-        (-0.356563782 +
-          t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-  const cdf = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * z * z) * poly;
-  return z >= 0 ? cdf : 1 - cdf;
-}
-
-// ---------------------------------------------------------------------------
 // Core Bayesian probability P(λ_B > λ_A)
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the posterior probability that the treatment rate (λ_B) exceeds
- * the control rate (λ_A), i.e. P(λ_B > λ_A).
+ * Attempts to return the posterior probability that the treatment rate
+ * (λ_B) exceeds the control rate (λ_A), i.e. P(λ_B > λ_A).
  *
- * Uses the normal approximation to the difference of Poisson rates,
- * which is accurate when both variants have at least ~100 impressions.
- *
- * Returns 0.5 (no information) when either variant has zero impressions.
+ * Always returns `null` today: `VariantMetrics` carries only aggregate
+ * watch minutes and their mean, never the per-observation variance a valid
+ * continuous-duration comparison requires (JOV-6469). Callers must treat
+ * `null` as "insufficient evidence" and hold at 'inconclusive' rather than
+ * substitute a guess. This still validates its inputs so obviously-corrupt
+ * data can never slip through once a real estimator is implemented here.
  */
 export function probTreatmentBeatsControl(
   control: Pick<VariantMetrics, 'impressions' | 'watchMinutes'>,
   treatment: Pick<VariantMetrics, 'impressions' | 'watchMinutes'>
-): number {
-  if (control.impressions === 0 || treatment.impressions === 0) return 0.5;
-
-  // MLE rate estimates
-  const rateA = control.watchMinutes / control.impressions;
-  const rateB = treatment.watchMinutes / treatment.impressions;
-
-  // Poisson variance: Var[rate] = rate / n
-  const varA = rateA / control.impressions;
-  const varB = rateB / treatment.impressions;
-  const se = Math.sqrt(varA + varB);
-
-  if (se === 0) {
-    // Both rates identical — 0.5 by symmetry
-    return 0.5;
+): number | null {
+  if (
+    !Number.isFinite(control.impressions) ||
+    !Number.isFinite(control.watchMinutes) ||
+    !Number.isFinite(treatment.impressions) ||
+    !Number.isFinite(treatment.watchMinutes) ||
+    control.impressions < 0 ||
+    treatment.impressions < 0
+  ) {
+    return null;
   }
 
-  // z-score for H0: rateB - rateA <= 0
-  const z = (rateB - rateA) / se;
-  return normCdf(z);
+  // ponytail: unconditional until VariantMetrics carries an observed
+  // watch-time variance/second-moment field (JOV-6469) — see module doc.
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,8 +150,8 @@ export type WinnerOutcome = 'treatment' | 'control' | 'inconclusive';
 
 export interface WinnerDecision {
   readonly winner: WinnerOutcome;
-  /** Posterior P(treatment > control). */
-  readonly confidence: number;
+  /** Posterior P(treatment > control), or null when no valid estimate exists. */
+  readonly confidence: number | null;
   readonly controlRate: number;
   readonly treatmentRate: number;
   readonly reason: string;
@@ -172,6 +161,13 @@ export interface WinnerDecision {
  * Evaluates the experiment and returns a winner decision.
  *
  * Must only be called after checkGuardrails() returns passed = true.
+ *
+ * JOV-6469: `probTreatmentBeatsControl` always returns `null` today (no
+ * valid confidence can be derived from the current VariantMetrics
+ * contract), so this always holds at 'inconclusive' — retaining control —
+ * rather than declare a winner off an unsupported estimate. The
+ * threshold-based branches below are kept so a future validated estimator
+ * can plug in without changing this function's contract.
  */
 export function selectWinner(
   control: VariantMetrics,
@@ -181,6 +177,17 @@ export function selectWinner(
   const confidence = probTreatmentBeatsControl(control, treatment);
   const controlRate = control.watchMinutes / control.impressions;
   const treatmentRate = treatment.watchMinutes / treatment.impressions;
+
+  if (confidence === null) {
+    return {
+      winner: 'inconclusive',
+      confidence: null,
+      controlRate,
+      treatmentRate,
+      reason:
+        'Inconclusive: no statistically valid confidence available (VariantMetrics carries no observed watch-time variance) — retaining control',
+    };
+  }
 
   if (confidence >= minBayesianConfidence) {
     return {
