@@ -649,6 +649,6 @@ const processMemory = memoryRecordBackend();
 let defaultStore: OperatingStore | undefined;
 
 export function getDefaultOperatingStore(): OperatingStore {
-  if (!defaultStore) defaultStore = new DurableOperatingStore(processMemory);
+  defaultStore ??= new DurableOperatingStore(processMemory);
   return defaultStore;
 }

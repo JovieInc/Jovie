@@ -175,6 +175,25 @@ describe('generateProfileStructuredData', () => {
     });
   });
 
+  it('trims padded profile urls into sameAs and drops whitespace-only urls', () => {
+    const data = generateProfileStructuredData(
+      {
+        ...BASE_PROFILE,
+        spotify_url: '  https://open.spotify.com/artist/padded  ',
+        apple_music_url: '   ',
+        youtube_url: null,
+        musicbrainz_id: null,
+      },
+      ['pop'],
+      [],
+      [],
+      []
+    );
+    const artist = findInGraph(data, 'MusicGroup');
+    expect(artist?.sameAs).toContain('https://open.spotify.com/artist/padded');
+    expect(artist?.sameAs).not.toContain('   ');
+  });
+
   it('omits sameAs when no valid social URLs exist', () => {
     const data = generateProfileStructuredData(
       {
@@ -548,6 +567,38 @@ describe('generateMusicStructuredData', () => {
         name: 'hello',
         url: 'https://jov.ie/hello',
         sameAs: ['https://open.spotify.com/artist/2o5jDhtHVPhrJdv3cEQ99Z'],
+      });
+    });
+
+    it('wraps one credited artist into the track-list recording ref', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Wheels Up',
+          slug: 'wheels-up',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'LYNX', handle: 'lynx' }],
+        },
+        ownerCreator,
+        [
+          {
+            title: 'Wheels Up',
+            slug: 'wheels-up',
+            trackNumber: 1,
+            durationMs: 210000,
+          },
+        ]
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const track = musicSchema.track as Record<string, unknown>;
+      const firstItem = (track.itemListElement as Record<string, unknown>[])[0]
+        .item as Record<string, unknown>;
+
+      expect(firstItem.byArtist).toEqual({
+        '@id': 'https://jov.ie/lynx#musicgroup',
       });
     });
 

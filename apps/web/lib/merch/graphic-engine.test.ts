@@ -63,6 +63,8 @@ describe('weightedPick', () => {
     expect(weightedPick(models, undefined, () => 0).key).toBe('a');
     expect(weightedPick(models, undefined, () => 0.5).key).toBe('b');
     expect(weightedPick(models, undefined, () => 0.99).key).toBe('c');
+    // A roll past the total weight falls through to the last model.
+    expect(weightedPick(models, undefined, () => 1.01).key).toBe('c');
   });
 
   it('biases toward the higher-weighted model', () => {

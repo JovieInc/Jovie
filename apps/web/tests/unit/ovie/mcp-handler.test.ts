@@ -112,6 +112,19 @@ function legacyEngineeringInitiative(id: string): OvieInitiative {
 }
 
 describe('Ovie MCP handler', () => {
+  it('rejects a body that does not name a method', async () => {
+    const result = await handleOvieMcpRequest({
+      body: { jsonrpc: '2.0', id: 7 },
+      principal: founder,
+    });
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32700, message: 'Parse error' },
+    });
+  });
+
   it('rejects unauthenticated initialize', async () => {
     const result = await handleOvieMcpRequest({
       body: rpc('initialize', {}, 42),

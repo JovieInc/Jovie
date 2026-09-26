@@ -140,40 +140,35 @@ export function mapSuggestedActionToInboxCard(
     row.payload
   );
   const signalType = classifyOpportunitySignalType(row);
-  const category: OpportunityInboxCardCategory = report
-    ? 'report'
-    : brandDeal
-      ? 'brand_deal'
-      : youtubeThumbnail
-        ? 'youtube_thumbnail'
-        : workflowCapturePayload?.success
-          ? 'workflow_capture'
-          : classifySuggestedActionCategory(row);
+  let category: OpportunityInboxCardCategory;
+  if (report) category = 'report';
+  else if (brandDeal) category = 'brand_deal';
+  else if (youtubeThumbnail) category = 'youtube_thumbnail';
+  else if (workflowCapturePayload?.success) category = 'workflow_capture';
+  else category = classifySuggestedActionCategory(row);
   const title = titleFromPayload(row.payload, category);
   const visual = visualFromPayload(row.payload, title);
+  let typeLabel: string;
+  if (category === 'report') typeLabel = 'Report';
+  else if (category === 'workflow_capture') typeLabel = 'Workflow';
+  else if (category === 'youtube_thumbnail') typeLabel = 'YouTube Thumbnail';
+  else if (category === 'brand_deal') typeLabel = 'Brand Deal';
+  else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
+  let why: string;
+  if (brandDeal) why = formatBrandDealOpportunityMetadata(brandDeal);
+  else if (youtubeThumbnail) {
+    why = `YouTube API snapshot captured ${youtubeThumbnail.apiMetrics.capturedAt}. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.`;
+  } else why = whyFromRow(row, category);
   return {
     id: row.id,
     sourceKind: row.kind,
     signalType,
     // Report cards keep a fixed type label; all other cards use the typed
     // signal-category label (song / event / profile match / suggestion).
-    typeLabel:
-      category === 'report'
-        ? 'Report'
-        : category === 'workflow_capture'
-          ? 'Workflow'
-          : category === 'youtube_thumbnail'
-            ? 'YouTube Thumbnail'
-            : category === 'brand_deal'
-              ? 'Brand Deal'
-              : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
+    typeLabel,
     createdAt: row.createdAt.toISOString(),
     title,
-    why: brandDeal
-      ? formatBrandDealOpportunityMetadata(brandDeal)
-      : youtubeThumbnail
-        ? `YouTube API snapshot captured ${youtubeThumbnail.apiMetrics.capturedAt}. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.`
-        : whyFromRow(row, category),
+    why,
     primaryActionLabel:
       (youtubeThumbnail ? 'Approve Candidate' : report?.nextStep?.label) ??
       (workflowCaptureResult.success &&

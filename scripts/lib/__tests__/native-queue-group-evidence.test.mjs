@@ -158,21 +158,17 @@ describe('independent native combined-head evidence', () => {
       ['group-evidence-missing']
     );
   });
-  it.each([
-    'failure',
-    'skipped',
-    'pending',
-    'neutral',
-    'cancelled',
-    '',
-  ])('rejects a selected unit suite with %s', result => {
-    const m = receipt();
-    m.gateEvidence.readyLog = m.gateEvidence.readyLog.replace(
-      'UNIT_RESULT="success"',
-      `UNIT_RESULT="${result}"`
-    );
-    expect(groupEvidenceFailures(m)).toContain('selected-suite:UNIT_RESULT');
-  });
+  it.each(['failure', 'skipped', 'pending', 'neutral', 'cancelled', ''])(
+    'rejects a selected unit suite with %s',
+    result => {
+      const m = receipt();
+      m.gateEvidence.readyLog = m.gateEvidence.readyLog.replace(
+        'UNIT_RESULT="success"',
+        `UNIT_RESULT="${result}"`
+      );
+      expect(groupEvidenceFailures(m)).toContain('selected-suite:UNIT_RESULT');
+    }
+  );
   it.each([
     'ADMISSION',
     'MIGRATION',
@@ -286,9 +282,12 @@ describe('independent native combined-head evidence', () => {
     ['ADMISSION_OBSOLETE="false"', 'ADMISSION_OBSOLETE="true"'],
     ['ADMISSION_PR="16237"', 'ADMISSION_PR="17483"'],
     [`ADMISSION_SYNTHETIC_HEAD="${head}"`, 'ADMISSION_SYNTHETIC_HEAD=""'],
-  ])('rejects an obsolete, rejected or mismatched admission %s', (before, after) => {
-    const m = receipt();
-    m.gateEvidence.readyLog = m.gateEvidence.readyLog.replace(before, after);
-    expect(groupEvidenceFailures(m)).toContain('live-group-admission');
-  });
+  ])(
+    'rejects an obsolete, rejected or mismatched admission %s',
+    (before, after) => {
+      const m = receipt();
+      m.gateEvidence.readyLog = m.gateEvidence.readyLog.replace(before, after);
+      expect(groupEvidenceFailures(m)).toContain('live-group-admission');
+    }
+  );
 });

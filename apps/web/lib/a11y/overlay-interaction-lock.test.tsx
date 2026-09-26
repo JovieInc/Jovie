@@ -46,6 +46,17 @@ describe('hasGenuineBlockingOverlay', () => {
     expect(hasGenuineBlockingOverlay()).toBe('menu');
   });
 
+  it('classifies an open dialog overlay and an open sheet overlay by slot', () => {
+    const { unmount } = render(
+      <div data-slot='dialog-overlay' data-state='open' />
+    );
+    expect(hasGenuineBlockingOverlay()).toBe('overlay');
+    unmount();
+
+    render(<div data-slot='sheet-overlay' data-state='open' />);
+    expect(hasGenuineBlockingOverlay()).toBe('overlay');
+  });
+
   it('does not treat a closed leftover overlay as a genuine blocker', () => {
     render(
       <div
@@ -98,6 +109,57 @@ describe('restoreLeakedOverlayLocks', () => {
       OVERLAY_LOCK_ATTR,
       'dialog'
     );
+  });
+
+  it('focuses the chat composer when the active element stays inert', () => {
+    const { container } = render(
+      <div>
+        <div data-app-shell-frame='true'>
+          <div id='main-content' inert>
+            Library
+          </div>
+        </div>
+        <textarea aria-label='Chat Message Input' />
+        <button type='button' inert>
+          Stuck
+        </button>
+      </div>
+    );
+    const stuck = container.querySelector('button') as HTMLButtonElement;
+    const composer = container.querySelector(
+      '[aria-label="Chat Message Input"]'
+    ) as HTMLTextAreaElement;
+    stuck.focus();
+
+    const withComposer = restoreLeakedOverlayLocks();
+
+    expect(withComposer.restored).toContain('focus');
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it('focuses main when the chat composer is absent and the active element stays inert', () => {
+    const { container } = render(
+      <div>
+        <div data-app-shell-frame='true'>
+          <button id='main-content' type='button' inert>
+            Library
+          </button>
+        </div>
+        <button type='button' inert>
+          Stuck
+        </button>
+      </div>
+    );
+    const stuck = container.querySelector(
+      'button[type="button"]:not(#main-content)'
+    ) as HTMLButtonElement;
+    const main = container.querySelector('#main-content') as HTMLButtonElement;
+    stuck.focus();
+
+    const result = restoreLeakedOverlayLocks();
+
+    expect(result.restored).toContain('focus');
+    expect(document.activeElement).toBe(main);
   });
 
   it('restores leaked inert on the app-shell main plane after overlays close', () => {

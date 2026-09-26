@@ -535,5 +535,5 @@ function normalizeSnapshotToken(value: unknown): string | null {
   }
 
   const normalized = String(value).trim().toLowerCase();
-  return normalized ? normalized : null;
+  return normalized || null;
 }

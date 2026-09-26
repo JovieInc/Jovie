@@ -13,7 +13,7 @@ export const ONBOARDING_STARTER_SUGGESTIONS: readonly ChatSuggestion[] = [
     accent: 'blue',
   },
   {
-    icon: 'Disc3',
+    icon: 'Layers',
     label: 'Plan A Release',
     prompt: 'Help me plan my next release.',
     accent: 'green',

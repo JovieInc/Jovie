@@ -64,11 +64,11 @@ function scoreAliasExactMatch(
     return null;
   }
 
-  const exactAlias = getCollaboratorLabels(collaborator).find(
+  const hasExactAlias = getCollaboratorLabels(collaborator).some(
     label => normalizeCollaboratorAlias(label) === normalizedSignal
   );
 
-  if (!exactAlias) {
+  if (!hasExactAlias) {
     return null;
   }
 

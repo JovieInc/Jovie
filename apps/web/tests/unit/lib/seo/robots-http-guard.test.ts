@@ -52,4 +52,23 @@ describe('sitemap-http-guard', () => {
     expect(result.ok).toBe(true);
     expect(result.urlCount).toBe(1);
   });
+
+  it('rejects a captured lastmod that is not a date and keeps a real one', () => {
+    const invalid = `<urlset>
+  <url><loc>https://jov.ie/pricing</loc><lastmod>not-a-date</lastmod></url>
+</urlset>`;
+    const invalidResult = validateSitemapXmlBody(invalid);
+    expect(invalidResult.ok).toBe(false);
+    expect(invalidResult.violations).toContain(
+      'sitemap.xml url[0] has an invalid <lastmod>'
+    );
+
+    const valid = `<urlset>
+  <url><loc>https://jov.ie/pricing</loc><lastmod>2026-06-17</lastmod></url>
+</urlset>`;
+    const validResult = validateSitemapXmlBody(valid);
+    expect(validResult.ok).toBe(true);
+    expect(validResult.urlCount).toBe(1);
+    expect(validResult.violations).toEqual([]);
+  });
 });

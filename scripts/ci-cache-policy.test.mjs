@@ -45,15 +45,20 @@ test('Mac packaging lanes cache only Electron download artifacts', () => {
   }
 });
 
-test('runner-side repair restores the exact source dependency store', () => {
+// #16737 replaced the runner-side `source/` checkout with the hosted
+// `candidate/` repair checkout; the dependency store must follow its lockfile.
+test('hosted repair restores the exact candidate dependency store', () => {
   const workflow = read('.github/workflows/rolling-ci-dispatch.yml');
   assert.match(workflow, /cache: pnpm/);
-  assert.match(workflow, /cache-dependency-path: source\/pnpm-lock\.yaml/);
+  assert.match(workflow, /cache-dependency-path: candidate\/pnpm-lock\.yaml/);
 });
 
+// pr-visual-review.yml is deliberately absent: its capture job runs
+// PR-controlled code, and its trust-boundary contract
+// (apps/web/tests/unit/ci/pr-visual-review-workflow.test.ts) forbids any
+// actions/cache step there.
 test('Chromium download steps restore a Playwright cache first', () => {
   for (const file of [
-    '.github/workflows/pr-visual-review.yml',
     '.github/workflows/screenshots.yml',
     '.github/workflows/visual-a11y.yml',
   ]) {

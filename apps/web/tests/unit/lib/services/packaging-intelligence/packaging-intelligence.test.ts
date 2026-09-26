@@ -152,6 +152,8 @@ describe('packaging intelligence', () => {
 
   it('parses WebVTT and extracts the first-30s hook window', () => {
     const segments = parseWebVtt(SAMPLE_VTT);
+    const crlfSegments = parseWebVtt(SAMPLE_VTT.replaceAll('\n', '\r\n'));
+    expect(crlfSegments).toEqual(segments);
     expect(segments).toHaveLength(3);
     expect(extractFirst30sHookText(segments)).toBe(
       'Hook line one. Hook line two.'

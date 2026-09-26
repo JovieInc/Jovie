@@ -94,9 +94,10 @@ describe('ProfilePrimaryTabPanel', () => {
       ],
     });
 
-    expect(
-      screen.getByTestId('profile-primary-tab-releases')
-    ).toBeInTheDocument();
+    const releases = screen.getByTestId('profile-primary-tab-releases');
+    expect(releases).toBeInTheDocument();
+    expect(releases.className).toContain('-mx-(--page-pad)');
+    expect(releases.className).not.toContain('-mx-4');
     expect(screen.getByRole('heading', { name: 'Music' })).toBeInTheDocument();
   });
 

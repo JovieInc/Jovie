@@ -46,11 +46,7 @@ export default async function HudPage({
   const tokenAuth = kioskToken ? await authorizeHud(kioskToken) : null;
   const tokenOk = tokenAuth?.ok === true && tokenAuth.mode === 'kiosk';
 
-  if (kioskToken && !tokenOk) {
-    const adminAccess = await getCurrentAdminPageAccess();
-    if (!adminAccess.isAuthenticated) unauthorized();
-    if (!adminAccess.hasAdminRole) forbidden();
-  } else if (!tokenOk) {
+  if (!tokenOk) {
     const adminAccess = await getCurrentAdminPageAccess();
     if (!adminAccess.isAuthenticated) unauthorized();
     if (!adminAccess.hasAdminRole) forbidden();

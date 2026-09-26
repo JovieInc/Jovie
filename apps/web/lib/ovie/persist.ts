@@ -305,7 +305,6 @@ export async function applyOvieDump(
   items: readonly string[],
   options: OvieDumpOptions
 ): Promise<OvieReceipt[]> {
-  void options.spawn;
   const mode = options.mode ?? getOvieIntakeMode();
   const receipts: OvieReceipt[] = [];
   for (let index = 0; index < items.length; index += 1) {

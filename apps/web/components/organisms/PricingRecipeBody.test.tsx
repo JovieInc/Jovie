@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 import PricingPage from '@/app/(marketing)/pricing/page';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
+import {
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+  FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS,
+} from '@/lib/billing/offer-truth';
 import { PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
@@ -28,9 +32,23 @@ describe('PricingRecipeBody', () => {
       screen.getByTestId('marketing-pricing-plan-enterprise')
     ).toBeInTheDocument();
     expect(screen.queryByTestId('marketing-pricing-plan-max')).toBeNull();
+    expect(screen.queryByText('Max')).toBeNull();
+    expect(screen.queryByText('$149')).toBeNull();
+    expect(screen.getByTestId('marketing-pricing-plan-pro')).toHaveTextContent(
+      '$199'
+    );
     expect(
       screen.getAllByRole('link', { name: 'Request access' })[0]
     ).toHaveAttribute('href', '/waitlist');
+    expect(
+      container.querySelector(
+        `[data-offer-contract="${ARTIST_VISIBILITY_OFFER_CONTRACT_ID}"]`
+      )
+    ).not.toBeNull();
+    const pageText = container.textContent ?? '';
+    for (const marker of FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS) {
+      expect(pageText).not.toContain(marker);
+    }
     expect(screen.queryByText('Automated follow-ups')).toBeNull();
     expect(screen.queryByText('Email campaigns')).toBeNull();
 

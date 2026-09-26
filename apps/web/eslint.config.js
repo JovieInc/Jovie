@@ -328,6 +328,7 @@ module.exports = [
       'components/atoms/CopyableMonospaceCell.tsx',
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
+      'components/atoms/ReleaseArtworkThumb.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

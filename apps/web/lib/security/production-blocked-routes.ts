@@ -55,8 +55,8 @@ export function isProxyAllowlistedDevelopmentRoute(pathname: string): boolean {
 }
 
 export function isProductScreenshotCapturePath(pathname: string): boolean {
-  return PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS.some(
-    allowed => pathname === allowed
+  return (PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS as readonly string[]).includes(
+    pathname
   );
 }
 
@@ -107,7 +107,7 @@ export function isProductionBlockedDebugPath(
     return true;
   }
 
-  if (PRODUCTION_BLOCKED_PAGE_EXACT.some(exactPath => pathname === exactPath)) {
+  if ((PRODUCTION_BLOCKED_PAGE_EXACT as readonly string[]).includes(pathname)) {
     return true;
   }
 

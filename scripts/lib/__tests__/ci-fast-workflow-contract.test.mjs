@@ -25,10 +25,12 @@ import {
   LANE_GROUPS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
+  OFFLINE_FAILURE_COVERAGE_COMMAND,
   selectBillingCoverageCommands,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
+import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -705,6 +707,87 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).not.toContain('turbo run');
   });
 
+  it('warms web tsc incremental state without weakening the forced gate', () => {
+    const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
+    const step = name =>
+      typecheck.match(
+        new RegExp(
+          `- name: ${name}\\n(?<body>[\\s\\S]*?)(?=\\n      - name:|$)`
+        )
+      )?.groups?.body ?? '';
+    const restore = step('Restore web tsc incremental state');
+    const record = step('Record restored web tsc state');
+    const save = step('Save web tsc incremental state');
+    const cacheSha = '55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0';
+
+    // The web package keeps compiling incrementally into the cached path.
+    const webPackage = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'apps/web/package.json'), 'utf8')
+    );
+    expect(webPackage.scripts.typecheck).toContain(
+      'tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo'
+    );
+
+    // Restore: same hydration gate, pinned, lockfile+tsconfig keyed, prefix
+    // fallback (tsc re-verifies every input hash, so older state is safe).
+    expect(restore).toContain('id: web-tsbuildinfo');
+    expect(restore).toMatch(
+      /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+    );
+    expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo');
+    const configHash =
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json')";
+    expect(restore).toContain(
+      `key: jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
+    );
+    expect(restore).toContain(
+      `jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\n`
+    );
+    expect(restore).toMatch(
+      /\n\s+jovie-web-tsbuildinfo-v1-\$\{\{ runner\.os \}\}-\s*$/
+    );
+    expect(record).toContain(
+      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}"
+    );
+
+    // Order: restore before the lanes, save after them.
+    const at = marker => typecheck.indexOf(marker);
+    expect(at('- name: Restore web tsc incremental state')).toBeLessThan(
+      at('- name: Run ci-fast lanes')
+    );
+    expect(at('- name: Run ci-fast lanes')).toBeLessThan(
+      at('- name: Save web tsc incremental state')
+    );
+
+    // Save: green lane, changed state, trusted refs only, never blocking.
+    expect(save).toContain(`uses: actions/cache/save@${cacheSha}`);
+    expect(save).toContain("steps.lanes.outcome == 'success' &&");
+    expect(save).toContain(
+      "hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash"
+    );
+    expect(save).toContain(
+      "((github.event_name == 'push' && github.ref == 'refs/heads/main') ||"
+    );
+    expect(save).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository))'
+    );
+    for (const untrusted of [
+      'merge_group',
+      'pull_request_target',
+      'workflow_run',
+    ]) {
+      expect(save).not.toContain(untrusted);
+    }
+    expect(save).toContain('continue-on-error: true');
+    expect(save).toContain(
+      'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}'
+    );
+
+    // The gate itself is unchanged: turbo never replays a cached verdict.
+    expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
+  });
+
   it('isolates Jovie product typecheck from Symphony/control-plane suites', () => {
     expect(CI_FAST_SOURCE).toContain("from './lib/ci-repo-lanes.mjs'");
     expect(CI_FAST_SOURCE).toContain(
@@ -849,7 +932,9 @@ describe('ci-fast bounded parallel workflow', () => {
         ' && ' +
         ACQUISITION_CERTIFICATION_COMMAND +
         ' && ' +
-        DESKTOP_RELEASE_COVERAGE_COMMAND,
+        DESKTOP_RELEASE_COVERAGE_COMMAND +
+        ' && ' +
+        OFFLINE_FAILURE_COVERAGE_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -1056,8 +1141,17 @@ describe('ci-fast bounded parallel workflow', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
     expect(preflight).toContain(
-      'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
+      'run: node scripts/lockfile-specifier-preflight.mjs'
     );
+    expect(preflight).toContain(
+      'run: node scripts/verify-workflow-references.mjs'
+    );
+    // Dependency-free preflight: plain setup-node from .nvmrc, no pnpm install.
+    expect(preflight).toMatch(
+      /uses: actions\/setup-node@[0-9a-f]{40} # v\d+[\s\S]*node-version-file: '\.nvmrc'/
+    );
+    expect(preflight).not.toContain('setup-node-pnpm');
+    expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
@@ -1066,21 +1160,26 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
-    const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
-
-    expect(controlTest).toContain(
-      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
+      'node scripts/run-affected-tests.mjs --control'
     );
-    expect(controlTest).toContain(
-      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
-    );
-    expect(controlTest).toContain('--test-coverage-lines=90');
-    expect(controlTest).toContain('--test-coverage-branches=75');
-    expect(controlTest).toContain('--test-coverage-functions=90');
-    expect(controlTest).toContain(
-      '&& node scripts/run-affected-tests.mjs --control'
-    );
-    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const controlStages = buildControlTestCommands();
+    expect(controlStages).toContainEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=75',
+        '--test-coverage-functions=90',
+        'scripts/symphony/tests/control-bundle-manifest.test.mjs',
+      ],
+    ]);
+    expect(controlStages).toContainEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
     const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
@@ -2020,6 +2119,45 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   );
 });
 
+describe('invariant-scanned PR structural selection', () => {
+  // #18182 changed apps/desktop/src/main.ts (JOV-INV-031 scope) without any
+  // invariant run; PR structural selection must derive from the scan roots.
+  it('selects structural for every invariant-scanned path on source PRs', () => {
+    const addition =
+      'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeLessThan(
+      decision.indexOf('if git diff --name-only')
+    );
+
+    const ere = execFileSync(
+      process.execPath,
+      [resolve(REPO_ROOT, 'scripts/invariants/scanned-paths.mjs'), '--ere'],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    ).trim();
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    for (const path of [
+      'apps/desktop/src/main.ts',
+      'apps/web/lib/chat/knowledge/topics.ts',
+      'apps/web/app/[username]/page.tsx',
+      'scripts/invariants/latency-sensitive-execution-allowlist.json',
+    ]) {
+      expect(selects(path), path).toBe(true);
+    }
+    for (const path of [
+      'apps/desktop/src-other/main.ts',
+      'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    ]) {
+      expect(selects(path), path).toBe(false);
+    }
+  });
+});
+
 describe('CI diff selection on a divergent PR', () => {
   it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
     const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));
@@ -2082,5 +2220,251 @@ describe('CI diff selection on a divergent PR', () => {
       vi.unstubAllEnvs();
       rmSync(repository, { recursive: true, force: true });
     }
+  });
+});
+
+it('selects and enforces offline failure behavior coverage for module-only and test-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  expect(pattern).toBeDefined();
+  for (const path of [
+    'scripts/lib/rolling-ci-failure-disposition.mjs',
+    'scripts/lib/__tests__/rolling-ci-failure-disposition.test.mjs',
+  ]) {
+    expect(
+      spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status,
+      path
+    ).toBe(0);
+  }
+  expect(
+    spawnSync('grep', ['-qE', pattern], {
+      input: 'scripts/lib/rolling-ci-failure-disposition.mjs.unrelated\n',
+    }).status
+  ).toBe(1);
+  expect(LANE_COMMANDS.structural).toContain(OFFLINE_FAILURE_COVERAGE_COMMAND);
+  expect(
+    CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const operationsParts = ['),
+      CI_FAST_SOURCE.indexOf('const webParts = [')
+    )
+  ).toContain('OFFLINE_FAILURE_COVERAGE_COMMAND');
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    'lib/__tests__/rolling-ci-failure-disposition.test.mjs'
+  );
+  expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+    '--coverage.include="$PWD/scripts/lib/rolling-ci-failure-disposition.mjs"'
+  );
+  for (const metric of [
+    'lines=100',
+    'statements=100',
+    'functions=100',
+    'branches=95',
+    'perFile=true',
+  ]) {
+    expect(OFFLINE_FAILURE_COVERAGE_COMMAND).toContain(
+      `--coverage.thresholds.${metric}`
+    );
+  }
+});
+
+describe('Symphony selector toolchain cache', () => {
+  const SELECTOR =
+    'scripts/symphony/tests/run-governor-bounded-codex-selector.sh';
+  const CACHE_PATHS = [
+    '${{ runner.temp }}/symphony-selector-beam',
+    '${{ runner.temp }}/symphony-selector-mix-home',
+    '${{ runner.temp }}/symphony-selector-src/elixir/deps',
+    '${{ runner.temp }}/symphony-selector-src/elixir/_build/test',
+  ];
+  const remaining = () =>
+    jobBlock('ci-fast-remaining', 'ci-profile-admission-browser');
+
+  function step(block, name) {
+    const start = block.indexOf(`      - name: ${name}\n`);
+    expect(start, `missing step ${name}`).toBeGreaterThanOrEqual(0);
+    const next = block.indexOf('\n      - name: ', start + 1);
+    return block.slice(start, next === -1 ? block.length : next);
+  }
+
+  function printCacheKey() {
+    const out = execFileSync('bash', [SELECTOR, '--print-cache-key'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    return Object.fromEntries(
+      out
+        .trim()
+        .split('\n')
+        .map(line => [
+          line.slice(0, line.indexOf('=')),
+          line.slice(line.indexOf('=') + 1),
+        ])
+    );
+  }
+
+  it('restores an exact key built from the pin, BEAM versions, platform and script hash', () => {
+    const block = remaining();
+    expect(step(block, 'Resolve Symphony selector cache key')).toContain(
+      `bash ${SELECTOR} --print-cache-key >> "$GITHUB_OUTPUT"`
+    );
+    const restore = step(block, 'Restore Symphony selector cache');
+    expect(restore).toContain(
+      'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+    );
+    for (const output of ['platform', 'otp', 'elixir', 'pin']) {
+      expect(restore).toContain(
+        `\${{ steps.selector-cache-key.outputs.${output} }}`
+      );
+    }
+    expect(restore).toContain('${{ runner.os }}');
+    expect(restore).toContain(`\${{ hashFiles('${SELECTOR}') }}`);
+    // Exact key only: another pin or toolchain must never seed build outputs.
+    expect(restore).not.toContain('restore-keys');
+    for (const path of CACHE_PATHS) expect(restore).toContain(path);
+
+    const key = printCacheKey();
+    const runtime = readFileSync(
+      resolve(REPO_ROOT, 'scripts/symphony/symphony_official_runtime.py'),
+      'utf8'
+    );
+    expect(key.pin).toBe(
+      runtime.match(/OFFICIAL_SYMPHONY_GIT_SHA = "([0-9a-f]{40})"/)?.[1]
+    );
+    expect(key.otp).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(key.elixir).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(key.platform).toMatch(/^[a-z]+-[\d.]+-\w+$/);
+  });
+
+  it('points the selector at the cached paths and saves only from main pushes', () => {
+    const block = remaining();
+    const keyAt = block.indexOf('- name: Resolve Symphony selector cache key');
+    const restoreAt = block.indexOf('- name: Restore Symphony selector cache');
+    const laneAt = block.indexOf('- name: Run structural ci-fast lane');
+    const saveAt = block.indexOf('- name: Save Symphony selector cache');
+    expect(keyAt).toBeGreaterThan(0);
+    expect(restoreAt).toBeGreaterThan(keyAt);
+    expect(laneAt).toBeGreaterThan(restoreAt);
+    expect(saveAt).toBeGreaterThan(laneAt);
+
+    const lane = step(block, 'Run structural ci-fast lane');
+    expect(lane).toContain(
+      'SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam'
+    );
+    expect(lane).toContain(
+      'MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix'
+    );
+    expect(lane).toContain(
+      'HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex'
+    );
+    // Overriding the checkout would skip the pinned clone entirely.
+    expect(block).not.toContain('SYMPHONY_SELECTOR_CHECKOUT');
+    expect(readFileSync(resolve(REPO_ROOT, SELECTOR), 'utf8')).toContain(
+      'CHECKOUT="${RUNNER_TEMP:-/tmp}/symphony-selector-src"'
+    );
+
+    const ready = step(block, 'Check Symphony selector cache outputs');
+    expect(ready).toContain("github.event_name == 'push'");
+    expect(ready).toContain("github.ref == 'refs/heads/main'");
+    expect(ready).toContain("steps.selector-cache.outputs.cache-hit != 'true'");
+    const save = step(block, 'Save Symphony selector cache');
+    expect(save).toContain(
+      "if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}"
+    );
+    expect(save).toContain('continue-on-error: true');
+    expect(save).toContain(
+      'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+    );
+    expect(save).toContain(
+      'key: ${{ steps.selector-cache.outputs.cache-primary-key }}'
+    );
+    for (const path of CACHE_PATHS) expect(save).toContain(path);
+  });
+
+  function runSelectorWithStubs(installedOtp) {
+    const { pin, otp, elixir } = printCacheKey();
+    const otpMajor = otp.split('.')[0];
+    const root = mkdtempSync(join(tmpdir(), 'selector-cache-'));
+    try {
+      const log = join(root, 'calls.log');
+      const stubs = join(root, 'stubs');
+      const prefix = join(root, 'symphony-selector-beam');
+      const elixirDir = join(root, 'symphony-selector-src', 'elixir');
+      for (const dir of [
+        stubs,
+        join(prefix, 'bin'),
+        join(prefix, 'otp', 'bin'),
+        join(prefix, 'otp', 'releases', otpMajor),
+        join(elixirDir, 'deps', 'jason'),
+        join(elixirDir, '_build', 'test', 'lib'),
+      ]) {
+        mkdirSync(dir, { recursive: true });
+      }
+      const stub = (file, body) => {
+        writeFileSync(file, `#!/usr/bin/env bash\n${body}\n`);
+        chmodSync(file, 0o755);
+      };
+      stub(
+        join(stubs, 'git'),
+        [
+          `echo "git $*" >> "${log}"`,
+          'if [[ "$1" == clone ]]; then mkdir -p "${@: -1}/.git"; exit 0; fi',
+          'if [[ "$3" == checkout ]]; then mkdir -p "$2/elixir/test/symphony_elixir"; fi',
+          `if [[ "$3" == rev-parse ]]; then echo "${pin}"; fi`,
+          'exit 0',
+        ].join('\n')
+      );
+      stub(join(stubs, 'curl'), `echo "curl $*" >> "${log}"; exit 22`);
+      stub(join(prefix, 'otp', 'bin', 'erl'), 'exit 0');
+      stub(
+        join(prefix, 'bin', 'elixir'),
+        `printf 'Erlang/OTP ${otpMajor}\\n\\nElixir ${elixir} (compiled with Erlang/OTP ${otpMajor})\\n'`
+      );
+      stub(join(prefix, 'bin', 'mix'), `echo "mix $*" >> "${log}"`);
+      writeFileSync(
+        join(prefix, 'otp', 'releases', otpMajor, 'OTP_VERSION'),
+        `${installedOtp ?? otp}\n`
+      );
+      writeFileSync(join(elixirDir, '_build', 'test', 'lib', 'marker'), 'x');
+      const result = spawnSync('bash', [SELECTOR], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          PATH: `${stubs}:/usr/bin:/bin`,
+          HOME: root,
+          RUNNER_TEMP: root,
+          SYMPHONY_ELIXIR_PREFIX: prefix,
+        },
+      });
+      return {
+        result,
+        calls: existsSync(log) ? readFileSync(log, 'utf8') : '',
+        build: existsSync(join(elixirDir, '_build', 'test', 'lib', 'marker')),
+        deps: existsSync(join(elixirDir, 'deps', 'jason')),
+        parked: existsSync(join(root, 'symphony-selector-src.restored')),
+      };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('reuses a verified warm toolchain and restored build outputs without downloads', () => {
+    const run = runSelectorWithStubs();
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.result.stdout).toContain('symphony-selector-beam=warm');
+    expect(run.calls).not.toContain('curl');
+    expect(run.calls).toMatch(/git clone .*JovieInc\/symphony\.git/);
+    expect(run.calls).toContain('mix local.hex --force --if-missing');
+    expect(run.calls).toContain('mix local.rebar --force --if-missing');
+    expect(run.calls).toContain('mix deps.get');
+    expect(run.build).toBe(true);
+    expect(run.deps).toBe(true);
+    expect(run.parked).toBe(false);
+  });
+
+  it('reinstalls instead of trusting a restored toolchain whose OTP drifted', () => {
+    const run = runSelectorWithStubs('26.2.5');
+    expect(run.result.status).not.toBe(0);
+    expect(run.result.stdout).not.toContain('symphony-selector-beam=warm');
+    expect(run.calls).toMatch(/curl .*builds\.hex\.pm\/builds\/otp\//);
+    expect(run.calls).not.toContain('mix ');
   });
 });

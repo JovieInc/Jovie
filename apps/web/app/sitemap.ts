@@ -159,11 +159,17 @@ const getSitemapCatalog = unstable_cache(
           ),
       ]);
 
+      const usernamesWithPublicRelease = new Set(
+        releases.map(release => release.username.trim().toLowerCase())
+      );
       const discoverableProfiles = filterPublicDiscoveryIdentities(
         profiles.map(profile => ({
           ...profile,
           handle: profile.username,
           isPublic: true,
+          hasPublicRelease: usernamesWithPublicRelease.has(
+            profile.username.trim().toLowerCase()
+          ),
         }))
       );
       const eligibleUsernames = new Set(
@@ -191,7 +197,7 @@ const getSitemapCatalog = unstable_cache(
       return EMPTY_CATALOG;
     }
   },
-  ['sitemap-catalog-v6'],
+  ['sitemap-catalog-v7'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 
@@ -317,10 +323,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           release.date ? `${release.date}T00:00:00Z` : undefined
         )
       )
-    )
-  );
-
-  editorialPages.push(
+    ),
     ...engineeringStories.flatMap(story =>
       story.source
         ? [

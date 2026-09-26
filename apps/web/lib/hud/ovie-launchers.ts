@@ -265,12 +265,11 @@ export function whyForControl(input: {
   if (definition.agentCliOnly) {
     return 'Agent-owned CLI. Kept in diagnostics so it cannot crowd the human rail.';
   }
-  const statusWhy =
-    status === 'ready'
-      ? 'Destination preflight succeeded.'
-      : status === 'not_configured'
-        ? 'No configured destination yet.'
-        : 'Preflight did not reach the destination.';
+  let statusWhy = 'Preflight did not reach the destination.';
+  if (status === 'ready') statusWhy = 'Destination preflight succeeded.';
+  else if (status === 'not_configured') {
+    statusWhy = 'No configured destination yet.';
+  }
   const loopWhy =
     timActionCount > 0 &&
     (definition.loop === 'review' || definition.loop === 'approve')
@@ -349,10 +348,11 @@ export function rankLaunchers(input: {
     };
     const readyish =
       destination.configured || destination.href || destination.sshHost;
-    const status = definition.agentCliOnly
-      ? 'not_configured'
-      : (input.state.availability[definition.id] ??
-        (readyish ? 'unavailable' : 'not_configured'));
+    const recordedStatus = input.state.availability[definition.id];
+    let status: OvieLauncherStatus = 'not_configured';
+    if (definition.agentCliOnly) status = 'not_configured';
+    else if (recordedStatus) status = recordedStatus;
+    else if (readyish) status = 'unavailable';
     return buildLauncherControl({
       definition,
       destination,
