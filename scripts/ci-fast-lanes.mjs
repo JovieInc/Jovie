@@ -83,6 +83,91 @@ export const COPY_GATE_PATHS = Object.freeze([
 export const COPY_GATE_COMMAND =
   'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
 
+/**
+ * Guards that read their inputs from disk instead of importing them. PR CI
+ * picks web unit tests by import graph (Exact-head Coverage `--changed`) and
+ * the structural lane by path pattern, so none of these ran on the source PR
+ * that fed them a bad input; the merge queue found each one instead:
+ * - ci-schedule-inventory reads every top-level workflow and no CI command
+ *   ran it at all (#18703 landed a cron workflow without `# clock-class:`).
+ * - node-environment-files reads the node test list and every listed test
+ *   file, but only runs in the structural lane's tests/unit/ci directory run.
+ * - static-revalidate-policy walks marketing routes and the download page's
+ *   whole local import graph, but only runs in web Unit Tests.
+ * Each runs here when the diff touches a file it reads. `prOnly` guards
+ * already run in every web merge group and push, so they run on PRs only.
+ */
+export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    id: 'ci-schedule-inventory',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-schedule-inventory.test.mjs',
+    inputs:
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|scripts\/lib\/(?:ci-schedule-inventory\.mjs|__tests__\/ci-schedule-inventory\.test\.mjs))$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    id: 'node-environment-files',
+    command:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-environment-files.test.ts',
+    // The list, any test file a list entry can name, and the setup/config
+    // files the guard pins.
+    inputs:
+      /^apps\/web\/(?:.+\.test\.[cm]?[jt]s|tests\/(?:node-environment-files\.json|setup-optimized\.ts)|vitest\.config\.fast\.mts)$/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    id: 'static-revalidate-policy',
+    command:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/marketing/static-revalidate-policy.test.ts',
+    // `@/` and relative imports reach any non-test apps/web source.
+    inputs:
+      /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
+    prOnly: true,
+  }),
+]);
+
+/**
+ * @param {string} event GITHUB_EVENT_NAME ('' locally)
+ * @param {readonly string[] | null} changed changed paths; null = unreadable
+ * @returns {Array<(typeof SOURCE_GUARDS)[number]>}
+ */
+export function selectSourceGuards(event, changed) {
+  return SOURCE_GUARDS.filter(guard => {
+    if (guard.prOnly && event !== 'pull_request' && event !== '') return false;
+    // Manual, local, and unreadable or empty diffs fail closed onto the guard.
+    if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
+      return true;
+    }
+    return changed.some(file => guard.inputs.test(file));
+  });
+}
+
+export function runSourceGuards() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const guards = selectSourceGuards(event, listAllChangedFiles());
+  if (guards.length === 0) {
+    return {
+      code: 0,
+      output: 'Source-read guards skipped (no guard input changed)\n',
+      skipped: true,
+    };
+  }
+  // Independent guards: report every failure in one run.
+  let combined = '';
+  let code = 0;
+  for (const guard of guards) {
+    const result = shell(guard.command);
+    combined += `[source-guards] ${guard.id}: exit ${result.code}\n${result.output}`;
+    if (result.code !== 0 && code === 0) code = result.code;
+  }
+  return { code, output: combined };
+}
+
+export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
+  guard => guard.command
+).join(' && ');
+
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -477,6 +562,12 @@ const LANES = [
     run: runCopyGate,
   },
   {
+    id: 'source-guards',
+    name: 'Source-read guard contracts (changed inputs)',
+    nextLocalCommand: SOURCE_GUARDS_COMMAND,
+    run: runSourceGuards,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -518,6 +609,7 @@ export const LANE_GROUPS = Object.freeze({
     'profile-admission',
     'billing-coverage',
     'copy-gate',
+    'source-guards',
     'structural',
   ]),
 });
