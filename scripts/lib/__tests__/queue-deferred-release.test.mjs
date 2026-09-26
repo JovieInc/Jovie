@@ -65,8 +65,12 @@ describe('retired queue release and retained fleet refresh', () => {
     // missed-event pass; it can never reach the refresh or assess jobs.
     expect(fleetGateRefreshWorkflow).not.toContain('gate-next');
     expect(fleetGateRefreshWorkflow).not.toContain('admit-next');
-    expect(fleetGateRefreshWorkflow).toContain("github.event_name != 'schedule'");
-    expect(fleetGateRefreshWorkflow).toContain("github.event_name == 'schedule'");
+    expect(fleetGateRefreshWorkflow).toContain(
+      "github.event_name != 'schedule'"
+    );
+    expect(fleetGateRefreshWorkflow).toContain(
+      "github.event_name == 'schedule'"
+    );
     expect(fleetGateRefreshWorkflow).toContain('intake-readiness');
     expect(fleetGateRefreshWorkflow).toContain('mutations == 0');
     const markerRecovery = readFileSync(
