@@ -35,6 +35,8 @@ const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const MAX_TASK_CHARS = 2000;
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = v => (typeof v === 'number' ? v : null);
+const ints = v => (v === '' ? [] : v.split(',').map(Number));
+
 export function normalizeClusters(clusters) {
   if (!Array.isArray(clusters)) return Object.freeze([]);
   const seen = new Set();
@@ -48,8 +50,7 @@ export function normalizeClusters(clusters) {
     out.push(
       Object.freeze({
         slug,
-        displayName:
-          typeof name === 'string' && name.trim() ? name.trim() : slug,
+        displayName: typeof name === 'string' && name.trim() ? name.trim() : slug,
       })
     );
   }
@@ -154,7 +155,6 @@ export function validateReleaseTaskCorpus(corpus) {
     errors.push('examples must be a non-empty array');
     return errors;
   }
-  const parseInts = v => (v === '' ? [] : v.split(',').map(Number));
   const splits = new Set();
   for (const [i, row] of corpus.examples.entries()) {
     const at = `examples[${i}]`;
@@ -171,8 +171,8 @@ export function validateReleaseTaskCorpus(corpus) {
     const text = parts.slice(4).join('|');
     const expected = e === '' ? null : Number(e);
     const split = Number(s);
-    const tags = parseInts(g);
-    const clusters = c === '' ? null : parseInts(c);
+    const tags = ints(g);
+    const clusters = c === '' ? null : ints(c);
     if (expected !== null && !inRange(expected, allowlist?.length ?? 0))
       errors.push(`${at}: expected index out of range`);
     if (split !== 0 && split !== 1) errors.push(`${at}: split must be 0|1`);
@@ -197,14 +197,12 @@ export function decodeReleaseTaskCorpus(corpus) {
   const legend = corpus.tags ?? [];
   return corpus.examples.map((row, i) => {
     const [e, s, g, c, ...rest] = String(row).split('|');
-    const clusters = c === '' ? null : c.split(',').map(Number);
+    const clusters = c === '' ? null : ints(c);
     return Object.freeze({
       id: `rt-${String(i + 1).padStart(4, '0')}`,
       split: splits[Number(s)] ?? 'tuning',
       expected: e === '' ? null : corpus.clusterAllowlist[Number(e)],
-      tags: Object.freeze(
-        (g === '' ? [] : g.split(',').map(Number)).map(t => legend[t])
-      ),
+      tags: Object.freeze(ints(g).map(t => legend[t])),
       clusters:
         clusters === null
           ? null
