@@ -2,14 +2,18 @@
  * Tests for the packaging swap experiment Bayesian engine (JovieInc/Jovie#10919).
  *
  * Covers:
- * - probTreatmentBeatsControl: core statistical property (symmetry, monotonicity)
- * - checkGuardrails: each guardrail in isolation
- * - selectWinner: correct outcome classification
+ * - normCdf: standard normal CDF math (retained for a future validated estimator)
+ * - probTreatmentBeatsControl: confidence is unavailable (JOV-6469) — see below
+ * - units invariance (JOV-6469): a valid estimator cannot depend on the
+ *   arbitrary unit chosen for a continuous measurement like watch duration
+ * - checkGuardrails: each guardrail in isolation, including invalid-metrics
+ * - selectWinner: no automatic winner is ever declared from unavailable confidence
  */
 
 import { describe, expect, it } from 'vitest';
 import {
   checkGuardrails,
+  normCdf,
   probTreatmentBeatsControl,
   selectWinner,
 } from '@/lib/workflows/youtube-packaging/bayesian';
@@ -40,79 +44,132 @@ function makeMetrics(
 }
 
 // ---------------------------------------------------------------------------
-// probTreatmentBeatsControl
+// normCdf
+// ---------------------------------------------------------------------------
+
+describe('normCdf', () => {
+  it('returns 0.5 for z=0 (symmetric)', () => {
+    expect(normCdf(0)).toBeCloseTo(0.5, 5);
+  });
+
+  it('returns ~0.841 for z=1', () => {
+    expect(normCdf(1)).toBeCloseTo(0.8413, 3);
+  });
+
+  it('returns ~0.159 for z=-1 (symmetric)', () => {
+    expect(normCdf(-1)).toBeCloseTo(0.1587, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// probTreatmentBeatsControl (JOV-6469: confidence unavailable)
 // ---------------------------------------------------------------------------
 
 describe('probTreatmentBeatsControl', () => {
-  it('returns 0.5 when rates are equal', () => {
+  it('returns null when rates are equal (no fabricated 0.5)', () => {
     const a = makeMetrics('control', { impressions: 1000, watchMinutes: 500 });
     const b = makeMetrics('treatment', {
       impressions: 1000,
       watchMinutes: 500,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeCloseTo(0.5, 1);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('returns > 0.95 when treatment is clearly better with large sample', () => {
-    // Control: 0.5 min/impression; Treatment: 0.7 min/impression; n=2000 each
+  it('returns null even when treatment appears clearly better with a large sample', () => {
+    // Control: 0.5 min/impression; Treatment: 0.7 min/impression; n=2000 each.
+    // VariantMetrics carries no per-impression variance, so no statistically
+    // valid confidence can be produced regardless of the apparent effect size.
     const a = makeMetrics('control', { impressions: 2000, watchMinutes: 1000 });
     const b = makeMetrics('treatment', {
       impressions: 2000,
       watchMinutes: 1400,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeGreaterThan(0.95);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('returns < 0.05 when control is clearly better', () => {
+  it('returns null even when control appears clearly better', () => {
     const a = makeMetrics('control', { impressions: 2000, watchMinutes: 1400 });
     const b = makeMetrics('treatment', {
       impressions: 2000,
       watchMinutes: 1000,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeLessThan(0.05);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('is symmetric (P(B>A) = 1 - P(A>B))', () => {
-    const a = makeMetrics('control', { impressions: 1500, watchMinutes: 900 });
-    const b = makeMetrics('treatment', {
-      impressions: 1500,
-      watchMinutes: 1050,
-    });
-    const pBA = probTreatmentBeatsControl(a, b);
-    const pAB = probTreatmentBeatsControl(b, a);
-    expect(pBA + pAB).toBeCloseTo(1.0, 5);
-  });
-
-  it('returns 0.5 when either impressions = 0', () => {
+  it('returns null when either impressions = 0', () => {
     const a = makeMetrics('control', { impressions: 0, watchMinutes: 0 });
     const b = makeMetrics('treatment', {
       impressions: 1000,
       watchMinutes: 500,
     });
-    expect(probTreatmentBeatsControl(a, b)).toBe(0.5);
-    expect(probTreatmentBeatsControl(b, a)).toBe(0.5);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
+    expect(probTreatmentBeatsControl(b, a)).toBeNull();
   });
+});
 
-  it('probability increases monotonically as treatment rate improves', () => {
+// ---------------------------------------------------------------------------
+// Units invariance (JOV-6469) — a valid estimator cannot depend on the
+// arbitrary unit chosen for a continuous measurement like watch duration.
+// The prior Poisson-rate model scaled its z-score by √c under a c× unit
+// rescale (e.g. minutes→seconds, c=60), which could flip the decision kind
+// purely from unit choice. These tests fail against that model and pass now
+// that the estimator honestly reports "unavailable" instead.
+// ---------------------------------------------------------------------------
+
+describe('units invariance (JOV-6469)', () => {
+  it('probTreatmentBeatsControl is invariant to rescaling watch-minutes (e.g. minutes vs seconds)', () => {
     const control = makeMetrics('control', {
-      impressions: 1000,
+      impressions: 5000,
       watchMinutes: 500,
     });
-    const rates = [0.45, 0.5, 0.55, 0.6, 0.65].map(r =>
-      probTreatmentBeatsControl(
-        control,
-        makeMetrics('treatment', {
-          impressions: 1000,
-          watchMinutes: Math.round(r * 1000),
-        })
-      )
+    const treatment = makeMetrics('treatment', {
+      impressions: 5000,
+      watchMinutes: 1000,
+    });
+    const RESCALE = 60; // simulate expressing the same durations in seconds
+    const controlRescaled = {
+      ...control,
+      watchMinutes: control.watchMinutes * RESCALE,
+    };
+    const treatmentRescaled = {
+      ...treatment,
+      watchMinutes: treatment.watchMinutes * RESCALE,
+    };
+
+    expect(probTreatmentBeatsControl(control, treatment)).toBe(
+      probTreatmentBeatsControl(controlRescaled, treatmentRescaled)
     );
-    for (let i = 1; i < rates.length; i++) {
-      expect(rates[i]).toBeGreaterThan(rates[i - 1]);
-    }
+  });
+
+  it('selectWinner reaches the same winner regardless of the watch-time unit scale', () => {
+    const control = makeMetrics('control', {
+      impressions: 5000,
+      watchMinutes: 500,
+    });
+    const treatment = makeMetrics('treatment', {
+      impressions: 5000,
+      watchMinutes: 520,
+    });
+    const RESCALE = 60;
+    const controlRescaled = {
+      ...control,
+      watchMinutes: control.watchMinutes * RESCALE,
+    };
+    const treatmentRescaled = {
+      ...treatment,
+      watchMinutes: treatment.watchMinutes * RESCALE,
+    };
+
+    const dBase = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
+    const dRescaled = selectWinner(
+      controlRescaled,
+      treatmentRescaled,
+      MIN_BAYESIAN_CONFIDENCE
+    );
+
+    expect(dBase.winner).toBe(dRescaled.winner);
+    expect(dBase.confidence).toBe(dRescaled.confidence);
+    expect(dBase.winner).toBe('inconclusive');
   });
 });
 
@@ -224,15 +281,48 @@ describe('checkGuardrails', () => {
     });
     expect(result.passed).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // Invalid metrics (deliberate-red) — must fail closed, never crash
+  // -------------------------------------------------------------------------
+
+  it('blocks on NaN watch minutes instead of crashing', () => {
+    const result = checkGuardrails(
+      baseControl,
+      { ...baseTreatment, watchMinutes: Number.NaN },
+      baseOpts
+    );
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/NaN|negative|non-finite/);
+  });
+
+  it('blocks on negative impressions instead of crashing', () => {
+    const result = checkGuardrails(
+      { ...baseControl, impressions: -1 },
+      baseTreatment,
+      baseOpts
+    );
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/NaN|negative|non-finite/);
+  });
+
+  it('blocks on non-finite avgViewDurationSeconds instead of crashing', () => {
+    const result = checkGuardrails(
+      baseControl,
+      { ...baseTreatment, avgViewDurationSeconds: Number.POSITIVE_INFINITY },
+      baseOpts
+    );
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/NaN|negative|non-finite/);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// selectWinner
+// selectWinner (deliberate-red: no unsupported auto-winner)
 // ---------------------------------------------------------------------------
 
 describe('selectWinner', () => {
-  it('declares treatment winner when confidence >= threshold', () => {
-    // Treatment is clearly better — P(B>A) will be very high
+  it('does NOT declare treatment winner even when it appears to clearly outperform control', () => {
     const control = makeMetrics('control', {
       impressions: 2000,
       watchMinutes: 1000,
@@ -242,11 +332,12 @@ describe('selectWinner', () => {
       watchMinutes: 1500,
     });
     const decision = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
-    expect(decision.winner).toBe('treatment');
-    expect(decision.confidence).toBeGreaterThanOrEqual(MIN_BAYESIAN_CONFIDENCE);
+    expect(decision.winner).toBe('inconclusive');
+    expect(decision.confidence).toBeNull();
+    expect(decision.reason).toMatch(/unavailable/i);
   });
 
-  it('declares control winner when P(A>B) >= threshold', () => {
+  it('does NOT declare control winner even when treatment appears to clearly underperform', () => {
     const control = makeMetrics('control', {
       impressions: 2000,
       watchMinutes: 1500,
@@ -256,11 +347,11 @@ describe('selectWinner', () => {
       watchMinutes: 1000,
     });
     const decision = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
-    expect(decision.winner).toBe('control');
+    expect(decision.winner).toBe('inconclusive');
+    expect(decision.confidence).toBeNull();
   });
 
-  it('returns inconclusive when neither variant clears threshold', () => {
-    // Very similar rates — no clear winner
+  it('returns inconclusive when variants are similar (also confidence-unavailable, not threshold ambiguity)', () => {
     const control = makeMetrics('control', {
       impressions: 600,
       watchMinutes: 500,
@@ -273,7 +364,24 @@ describe('selectWinner', () => {
     expect(decision.winner).toBe('inconclusive');
   });
 
-  it('includes correct rate metrics in the decision', () => {
+  it('never declares a winner regardless of how permissive the threshold is', () => {
+    const control = makeMetrics('control', {
+      impressions: 2000,
+      watchMinutes: 800,
+    });
+    const treatment = makeMetrics('treatment', {
+      impressions: 2000,
+      watchMinutes: 820,
+    });
+    const dHigh = selectWinner(control, treatment, 0.999);
+    const dLow = selectWinner(control, treatment, 0.001);
+    // No threshold, however permissive, can produce an automatic winner from
+    // an unavailable confidence value.
+    expect(dHigh.winner).toBe('inconclusive');
+    expect(dLow.winner).toBe('inconclusive');
+  });
+
+  it('still includes correct rate metrics in the decision', () => {
     const control = makeMetrics('control', {
       impressions: 1000,
       watchMinutes: 400,
@@ -285,6 +393,16 @@ describe('selectWinner', () => {
     const decision = selectWinner(control, treatment, 0.95);
     expect(decision.controlRate).toBeCloseTo(0.4, 5);
     expect(decision.treatmentRate).toBeCloseTo(0.8, 5);
+  });
+
+  it('holds instead of crashing on NaN watch minutes', () => {
+    const control = makeMetrics('control');
+    const treatment = makeMetrics('treatment', { watchMinutes: Number.NaN });
+    const decision = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
+    expect(decision.winner).toBe('inconclusive');
+    expect(decision.confidence).toBeNull();
+    expect(Number.isFinite(decision.controlRate)).toBe(true);
+    expect(Number.isFinite(decision.treatmentRate)).toBe(true);
   });
 });
 
