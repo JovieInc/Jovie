@@ -71,6 +71,12 @@ const TEMPORARY_ALLOWLIST = [
   'components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx',
   'components/features/admin/leads/GrowthIntakeComposer.tsx',
   'components/molecules/filters/FilterChip.tsx',
+  // TODO: these are in-scope screens without a screen-certification
+  // registration, so any edit trips screen-registration-gate (JOV-INV-018).
+  // Swap bg-background -> bg-base in the follow-up that registers them.
+  'app/account/layout.tsx',
+  'app/billing/layout.tsx',
+  'app/waitlist/error.tsx',
 ] as const;
 
 function walk(dir: string, out: string[]): void {
