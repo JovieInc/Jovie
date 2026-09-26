@@ -110,7 +110,7 @@ describe('Noir Ion — approved dark anchors', () => {
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
     expect(linearDark).toContain('--linear-bg-page: #07080a;');
     expect(linearDark).toContain('--linear-bg-surface-1: #131417;');
-    expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 6 8 13;');
+    expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 7 8 10;');
   });
 
   it('uses ion for routine action, selection, and product focus', () => {

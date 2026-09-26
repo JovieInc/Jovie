@@ -70,7 +70,7 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--linear-bg-page:\s*#07080a;/
     );
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*6 8 13;/
+      /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*7 8 10;/
     );
   });
 
