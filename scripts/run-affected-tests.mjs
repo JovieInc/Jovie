@@ -180,6 +180,20 @@ const SUMMER_COMMISSIONING_LANE = new Set([
   ...SUMMER_COMMISSIONING_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
+  'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/capability-benchmark.mjs',
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'docs/operations/CAPABILITY_BENCHMARK.md',
+]);
+const CAPABILITY_BENCHMARK_LANE = new Set([
+  ...CAPABILITY_BENCHMARK_PRIMARY_INPUTS,
+  'scripts/ci-fast-lanes.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CAPABILITY_BENCHMARK_NODE_TESTS = [
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
+];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
@@ -1370,6 +1384,22 @@ export function buildAffectedTestPlan(
         'scripts/summer-commissioning/project-creation-policy.test.mjs',
       ],
       retouchPromptCoverage: true,
+    };
+  }
+  const isBoundedCapabilityBenchmarkChange =
+    files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => CAPABILITY_BENCHMARK_LANE.has(file));
+  if (isBoundedCapabilityBenchmarkChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
   }
   const isBoundedSummerCommissioningChange =
