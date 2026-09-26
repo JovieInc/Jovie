@@ -130,7 +130,7 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-const DEFAULT_TEST_RELEASE_ARTWORK_URL = '/android-chrome-512x512.png';
+const DEFAULT_TEST_RELEASE_ARTWORK_URL = '/web-app-manifest-512x512.png';
 
 /**
  * Deterministic public track-preview fixture (F6, docs/qa/public-profile-stories.md).
