@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AudioTrackSource } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 
 let audioEventListeners: Record<string, Array<() => void>>;
 let mockAudio: {
@@ -198,7 +199,7 @@ describe('useTrackAudioPlayer', () => {
     expect(ps(result).activeTrackId).toBe('track-1');
   });
 
-  const queue = () => [
+  const queue = (): AudioTrackSource[] => [
     song('track-1', { title: 'First Song', audioUrl: `${CDN}/first.mp3` }),
     song('track-2', { title: 'Second Song', audioUrl: `${CDN}/second.mp3` }),
   ];

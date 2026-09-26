@@ -72,33 +72,33 @@ function createTrack(overrides: Partial<TrackViewModel> = {}): TrackViewModel {
 }
 
 function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
-  const track = props.track ?? createTrack();
-  const renderMode = props.renderMode ?? 'table';
-  const row = (
-    <TrackRow
-      track={track}
-      providerConfig={providerConfig}
-      allProviders={['spotify', 'apple_music']}
-      columnCount={11}
-      columnVisibility={{
-        select: true,
-        release: true,
-        availability: true,
-        metrics: true,
-        primaryIsrc: true,
-        actions: true,
-      }}
-      {...props}
-    />
-  );
+  const { renderMode = 'table', ...rest } = props;
+  const rowProps: ComponentProps<typeof TrackRow> = {
+    track: createTrack(),
+    providerConfig,
+    allProviders: ['spotify', 'apple_music'],
+    columnCount: 11,
+    columnVisibility: {
+      select: true,
+      release: true,
+      availability: true,
+      metrics: true,
+      primaryIsrc: true,
+      actions: true,
+    },
+    renderMode,
+    ...rest,
+  };
 
   if (renderMode === 'stack') {
-    return render(row);
+    return render(<TrackRow {...rowProps} />);
   }
 
   return render(
     <table>
-      <tbody>{row}</tbody>
+      <tbody>
+        <TrackRow {...rowProps} />
+      </tbody>
     </table>
   );
 }

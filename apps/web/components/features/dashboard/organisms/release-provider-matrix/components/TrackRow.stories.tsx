@@ -4,7 +4,7 @@ import type {
   ReleaseViewModel,
   TrackViewModel,
 } from '@/lib/discography/types';
-import { TrackRow } from './TrackRow';
+import { TrackRow, TrackRowsContainer } from './TrackRow';
 
 const providerConfig = {
   spotify: { label: 'Spotify', accent: '#1DB954' },
@@ -81,6 +81,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Stack: Story = {};
+
+export const Container: Story = {
+  render: () => (
+    <TrackRowsContainer
+      tracks={[track]}
+      release={release}
+      providerConfig={providerConfig}
+      allProviders={allProviders}
+      columnCount={11}
+      renderMode='stack'
+    />
+  ),
+};
 
 export const Table: Story = {
   args: {

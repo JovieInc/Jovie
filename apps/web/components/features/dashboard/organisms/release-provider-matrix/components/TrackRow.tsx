@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/release-provider-matrix/TrackRow.test.tsx
 import { Badge } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
