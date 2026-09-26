@@ -216,6 +216,10 @@ function confidenceForSources(sourceCount: number): number {
   return Math.min(0.95, 0.7 + 0.15 * (sourceCount - 1));
 }
 
+function sortStrings(values: Iterable<string>): string[] {
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Evaluate identity observations into verified/conflicted destinations.
  *
@@ -228,9 +232,9 @@ function confidenceForSources(sourceCount: number): number {
  *    unresolved and marks the evaluation conflicted;
  *  - `website` is multi-identity: several official domains are all verified.
  */
-export function evaluateUnclaimedArtistIdentity(
+function indexObservationsByCanonical(
   observations: readonly IdentityObservation[]
-): UnclaimedArtistIdentityEvaluation {
+): Map<string, Map<string, CanonicalBucket>> {
   const byPlatform = new Map<string, Map<string, CanonicalBucket>>();
 
   for (const observation of observations) {
@@ -264,73 +268,125 @@ export function evaluateUnclaimedArtistIdentity(
     }
   }
 
-  const links: EvaluatedIdentityLink[] = [];
+  return byPlatform;
+}
+
+function toLink(
+  platformId: string,
+  bucket: CanonicalBucket,
+  status: EvaluatedIdentityLink['status'],
+  confidence: number
+): EvaluatedIdentityLink {
+  return {
+    platform: platformId,
+    url: bucket.normalizedUrl,
+    status,
+    confidence,
+    sources: sortStrings(bucket.sources),
+    observedAt: bucket.observedAt,
+  };
+}
+
+function socialHandle(bucket: CanonicalBucket): string[] {
+  return bucket.category === 'social' && bucket.handle ? [bucket.handle] : [];
+}
+
+interface PlatformEvaluation {
+  readonly links: EvaluatedIdentityLink[];
+  readonly conflicts: IdentityPlatformConflict[];
+  readonly handleEvidence: string[];
+}
+
+function evaluatePlatformBuckets(
+  platformId: string,
+  buckets: Map<string, CanonicalBucket>
+): PlatformEvaluation {
+  const candidates = [...buckets.values()];
+
+  if (candidates.length === 1 || MULTI_IDENTITY_PLATFORMS.has(platformId)) {
+    return {
+      links: candidates.map(bucket =>
+        toLink(
+          platformId,
+          bucket,
+          'verified',
+          confidenceForSources(bucket.sources.size)
+        )
+      ),
+      conflicts: [],
+      handleEvidence: candidates.flatMap(socialHandle),
+    };
+  }
+
+  // Single-identity platform disagreement: corroboration decides, ties
+  // stay unresolved so a stale or fan-adjacent handle never wins silently.
+  const maxSources = Math.max(...candidates.map(c => c.sources.size));
+  const winners = candidates.filter(c => c.sources.size === maxSources);
+  const winner = winners.length === 1 ? winners[0] : null;
+
+  const conflict: IdentityPlatformConflict = {
+    platform: platformId,
+    urls: sortStrings(candidates.map(c => c.normalizedUrl)),
+    resolvedUrl: winner?.normalizedUrl ?? null,
+  };
+
+  const links = candidates.map(bucket => {
+    const resolved = winner === bucket;
+    return toLink(
+      platformId,
+      bucket,
+      resolved ? 'verified' : 'conflicted',
+      resolved
+        ? confidenceForSources(bucket.sources.size)
+        : Math.min(0.4, confidenceForSources(bucket.sources.size) - 0.3)
+    );
+  });
+
+  return {
+    links,
+    conflicts: [conflict],
+    handleEvidence: winner ? socialHandle(winner) : [],
+  };
+}
+
+function evaluationStatus(
+  verifiedCount: number,
+  hasConflicts: boolean,
+  hasUnresolved: boolean
+): UnclaimedArtistIdentityEvaluation['status'] {
+  if (verifiedCount === 0) {
+    return hasConflicts ? 'conflicted' : 'not_found';
+  }
+  return hasUnresolved ? 'conflicted' : 'verified';
+}
+
+export function evaluateUnclaimedArtistIdentity(
+  observations: readonly IdentityObservation[]
+): UnclaimedArtistIdentityEvaluation {
+  const byPlatform = indexObservationsByCanonical(observations);
+
+  const evaluatedLinks: EvaluatedIdentityLink[] = [];
   const conflicts: IdentityPlatformConflict[] = [];
   const handleEvidence: string[] = [];
 
   for (const [platformId, buckets] of byPlatform) {
-    const candidates = [...buckets.values()];
-
-    if (candidates.length === 1 || MULTI_IDENTITY_PLATFORMS.has(platformId)) {
-      for (const bucket of candidates) {
-        links.push({
-          platform: platformId,
-          url: bucket.normalizedUrl,
-          status: 'verified',
-          confidence: confidenceForSources(bucket.sources.size),
-          sources: [...bucket.sources].sort(),
-          observedAt: bucket.observedAt,
-        });
-        if (bucket.category === 'social' && bucket.handle) {
-          handleEvidence.push(bucket.handle);
-        }
-      }
-      continue;
-    }
-
-    // Single-identity platform disagreement: corroboration decides, ties
-    // stay unresolved so a stale or fan-adjacent handle never wins silently.
-    const maxSources = Math.max(...candidates.map(c => c.sources.size));
-    const winners = candidates.filter(c => c.sources.size === maxSources);
-    const winner = winners.length === 1 ? winners[0] : null;
-
-    conflicts.push({
-      platform: platformId,
-      urls: candidates.map(c => c.normalizedUrl).sort(),
-      resolvedUrl: winner?.normalizedUrl ?? null,
-    });
-
-    for (const bucket of candidates) {
-      const resolved = winner === bucket;
-      links.push({
-        platform: platformId,
-        url: bucket.normalizedUrl,
-        status: resolved ? 'verified' : 'conflicted',
-        confidence: resolved
-          ? confidenceForSources(bucket.sources.size)
-          : Math.min(0.4, confidenceForSources(bucket.sources.size) - 0.3),
-        sources: [...bucket.sources].sort(),
-        observedAt: bucket.observedAt,
-      });
-      if (resolved && bucket.category === 'social' && bucket.handle) {
-        handleEvidence.push(bucket.handle);
-      }
-    }
+    const evaluated = evaluatePlatformBuckets(platformId, buckets);
+    evaluatedLinks.push(...evaluated.links);
+    conflicts.push(...evaluated.conflicts);
+    handleEvidence.push(...evaluated.handleEvidence);
   }
 
   const unresolved = conflicts.some(conflict => conflict.resolvedUrl === null);
-  const verifiedCount = links.filter(link => link.status === 'verified').length;
+  const verifiedCount = evaluatedLinks.filter(
+    link => link.status === 'verified'
+  ).length;
+  const status = evaluationStatus(
+    verifiedCount,
+    conflicts.length > 0,
+    unresolved
+  );
 
-  const status: UnclaimedArtistIdentityEvaluation['status'] =
-    verifiedCount === 0
-      ? conflicts.length > 0
-        ? 'conflicted'
-        : 'not_found'
-      : unresolved
-        ? 'conflicted'
-        : 'verified';
-
-  return { status, links, handleEvidence, conflicts };
+  return { status, links: evaluatedLinks, handleEvidence, conflicts };
 }
 
 // ============================================================================
@@ -393,9 +449,9 @@ export function buildUnclaimedIdentityEnrichmentReceipt(
   return {
     status: evaluation.status,
     observedAt: params.observedAt,
-    sources: [
-      ...new Set(evaluation.links.flatMap(link => link.sources)),
-    ].sort(),
+    sources: sortStrings(
+      new Set(evaluation.links.flatMap(link => link.sources))
+    ),
     provider: 'spotify',
     providerArtistId: params.providerArtistId,
     verifiedPlatforms: verified.map(link => link.platform),
