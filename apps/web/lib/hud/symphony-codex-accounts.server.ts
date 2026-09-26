@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -27,11 +27,13 @@ function helperPath(): string {
   const configured = process.env.JOVIE_CODEX_ACCOUNT_CONTROL_HELPER;
   if (configured) return configured;
   const cwd = process.cwd();
-  const staged = join(
-    cwd,
-    'runtime-data/scripts/symphony/symphony-codex-account-control.py'
-  );
-  if (existsSync(staged)) return staged;
+  // Deployed builds ship the staged copy (scripts/stage-runtime-data.mjs).
+  if (process.env.VERCEL) {
+    return join(
+      cwd,
+      'runtime-data/scripts/symphony/symphony-codex-account-control.py'
+    );
+  }
   return cwd.endsWith('/apps/web')
     ? join(cwd, '../../scripts/symphony/symphony-codex-account-control.py')
     : join(cwd, 'scripts/symphony/symphony-codex-account-control.py');
