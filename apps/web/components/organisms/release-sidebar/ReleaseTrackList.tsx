@@ -50,6 +50,7 @@ function buildTrackSidebarData(
 interface TrackControlSource {
   readonly id: string;
   readonly title: string;
+  readonly releaseId?: string;
   readonly audioUrl?: string;
   readonly isrc?: string | null;
   readonly releaseTitle?: string;
@@ -89,6 +90,7 @@ function buildReleasePlaybackQueue(
       {
         id: track.id,
         title: track.title,
+        releaseId: release.id,
         audioUrl,
         isrc: track.isrc,
         releaseTitle: release.title,
@@ -159,22 +161,11 @@ export function ReleaseTrackList({
   }
 
   if (hasError) {
-    return (
-      <DrawerInlineNote
-        className='min-h-12 px-0'
-        message='Failed to load tracks.'
-        tone='error'
-      />
-    );
+    return <DrawerInlineNote message='Failed to load tracks.' tone='error' />;
   }
 
   if (!tracks || tracks.length === 0) {
-    return (
-      <DrawerInlineNote
-        className='min-h-12 px-0'
-        message='No track data available.'
-      />
-    );
+    return <DrawerInlineNote message='No track data available.' />;
   }
 
   const inferredDiscCount = Math.max(
@@ -266,6 +257,7 @@ function TrackListRow({
       {
         id: track.id,
         title: track.title,
+        releaseId: release.id,
         audioUrl: playableUrl,
         isrc: track.isrc,
         releaseTitle: release.title,
@@ -284,6 +276,7 @@ function TrackListRow({
     playableUrl,
     release.artistNames,
     release.artworkUrl,
+    release.id,
     release.title,
     track.id,
     track.isrc,

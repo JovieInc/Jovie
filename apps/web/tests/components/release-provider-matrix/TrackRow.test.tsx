@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TrackRow } from '@/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
+import { TrackRow } from '@/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
@@ -72,33 +72,33 @@ function createTrack(overrides: Partial<TrackViewModel> = {}): TrackViewModel {
 }
 
 function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
-  const track = props.track ?? createTrack();
-  const renderMode = props.renderMode ?? 'table';
-  const row = (
-    <TrackRow
-      track={track}
-      providerConfig={providerConfig}
-      allProviders={['spotify', 'apple_music']}
-      columnCount={11}
-      columnVisibility={{
-        select: true,
-        release: true,
-        availability: true,
-        metrics: true,
-        primaryIsrc: true,
-        actions: true,
-      }}
-      {...props}
-    />
-  );
+  const { renderMode = 'table', ...rest } = props;
+  const rowProps: ComponentProps<typeof TrackRow> = {
+    track: createTrack(),
+    providerConfig,
+    allProviders: ['spotify', 'apple_music'],
+    columnCount: 11,
+    columnVisibility: {
+      select: true,
+      release: true,
+      availability: true,
+      metrics: true,
+      primaryIsrc: true,
+      actions: true,
+    },
+    renderMode,
+    ...rest,
+  };
 
   if (renderMode === 'stack') {
-    return render(row);
+    return render(<TrackRow {...rowProps} />);
   }
 
   return render(
     <table>
-      <tbody>{row}</tbody>
+      <tbody>
+        <TrackRow {...rowProps} />
+      </tbody>
     </table>
   );
 }
@@ -126,6 +126,7 @@ describe('TrackRow', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Open Skies',
+      releaseId: 'release-1',
       audioUrl: 'https://cdn.example.com/track.mp3',
       artistName: undefined,
       artworkUrl: undefined,

@@ -27,7 +27,7 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
 }));
 
 const { ReleaseCell } = await import(
-  '@/features/dashboard/organisms/releases/cells/ReleaseCell'
+  '@/components/features/dashboard/organisms/releases/cells/ReleaseCell'
 );
 
 const baseRelease: ReleaseViewModel = {
@@ -123,6 +123,7 @@ describe('ReleaseCell', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'release-1',
       title: 'Skyline Dreams',
+      releaseId: 'release-1',
       audioUrl: 'https://cdn.example.com/preview.mp3',
       releaseTitle: 'Skyline Dreams',
       artistName: undefined,

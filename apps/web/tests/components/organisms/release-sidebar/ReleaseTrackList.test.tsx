@@ -199,6 +199,7 @@ describe('ReleaseTrackList', () => {
     const expectedTrack = {
       id: 'track_1',
       title: 'Static Skies',
+      releaseId: release.id,
       audioUrl: 'https://example.com/preview.mp3',
       isrc: 'USRC17607839',
       releaseTitle: 'Midnight Sun',
