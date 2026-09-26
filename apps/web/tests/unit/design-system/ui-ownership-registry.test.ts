@@ -201,10 +201,11 @@ describe('cross-surface UI ownership registry', () => {
   it('RED: rejects a legacy 32px equivalent CTA geometry', () => {
     expectIssue(
       mutate('molecule.profile-primary-cta', entry => ({
+        // Deliberately outside the typed contract: the validator must reject it.
         visibleControlGeometry: {
           ...entry.visibleControlGeometry,
           visiblePx: 32,
-        } as Entry['visibleControlGeometry'],
+        } as unknown as Entry['visibleControlGeometry'],
       })),
       'invalid-visible-control-geometry'
     );
@@ -624,10 +625,11 @@ describe('cross-surface UI ownership registry', () => {
   it('fails closed on serif policy and Pen proposal/canonical confusion', () => {
     expectIssue(
       mutate('organism.marketing-header', entry => ({
+        // Deliberately outside the typed contract: the validator must reject it.
         typography: {
           ...entry.typography,
           family: 'Georgia',
-        } as Entry['typography'],
+        } as unknown as Entry['typography'],
       })),
       'unregistered-serif'
     );

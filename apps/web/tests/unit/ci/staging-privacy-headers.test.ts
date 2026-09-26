@@ -1,20 +1,29 @@
+import type { NextConfig } from 'next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RENDER_FIXTURE_X_ROBOTS_TAG } from '@/lib/render-fixture-policy';
 
 const originalVercelEnv = process.env.VERCEL_ENV;
 
-async function loadHeaders(vercelEnv: string) {
+/** The subset of Next's `headers()` rule shape these assertions read. */
+interface HeaderRule {
+  readonly source: string;
+  readonly headers: ReadonlyArray<{
+    readonly key: string;
+    readonly value: string;
+  }>;
+}
+
+async function loadHeaders(vercelEnv: string): Promise<HeaderRule[]> {
   process.env.VERCEL_ENV = vercelEnv;
   vi.resetModules();
   const nextConfigModule = await import('../../../next.config.js');
-  const nextConfig = nextConfigModule.default ?? nextConfigModule;
+  const nextConfig: NextConfig = nextConfigModule.default ?? nextConfigModule;
+  if (!nextConfig.headers)
+    throw new Error('next.config.js must define headers()');
   return nextConfig.headers();
 }
 
-function matchingHeaderValues(
-  rules: Awaited<ReturnType<typeof loadHeaders>>,
-  key: string
-) {
+function matchingHeaderValues(rules: readonly HeaderRule[], key: string) {
   return rules.flatMap(rule =>
     rule.headers
       .filter(header => header.key.toLowerCase() === key.toLowerCase())

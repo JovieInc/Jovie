@@ -312,7 +312,7 @@ describe('YouTube Library provider', () => {
   });
 
   it('keeps each analytics window on its inclusive range', async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn(async (_input: RequestInfo | URL) =>
       jsonResponse({
         columnHeaders: [{ name: 'video' }, { name: 'views' }],
         rows: [['video-1', 1]],
@@ -387,7 +387,7 @@ describe('YouTube Library provider', () => {
   });
 
   it('bounds lifetime batches by the Analytics report cell limit', async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn(async (_input: RequestInfo | URL) =>
       jsonResponse({
         columnHeaders: [{ name: 'video' }],
         rows: [],
