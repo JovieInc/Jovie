@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 
 const H = '[0-9a-f]+';
 const FAMILIES = [
-  `(\\w+-next-build-web-v1)-${H}-\\d{8}`,
+  `(\\w+-next-build-web-v1)-${H}-\\d{8}(?:\\d{2})?`,
   `(jovie-web-tsbuildinfo-v2-\\w+)-${H}-(h\\d{10}|${H})`,
   `(pnpm-node-modules-v2-\\w+-\\w+)-${H}-${H}`,
   `(jovie-production-next-cache-v1-\\w+)-${H}`,
