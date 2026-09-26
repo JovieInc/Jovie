@@ -2275,6 +2275,11 @@ describe('Symphony selector toolchain cache', () => {
     '${{ runner.temp }}/symphony-selector-src/elixir/deps',
     '${{ runner.temp }}/symphony-selector-src/elixir/_build/test',
   ];
+  const SELECTOR_ENV = [
+    'SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam',
+    'MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix',
+    'HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex',
+  ];
   const remaining = () =>
     jobBlock('ci-fast-remaining', 'ci-profile-admission-browser');
 
@@ -2334,40 +2339,96 @@ describe('Symphony selector toolchain cache', () => {
     expect(key.platform).toMatch(/^[a-z]+-[\d.]+-\w+$/);
   });
 
-  it('points the selector at the cached paths and saves only from main pushes', () => {
+  it('points the selector at the cached paths and never saves from ci-fast', () => {
     const block = remaining();
     const keyAt = block.indexOf('- name: Resolve Symphony selector cache key');
     const restoreAt = block.indexOf('- name: Restore Symphony selector cache');
     const laneAt = block.indexOf('- name: Run structural ci-fast lane');
-    const saveAt = block.indexOf('- name: Save Symphony selector cache');
     expect(keyAt).toBeGreaterThan(0);
     expect(restoreAt).toBeGreaterThan(keyAt);
     expect(laneAt).toBeGreaterThan(restoreAt);
-    expect(saveAt).toBeGreaterThan(laneAt);
 
     const lane = step(block, 'Run structural ci-fast lane');
-    expect(lane).toContain(
-      'SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam'
-    );
-    expect(lane).toContain(
-      'MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix'
-    );
-    expect(lane).toContain(
-      'HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex'
-    );
+    for (const env of SELECTOR_ENV) expect(lane).toContain(env);
     // Overriding the checkout would skip the pinned clone entirely.
     expect(block).not.toContain('SYMPHONY_SELECTOR_CHECKOUT');
     expect(readFileSync(resolve(REPO_ROOT, SELECTOR), 'utf8')).toContain(
       'CHECKOUT="${RUNNER_TEMP:-/tmp}/symphony-selector-src"'
     );
 
-    const ready = step(block, 'Check Symphony selector cache outputs');
-    expect(ready).toContain("github.event_name == 'push'");
-    expect(ready).toContain("github.ref == 'refs/heads/main'");
-    expect(ready).toContain("steps.selector-cache.outputs.cache-hit != 'true'");
-    const save = step(block, 'Save Symphony selector cache');
+    // Queue-proven main pushes skip ci-fast (remaining), so a save here could
+    // never run. PR and merge-group runs only restore main's entry.
+    expect(block).not.toContain('actions/cache/save@');
+    expect(block).not.toContain('Save Symphony selector cache');
+  });
+
+  it('writes the selector cache only from a trusted-main warmer with the identical key', () => {
+    const warm = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/symphony-selector-cache-warm.yml'),
+      'utf8'
+    );
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:\n {2}contents: read\n/m
+    );
+    for (const trigger of [
+      'pull_request',
+      'pull_request_target',
+      'merge_group',
+      'workflow_run',
+      'schedule',
+    ]) {
+      expect(header).not.toMatch(new RegExp(`^\\s+${trigger}:`, 'm'));
+    }
+    expect(warm).not.toContain('secrets.');
+    expect(warm).toContain('persist-credentials: false');
+    expect(warm).toContain('runs-on: ubuntu-latest');
+    expect(warm).toContain("github.ref == 'refs/heads/main' &&");
+    expect(warm).toContain(
+      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+    );
+
+    // Byte-identical key and paths to the ci-fast restore.
+    const keyLine = block =>
+      block
+        .split('\n')
+        .find(line => line.trim().startsWith('key: symphony-selector-v1-'))
+        ?.trim();
+    const ciRestore = step(remaining(), 'Restore Symphony selector cache');
+    const lookup = step(warm, 'Look up Symphony selector cache');
+    expect(keyLine(ciRestore)).toBeDefined();
+    expect(keyLine(lookup)).toBe(keyLine(ciRestore));
+    expect(step(warm, 'Resolve Symphony selector cache key')).toContain(
+      `bash ${SELECTOR} --print-cache-key >> "$GITHUB_OUTPUT"`
+    );
+    expect(lookup).toContain('lookup-only: true');
+    expect(lookup).not.toContain('restore-keys');
+    for (const path of CACHE_PATHS) expect(lookup).toContain(path);
+
+    // A hit exits after the lookup; a miss runs the real selector test before
+    // any output is saved.
+    const miss = "steps.selector-cache.outputs.cache-hit != 'true'";
+    const run = step(warm, 'Run pinned Symphony selector');
+    expect(run).toContain(miss);
+    expect(run.trimEnd().endsWith(`run: bash ${SELECTOR}`)).toBe(true);
+    for (const env of SELECTOR_ENV) expect(run).toContain(env);
+    expect(step(warm, 'Check Symphony selector cache outputs')).toContain(
+      `success() && ${miss}`
+    );
+    const at = name => warm.indexOf(`      - name: ${name}\n`);
+    expect(at('Look up Symphony selector cache')).toBeLessThan(
+      at('Run pinned Symphony selector')
+    );
+    expect(at('Run pinned Symphony selector')).toBeLessThan(
+      at('Check Symphony selector cache outputs')
+    );
+    expect(at('Check Symphony selector cache outputs')).toBeLessThan(
+      at('Save Symphony selector cache (trusted main only)')
+    );
+    const save = step(warm, 'Save Symphony selector cache (trusted main only)');
+    expect(save).toContain("github.ref == 'refs/heads/main'");
     expect(save).toContain(
-      "if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}"
+      "steps.selector-cache-ready.outputs.ready == 'true'"
     );
     expect(save).toContain('continue-on-error: true');
     expect(save).toContain(
