@@ -18,6 +18,7 @@ import {
   canAcceptExactHeadQueueReceipt,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
+  ejectedWithoutRepair,
   enrollPullRequest,
   explainExactHeadAdmissionSelector,
   explainExactHeadQueueReceipt,
@@ -144,6 +145,7 @@ function createNativeRunner({
   membershipPayload = null,
   listPages = null,
   enableResult = ok({ data: {} }),
+  ejectionTimeline = [],
   viewerPayload = /** @type {unknown} */ ({
     data: { viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR } },
   }),
@@ -195,6 +197,15 @@ function createNativeRunner({
           },
         ]
       );
+    }
+    if (query.includes('MergeQueueEjectionHistory')) {
+      return ok({
+        data: {
+          repository: {
+            pullRequest: { timelineItems: { nodes: ejectionTimeline } },
+          },
+        },
+      });
     }
     if (query.includes('MergeQueueCanonicalMembership')) {
       return ok(membershipPayload ?? canonicalMembership(lastState));
@@ -2755,6 +2766,45 @@ describe('exact-head queue receipt proof', () => {
     expect(invokedNativeMutation(runner)).toBe(false);
     expect(invokedMutationActorCheck(runner)).toBe(false);
   });
+
+  it('keeps every bounded receipt read when fixtures zero the CLI poll delay', async () => {
+    const runner = createNativeRunner({
+      states: Array.from({ length: 6 }, () => prState()),
+    });
+    const startedAt = performance.now();
+    await expect(
+      runCli(['prove-receipt', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_POSTCONDITION_DELAY_MS: '0',
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ ok: false, attempts: 6 });
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each(['-1', '1.5', 'soon'])(
+    'rejects malformed MERGE_QUEUE_POSTCONDITION_DELAY_MS=%s before reading state',
+    async delay => {
+      const runner = createNativeRunner({ states: [prState()] });
+      await expect(
+        runCli(['prove-receipt', '14359', HEAD], {
+          env: {
+            MERGE_QUEUE_BACKEND: 'native',
+            GITHUB_REPOSITORY: REPOSITORY,
+            MERGE_QUEUE_POSTCONDITION_DELAY_MS: delay,
+          },
+          runner,
+          write: vi.fn(),
+        })
+      ).rejects.toMatchObject({ code: 'invalid_postcondition_delay' });
+      expect(runner).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('authoritative native state listing', () => {
@@ -3070,4 +3120,56 @@ it('real prove-admission CLI emits only the sanitized failed-predicate receipt',
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+describe('same-head re-enrollment after a failed-checks ejection (JOV-6620)', () => {
+  const REMOVED = { __typename: 'RemovedFromMergeQueueEvent', reason: 'failed_checks' };
+
+  it('detects an ejection with no later head change', () => {
+    expect(ejectedWithoutRepair([])).toBe(false);
+    expect(ejectedWithoutRepair([{ __typename: 'PullRequestCommit' }, REMOVED])).toBe(true);
+    expect(ejectedWithoutRepair([REMOVED, { __typename: 'HeadRefForcePushedEvent' }])).toBe(false);
+    expect(ejectedWithoutRepair([REMOVED, { __typename: 'PullRequestCommit' }])).toBe(false);
+    expect(
+      ejectedWithoutRepair([{ __typename: 'RemovedFromMergeQueueEvent', reason: 'dequeued' }])
+    ).toBe(false);
+    expect(() => ejectedWithoutRepair(null)).toThrow(/not an array/);
+  });
+
+  it('refuses to re-enroll the rejected head and never calls the mutation', async () => {
+    const runner = createNativeRunner({ states: [prState()], ejectionTimeline: [REMOVED] });
+    await expect(enroll(runner)).rejects.toMatchObject({ code: 'ejected_same_head' });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('enrolls again after a repair push', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })],
+      ejectionTimeline: [REMOVED, { __typename: 'HeadRefForcePushedEvent' }],
+    });
+    await expect(enroll(runner)).resolves.toMatchObject({ changed: true });
+  });
+
+  it('allows an explicit flake rerun receipt at the same head', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })],
+      ejectionTimeline: [REMOVED],
+    });
+    await expect(
+      enroll(runner, { flakeRerunReceipt: 'https://github.com/JovieInc/Jovie/actions/runs/1' })
+    ).resolves.toMatchObject({ changed: true });
+  });
+
+  it('check-reenroll CLI refuses a rejected head and passes a repaired one', async () => {
+    const blocked = createNativeRunner({ ejectionTimeline: [REMOVED] });
+    await expect(
+      runCli(['check-reenroll', '14359'], { env: {}, runner: blocked, write: () => {} })
+    ).rejects.toMatchObject({ code: 'ejected_same_head' });
+    const repaired = createNativeRunner({
+      ejectionTimeline: [REMOVED, { __typename: 'PullRequestCommit' }],
+    });
+    await expect(
+      runCli(['check-reenroll', '14359'], { env: {}, runner: repaired, write: () => {} })
+    ).resolves.toMatchObject({ reenrollable: true });
+  });
 });

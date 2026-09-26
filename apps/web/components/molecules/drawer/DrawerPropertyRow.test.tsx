@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 
 describe('DrawerPropertyRow', () => {
@@ -25,7 +26,9 @@ describe('DrawerPropertyRow', () => {
       />
     );
 
-    const property = screen.getByRole('button', { name: 'Status Ready' });
+    const property = screen.getByRole('button', {
+      name: segmentedAccessibleName('Status', 'Ready'),
+    });
     expect(property).toHaveStyle({
       gridTemplateColumns: '120px minmax(0, 1fr)',
     });

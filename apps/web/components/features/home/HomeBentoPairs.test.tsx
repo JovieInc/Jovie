@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { HomeBentoPairs } from './HomeBentoPairs';
 
 describe('HomeBentoPairs', () => {
@@ -10,7 +11,7 @@ describe('HomeBentoPairs', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Turn attention into action.',
+        name: segmentedAccessibleName('Turn attention', 'into action.'),
       })
     ).toHaveClass('line-clamp-2');
     expect(screen.getAllByRole('article')).toHaveLength(4);

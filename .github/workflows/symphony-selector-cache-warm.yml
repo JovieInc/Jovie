@@ -1,0 +1,96 @@
+name: Symphony Selector Cache Warm
+
+# Writes the pinned Symphony selector cache (BEAM toolchain, Mix/Hex home and
+# the selector checkout's deps/ + _build/test) that ci.yml's structural
+# `ci-fast-remaining` lane restores on PR and merge-group runs. ci.yml cannot
+# write it: queue-proven main pushes skip Path Changes and therefore skip
+# ci-fast (remaining), so its trusted-main save step never ran and every
+# structural run installed OTP/Elixir and compiled the selector cold.
+#
+# Trust boundary: only push to main and a manual dispatch on main run this job.
+# No PR, fork or merge-group code ever reaches the save step. No secrets are
+# used; the selector runs with its public fixture Linear token.
+#
+# Cost: one cold selector run per new key (selector pin, OTP/Elixir versions,
+# platform or selector script change). Every other main push exits after a
+# lookup-only probe of the exact key.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symphony-selector-cache-warm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    name: Warm Symphony selector cache
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      # Same key scheme and paths as ci.yml's "Restore Symphony selector cache".
+      - name: Resolve Symphony selector cache key
+        id: selector-cache-key
+        run: bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh --print-cache-key >> "$GITHUB_OUTPUT"
+      - name: Look up Symphony selector cache
+        id: selector-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/symphony-selector-beam
+            ${{ runner.temp }}/symphony-selector-mix-home
+            ${{ runner.temp }}/symphony-selector-src/elixir/deps
+            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
+          key: symphony-selector-v1-${{ runner.os }}-${{ steps.selector-cache-key.outputs.platform }}-otp-${{ steps.selector-cache-key.outputs.otp }}-elixir-${{ steps.selector-cache-key.outputs.elixir }}-${{ steps.selector-cache-key.outputs.pin }}-${{ hashFiles('scripts/symphony/tests/run-governor-bounded-codex-selector.sh') }}
+          lookup-only: true
+      - name: Report existing Symphony selector cache
+        if: ${{ steps.selector-cache.outputs.cache-hit == 'true' }}
+        run: echo "::notice::Symphony selector cache for this key already exists; nothing to warm."
+      # The full selector run is the proof: only outputs that just passed the
+      # pinned intake test are saved.
+      - name: Run pinned Symphony selector
+        if: ${{ steps.selector-cache.outputs.cache-hit != 'true' }}
+        env:
+          SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam
+          MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix
+          HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex
+        run: bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh
+      - name: Check Symphony selector cache outputs
+        id: selector-cache-ready
+        if: ${{ success() && steps.selector-cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=true
+          for output in \
+            "$RUNNER_TEMP/symphony-selector-beam/otp/bin/erl" \
+            "$RUNNER_TEMP/symphony-selector-beam/bin/elixir" \
+            "$RUNNER_TEMP/symphony-selector-mix-home/mix" \
+            "$RUNNER_TEMP/symphony-selector-src/elixir/deps" \
+            "$RUNNER_TEMP/symphony-selector-src/elixir/_build/test"; do
+            [[ -e "$output" ]] || ready=false
+          done
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+      - name: Save Symphony selector cache (trusted main only)
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.selector-cache-ready.outputs.ready == 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/symphony-selector-beam
+            ${{ runner.temp }}/symphony-selector-mix-home
+            ${{ runner.temp }}/symphony-selector-src/elixir/deps
+            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
+          key: ${{ steps.selector-cache.outputs.cache-primary-key }}

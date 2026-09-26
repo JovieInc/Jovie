@@ -75,16 +75,20 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; JOV-INV-033 Done-sprint production HTML rescan (`DONE_INVARIANT_RESCAN=release`) against that same URL; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
-| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
+| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made the
   native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
-  *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
-  post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
-  (`taste-classifier` + production walkthroughs). Do not add slopcheck to
-  `PR Ready` or `ci-harness/manifest.json`.
+  *merged* code on `main` + nightly.
+- **Exception: the deterministic copy gate runs on PRs.** The `copy-gate`
+  ci-fast lane lints only lines a PR adds in customer-facing copy paths
+  (`@jovie/copy`, policy in `canon/VOICE.md`). It is pure regex, runs in about a
+  second, and blocks new harm, legal, platform-ToS, leak, and slop violations
+  (founder decision 2026-09-25). Legacy lines stay advisory. LLM judge panels
+  never run in PR CI; they run in the authoring loop (`copywriting` skill) and
+  taste stays post-ship. Slop Gate and `slopcheck.py` are retired.
 - **Exception — secret scanning gates PRs.** A diff-scoped gitleaks + trufflehog
   runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
   within seconds of hitting `main`, so it is EVENT-class and must be caught

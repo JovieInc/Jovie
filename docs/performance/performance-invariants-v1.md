@@ -36,6 +36,12 @@ disagree, the stricter number governs and the file is named in the audit report.
 - `docs/launch/LAUNCH_GATES.md` names the dashboard/onboarding Lighthouse jobs "Lighthouse
   (dashboard PR)" / "Lighthouse (onboarding PR)"; the current job display names are
   "Lighthouse (dashboard manual)" / "Lighthouse (onboarding manual)".
+- Desktop (`apps/desktop`) has no certified responsiveness budgets. The main-process
+  liveness probe (`apps/desktop/src/main-liveness.ts`, JOV-6192) uses
+  `MAIN_LIVENESS_PROBE_INTERVAL_MS` / `MAIN_LIVENESS_PONG_BUDGET_MS` as proposed
+  detection parameters only; input-to-paint, renderer long-task, and
+  cold-launch limits are likewise unbudgeted. Recorded for proposal — do not cite
+  these as approved thresholds until a named budget authority adopts them.
 
 Fixes for these holes are separate flips, one PR per file, per the enforcement path in the
 GBrain page. This contract file intentionally changes no product or CI behavior.

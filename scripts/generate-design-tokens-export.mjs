@@ -44,7 +44,7 @@ const TOKEN_MAP = {
   'surface.bgBase': '--noir-ion-canvas',
   'surface.bgPage': '--noir-ion-canvas',
   'surface.surface0': '--noir-ion-shell',
-  // --color-bg-surface-1 = var(--noir-ion-card) (#0f1420).
+  // --color-bg-surface-1 = var(--noir-ion-card) (#131417).
   'surface.surface1': '--noir-ion-card',
   'surface.surface2': '--noir-ion-elevated',
   'surface.surface3': '--noir-ion-floating',
@@ -79,7 +79,10 @@ const TOKEN_MAP = {
 
 /** Parse `--noir-ion-*` anchors from the `:root.dark` block of the CSS. */
 export function loadAnchors(css = readFileSync(SOURCE_PATH, 'utf8')) {
-  const blocks = css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+  /** @type {string[]} */
+  const blocks = [
+    ...(css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? []),
+  ];
   const block = blocks.find(b => b.includes('--noir-ion-canvas'));
   if (!block) {
     throw new Error(

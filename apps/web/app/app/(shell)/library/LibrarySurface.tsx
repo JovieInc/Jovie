@@ -22,12 +22,12 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
-  Disc3,
   FileAudio2,
   FileText,
   Filter,
   Grid3x3,
   ImageIcon,
+  Layers,
   LayoutList,
   type LucideIcon,
   Music2,
@@ -967,7 +967,7 @@ function LibraryFilterPanel({
               key={type}
               active={filters.releaseTypes.has(type)}
               count={counts.releaseTypes.get(type) ?? 0}
-              icon={Disc3}
+              icon={Layers}
               label={formatReleaseType(type)}
               onClick={() =>
                 onFilters({
@@ -1538,7 +1538,7 @@ const AssetCard = memo(function AssetCard({
               {getLibraryItemKind(asset) === 'merch' ? (
                 <Shirt className='h-3 w-3 shrink-0' />
               ) : (
-                <Disc3 className='h-3 w-3 shrink-0' />
+                <Layers className='h-3 w-3 shrink-0' />
               )}
               <span>{formatLibraryItemType(asset)}</span>
               {getLibraryItemKind(asset) === 'release' ? (

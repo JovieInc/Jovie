@@ -672,6 +672,55 @@ describe('ProfileCompactTemplate', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the release credits drawer from the profile credits trigger', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[
+          { role: 'producer', label: 'Producer', entries: [] },
+          {
+            role: 'main_artist',
+            label: 'Main artist',
+            entries: [
+              {
+                artistId: 'artist-1',
+                name: 'Test Artist',
+                handle: null,
+                role: 'main_artist',
+                position: 0,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+
+    const drawer = await screen.findByRole('dialog', { name: 'Credits' });
+    expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
+    expect(within(drawer).queryByText('Producer')).toBeNull();
+  });
+
+  it('hides the release credits trigger when every credit group is empty', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[{ role: 'producer', label: 'Producer', entries: [] }]}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+  });
+
   it('uses the compact no-media hero geometry when a profile has no real image', () => {
     render(
       <ProfileCompactTemplate

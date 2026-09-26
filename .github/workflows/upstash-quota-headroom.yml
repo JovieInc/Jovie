@@ -1,0 +1,100 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# necessary-trust-boundary: The Upstash management credential cannot be handed to the app runtime or the in-app cron; only a hosted observer can read provider quota stats and route the breach alert without receiving any mutation capability.
+# removal-trigger: Remove or reduce this hop when the human-gated capacity remedy lands and provider-native spend/quota alerting proves delivery to the owner for 30 consecutive days.
+# Upstash Quota Headroom Monitor (JOV-5022)
+#
+# PURPOSE: The production Upstash Redis instance (Jovie-1, free tier,
+# auto_upgrade=false) hard-fails commands at 500,000 requests per billing
+# period. A past exhaustion event (500,002 vs 500,000) degraded the auth
+# path. This observer reads `total_monthly_requests` from the provider
+# management API and alerts the owner before the ceiling: 70%, 85%, 95%.
+#
+# TRIGGER: Declared 6-hour hosted schedule plus manual dispatch. Workflow
+# enablement and Production UPSTASH_EMAIL / UPSTASH_API_KEY / SLACK_WEBHOOK_URL
+# secrets are operational prerequisites; the YAML schedule does not prove
+# either is active.
+#
+# SAFETY: Alert-only by construction. The management credential performs two
+# read-only GETs (database identity + stats). The script is fail-closed on the
+# exact bound database identity and exposes no plan, billing, or mutation
+# operation. A breached threshold exits 2 so the run is visibly red; the Slack
+# step still runs under `if: always()`.
+
+name: Upstash Quota Headroom
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: upstash-quota-headroom
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Evaluate Upstash Monthly Request Headroom
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: Production – jovie
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Evaluate monthly request headroom
+        id: quota
+        env:
+          UPSTASH_EMAIL: ${{ secrets.UPSTASH_EMAIL }}
+          UPSTASH_API_KEY: ${{ secrets.UPSTASH_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$UPSTASH_EMAIL" && test -n "$UPSTASH_API_KEY" || {
+            echo "::error::Production UPSTASH_EMAIL/UPSTASH_API_KEY are unavailable."
+            exit 1
+          }
+          RESULT_FILE=$(mktemp)
+          STATUS=0
+          node scripts/upstash-production-operator.mjs quota > "$RESULT_FILE" || STATUS=$?
+          cat "$RESULT_FILE"
+          jq -e '.headroom.status and (.headroom.status | IN("ok","alert"))' \
+            "$RESULT_FILE" >/dev/null
+          echo "status=$(jq -r '.headroom.status' "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+          echo "threshold=$(jq -r '.headroom.breachedThreshold // 0' "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+          echo "percent=$(jq -r '.headroom.percentUsed' "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+          echo "used=$(jq -r '.headroom.monthlyRequests' "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+          echo "limit=$(jq -r '.headroom.limit' "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+          if [[ "$STATUS" -ne 0 && "$STATUS" -ne 2 ]]; then exit "$STATUS"; fi
+
+      - name: Slack alert on breached threshold
+        if: always() && steps.quota.outputs.status == 'alert' && env.SLACK_WEBHOOK_URL != ''
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+            -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
+            -d "$(jq -n \
+              --arg used "${{ steps.quota.outputs.used }}" \
+              --arg limit "${{ steps.quota.outputs.limit }}" \
+              --arg percent "${{ steps.quota.outputs.percent }}" \
+              --arg threshold "${{ steps.quota.outputs.threshold }}" \
+              --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{text: "Upstash auth Redis quota headroom breach — alert only", attachments: [{color: "warning", fields: [
+                {title: "Usage", value: ($used + " / " + $limit + " monthly requests (" + $percent + "%)"), short: false},
+                {title: "Breached threshold", value: ($threshold + "%"), short: true},
+                {title: "Database", value: "Jovie-1 (real-kiwi-157253.upstash.io)", short: true},
+                {title: "Action", value: "Capacity decision is human-gated; see docs/operations/UPSTASH_PRODUCTION_AUTOMATION.md and JOV-5022.", short: false},
+                {title: "Run", value: ("<" + $run + "|View observer run>"), short: false}
+              ]}]}')"
+
+      - name: Propagate alert exit code
+        if: always() && steps.quota.outputs.status == 'alert'
+        run: exit 2

@@ -177,6 +177,9 @@ class ProviderAndLockTest(unittest.TestCase):
             self.assertTrue(any("{prompt" in arg for arg in spec["cmd"]), name)
             self.assertTrue(spec["health"])
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
+        # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
+        cmd = providers["devin"]["cmd"]
+        self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
 
     def test_template_substitutes_prompt(self):
         self.assertEqual(lane.template(["x", "{prompt_file}"], {"prompt": "p", "prompt_file": "/f"}), ["x", "/f"])
@@ -405,6 +408,21 @@ class DispatchTest(unittest.TestCase):
                 lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh = saved
             self.assertFalse(old.exists())
         self.assertEqual(spawned, ["a", "a"])
+
+    def test_shallow_clones_are_unshallowed_before_gating(self):
+        calls = []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
+            out = "true\n" if args[:2] == ["git", "rev-parse"] else ""
+            return SimpleNamespace(returncode=0, stderr="", stdout=out)
+        real = lane.sh
+        lane.sh = fake
+        try:
+            lane.ensure_full_history(lane.Host(repo=Path("/tmp")))
+        finally:
+            lane.sh = real
+        self.assertIn(["git", "fetch", "-q", "--unshallow", "origin"], calls)
 
     def test_health_check_matches_output_and_survives_missing_binaries(self):
         ok = [sys.executable, "-c", "print('Logged in (via Devin).')"]

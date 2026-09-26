@@ -73,6 +73,8 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 // Event enqueuer uses the app's [bot] login; actor/entry enqueuer use Bot.login.
 const CANONICAL_MEMBERSHIP_QUERY = `query MergeQueueCanonicalMembership($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} mergeQueueEntry{enqueuer{__typename login}} timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{id createdAt actor{__typename login} enqueuer{login}} ... on RemovedFromMergeQueueEvent{id createdAt actor{__typename login}}} pageInfo{hasNextPage}}}}}`;
+// Chronological window of queue removals and head changes (JOV-6620).
+const EJECTION_HISTORY_QUERY = `query MergeQueueEjectionHistory($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){timelineItems(last:20,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
@@ -208,6 +210,27 @@ function errorSummary(error) {
 
 const sleep = milliseconds =>
   new Promise(resolve => setTimeout(resolve, milliseconds));
+
+/**
+ * Postcondition poll spacing for CLI callers. Hermetic fixtures (whose fake
+ * `gh` answers instantly) set MERGE_QUEUE_POSTCONDITION_DELAY_MS=0 so the
+ * same bounded read sequence runs without real wall-clock waits; production
+ * leaves it unset and keeps the eventual-consistency default.
+ * @param {NodeJS.ProcessEnv} env
+ */
+function postconditionDelayFromEnv(env) {
+  const raw = env.MERGE_QUEUE_POSTCONDITION_DELAY_MS;
+  if (raw === undefined || raw === '') {
+    return DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS;
+  }
+  if (!/^\d{1,6}$/.test(raw)) {
+    throw backendError(
+      'invalid_postcondition_delay',
+      'MERGE_QUEUE_POSTCONDITION_DELAY_MS must be a non-negative integer'
+    );
+  }
+  return Number(raw);
+}
 
 export function createGhRunner({ env = process.env, spawn = spawnSync } = {}) {
   return async args => {
@@ -1187,6 +1210,53 @@ function assertEnrollCandidate(state, expectedHeadOid) {
   }
 }
 
+/**
+ * True when the newest queue-relevant timeline event is a failed-checks
+ * removal: the head has not changed since the queue rejected it, so
+ * re-enrolling would poison and rebuild every merge group behind it
+ * (JOV-6620). Timeline items are chronological.
+ *
+ * @param {Array<{ __typename?: string, reason?: string }> | null | undefined} nodes
+ */
+export function ejectedWithoutRepair(nodes) {
+  if (!Array.isArray(nodes)) {
+    throw backendError(
+      'incomplete_queue_state',
+      'Merge-queue ejection history is not an array'
+    );
+  }
+  const newest = nodes.at(-1);
+  return (
+    newest?.__typename === 'RemovedFromMergeQueueEvent' &&
+    newest.reason === 'failed_checks'
+  );
+}
+
+async function assertNotEjectedAtSameHead({ runner, repository, number }) {
+  const { owner, name } = parseRepositorySlug(repository);
+  const description = `reading merge-queue ejections for PR #${number}`;
+  const payload = await runGhJson(
+    runner,
+    graphqlArgs(
+      EJECTION_HISTORY_QUERY,
+      { owner, name, number },
+      { typed: ['number'] }
+    ),
+    description
+  );
+  assertGraphqlResponse(payload, description);
+  if (
+    ejectedWithoutRepair(
+      payload?.data?.repository?.pullRequest?.timelineItems?.nodes
+    )
+  ) {
+    throw backendError(
+      'ejected_same_head',
+      `PR #${number} was removed from the merge queue for failed checks and its head has not changed since. Push a repair, or pass a flake rerun receipt (JOV-6620).`
+    );
+  }
+}
+
 async function pollEnrollmentPostcondition({
   stateOptions,
   expectedHeadOid,
@@ -1220,6 +1290,7 @@ async function pollEnrollmentPostcondition({
  *   postconditionAttempts?: number,
  *   postconditionDelayMs?: number,
  *   wait?: (milliseconds: number) => Promise<void>,
+ *   flakeRerunReceipt?: string,
  * }} [input]
  */
 export async function enrollPullRequest({
@@ -1235,6 +1306,7 @@ export async function enrollPullRequest({
   postconditionAttempts = DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS,
   postconditionDelayMs = DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS,
   wait = sleep,
+  flakeRerunReceipt = '',
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
@@ -1280,6 +1352,14 @@ export async function enrollPullRequest({
       mutationActor,
       state: before,
     };
+  }
+
+  if (!flakeRerunReceipt) {
+    await assertNotEjectedAtSameHead({
+      runner,
+      repository,
+      number: parsedNumber,
+    });
   }
 
   let mutationError = null;
@@ -1593,14 +1673,23 @@ export async function runCli(
         ...options,
         number: args[0],
         expectedHeadOid: args[1],
+        postconditionDelayMs: postconditionDelayFromEnv(env),
       }),
     enroll: () =>
       enrollPullRequest({
         ...preflightOptions,
         number: args[0],
         expectedHeadOid: args[1],
+        flakeRerunReceipt: args[2] ?? '',
         mutationRunner: resolvedMutationRunner,
+        postconditionDelayMs: postconditionDelayFromEnv(env),
       }),
+    // Read-only; agents run it before `gh pr merge --auto` (JOV-6620).
+    'check-reenroll': async () => {
+      const number = parsePullRequestNumber(args[0]);
+      await assertNotEjectedAtSameHead({ runner, repository, number });
+      return { number, reenrollable: true };
+    },
     dequeue: () =>
       dequeuePullRequest({
         ...options,
@@ -1627,7 +1716,8 @@ export async function runCli(
       'prove-admission requires <number> <headSha> <entryId>',
     ],
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
-    enroll: [2, 'enroll requires <number> <headSha>'],
+    enroll: [2, 'enroll requires <number> <headSha> [flakeRerunReceipt]'],
+    'check-reenroll': [1, 'check-reenroll requires <number>'],
     dequeue: [1, 'dequeue requires <number>'],
     'dequeue-ineligible': [
       2,
@@ -1637,7 +1727,7 @@ export async function runCli(
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|prove-admission|enroll|dequeue|dequeue-ineligible>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|prove-admission|enroll|check-reenroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];
@@ -1645,7 +1735,10 @@ export async function runCli(
     if (args.length > 1) {
       throw backendError('usage', usageMessage);
     }
-  } else if (args.length !== argumentCount) {
+  } else if (
+    args.length !== argumentCount &&
+    !(command === 'enroll' && args.length === argumentCount + 1)
+  ) {
     throw backendError('usage', usageMessage);
   }
   if (

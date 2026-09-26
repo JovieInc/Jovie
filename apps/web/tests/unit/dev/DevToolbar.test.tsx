@@ -39,6 +39,7 @@ vi.mock('@/lib/flags/contracts', () => ({
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
 import { isDevToolbarSuppressedPath } from '@/components/features/dev/DevToolbarGate';
 import { FlagRow } from '@/components/features/dev/DevToolbarRows';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
@@ -214,9 +215,9 @@ describe('DevToolbar', () => {
       const bottomBar = screen.getByTestId('dev-toolbar-bottom-bar');
 
       expect(drawer).toHaveClass('overflow-y-auto');
-      expect(drawer).toHaveStyle({
-        maxHeight: 'min(400px, calc(100dvh - 7rem))',
-      });
+      expect(drawer.style.maxHeight).toBe(
+        serializedDeclaration('max-height', 'min(400px, calc(100dvh - 7rem))')
+      );
       expect(bottomBar).toHaveClass('overflow-x-auto');
       expect(
         screen.getByRole('textbox', { name: 'Search Flags' })

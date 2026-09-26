@@ -172,7 +172,12 @@ test('fast Vitest config owns the eval-lane regression suite', () => {
     join(webRoot, 'vitest.config.fast.mts'),
     'utf8'
   );
-  const selectionStart = fastConfig.indexOf('test: {');
+  // Anchor on the root config: per-environment projects declared above it
+  // carry their own `test: {` blocks with narrower includes.
+  const selectionStart = fastConfig.indexOf(
+    'test: {',
+    fastConfig.indexOf('export default defineConfig(')
+  );
   const selectionEnd = fastConfig.indexOf('// Use forks');
   expect(selectionStart).toBeGreaterThanOrEqual(0);
   expect(selectionEnd).toBeGreaterThan(selectionStart);
