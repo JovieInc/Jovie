@@ -41,7 +41,7 @@ export const MARKETING_NAV_UTILITIES = [
 
 export const MARKETING_FOR_FLYOUT_LINKS = [
   {
-    href: APP_ROUTES.ARTIST_PROFILES,
+    href: APP_ROUTES.SOLUTIONS_ARTISTS,
     label: 'Artists',
     description: 'Release pages, audience capture, and fan reactivation.',
   },
