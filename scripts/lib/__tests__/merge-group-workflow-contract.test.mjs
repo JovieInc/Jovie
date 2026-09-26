@@ -2807,7 +2807,12 @@ describe('Storybook Surface Matrix shallow diff-base history', () => {
 
   afterEach(() => {
     for (const root of tempRoots.splice(0)) {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 
@@ -2889,6 +2894,11 @@ describe('Storybook Surface Matrix shallow diff-base history', () => {
       `file://${origin}`,
       work,
     ]);
+    // Each `git fetch` otherwise spawns a detached `git maintenance run
+    // --auto` that can still be writing .git/objects when afterEach removes
+    // the fixture (ENOTEMPTY in merge-group Structural Contract).
+    git(work, ['config', 'maintenance.auto', 'false']);
+    git(work, ['config', 'gc.auto', '0']);
     expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('true');
     expect(git(work, ['rev-parse', 'HEAD'])).toBe(head);
     return { work, shas, sibling, head };
