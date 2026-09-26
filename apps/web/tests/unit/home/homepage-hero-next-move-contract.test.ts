@@ -106,11 +106,26 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(auraCss).toContain('mask-composite: exclude');
   });
 
-  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+  it('keeps the Find me pill on the 28/510 marketing button contract', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
-      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-inter\)[\s\S]*?font-size: 13px;[\s\S]*?font-weight: 510;[\s\S]*?line-height: 1\.5;[\s\S]*?\}/
+    );
+  });
+
+  it('binds the editorial headline to the canonical Satoshi variable face', () => {
+    const css = readHeroCss();
+    const layout = readFileSync(path.join(webRoot, 'app/layout.tsx'), 'utf8');
+
+    expect(layout).toContain("src: '../public/fonts/Satoshi-Latin.woff2'");
+    expect(layout).toContain("weight: '300 900'");
+    expect(css).toContain('var(--font-satoshi)');
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?font-weight: 400;/
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?font-weight: 400;/
     );
   });
 

@@ -106,9 +106,13 @@ describe('homepage-optical-polish-v1', () => {
     expect(heroCss).toMatch(
       /\.homepage-name-search__field\s*\{[\s\S]*?--homepage-editorial-field:/
     );
+    expect(heroCss).toContain(
+      'outline: var(--space-px) solid var(--homepage-editorial-hairline);'
+    );
+    expect(heroCss).toContain('outline-offset: -1px;');
     expect(heroCss).toContain('--homepage-name-search-inset: var(--space-2);');
     expect(heroCss).toMatch(
-      /min-height:\s*calc\(\s*var\(--space-6\)\s*\+\s*var\(--space-1\)\s*\+\s*var\(--homepage-name-search-inset\)\s*\*\s*2/
+      /min-height:\s*calc\(\s*var\(--space-6\)\s*\+\s*var\(--homepage-name-search-inset\)\s*\*\s*2/
     );
     expect(heroCss).toMatch(
       /\.homepage-name-search__field\s*\{[\s\S]*?background:\s*var\(--homepage-editorial-field\);/

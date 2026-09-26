@@ -120,12 +120,11 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--homepage-grid-gutter)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain('font-weight: var(--font-weight-bold);');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
-    );
+    expect(css).toContain('font-weight: 400;');
+    expect(css).toContain('letter-spacing: -0.03em;');
     expect(css).toContain('border-radius: var(--radius-pill);');
-    expect(css).toContain('min-height: 100svh;');
+    expect(css).toContain('min-height: 660px;');
+    expect(css).toContain('.homepage-editorial-hero__stage');
     // Every scrim color is mixed from a token, never a raw value.
     const tokenMixes = css.match(/color-mix\(\s*in oklab,\s*var\(--system-b-/g);
     expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(4);

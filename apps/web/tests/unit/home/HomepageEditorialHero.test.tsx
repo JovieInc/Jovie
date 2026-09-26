@@ -143,6 +143,22 @@ describe('HomepageEditorialHero', () => {
       0
     );
   });
+
+  it('keeps the active copy and search inside the canonical stage wrapper', () => {
+    renderHero();
+
+    const hero = screen.getByTestId('marketing-section-hero');
+    const stage = hero.querySelector('.homepage-editorial-hero__stage');
+    const copy = hero.querySelector('.homepage-editorial-hero__copy');
+    if (!stage || !copy) throw new Error('Homepage hero stage is missing');
+
+    expect(stage).toContainElement(copy);
+    expect(copy).toHaveAttribute('data-hero-layer', 'active');
+    expect(stage).toContainElement(
+      screen.getByTestId('homepage-editorial-hero-search')
+    );
+    expect(stage).toContainElement(screen.getByTestId('homepage-primary-cta'));
+  });
 });
 
 describe('certified homepage optimization contract (JOV-INV-012)', () => {

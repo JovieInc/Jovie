@@ -6,7 +6,13 @@
       "rule": "arbitrary-value",
       "value": "JOV-[1-9]",
       "reason": "JOV-6224: server-side issue identifier regular expression, not a Tailwind class or visual token. Preserve strict positive issue-number validation."
+    },
+    {
+      "file": "packages/ui/atoms/button.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[box-shadow,transform]",
+      "reason": "Primary Button feedback: background, border, color, and opacity state changes must be immediate while decorative box-shadow and transform remain interruptible. This exact shared-atom override is intentionally scoped; no canonical single-property utility expresses the required pair."
     }
   ],
-  "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."
+  "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies. The Button transition entry is the narrow shared-atom exception for immediate state feedback with decorative transition continuity."
 }

@@ -965,6 +965,17 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
     }
   });
 
+  it('keeps the feature-split source selector on its native registry identity', () => {
+    const entry = sectionEntry('feature-split');
+
+    expect(MARKETING_PEN_CONTRACT_IDS.section.featureSplit).toBe('Y44oSU');
+    expect(entry.penRootIds).toEqual(['Y44oSU']);
+    expect(entry.penRootIds).not.toContain('DEIfw');
+    expect(
+      marketingPenSelector(MARKETING_PEN_CONTRACT_IDS.section.featureSplit)
+    ).toBe('[data-pen-contract="Y44oSU"]');
+  });
+
   it('spec-wall registers the shipped five-screenshot-tile production variant', () => {
     expect(sectionEntry('spec-wall')).toMatchObject({
       sourceBacked: true,

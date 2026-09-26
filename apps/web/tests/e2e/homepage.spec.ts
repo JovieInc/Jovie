@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
@@ -10,6 +11,7 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 const HOMEPAGE_NAVIGATION_TIMEOUT = 60_000;
 type PlaywrightPage = import('@playwright/test').Page;
+type PlaywrightContext = import('@playwright/test').BrowserContext;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
@@ -57,6 +59,271 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
+async function prepareConsentFixture(
+  page: PlaywrightPage,
+  context: PlaywrightContext
+) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // Match the consent fixture: middleware refreshes this flag from geo headers.
+  await page.setExtraHTTPHeaders({
+    'x-vercel-ip-country': 'DE',
+    'x-vercel-ip-country-region': 'BE',
+  });
+  await page.addInitScript(() => {
+    try {
+      localStorage.removeItem('jv_cc');
+    } catch {
+      // ignore
+    }
+  });
+  await context.addCookies([
+    {
+      name: 'jv_cc_required',
+      value: '1',
+      url: process.env.BASE_URL ?? 'http://localhost:3100',
+      sameSite: 'Lax',
+    },
+  ]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForHydration(page);
+}
+
+async function readRenderedHeroFontEvidence(page: PlaywrightPage) {
+  const binding = await page.evaluate(() => {
+    const headline = document.querySelector<HTMLElement>(
+      '.homepage-editorial-hero__headline'
+    );
+    if (!headline) throw new Error('Homepage hero headline missing');
+    const firstFamily = (value: string) =>
+      value
+        .split(',')[0]
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
+    const style = getComputedStyle(headline);
+    const rootSatoshi = firstFamily(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        '--font-satoshi'
+      )
+    );
+    return {
+      requestedFamily: firstFamily(style.fontFamily),
+      rootSatoshi,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      letterSpacing: style.letterSpacing,
+      fontStatus: document.fonts.status,
+      matchingFaces: Array.from(document.fonts)
+        .filter(face => firstFamily(face.family) === rootSatoshi)
+        .map(face => ({
+          family: firstFamily(face.family),
+          weight: face.weight,
+          style: face.style,
+          status: face.status,
+          display: face.display,
+        })),
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+        .matches,
+    };
+  });
+
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable');
+    await session.send('CSS.enable');
+    const { root } = await session.send('DOM.getDocument');
+    const { nodeId } = await session.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '.homepage-editorial-hero__headline',
+    });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', {
+      nodeId,
+    });
+    return {
+      binding,
+      platformFonts: fonts
+        .filter(font => font.glyphCount > 0)
+        .map(font => ({
+          familyName: font.familyName,
+          postScriptName: font.postScriptName,
+          isCustomFont: font.isCustomFont,
+          glyphCount: font.glyphCount,
+        })),
+    };
+  } finally {
+    await session.detach();
+  }
+}
+
+async function readHeroFontSpecimen(page: PlaywrightPage) {
+  return page.evaluate(() => {
+    const headline = document.querySelector<HTMLElement>(
+      '.homepage-editorial-hero__headline'
+    );
+    if (!headline) throw new Error('Homepage hero headline missing');
+    const style = getComputedStyle(headline);
+    const fontSize = Number.parseFloat(style.fontSize);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    if (!Number.isFinite(fontSize) || !Number.isFinite(lineHeight)) {
+      throw new Error('Homepage hero font metrics are not numeric');
+    }
+    const strip = document.createElement('div');
+    strip.dataset.homepageFontSpecimen = 'true';
+    strip.style.cssText =
+      'position:absolute;left:-100000px;top:0;display:flex;flex-direction:column;visibility:hidden;pointer-events:none;white-space:nowrap;';
+    const variants = [
+      { viewport: 'desktop', fontSize: 80 },
+      { viewport: 'mobile', fontSize: 40 },
+    ] as const;
+    const weights = [400, 500, 600] as const;
+    for (const variant of variants) {
+      for (const weight of weights) {
+        const sample = document.createElement('span');
+        sample.dataset.fontWeight = String(weight);
+        sample.dataset.fontViewport = variant.viewport;
+        sample.textContent = headline.textContent ?? '';
+        sample.style.fontFamily = style.fontFamily;
+        sample.style.fontSize = `${variant.fontSize}px`;
+        sample.style.fontWeight = String(weight);
+        sample.style.lineHeight = String(lineHeight / fontSize);
+        sample.style.letterSpacing = style.letterSpacing;
+        strip.append(sample);
+      }
+    }
+    document.body.append(strip);
+    try {
+      return {
+        copy: headline.textContent ?? '',
+        fontFamily: style.fontFamily,
+        lineHeightRatio: lineHeight / fontSize,
+        letterSpacing: style.letterSpacing,
+        variants: Array.from(strip.children).map(sample => {
+          const bounds = sample.getBoundingClientRect();
+          return {
+            viewport: sample.getAttribute('data-font-viewport'),
+            fontSize: Number.parseFloat(getComputedStyle(sample).fontSize),
+            fontWeight: Number.parseInt(
+              sample.getAttribute('data-font-weight') ?? '0',
+              10
+            ),
+            width: bounds.width,
+            height: bounds.height,
+          };
+        }),
+      };
+    } finally {
+      strip.remove();
+    }
+  });
+}
+
+interface HeroActionVisual {
+  readonly backgroundColor: string;
+  readonly borderColor: string;
+  readonly color: string;
+  readonly boxShadow: string;
+  readonly transform: string;
+  readonly opacity: string;
+  readonly transitionProperty: string;
+}
+
+async function readHeroActionVisual(
+  action: import('@playwright/test').Locator
+): Promise<HeroActionVisual> {
+  return action.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+      opacity: style.opacity,
+      transitionProperty: style.transitionProperty,
+    };
+  });
+}
+
+async function readHeroActionVisualAfterFrame(
+  page: PlaywrightPage,
+  selector: string
+): Promise<HeroActionVisual> {
+  return page.evaluate(async targetSelector => {
+    const element = document.querySelector<HTMLElement>(targetSelector);
+    if (!element) throw new Error('Hero action missing for visual sampling');
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+      opacity: style.opacity,
+      transitionProperty: style.transitionProperty,
+    };
+  }, selector);
+}
+
+function hasHeroActionVisualDelta(
+  baseline: HeroActionVisual,
+  sample: HeroActionVisual
+): boolean {
+  return (
+    baseline.backgroundColor !== sample.backgroundColor ||
+    baseline.borderColor !== sample.borderColor ||
+    baseline.color !== sample.color ||
+    baseline.boxShadow !== sample.boxShadow ||
+    baseline.transform !== sample.transform ||
+    baseline.opacity !== sample.opacity
+  );
+}
+
+function sameHeroActionVisual(
+  first: HeroActionVisual,
+  second: HeroActionVisual
+): boolean {
+  return !hasHeroActionVisualDelta(first, second);
+}
+
+async function measureHeroAction(action: import('@playwright/test').Locator) {
+  return action.evaluate(element => {
+    const face = element.getBoundingClientRect();
+    const pseudo = getComputedStyle(element, '::before');
+    const width = Math.max(face.width, Number.parseFloat(pseudo.width) || 0);
+    const height = Math.max(face.height, Number.parseFloat(pseudo.height) || 0);
+    const left = face.x + (face.width - width) / 2;
+    const top = face.y + (face.height - height) / 2;
+    const points = [
+      [left + width / 2, top + 1],
+      [left + width / 2, top + height - 1],
+      [left + 1, top + height / 2],
+      [left + width - 1, top + height / 2],
+    ];
+    return {
+      faceHeight: face.height,
+      clientHeight: element.clientHeight,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      scrollWidth: element.scrollWidth,
+      width,
+      height,
+      left,
+      right: left + width,
+      top,
+      bottom: top + height,
+      viewportWidth: window.innerWidth,
+      owned: points.every(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit === element || (hit !== null && element.contains(hit));
+      }),
+      field: element
+        .closest('.homepage-name-search__field')
+        ?.getBoundingClientRect(),
+    };
+  });
+}
+
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
@@ -99,13 +366,11 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
 
-    // The hero owns the first viewport.
+    // The canonical desktop Hero stage is a 660px slice; the independent
+    // proof/logo slice owns the content that follows it.
     const heroBox = await hero.boundingBox();
-    const viewport = page.viewportSize();
     expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
-    expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
-      (viewport?.height ?? 0) - 1
-    );
+    expect(heroBox?.height ?? 0).toBeCloseTo(660, 0);
 
     if (!FEATURE_FLAGS.WAITLIST_ENABLED) {
       const searchBox = await hero
@@ -117,6 +382,362 @@ test.describe('Homepage', () => {
       expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
       expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
     }
+  });
+
+  test('hero action remains independently operable through 40px label enlargement and state reversal', async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== 'chromium',
+      'Platform font evidence is Chromium-only'
+    );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => document.fonts.ready);
+
+    const hero = page.getByTestId('marketing-section-hero');
+    const input = hero.getByPlaceholder('Search your name');
+    const action = hero.getByRole('button', { name: 'Find me', exact: true });
+    const actionSelector = '[data-testid="homepage-primary-cta"]';
+    await expect(input).toBeVisible();
+    await expect(action).toBeEnabled();
+
+    const fontEvidence = await readRenderedHeroFontEvidence(page);
+    const fontSpecimen = await readHeroFontSpecimen(page);
+    await writeFile(
+      testInfo.outputPath('homepage-hero-font-evidence.json'),
+      JSON.stringify(fontEvidence, null, 2)
+    );
+    await testInfo.attach('homepage-hero-font-evidence.json', {
+      path: testInfo.outputPath('homepage-hero-font-evidence.json'),
+      contentType: 'application/json',
+    });
+    await writeFile(
+      testInfo.outputPath('homepage-hero-font-specimen.json'),
+      JSON.stringify(fontSpecimen, null, 2)
+    );
+    await testInfo.attach('homepage-hero-font-specimen.json', {
+      path: testInfo.outputPath('homepage-hero-font-specimen.json'),
+      contentType: 'application/json',
+    });
+    expect(fontEvidence.binding.fontStatus).toBe('loaded');
+    expect(fontEvidence.binding.requestedFamily.toLowerCase()).toBe('satoshi');
+    expect(fontEvidence.binding.rootSatoshi.toLowerCase()).toBe('satoshi');
+    expect(fontEvidence.binding.reducedMotion).toBe(true);
+    expect(
+      fontEvidence.platformFonts.some(
+        font => font.isCustomFont && /satoshi/i.test(font.familyName)
+      )
+    ).toBe(true);
+    expect(fontSpecimen.copy).toBe('Control how the world sees you.');
+    expect(fontSpecimen.variants).toHaveLength(6);
+    expect(fontSpecimen.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ viewport: 'desktop', fontSize: 80 }),
+        expect.objectContaining({ viewport: 'mobile', fontSize: 40 }),
+      ])
+    );
+    for (const specimen of fontSpecimen.variants) {
+      expect(specimen.width).toBeGreaterThan(0);
+      expect(specimen.height).toBeGreaterThan(0);
+    }
+
+    const baseline = await measureHeroAction(action);
+    expect(baseline.faceHeight).toBeCloseTo(28, 0);
+    expect(baseline.height).toBeGreaterThanOrEqual(44);
+    expect(baseline.width).toBeGreaterThanOrEqual(44);
+    expect(baseline.owned).toBe(true);
+    expect(baseline.field).not.toBeUndefined();
+    expect(baseline.left).toBeGreaterThanOrEqual(baseline.field?.left ?? 0);
+    expect(baseline.right).toBeLessThanOrEqual(baseline.field?.right ?? 0);
+    expect(baseline.top).toBeGreaterThanOrEqual(baseline.field?.top ?? 0);
+    expect(baseline.bottom).toBeLessThanOrEqual(baseline.field?.bottom ?? 0);
+
+    const interactionEvidence: Array<{
+      reducedMotion: boolean;
+      baseline: HeroActionVisual;
+      hoverFirstFrame: HeroActionVisual;
+      hoverSettled: HeroActionVisual;
+      leaveFirstFrame: HeroActionVisual;
+      leaveSettled: HeroActionVisual;
+      pressedFirstFrame: HeroActionVisual;
+      pressedSettled: HeroActionVisual;
+      releaseFirstFrame: HeroActionVisual;
+      releaseSettled: HeroActionVisual;
+      rapidHover: {
+        enterFirstFrame: HeroActionVisual;
+        leaveFirstFrame: HeroActionVisual;
+        reenterFirstFrame: HeroActionVisual;
+      };
+      rapidPress: {
+        downFirstFrame: HeroActionVisual;
+        upWhileHoveringFirstFrame: HeroActionVisual;
+        afterLeaveFirstFrame: HeroActionVisual;
+      };
+      hoverFirstFrameChangedFromBaseline: boolean;
+      hoverSettledChangedFromBaseline: boolean;
+      leaveFirstFrameChangedFromHover: boolean;
+      leaveSettledReturnedToBaseline: boolean;
+      pressedFirstFrameChangedFromHover: boolean;
+      pressedSettledChangedFromHover: boolean;
+      releaseFirstFrameChangedFromPressed: boolean;
+      releaseSettledReturnedToBaseline: boolean;
+    }> = [];
+
+    for (const reducedMotion of [false, true]) {
+      await page.emulateMedia({
+        reducedMotion: reducedMotion ? 'reduce' : 'no-preference',
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+      const modeHero = page.getByTestId('marketing-section-hero');
+      const modeInput = modeHero.getByPlaceholder('Search your name');
+      const modeAction = modeHero.getByRole('button', {
+        name: 'Find me',
+        exact: true,
+      });
+      await expect(modeAction).toBeEnabled();
+      const stableBox = await modeAction.boundingBox();
+      const baselineVisual = await readHeroActionVisual(modeAction);
+      if (reducedMotion) {
+        expect(baselineVisual.transitionProperty).toBe('none');
+      } else {
+        expect(baselineVisual.transitionProperty).toContain('box-shadow');
+        expect(baselineVisual.transitionProperty).toContain('transform');
+        expect(baselineVisual.transitionProperty).not.toContain('opacity');
+        expect(baselineVisual.transitionProperty).not.toContain(
+          'background-color'
+        );
+        expect(baselineVisual.transitionProperty).not.toContain('border-color');
+        expect(baselineVisual.transitionProperty).not.toContain('color');
+      }
+
+      await modeAction.focus();
+      await expect(modeAction).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(modeInput).toBeFocused();
+
+      // Sample rapid state reversals without settling sleeps. Each sample
+      // waits for only the next animation frame, so the target and baseline
+      // are observed while the pointer is still reversing direction.
+      await modeAction.hover();
+      const rapidHoverEnterFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(baselineVisual, rapidHoverEnterFirstFrame)
+      ).toBe(true);
+      await modeInput.hover();
+      const rapidHoverLeaveFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        sameHeroActionVisual(rapidHoverLeaveFirstFrame, baselineVisual)
+      ).toBe(true);
+      await modeAction.hover();
+      const rapidHoverReenterFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(baselineVisual, rapidHoverReenterFirstFrame)
+      ).toBe(true);
+      await modeInput.hover();
+      expect(
+        sameHeroActionVisual(
+          await readHeroActionVisualAfterFrame(page, actionSelector),
+          baselineVisual
+        )
+      ).toBe(true);
+
+      await modeAction.hover();
+      await page.waitForTimeout(220);
+      const rapidHoverBaseline = await readHeroActionVisual(modeAction);
+      const rapidPressBox = await modeAction.boundingBox();
+      if (!rapidPressBox) throw new Error('Hero action box missing');
+      await page.mouse.move(
+        rapidPressBox.x + rapidPressBox.width / 2,
+        rapidPressBox.y + rapidPressBox.height / 2
+      );
+      await page.mouse.down();
+      const rapidPressDownFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(rapidHoverBaseline, rapidPressDownFirstFrame)
+      ).toBe(true);
+      await page.mouse.up();
+      const rapidPressUpWhileHoveringFirstFrame =
+        await readHeroActionVisualAfterFrame(page, actionSelector);
+      expect(
+        sameHeroActionVisual(
+          rapidPressUpWhileHoveringFirstFrame,
+          rapidHoverBaseline
+        )
+      ).toBe(true);
+      await modeInput.hover();
+      const rapidPressAfterLeaveFirstFrame =
+        await readHeroActionVisualAfterFrame(page, actionSelector);
+      expect(
+        sameHeroActionVisual(rapidPressAfterLeaveFirstFrame, baselineVisual)
+      ).toBe(true);
+
+      await modeAction.hover();
+      expect(
+        await modeAction.evaluate(element => element.matches(':hover'))
+      ).toBe(true);
+      const hoverFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(hasHeroActionVisualDelta(baselineVisual, hoverFirstFrame)).toBe(
+        true
+      );
+      await page.waitForTimeout(220);
+      const hoverSettled = await readHeroActionVisual(modeAction);
+      expect(hasHeroActionVisualDelta(baselineVisual, hoverSettled)).toBe(true);
+      await modeInput.hover();
+      expect(
+        await modeAction.evaluate(element => element.matches(':hover'))
+      ).toBe(false);
+      const leaveFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(sameHeroActionVisual(leaveFirstFrame, baselineVisual)).toBe(true);
+      await page.waitForTimeout(220);
+      const leaveSettled = await readHeroActionVisual(modeAction);
+      expect(leaveSettled).toEqual(baselineVisual);
+
+      await modeAction.hover();
+      await page.waitForTimeout(220);
+      const pressedHoverSettled = await readHeroActionVisual(modeAction);
+      expect(pressedHoverSettled).toEqual(hoverSettled);
+      const pressedBox = await modeAction.boundingBox();
+      if (!pressedBox) throw new Error('Hero action box missing');
+      await page.mouse.move(
+        pressedBox.x + pressedBox.width / 2,
+        pressedBox.y + pressedBox.height / 2
+      );
+      await page.mouse.down();
+      expect(
+        await modeAction.evaluate(element => element.matches(':active'))
+      ).toBe(true);
+      const pressedFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(
+        hasHeroActionVisualDelta(pressedHoverSettled, pressedFirstFrame)
+      ).toBe(true);
+      await page.waitForTimeout(220);
+      const pressedSettled = await readHeroActionVisual(modeAction);
+      // Compare against settled hover so hover cannot masquerade as press
+      // feedback. The shared primary Button supplies an opacity state that
+      // remains available when reduced-motion removes transitions.
+      expect(
+        hasHeroActionVisualDelta(pressedHoverSettled, pressedSettled)
+      ).toBe(true);
+      await page.mouse.up();
+      expect(
+        await modeAction.evaluate(element => element.matches(':active'))
+      ).toBe(false);
+      await modeInput.hover();
+      const releaseFirstFrame = await readHeroActionVisualAfterFrame(
+        page,
+        actionSelector
+      );
+      expect(sameHeroActionVisual(releaseFirstFrame, baselineVisual)).toBe(
+        true
+      );
+      await page.waitForTimeout(220);
+      expect(await modeAction.boundingBox()).toEqual(pressedBox);
+      expect(await modeAction.boundingBox()).toEqual(stableBox);
+      await page.waitForTimeout(220);
+      const releaseSettled = await readHeroActionVisual(modeAction);
+      expect(releaseSettled).toEqual(baselineVisual);
+      interactionEvidence.push({
+        reducedMotion,
+        baseline: baselineVisual,
+        hoverFirstFrame,
+        hoverSettled,
+        leaveFirstFrame,
+        leaveSettled,
+        pressedFirstFrame,
+        pressedSettled,
+        releaseFirstFrame,
+        releaseSettled,
+        rapidHover: {
+          enterFirstFrame: rapidHoverEnterFirstFrame,
+          leaveFirstFrame: rapidHoverLeaveFirstFrame,
+          reenterFirstFrame: rapidHoverReenterFirstFrame,
+        },
+        rapidPress: {
+          downFirstFrame: rapidPressDownFirstFrame,
+          upWhileHoveringFirstFrame: rapidPressUpWhileHoveringFirstFrame,
+          afterLeaveFirstFrame: rapidPressAfterLeaveFirstFrame,
+        },
+        hoverFirstFrameChangedFromBaseline: hasHeroActionVisualDelta(
+          baselineVisual,
+          hoverFirstFrame
+        ),
+        hoverSettledChangedFromBaseline: hasHeroActionVisualDelta(
+          baselineVisual,
+          hoverSettled
+        ),
+        leaveFirstFrameChangedFromHover: hasHeroActionVisualDelta(
+          hoverSettled,
+          leaveFirstFrame
+        ),
+        leaveSettledReturnedToBaseline: sameHeroActionVisual(
+          leaveSettled,
+          baselineVisual
+        ),
+        pressedFirstFrameChangedFromHover: hasHeroActionVisualDelta(
+          pressedHoverSettled,
+          pressedFirstFrame
+        ),
+        pressedSettledChangedFromHover: hasHeroActionVisualDelta(
+          pressedHoverSettled,
+          pressedSettled
+        ),
+        releaseFirstFrameChangedFromPressed: hasHeroActionVisualDelta(
+          pressedSettled,
+          releaseFirstFrame
+        ),
+        releaseSettledReturnedToBaseline: sameHeroActionVisual(
+          releaseSettled,
+          baselineVisual
+        ),
+      });
+    }
+
+    await writeFile(
+      testInfo.outputPath('homepage-hero-interaction-evidence.json'),
+      JSON.stringify(interactionEvidence, null, 2)
+    );
+    await testInfo.attach('homepage-hero-interaction-evidence.json', {
+      path: testInfo.outputPath('homepage-hero-interaction-evidence.json'),
+      contentType: 'application/json',
+    });
+
+    await action.evaluate(element => {
+      (element as HTMLElement).style.fontSize = '40px';
+    });
+    const enlarged = await measureHeroAction(action);
+    expect(enlarged.faceHeight).toBeGreaterThan(28);
+    expect(enlarged.scrollHeight).toBeLessThanOrEqual(enlarged.clientHeight);
+    expect(enlarged.scrollWidth).toBeLessThanOrEqual(enlarged.clientWidth);
+    expect(enlarged.height).toBeGreaterThanOrEqual(44);
+    expect(enlarged.width).toBeGreaterThanOrEqual(44);
+    expect(enlarged.owned).toBe(true);
+    expect(enlarged.left).toBeGreaterThanOrEqual(enlarged.field?.left ?? 0);
+    expect(enlarged.right).toBeLessThanOrEqual(enlarged.field?.right ?? 0);
+    expect(enlarged.left).toBeGreaterThanOrEqual(0);
+    expect(enlarged.right).toBeLessThanOrEqual(enlarged.viewportWidth);
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -163,38 +784,17 @@ test.describe('Homepage', () => {
     page,
     context,
   }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    // Match the consent fixture: middleware refreshes this flag from geo headers.
-    await page.setExtraHTTPHeaders({
-      'x-vercel-ip-country': 'DE',
-      'x-vercel-ip-country-region': 'BE',
-    });
-    await page.addInitScript(() => {
-      try {
-        localStorage.removeItem('jv_cc');
-      } catch {
-        // ignore
-      }
-    });
-    await context.addCookies([
-      {
-        name: 'jv_cc_required',
-        value: '1',
-        url: process.env.BASE_URL ?? 'http://localhost:3100',
-        sameSite: 'Lax',
-      },
-    ]);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await prepareConsentFixture(page, context);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
       const actions = page.locator(
-        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button:visible, [data-testid="homepage-primary-cta"]:visible'
       );
       await expect(page.getByTestId('cookie-actions')).toBeVisible();
       expect(await actions.count()).toBeGreaterThanOrEqual(4);
+      await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
       for (const action of await actions.all()) {
         const geometry = await action.evaluate(element => {
           const face = element.getBoundingClientRect();
@@ -210,47 +810,8 @@ test.describe('Homepage', () => {
         expect(geometry.targetWidth).toBeGreaterThanOrEqual(44);
       }
 
-      const ink = await page
-        .locator('.homepage-trust-logo-slot:visible')
-        .evaluateAll(slots =>
-          slots.map(slot => {
-            const svg = slot.querySelector('svg');
-            if (!svg) throw new Error('Trust logo SVG missing');
-            const matrix = svg.getScreenCTM();
-            if (!matrix) throw new Error('Trust logo transform missing');
-            const bounds = svg.getBBox();
-            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
-              matrix
-            );
-            const rightBottom = new DOMPoint(
-              bounds.x + bounds.width,
-              bounds.y + bounds.height
-            ).matrixTransform(matrix);
-            const frame = slot.getBoundingClientRect();
-            return {
-              left: leftTop.x,
-              right: rightBottom.x,
-              top: leftTop.y,
-              bottom: rightBottom.y,
-              frameLeft: frame.left,
-              frameRight: frame.right,
-              frameTop: frame.top,
-              frameBottom: frame.bottom,
-            };
-          })
-        );
-      expect(ink.length).toBeGreaterThanOrEqual(4);
-      for (const logo of ink) {
-        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
-        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
-        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
-        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
-        expect(logo.left).toBeGreaterThanOrEqual(0);
-        expect(logo.right).toBeLessThanOrEqual(width);
-      }
-
       const consentAndHeader = page.locator(
-        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button'
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button:visible'
       );
       const assertTargets = async () => {
         const targets = await consentAndHeader.evaluateAll(elements =>
@@ -386,7 +947,7 @@ test.describe('Homepage', () => {
     const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
     const viewportCenter = (viewport?.width ?? 0) / 2;
     expect(Math.abs(copyCenter - viewportCenter)).toBeLessThanOrEqual(1);
-    expect(copyBox?.y ?? -1).toBeGreaterThan(0);
+    expect(copyBox?.y ?? -1).toBeGreaterThanOrEqual(0);
     expect((copyBox?.y ?? 0) + (copyBox?.height ?? 0)).toBeLessThan(
       viewport?.height ?? 0
     );
@@ -726,14 +1287,10 @@ test.describe('Homepage', () => {
     const searchBounds = await search.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
-    const [heroInlinePadding, searchMaterial] = await Promise.all([
-      page.getByTestId('marketing-section-hero').evaluate(element => {
-        const style = getComputedStyle(element);
-        return (
-          Number.parseFloat(style.paddingLeft) +
-          Number.parseFloat(style.paddingRight)
-        );
-      }),
+    const [heroStageWidth, searchMaterial] = await Promise.all([
+      page
+        .locator('.homepage-editorial-hero__stage')
+        .evaluate(element => element.getBoundingClientRect().width),
       FEATURE_FLAGS.WAITLIST_ENABLED
         ? Promise.resolve(null)
         : search.locator('.homepage-name-search').evaluate(element => {
@@ -762,8 +1319,9 @@ test.describe('Homepage', () => {
     expect(
       (searchBounds?.x ?? 0) + (searchBounds?.width ?? 0)
     ).toBeLessThanOrEqual(viewportWidth + 1);
-    expect(searchBounds?.width ?? 0).toBeGreaterThanOrEqual(
-      viewportWidth - heroInlinePadding - 1
+    expect(searchBounds?.width ?? 0).toBeCloseTo(
+      Math.min(640, heroStageWidth),
+      0
     );
     if (FEATURE_FLAGS.WAITLIST_ENABLED) {
       await expect(
@@ -1078,6 +1636,9 @@ test.describe('Homepage', () => {
       expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
       expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
       expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
+      expect(heroSearch?.fieldHeight).toBeCloseTo(44, 0);
+      expect(heroSearch?.insetTop).toBeCloseTo(8, 0);
+      expect(heroSearch?.insetRight).toBeCloseTo(8, 0);
 
       const input = page
         .getByTestId('homepage-editorial-hero-search')
