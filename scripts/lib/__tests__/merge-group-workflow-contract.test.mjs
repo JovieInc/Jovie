@@ -1596,18 +1596,20 @@ ${selectedGateScript}`,
       'Restore Next build cache (read-only)'
     );
     const lookup = stepIn(warm, "Look up today's Next build cache");
-    const restore = stepIn(warm, 'Restore newest Next build cache');
     expect(keyLines(ciRestore)).toHaveLength(3);
-    expect(keyLines(restore)).toEqual(keyLines(ciRestore));
     expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
+
+    // The warmer always compiles cold. Building on top of a restored older
+    // entry grew the cache past the 3 GiB save bound (3.51-3.54 GB vs 2.37 GB
+    // cold), so the warmer rebuilt on every main push and never saved.
+    expect(warm.match(/actions\/cache\/restore@/g)).toHaveLength(1);
+    expect(warm).not.toContain('restore-keys:');
     const dayRun = step =>
       step.split('\n').find(line => line.trim().startsWith('run:'));
     expect(dayRun(stepIn(warm, 'Resolve Next build cache day'))).toBe(
       dayRun(stepIn(buildLayout, 'Resolve Next build cache day'))
     );
-    for (const step of [lookup, restore]) {
-      expect(step).toContain('path: apps/web/.next/cache/turbopack');
-    }
+    expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
 
     // Lookup-only early exit: nothing heavy runs on an exact-key hit.
     expect(lookup).toContain('lookup-only: true');
@@ -1619,7 +1621,6 @@ ${selectedGateScript}`,
       warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
     ).toContain(miss);
     for (const name of [
-      'Restore newest Next build cache',
       'Build web for cache',
       'Measure Next build cache (trusted main only)',
     ]) {
@@ -1651,7 +1652,7 @@ ${selectedGateScript}`,
     );
     expect(save).toContain('path: apps/web/.next/cache/turbopack');
     expect(save).toContain(
-      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
+      'key: ${{ steps.next-build-cache-lookup.outputs.cache-primary-key }}'
     );
     expect(warm.match(/actions\/cache\/save@/g)).toHaveLength(1);
     expect(warm).not.toContain('uses: actions/cache@');
