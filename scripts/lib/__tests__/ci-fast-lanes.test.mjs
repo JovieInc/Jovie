@@ -23,6 +23,7 @@ import {
   runStructural,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+  selectDesignRatchetTests,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -98,6 +99,16 @@ describe('CI control selector', () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+});
+
+it('runs design-system ratchets on PRs that change scanned sources only', () => {
+  const pr = f => selectDesignRatchetTests('pull_request', f);
+  expect(pr(['apps/web/components/x/Card.tsx'])).toBe(true);
+  expect(pr(['packages/ui/atoms/button.tsx'])).toBe(true);
+  expect(pr(['scripts/ci-fast-lanes.mjs'])).toBe(false);
+  expect(selectDesignRatchetTests('merge_group', ['apps/web/app/a.tsx'])).toBe(
+    false
+  );
 });
 
 describe('runDesignConformance', () => {

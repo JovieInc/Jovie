@@ -116,6 +116,15 @@ export function selectPlaywrightReceipt(event, selected, changed) {
   }
   return event !== 'workflow_dispatch' && !selected.has('web');
 }
+// Web Unit Tests skip PRs, so #18679 met raw-button-ratchet only in the queue.
+// Run the source-tree design-system ratchets on PRs touching what they scan.
+const DESIGN_RATCHET_INPUTS =
+  /^(apps\/web\/(app|components|hooks|lib|styles|tests\/unit\/design-system)\/|packages\/ui\/)/u;
+export const DESIGN_RATCHET_TESTS_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/';
+export const selectDesignRatchetTests = (event, changed) =>
+  event === 'pull_request' &&
+  (!changed?.length || changed.some(f => DESIGN_RATCHET_INPUTS.test(f)));
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
   runElsewhere = []
@@ -1300,7 +1309,12 @@ function runDesignSystemSourceRatchet() {
       skipped: true,
     };
   }
-  return shell(LANE_COMMANDS['design-system-source-ratchet']);
+  const result = shell(LANE_COMMANDS['design-system-source-ratchet']);
+  if (result.code || !selectDesignRatchetTests(event, listAllChangedFiles())) {
+    return result;
+  }
+  const tests = shell(DESIGN_RATCHET_TESTS_COMMAND);
+  return { code: tests.code, output: result.output + tests.output };
 }
 
 function runDesignExceptionRegistry() {
