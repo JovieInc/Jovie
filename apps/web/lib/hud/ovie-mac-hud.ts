@@ -1,3 +1,7 @@
+import {
+  EMPTY_OVIE_ACTIVITY_SOURCES,
+  type OvieActivitySources,
+} from '@/lib/hud/company-activity';
 import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
 
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
@@ -86,6 +90,7 @@ export type OvieMacHudSnapshot = {
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  activitySources: OvieActivitySources;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -574,6 +579,7 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  activitySources?: OvieActivitySources;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
@@ -589,6 +595,7 @@ export function composeOvieMacHudSnapshot(input: {
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    activitySources: input.activitySources ?? EMPTY_OVIE_ACTIVITY_SOURCES,
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };
