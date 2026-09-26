@@ -18,6 +18,7 @@ import {
   copyShareableQueryData,
   subscribeCacheFence,
 } from '@/lib/queries/cache-isolation';
+import { defaultQueryRetryPolicy } from '@/lib/queries/retry-policy';
 
 declare global {
   interface Window {
@@ -77,11 +78,12 @@ const createQueryClientConfig = (): QueryClientConfig => ({
       // Allows instant back-navigation without refetching
       gcTime: 30 * 60 * 1000,
 
-      // Retry failed requests up to 3 times with exponential backoff
-      // Handles transient network issues gracefully.
-      // JOV-6185 owns classified-retry rewrite — do not change this default here.
-      retry: 3,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // JOV-6185: shared classified retry policy. Intentional cancellation
+      // and ordinary auth/validation/schema failures stop immediately;
+      // transient network/timeout/server/rate-limit failures retry within
+      // bounded attempts, a wall-clock budget, and backoff with jitter.
+      retry: defaultQueryRetryPolicy.retry,
+      retryDelay: defaultQueryRetryPolicy.retryDelay,
 
       // Refetch on window focus in production only
       // Keeps data fresh when users switch tabs back to the app

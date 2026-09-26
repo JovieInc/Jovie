@@ -8,6 +8,7 @@ import {
 } from '@/lib/activity/jovie-work-feed';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { defaultQueryRetryPolicy } from './retry-policy';
 
 interface JovieWorkFeedOptions {
   readonly profileId: string;
@@ -43,7 +44,8 @@ export function useJovieWorkFeedQuery({
     refetchOnWindowFocus: false,
     refetchInterval: 5 * 60 * 1000,
     refetchIntervalInBackground: false,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30_000),
+    // JOV-6185: shared classified retry — transient failures only.
+    retry: defaultQueryRetryPolicy.retry,
+    retryDelay: defaultQueryRetryPolicy.retryDelay,
   });
 }

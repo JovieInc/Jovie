@@ -282,6 +282,14 @@ export const queryKeys = {
     env: () => [...queryKeys.health.all, 'env'] as const,
   },
 
+  // HUD ops metrics. Scoped by access mode only — the raw kiosk token is a
+  // secret and must never appear in query keys, logs, or devtools.
+  hud: {
+    all: ['hud'] as const,
+    metrics: (scope: 'admin' | 'kiosk') =>
+      [...queryKeys.hud.all, 'metrics', scope] as const,
+  },
+
   // Admin queries
   admin: {
     all: ['admin'] as const,
