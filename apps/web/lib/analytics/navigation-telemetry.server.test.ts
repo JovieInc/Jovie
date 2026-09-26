@@ -532,21 +532,18 @@ describe('navigation telemetry baseline privacy', () => {
   it.each([
     NAVIGATION_TELEMETRY_MINIMUM_SAMPLE,
     NAVIGATION_TELEMETRY_MINIMUM_SAMPLE + 1,
-  ])(
-    'keeps an HLL estimate of %i suppressed at the privacy boundary',
-    count => {
-      const [field, impressions] = aggregate({ event: 'impression' }, count);
-      const result = navigationTelemetryTestUtils.readDailyHashes({
-        hashes: [{ [field]: impressions }],
-        contributorCounts: contributorCounts(count),
-        startDate: '2026-06-23',
-        endDate: '2026-07-22',
-      });
+  ])('keeps an HLL estimate of %i suppressed at the privacy boundary', count => {
+    const [field, impressions] = aggregate({ event: 'impression' }, count);
+    const result = navigationTelemetryTestUtils.readDailyHashes({
+      hashes: [{ [field]: impressions }],
+      contributorCounts: contributorCounts(count),
+      startDate: '2026-06-23',
+      endDate: '2026-07-22',
+    });
 
-      expect(result.published).toBe(false);
-      expect(result.segments[0]?.suppressed).toBe(true);
-    }
-  );
+    expect(result.published).toBe(false);
+    expect(result.segments[0]?.suppressed).toBe(true);
+  });
 
   it('clamps all published rates to one even if historical aggregates are malformed', () => {
     const hash = Object.fromEntries([
@@ -635,32 +632,31 @@ describe('navigation telemetry baseline privacy', () => {
     });
   });
 
-  it.each([1, 2])(
-    '%i accounts cannot unsuppress a 30-day cohort regardless of event volume',
-    distinctAccounts => {
-      const [field] = aggregate({ event: 'impression' }, 1);
-      const hashes = Array.from({ length: 30 }, () => ({
-        [field]: 1,
-        'health|attempts': 50,
-        'health|accepted': 1,
-        'health|duplicates': 49,
-      }));
+  it.each([
+    1, 2,
+  ])('%i accounts cannot unsuppress a 30-day cohort regardless of event volume', distinctAccounts => {
+    const [field] = aggregate({ event: 'impression' }, 1);
+    const hashes = Array.from({ length: 30 }, () => ({
+      [field]: 1,
+      'health|attempts': 50,
+      'health|accepted': 1,
+      'health|duplicates': 49,
+    }));
 
-      const result = navigationTelemetryTestUtils.readDailyHashes({
-        hashes,
-        contributorCounts: contributorCounts(distinctAccounts),
-        startDate: '2026-06-23',
-        endDate: '2026-07-22',
-      });
+    const result = navigationTelemetryTestUtils.readDailyHashes({
+      hashes,
+      contributorCounts: contributorCounts(distinctAccounts),
+      startDate: '2026-06-23',
+      endDate: '2026-07-22',
+    });
 
-      expect(result.published).toBe(false);
-      expect(result.health).toBeNull();
-      expect(result.segments[0]).toMatchObject({
-        suppressed: true,
-        minimumSample: NAVIGATION_TELEMETRY_MINIMUM_SAMPLE,
-      });
-    }
-  );
+    expect(result.published).toBe(false);
+    expect(result.health).toBeNull();
+    expect(result.segments[0]).toMatchObject({
+      suppressed: true,
+      minimumSample: NAVIGATION_TELEMETRY_MINIMUM_SAMPLE,
+    });
+  });
 
   it('fails closed if the non-enumerable contributor sketch result is malformed', async () => {
     const hashExec = vi

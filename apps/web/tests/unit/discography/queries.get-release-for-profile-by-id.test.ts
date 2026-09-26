@@ -84,26 +84,28 @@ describe('getReleaseForProfileById', () => {
     vi.clearAllMocks();
   });
 
-  it.each(['<id>', 'not-a-uuid', 'rel_1', ''])(
-    'returns null without querying when releaseId is not a UUID (%s)',
-    async releaseId => {
-      const result = await getReleaseForProfileById(
-        CREATOR_PROFILE_ID,
-        releaseId
-      );
+  it.each([
+    '<id>',
+    'not-a-uuid',
+    'rel_1',
+    '',
+  ])('returns null without querying when releaseId is not a UUID (%s)', async releaseId => {
+    const result = await getReleaseForProfileById(
+      CREATOR_PROFILE_ID,
+      releaseId
+    );
 
-      expect(result).toBeNull();
-      expect(hoisted.selectMock).not.toHaveBeenCalled();
-      expect(hoisted.captureMessageMock).toHaveBeenCalledTimes(1);
-      expect(hoisted.captureMessageMock).toHaveBeenCalledWith(
-        'getReleaseForProfileById: non-UUID releaseId',
-        expect.objectContaining({
-          level: 'warning',
-          extra: expect.objectContaining({ releaseId }),
-        })
-      );
-    }
-  );
+    expect(result).toBeNull();
+    expect(hoisted.selectMock).not.toHaveBeenCalled();
+    expect(hoisted.captureMessageMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.captureMessageMock).toHaveBeenCalledWith(
+      'getReleaseForProfileById: non-UUID releaseId',
+      expect.objectContaining({
+        level: 'warning',
+        extra: expect.objectContaining({ releaseId }),
+      })
+    );
+  });
 
   it('queries and returns the release for a valid UUID (unchanged behavior)', async () => {
     const releaseRow = {

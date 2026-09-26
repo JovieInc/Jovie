@@ -106,15 +106,14 @@ describe('Fit Score Calculator', () => {
         expect(result.breakdown.usesLinkInBio).toBe(0);
       });
 
-      it.each([...LINK_IN_BIO_PLATFORMS])(
-        'should recognize %s as link-in-bio platform',
-        platform => {
-          const result = calculateFitScore({
-            ingestionSourcePlatform: platform,
-          });
-          expect(result.breakdown.usesLinkInBio).toBe(15);
-        }
-      );
+      it.each([
+        ...LINK_IN_BIO_PLATFORMS,
+      ])('should recognize %s as link-in-bio platform', platform => {
+        const result = calculateFitScore({
+          ingestionSourcePlatform: platform,
+        });
+        expect(result.breakdown.usesLinkInBio).toBe(15);
+      });
     });
 
     describe('paid tier scoring (+20 points)', () => {
@@ -189,15 +188,14 @@ describe('Fit Score Calculator', () => {
         expect(result.breakdown.usesMusicTools).toBe(0);
       });
 
-      it.each([...MUSIC_TOOL_PLATFORMS])(
-        'should recognize %s as music tool platform',
-        platform => {
-          const result = calculateFitScore({
-            socialLinkPlatforms: [platform],
-          });
-          expect(result.breakdown.usesMusicTools).toBe(10);
-        }
-      );
+      it.each([
+        ...MUSIC_TOOL_PLATFORMS,
+      ])('should recognize %s as music tool platform', platform => {
+        const result = calculateFitScore({
+          socialLinkPlatforms: [platform],
+        });
+        expect(result.breakdown.usesMusicTools).toBe(10);
+      });
     });
 
     describe('Spotify profile scoring (+15 points)', () => {

@@ -53,12 +53,14 @@ describe('getPlatformCategory', () => {
   });
 
   describe('Website platforms (custom)', () => {
-    it.each(['website', 'linktree', 'laylo', 'beacons'])(
-      'categorizes %s as websites',
-      platform => {
-        expect(getPlatformCategory(platform)).toBe('websites');
-      }
-    );
+    it.each([
+      'website',
+      'linktree',
+      'laylo',
+      'beacons',
+    ])('categorizes %s as websites', platform => {
+      expect(getPlatformCategory(platform)).toBe('websites');
+    });
   });
 
   describe('MusicFetch-enriched platform routing', () => {

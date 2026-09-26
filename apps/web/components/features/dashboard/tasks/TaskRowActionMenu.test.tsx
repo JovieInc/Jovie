@@ -63,23 +63,23 @@ describe('TaskRowActionMenu', () => {
     ).toBeInTheDocument();
   });
 
-  it.each(['{Enter}', ' '])(
-    'opens the menu with keyboard activation %s',
-    async key => {
-      const user = userEvent.setup();
+  it.each([
+    '{Enter}',
+    ' ',
+  ])('opens the menu with keyboard activation %s', async key => {
+    const user = userEvent.setup();
 
-      render(
-        <TaskRowActionMenu
-          items={[{ id: 'archive', label: 'Archive', onClick: vi.fn() }]}
-        />
-      );
+    render(
+      <TaskRowActionMenu
+        items={[{ id: 'archive', label: 'Archive', onClick: vi.fn() }]}
+      />
+    );
 
-      screen.getByRole('button', { name: 'Open task actions' }).focus();
-      await user.keyboard(key);
+    screen.getByRole('button', { name: 'Open task actions' }).focus();
+    await user.keyboard(key);
 
-      expect(
-        await screen.findByRole('menuitem', { name: 'Archive' })
-      ).toBeInTheDocument();
-    }
-  );
+    expect(
+      await screen.findByRole('menuitem', { name: 'Archive' })
+    ).toBeInTheDocument();
+  });
 });

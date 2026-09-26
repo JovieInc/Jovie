@@ -72,45 +72,39 @@ describe('SuggestedActionCard', () => {
     ['rejected', 'Rejected', 'neutral'],
     ['failed', 'Failed', 'error'],
     ['expired', 'Expired', 'neutral'],
-  ] as const)(
-    'renders %s as non-interactive semantic status',
-    (status, label, tone) => {
-      const onApprove = vi.fn();
-      const onReject = vi.fn();
-      render(
-        <SuggestedActionCard
-          {...BASE_PROPS}
-          status={status}
-          onApprove={onApprove}
-          onReject={onReject}
-        />
-      );
+  ] as const)('renders %s as non-interactive semantic status', (status, label, tone) => {
+    const onApprove = vi.fn();
+    const onReject = vi.fn();
+    render(
+      <SuggestedActionCard
+        {...BASE_PROPS}
+        status={status}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+    );
 
-      expect(
-        screen.getByRole('status', { name: `Status: ${label}` })
-      ).toHaveAttribute('data-tone', tone);
-      expect(screen.queryByRole('button')).not.toBeInTheDocument();
-      expect(onApprove).not.toHaveBeenCalled();
-      expect(onReject).not.toHaveBeenCalled();
-    }
-  );
+    expect(
+      screen.getByRole('status', { name: `Status: ${label}` })
+    ).toHaveAttribute('data-tone', tone);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(onReject).not.toHaveBeenCalled();
+  });
 
   it.each([
     [0.96, 'High Confidence, 96%', 'success'],
     [0.75, 'Medium Confidence, 75%', 'warning'],
     [0.5, 'Low Confidence, 50%', 'error'],
     [Number.NaN, 'Low Confidence, 0%', 'error'],
-  ] as const)(
-    'exposes %s confidence through text and semantic tone',
-    (confidence, accessibleName, tone) => {
-      render(<SuggestedActionCard {...BASE_PROPS} confidence={confidence} />);
+  ] as const)('exposes %s confidence through text and semantic tone', (confidence, accessibleName, tone) => {
+    render(<SuggestedActionCard {...BASE_PROPS} confidence={confidence} />);
 
-      expect(screen.getByLabelText(accessibleName)).toHaveAttribute(
-        'data-tone',
-        tone
-      );
-    }
-  );
+    expect(screen.getByLabelText(accessibleName)).toHaveAttribute(
+      'data-tone',
+      tone
+    );
+  });
 
   it('renders valid dates and composes a partial location without empty separators', () => {
     const { rerender } = render(

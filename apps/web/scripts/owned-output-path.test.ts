@@ -36,14 +36,15 @@ describe('owned output paths', () => {
     );
   }
 
-  it.each(['nested/run', '..', '/tmp/escaped-output'])(
-    'rejects unsafe output segment %j',
-    segment => {
-      expect(() =>
-        resolveOwnedOutputDirectory('/tmp/owned-output', segment, 'QA_CYCLE')
-      ).toThrow('QA_CYCLE must be a single safe path segment');
-    }
-  );
+  it.each([
+    'nested/run',
+    '..',
+    '/tmp/escaped-output',
+  ])('rejects unsafe output segment %j', segment => {
+    expect(() =>
+      resolveOwnedOutputDirectory('/tmp/owned-output', segment, 'QA_CYCLE')
+    ).toThrow('QA_CYCLE must be a single safe path segment');
+  });
 
   it.each([
     'latest',

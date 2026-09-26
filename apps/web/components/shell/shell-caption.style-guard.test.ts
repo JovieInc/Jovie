@@ -25,15 +25,14 @@ describe('shell caption Title Case contract (JOV-5293)', () => {
     expect(source).not.toMatch(/\buppercase\b/);
   });
 
-  it.each(captionAtomFiles)(
-    '%s uses SHELL_CAPTION_CLASSNAME and does not reintroduce tracked caps',
-    fileName => {
-      const source = readFileSync(path.join(shellDir, fileName), 'utf8');
+  it.each(
+    captionAtomFiles
+  )('%s uses SHELL_CAPTION_CLASSNAME and does not reintroduce tracked caps', fileName => {
+    const source = readFileSync(path.join(shellDir, fileName), 'utf8');
 
-      expect(source).toContain("from './shell-caption'");
-      expect(source).toContain('SHELL_CAPTION_CLASSNAME');
-      expect(source).not.toContain('uppercase tracking');
-      expect(source).not.toMatch(/\buppercase\b/);
-    }
-  );
+    expect(source).toContain("from './shell-caption'");
+    expect(source).toContain('SHELL_CAPTION_CLASSNAME');
+    expect(source).not.toContain('uppercase tracking');
+    expect(source).not.toMatch(/\buppercase\b/);
+  });
 });

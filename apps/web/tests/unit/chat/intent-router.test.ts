@@ -65,15 +65,14 @@ describe('Intent router: CRUD vs AI routing', () => {
       ['disable notifications', IntentCategory.SETTINGS_TOGGLE],
     ];
 
-    it.each(crudMessages)(
-      'classifies "%s" as CRUD category %s',
-      (message, expectedCategory) => {
-        const intent = classifyIntent(message);
-        expect(intent).not.toBeNull();
-        expect(intent!.category).toBe(expectedCategory);
-        expect(isDeterministicIntent(intent)).toBe(true);
-      }
-    );
+    it.each(
+      crudMessages
+    )('classifies "%s" as CRUD category %s', (message, expectedCategory) => {
+      const intent = classifyIntent(message);
+      expect(intent).not.toBeNull();
+      expect(intent!.category).toBe(expectedCategory);
+      expect(isDeterministicIntent(intent)).toBe(true);
+    });
 
     it('CRUD intents always have confidence 1.0 (deterministic, not probabilistic)', () => {
       const intent = classifyIntent('change name to Test Artist');

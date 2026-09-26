@@ -189,38 +189,39 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(menu).not.toHaveAttribute('aria-modal', 'true');
   });
 
-  it.each(VIEWPORTS)(
-    '$label ($width px, $presentation) exposes dialog semantics, contains Tab, and restores on Escape',
-    async ({ presentation }) => {
-      const user = userEvent.setup({ delay: null });
-      const onOpenChange = vi.fn();
-      render(
-        <OpenShell presentation={presentation} onOpenChange={onOpenChange} />
-      );
-      const opener = screen.getByRole('button', { name: 'Open menu' });
-      opener.focus();
-      await user.click(opener);
+  it.each(
+    VIEWPORTS
+  )('$label ($width px, $presentation) exposes dialog semantics, contains Tab, and restores on Escape', async ({
+    presentation,
+  }) => {
+    const user = userEvent.setup({ delay: null });
+    const onOpenChange = vi.fn();
+    render(
+      <OpenShell presentation={presentation} onOpenChange={onOpenChange} />
+    );
+    const opener = screen.getByRole('button', { name: 'Open menu' });
+    opener.focus();
+    await user.click(opener);
 
-      const dialog = screen.getByTestId('profile-menu-drawer');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(screen.getByRole('dialog')).toBe(dialog);
+    const dialog = screen.getByTestId('profile-menu-drawer');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('dialog')).toBe(dialog);
 
-      const first = screen.getByRole('button', { name: 'Share Profile' });
-      const last = screen.getByRole('button', { name: 'Pay' });
-      expect(first).toHaveFocus();
-      last.focus();
-      fireEvent.keyDown(document, { key: 'Tab' });
-      expect(first).toHaveFocus();
-      first.focus();
-      fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-      expect(last).toHaveFocus();
-      opener.focus();
-      expect(first).toHaveFocus();
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-      expect(opener).toHaveFocus();
-    }
-  );
+    const first = screen.getByRole('button', { name: 'Share Profile' });
+    const last = screen.getByRole('button', { name: 'Pay' });
+    expect(first).toHaveFocus();
+    last.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(first).toHaveFocus();
+    first.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    opener.focus();
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(opener).toHaveFocus();
+  });
 
   it('locks document scroll for modal and embedded presentations and cleans up', () => {
     const { unmount, rerender } = renderOpenShell('modal');
@@ -321,51 +322,54 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
 describe('ProfileUnifiedDrawer public menu interactions', () => {
   afterEach(resetScrollLock);
 
-  it.each(['standalone', 'embedded', 'modal'] as const)(
-    'keeps Share → Pay → Contact order and gating in %s mode',
-    presentation => {
-      render(
-        <ProfileUnifiedDrawer
-          {...drawerProps}
-          open
-          presentation={presentation}
-          hasTip
-          hasContacts
-        />
-      );
-      expect(
-        within(screen.getByRole('menu'))
-          .getAllByRole('menuitem')
-          .map(item => item.textContent)
-      ).toEqual(['Share Profile', 'Pay', 'Contact']);
-    }
-  );
+  it.each([
+    'standalone',
+    'embedded',
+    'modal',
+  ] as const)('keeps Share → Pay → Contact order and gating in %s mode', presentation => {
+    render(
+      <ProfileUnifiedDrawer
+        {...drawerProps}
+        open
+        presentation={presentation}
+        hasTip
+        hasContacts
+      />
+    );
+    expect(
+      within(screen.getByRole('menu'))
+        .getAllByRole('menuitem')
+        .map(item => item.textContent)
+    ).toEqual(['Share Profile', 'Pay', 'Contact']);
+  });
 
-  it.each(CAPABILITY_FIXTURES)(
-    'capability fixture: $name',
-    ({ hasTip, hasContacts, visible, hidden }) => {
-      render(
-        <MenuView
-          onNavigate={vi.fn()}
-          hasReleases={false}
-          hasTourDates={false}
-          hasTip={hasTip}
-          hasContacts={hasContacts}
-        />
-      );
-      const menu = screen.getByRole('menu');
-      for (const label of visible) {
-        expect(
-          within(menu).getByRole('menuitem', { name: label })
-        ).toBeInTheDocument();
-      }
-      for (const label of hidden) {
-        expect(
-          within(menu).queryByRole('menuitem', { name: label })
-        ).not.toBeInTheDocument();
-      }
+  it.each(CAPABILITY_FIXTURES)('capability fixture: $name', ({
+    hasTip,
+    hasContacts,
+    visible,
+    hidden,
+  }) => {
+    render(
+      <MenuView
+        onNavigate={vi.fn()}
+        hasReleases={false}
+        hasTourDates={false}
+        hasTip={hasTip}
+        hasContacts={hasContacts}
+      />
+    );
+    const menu = screen.getByRole('menu');
+    for (const label of visible) {
+      expect(
+        within(menu).getByRole('menuitem', { name: label })
+      ).toBeInTheDocument();
     }
-  );
+    for (const label of hidden) {
+      expect(
+        within(menu).queryByRole('menuitem', { name: label })
+      ).not.toBeInTheDocument();
+    }
+  });
 
   it('activates a menu entry with Enter and keeps the shell open for in-drawer navigation', async () => {
     const user = userEvent.setup({ delay: null });

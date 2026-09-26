@@ -112,30 +112,27 @@ describe('OpportunityCardStack', () => {
     ['Control', { ctrlKey: true }],
     ['Alt', { altKey: true }],
     ['Shift', { shiftKey: true }],
-  ])(
-    'does not claim %s+ArrowRight from the keyboard control',
-    (_name, keys) => {
-      const onAccept = vi.fn();
+  ])('does not claim %s+ArrowRight from the keyboard control', (_name, keys) => {
+    const onAccept = vi.fn();
 
-      render(
-        <OpportunityCardStack
-          cards={CARDS}
-          onAccept={onAccept}
-          onReject={vi.fn()}
-          onOpen={vi.fn()}
-        />
-      );
+    render(
+      <OpportunityCardStack
+        cards={CARDS}
+        onAccept={onAccept}
+        onReject={vi.fn()}
+        onOpen={vi.fn()}
+      />
+    );
 
-      const keyboardControl = screen.getByRole('button', {
-        name: 'Review Current Opportunity',
-      });
+    const keyboardControl = screen.getByRole('button', {
+      name: 'Review Current Opportunity',
+    });
 
-      expect(
-        fireEvent.keyDown(keyboardControl, { key: 'ArrowRight', ...keys })
-      ).toBe(true);
-      expect(onAccept).not.toHaveBeenCalled();
-    }
-  );
+    expect(
+      fireEvent.keyDown(keyboardControl, { key: 'ArrowRight', ...keys })
+    ).toBe(true);
+    expect(onAccept).not.toHaveBeenCalled();
+  });
 
   it('respects a stack key event already handled by an ancestor', () => {
     const onAccept = vi.fn();

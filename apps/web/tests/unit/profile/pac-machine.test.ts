@@ -72,26 +72,23 @@ describe('resolveInitialPacState', () => {
       'tickets',
     ],
     ['unticketed show', { hasUpcomingShow: true }, 'rsvp'],
-  ] as const)(
-    'cold visitor with only %s inventory resolves to %s instead of an empty listen state',
-    (_label, availableInventory, expectedKind) => {
-      expect(
-        resolveInitialPacState(
-          ctx({
-            inventory: {
-              hasListen: false,
-              hasPreview: false,
-              hasMerch: false,
-              hasTip: false,
-              hasTicketedShow: false,
-              hasUpcomingShow: false,
-              ...availableInventory,
-            },
-          })
-        ).kind
-      ).toBe(expectedKind);
-    }
-  );
+  ] as const)('cold visitor with only %s inventory resolves to %s instead of an empty listen state', (_label, availableInventory, expectedKind) => {
+    expect(
+      resolveInitialPacState(
+        ctx({
+          inventory: {
+            hasListen: false,
+            hasPreview: false,
+            hasMerch: false,
+            hasTip: false,
+            hasTicketedShow: false,
+            hasUpcomingShow: false,
+            ...availableInventory,
+          },
+        })
+      ).kind
+    ).toBe(expectedKind);
+  });
 
   it('warmed visitor lands in the capture prompt', () => {
     expect(resolveInitialPacState(ctx({ tier: 'warmed' })).kind).toBe('prompt');

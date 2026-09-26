@@ -13,20 +13,17 @@ describe('mobile Ovie Summer safety', () => {
   it.each([
     ['unconfigured', 503, 'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED'],
     ['forbidden', 403, 'SUMMER_FOUNDER_ACCESS_REQUIRED'],
-  ] as const)(
-    'rejects a %s founder identity before reserving or dispatching work',
-    async (authorization, status, errorCode) => {
-      h.authorizeFounderSummerUser.mockReturnValueOnce(authorization);
+  ] as const)('rejects a %s founder identity before reserving or dispatching work', async (authorization, status, errorCode) => {
+    h.authorizeFounderSummerUser.mockReturnValueOnce(authorization);
 
-      const response = await handleMobileOvChatTurn(ovInput);
+    const response = await handleMobileOvChatTurn(ovInput);
 
-      expect(response.status).toBe(status);
-      expect(await response.text()).toContain(errorCode);
-      expect(h.reserveChatTurn).not.toHaveBeenCalled();
-      expect(h.bindEveSummerSpeaker).not.toHaveBeenCalled();
-      expect(h.runOvieSummerTurn).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(status);
+    expect(await response.text()).toContain(errorCode);
+    expect(h.reserveChatTurn).not.toHaveBeenCalled();
+    expect(h.bindEveSummerSpeaker).not.toHaveBeenCalled();
+    expect(h.runOvieSummerTurn).not.toHaveBeenCalled();
+  });
 
   it('binds the Eve speaker and hashes the authenticated founder into the durable turn', async () => {
     const response = await handleMobileOvChatTurn(ovInput);
@@ -157,22 +154,22 @@ describe('mobile Ovie Summer safety', () => {
     expect(h.prepareOvieChatTurn).not.toHaveBeenCalled();
   });
 
-  it.each(['degraded', 'unavailable'])(
-    'fails closed when the admin admission limiter is %s',
-    async mode => {
-      h.checkAiChatRateLimitForPlan.mockResolvedValueOnce({
-        success: true,
-        [mode]: true,
-      });
+  it.each([
+    'degraded',
+    'unavailable',
+  ])('fails closed when the admin admission limiter is %s', async mode => {
+    h.checkAiChatRateLimitForPlan.mockResolvedValueOnce({
+      success: true,
+      [mode]: true,
+    });
 
-      const response = await handleMobileOvChatTurn(ovInput);
-      const body = await response.text();
+    const response = await handleMobileOvChatTurn(ovInput);
+    const body = await response.text();
 
-      expect(body).toContain('SUMMER_ADMISSION_UNAVAILABLE');
-      expect(body).toContain('admission control');
-      expect(h.prepareOvieChatTurn).not.toHaveBeenCalled();
-    }
-  );
+    expect(body).toContain('SUMMER_ADMISSION_UNAVAILABLE');
+    expect(body).toContain('admission control');
+    expect(h.prepareOvieChatTurn).not.toHaveBeenCalled();
+  });
 
   it('reclaims the same turn after admission control recovers', async () => {
     h.checkAiChatRateLimitForPlan

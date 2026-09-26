@@ -27,21 +27,23 @@ describe('createAdditionalProfile', () => {
     hoisted.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
   });
 
-  it.each(['dualipa', 'testartist', 'authqaprod', 'e2eclaimartist'])(
-    'rejects protected identity %s before database access',
-    async username => {
-      const { createAdditionalProfile } = await import('./switch-profile');
-      const result = await createAdditionalProfile({
-        displayName: 'Protected Fixture',
-        username,
-      });
+  it.each([
+    'dualipa',
+    'testartist',
+    'authqaprod',
+    'e2eclaimartist',
+  ])('rejects protected identity %s before database access', async username => {
+    const { createAdditionalProfile } = await import('./switch-profile');
+    const result = await createAdditionalProfile({
+      displayName: 'Protected Fixture',
+      username,
+    });
 
-      expect(result).toEqual({
-        success: false,
-        error: 'Username is reserved',
-      });
-      expect(hoisted.select).not.toHaveBeenCalled();
-      expect(hoisted.transaction).not.toHaveBeenCalled();
-    }
-  );
+    expect(result).toEqual({
+      success: false,
+      error: 'Username is reserved',
+    });
+    expect(hoisted.select).not.toHaveBeenCalled();
+    expect(hoisted.transaction).not.toHaveBeenCalled();
+  });
 });

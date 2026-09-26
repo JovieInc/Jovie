@@ -11,27 +11,25 @@ const UNAUTHORIZED_MESSAGES = [
 ];
 
 describe('session error response helpers', () => {
-  it.each(UNAUTHORIZED_MESSAGES)(
-    'maps "%s" to a 401 response',
-    async message => {
-      const response = getSessionErrorResponse(new TypeError(message), {
-        'Cache-Control': 'no-store',
-      });
+  it.each(
+    UNAUTHORIZED_MESSAGES
+  )('maps "%s" to a 401 response', async message => {
+    const response = getSessionErrorResponse(new TypeError(message), {
+      'Cache-Control': 'no-store',
+    });
 
-      expect(response).not.toBeNull();
-      expect(response?.status).toBe(401);
-      await expect(response?.json()).resolves.toEqual({
-        error: 'Unauthorized',
-      });
-    }
-  );
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Unauthorized',
+    });
+  });
 
-  it.each(UNAUTHORIZED_MESSAGES)(
-    'isSessionError returns true for "%s"',
-    message => {
-      expect(isSessionError(new TypeError(message))).toBe(true);
-    }
-  );
+  it.each(
+    UNAUTHORIZED_MESSAGES
+  )('isSessionError returns true for "%s"', message => {
+    expect(isSessionError(new TypeError(message))).toBe(true);
+  });
 
   it('maps profile missing errors to 404', async () => {
     const response = getSessionErrorResponse(

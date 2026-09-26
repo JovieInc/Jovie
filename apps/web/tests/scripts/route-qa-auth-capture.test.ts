@@ -283,27 +283,24 @@ describe('route-qa authenticated capture', () => {
       { testAuthLocation: '' },
       'Test-auth 303 did not include a redirect location.',
     ],
-  ])(
-    'persists a %s bootstrap failure without navigating the page',
-    async (_name, options, message) => {
-      const runtime = createFakeRuntime(options);
-      const receipt = await runAuthenticatedRouteCapture(
-        {
-          requestedPath: '/app',
-          baseUrl: 'http://localhost:3220',
-          outputRoot: '/tmp/route-qa-invalid-redirect',
-          timeoutMs: 50,
-          closeTimeoutMs: 50,
-        },
-        {
-          launchBrowser: vi.fn().mockResolvedValue(runtime.browser as never),
-          persistReceipt: vi.fn().mockResolvedValue(undefined),
-        }
-      );
-      expect(receipt.failure?.message).toBe(message);
-      expect(runtime.page.goto).not.toHaveBeenCalled();
-    }
-  );
+  ])('persists a %s bootstrap failure without navigating the page', async (_name, options, message) => {
+    const runtime = createFakeRuntime(options);
+    const receipt = await runAuthenticatedRouteCapture(
+      {
+        requestedPath: '/app',
+        baseUrl: 'http://localhost:3220',
+        outputRoot: '/tmp/route-qa-invalid-redirect',
+        timeoutMs: 50,
+        closeTimeoutMs: 50,
+      },
+      {
+        launchBrowser: vi.fn().mockResolvedValue(runtime.browser as never),
+        persistReceipt: vi.fn().mockResolvedValue(undefined),
+      }
+    );
+    expect(receipt.failure?.message).toBe(message);
+    expect(runtime.page.goto).not.toHaveBeenCalled();
+  });
 
   it('turns an aborted destination ending at about:blank into a persisted redirect failure', async () => {
     const runtime = createFakeRuntime({

@@ -157,22 +157,23 @@ describe('ProfilePaySurface', () => {
   });
 
   describe.each(['settings', 'drawer'] as const)('%s variant', variant => {
-    it.each(renderCases)(
-      'renders $name state',
-      ({ summary, heading, action }) => {
-        const { getByText, getByRole, getByTestId } = fastRender(
-          <ProfilePaySurface
-            summary={summary}
-            variant={variant}
-            {...baseCallbacks}
-          />
-        );
+    it.each(renderCases)('renders $name state', ({
+      summary,
+      heading,
+      action,
+    }) => {
+      const { getByText, getByRole, getByTestId } = fastRender(
+        <ProfilePaySurface
+          summary={summary}
+          variant={variant}
+          {...baseCallbacks}
+        />
+      );
 
-        expect(getByTestId(`profile-tips-surface-${variant}`)).toBeDefined();
-        expect(getByText(heading)).toBeDefined();
-        expect(getByRole('button', { name: action })).toBeDefined();
-      }
-    );
+      expect(getByTestId(`profile-tips-surface-${variant}`)).toBeDefined();
+      expect(getByText(heading)).toBeDefined();
+      expect(getByRole('button', { name: action })).toBeDefined();
+    });
   });
 
   it('uses Set Up Payments copy when Stripe Connect is enabled', () => {

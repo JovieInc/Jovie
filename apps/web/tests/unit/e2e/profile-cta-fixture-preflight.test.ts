@@ -81,14 +81,11 @@ describe('filtered profile CTA fixture preflight', () => {
     { E2E_WEB_SERVER_COMMAND: 'custom-server' },
     { DATABASE_URL: '' },
     { CI: '' },
-  ])(
-    'rejects an environment that cannot prove the managed local fixture: %j',
-    override => {
-      expect(() =>
-        validateProfileCtaEnvironment({ ...env, ...override })
-      ).toThrow();
-    }
-  );
+  ])('rejects an environment that cannot prove the managed local fixture: %j', override => {
+    expect(() =>
+      validateProfileCtaEnvironment({ ...env, ...override })
+    ).toThrow();
+  });
   it('accepts the same owned branch and direct connection without returning credentials', () => {
     validateProfileCtaEnvironment(env);
     expect(validateProfileCtaConnection(env, connection)).toEqual({
@@ -135,19 +132,19 @@ describe('filtered profile CTA fixture preflight', () => {
       /^profile-cta seed failed$/
     );
   });
-  it.each(['tim', 'edgecase-empty'])(
-    'rejects a missing %s without treating it as an empty tour',
-    async username => {
-      const deps = dependencies();
-      deps.profiles.mockResolvedValue(
-        profiles.filter(profile => profile.username !== username)
-      );
-      await expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
-        `public profile invalid: ${username}`
-      );
-      expect(deps.upcomingCount).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    'tim',
+    'edgecase-empty',
+  ])('rejects a missing %s without treating it as an empty tour', async username => {
+    const deps = dependencies();
+    deps.profiles.mockResolvedValue(
+      profiles.filter(profile => profile.username !== username)
+    );
+    await expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
+      `public profile invalid: ${username}`
+    );
+    expect(deps.upcomingCount).not.toHaveBeenCalled();
+  });
   it.each([
     { is_public: false },
     { has_owner: false },
@@ -163,28 +160,32 @@ describe('filtered profile CTA fixture preflight', () => {
       'public profile invalid: edgecase-empty'
     );
   });
-  it.each([1, '1', null, undefined, '', -1])(
-    'rejects a nonzero or absent measurement: %j',
-    count => {
-      const deps = dependencies();
-      deps.upcomingCount.mockResolvedValue(count);
-      return expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
-        'count is not zero'
-      );
-    }
-  );
-  it.each(['profiles', 'upcomingCount'] as const)(
-    'rejects %s query errors instead of qualifying an empty screen',
-    async query => {
-      const deps = dependencies();
-      deps[query].mockRejectedValue(new Error('private connection detail'));
-      await expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
-        query === 'profiles'
-          ? /^profile-cta profile query failed$/
-          : /^profile-cta upcoming tour query failed$/
-      );
-    }
-  );
+  it.each([
+    1,
+    '1',
+    null,
+    undefined,
+    '',
+    -1,
+  ])('rejects a nonzero or absent measurement: %j', count => {
+    const deps = dependencies();
+    deps.upcomingCount.mockResolvedValue(count);
+    return expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
+      'count is not zero'
+    );
+  });
+  it.each([
+    'profiles',
+    'upcomingCount',
+  ] as const)('rejects %s query errors instead of qualifying an empty screen', async query => {
+    const deps = dependencies();
+    deps[query].mockRejectedValue(new Error('private connection detail'));
+    await expect(verifyProfileCtaFixtures(deps)).rejects.toThrow(
+      query === 'profiles'
+        ? /^profile-cta profile query failed$/
+        : /^profile-cta upcoming tour query failed$/
+    );
+  });
 });
 
 // Real temporary files exercise receipt/source I/O. Git and Neon are mocked before
@@ -308,25 +309,19 @@ describe('runProfileCtaPreflight adapter and receipt', () => {
   it.each([
     { connection: { branchId: 'br-owned-fixture' } },
     { DATABASE_URL: 'postgresql://private.invalid/db' },
-  ])(
-    'the unchanged guard rejects forbidden fields injected into the emitted receipt: %j',
-    async forbidden => {
-      const f = fixture();
-      await runProfileCtaPreflight(f.env, f.webRoot, f.seed);
-      writeFileSync(
-        f.output,
-        JSON.stringify({ ...f.readProof(), ...forbidden })
-      );
-      expect(
-        guardPlaywrightArtifacts(
-          [f.output],
-          { NODE_ENV: 'test' },
-          { workspace: f.root }
-        )
-      ).not.toEqual([]);
-      expect(adapters.spawn).not.toHaveBeenCalled();
-    }
-  );
+  ])('the unchanged guard rejects forbidden fields injected into the emitted receipt: %j', async forbidden => {
+    const f = fixture();
+    await runProfileCtaPreflight(f.env, f.webRoot, f.seed);
+    writeFileSync(f.output, JSON.stringify({ ...f.readProof(), ...forbidden }));
+    expect(
+      guardPlaywrightArtifacts(
+        [f.output],
+        { NODE_ENV: 'test' },
+        { workspace: f.root }
+      )
+    ).not.toEqual([]);
+    expect(adapters.spawn).not.toHaveBeenCalled();
+  });
   it('fails wrong HEAD before seeding or opening the database and retains sanitized evidence', async () => {
     const f = fixture();
     adapters.head.mockReturnValue('b'.repeat(40));
@@ -353,63 +348,64 @@ describe('runProfileCtaPreflight adapter and receipt', () => {
     });
     expect(adapters.neon).not.toHaveBeenCalled();
   });
-  it.each(['missing', 'malformed', 'mismatch'] as const)(
-    'retains a sanitized connection failure: %s',
-    async mode => {
-      const f = fixture();
-      if (mode === 'missing') rmSync(f.connectionFile);
-      else
-        writeFileSync(
-          f.connectionFile,
-          mode === 'malformed'
-            ? 'private invalid JSON'
-            : JSON.stringify({ ...connection, db_url: 'private mismatch' })
-        );
-      await expect(
-        runProfileCtaPreflight(f.env, f.webRoot, f.seed)
-      ).rejects.toThrow('failed at connection');
-      expect(f.readProof()).toMatchObject({
-        status: 'FAILED',
-        failedStage: 'connection',
-      });
-      expect(readFileSync(f.output, 'utf8')).not.toContain('private');
-      expect(f.seed).not.toHaveBeenCalled();
-      expect(adapters.neon).not.toHaveBeenCalled();
-    }
-  );
-  it.each(['profiles', 'tour'] as const)(
-    'retains a failed receipt when the real adapter %s query rejects',
-    async query => {
-      const f = fixture();
-      adapters.sql.mockReset();
-      if (query === 'tour') adapters.sql.mockResolvedValueOnce(profiles);
-      adapters.sql.mockRejectedValueOnce(
-        new Error('private database credential')
+  it.each([
+    'missing',
+    'malformed',
+    'mismatch',
+  ] as const)('retains a sanitized connection failure: %s', async mode => {
+    const f = fixture();
+    if (mode === 'missing') rmSync(f.connectionFile);
+    else
+      writeFileSync(
+        f.connectionFile,
+        mode === 'malformed'
+          ? 'private invalid JSON'
+          : JSON.stringify({ ...connection, db_url: 'private mismatch' })
       );
-      await expect(
-        runProfileCtaPreflight(f.env, f.webRoot, f.seed)
-      ).rejects.toThrow('failed at fixtures');
-      expect(f.readProof()).toMatchObject({
-        status: 'FAILED',
-        failedStage: 'fixtures',
-        reason:
-          query === 'tour'
-            ? 'profile-cta upcoming tour query failed'
-            : 'profile-cta profile query failed',
-      });
-      expect(readFileSync(f.output, 'utf8')).not.toContain('private');
-    }
-  );
-  it.each([true, false])(
-    'propagates receipt write failure even when fixture success is %s',
-    async success => {
-      const f = fixture();
-      // A directory in place of the JSON destination deterministically rejects writing.
-      mkdirSync(f.output, { recursive: true });
-      if (!success) f.seed.mockResolvedValue({ success: false });
-      await expect(
-        runProfileCtaPreflight(f.env, f.webRoot, f.seed)
-      ).rejects.toMatchObject({ code: 'EISDIR' });
-    }
-  );
+    await expect(
+      runProfileCtaPreflight(f.env, f.webRoot, f.seed)
+    ).rejects.toThrow('failed at connection');
+    expect(f.readProof()).toMatchObject({
+      status: 'FAILED',
+      failedStage: 'connection',
+    });
+    expect(readFileSync(f.output, 'utf8')).not.toContain('private');
+    expect(f.seed).not.toHaveBeenCalled();
+    expect(adapters.neon).not.toHaveBeenCalled();
+  });
+  it.each([
+    'profiles',
+    'tour',
+  ] as const)('retains a failed receipt when the real adapter %s query rejects', async query => {
+    const f = fixture();
+    adapters.sql.mockReset();
+    if (query === 'tour') adapters.sql.mockResolvedValueOnce(profiles);
+    adapters.sql.mockRejectedValueOnce(
+      new Error('private database credential')
+    );
+    await expect(
+      runProfileCtaPreflight(f.env, f.webRoot, f.seed)
+    ).rejects.toThrow('failed at fixtures');
+    expect(f.readProof()).toMatchObject({
+      status: 'FAILED',
+      failedStage: 'fixtures',
+      reason:
+        query === 'tour'
+          ? 'profile-cta upcoming tour query failed'
+          : 'profile-cta profile query failed',
+    });
+    expect(readFileSync(f.output, 'utf8')).not.toContain('private');
+  });
+  it.each([
+    true,
+    false,
+  ])('propagates receipt write failure even when fixture success is %s', async success => {
+    const f = fixture();
+    // A directory in place of the JSON destination deterministically rejects writing.
+    mkdirSync(f.output, { recursive: true });
+    if (!success) f.seed.mockResolvedValue({ success: false });
+    await expect(
+      runProfileCtaPreflight(f.env, f.webRoot, f.seed)
+    ).rejects.toMatchObject({ code: 'EISDIR' });
+  });
 });

@@ -221,23 +221,20 @@ describe('enqueueWaitlistApprovalInviteEmail (issueWaitlistInviteToken)', () => 
     'rejected',
     'expired',
     'blocked',
-  ])(
-    'does not issue a token or enqueue an email for non-redeemable status %s',
-    async status => {
-      const { tx, updateCalls, insertCalls } = createIssueTokenTxMock({
-        id: ENTRY_ID,
-        status,
-        inviteTokenHash: null,
-        inviteTokenExpiresAt: null,
-      });
+  ])('does not issue a token or enqueue an email for non-redeemable status %s', async status => {
+    const { tx, updateCalls, insertCalls } = createIssueTokenTxMock({
+      id: ENTRY_ID,
+      status,
+      inviteTokenHash: null,
+      inviteTokenExpiresAt: null,
+    });
 
-      const result = await enqueueWaitlistApprovalInviteEmail(tx, ENTRY_ID);
+    const result = await enqueueWaitlistApprovalInviteEmail(tx, ENTRY_ID);
 
-      expect(result).toBeNull();
-      expect(updateCalls).toHaveLength(0);
-      expect(insertCalls).toHaveLength(0);
-    }
-  );
+    expect(result).toBeNull();
+    expect(updateCalls).toHaveLength(0);
+    expect(insertCalls).toHaveLength(0);
+  });
 
   it('returns null and writes nothing when the entry does not exist', async () => {
     const { tx, updateCalls, insertCalls } = createIssueTokenTxMock(undefined);

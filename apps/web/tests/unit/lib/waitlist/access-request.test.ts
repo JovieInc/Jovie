@@ -450,27 +450,27 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, 'invalid+base@e2e.example.com'])(
-    'keeps the reserved namespace suppressed when base config is %s',
-    async baseEmail => {
-      if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
-      const { submitWaitlistAccessRequest } = await import(
-        '@/lib/waitlist/access-request'
-      );
+  it.each([
+    undefined,
+    'invalid+base@e2e.example.com',
+  ])('keeps the reserved namespace suppressed when base config is %s', async baseEmail => {
+    if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
 
-      await submitWaitlistAccessRequest({
-        ...baseInput,
-        email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
-      });
+    await submitWaitlistAccessRequest({
+      ...baseInput,
+      email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+    });
 
-      expect(
-        insertedEntries.some(
-          entry => entry.vals.jobType === 'send_waitlist_email'
-        )
-      ).toBe(false);
-      expect(notifySlackWaitlist).not.toHaveBeenCalled();
-    }
-  );
+    expect(
+      insertedEntries.some(
+        entry => entry.vals.jobType === 'send_waitlist_email'
+      )
+    ).toBe(false);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
 
   it('writes a fresh audit receipt on an idempotent canary reassertion', async () => {
     vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
