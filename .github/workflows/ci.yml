@@ -2840,6 +2840,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      # Boot Storybook before the independent checks and Playwright setup so
+      # its ~12s startup and Vite dependency scan/bundle overlap them instead
+      # of running serially inside the matrix step. Output goes to a file: a
+      # background writer on this step's closed stdout would take SIGPIPE.
+      # The matrix step still waits for readiness, fails if the server died,
+      # prints this log, and stops the server.
+      - name: Start Storybook dev server
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          nohup pnpm exec storybook dev -p 6006 --no-open \
+            > "$RUNNER_TEMP/storybook-dev.log" 2>&1 &
+          echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"
+        # Server-side config reads these (.storybook/main.ts drops the
+        # automatic a11y addon under the manual axe suite); keep them equal
+        # to the matrix step's values.
+        env:
+          CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
@@ -2854,9 +2873,12 @@ jobs:
           set -euo pipefail
           cd apps/web
 
-          pnpm exec storybook dev -p 6006 --no-open &
-          STORYBOOK_PID=$!
-          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true' EXIT
+          # Started by "Start Storybook dev server"; fail closed without it.
+          : "${STORYBOOK_PID:?Storybook dev server was not started}"
+          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true
+            echo "::group::Storybook dev server log"
+            cat "$RUNNER_TEMP/storybook-dev.log" 2>/dev/null || true
+            echo "::endgroup::"' EXIT
 
           for attempt in $(seq 1 150); do
             kill -0 "$STORYBOOK_PID" 2>/dev/null || {
