@@ -273,6 +273,7 @@
     "backlog:reconcile": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile",
     "backlog:audit": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit",
     "backlog:report": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs report",
+    "backlog:hygiene": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs backlog-hygiene",
     "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/*.test.mjs"
   },
   "devDependencies": {
