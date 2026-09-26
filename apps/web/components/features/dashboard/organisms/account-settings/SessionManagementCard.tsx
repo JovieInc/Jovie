@@ -24,9 +24,6 @@ interface AccountSessionDTO {
   readonly isCurrent: boolean;
 }
 
-const END_SESSION_BUTTON_CLASS =
-  'h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive';
-
 export function SessionManagementCard() {
   const notifications = useNotifications();
   const [sessions, setSessions] = useState<AccountSessionDTO[]>([]);
@@ -165,10 +162,11 @@ export function SessionManagementCard() {
             {session.isCurrent ? null : (
               <Button
                 variant='ghost'
+                destructive
                 size='sm'
                 disabled={endingSessionId === session.id}
                 onClick={() => setSessionToEnd(session)}
-                className={END_SESSION_BUTTON_CLASS}
+                className='shrink-0'
               >
                 {endingSessionId === session.id ? 'Ending…' : 'End session'}
               </Button>
@@ -179,10 +177,11 @@ export function SessionManagementCard() {
           <div className='flex justify-end px-4 py-3 sm:px-5'>
             <Button
               variant='ghost'
+              destructive
               size='sm'
               disabled={signingOutOthers}
               onClick={() => setConfirmSignOutOthers(true)}
-              className={END_SESSION_BUTTON_CLASS}
+              className='shrink-0'
             >
               {signingOutOthers
                 ? 'Signing out…'
