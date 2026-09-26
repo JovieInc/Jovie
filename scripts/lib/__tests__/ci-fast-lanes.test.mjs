@@ -190,7 +190,9 @@ describe('runStructural screenshot contract discovery', () => {
     await runStructural({ execute });
     const commands = execute.mock.calls.map(([command]) => String(command));
     const directoryRuns = commands.filter(command =>
-      /vitest\.config\.mts tests\/unit\/ci( |$)/.test(command)
+      // Any web Vitest config: a second directory run under another config
+      // would still execute every contract twice.
+      /vitest\.config(\.[\w-]+)?\.mts tests\/unit\/ci( |$)/.test(command)
     );
     expect(directoryRuns).toHaveLength(1);
     const explicitCiFiles = commands
@@ -262,6 +264,11 @@ describe('runStructural screenshot contract discovery', () => {
         String(command).endsWith('tests/unit/ci/deploy-workflow.test.ts')
       );
       expect(byName).toHaveLength(expected);
+      for (const [command] of byName) {
+        expect(command).toBe(
+          'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/deploy-workflow.test.ts'
+        );
+      }
     }
   );
 
@@ -1114,7 +1121,7 @@ describe('webCiContractTestsCommand', () => {
       expect(command).not.toContain('webhook-handler');
       expect(command).not.toContain('not-a-unit');
       expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
