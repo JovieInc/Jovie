@@ -1226,35 +1226,41 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-// Read once, off the main thread, at startup: the splash paints on the main process's
-// latency-sensitive path, so it must never block on disk (latency-sensitive invariant).
-let desktopWordmarkDataUrl: string | null = null;
-const desktopWordmarkLoaded = fs.promises
-  .readFile(
-    app.isPackaged
-      ? path.join(process.resourcesPath, 'Jovie-Wordmark-Cream.svg')
-      : path.join(
-          __dirname,
-          '..',
-          '..',
-          'web',
-          'public',
-          'brand',
-          'Jovie-Wordmark-Cream.svg'
-        )
-  )
-  .then(wordmark => {
-    desktopWordmarkDataUrl = `data:image/svg+xml;base64,${wordmark.toString('base64')}`;
-  })
-  .catch(() => {
+// Resolved once at startup (see preloadDesktopBootSplashWordmark) so the
+// splash builder stays synchronous without a thread-blocking file read.
+let desktopBootSplashWordmarkDataUrl: string | null = null;
+
+function resolveDesktopBootSplashWordmarkPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'Jovie-Wordmark-Cream.svg')
+    : path.join(
+        __dirname,
+        '..',
+        '..',
+        'web',
+        'public',
+        'brand',
+        'Jovie-Wordmark-Cream.svg'
+      );
+}
+
+async function preloadDesktopBootSplashWordmark(): Promise<void> {
+  try {
+    const wordmark = await fs.promises.readFile(
+      resolveDesktopBootSplashWordmarkPath()
+    );
+    desktopBootSplashWordmarkDataUrl = `data:image/svg+xml;base64,${wordmark.toString('base64')}`;
+  } catch {
     // Keep first paint usable if a development or damaged package lacks the asset.
-  });
+    desktopBootSplashWordmarkDataUrl = null;
+  }
+}
 
 function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
   const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
   const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
-  const wordmarkDataUrl = desktopWordmarkDataUrl;
+  const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -2813,8 +2819,6 @@ if (gotSingleInstanceLock) {
 }
 
 app.whenReady().then(async () => {
-  // Wordmark preload started at module load; waiting here never blocks the thread.
-  await desktopWordmarkLoaded;
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
   void persistDesktopBuildIdentityEvidence();
@@ -2857,7 +2861,12 @@ app.whenReady().then(async () => {
     return;
   }
 
+  // The first window paints the boot splash, so the cached wordmark must be
+  // resolved before createWindow runs. Start it alongside window-state
+  // hydration; the preload never rejects (it falls back to the mark).
+  const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark();
   await hydrateWindowState();
+  await bootSplashWordmarkReady;
 
   // macOS menu bar extra (NSStatusItem via Electron Tray)
   if (process.platform === 'darwin') {

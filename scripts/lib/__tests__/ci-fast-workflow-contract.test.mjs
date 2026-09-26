@@ -639,6 +639,87 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).not.toContain('turbo run');
   });
 
+  it('warms web tsc incremental state without weakening the forced gate', () => {
+    const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
+    const step = name =>
+      typecheck.match(
+        new RegExp(
+          `- name: ${name}\\n(?<body>[\\s\\S]*?)(?=\\n      - name:|$)`
+        )
+      )?.groups?.body ?? '';
+    const restore = step('Restore web tsc incremental state');
+    const record = step('Record restored web tsc state');
+    const save = step('Save web tsc incremental state');
+    const cacheSha = '55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0';
+
+    // The web package keeps compiling incrementally into the cached path.
+    const webPackage = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'apps/web/package.json'), 'utf8')
+    );
+    expect(webPackage.scripts.typecheck).toContain(
+      'tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo'
+    );
+
+    // Restore: same hydration gate, pinned, lockfile+tsconfig keyed, prefix
+    // fallback (tsc re-verifies every input hash, so older state is safe).
+    expect(restore).toContain('id: web-tsbuildinfo');
+    expect(restore).toMatch(
+      /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+    );
+    expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo');
+    const configHash =
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json')";
+    expect(restore).toContain(
+      `key: jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
+    );
+    expect(restore).toContain(
+      `jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\n`
+    );
+    expect(restore).toMatch(
+      /\n\s+jovie-web-tsbuildinfo-v1-\$\{\{ runner\.os \}\}-\s*$/
+    );
+    expect(record).toContain(
+      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}"
+    );
+
+    // Order: restore before the lanes, save after them.
+    const at = marker => typecheck.indexOf(marker);
+    expect(at('- name: Restore web tsc incremental state')).toBeLessThan(
+      at('- name: Run ci-fast lanes')
+    );
+    expect(at('- name: Run ci-fast lanes')).toBeLessThan(
+      at('- name: Save web tsc incremental state')
+    );
+
+    // Save: green lane, changed state, trusted refs only, never blocking.
+    expect(save).toContain(`uses: actions/cache/save@${cacheSha}`);
+    expect(save).toContain("steps.lanes.outcome == 'success' &&");
+    expect(save).toContain(
+      "hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash"
+    );
+    expect(save).toContain(
+      "((github.event_name == 'push' && github.ref == 'refs/heads/main') ||"
+    );
+    expect(save).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository))'
+    );
+    for (const untrusted of [
+      'merge_group',
+      'pull_request_target',
+      'workflow_run',
+    ]) {
+      expect(save).not.toContain(untrusted);
+    }
+    expect(save).toContain('continue-on-error: true');
+    expect(save).toContain(
+      'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}'
+    );
+
+    // The gate itself is unchanged: turbo never replays a cached verdict.
+    expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
+  });
+
   it('isolates Jovie product typecheck from Symphony/control-plane suites', () => {
     expect(CI_FAST_SOURCE).toContain("from './lib/ci-repo-lanes.mjs'");
     expect(CI_FAST_SOURCE).toContain(

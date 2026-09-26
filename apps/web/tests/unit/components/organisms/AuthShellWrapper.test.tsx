@@ -327,30 +327,33 @@ describe('AuthShellWrapper', () => {
     ['dashboard', {}],
     ['chat', { isChatRoute: true }],
     ['admin', { section: 'admin' }],
-  ])('does not mount stale release-transition copy at rest on %s routes', (_, overrides) => {
-    useAuthRouteConfigMock.mockReturnValue({
-      section: 'dashboard',
-      isArtistProfileSettings: false,
-      breadcrumbs: [],
-      showMobileTabs: false,
-      isTableRoute: false,
-      isDemoRoute: false,
-      isChatRoute: false,
-      isLyricsRoute: false,
-      ...overrides,
-    });
+  ])(
+    'does not mount stale release-transition copy at rest on %s routes',
+    (_, overrides) => {
+      useAuthRouteConfigMock.mockReturnValue({
+        section: 'dashboard',
+        isArtistProfileSettings: false,
+        breadcrumbs: [],
+        showMobileTabs: false,
+        isTableRoute: false,
+        isDemoRoute: false,
+        isChatRoute: false,
+        isLyricsRoute: false,
+        ...overrides,
+      });
 
-    render(
-      <AuthShellWrapper>
-        <div>route content</div>
-      </AuthShellWrapper>
-    );
+      render(
+        <AuthShellWrapper>
+          <div>route content</div>
+        </AuthShellWrapper>
+      );
 
-    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Preparing your release workspace.')
-    ).not.toBeInTheDocument();
-  });
+      expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Preparing your release workspace.')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('mounts the release-transition overlay only while Releases is pending and clears it on success', () => {
     render(

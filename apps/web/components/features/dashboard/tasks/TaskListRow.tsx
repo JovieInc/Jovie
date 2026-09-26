@@ -169,12 +169,15 @@ export const TaskListRow = memo(function TaskListRow({
     task.status,
     task.agentStatus
   );
+  let rowOpacity: 'quiet' | 'muted' | 'full' = 'full';
+  if (isCancelled) rowOpacity = 'quiet';
+  else if (isDone) rowOpacity = 'muted';
 
   return (
     <TaskProjectionListRow
       testId={`task-list-row-${task.id}`}
       isSelected={isSelected}
-      opacity={isCancelled ? 'quiet' : isDone ? 'muted' : 'full'}
+      opacity={rowOpacity}
       leading={<TaskStageGlyph task={task} />}
       title={hideTitle ? undefined : task.title}
       titleAfter={agentWorking ? <TaskAgentWorkingGlyph /> : null}
