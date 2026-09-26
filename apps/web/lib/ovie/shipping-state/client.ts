@@ -101,6 +101,9 @@ const sourceObservationSchema = z.object({
     running: countMeasurementSchema,
     retrying: countMeasurementSchema,
     blocked: countMeasurementSchema,
+    terminalFailures: countMeasurementSchema
+      .optional()
+      .default(NOT_MEASURED_COUNT_VALUE),
     queued: countMeasurementSchema,
     openPullRequests: countMeasurementSchema
       .optional()
@@ -135,6 +138,7 @@ export const shippingCockpitProjectionSchema = z.object({
     exactLiveBuild: booleanMeasurementSchema,
   }),
   retrying: countMeasurementSchema,
+  blocked: countMeasurementSchema.optional().default(NOT_MEASURED_COUNT_VALUE),
   terminalFailures: countMeasurementSchema,
   capacityAvailable: countMeasurementSchema,
   operationalTasks: operationalTaskFeedSchema,

@@ -165,19 +165,35 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
-  if (start == null || end == null) return NOT_MEASURED_DURATION;
-  const startMs = Date.parse(start);
-  const endMs = Date.parse(end);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
-    return NOT_MEASURED_DURATION;
+  // Ship time is only measurable when a single authoritative identity spans
+  // both ends. Subtracting timestamps from unmatched sources fabricates a
+  // duration for work that may not be the build being measured.
+  const starts = [
+    sources['github-native-merge-queue'],
+    sources['fleet-receipt'],
+  ];
+  const ends = [sources['live-build-info'], sources['production-controller']];
+  for (const start of starts) {
+    for (const end of ends) {
+      const startSha = start.correlation.sha;
+      if (!isExactSha(startSha) || startSha !== end.correlation.sha) continue;
+      const startMs = start.sourceTimestamp
+        ? Date.parse(start.sourceTimestamp)
+        : Number.NaN;
+      const endMs = end.sourceTimestamp
+        ? Date.parse(end.sourceTimestamp)
+        : Number.NaN;
+      if (
+        !Number.isFinite(startMs) ||
+        !Number.isFinite(endMs) ||
+        endMs < startMs
+      ) {
+        continue;
+      }
+      return measuredDuration(Math.round((endMs - startMs) / 1000));
+    }
   }
-  return measuredDuration(Math.round((endMs - startMs) / 1000));
+  return NOT_MEASURED_DURATION;
 }
 
 function revisionFingerprint(
@@ -367,7 +383,8 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    blocked: pickCount(input.sources, 'blocked'),
+    terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
     operationalTasks: projectOperationalTasks(input),
   };
@@ -554,6 +571,7 @@ export function unknownProjection(input: {
     },
     timeToShipSeconds: NOT_MEASURED_DURATION,
     retrying: NOT_MEASURED_COUNT,
+    blocked: NOT_MEASURED_COUNT,
     terminalFailures: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
     operationalTasks: {

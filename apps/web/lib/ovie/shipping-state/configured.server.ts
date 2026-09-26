@@ -18,6 +18,8 @@ const configuredReaders = createLiveShippingStateReaders(
     githubToken: env.HUD_GITHUB_TOKEN,
     githubOwner: env.HUD_GITHUB_OWNER,
     githubRepo: env.HUD_GITHUB_REPO,
+    gemAuthorityUrl: env.HUD_GEM_AUTHORITY_URL,
+    gemAuthorityToken: env.HUD_GEM_AUTHORITY_TOKEN,
   })
 );
 

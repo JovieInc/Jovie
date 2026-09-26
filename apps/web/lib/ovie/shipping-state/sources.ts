@@ -148,6 +148,13 @@ export function interpretCounts(
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
+      // Terminal failures are a distinct authority list/count. Blocked work is
+      // still retryable; it must never stand in for a terminal failure.
+      terminalFailures: Array.isArray(payload.failed)
+        ? measuredCount(payload.failed.length)
+        : Array.isArray(payload.terminal)
+          ? measuredCount(payload.terminal.length)
+          : countFromNumber(payload.terminalFailures),
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,
