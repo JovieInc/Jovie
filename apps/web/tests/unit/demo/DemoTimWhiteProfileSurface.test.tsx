@@ -26,7 +26,10 @@ vi.mock('@/features/demo/DemoClientProviders', () => ({
   ),
 }));
 
-const SLOW_DEMO_SURFACE_TIMEOUT_MS = 15_000;
+// First `renderSurface()` pays a cold dynamic import of the demo surface
+// module graph: ~1.8s warm, but the 15s budget fired under full-suite shard
+// CPU contention.
+const SLOW_DEMO_SURFACE_TIMEOUT_MS = 45_000;
 
 async function renderSurface(search = '') {
   mockSearchParams.mockReturnValue(new URLSearchParams(search));

@@ -81,7 +81,10 @@ describe('auth front-door contract', () => {
       destination: APP_ROUTES.SIGNIN,
       permanent: true,
     });
-  });
+    // Cold `import('next.config.js')` pulls the whole Next config module
+    // graph: <1s warm, but the default 12s budget fired under full-suite
+    // shard CPU contention.
+  }, 45_000);
 
   it('keeps first-party auth copy aligned with the canonical cross-links', () => {
     expect(authCopy.signUp.start.title).toBe('Continue to Jovie');
