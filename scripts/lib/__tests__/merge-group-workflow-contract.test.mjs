@@ -2869,7 +2869,11 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-describe('Storybook Surface Matrix shallow diff-base history', () => {
+// Each case builds a 40+ commit fixture repo with real git subprocesses;
+// the default 5s timeout flaked under load and ejected merge-queue groups.
+describe('Storybook Surface Matrix shallow diff-base history', {
+  timeout: 30_000,
+}, () => {
   const tempRoots = [];
 
   afterEach(() => {
