@@ -430,6 +430,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
     ],
   ],
   [
+    '.github/scripts/vercel-output-manifest.test.mjs',
+    '.github/scripts/vercel-output-manifest.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
     '.github/scripts/production-input-provenance.test.mjs',
     '.github/scripts/production-input-provenance.mjs',
     [

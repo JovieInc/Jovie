@@ -314,6 +314,37 @@ try {
 NODE
 }
 
+# Diagnostic only: record the shape of the prebuilt upload (names, sizes,
+# modes, symlink targets; never contents or env) right before the tgz attempt
+# so an "Extracting deployment files" failure can be diffed against the last
+# success. Failure of the manifest itself never changes deploy behavior.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_MANIFEST_FILE="${VERCEL_OUTPUT_MANIFEST_FILE:-${RUNNER_TEMP:-/tmp}/jovie-vercel-output-manifest.json}"
+OUTPUT_MANIFEST_WRITTEN=false
+
+record_output_manifest() {
+  echo "Recording prebuilt upload manifest (${OUTPUT_MANIFEST_FILE})"
+  if node "$SCRIPT_DIR/vercel-output-manifest.mjs" --json "$OUTPUT_MANIFEST_FILE"; then
+    OUTPUT_MANIFEST_WRITTEN=true
+  else
+    echo "Vercel output manifest unavailable" >&2
+  fi
+}
+
+print_output_manifest_summary() {
+  if [ "$OUTPUT_MANIFEST_WRITTEN" = true ]; then
+    node "$SCRIPT_DIR/vercel-output-manifest.mjs" --summary "$OUTPUT_MANIFEST_FILE" >&2 || true
+  fi
+}
+
+report_extracted_file_count() {
+  local extracted=""
+  extracted="$(grep -Eo 'Extracted [0-9]+ deployment files' "$1" | tail -1 || true)"
+  if [ -n "$extracted" ]; then
+    echo "Vercel remote build: ${extracted}"
+  fi
+}
+
 try_mode() {
   local mode="$1"
   local attempt="$2"
@@ -321,13 +352,20 @@ try_mode() {
 
   local deploy_output_file=""
   local deploy_status=0
+  if [ "$mode" = "tgz" ]; then
+    record_output_manifest || true
+  fi
   deploy_output_file="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-vercel-deploy.XXXXXX")"
   chmod 600 "$deploy_output_file"
   run_deploy "$mode" "$@" >"$deploy_output_file" 2>&1 || deploy_status=$?
   local deployment_url=""
   deployment_url="$(parse_deployment_url_file "$deploy_output_file")"
+  report_extracted_file_count "$deploy_output_file" || true
   if [ "$deploy_status" -ne 0 ]; then
     emit_failure_diagnostic "$deploy_output_file" "$mode" "$attempt" "$deploy_status" || true
+    if [ "$mode" = "tgz" ]; then
+      print_output_manifest_summary
+    fi
   fi
   rm -f "$deploy_output_file"
   if [ "$deploy_status" -eq 0 ]; then
