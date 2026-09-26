@@ -293,6 +293,31 @@ struct AppShellChatFirstTests {
     #expect(!source.contains("isPresented: isShowingDrawer"))
   }
 
+  // JOV-5353 / ios-nav-one-trailing-action: the shell toolbar's trailing
+  // cluster is exactly one control — the Actions overflow menu. Vlog, Talk,
+  // and Settings live inside it; sibling trailing icon buttons never return.
+  @Test func shellToolbarExposesSingleActionsMenu() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/AppShell/AppShellView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    guard let toolbarRange = source.range(of: "private var shellToolbar") else {
+      Issue.record("shellToolbar not found in AppShellView.swift")
+      return
+    }
+    let toolbar = String(source[toolbarRange.lowerBound...])
+    #expect(toolbar.contains("Menu {"))
+    #expect(toolbar.contains(#".accessibilityIdentifier("shell-actions-menu")"#))
+    #expect(toolbar.contains(#".accessibilityIdentifier("shell-vlog-open")"#))
+    #expect(toolbar.contains(#".accessibilityIdentifier("shell-talk-fab")"#))
+    #expect(toolbar.contains(#".accessibilityLabel("Open Settings")"#))
+    #expect(
+      !toolbar.contains(".buttonStyle(JovieIconButtonStyle())"),
+      "Trailing icon buttons must live inside the Actions menu, not as siblings."
+    )
+  }
+
   @Test func merchHorizontalScrollSuppressesShellRailSwipe() throws {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()

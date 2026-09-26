@@ -246,17 +246,20 @@ if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
   write_failure production_promotion_state_invalid
   exit 1
 fi
-if [ "$current_main_sha" != "$expected_main_sha" ]; then
+# Forward-only lineage: an authorized SHA that is still an ancestor of main is
+# promoted even though main advanced; only a rewind or force-push yields.
+if [ "$current_main_sha" != "$expected_main_sha" ] &&
+  [ "$($gh_cli api "repos/$repository/compare/${expected_main_sha}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
   fi
-  echo "Release $expected_main_sha was superseded by $current_main_sha before production mutation."
+  echo "Release $expected_main_sha left main's lineage (main is $current_main_sha) before production mutation."
   exit 0
 fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  # The observed SHA is public, high-entropy release identity. Unlike a boolean
+  # The promoted SHA is public, high-entropy release identity. Unlike a boolean
   # true, it cannot collide with a Doppler-added secret mask at the job boundary.
-  printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+  printf 'promotion_sha=%s\n' "$expected_main_sha" >> "$GITHUB_OUTPUT"
 fi
 
 promotion_requested=false

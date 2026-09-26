@@ -12,11 +12,11 @@ import {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Jovie Docs',
-    template: '%s | Jovie Docs',
+    default: 'Jovie Help Center',
+    template: '%s | Jovie Help Center',
   },
   description:
-    'Documentation for Jovie - the platform for musicians to manage their career.',
+    'Clear answers for building your profile, sharing your work, and understanding your audience.',
 };
 
 export default async function RootLayout({
@@ -48,7 +48,7 @@ export default async function RootLayout({
             <Navbar
               logo={
                 <span style={{ fontWeight: 700, fontSize: 18 }}>
-                  Jovie Docs
+                  Jovie Help Center
                 </span>
               }
             >
