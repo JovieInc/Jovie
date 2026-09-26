@@ -346,6 +346,32 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('path-selects and runs the disabled DeepSec policy safety tests', () => {
+    const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    const additions = [
+      ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+    ].map(match => match[1]);
+    expect(initial).toBeTruthy();
+    const pattern = initial + additions.join('');
+    for (const path of [
+      'scripts/security/deepsec-policy.mjs',
+      'scripts/security/deepsec-policy.test.mjs',
+      'scripts/security/deepsec/policy.json',
+      'scripts/security/deepsec/targets.json',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs'"
+    );
+  });
+
   it('runs Linux restart boundary tests when the helper or its proof changes', () => {
     const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeTruthy();
