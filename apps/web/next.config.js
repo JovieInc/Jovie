@@ -62,11 +62,6 @@ const nextConfig = {
   // are small content and chat-topic catalogs.
   outputFileTracingIncludes: {
     '/*': [
-      '../../CHANGELOG.md',
-      '../../docs/FEATURE_REGISTRY.md',
-      '../../scripts/symphony/symphony-codex-account-control.py',
-      '../../apps/eve-pilot/identities/jovie/instructions.md',
-      '../../apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
       'lib/chat/knowledge/topics/**/*',
