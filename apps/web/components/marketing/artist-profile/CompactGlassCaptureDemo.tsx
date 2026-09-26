@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/marketing/artist-profile/CompactGlassModule.test.tsx
 'use client';
 
 /**
