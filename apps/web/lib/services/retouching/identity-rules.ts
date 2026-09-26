@@ -105,10 +105,10 @@ function evaluateAmbiguousIdentityRefused(): RetouchRuleCaseResult {
 export function evaluateRetouchRuleCase(
   id: RetouchRuleCaseId
 ): RetouchRuleCaseResult {
-  switch (id) {
-    case 'ambiguous-identity-refused':
-      return evaluateAmbiguousIdentityRefused();
+  if (id === 'ambiguous-identity-refused') {
+    return evaluateAmbiguousIdentityRefused();
   }
+  throw new TypeError(`Unknown retouch rule case: ${id}`);
 }
 
 export function evaluateAllRetouchRuleCases(): RetouchRuleCaseResult[] {

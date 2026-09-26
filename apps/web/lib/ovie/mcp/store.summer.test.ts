@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DurableOperatingStore,
   FailoverOperatingStore,
+  getDefaultOperatingStore,
   memoryRecordBackend,
 } from './store';
 import type { OvieDecision, OvieSummerTurn } from './types';
@@ -30,6 +31,14 @@ const decision = (decided: string): OvieDecision => ({
   why: 'test decision compare-and-set',
   provenance: 'test',
   createdAt: '2026-09-09T00:00:00.000Z',
+});
+
+describe('default operating store', () => {
+  it('reuses one in-memory store', () => {
+    const first = getDefaultOperatingStore();
+    const second = getDefaultOperatingStore();
+    expect(second).toBe(first);
+  });
 });
 
 describe('durable Ovie Summer turn store', () => {

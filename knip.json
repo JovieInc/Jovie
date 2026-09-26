@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "exclude": [
     "files",
     "exports",
@@ -7,7 +7,6 @@
     "nsExports",
     "nsTypes",
     "enumMembers",
-    "classMembers",
     "duplicates",
     "unlisted",
     "binaries",
@@ -24,7 +23,7 @@
         "sentry.*.config.ts",
         "scripts/**/*.{ts,mjs,js}"
       ],
-      "project": ["**/*.{ts,tsx,js,jsx,mjs}"],
+      "project": ["**/*.{ts,tsx,js,jsx,mjs,css,mdx}"],
       "ignore": [
         ".next/**",
         "drizzle/migrations/**",
@@ -33,21 +32,11 @@
         "lib/db/schema/**"
       ],
       "ignoreDependencies": [
-        "tw-animate-css",
-        "@radix-ui/react-alert-dialog",
         "@radix-ui/react-avatar",
-        "@radix-ui/react-checkbox",
-        "@radix-ui/react-label",
-        "@radix-ui/react-radio-group",
-        "@radix-ui/react-select",
-        "@radix-ui/react-separator",
-        "@radix-ui/react-tabs",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
-        "@radix-ui/react-tooltip",
         "@opentelemetry/sdk-trace-base",
-        "@sentry/node",
-        "promptfoo"
+        "@sentry/node"
       ],
       "playwright": {
         "config": [
@@ -84,20 +73,13 @@
     },
     "apps/desktop": {
       "entry": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
-      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
-      "ignoreDependencies": [
-        "electron",
-        "electron-builder",
-        "sharp",
-        "cross-env",
-        "@electron/fuses"
-      ]
+      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"]
     },
     "apps/should-i-make": {
       "entry": ["next.config.{js,ts}"],
-      "project": ["**/*.{ts,tsx,js,jsx}"],
+      "project": ["**/*.{ts,tsx,js,jsx,css}"],
       "ignore": [".next/**"],
-      "ignoreDependencies": ["@fontsource-variable/inter", "tailwindcss"],
+      "ignoreDependencies": ["@fontsource-variable/inter"],
       "next": {
         "entry": ["next.config.{js,ts}"]
       }
@@ -109,6 +91,16 @@
         "config": ["vitest.config.mts"],
         "entry": ["**/*.test.{ts,tsx}"]
       }
+    },
+    "apps/ovie": {
+      "ignoreDependencies": [
+        "@jovie/ui",
+        "@jovie/web",
+        "@statsig/statsig-node-core",
+        "server-only",
+        "tailwindcss",
+        "tw-animate-css"
+      ]
     }
   }
 }

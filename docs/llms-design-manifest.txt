@@ -52,7 +52,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (266 contract tokens; 503 total in CSS)
+## Design Tokens (274 contract tokens; 511 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -86,7 +86,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Semantic Colors
 
 - `--color-accent`: #11afff
-- `--color-bg-active`: var(--noir-ion-elevated)
+- `--color-bg-active`: rgba(0, 0, 0, 0.06)
 - `--color-bg-base`: var(--noir-ion-canvas)
 - `--color-bg-button`: var(--noir-ion-elevated)
 - `--color-bg-elevated`: var(--noir-ion-elevated)
@@ -229,12 +229,17 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-accent-rgb`: 242 243 245
 - `--app-shell-sidebar-background`: rgb(247 248 248)
 - `--app-shell-sidebar-background-rgb`: 247 248 248
+- `--app-shell-sidebar-badge-font-size`: 0.5rem
 - `--app-shell-sidebar-border-rgb`: 0 0 0 / 0.06
 - `--app-shell-sidebar-floating-radius`: 14px
 - `--app-shell-sidebar-foreground-rgb`: 18 18 20
+- `--app-shell-sidebar-history-font-size`: 0.78125rem
+- `--app-shell-sidebar-history-grid`: minmax(0, 1fr) auto
+- `--app-shell-sidebar-icon-size`: 0.9375rem
 - `--app-shell-sidebar-item-foreground-rgb`: 88 90 96
 - `--app-shell-sidebar-item-icon-rgb`: 122 125 132
 - `--app-shell-sidebar-muted-rgb`: 112 116 124
+- `--app-shell-sidebar-nav-grid`: var(--app-shell-sidebar-icon-size) minmax(0, 1fr)
 - `--app-shell-sidebar-seam`: rgba(0, 0, 0, 0.05)
 - `--app-shell-sidebar-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035)
 - `--app-shell-sidebar-width`: 280px
@@ -313,12 +318,15 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--space-24`: 6rem
 - `--space-28`: 7rem
 - `--space-3`: 0.75rem
+- `--space-3-5`: 0.875rem
 - `--space-32`: 8rem
 - `--space-4`: 1rem
 - `--space-40`: 10rem
 - `--space-5`: 1.25rem
 - `--space-6`: 1.5rem
+- `--space-7`: 1.75rem
 - `--space-8`: 2rem
+- `--space-9`: 2.25rem
 - `--space-px`: 1px
 
 ### Shadows

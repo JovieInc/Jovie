@@ -164,10 +164,10 @@ describe('validateEmail - ReDoS Protection', () => {
   });
 
   it('handles null and empty values', () => {
-    expect(validateEmail(null)).toBe(null);
-    expect(validateEmail(undefined)).toBe(null);
-    expect(validateEmail('')).toBe(null);
-    expect(validateEmail('   ')).toBe(null);
+    expect(validateEmail(null)).toBeNull();
+    expect(validateEmail(undefined)).toBeNull();
+    expect(validateEmail('')).toBeNull();
+    expect(validateEmail('   ')).toBeNull();
   });
 
   it('performs efficiently on malicious input patterns', () => {

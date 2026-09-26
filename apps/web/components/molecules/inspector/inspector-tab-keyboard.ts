@@ -21,7 +21,7 @@ export function nextInspectorTabValue<T extends string>(
   if (enabled.length === 0) return null;
 
   const index = enabled.indexOf(current);
-  const fallbackIndex = index < 0 ? 0 : index;
+  const fallbackIndex = Math.max(index, 0);
 
   if (key === 'ArrowRight' || key === 'ArrowDown') {
     return enabled[(fallbackIndex + 1) % enabled.length] ?? null;
@@ -32,7 +32,7 @@ export function nextInspectorTabValue<T extends string>(
     );
   }
   if (key === 'Home') return enabled[0] ?? null;
-  if (key === 'End') return enabled[enabled.length - 1] ?? null;
+  if (key === 'End') return enabled.at(-1) ?? null;
   return null;
 }
 

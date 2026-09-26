@@ -95,7 +95,7 @@ export function ProgressBar({
         aria-label={progressAriaLabel}
         aria-valuemin={safeMin}
         aria-valuemax={safeMax}
-        aria-valuenow={currentValue === undefined ? undefined : currentValue}
+        aria-valuenow={currentValue ?? undefined}
         aria-valuetext={
           hasDeterminateValue ? `${Math.round(percent)}%` : undefined
         }

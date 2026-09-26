@@ -67,7 +67,7 @@ function updateTaskInList(
 
   return {
     ...list,
-    tasks: options.sort ? tasks.sort(compareTasksByBoardOrder) : tasks,
+    tasks: options.sort ? tasks.toSorted(compareTasksByBoardOrder) : tasks,
   };
 }
 

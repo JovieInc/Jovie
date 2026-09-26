@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -15,6 +15,27 @@ const WEB_SOURCE_PREFIX = 'apps/web/';
 const SOURCE_PATH = /^apps\/web\/.*\.(?:[cm]?[jt]sx?)$/;
 const EXCLUDED_SOURCE_PATH =
   /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$|\.config(?:\.[^./]+)*\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$|(?:^|\/)scripts\/vitest-wrapper\.mjs$/;
+
+const TEST_FILE_PATH = /^apps\/web\/.*\.(?:test|spec)\.[cm]?[jt]sx?$/;
+const RESOLVABLE_EXTENSIONS = [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mts',
+  '.cts',
+  '.mjs',
+  '.cjs',
+];
+/**
+ * Module specifiers a test can use to load a source file. Vitest's `related`
+ * module graph only follows edges Vite records during transform, which misses
+ * `await import('../page')` inside test bodies and `createRequire(...)` +
+ * `require('./rule.js')`. Match those forms (plus static imports, re-exports
+ * and vi.mock/importActual paths) textually so the planner can add the tests.
+ */
+const SPECIFIER_PATTERN =
+  /(?:\bfrom|\bimport|\brequire(?:\.resolve)?|\bvi\.(?:mock|doMock|unmock|doUnmock|importActual|importMock))\s*\(?\s*(['"])([^'"\r\n]+)\1/g;
 
 export function isCoverageSourcePath(path) {
   return SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path);
@@ -232,22 +253,105 @@ function coverageIncludeFromFiles(files) {
   return Array.isArray(coverageInclude) ? coverageInclude : [];
 }
 
+/**
+ * Candidate repo paths a specifier can resolve to from a test file, mirroring
+ * the apps/web Vitest aliases for `@/` (see vitest.config.fast.mts).
+ */
+export function resolveTestSpecifierCandidates(testPath, specifier) {
+  let bases;
+  if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    bases = [posix.join(posix.dirname(testPath), specifier)];
+  } else if (specifier.startsWith('@/')) {
+    const rest = specifier.slice(2);
+    bases = [`${WEB_SOURCE_PREFIX}${rest}`];
+    if (rest.startsWith('features/')) {
+      bases.push(`${WEB_SOURCE_PREFIX}components/${rest}`);
+    }
+    if (rest.startsWith('app/')) {
+      bases.push(`${WEB_SOURCE_PREFIX}app/${rest}`);
+    }
+  } else {
+    return [];
+  }
+  const candidates = new Set();
+  for (const base of bases) {
+    if (!base.startsWith(WEB_SOURCE_PREFIX)) continue;
+    candidates.add(base);
+    const jsExtension = base.match(/\.([cm]?)jsx?$/);
+    if (jsExtension) {
+      const stem = base.slice(0, -jsExtension[0].length);
+      candidates.add(`${stem}.${jsExtension[1]}ts`);
+      candidates.add(`${stem}.${jsExtension[1]}tsx`);
+    }
+    for (const extension of RESOLVABLE_EXTENSIONS) {
+      candidates.add(`${base}${extension}`);
+      candidates.add(`${base}/index${extension}`);
+    }
+  }
+  return [...candidates];
+}
+
+/**
+ * Tests that reference a changed source by a resolvable relative or `@/`
+ * specifier (static/dynamic import, require, vi.mock). Returned paths are
+ * apps/web-relative so they can be passed straight to `vitest related`.
+ *
+ * @param {{ changedFiles: string[], testFiles: { path: string, source: string }[] }} options
+ */
+export function findReferencingTests({ changedFiles, testFiles }) {
+  const changed = new Set(changedFiles);
+  const selected = new Set();
+  for (const { path, source } of testFiles) {
+    if (!TEST_FILE_PATH.test(path)) continue;
+    for (const match of source.matchAll(SPECIFIER_PATTERN)) {
+      const candidates = resolveTestSpecifierCandidates(path, match[2]);
+      if (candidates.some(candidate => changed.has(candidate))) {
+        selected.add(path.slice(WEB_SOURCE_PREFIX.length));
+        break;
+      }
+    }
+  }
+  return [...selected].sort();
+}
+
+function readWebTestFiles(repoRoot) {
+  return execFileSync('git', ['ls-files', '-z', '--', 'apps/web'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+  })
+    .split('\0')
+    .filter(path => TEST_FILE_PATH.test(path))
+    .map(path => ({
+      path,
+      source: readFileSync(resolve(repoRoot, path), 'utf8'),
+    }));
+}
+
 /** @param {*} [options] */
 export function planChangedLineCoverage({
   base,
   head,
   repoRoot = REPO_ROOT,
   files: providedFiles,
+  testFiles: providedTestFiles,
 } = {}) {
   const files =
     providedFiles ??
     [
       ...parseChangedLines(readExactWebDiff({ base, head, repoRoot })).keys(),
     ].filter(path => isCoverageSourcePath(path));
+  const applicable = files.length > 0;
   return {
-    applicable: files.length > 0,
+    applicable,
     files,
     coverageInclude: coverageIncludeFromFiles(files),
+    relatedTests: applicable
+      ? findReferencingTests({
+          changedFiles: files,
+          testFiles: providedTestFiles ?? readWebTestFiles(repoRoot),
+        })
+      : [],
   };
 }
 

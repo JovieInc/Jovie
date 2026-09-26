@@ -208,18 +208,21 @@ describe('offline Summer Photon proof', () => {
   it.each([
     ['stale', '2026-09-02T04:54:59.000Z'],
     ['future', '2026-09-02T05:01:01.000Z'],
-  ])('refuses a current signature carrying a %s embedded event timestamp', async (_name, timestamp) => {
-    const proof = harness();
-    const response = await createSummerPhotonOfflineProofHandler(
-      proof.dependencies
-    )(signedRequest(event({ timestamp })));
+  ])(
+    'refuses a current signature carrying a %s embedded event timestamp',
+    async (_name, timestamp) => {
+      const proof = harness();
+      const response = await createSummerPhotonOfflineProofHandler(
+        proof.dependencies
+      )(signedRequest(event({ timestamp })));
 
-    expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'event_outside_freshness_window',
-    });
-    expect(proof.persistImmutable).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'event_outside_freshness_window',
+      });
+      expect(proof.persistImmutable).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects a validly signed malformed JSON body', async () => {
     const proof = harness();
@@ -234,27 +237,27 @@ describe('offline Summer Photon proof', () => {
     expect(proof.persistImmutable).not.toHaveBeenCalled();
   });
 
-  it.each([
-    'declared',
-    'streamed',
-  ])('rejects an oversized %s body before signature verification', async mode => {
-    const proof = harness();
-    const rawBody = 'x'.repeat(16 * 1024 + 1);
-    const oversized = signedRawRequest(rawBody);
-    if (mode === 'declared') {
-      oversized.headers.set('content-length', String(rawBody.length));
+  it.each(['declared', 'streamed'])(
+    'rejects an oversized %s body before signature verification',
+    async mode => {
+      const proof = harness();
+      const rawBody = 'x'.repeat(16 * 1024 + 1);
+      const oversized = signedRawRequest(rawBody);
+      if (mode === 'declared') {
+        oversized.headers.set('content-length', String(rawBody.length));
+      }
+
+      const response = await createSummerPhotonOfflineProofHandler(
+        proof.dependencies
+      )(oversized);
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'body_too_large',
+      });
+      expect(proof.persistImmutable).not.toHaveBeenCalled();
     }
-
-    const response = await createSummerPhotonOfflineProofHandler(
-      proof.dependencies
-    )(oversized);
-
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'body_too_large',
-    });
-    expect(proof.persistImmutable).not.toHaveBeenCalled();
-  });
+  );
 
   it.each([
     ['sender', { sender: { id: 'synthetic-other-sender' } }],

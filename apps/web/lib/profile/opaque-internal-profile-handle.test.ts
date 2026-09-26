@@ -87,6 +87,22 @@ describe('opaque internal profile handles (JOV-6201)', () => {
     ).toBe(publicProfilePathForHandle(FIXTURE.ownerHandle));
   });
 
+  it('keeps a leading slash on the redirect suffix and adds one when it is missing', () => {
+    const decision = {
+      action: 'redirect' as const,
+      handle: FIXTURE.ownerHandle,
+    };
+    const base = publicProfilePathForHandle(FIXTURE.ownerHandle);
+
+    expect(opaqueInternalProfileRedirectPath(decision, '')).toBe(base);
+    expect(opaqueInternalProfileRedirectPath(decision, 'bio')).toBe(
+      `${base}/bio`
+    );
+    expect(opaqueInternalProfileRedirectPath(decision, '/bio')).toBe(
+      `${base}/bio`
+    );
+  });
+
   it('404s an opaque profile URL with no canonical twin', () => {
     expect(
       decideOpaqueInternalProfileUsername({

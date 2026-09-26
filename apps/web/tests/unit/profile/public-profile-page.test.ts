@@ -487,7 +487,7 @@ describe('Public Profile Page Logic', () => {
       const spotifyUrls = (musicGroup.sameAs as string[]).filter(
         (url: string) => url.includes('spotify')
       );
-      expect(spotifyUrls.length).toBe(1);
+      expect(spotifyUrls).toHaveLength(1);
     });
 
     it('falls back to "Music" genre when no genres provided', () => {
@@ -548,7 +548,7 @@ describe('Public Profile Page Logic', () => {
       const breadcrumb = findInGraph(data, 'BreadcrumbList')!;
 
       expect(breadcrumb['@type']).toBe('BreadcrumbList');
-      expect((breadcrumb.itemListElement as unknown[]).length).toBe(2);
+      expect(breadcrumb.itemListElement as unknown[]).toHaveLength(2);
     });
 
     it('uses bio as description, falls back to generated text', () => {
@@ -647,7 +647,7 @@ describe('Public Profile Page Logic', () => {
         item => item['@type'] === 'MusicEvent'
       );
 
-      expect(events.length).toBe(5);
+      expect(events).toHaveLength(5);
     });
 
     it('emits zero MusicEvent schemas when no tour dates', () => {
@@ -661,7 +661,7 @@ describe('Public Profile Page Logic', () => {
         item => item['@type'] === 'MusicEvent'
       );
 
-      expect(events.length).toBe(0);
+      expect(events).toHaveLength(0);
     });
   });
 
@@ -802,7 +802,7 @@ describe('Public Profile Page Logic', () => {
       expect(keywords).toContain('Test Artist music');
       expect(keywords).toContain('rock');
       expect(keywords).toContain('indie');
-      expect(keywords.length).toBe(10);
+      expect(keywords).toHaveLength(10);
     });
 
     it('includes canonical URL in alternates', () => {

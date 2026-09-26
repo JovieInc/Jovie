@@ -175,10 +175,7 @@ export function buildUserPrompt(
   }
 
   sections.push(
-    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`
-  );
-
-  sections.push(
+    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`,
     `\nGenerate a playlist pitch for each platform. Stay strictly within character limits. If a curator-checklist field is UNKNOWN, mark it UNKNOWN instead of inventing it.`
   );
   return sections.join('\n');
@@ -205,10 +202,7 @@ export function buildPitchDraftUserPrompt(params: {
   }
 
   sections.push(
-    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`
-  );
-
-  sections.push(
+    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`,
     `\nGenerate one pitch for the requested destination. Return a concise subject line only when the pitch would naturally be sent as an email or DM. If a curator-checklist field is UNKNOWN, mark it UNKNOWN instead of inventing it.`
   );
 

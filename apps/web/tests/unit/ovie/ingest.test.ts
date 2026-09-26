@@ -5,6 +5,8 @@ import {
   DEST_KANBAN,
   DEST_LINEAR,
   DEST_PERSONAL,
+  ingestOvieDump,
+  ingestOvieItem,
   OVIE_LINEAR_QUEUED_ACK,
   OVIE_QUEUED_ACK,
   readOvieLinearRoutes,
@@ -104,6 +106,25 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(receipts).toEqual([]);
     expect(readOvieReceiptLog()).toEqual([]);
     expect(readOvieLinearRoutes()).toEqual([]);
+  });
+
+  it('classifies items without calling the supplied spawn', () => {
+    const spawned: string[] = [];
+    const spawn = (goal: string) => {
+      spawned.push(goal);
+    };
+    const item = ingestOvieItem('Jovie signup returns 500 on /start', {
+      spawn,
+    });
+    const dump = ingestOvieDump(['post this tweet'], { spawn });
+
+    expect(spawned).toEqual([]);
+    expect(item.workerSpawned).toBe(false);
+    expect(item.lane).toBe('engineering');
+    expect(item.destination).toBe(DEST_LINEAR);
+    expect(dump).toHaveLength(1);
+    expect(dump[0]?.workerSpawned).toBe(false);
+    expect(dump[0]?.lane).toBe('flash');
   });
 
   it('classifies a dump without persisting when the chat hook is used', () => {

@@ -127,7 +127,9 @@ function isSafeAttribute(name: string, value: string | null): boolean {
     .trim()
     .toLowerCase()
     .replaceAll(/&#(?:(\d+)|x([0-9a-f]+));/gi, (_, dec, hex) =>
-      String.fromCharCode(hex ? parseInt(hex, 16) : parseInt(dec, 10))
+      String.fromCharCode(
+        hex ? Number.parseInt(hex, 16) : Number.parseInt(dec, 10)
+      )
     );
   return (
     !normalizedValue.startsWith('javascript:') &&

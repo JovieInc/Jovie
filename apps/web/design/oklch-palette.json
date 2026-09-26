@@ -14,28 +14,28 @@
   "elevation": {
     "tokens": ["surface-0", "surface-1", "surface-2", "surface-3"],
     "dark": { "order": "recessed-to-raised", "lightness": "monotonic-increasing" },
-    "light": { "order": "raised-to-recessed", "lightness": "monotonic-decreasing" }
+    "light": { "order": "recessed-to-raised", "lightness": "monotonic-non-decreasing" }
   },
   "swatches": {
     "canvas": {
-      "light": { "oklch": "oklch(98.44% 0.0045 258.32)", "hex": "#F8FAFD" },
-      "dark": { "oklch": "oklch(10.69% 0.0107 266.51)", "hex": "#030407" }
+      "light": { "oklch": "oklch(96.70% 0.0029 264.54)", "hex": "#F3F4F6" },
+      "dark": { "oklch": "oklch(10.61% 0.0079 260.13)", "hex": "#030406" }
     },
     "surface-0": {
-      "light": { "oklch": "oklch(96.95% 0.0045 258.32)", "hex": "#F3F5F8" },
-      "dark": { "oklch": "oklch(13.43% 0.0122 264.69)", "hex": "#06080D" }
+      "light": { "oklch": "oklch(98.49% 0.0029 264.54)", "hex": "#F9FAFC" },
+      "dark": { "oklch": "oklch(13.40% 0.0051 262.32)", "hex": "#07080A" }
     },
     "surface-1": {
-      "light": { "oklch": "oklch(94.50% 0.0063 255.48)", "hex": "#EAEDF1" },
-      "dark": { "oklch": "oklch(19.24% 0.0257 266.62)", "hex": "#0F1420" }
+      "light": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" },
+      "dark": { "oklch": "oklch(19.15% 0.0062 271.08)", "hex": "#131417" }
     },
     "surface-2": {
-      "light": { "oklch": "oklch(91.42% 0.0081 253.86)", "hex": "#DFE3E8" },
-      "dark": { "oklch": "oklch(22.38% 0.0308 267.18)", "hex": "#151B2A" }
+      "light": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" },
+      "dark": { "oklch": "oklch(22.23% 0.0060 271.14)", "hex": "#1A1B1E" }
     },
     "surface-3": {
-      "light": { "oklch": "oklch(88.35% 0.0110 256.70)", "hex": "#D4D9E0" },
-      "dark": { "oklch": "oklch(26.08% 0.0364 263.63)", "hex": "#1B2436" }
+      "light": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" },
+      "dark": { "oklch": "oklch(26.05% 0.0058 271.19)", "hex": "#232427" }
     },
     "text-primary": {
       "light": { "oklch": "oklch(15.43% 0 0)", "hex": "#0C0C0C" },
