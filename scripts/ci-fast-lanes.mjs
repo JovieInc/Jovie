@@ -1156,7 +1156,7 @@ function runTypecheck() {
       };
     }
   }
-  return shell('pnpm turbo typecheck --affected --force');
+  return shellAsync('pnpm turbo typecheck --affected --force');
 }
 
 function runWebTestsTypecheck() {
@@ -1193,7 +1193,10 @@ function runWebTestsTypecheck() {
       };
     }
   }
-  return shell(WEB_TESTS_TYPECHECK_COMMAND);
+  // Own lock so it overlaps app tsc instead of queueing behind it.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
 }
 
 function runScriptsTypecheck() {
@@ -1979,10 +1982,20 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
+    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    const started = new Map();
+    for (const lane of selectedLanes.filter(l =>
+      LANE_GROUPS.typecheck.includes(l.id)
+    )) {
+      const run = Promise.resolve().then(() => lane.run());
+      run.catch(() => {});
+      started.set(lane.id, [Date.now(), run]);
+    }
+
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
-      const laneStartedAt = Date.now();
+      const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
@@ -2001,7 +2014,7 @@ async function main() {
 
       let outcome;
       try {
-        outcome = await lane.run();
+        outcome = await (run ?? lane.run());
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);
