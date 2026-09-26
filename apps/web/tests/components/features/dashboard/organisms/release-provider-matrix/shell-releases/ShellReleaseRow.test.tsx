@@ -1,9 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
+const fetchMock = vi.fn();
+global.fetch = fetchMock;
 let playbackState: {
   activeTrackId: string | null;
   isPlaying: boolean;
@@ -16,6 +19,8 @@ let playbackState: {
 
 beforeEach(() => {
   toggleTrack.mockClear();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
   playbackState = {
     activeTrackId: null,
     isPlaying: false,
@@ -492,5 +497,60 @@ describe('ShellReleaseRow weekly streams metric', () => {
       '[data-testid="shell-release-weekly-streams"]'
     );
     expect(cell?.className).toContain('w-20');
+  });
+
+  it('prefetches the release track list on row intent without selecting', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <ShellReleaseRow
+          release={fakeRelease({
+            id: 'r1',
+            title: 'Lost in the Light',
+            previewUrl: null,
+            totalTracks: 3,
+          })}
+          isSelected={false}
+          onSelect={onSelect}
+        />
+      </QueryClientProvider>
+    );
+
+    const row = container.querySelector('[data-shell-release-row]');
+    expect(row).not.toBeNull();
+
+    await user.hover(row as Element);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/dashboard/releases/r1/tracks',
+        expect.any(Object)
+      )
+    );
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not prefetch without a query client provider', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: null,
+          totalTracks: 3,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    const row = container.querySelector('[data-shell-release-row]');
+    await user.hover(row as Element);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

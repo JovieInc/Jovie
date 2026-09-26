@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -103,5 +103,50 @@ describe('useReleaseEntityQuery', () => {
     // treats seeded data as stale from t=0.
     expect(result.current.dataUpdatedAt).toBe(matrixState?.dataUpdatedAt);
     expect(result.current.isStale).toBe(false);
+  });
+
+  it('converges detail data when a targeted mutation updates the matrix row', async () => {
+    const cachedRelease = makeRelease();
+    const matrixKey = queryKeys.releases.matrix('profile-1');
+    queryClient.setQueryData(matrixKey, [cachedRelease]);
+
+    const { result } = renderHook(
+      () => useReleaseEntityQuery('profile-1', 'release-1'),
+      { wrapper: TestWrapper }
+    );
+
+    expect(result.current.data?.title).toBe('Lost In The Light');
+
+    // Mirrors the targeted setQueryData in useReleaseMutations: only the
+    // affected record is replaced, no unrelated queries are invalidated.
+    const updated = {
+      ...cachedRelease,
+      title: 'New Title',
+      artworkUrl: 'https://x.invalid/new.jpg',
+    };
+    act(() => {
+      queryClient.setQueryData<ReleaseViewModel[]>(matrixKey, [updated]);
+    });
+
+    await waitFor(() => expect(result.current.data?.title).toBe('New Title'));
+    expect(result.current.data?.artworkUrl).toBe('https://x.invalid/new.jpg');
+    // No detail refetch is needed — convergence comes from the matrix write.
+    expect(mockLoadReleaseEntity).not.toHaveBeenCalled();
+  });
+
+  it('still returns detail data for releases absent from the matrix', async () => {
+    const other = makeRelease('release-other');
+    queryClient.setQueryData(queryKeys.releases.matrix('profile-1'), [other]);
+
+    const detailRelease = makeRelease('release-1');
+    mockLoadReleaseEntity.mockResolvedValueOnce(detailRelease);
+
+    const { result } = renderHook(
+      () => useReleaseEntityQuery('profile-1', 'release-1'),
+      { wrapper: TestWrapper }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.id).toBe('release-1');
   });
 });
