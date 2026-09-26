@@ -52,23 +52,24 @@ const nextConfig = {
   // Never ship source maps to browsers (Sentry plugin uploads them separately)
   productionBrowserSourceMaps: false,
   output: isVercelPreview ? undefined : 'standalone',
-  // Monorepo root for output file tracing in every build. Preview/staging
-  // builds (which production promotes) used to leave this unset, so the
-  // monorepo-relative ('../../') tracing includes below escaped the trace
-  // root and Vercel failed at "Extracting deployment files" (prod frozen
-  // 2026-09-21..26).
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
+  outputFileTracingRoot: isVercelPreview
+    ? undefined
+    : path.join(__dirname, '../../'),
   // These request-time readers build data paths dynamically, so NFT cannot
   // reliably infer their files from the compiled route bundles. Keep this
   // list limited to the data they actually read; the broad directory entries
   // are small content and chat-topic catalogs.
+  // Monorepo files are staged into apps/web/runtime-data by
+  // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
+  // project root), which breaks deployment extraction.
   outputFileTracingIncludes: {
     '/*': [
-      '../../CHANGELOG.md',
-      '../../docs/FEATURE_REGISTRY.md',
-      '../../scripts/symphony/symphony-codex-account-control.py',
-      '../../apps/eve-pilot/identities/jovie/instructions.md',
-      '../../apps/eve-pilot/identities/summer/instructions.md',
+      'runtime-data/CHANGELOG.md',
+      'runtime-data/docs/FEATURE_REGISTRY.md',
+      'runtime-data/scripts/symphony/symphony-codex-account-control.py',
+      'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
+      'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
       'lib/chat/knowledge/topics/**/*',

@@ -147,24 +147,19 @@ function turbopackGlobSource(exclude: string): string {
 
 describe('Vercel function config', () => {
   it.each(['', 'preview', 'production'])(
-    'keeps every tracing include inside the trace root (VERCEL_ENV=%s)',
+    'never traces files outside apps/web (VERCEL_ENV=%s)',
     vercelEnv => {
-      // Preview/staging builds (promoted to production) once left the root
-      // unset, so '../../' includes escaped it and Vercel failed at
-      // "Extracting deployment files" (prod frozen 2026-09-21..26).
+      // Vercel's project root is apps/web. Traced '../../' files broke
+      // deployment extraction and froze prod 2026-09-21..26; monorepo files
+      // are staged into runtime-data/ by scripts/stage-runtime-data.mjs.
       const nextConfig = loadNextConfigForTracingTest(vercelEnv);
-      const traceRoot = nextConfig.outputFileTracingRoot;
-      expect(traceRoot).toBeTruthy();
       const appDirectory = resolve(repoRoot, 'apps/web');
       for (const globs of Object.values(
         nextConfig.outputFileTracingIncludes ?? {}
       )) {
         for (const glob of globs) {
-          const fromRoot = relative(
-            resolve(traceRoot as string),
-            resolve(appDirectory, glob)
-          );
-          expect(fromRoot.startsWith('..'), glob).toBe(false);
+          const fromApp = relative(appDirectory, resolve(appDirectory, glob));
+          expect(fromApp.startsWith('..'), glob).toBe(false);
         }
       }
     }
@@ -310,11 +305,11 @@ describe('Vercel function config', () => {
 
     expect(includes).toEqual(
       expect.arrayContaining([
-        '../../CHANGELOG.md',
-        '../../docs/FEATURE_REGISTRY.md',
-        '../../scripts/symphony/symphony-codex-account-control.py',
-        '../../apps/eve-pilot/identities/jovie/instructions.md',
-        '../../apps/eve-pilot/identities/summer/instructions.md',
+        'runtime-data/CHANGELOG.md',
+        'runtime-data/docs/FEATURE_REGISTRY.md',
+        'runtime-data/scripts/symphony/symphony-codex-account-control.py',
+        'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
+        'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
         'tests/quarantine.json',
         'content/**/*',
         'lib/chat/knowledge/topics/**/*',
@@ -340,7 +335,9 @@ describe('Vercel function config', () => {
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
   });
 
-  it('excludes non-runtime repo files from traces without dropping runtime reads', () => {
+  it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {
+    // The build stages monorepo runtime files into runtime-data/ first.
+    await import('../../../scripts/stage-runtime-data.mjs');
     const nextConfig = loadNextConfigForTracingTest();
     const excludesByRoute = nextConfig.outputFileTracingExcludes ?? {};
     // '**' is the only route glob that also matches the root route '/'.
@@ -377,8 +374,8 @@ describe('Vercel function config', () => {
       .map(file => relative(repoRoot, resolve(appWebRoot, file)));
     expect(includedRuntimeFiles).toEqual(
       expect.arrayContaining([
-        'CHANGELOG.md',
-        'docs/FEATURE_REGISTRY.md',
+        'apps/web/runtime-data/CHANGELOG.md',
+        'apps/web/runtime-data/docs/FEATURE_REGISTRY.md',
         'apps/web/tests/quarantine.json',
         'apps/web/screenshot-catalog/current/manifest.json',
       ])
