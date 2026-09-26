@@ -27,7 +27,7 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
 }));
 
 const { ReleaseCell } = await import(
-  '@/features/dashboard/organisms/releases/cells/ReleaseCell'
+  '@/components/features/dashboard/organisms/releases/cells/ReleaseCell'
 );
 
 const baseRelease: ReleaseViewModel = {

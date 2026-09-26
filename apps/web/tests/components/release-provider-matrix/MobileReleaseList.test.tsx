@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { MobileReleaseList } from '@/features/dashboard/organisms/release-provider-matrix/MobileReleaseList';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { queryKeys } from '@/lib/queries';
 
 const mobileReleaseListSourcePath =
   'components/features/dashboard/organisms/release-provider-matrix/MobileReleaseList.tsx';
@@ -129,6 +131,45 @@ describe('MobileReleaseList', () => {
     await user.click(row);
 
     expect(onEdit).toHaveBeenCalledWith(release);
+  });
+
+  it('prefetches release detail data on row focus intent', () => {
+    const queryClient = new QueryClient();
+    const prefetchSpy = vi
+      .spyOn(queryClient, 'prefetchQuery')
+      .mockResolvedValue(undefined);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MobileReleaseList
+          releases={[createRelease()]}
+          artistName='Jovie Artist'
+          onEdit={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.focus(screen.getByTestId('mobile-release-row-release-1'));
+
+    expect(prefetchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.releases.tracks('release-1'),
+      })
+    );
+  });
+
+  it('does not prefetch without a query client context', () => {
+    render(
+      <MobileReleaseList
+        releases={[createRelease()]}
+        artistName='Jovie Artist'
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(() =>
+      fireEvent.focus(screen.getByTestId('mobile-release-row-release-1'))
+    ).not.toThrow();
   });
 
   it('uses the shell release typography tokens for mobile scanning', () => {

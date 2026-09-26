@@ -1,10 +1,31 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TrackSidebar,
   type TrackSidebarData,
 } from '@/components/organisms/release-sidebar/TrackSidebar';
+
+const audioPlayer = vi.hoisted(() => ({
+  toggleTrack: vi.fn().mockResolvedValue(undefined),
+  seek: vi.fn(),
+  onError: vi.fn(() => () => {}),
+  playbackState: {
+    activeTrackId: null as string | null,
+    isPlaying: false,
+    playbackStatus: 'idle' as const,
+    currentTime: 0,
+    duration: 0,
+  },
+}));
+
+vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
+  useTrackAudioPlayer: () => audioPlayer,
+}));
+
+beforeEach(() => {
+  audioPlayer.toggleTrack.mockClear();
+});
 
 function buildTrack(
   overrides: Partial<TrackSidebarData> = {}
@@ -150,6 +171,31 @@ describe('TrackSidebar', () => {
     expect(
       screen.getByRole('img', { name: 'Midnight Echo (EP) artwork' })
     ).toHaveAttribute('width', '44');
+  });
+
+  it('passes the owning release id when toggling preview playback', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TrackSidebar
+        track={buildTrack({
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        })}
+        isOpen={true}
+        onClose={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+    await user.click(screen.getByRole('button', { name: 'Play preview' }));
+
+    expect(audioPlayer.toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'track-1',
+        releaseId: 'release-1',
+        audioUrl: 'https://cdn.example.com/preview.mp3',
+      })
+    );
   });
 
   it('treats missing preview verification as not checked and keeps unknown-confidence links out of canonical DSPs', async () => {

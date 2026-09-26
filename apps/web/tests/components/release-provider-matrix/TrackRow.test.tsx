@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TrackRow } from '@/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
+import { TrackRow } from '@/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
@@ -105,7 +105,19 @@ function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
 
 describe('TrackRow', () => {
   it('marks selected rows with the selected state contract', () => {
-    renderTrackRow({ isSelected: true });
+    render(
+      <table>
+        <tbody>
+          <TrackRow
+            track={createTrack()}
+            providerConfig={providerConfig}
+            allProviders={['spotify', 'apple_music']}
+            columnCount={11}
+            isSelected={true}
+          />
+        </tbody>
+      </table>
+    );
 
     const row = screen.getByTestId('track-row-track-1');
     expect(row).toHaveAttribute('data-state', 'selected');
