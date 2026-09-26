@@ -6,7 +6,7 @@ const tsc = 'jovie-web-tsbuildinfo-v2-Linux-a-h20260926';
 const nm = 'pnpm-node-modules-v2-Linux-';
 const rows = [
   'Linux-next-build-web-v1-a1-20260925',
-  'Linux-next-build-web-v1-b2-20260926',
+  'Linux-next-build-web-v1-b2-2026092614', // hourly supersedes daily
   `${tsc}13`,
   `${tsc}14`,
   `${tsc}15`,
