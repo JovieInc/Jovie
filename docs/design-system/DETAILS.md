@@ -341,7 +341,7 @@ prior anchors without a second theme provider).
 | Role | Anchor | Product token(s) | Usage |
 |------|--------|------------------|-------|
 | Canvas | `#030406` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
-| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
 | Card | `#131417` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
 | Elevated | `#1A1B1E` | `--color-bg-surface-2` | Inputs, raised |
 | Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
@@ -765,7 +765,7 @@ keep them at semibold (~590) and do not drop medium surfaces to book/400.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 244px | 244px |
-| Background RGB | `247 248 248` | `6 8 13` |
+| Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |

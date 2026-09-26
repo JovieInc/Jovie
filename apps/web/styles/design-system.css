@@ -1517,8 +1517,8 @@ html[data-profile-initial-mode]
     0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
   --app-shell-drawer-shadow:
     0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
-  --app-shell-sidebar-background: rgb(6 8 13);
-  --app-shell-sidebar-background-rgb: 6 8 13;
+  --app-shell-sidebar-background: rgb(7 8 10);
+  --app-shell-sidebar-background-rgb: 7 8 10;
   --app-shell-sidebar-foreground-rgb: 245 247 251;
   --app-shell-sidebar-border-rgb: 168 176 195 / 0.1;
   --app-shell-sidebar-accent-rgb: 168 176 195 / 0.06;

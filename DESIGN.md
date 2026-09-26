@@ -148,7 +148,7 @@ Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these n
 
 | Surface | Dark value |
 |---|---|
-| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
 
 ## Spacing
 
@@ -218,7 +218,7 @@ keeps its composition. Homepage `t1x8T` remains locked.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 280px | 280px |
-| Background RGB | `247 248 248` | `6 8 13` |
+| Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
