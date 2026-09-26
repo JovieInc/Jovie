@@ -64,33 +64,20 @@ function ship(
 }
 
 describe('composeCompanyActivity', () => {
-  it('projects a runtime-hot Linear row with its latest state delta', () => {
+  it('projects a runtime-hot Linear row', () => {
     const result = composeCompanyActivity({
-      operationalTasks: feed({
-        tasks: [task()],
-        deltas: [
-          {
-            taskId: 'linear:JOV-5000',
-            kind: 'updated',
-            fromState: 'queued',
-            toState: 'running',
-            sequence: 7,
-          },
-        ],
-      }),
+      operationalTasks: feed({ tasks: [task()] }),
       pullRequests: EMPTY_PRS,
     });
 
-    expect(result.sources.linear).toBe('ok');
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]).toMatchObject({
       id: 'linear:JOV-5000',
       linearIdentifier: 'JOV-5000',
-      linearUrl: 'https://linear.app/jovie/issue/JOV-5000/example',
       state: 'in-progress',
       actor: 'Symphony',
-      detail: 'Queued → In Progress',
       receipted: false,
+      href: 'https://linear.app/jovie/issue/JOV-5000/example',
     });
   });
 
@@ -106,7 +93,6 @@ describe('composeCompanyActivity', () => {
       }),
       pullRequests: EMPTY_PRS,
       receiptedShips: [ship()],
-      receiptsAvailable: true,
     });
 
     expect(result.rows).toHaveLength(1);
@@ -114,7 +100,6 @@ describe('composeCompanyActivity', () => {
       state: 'deployed',
       receipted: true,
     });
-    expect(result.sources.receipts).toBe('ok');
   });
 
   it('emits a standalone deployed row for a receipt with no matching work row', () => {
@@ -122,7 +107,6 @@ describe('composeCompanyActivity', () => {
       operationalTasks: feed(),
       pullRequests: EMPTY_PRS,
       receiptedShips: [ship()],
-      receiptsAvailable: true,
     });
 
     expect(result.rows).toHaveLength(1);
@@ -164,57 +148,8 @@ describe('composeCompanyActivity', () => {
       state: 'merge-queued',
       actor: 'devin-ai-integration',
       prNumber: 17156,
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/17156',
+      detail: 'Position 2',
       href: 'https://github.com/JovieInc/Jovie/pull/17156',
-    });
-  });
-
-  it('projects curated digest rows as public with changelog provenance only', () => {
-    const result = composeCompanyActivity({
-      operationalTasks: feed(),
-      pullRequests: EMPTY_PRS,
-      publicDigest: {
-        availability: 'available',
-        items: [
-          {
-            title: 'Faster profile pages',
-            slug: 'faster-profile-pages-v1-2-0-0',
-            date: '2026-09-25',
-            technicalVersion: '1.2.0',
-          },
-        ],
-      },
-    });
-
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]).toMatchObject({
-      state: 'public',
-      actor: "What's New",
-      detail: 'v1.2.0',
-      href: '/changelog#faster-profile-pages-v1-2-0-0',
-      prUrl: null,
-    });
-    expect(result.sources.digest).toBe('ok');
-  });
-
-  it('reports unavailable sources instead of inventing rows', () => {
-    const result = composeCompanyActivity({
-      operationalTasks: null,
-      pullRequests: {
-        ...EMPTY_PRS,
-        availability: 'error',
-        errorMessage: 'GitHub API error (502)',
-      },
-      receiptsAvailable: false,
-      publicDigest: null,
-    });
-
-    expect(result.rows).toEqual([]);
-    expect(result.sources).toEqual({
-      linear: 'unavailable',
-      github: 'unavailable',
-      receipts: 'unavailable',
-      digest: 'unavailable',
     });
   });
 

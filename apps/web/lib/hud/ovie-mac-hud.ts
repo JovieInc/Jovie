@@ -89,20 +89,7 @@ export type OvieMacHudReceiptedShip = {
   receiptAt: string;
 };
 
-export type OvieMacHudPublicDigestItem = {
-  title: string;
-  slug: string;
-  date: string;
-  technicalVersion: string;
-};
-
-export type OvieMacHudPublicDigest = {
-  availability: 'available' | 'unavailable';
-  items: readonly OvieMacHudPublicDigestItem[];
-};
-
 export const OVIE_MAC_HUD_RECEIPTED_SHIP_LIMIT = 10;
-export const OVIE_MAC_HUD_PUBLIC_DIGEST_LIMIT = 3;
 
 export type OvieMacHudSnapshot = {
   alive: OvieMacHudAliveMetric;
@@ -110,7 +97,6 @@ export type OvieMacHudSnapshot = {
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
   receiptedShips: readonly OvieMacHudReceiptedShip[];
-  publicDigest: OvieMacHudPublicDigest;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -610,7 +596,6 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
-  publicDigest?: OvieMacHudPublicDigest;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
@@ -630,10 +615,6 @@ export function composeOvieMacHudSnapshot(input: {
       input.shippingAvailable === false
         ? []
         : recentReceiptedShips(input.shippingEntries),
-    publicDigest: input.publicDigest ?? {
-      availability: 'unavailable',
-      items: [],
-    },
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };

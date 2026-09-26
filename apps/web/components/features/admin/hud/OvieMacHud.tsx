@@ -239,8 +239,6 @@ export function OvieMacHud({
         <CompanyActivityFeed
           pullRequests={inFlightPullRequests}
           receiptedShips={snapshot.receiptedShips}
-          receiptsAvailable={shipping.available}
-          publicDigest={snapshot.publicDigest}
         />
         <DesignProposalReviewPanel />
       </main>

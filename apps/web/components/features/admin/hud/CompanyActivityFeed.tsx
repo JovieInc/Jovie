@@ -9,45 +9,18 @@ import {
   COMPANY_ACTIVITY_STATE_LABELS,
   type CompanyActivityFeedData,
   type CompanyActivityRow,
-  type CompanyActivitySourceId,
-  type CompanyActivitySourceStatus,
   type CompanyActivityState,
   composeCompanyActivity,
 } from '@/lib/hud/company-activity';
 import type {
   OvieMacHudInFlightPullRequests,
-  OvieMacHudPublicDigest,
   OvieMacHudReceiptedShip,
 } from '@/lib/hud/ovie-mac-hud';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
-const SOURCE_LABELS: Record<CompanyActivitySourceId, string> = {
-  linear: 'Linear',
-  github: 'GitHub',
-  receipts: 'Receipts',
-  digest: "What's New",
-};
+type Tone = 'good' | 'warning' | 'bad' | 'neutral';
 
-const SOURCE_STATUS_LABELS: Record<CompanyActivitySourceStatus, string> = {
-  ok: 'Live',
-  empty: 'Empty',
-  stale: 'Stale',
-  unavailable: 'Unavailable',
-};
-
-const SOURCE_STATUS_TONES: Record<
-  CompanyActivitySourceStatus,
-  'good' | 'warning' | 'bad' | 'neutral'
-> = {
-  ok: 'good',
-  empty: 'neutral',
-  stale: 'warning',
-  unavailable: 'bad',
-};
-
-function stateTone(
-  state: CompanyActivityState
-): 'good' | 'warning' | 'bad' | 'neutral' {
+function stateTone(state: CompanyActivityState): Tone {
   if (state === 'blocked' || state === 'failed') return 'bad';
   if (state === 'merged' || state === 'deployed' || state === 'public') {
     return 'good';
@@ -57,13 +30,10 @@ function stateTone(
 }
 
 function formatRelativeTime(iso: string | null): string {
-  if (!iso) return 'time unknown';
-  const time = Date.parse(iso);
+  const time = iso ? Date.parse(iso) : Number.NaN;
   if (!Number.isFinite(time)) return 'time unknown';
-  const diffSeconds = Math.floor((Date.now() - time) / 1000);
-  if (diffSeconds < 0) return 'just now';
-  if (diffSeconds < 60) return 'just now';
-  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffMinutes = Math.floor((Date.now() - time) / 60_000);
+  if (diffMinutes < 1) return 'just now';
   if (diffMinutes < 60) return `${diffMinutes}m ago`;
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
@@ -76,12 +46,10 @@ function formatRelativeTime(iso: string | null): string {
   });
 }
 
-function ActivityRow({ row }: Readonly<{ readonly row: CompanyActivityRow }>) {
-  const meta = [
-    row.actor,
-    row.detail,
-    formatRelativeTime(row.occurredAt),
-  ].filter(Boolean);
+function ActivityRow({ row }: { readonly row: CompanyActivityRow }) {
+  const meta = [row.actor, row.detail, formatRelativeTime(row.occurredAt)]
+    .filter(Boolean)
+    .join(' · ');
 
   const body = (
     <>
@@ -100,8 +68,8 @@ function ActivityRow({ row }: Readonly<{ readonly row: CompanyActivityRow }>) {
         />
       </div>
       <p className='mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 text-2xs text-tertiary-token'>
-        <span className='truncate'>{meta.join(' · ')}</span>
-        {row.prUrl ? (
+        <span className='truncate'>{meta}</span>
+        {row.prNumber != null ? (
           <span className='font-medium text-secondary-token'>
             PR #{row.prNumber}
           </span>
@@ -120,7 +88,7 @@ function ActivityRow({ row }: Readonly<{ readonly row: CompanyActivityRow }>) {
     'block rounded-lg px-2 py-2 text-left outline-none transition-colors duration-subtle hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset';
 
   return (
-    <li key={row.id}>
+    <li>
       {row.href ? (
         <a
           className={className}
@@ -139,29 +107,18 @@ function ActivityRow({ row }: Readonly<{ readonly row: CompanyActivityRow }>) {
 
 export function CompanyActivityFeedView({
   feed,
-}: Readonly<{ readonly feed: CompanyActivityFeedData }>) {
-  const sourceEntries = (
-    Object.keys(SOURCE_LABELS) as readonly CompanyActivitySourceId[]
-  ).map(id => ({ id, status: feed.sources[id] }));
-
+}: {
+  readonly feed: CompanyActivityFeedData;
+}) {
   return (
     <ContentSurfaceCard
       className='flex flex-col'
       data-testid='ovie-mac-hud-activity-feed'
     >
-      <div className='flex min-h-6 flex-wrap items-center justify-between gap-2 p-3 pb-0'>
+      <div className='flex min-h-6 items-center p-3 pb-0'>
         <p className='truncate text-2xs font-semibold tracking-normal text-tertiary-token'>
           Company Activity
         </p>
-        <div className='flex shrink-0 items-center gap-1.5'>
-          {sourceEntries.map(({ id, status }) => (
-            <HudStatusPill
-              key={id}
-              label={`${SOURCE_LABELS[id]} ${SOURCE_STATUS_LABELS[status]}`}
-              tone={SOURCE_STATUS_TONES[status]}
-            />
-          ))}
-        </div>
       </div>
 
       <div className='mt-3 px-3 pb-3'>
@@ -192,13 +149,9 @@ export function CompanyActivityFeedView({
 export function CompanyActivityFeed({
   pullRequests,
   receiptedShips,
-  receiptsAvailable,
-  publicDigest,
 }: Readonly<{
   readonly pullRequests: OvieMacHudInFlightPullRequests;
   readonly receiptedShips: readonly OvieMacHudReceiptedShip[];
-  readonly receiptsAvailable: boolean;
-  readonly publicDigest: OvieMacHudPublicDigest | null;
 }>) {
   const { operationalTasks } = useHudShippingStateQuery(null);
   const feed = useMemo(
@@ -207,16 +160,8 @@ export function CompanyActivityFeed({
         operationalTasks,
         pullRequests,
         receiptedShips,
-        receiptsAvailable,
-        publicDigest,
       }),
-    [
-      operationalTasks,
-      pullRequests,
-      receiptedShips,
-      receiptsAvailable,
-      publicDigest,
-    ]
+    [operationalTasks, pullRequests, receiptedShips]
   );
   return <CompanyActivityFeedView feed={feed} />;
 }
