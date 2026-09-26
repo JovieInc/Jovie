@@ -2,6 +2,7 @@
 # accountable-writer: Devin
 # necessary-trust-boundary: The Upstash management credential cannot be handed to the app runtime or the in-app cron; only a hosted observer can read provider quota stats and route the breach alert without receiving any mutation capability.
 # removal-trigger: Remove or reduce this hop when the human-gated capacity remedy lands and provider-native spend/quota alerting proves delivery to the owner for 30 consecutive days.
+# clock-class: temporal-resource
 # Upstash Quota Headroom Monitor (JOV-5022)
 #
 # PURPOSE: The production Upstash Redis instance (Jovie-1, free tier,
