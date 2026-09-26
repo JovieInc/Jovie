@@ -113,7 +113,7 @@ runs:
 
     # Both packages pick binaries by process.platform, so a Linux tree never
     # loads these darwin/win32 copies: ~340 MB raw, ~125 MB of the archive.
-    - name: Drop non-Linux binaries before save
+    - name: Drop unloadable binaries before save
       if: >-
         runner.os == 'Linux' &&
         steps.node-modules-cache.outcome == 'success' &&
@@ -126,6 +126,11 @@ runs:
         cd node_modules/.pnpm
         rm -rf onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v*/{darwin,win32} \
           app-builder-bin@*/node_modules/app-builder-bin/{mac,win}
+        # pnpm 9 installs musl builds too (lockfile has no libc). Glibc loaders
+        # never pick them: ~630 MB raw. Keep package.json so a frozen install
+        # still treats them as linked instead of refetching them on every hit.
+        find . -maxdepth 1 \( -name '*-musl@*' -o -name '*linuxmusl-*@*' \) \
+          -exec find {}/node_modules -type f ! -name package.json -delete \;
 
     # Save right after install, before any job step can write build or test
     # output under node_modules. Only same-repository push and pull_request

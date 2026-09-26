@@ -171,9 +171,9 @@ describe('self-hosted runner setup action', () => {
       );
     });
 
-    it('drops only foreign-OS binaries, on Linux, just before a save', () => {
-      const name = '- name: Drop non-Linux binaries before save';
-      const prune = stepBlock('Drop non-Linux binaries before save');
+    it('drops only unloadable binaries, on Linux, just before a save', () => {
+      const name = '- name: Drop unloadable binaries before save';
+      const prune = stepBlock('Drop unloadable binaries before save');
       expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
         action.indexOf(name)
       );
@@ -187,6 +187,12 @@ describe('self-hosted runner setup action', () => {
       expect(prune.match(/rm -rf.*\n.*/)?.[0]).toBe(
         'rm -rf onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v*/{darwin,win32} \\\n' +
           '          app-builder-bin@*/node_modules/app-builder-bin/{mac,win}'
+      );
+      // Hollow musl builds but keep package.json, so a restored tree stays
+      // "Already up to date" instead of refetching them on every hit.
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
+          '          -exec find {}/node_modules -type f ! -name package.json -delete \\;'
       );
     });
   });
