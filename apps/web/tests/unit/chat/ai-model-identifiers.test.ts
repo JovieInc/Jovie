@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALBUM_ART_GATEWAY_IMAGE_MODEL,
   CHAT_MODEL,
   CHAT_MODEL_ROTATION_CHAIN,
   TITLE_MODEL,
@@ -23,6 +24,7 @@ describe('AI Gateway model identifiers', () => {
   it.each([
     ['CHAT_MODEL', CHAT_MODEL],
     ['TITLE_MODEL', TITLE_MODEL],
+    ['ALBUM_ART_GATEWAY_IMAGE_MODEL', ALBUM_ART_GATEWAY_IMAGE_MODEL],
   ])('%s uses provider/model format (forward slash)', (_name, identifier) => {
     expect(identifier).toMatch(GATEWAY_ID_PATTERN);
   });
@@ -30,6 +32,7 @@ describe('AI Gateway model identifiers', () => {
   it.each([
     ['CHAT_MODEL', CHAT_MODEL],
     ['TITLE_MODEL', TITLE_MODEL],
+    ['ALBUM_ART_GATEWAY_IMAGE_MODEL', ALBUM_ART_GATEWAY_IMAGE_MODEL],
   ])('%s does not use colon separator', (_name, identifier) => {
     expect(identifier).not.toContain(':');
   });
@@ -40,6 +43,11 @@ describe('AI Gateway model identifiers', () => {
 
   it('TITLE_MODEL specifies the google provider', () => {
     expect(TITLE_MODEL.split('/')[0]).toBe('google');
+  });
+
+  it('album art uses the cheap spacexai image model', () => {
+    expect(ALBUM_ART_GATEWAY_IMAGE_MODEL).toBe('spacexai/grok-imagine-image');
+    expect(ALBUM_ART_GATEWAY_IMAGE_MODEL.split('/')[0]).toBe('spacexai');
   });
 
   it('every CHAT_MODEL_ROTATION_CHAIN entry uses provider/model format', () => {

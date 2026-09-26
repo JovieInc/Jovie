@@ -1,6 +1,11 @@
 import AVFoundation
 import SwiftUI
 
+/// Shared background fill for teleprompter control chrome (capsules and
+/// rounded-rect buttons). Named to replace seven identical
+/// `Color.black.opacity(0.58)` literals with one source of truth.
+private let teleprompterControlScrim = Color.black.opacity(0.58)
+
 /// Camera preview bridge for the teleprompter overlay. The preview layer is
 /// owned by the controller's session; the view only re-points it.
 private struct TeleprompterCameraPreview: UIViewRepresentable {
@@ -362,7 +367,7 @@ struct TeleprompterOverlayView: View {
         contentModeButton(.prompt, title: "Prompt")
       }
       .padding(3)
-      .background(Color.black.opacity(0.58), in: Capsule())
+      .background(teleprompterControlScrim, in: Capsule())
       .accessibilityElement(children: .contain)
 
       overlayVisibilityButton
@@ -385,7 +390,7 @@ struct TeleprompterOverlayView: View {
         contentModeButton(.prompt, title: "Prompt")
       }
       .padding(3)
-      .background(Color.black.opacity(0.58), in: Capsule())
+      .background(teleprompterControlScrim, in: Capsule())
       .accessibilityElement(children: .contain)
     }
   }
@@ -396,7 +401,7 @@ struct TeleprompterOverlayView: View {
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(JovieColor.textPrimary)
         .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel("Close capture")
@@ -415,7 +420,7 @@ struct TeleprompterOverlayView: View {
     .foregroundStyle(JovieColor.textPrimary)
     .padding(.horizontal, JovieSpacing.medium)
     .frame(minHeight: 44)
-    .background(Color.black.opacity(0.58), in: Capsule())
+    .background(teleprompterControlScrim, in: Capsule())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
       viewModel.isRecording
@@ -459,7 +464,7 @@ struct TeleprompterOverlayView: View {
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(JovieColor.accent)
         .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel(
@@ -481,7 +486,7 @@ struct TeleprompterOverlayView: View {
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(viewModel.framingGrid == .thirds ? JovieColor.accent : JovieColor.textPrimary)
         .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel(viewModel.framingGrid == .thirds ? "Hide framing grid" : "Show framing grid")
@@ -511,7 +516,7 @@ struct TeleprompterOverlayView: View {
       promptFeedbackButton(.notUseful, systemImage: "hand.thumbsdown.fill", label: "Not useful prompt")
     }
     .padding(4)
-    .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityElement(children: .contain)
   }
 

@@ -131,6 +131,42 @@ describe('EmailCodeAuthForm', () => {
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
+  it('reads a send error code from the message prefix when code is absent', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'rate_limit_exceeded: slow down' },
+    });
+    renderForm();
+    await submitEmail();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/too many requests\. please wait a moment/i)
+      ).toBeTruthy()
+    );
+    expect(
+      document.querySelector('[data-auth-email-code-step="code"]')
+    ).toBeNull();
+  });
+
+  it('locks verify when the message prefix is too many attempts and code is absent', async () => {
+    renderForm();
+    await reachCodeStep();
+
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'TOO_MANY_ATTEMPTS: locked out' },
+    });
+    await submitCode('111111');
+
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="locked"]')
+      ).toBeTruthy()
+    );
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
   it('navigates to the redirect URL when verify succeeds', async () => {
     renderForm();
     await reachCodeStep();

@@ -23,7 +23,7 @@ export function writeTaskDescriptionContent(
   content: RichTextDocument
 ): Record<string, unknown> {
   return {
-    ...(metadata ?? {}),
+    ...metadata,
     [TASK_DESCRIPTION_RICH_TEXT_KEY]: richTextDocumentSchema.parse(content),
   };
 }

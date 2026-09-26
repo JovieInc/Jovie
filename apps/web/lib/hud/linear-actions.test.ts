@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const { env } = vi.hoisted(() => ({
+  env: { LINEAR_API_KEY: undefined as string | undefined },
+}));
+
 // Mock server-only so the module can be tested in vitest (node env)
 vi.mock('server-only', () => ({}));
 
 // Mock the env module before importing the module under test
-vi.mock('@/lib/env-server', () => ({
-  env: {
-    LINEAR_API_KEY: undefined,
-  },
-}));
+vi.mock('@/lib/env-server', () => ({ env }));
 
 // Mock the logger
 vi.mock('@/lib/utils/logger', () => ({
@@ -30,6 +30,64 @@ describe('fetchTimActionIssues', () => {
     expect(result.observation).toBe('not_configured');
     expect(result.issues).toEqual([]);
     expect(typeof result.fetchedAt).toBe('string');
+  });
+
+  it('keeps triage, unstarted, and started issues and drops the rest', async () => {
+    env.LINEAR_API_KEY = 'lin_api_test';
+    const node = (
+      id: string,
+      type: string,
+      priority: number,
+      createdAt: string
+    ) => ({
+      id,
+      identifier: id.toUpperCase(),
+      title: id,
+      url: `https://linear.app/jovie/issue/${id}`,
+      priority,
+      priorityLabel: String(priority),
+      createdAt,
+      state: { type },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          data: {
+            issues: {
+              nodes: [
+                node('completed-1', 'completed', 1, '2026-01-01T00:00:00.000Z'),
+                node('started-1', 'started', 2, '2026-01-04T00:00:00.000Z'),
+                node('triage-1', 'triage', 1, '2026-01-03T00:00:00.000Z'),
+                node('canceled-1', 'canceled', 1, '2026-01-02T00:00:00.000Z'),
+                node('unstarted-1', 'unstarted', 2, '2026-01-02T00:00:00.000Z'),
+              ],
+            },
+          },
+        }),
+      }))
+    );
+    try {
+      const { fetchTimActionIssues } = await import('./linear-actions');
+      const result = await fetchTimActionIssues();
+      expect(result.observation).toBe('ok');
+      expect(result.issues.map(issue => issue.stateType)).toEqual([
+        'triage',
+        'unstarted',
+        'started',
+      ]);
+      expect(result.issues.map(issue => issue.id)).toEqual([
+        'triage-1',
+        'unstarted-1',
+        'started-1',
+      ]);
+    } finally {
+      env.LINEAR_API_KEY = undefined;
+      vi.unstubAllGlobals();
+    }
   });
 });
 

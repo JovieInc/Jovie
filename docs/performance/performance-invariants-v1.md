@@ -33,9 +33,6 @@ disagree, the stricter number governs and the file is named in the audit report.
 
 - `apps/web/performance-budgets.config.js` is a stale, unreferenced legacy copy of the route
   manifest (e.g. `/app/chat` LCP 2500 vs manifest 3000). Never cite it for a budget.
-- `test:lighthouse:admin:pr` (`apps/web/package.json`) navigates `/app/ov/*` URLs, but
-  `.lighthouserc.admin.pr.json` asserts on `/app/admin/(growth|creators|users|releases)` and
-  no `/app/ov` routes exist — the admin Lighthouse assertions never bind.
 - `docs/launch/LAUNCH_GATES.md` names the dashboard/onboarding Lighthouse jobs "Lighthouse
   (dashboard PR)" / "Lighthouse (onboarding PR)"; the current job display names are
   "Lighthouse (dashboard manual)" / "Lighthouse (onboarding manual)".

@@ -267,8 +267,8 @@ if (!validation.ok) {
 }
 
 /**
- * The protected pull_request_target workflow runs this checked-out script from
- * the PR head, while its YAML remains sourced from the base branch. Keep the
+ * The unprivileged pull_request workflow (read-only token, no secrets) runs
+ * this checked-out script from the exact PR head. Keep the
  * public footer interaction proof here so it shares this job's exact build and
  * production server rather than creating a second browser lane.
  */

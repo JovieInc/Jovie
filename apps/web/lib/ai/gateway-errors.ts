@@ -61,12 +61,11 @@ function walkErrorChain(
     return [];
   }
   seen.add(error);
-  const cause =
-    error instanceof Error
-      ? error.cause
-      : error && typeof error === 'object'
-        ? (error as { cause?: unknown }).cause
-        : undefined;
+  let cause: unknown;
+  if (error instanceof Error) cause = error.cause;
+  else if (error && typeof error === 'object') {
+    cause = (error as { cause?: unknown }).cause;
+  } else cause = undefined;
   return [error, ...walkErrorChain(cause, seen)];
 }
 

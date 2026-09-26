@@ -790,8 +790,16 @@ function runCleanup(root, mode, extraEnv = {}) {
   });
 }
 
-test('cleanup dry-run preserves targets and apply removes only safe targets', () => {
+// #17426 (5b319a756d) made cleanup report-only for caches and Git temp packs:
+// no allocation-release contract exists yet, so --apply must preserve them.
+test('cleanup dry-run and apply report over-limit caches and preserve every cache and Git pack', () => {
   const { oldPack, root, youngPack } = setupCleanupFixture();
+  const cachePaths = [
+    'apps/web/.next/dev/cache/turbopack',
+    'apps/web/.next/cache/turbopack',
+    'apps/web/.next/cache/pack',
+    '.turbo/cache',
+  ];
   try {
     const dryRun = runCleanup(root, '--dry-run');
     assert.equal(dryRun.status, 0, dryRun.stderr);
@@ -800,17 +808,20 @@ test('cleanup dry-run preserves targets and apply removes only safe targets', ()
 
     const apply = runCleanup(root, '--apply');
     assert.equal(apply.status, 0, apply.stderr);
-    assert.equal(existsSync(join(root, '.turbo/cache')), false);
-    assert.equal(
-      existsSync(join(root, 'apps/web/.next/dev/cache/turbopack')),
-      false
+    for (const path of cachePaths) {
+      assert.ok(existsSync(join(root, path, 'cache.bin')), path);
+      assert.match(
+        apply.stdout,
+        new RegExp(
+          `Cleanup debt ${path.replaceAll('.', '\\.')}: \\d+ KiB; no verified allocation release, preserved`
+        )
+      );
+    }
+    assert.match(
+      apply.stdout,
+      /Preserved Git temp packs and worktree metadata: no verified allocation release/
     );
-    assert.equal(
-      existsSync(join(root, 'apps/web/.next/cache/turbopack')),
-      false
-    );
-    assert.equal(existsSync(join(root, 'apps/web/.next/cache/pack')), false);
-    assert.equal(existsSync(oldPack), false);
+    assert.equal(statSync(oldPack).size, 32);
     assert.ok(existsSync(youngPack));
     assert.equal(statSync(youngPack).size, 32);
   } finally {
@@ -862,8 +873,19 @@ test('cleanup preserves cache and Git data behind symlinked ancestors', () => {
     for (const payload of [nextPayload, turboPayload, packPayload]) {
       assert.ok(existsSync(payload), payload);
     }
-    assert.match(result.stderr, /unsafe or symlinked cache path/);
-    assert.match(result.stderr, /unsafe or symlinked pack directory/);
+    assert.match(
+      result.stderr,
+      /Skipped apps\/web\/\.next\/dev\/cache\/turbopack: unsafe or symlinked cache path/
+    );
+    assert.match(
+      result.stderr,
+      /Skipped \.turbo\/cache: unsafe or symlinked cache path/
+    );
+    // Since #17426 Git temp packs are never traversed or removed, symlinked or not.
+    assert.match(
+      result.stdout,
+      /Preserved Git temp packs and worktree metadata: no verified allocation release/
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
@@ -879,9 +901,11 @@ test('cleanup preserves aged Git temp packs when lsof is unavailable', () => {
     });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(existsSync(oldPack));
+    assert.equal(statSync(oldPack).size, 32);
+    // Since #17426 preservation no longer depends on lsof ownership probes.
     assert.match(
-      result.stderr,
-      /lsof unavailable; ownership cannot be verified/
+      result.stdout,
+      /Preserved Git temp packs and worktree metadata: no verified allocation release/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

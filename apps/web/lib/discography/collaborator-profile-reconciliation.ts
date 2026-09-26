@@ -33,6 +33,7 @@ import {
   type CreditedArtistCandidate,
   type SpotifyArtistProfileData,
 } from './collaborator-profile-plan';
+import { composeFriendlyArtistHandleCandidates } from './friendly-artist-handle';
 
 export interface CollaboratorProfileReconciliationResult {
   readonly candidates: number;
@@ -260,15 +261,46 @@ async function reconcileCandidate(
         };
       }
 
-      const handle = buildUnclaimedArtistHandle(candidate.artistId);
+      // JOV-6528: compose friendly candidates from the identity signals the
+      // exact-ID match already validated, then take the first one that is
+      // free. The deterministic opaque `a_*` handle is the last-resort
+      // fallback so ingest can never fail closed for lack of a friendly
+      // candidate. Handles are resolved in-rank inside the same serializable
+      // transaction that inserts the profile — no name-only identity is ever
+      // established here.
+      const composed = composeFriendlyArtistHandleCandidates({
+        registryName: lockedArtist.name,
+        providerArtist: spotifyArtist,
+      });
+
+      let handle: string | null = null;
+      if (composed.accepted.length > 0) {
+        const candidateHandles = composed.accepted.map(c => c.handle);
+        const takenHandles = await tx
+          .select({
+            usernameNormalized: creatorProfiles.usernameNormalized,
+          })
+          .from(creatorProfiles)
+          .where(inArray(creatorProfiles.usernameNormalized, candidateHandles));
+        const takenSet = new Set(
+          takenHandles.map(row => row.usernameNormalized)
+        );
+        handle =
+          candidateHandles.find(candidate => !takenSet.has(candidate)) ?? null;
+      }
+      if (!handle) {
+        handle = buildUnclaimedArtistHandle(candidate.artistId);
+      }
+
       const [handleOwner] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.usernameNormalized, handle))
         .limit(1);
 
-      // The handle encodes the full registry UUID, so an occupied handle with
-      // no exact Spotify-ID match indicates corrupted or manually forged data.
+      // An occupied fallback handle (the encoded full registry UUID) with
+      // no exact Spotify-ID match indicates corrupted or manually forged
+      // data. An occupied friendly candidate was already skipped above.
       if (handleOwner) {
         await markArtistProfileConflict(tx, lockedArtist, 'handle_collision');
         return { status: 'conflicted' };

@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { extractSwitchContrastPairs } from '../../component-live-storybook-browser.mjs';
 import {
   CANONICAL_LIVE_STORIES,
@@ -31,6 +31,7 @@ import {
   findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
+  mergeOwnedBrowserGroups,
   planOwnedBrowserSignals,
   reapStaleStorybookVitestLeases,
   STORYBOOK_VITEST_OWNER_ARG,
@@ -57,6 +58,12 @@ const LIFECYCLE_MODULE_URL = pathToFileURL(
   resolve(import.meta.dirname, '../../component-live-storybook-lifecycle.mjs')
 ).href;
 const LIFECYCLE_TEST_TIMEOUT_MS = 30_000;
+// Chromium cold start is process startup, not certification behavior. In CI
+// this file runs inside the structural lane beside the profile-admission
+// Playwright lane on a 2-CPU runner, where launch alone has outrun Vitest's 5s
+// per-test budget. Launch once in a hook with the same process-startup budget
+// the lifecycle tests use, so the test body times only render + extraction.
+const BROWSER_LAUNCH_TIMEOUT_MS = LIFECYCLE_TEST_TIMEOUT_MS;
 const ownedPids = [];
 const lifecycleIt = process.platform === 'win32' ? it.skip : it;
 
@@ -328,6 +335,17 @@ afterEach(() => {
 });
 
 describe('live Storybook component certification', () => {
+  /** @type {import('playwright').Browser | undefined} */
+  let browser;
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+  }, BROWSER_LAUNCH_TIMEOUT_MS);
+
+  afterAll(async () => {
+    await browser?.close();
+  });
+
   it('qualifies exact Node 22 and rejects other majors', () => {
     expect(qualifyNode22('22.23.2').ok).toBe(true);
     expect(qualifyNode22('22.13.0').ok).toBe(true);
@@ -523,9 +541,9 @@ describe('live Storybook component certification', () => {
   });
 
   it('extracts low-contrast thumb and track paints from a rendered Switch fixture', async () => {
-    const browser = await chromium.launch({ headless: true });
+    if (!browser) throw new Error('Chromium was not launched for this suite');
+    const page = await browser.newPage();
     try {
-      const page = await browser.newPage();
       await page.setContent(`
         <div id="switch-fixture">
           <button role="switch" aria-label="Checked toggle" data-state="checked" style="background: rgb(32, 32, 32)">
@@ -571,7 +589,7 @@ describe('live Storybook component certification', () => {
       expect(evaluation.ok).toBe(false);
       expect(details(evaluation)).toMatch(/below WCAG AA/);
     } finally {
-      await browser.close();
+      await page.close();
     }
   });
 
@@ -863,6 +881,61 @@ describe('live Storybook lifecycle', () => {
         tempRoot
       )
     ).toEqual({ ok: true, groupPids: [200], individualPids: [] });
+  });
+
+  it('refreshes a helper captured between fork and exec so it is still reaped after its leader dies', () => {
+    const token = randomUUID();
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-exec-')
+    );
+    temps.push(tempRoot);
+    const startedAt = 'Sun Aug 30 15:00:00 2026';
+    const leaderCommand = `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-exec`;
+    const helperCommand =
+      'chromium --type=renderer --field-trial-handle=owned-fixture';
+    const commandHash = command =>
+      createHash('sha256').update(command).digest('hex');
+    const receipt = (pid, command) => ({
+      pid,
+      pgid: 300,
+      startedAt,
+      commandHash: commandHash(command),
+    });
+    // Before exec, `ps` shows the forked helper with its parent's argv.
+    const forkCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, leaderCommand)],
+    };
+    const execCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, helperCommand)],
+    };
+
+    const merged = mergeOwnedBrowserGroups([forkCapture], [execCapture]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].members).toEqual(execCapture.members);
+    // The captures passed in are not mutated.
+    expect(forkCapture.members[1].commandHash).toBe(commandHash(leaderCommand));
+
+    // The leader exited on the group SIGTERM; the helper ignored it.
+    const helperRow = {
+      pid: 301,
+      pgid: 300,
+      startedAt,
+      command: helperCommand,
+    };
+    expect(
+      planOwnedBrowserSignals(merged, [helperRow], token, tempRoot)
+    ).toEqual({ ok: true, groupPids: [], individualPids: [301] });
+    // A different process that reused pid 301 is never targeted.
+    expect(
+      planOwnedBrowserSignals(
+        merged,
+        [{ ...helperRow, startedAt: 'Sun Aug 30 15:00:01 2026' }],
+        token,
+        tempRoot
+      )
+    ).toEqual({ ok: true, groupPids: [], individualPids: [] });
   });
 
   it('treats a defunct zombie process as gone', async () => {

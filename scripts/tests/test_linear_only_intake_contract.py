@@ -15,6 +15,11 @@ def block(text: str, indent: int, name: str) -> str:
     assert match, f"missing block: {name}"
     return match.group(1)
 
+ISSUE_WRITES = ("issues: write", "gh issue", "issues.create", "issues.update", "/issues")
+
+def assert_writes_no_issues(text: str) -> None:
+    assert not [token for token in ISSUE_WRITES if token in text]
+
 def step(text: str, name: str) -> str:
     marker = f"      - name: {name}\n"
     assert marker in text
@@ -42,13 +47,18 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     retired_steps = {
         "production-controller-health.yml": ["Open one manual-recovery incident"],
         "runner-health-monitor.yml": ["Open one fixed-runner degradation incident"],
-        "test-coverage-audit.yml": ["Notify on failure"],
         "test-flakiness-report.yml": ["Find or create tracking issue", "Create or update tracking issue", "Auto-file deflake issues for high-severity tests"],
     }
     for name, steps in retired_steps.items():
         workflow = read(WF / name)
         assert "issues: write" not in workflow
         assert all(RETIRED in step(workflow, item) for item in steps)
+    # The coverage audit's GitHub-issue failure notifier was deleted outright
+    # (Slack is the failure channel), so assert it cannot write issues at all.
+    coverage = read(WF / "test-coverage-audit.yml")
+    assert_writes_no_issues(coverage)
+    assert "      - name: Notify on failure\n" not in coverage
+    assert "Slack alert on failure" in coverage
     observability = read(WF / "observability-issue.yml")
     assert "issues: write" not in observability
     assert "observability-issue-linear.mjs" in observability
@@ -59,8 +69,13 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     assert "issues: write" not in cost and "Prepare Linear-only anomaly receipt" in cost
     assert RETIRED in step(cost, "Create one open cost-anomaly incident")
     visual = read(WF / "pr-visual-review.yml")
-    assert "gh issue" not in visual and "github-ai-orchestrator.yml" not in visual
-    assert "actions: write" not in block(visual, 2, "review")
+    assert_writes_no_issues(visual)
+    assert "github-ai-orchestrator.yml" not in visual
+    # JOV-6232 retired the paid model `review` job; only capture remains and it
+    # must not regain dispatch (actions: write) or issue-writing authority.
+    jobs = block(visual, 0, "jobs")
+    assert re.findall(r"^  ([A-Za-z0-9_-]+):\n", jobs, re.MULTILINE) == ["capture"]
+    assert "actions: write" not in visual
 
 def test_active_facades_are_linear_only_and_fail_closed() -> None:
     tracker = read(ROOT / "scripts/symphony/lib/tracker-client.ts")

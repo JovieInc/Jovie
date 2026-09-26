@@ -31,10 +31,17 @@ for arg in "$@"; do
     if [ "$heartbeat_seconds" -gt 0 ] 2>/dev/null; then
       parent_pid="$$"
       (
-        trap 'exit 0' TERM INT
-        trap 'kill -TERM "$parent_pid" 2>/dev/null || true; exit 0' PIPE
+        # Bash defers a trap until its foreground child exits, so a foreground
+        # `sleep` held every launch for up to one heartbeat interval after
+        # preflight finished. Wait on a background sleep so TERM lands at once.
+        heartbeat_sleep_pid=""
+        trap 'kill "$heartbeat_sleep_pid" 2>/dev/null || true; exit 0' TERM INT
+        trap 'kill "$heartbeat_sleep_pid" 2>/dev/null || true; kill -TERM "$parent_pid" 2>/dev/null || true; exit 0' PIPE
         started_at="$(date +%s)"
-        while sleep "$heartbeat_seconds"; do
+        while :; do
+          sleep "$heartbeat_seconds" &
+          heartbeat_sleep_pid="$!"
+          wait "$heartbeat_sleep_pid" || exit 0
           printf '{"jsonrpc":"2.0","method":"symphony-router/preflight","params":{"elapsedSeconds":%d}}\n' \
             "$(( $(date +%s) - started_at ))" || {
               kill -TERM "$parent_pid" 2>/dev/null || true
