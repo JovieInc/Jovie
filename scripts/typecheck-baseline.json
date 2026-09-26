@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-09-11T15:17:29.586Z",
-  "totalErrors": 140,
+  "generatedAt": "2026-09-26T01:37:02.078Z",
+  "totalErrors": 119,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -54,17 +54,11 @@
       "TS2307": 1,
       "TS2584": 8
     },
-    "scripts/lib/__tests__/agent-config-health.test.mjs": {
-      "TS2345": 1
-    },
     "scripts/lib/__tests__/automation-verify.test.mjs": {
       "TS2345": 1
     },
     "scripts/lib/__tests__/ci-harness.test.mjs": {
       "TS2345": 1
-    },
-    "scripts/lib/__tests__/codex-issue-shipper.test.mjs": {
-      "TS2345": 3
     },
     "scripts/lib/__tests__/main-release-readiness.test.mjs": {
       "TS2322": 5
@@ -74,9 +68,6 @@
     },
     "scripts/lib/__tests__/qa-swarm.test.mjs": {
       "TS2345": 5
-    },
-    "scripts/lib/__tests__/ship-ledger.test.mjs": {
-      "TS2339": 4
     },
     "scripts/lib/ci-duration-ratchet.mjs": {
       "TS2353": 1

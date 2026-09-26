@@ -1,6 +1,6 @@
 import { createPrivateKey, sign as nodeSign } from 'node:crypto';
 import { isIP } from 'node:net';
-import { canonical } from '../symphony/summer-symphony-outbox-consumer.mjs';
+import { canonical } from '../lib/canonical-json.mjs';
 
 export const TRIAGE_ASSESSMENT_DOMAIN =
   'jovie.linear-triage-assessment-request/v1';
