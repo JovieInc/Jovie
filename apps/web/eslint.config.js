@@ -482,16 +482,28 @@ module.exports = [
         'warn',
         {
           default: 'allow',
-          rules: [
+          policies: [
             {
-              from: ['atoms'],
-              disallow: ['molecules', 'organisms', 'features'],
+              from: [{ element: { type: 'atoms' } }],
+              disallow: {
+                to: {
+                  element: {
+                    types: { anyOf: ['molecules', 'organisms', 'features'] },
+                  },
+                },
+              },
               message:
                 'Atoms cannot import from molecules, organisms, or features. Keep atoms props-driven.',
             },
             {
-              from: ['molecules'],
-              disallow: ['organisms', 'features'],
+              from: [{ element: { type: 'molecules' } }],
+              disallow: {
+                to: {
+                  element: {
+                    types: { anyOf: ['organisms', 'features'] },
+                  },
+                },
+              },
               message:
                 'Molecules cannot import from organisms or features. Compose only from atoms.',
             },

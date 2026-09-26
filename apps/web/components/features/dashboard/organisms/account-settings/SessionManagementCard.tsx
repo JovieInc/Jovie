@@ -162,9 +162,9 @@ export function SessionManagementCard({
           <Button
             variant='ghost'
             size='sm'
+            destructive
             disabled={endingAllOthers}
             onClick={() => setConfirmEndAllOthers(true)}
-            className='h-7 rounded-lg px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
           >
             {endingAllOthers ? 'Signing out…' : 'Sign out other sessions'}
           </Button>
@@ -206,9 +206,10 @@ export function SessionManagementCard({
                 <Button
                   variant='ghost'
                   size='sm'
+                  destructive
                   disabled={endingSessionId === session.id}
                   onClick={() => setSessionToEnd(session)}
-                  className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                  className='shrink-0'
                 >
                   {endingSessionId === session.id ? 'Ending…' : 'End session'}
                 </Button>
