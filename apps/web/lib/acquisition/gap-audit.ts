@@ -147,17 +147,19 @@ const YOUTUBE_GAPS = expand({
   ],
 });
 
-const PROFILE_GAPS = ACQUISITION_AUDIT_STAGES.map(stage => ({
-  stage,
-  status:
-    stage === 'experience_build'
-      ? 'in_flight'
-      : stage === 'machine_certification' || stage === 'rejection_rebuild'
-        ? 'missing'
-        : 'exists_uncertified',
-  owner: 'JOV-5912',
-  evidence: 'Experiment 1. Do not fork the YouTube closed loop.',
-})) as AcquisitionGapRow[];
+const PROFILE_GAPS = ACQUISITION_AUDIT_STAGES.map(stage => {
+  let status: AcquisitionGapStatus = 'exists_uncertified';
+  if (stage === 'experience_build') status = 'in_flight';
+  else if (stage === 'machine_certification' || stage === 'rejection_rebuild') {
+    status = 'missing';
+  }
+  return {
+    stage,
+    status,
+    owner: 'JOV-5912',
+    evidence: 'Experiment 1. Do not fork the YouTube closed loop.',
+  };
+});
 
 export const ACQUISITION_GAP_AUDIT = {
   shared: SHARED_GAPS,

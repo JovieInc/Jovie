@@ -211,6 +211,7 @@ export function classifyThrownToolError(
 
   if (
     errorCodeFromThrown === TOOL_ERROR_CODES.PROVIDER_UNAVAILABLE ||
+    thrownCode === 'ALBUM_ART_GATEWAY_UNCONFIGURED' ||
     thrownCode === 'XAI_API_KEY_MISSING'
   ) {
     return buildToolFailure({

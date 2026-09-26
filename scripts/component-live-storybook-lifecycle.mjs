@@ -352,7 +352,18 @@ function captureOwnedPlaywrightGroups(token, tempRoot, rows) {
     }));
 }
 
-function mergeOwnedBrowserGroups(...groupLists) {
+const processIdentityKey = receipt =>
+  `${receipt.pid}:${receipt.startedAt}:${receipt.pgid}`;
+
+/**
+ * Merge browser-group captures, oldest first. `ps` can sample a helper between
+ * fork and exec, while it still shows its parent's argv, so a later capture of
+ * the same process identity (pid, start time, pgid) refreshes the recorded
+ * command hash instead of being dropped. Every capture is taken while its
+ * token/profile leader is verified live in the same snapshot, and kill-time
+ * checks still require an exact receipt match, so this never widens targeting.
+ */
+export function mergeOwnedBrowserGroups(...groupLists) {
   const merged = new Map();
   for (const groups of groupLists) {
     for (const group of groups ?? []) {
@@ -362,14 +373,23 @@ function mergeOwnedBrowserGroups(...groupLists) {
         merged.set(key, structuredClone(group));
         continue;
       }
-      const memberKeys = new Set(
-        existing.members.map(
-          member => `${member.pid}:${member.startedAt}:${member.pgid}`
-        )
+      existing.leader = structuredClone(group.leader);
+      const memberIndexes = new Map(
+        existing.members.map((member, index) => [
+          processIdentityKey(member),
+          index,
+        ])
       );
       for (const member of group.members) {
-        const memberKey = `${member.pid}:${member.startedAt}:${member.pgid}`;
-        if (!memberKeys.has(memberKey)) existing.members.push(member);
+        const index = memberIndexes.get(processIdentityKey(member));
+        if (index === undefined) {
+          memberIndexes.set(
+            processIdentityKey(member),
+            existing.members.push(structuredClone(member)) - 1
+          );
+        } else {
+          existing.members[index] = structuredClone(member);
+        }
       }
     }
   }

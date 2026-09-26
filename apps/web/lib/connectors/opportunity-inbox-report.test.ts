@@ -70,6 +70,20 @@ describe('parseReportMeasurement', () => {
     });
   });
 
+  it('treats a zero delta as flat', () => {
+    const report = parseReportMeasurement({
+      metricLabel: 'views',
+      deltaPercent: 0,
+    });
+
+    expect(report).toMatchObject({
+      metricLabel: 'views',
+      deltaPercent: 0,
+      deltaDisplay: '0%',
+      direction: 'flat',
+    });
+  });
+
   it('supports flat payloads without a measurement wrapper', () => {
     const report = parseReportMeasurement({
       metricLabel: 'streams',

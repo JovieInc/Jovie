@@ -1,8 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
-import { OnboardingV2Form } from '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
+import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -446,6 +446,55 @@ describe('Onboarding screen performance budgets', () => {
     expect(renderTime).toBeLessThan(
       getBudgetThreshold(SCREEN_BUDGETS.spotifyResults)
     );
+  });
+
+  // JOV-6553: claimed artists must stay selectable (the server-side identity
+  // lock owns denial) and must show a truthful listing badge — never a
+  // disabled "Unavailable" dead-end or an "On Jovie" membership claim.
+  it('spotify results show truthful status for claimed artists', async () => {
+    mockArtistSearch.results = [
+      {
+        followers: 123456,
+        id: 'artist-result',
+        imageUrl: null,
+        name: 'Search Budget Artist',
+        popularity: 81,
+        url: 'https://open.spotify.com/artist/artist-result',
+      },
+      {
+        followers: 9,
+        id: 'claimed-result',
+        imageUrl: null,
+        name: 'Claimed Listing Artist',
+        popularity: 70,
+        url: 'https://open.spotify.com/artist/claimed-result',
+      },
+    ].map(r => ({
+      ...r,
+      isClaimed: r.id === 'claimed-result',
+    }));
+    mockArtistSearch.state = 'success';
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='spotify'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    const claimedRow = screen
+      .getByText('Claimed Listing Artist')
+      .closest('button')!;
+    expect(claimedRow).toBeEnabled();
+    const badge = within(claimedRow).getByTestId('listing-badge');
+    expect(badge).toHaveTextContent('Jovie listing');
+    expect(badge.textContent).not.toContain('On Jovie');
+    expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
   });
 
   it('checkout screen renders within budget', async () => {
