@@ -53,6 +53,12 @@ export interface PlaceholderProfileRow {
   readonly isClaimed: boolean | null;
 }
 
+export interface PlaceholderCandidateRow {
+  readonly username: string;
+  readonly usernameNormalized: string;
+  readonly displayName: string | null;
+}
+
 export interface PlaceholderUnpublishPlan {
   /** Claimed, currently-public rows the run will unpublish. */
   readonly unpublish: readonly PlaceholderProfileRow[];
@@ -90,12 +96,12 @@ export function planPlaceholderUnpublish(
   return { unpublish, alreadyPrivate, unclaimed, missingHandles };
 }
 
-interface CliOptions {
+export interface CliOptions {
   readonly execute: boolean;
   readonly handles: readonly string[];
 }
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: readonly string[]): CliOptions {
   let execute = false;
   const extraHandles: string[] = [];
 
@@ -114,6 +120,69 @@ function parseArgs(argv: string[]): CliOptions {
     ...new Set([...PLACEHOLDER_IDENTITY_HANDLES, ...extraHandles]),
   ];
   return { execute, handles };
+}
+
+export interface PlaceholderUnpublishDeps {
+  /** Load profile rows for the requested handles. */
+  readonly loadRows: (
+    handles: readonly string[]
+  ) => Promise<readonly PlaceholderProfileRow[]>;
+  /** Set is_public=false on the given profile ids. */
+  readonly unpublish: (ids: readonly string[]) => Promise<unknown>;
+  /** Scan for other claimed public placeholder-shaped identities. */
+  readonly loadCandidates: () => Promise<readonly PlaceholderCandidateRow[]>;
+  readonly log: (message: string) => void;
+}
+
+export async function runPlaceholderUnpublish(
+  options: CliOptions,
+  deps: PlaceholderUnpublishDeps
+): Promise<PlaceholderUnpublishPlan> {
+  const rows = await deps.loadRows(options.handles);
+  const plan = planPlaceholderUnpublish(rows, options.handles);
+
+  deps.log('\nPlaceholder identity unpublish plan');
+  deps.log(`  target handles: ${options.handles.join(', ')}`);
+  for (const row of plan.unpublish) {
+    deps.log(
+      `  UNPUBLISH @${row.username} (${row.id}, displayName=${row.displayName ?? 'null'})`
+    );
+  }
+  for (const row of plan.alreadyPrivate) {
+    deps.log(`  SKIP already private @${row.username} (${row.id})`);
+  }
+  for (const row of plan.unclaimed) {
+    deps.log(`  SKIP unclaimed @${row.username} (${row.id})`);
+  }
+  for (const handle of plan.missingHandles) {
+    deps.log(`  MISS no profile row for handle "${handle}"`);
+  }
+
+  if (options.execute && plan.unpublish.length > 0) {
+    await deps.unpublish(plan.unpublish.map(row => row.id));
+    deps.log(`\nUnpublished ${plan.unpublish.length} profile(s).`);
+  } else if (!options.execute) {
+    deps.log('\nNo rows updated (dry-run).');
+  }
+
+  // Report other claimed public placeholder-shaped identities for operator
+  // review. These are never mutated by this script.
+  const candidates = await deps.loadCandidates();
+  const remaining = candidates.filter(
+    row => !plan.unpublish.some(target => target.username === row.username)
+  );
+  if (remaining.length > 0) {
+    deps.log(
+      '\nOther claimed public placeholder-shaped identities (review only):'
+    );
+    for (const row of remaining) {
+      deps.log(
+        `  @${row.username} (displayName=${row.displayName ?? 'null'}) — rerun with --handle=${row.usernameNormalized} after confirming`
+      );
+    }
+  }
+
+  return plan;
 }
 
 async function main() {
@@ -136,91 +205,52 @@ async function main() {
   const sqlClient = neon(databaseUrl);
   const db = drizzle(sqlClient, { schema });
 
-  const rows = await db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      isPublic: creatorProfiles.isPublic,
-      isClaimed: creatorProfiles.isClaimed,
-    })
-    .from(creatorProfiles)
-    .where(inArray(creatorProfiles.usernameNormalized, [...options.handles]));
-
-  const plan = planPlaceholderUnpublish(rows, options.handles);
-
-  console.log('\nPlaceholder identity unpublish plan');
-  console.log(`  target handles: ${options.handles.join(', ')}`);
-  for (const row of plan.unpublish) {
-    console.log(
-      `  UNPUBLISH @${row.username} (${row.id}, displayName=${row.displayName ?? 'null'})`
-    );
-  }
-  for (const row of plan.alreadyPrivate) {
-    console.log(`  SKIP already private @${row.username} (${row.id})`);
-  }
-  for (const row of plan.unclaimed) {
-    console.log(`  SKIP unclaimed @${row.username} (${row.id})`);
-  }
-  for (const handle of plan.missingHandles) {
-    console.log(`  MISS no profile row for handle "${handle}"`);
-  }
-
-  if (options.execute && plan.unpublish.length > 0) {
-    await db
-      .update(creatorProfiles)
-      .set({ isPublic: false, updatedAt: new Date() })
-      .where(
-        and(
-          inArray(
-            creatorProfiles.id,
-            plan.unpublish.map(row => row.id)
-          ),
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isClaimed, true)
+  await runPlaceholderUnpublish(options, {
+    log: console.log,
+    loadRows: handles =>
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          displayName: creatorProfiles.displayName,
+          isPublic: creatorProfiles.isPublic,
+          isClaimed: creatorProfiles.isClaimed,
+        })
+        .from(creatorProfiles)
+        .where(inArray(creatorProfiles.usernameNormalized, [...handles])),
+    unpublish: ids =>
+      db
+        .update(creatorProfiles)
+        .set({ isPublic: false, updatedAt: new Date() })
+        .where(
+          and(
+            inArray(creatorProfiles.id, [...ids]),
+            eq(creatorProfiles.isPublic, true),
+            eq(creatorProfiles.isClaimed, true)
+          )
+        ),
+    loadCandidates: () =>
+      db
+        .select({
+          username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          displayName: creatorProfiles.displayName,
+        })
+        .from(creatorProfiles)
+        .where(
+          drizzleSql`
+            ${creatorProfiles.isPublic} = true
+            AND ${creatorProfiles.isClaimed} = true
+            AND (
+              coalesce(${creatorProfiles.displayName}, '') = ''
+              OR lower(${creatorProfiles.displayName}) = ${creatorProfiles.usernameNormalized}
+            )
+          `
         )
-      );
-    console.log(`\nUnpublished ${plan.unpublish.length} profile(s).`);
-  } else if (!options.execute) {
-    console.log('\nNo rows updated (dry-run).');
-  }
-
-  // Report other claimed public placeholder-shaped identities for operator
-  // review. These are never mutated by this script.
-  const candidates = await db
-    .select({
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-    })
-    .from(creatorProfiles)
-    .where(
-      drizzleSql`
-        ${creatorProfiles.isPublic} = true
-        AND ${creatorProfiles.isClaimed} = true
-        AND (
-          coalesce(${creatorProfiles.displayName}, '') = ''
-          OR lower(${creatorProfiles.displayName}) = ${creatorProfiles.usernameNormalized}
-        )
-      `
-    )
-    .orderBy(creatorProfiles.usernameNormalized)
-    .limit(100);
-
-  const remaining = candidates.filter(
-    row => !plan.unpublish.some(target => target.username === row.username)
-  );
-  if (remaining.length > 0) {
-    console.log(
-      '\nOther claimed public placeholder-shaped identities (review only):'
-    );
-    for (const row of remaining) {
-      console.log(
-        `  @${row.username} (displayName=${row.displayName ?? 'null'}) — rerun with --handle=${row.usernameNormalized} after confirming`
-      );
-    }
-  }
+        .orderBy(creatorProfiles.usernameNormalized)
+        .limit(100),
+  });
 }
 
 if (require.main === module) {
