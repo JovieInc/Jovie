@@ -59,7 +59,44 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+  if [ "${LANES_HUD:-0}" = "1" ]; then
+    # The console HUD (tty1). Font and sudo setfont mirror the retired Symphony Elixir HUD unit.
+    font="$HOME/.local/state/gem-checkin-hud/fonts/hud-symbols.psf"
+    cat >"$units/jovie-hud.service" <<UNIT
+[Unit]
+Description=Symphony lanes HUD on tty1
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+Environment=PATH=$path
+Environment=LANES_STATE=$state
+Environment=LANES_REPO=$repo
+Environment=LANES_LINEAR_ENV=${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}
+Environment=PYTHONUNBUFFERED=1
+Environment=TERM=linux
+Environment=LANG=en_US.UTF-8
+Environment=LC_ALL=en_US.UTF-8
+UnsetEnvironment=COLUMNS LINES
+$( [ -f "$font" ] && printf 'ExecStartPre=-/usr/bin/sudo -n /usr/bin/setfont -C /dev/tty1 %s\n' "$font" )
+ExecStart=/bin/bash $state/current/hud-tty1.sh
+Restart=always
+RestartSec=2
+StandardInput=null
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=no
+TTYVTDisallocate=yes
+[Install]
+WantedBy=default.target
+UNIT
+  fi
   systemctl --user daemon-reload
   systemctl --user enable --now jovie-lanes.timer
+  if [ "${LANES_HUD:-0}" = "1" ]; then
+    systemctl --user enable jovie-hud.service
+  fi
 fi
 echo "lanes installed: $(readlink "$state/current")"
