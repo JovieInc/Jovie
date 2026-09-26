@@ -8,13 +8,10 @@
 
 import type { ArtistRole } from '@/lib/db/schema/content';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
-import {
-  isPrimaryArtistRole,
-  PRIMARY_ARTIST_ROLES,
-} from './artist-credit-policy';
+import { isPrimaryArtistRole } from './artist-credit-policy';
 import { formatReleaseArtistLine } from './formatting';
 
-export { PRIMARY_ARTIST_ROLES };
+export { PRIMARY_ARTIST_ROLES } from './artist-credit-policy';
 
 export interface ReleaseCreditIdentity {
   readonly artistId?: string | null;

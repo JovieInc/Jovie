@@ -179,12 +179,12 @@ function sendToSentry(params: {
     // Stable fingerprint overrides default grouping so distinct failure classes
     // (e.g. RLS set_config) never merge into generic "Failed query" issues.
     // Quota exhaustion is one incident (JOV-5199), not one Linear issue per route.
-    const fingerprint =
-      typeof context?.fingerprint === 'string' && context.fingerprint
-        ? [context.fingerprint]
-        : quotaFailure
-          ? ['redis-quota-exceeded']
-          : undefined;
+    let fingerprint: string[] | undefined;
+    if (typeof context?.fingerprint === 'string' && context.fingerprint) {
+      fingerprint = [context.fingerprint];
+    } else if (quotaFailure) {
+      fingerprint = ['redis-quota-exceeded'];
+    }
 
     Sentry.captureException(errorInstance, {
       extra: {

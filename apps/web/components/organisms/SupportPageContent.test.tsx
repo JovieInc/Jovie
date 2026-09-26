@@ -80,10 +80,10 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I get started with Jovie?',
         answer:
-          'Create an account, pick your handle, connect Spotify or Apple Music, and set up your profile. Full walkthrough at https://docs.jov.ie/getting-started.',
+          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/getting-started.',
       },
       {
-        question: 'How do smart links work?',
+        question: 'How do music smart links work?',
         answer:
           'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
       },

@@ -47,17 +47,20 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({
     children,
     image,
+    meta,
     title,
     'data-testid': testId,
   }: {
     readonly children?: React.ReactNode;
     readonly image?: React.ReactNode;
+    readonly meta?: React.ReactNode;
     readonly title?: React.ReactNode;
     readonly 'data-testid'?: string;
   }) => (
     <div data-testid={testId}>
       {image}
       {title}
+      {meta}
       {children}
     </div>
   ),
@@ -90,7 +93,22 @@ vi.mock('@/components/shell/DropDateChip', () => ({
 }));
 
 vi.mock('@/components/shell/DspAvatarStack', () => ({
-  DspAvatarStack: () => null,
+  DspAvatarStack: ({
+    dsps,
+  }: {
+    readonly dsps?: ReadonlyArray<{
+      readonly glyph: string;
+      readonly id: string;
+    }>;
+  }) => (
+    <div>
+      {dsps?.map(dsp => (
+        <span key={dsp.id} data-testid={`dsp-glyph-${dsp.id}`}>
+          {dsp.glyph}
+        </span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/shell/MetaPill', () => ({
@@ -179,6 +197,55 @@ describe('ReleaseSidebarSections', () => {
     expect(artwork).toHaveAttribute('data-image-class', 'object-contain');
     expect(preview).toHaveClass('rounded-xs');
     expect(preview).not.toHaveClass('rounded-lg');
+  });
+
+  it('takes the provider glyph from the first letter or digit', () => {
+    render(
+      <ReleaseEntityHeader
+        release={
+          {
+            ...mockRelease,
+            providers: [
+              {
+                key: 'spotify',
+                url: 'https://open.spotify.com/album/1',
+                label: 'ignored',
+                source: 'manual',
+                updatedAt: '2026-01-01',
+                path: '/spotify',
+                isPrimary: true,
+              },
+              {
+                key: 'tidal',
+                url: 'https://tidal.com/album/1',
+                label: '!!!',
+                source: 'manual',
+                updatedAt: '2026-01-01',
+                path: '/tidal',
+                isPrimary: false,
+              },
+            ],
+          } as Release
+        }
+        artistName='Example Artist'
+        providerConfig={
+          {
+            spotify: { label: '— Spotify', accent: '#1db954' },
+          } as typeof providerConfig
+        }
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('dsp-glyph-spotify')).toHaveTextContent('S');
+    expect(screen.getByTestId('dsp-glyph-tidal')).toHaveTextContent('T');
   });
 
   it('keeps editable release artwork on the same xl artwork contract', () => {

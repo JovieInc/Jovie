@@ -66,7 +66,7 @@ export class AppleWalletConfigError extends Error {
 }
 
 function normalizePem(value: string): string {
-  return value.replaceAll('\\n', '\n').trim();
+  return value.replaceAll(String.raw`\n`, '\n').trim();
 }
 
 function requiredEnv(key: keyof typeof env): string {

@@ -104,12 +104,12 @@ export function qualifyRegularlyUploadingChannel(input: {
     return Number.isFinite(published) && published >= cutoff;
   }).length;
   const publicVideoCount = input.videos.length;
-  const reason =
-    publicVideoCount < YOUTUBE_REGULAR_UPLOAD_MIN_VIDEOS
-      ? 'need_more_public_videos'
-      : uploadsInWindow < YOUTUBE_REGULAR_UPLOAD_MIN_IN_WINDOW
-        ? 'not_regularly_uploading'
-        : 'regularly_uploading_music_channel';
+  let reason = 'regularly_uploading_music_channel';
+  if (publicVideoCount < YOUTUBE_REGULAR_UPLOAD_MIN_VIDEOS) {
+    reason = 'need_more_public_videos';
+  } else if (uploadsInWindow < YOUTUBE_REGULAR_UPLOAD_MIN_IN_WINDOW) {
+    reason = 'not_regularly_uploading';
+  }
   return {
     qualified: reason === 'regularly_uploading_music_channel',
     publicVideoCount,

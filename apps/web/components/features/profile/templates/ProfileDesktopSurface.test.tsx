@@ -610,6 +610,57 @@ describe('ProfileDesktopSurface', () => {
     ).toBeNull();
   });
 
+  it.each(['profile', 'tour'] as const)(
+    'uses the venue day in the desktop %s show row',
+    activeMode => {
+      const upcomingShow = {
+        id: 'show-1',
+        profileId: artist.id,
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+        title: null,
+        venueName: 'The Echo',
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        startDate: '2030-09-24T03:00:00Z',
+        startTime: null,
+        timezone: 'America/Chicago',
+        latitude: null,
+        longitude: null,
+        ticketUrl: 'https://tickets.example.com/show-1',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      } satisfies TourDateViewModel;
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          tourDates={[upcomingShow]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+      expect(screen.getByText('Sep')).toBeVisible();
+      expect(screen.getByText('23')).toBeVisible();
+      expect(screen.queryByText('24')).toBeNull();
+    }
+  );
+
   it('offers View Shows only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {
@@ -693,6 +744,73 @@ describe('ProfileDesktopSurface', () => {
     const releaseLink = screen.getByRole('link', { name: /Training Season/ });
     expect(releaseLink).toHaveAttribute('href', '/timwhite/training-season');
     expect(within(releaseLink).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  // JOV-6452: while the desktop surface is server-rendered but clip-hidden on
+  // mobile, portaled overlays must stay closed so they cannot flash open.
+  it('keeps portaled overlays closed while overlays are disabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        overlaysEnabled={false}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-open',
+      'false'
+    );
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens portaled overlays once overlays are enabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-open',
+      'true'
+    );
+    expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
   });
 
   it('does not render artist-generic Listen beside an imported catalog', () => {

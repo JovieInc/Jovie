@@ -704,7 +704,6 @@ export function ProfilePacCard({
           meta={`Watch your inbox for ${artist.name} updates.`}
         />
       );
-      status = null;
       break;
     }
 

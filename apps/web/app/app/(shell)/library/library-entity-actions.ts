@@ -406,17 +406,18 @@ export function buildLibraryEntityActions({
     });
   }
 
-  actions.push({
-    id: 'open-primary',
-    label: asset.primaryActionLabel ?? 'Open Smart Link',
-    icon: ExternalLink,
-    authority: 'none',
-    disabled: false,
-    destructive: false,
-    onExecute: () => openUrl(primaryHref),
-  });
-
-  actions.push(buildCopyAction({ asset, copyText }));
+  actions.push(
+    {
+      id: 'open-primary',
+      label: asset.primaryActionLabel ?? 'Open Smart Link',
+      icon: ExternalLink,
+      authority: 'none',
+      disabled: false,
+      destructive: false,
+      onExecute: () => openUrl(primaryHref),
+    },
+    buildCopyAction({ asset, copyText })
+  );
 
   const lifecycleAction = buildLifecycleAction({
     asset,

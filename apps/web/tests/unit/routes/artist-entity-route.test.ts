@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  result: [] as Array<{ username: string }>,
+  result: [] as Array<{ username: string; displayName?: string | null }>,
   select: vi.fn(),
   ensureUnclaimedArtistProfileForEntity: vi.fn(),
 }));
@@ -88,6 +88,25 @@ describe('GET /artists/[artistId]', () => {
       'https://jov.ie/austin-leeds'
     );
   });
+
+  it.each([
+    [{ username: 'tmoc0g1x9dwmk71', displayName: 'gp moc+clerk test' }],
+    [{ username: 'testartist', displayName: 'Test Artist' }],
+    [{ username: 'new-handle', displayName: 'gp moc+clerk test' }],
+  ])(
+    'fails closed for a public binding that fails discovery eligibility: %j',
+    async resolved => {
+      hoisted.result = [resolved];
+      const artistId = 'f5441adb-6789-449a-9553-ab7460c9c61c';
+      const response = await GET(
+        new Request(`https://jov.ie/artists/${artistId}`) as never,
+        context(artistId)
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get('Location')).toBeNull();
+    }
+  );
 
   it('fails closed for missing or private profile bindings', async () => {
     const artistId = '3cefe948-7521-465f-813a-95ae15e3141e';

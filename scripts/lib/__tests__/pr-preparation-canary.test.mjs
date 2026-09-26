@@ -184,14 +184,17 @@ describe('PR preparation eligibility parity', () => {
   it('treats every canonical queue hold, including fast, as a hard stop', () => {
     expect(HOLD_LABELS).toEqual(
       expect.arrayContaining([
-        'needs-human',
         'hold',
         'gated',
+        'incident',
         'queue-deferred',
         'needs-conflict-resolution',
+        'needs-manual-rebase',
         'fast',
       ])
     );
+    // #17263 made the legacy human-hold label inert; it must not stop the canary.
+    expect(HOLD_LABELS).not.toContain('needs-human');
     for (const label of HOLD_LABELS) {
       const decision = evaluateEligibility({
         entry: entry(),
@@ -593,38 +596,41 @@ describe('receipt durability', () => {
     ['invalid JSON', '{', 'not used'],
     ['plan validation', `${JSON.stringify(plan({ maxParallel: 5 }))}\n`, ''],
     ['plan hash mismatch', null, 'f'.repeat(64)],
-  ])('persists one error artifact for %s', async (_name, raw, planHashInput) => {
-    const directory = await makeTemp();
-    const planPath = join(directory, 'plan.json');
-    const rawPlan = raw ?? `${JSON.stringify(plan())}\n`;
-    const planHash = planHashInput || hash(rawPlan);
-    await writeFile(planPath, rawPlan);
-    const receiptPath = join(directory, 'receipt.json');
-    await expect(
-      runPreparedEntry(
-        {
-          planPath,
-          planHash,
-          trustedDefaultBranchSha: BASE,
-          mode: 'apply',
-          confirmation: planHash,
-          prNumber: 16001,
-          receiptPath,
-          runId: '1',
-          runAttempt: '1',
-        },
-        { nowImpl: () => NOW }
-      )
-    ).rejects.toThrow();
-    const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
-    expect(receipt.outcome).toBe('error');
-    expect(
-      (await readdir(directory)).filter(name => name.endsWith('.json'))
-    ).toEqual(expect.arrayContaining(['plan.json', 'receipt.json']));
-    expect(
-      (await readdir(directory)).some(name => name.includes('.tmp-'))
-    ).toBe(false);
-  });
+  ])(
+    'persists one error artifact for %s',
+    async (_name, raw, planHashInput) => {
+      const directory = await makeTemp();
+      const planPath = join(directory, 'plan.json');
+      const rawPlan = raw ?? `${JSON.stringify(plan())}\n`;
+      const planHash = planHashInput || hash(rawPlan);
+      await writeFile(planPath, rawPlan);
+      const receiptPath = join(directory, 'receipt.json');
+      await expect(
+        runPreparedEntry(
+          {
+            planPath,
+            planHash,
+            trustedDefaultBranchSha: BASE,
+            mode: 'apply',
+            confirmation: planHash,
+            prNumber: 16001,
+            receiptPath,
+            runId: '1',
+            runAttempt: '1',
+          },
+          { nowImpl: () => NOW }
+        )
+      ).rejects.toThrow();
+      const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+      expect(receipt.outcome).toBe('error');
+      expect(
+        (await readdir(directory)).filter(name => name.endsWith('.json'))
+      ).toEqual(expect.arrayContaining(['plan.json', 'receipt.json']));
+      expect(
+        (await readdir(directory)).some(name => name.includes('.tmp-'))
+      ).toBe(false);
+    }
+  );
 
   it('persists live-main and plan-validation failures before upload', async () => {
     const fixture = await preparedFixture();
@@ -711,13 +717,12 @@ describe('receipt durability', () => {
     ).toBe(false);
   });
 
-  it.each([
-    'SIGINT',
-    'SIGTERM',
-  ])('persists a terminal receipt during a process-level %s interleaving', async signal => {
-    const directory = await makeTemp();
-    const receiptPath = join(directory, `${signal}.json`);
-    const driver = `
+  it.each(['SIGINT', 'SIGTERM'])(
+    'persists a terminal receipt during a process-level %s interleaving',
+    async signal => {
+      const directory = await makeTemp();
+      const receiptPath = join(directory, `${signal}.json`);
+      const driver = `
         const mod = await import(process.argv[1]);
         const receiptPath = process.argv[2];
         const writer = mod.createAtomicReceiptWriter(receiptPath, {
@@ -735,45 +740,46 @@ describe('receipt durability', () => {
         writer.write({schema:mod.RECEIPT_SCHEMA,kind:'item',outcome:'started',mutationAttempted:false,mutationApplied:false});
         setInterval(() => {}, 1000);
       `;
-    const child = spawn(
-      process.execPath,
-      ['--input-type=module', '-e', driver, MODULE_URL, receiptPath],
-      { stdio: ['ignore', 'pipe', 'pipe'] }
-    );
-    let stderr = '';
-    child.stderr.on('data', chunk => {
-      stderr += chunk;
-    });
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error(`child did not become ready: ${stderr}`)),
-        5000
+      const child = spawn(
+        process.execPath,
+        ['--input-type=module', '-e', driver, MODULE_URL, receiptPath],
+        { stdio: ['ignore', 'pipe', 'pipe'] }
       );
-      child.stdout.on('data', chunk => {
-        if (String(chunk).includes('READY')) {
+      let stderr = '';
+      child.stderr.on('data', chunk => {
+        stderr += chunk;
+      });
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error(`child did not become ready: ${stderr}`)),
+          5000
+        );
+        child.stdout.on('data', chunk => {
+          if (String(chunk).includes('READY')) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+      child.kill(signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
+      const exitCode = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          child.kill('SIGKILL');
+          reject(new Error(`child did not exit: ${stderr}`));
+        }, 5000);
+        child.once('exit', code => {
           clearTimeout(timeout);
-          resolve();
-        }
+          resolve(code);
+        });
       });
-    });
-    child.kill(signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
-    const exitCode = await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        child.kill('SIGKILL');
-        reject(new Error(`child did not exit: ${stderr}`));
-      }, 5000);
-      child.once('exit', code => {
-        clearTimeout(timeout);
-        resolve(code);
-      });
-    });
-    expect(exitCode).toBe(signal === 'SIGINT' ? 130 : 143);
-    const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
-    expect(receipt.outcome).toBe('cancelled_indeterminate');
-    expect(receipt.mutationAttempted).toBeNull();
-    expect(receipt.mutationApplied).toBeNull();
-    expect(
-      (await readdir(directory)).some(name => name.includes('.tmp-'))
-    ).toBe(false);
-  });
+      expect(exitCode).toBe(signal === 'SIGINT' ? 130 : 143);
+      const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+      expect(receipt.outcome).toBe('cancelled_indeterminate');
+      expect(receipt.mutationAttempted).toBeNull();
+      expect(receipt.mutationApplied).toBeNull();
+      expect(
+        (await readdir(directory)).some(name => name.includes('.tmp-'))
+      ).toBe(false);
+    }
+  );
 });
