@@ -3,6 +3,8 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import { getChangelogSnapshot } from '@/lib/changelog-source';
+import { projectCustomerChangelog } from '@/lib/customer-changelog';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
@@ -207,17 +209,44 @@ export async function getOvieMacHudInFlightPullRequests(): Promise<OvieMacHudInF
   }
 }
 
+const ACTIVITY_RECEIPT_LIMIT = 12;
+const ACTIVITY_PUBLIC_UPDATE_LIMIT = 3;
+
+async function readPublicUpdates(): Promise<
+  { title: string; date: string; url: string }[]
+> {
+  try {
+    const snapshot = await getChangelogSnapshot();
+    return projectCustomerChangelog(snapshot.releases)
+      .slice(0, ACTIVITY_PUBLIC_UPDATE_LIMIT)
+      .map(entry => ({
+        title: entry.title,
+        date: entry.date,
+        url: '/changelog',
+      }));
+  } catch (error) {
+    await captureError('Ovie Mac HUD public updates unavailable', error);
+    return [];
+  }
+}
+
 export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
-    await Promise.all([
-      getAdminStripeOverviewMetrics(),
-      getAdminMercuryMetrics(),
-      getOvieMacHudInFlightPullRequests(),
-      getLybDailyMrr(new Date(nowMs)),
-    ]);
+  const [
+    stripeMetrics,
+    mercuryMetrics,
+    inFlightPullRequests,
+    lybMrr,
+    publicUpdates,
+  ] = await Promise.all([
+    getAdminStripeOverviewMetrics(),
+    getAdminMercuryMetrics(),
+    getOvieMacHudInFlightPullRequests(),
+    getLybDailyMrr(new Date(nowMs)),
+    readPublicUpdates(),
+  ]);
   const shipping = readShippingEntries();
   const financialAvailable =
     stripeMetrics.isAvailable &&
@@ -257,6 +286,11 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    activity: {
+      receipts: shipping.entries.slice(0, ACTIVITY_RECEIPT_LIMIT),
+      receiptsAvailable: shipping.available,
+      publicUpdates,
+    },
     lybMrr,
     generatedAtIso,
     nowMs,

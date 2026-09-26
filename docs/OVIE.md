@@ -73,6 +73,19 @@ and Eve remains denied from card transitions.
 
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
 
+## Company activity feed (JOV-5322)
+
+The packaged Mac HUD (`?ovie=mac`) renders one activity feed below the three
+hero metrics — not a second HUD, sidebar, or issue list. Rows compose the
+shared authorities read-only: Linear-canonical operational tasks from the
+shipping-state projection (exact states queued → in progress → merged →
+deployed, plus blocked), dogfood-receipted production ships, and the curated
+public changelog projection (JOV-6203) as What's New rows. Merged never
+displays as shipped without deployment and receipt evidence; missing sources
+surface syncing/stale/unavailable, never zero or current. Composer:
+`apps/web/lib/hud/ovie-activity-feed.ts`; panel:
+`apps/web/components/features/admin/hud/OvieActivityFeedPanel.tsx`.
+
 ## History
 
 The original Ovie plan was a standalone Swift menu-bar app at
