@@ -508,6 +508,7 @@ const mockRelease = {
   id: 'release_1',
   profileId: 'profile_1',
   title: 'Test Release',
+  status: 'released' as const,
   releaseDate: '2025-06-01T00:00:00.000Z',
   artworkUrl: 'https://example.com/art.jpg',
   slug: 'test-release',
