@@ -22,7 +22,7 @@ export default async function ReportPage({
         <ContentSectionHeader
           density='compact'
           title='Report this page'
-          subtitle='Flag a Jovie profile, smart link, or page for abuse, phishing, impersonation, or a security issue.'
+          subtitle='Flag abuse, phishing, impersonation, or a security issue on Jovie.'
         />
         <div className='px-5 py-5 sm:px-6'>
           <ReportForm initialTargetType={type} initialTarget={target} />

@@ -26,7 +26,7 @@ const CATEGORY_OPTIONS = (
   ] as const
 ).map(([value, label]) => ({ value: value as ReportCategory, label }));
 
-const SUCCESS_MESSAGE = 'Thanks — we received your report and will review it.';
+const GENERIC_ERROR = 'Unable to submit report right now.';
 
 function Field({
   children,
@@ -59,18 +59,12 @@ export function ReportForm({
   initialTargetType,
   initialTarget,
 }: ReportFormProps) {
-  const validTargetType = TARGET_TYPE_OPTIONS.some(
+  const defaultType = TARGET_TYPE_OPTIONS.some(
     ({ value }) => value === initialTargetType
   )
-    ? (initialTargetType as ReportTargetType)
+    ? initialTargetType
     : 'page';
 
-  const [targetType, setTargetType] =
-    useState<ReportTargetType>(validTargetType);
-  const [target, setTarget] = useState(initialTarget ?? '');
-  const [category, setCategory] = useState<ReportCategory>('phishing');
-  const [details, setDetails] = useState('');
-  const [reporterEmail, setReporterEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,16 +74,17 @@ export function ReportForm({
     setSubmitting(true);
     setError(null);
 
+    const form = new FormData(event.currentTarget);
     try {
       const response = await fetch('/api/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetType,
-          target,
-          category,
-          details: details || undefined,
-          reporterEmail: reporterEmail || undefined,
+          targetType: form.get('targetType'),
+          target: form.get('target'),
+          category: form.get('category'),
+          details: form.get('details') || undefined,
+          reporterEmail: form.get('email') || undefined,
         }),
       });
 
@@ -97,15 +92,14 @@ export function ReportForm({
         const body = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(body?.error ?? 'Unable to submit report right now.');
+        setError(body?.error ?? GENERIC_ERROR);
         return;
       }
 
-      // Deliberately show only a generic confirmation — no queue position,
-      // moderation state, or internal identifiers are exposed to reporters.
+      // Generic confirmation only — no queue position or internal state.
       setSubmitted(true);
     } catch {
-      setError('Unable to submit report right now.');
+      setError(GENERIC_ERROR);
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +108,7 @@ export function ReportForm({
   if (submitted) {
     return (
       <p className='text-sm text-secondary-token' role='status'>
-        {SUCCESS_MESSAGE}
+        Thanks — we received your report and will review it.
       </p>
     );
   }
@@ -124,19 +118,17 @@ export function ReportForm({
       <Field htmlFor='report-target-type' label='What Are You Reporting?'>
         <NativeSelect
           id='report-target-type'
+          name='targetType'
           options={TARGET_TYPE_OPTIONS}
-          value={targetType}
-          onChange={event =>
-            setTargetType(event.target.value as ReportTargetType)
-          }
+          defaultValue={defaultType}
         />
       </Field>
 
       <Field htmlFor='report-target' label='Profile Handle, Link, Or Page URL'>
         <Input
           id='report-target'
-          value={target}
-          onChange={event => setTarget(event.target.value)}
+          name='target'
+          defaultValue={initialTarget}
           placeholder='E.g. @handle or https://jov.ie/…'
           required
           maxLength={500}
@@ -146,17 +138,16 @@ export function ReportForm({
       <Field htmlFor='report-category' label='Category'>
         <NativeSelect
           id='report-category'
+          name='category'
           options={CATEGORY_OPTIONS}
-          value={category}
-          onChange={event => setCategory(event.target.value as ReportCategory)}
+          defaultValue='phishing'
         />
       </Field>
 
       <Field htmlFor='report-details' label='Details (Optional)'>
         <Textarea
           id='report-details'
-          value={details}
-          onChange={event => setDetails(event.target.value)}
+          name='details'
           placeholder='Anything that helps us investigate.'
           maxLength={2000}
           rows={4}
@@ -166,9 +157,8 @@ export function ReportForm({
       <Field htmlFor='report-email' label='Your Email (Optional)'>
         <Input
           id='report-email'
+          name='email'
           type='email'
-          value={reporterEmail}
-          onChange={event => setReporterEmail(event.target.value)}
           placeholder='Only if you want a follow-up'
           maxLength={320}
         />

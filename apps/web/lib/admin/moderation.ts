@@ -144,7 +144,7 @@ export async function applyModerationTakedown(input: ModerationTakedownInput) {
   };
 }
 
-/** Pending abuse/security reports for the admin moderation queue. */
+/** Pending abuse reports for the admin moderation queue. */
 export async function listAbuseReports(limit = 50) {
   return db
     .select({

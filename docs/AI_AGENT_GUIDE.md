@@ -55,7 +55,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/leads/[id]` | PATCH | Admin | Update lead |
 | `/api/admin/leads/keywords` | GET | Admin | Lead keywords |
 | `/api/admin/leads/qualify` | POST | Admin | Qualify leads |
-| `/api/admin/moderation` | GET/POST | Admin | List abuse reports / takedown profile+wrapped links |
+| `/api/admin/moderation` | GET/POST | Admin | Abuse reports + takedowns |
 | `/api/admin/overview` | GET | Admin | Admin dashboard overview |
 | `/api/admin/roles` | POST | Admin | Manage user roles |
 | `/api/admin/screenshots/[filename]` | GET | Admin | Serve screenshot |

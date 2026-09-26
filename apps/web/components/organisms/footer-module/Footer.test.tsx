@@ -49,8 +49,10 @@ describe('Footer', () => {
     }
   });
 
-  it('adds a Report link for the profile variant when a handle is present', () => {
-    render(<Footer variant='profile' artistHandle='someartist' />);
+  it('adds a Report link on the profile variant only when a handle is present', () => {
+    const { rerender } = render(
+      <Footer variant='profile' artistHandle='someartist' />
+    );
 
     for (const link of screen.getAllByRole('link', { name: 'Report' })) {
       expect(link).toHaveAttribute(
@@ -58,13 +60,8 @@ describe('Footer', () => {
         `${APP_ROUTES.REPORT}?type=profile&target=someartist`
       );
     }
-  });
 
-  it('omits the Report link on the profile variant without a handle', () => {
-    render(<Footer variant='profile' />);
-
-    expect(
-      screen.queryByRole('link', { name: 'Report' })
-    ).not.toBeInTheDocument();
+    rerender(<Footer variant='profile' />);
+    expect(screen.queryByRole('link', { name: 'Report' })).toBeNull();
   });
 });

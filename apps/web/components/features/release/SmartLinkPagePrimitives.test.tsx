@@ -34,26 +34,17 @@ describe('SmartLinkArtworkCard', () => {
 
 describe('SmartLinkPoweredByFooter', () => {
   it('links to the abuse report flow for smart links', () => {
-    render(<SmartLinkPoweredByFooter />);
-
-    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
-      'href',
-      '/report?type=smart_link'
-    );
+    const { rerender } = render(<SmartLinkPoweredByFooter />);
+    const link = screen.getByRole('link', { name: 'Report' });
+    expect(link).toHaveAttribute('href', '/report?type=smart_link');
     expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
       'href',
       '/'
     );
-  });
 
-  it('honours a custom report href', () => {
-    render(
+    rerender(
       <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
     );
-
-    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
-      'href',
-      '/report?type=smart_link&target=abc'
-    );
+    expect(link).toHaveAttribute('href', '/report?type=smart_link&target=abc');
   });
 });
