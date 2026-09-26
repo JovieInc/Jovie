@@ -1743,3 +1743,62 @@ describe('shipping-state security', () => {
     );
   });
 });
+
+describe('reopened repair semantics (JOV-5248)', () => {
+  it('does not alias blocked work as terminal failures', async () => {
+    const blocked = (items: unknown[]) =>
+      ok('symphony-runtime', { running: [], retrying: [], blocked: items });
+    const unmarked = await publish(
+      baseline({ 'symphony-runtime': blocked([{ issue_identifier: 'JOV-1' }]) })
+    );
+    expect(unmarked.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+    expect(unmarked.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+    resetShippingStatePublisher();
+    const marked = await publish(
+      baseline({
+        'symphony-runtime': blocked([
+          { issue_identifier: 'JOV-1', launcherFailure: { retryable: false } },
+          { issue_identifier: 'JOV-2', retryable: true },
+          { issue_identifier: 'JOV-3', exhausted: true },
+        ]),
+      })
+    );
+    expect(marked.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+    resetShippingStatePublisher();
+    expect((await publish(baseline())).terminalFailures).toEqual({
+      state: 'measured-zero',
+      value: 0,
+    });
+  });
+
+  it('measures ship time only for a matched build identity', async () => {
+    const receipt = (sha: string) =>
+      ok(
+        'fleet-receipt',
+        { state: 'GREEN', signals: { main: { sha } } },
+        { correlation: { sha }, sourceTimestamp: '2026-08-21T23:50:00.000Z' }
+      );
+    const matched = await publish(baseline({ 'fleet-receipt': receipt(SHA) }));
+    expect(matched.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 600,
+    });
+    resetShippingStatePublisher();
+    const mismatched = await publish(
+      baseline({ 'fleet-receipt': receipt(SHA_B) })
+    );
+    expect(mismatched.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+});

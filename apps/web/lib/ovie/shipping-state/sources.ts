@@ -107,6 +107,38 @@ function countFromNumber(value: unknown): CountMeasurement {
     : NOT_MEASURED_COUNT;
 }
 
+function terminalMarker(item: Record<string, unknown>): boolean | null {
+  const f = isRecord(item.launcherFailure) ? item.launcherFailure : null;
+  const flags = [
+    item.terminal,
+    item.deadLettered,
+    item.retryable,
+    item.exhausted,
+    f?.retryable,
+    f?.exhausted,
+  ];
+  if (flags.every(flag => flag === undefined)) return null;
+  return flags.some((flag, i) => flag === (i === 2 || i === 4 ? false : true));
+}
+
+// `blocked` holds both retry-scheduled and terminal work; count only items the
+// authority explicitly marked terminal, else stay not-measured.
+function terminalFailureCount(blocked: unknown): CountMeasurement {
+  if (!Array.isArray(blocked)) return NOT_MEASURED_COUNT;
+  let marked = false;
+  let count = 0;
+  for (const item of blocked) {
+    if (!isRecord(item)) return NOT_MEASURED_COUNT;
+    const marker = terminalMarker(item);
+    if (marker == null) continue;
+    marked = true;
+    if (marker) count += 1;
+  }
+  return marked || blocked.length === 0
+    ? measuredCount(count)
+    : NOT_MEASURED_COUNT;
+}
+
 export function failedRead(
   sourceId: ShippingSourceId,
   status: AuthorityReadStatus,
@@ -148,6 +180,7 @@ export function interpretCounts(
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
+      terminalFailures: terminalFailureCount(payload.blocked),
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,
