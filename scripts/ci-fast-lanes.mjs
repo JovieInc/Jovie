@@ -95,13 +95,27 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // production-marker-state coverage gate (operations structural command), and
 // every unit test in the quarantine ledger (Unit Tests reruns those with
 // retries under continue-on-error).
+const PLAYWRIGHT_RECEIPT_CI_TEST =
+  'tests/unit/ci/playwright-artifact-secrets.test.ts';
 const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
-  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  PLAYWRIGHT_RECEIPT_CI_TEST,
   'tests/unit/ci/production-marker-state.test.ts',
 ]);
 // Run by name in the web structural parts so it executes even while it sits in
 // the quarantine ledger.
 const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+// Web Unit Tests run the Playwright receipt only for web merge groups/pushes
+// (never PRs), so #18718 broke it unseen. Run it here when they will not.
+const PLAYWRIGHT_RECEIPT_INPUTS =
+  /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
+export function selectPlaywrightReceipt(event, selected, changed) {
+  if (event === 'pull_request') {
+    return (
+      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    );
+  }
+  return event !== 'workflow_dispatch' && !selected.has('web');
+}
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
   runElsewhere = []
@@ -185,8 +199,8 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
 /** @param {string} shard @param {string} expression */
 // The suite spawns thousands of short-lived jq/gh/node processes, so it is
 // CPU-bound on process startup: pytest-xdist spreads each shard over two
-// workers. Two, not auto: both shards run concurrently in the structural pool
-// on 4 vCPU, and a fourth concurrent worker measured slower (JovieInc/Jovie#18657).
+// workers. Two, not auto: both shards run concurrently on the 4 vCPU
+// structural python job; more workers measured slower (JovieInc/Jovie#18657).
 const structuralPytestShard = (shard, expression) =>
   `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
@@ -194,6 +208,9 @@ export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
   structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
   structuralPytestShard('b', `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`),
 ]);
+const STRUCTURAL_PYTEST_PARTS = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(
+  structuralPythonRegression
+);
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -211,7 +228,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
     ].join(' && ')
   ),
-  ...STRUCTURAL_PYTEST_SHARD_COMMANDS.map(structuralPythonRegression),
+  ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
@@ -234,6 +251,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
@@ -1156,7 +1174,7 @@ function runTypecheck() {
       };
     }
   }
-  return shell('pnpm turbo typecheck --affected --force');
+  return shellAsync('pnpm turbo typecheck --affected --force');
 }
 
 function runWebTestsTypecheck() {
@@ -1193,7 +1211,10 @@ function runWebTestsTypecheck() {
       };
     }
   }
-  return shell(WEB_TESTS_TYPECHECK_COMMAND);
+  // Own lock so it overlaps app tsc instead of queueing behind it.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
 }
 
 function runScriptsTypecheck() {
@@ -1730,7 +1751,8 @@ export async function runStructural(opts = {}) {
     SCRIPT_CONTRACT_VITEST_COMMAND,
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
+    // merge-group-workflow-contract runs in ci:control:test's Vitest run.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1812,7 +1834,7 @@ export async function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
-  const parts = [
+  const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
           webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
@@ -1826,6 +1848,11 @@ export async function runStructural(opts = {}) {
           // Targeting Vitest directly also fails closed when the file cannot
           // be resolved or contains no tests.
           `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          ...(selectPlaywrightReceipt(event, selected, changed)
+            ? [
+                `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${PLAYWRIGHT_RECEIPT_CI_TEST}`,
+              ]
+            : []),
         ]
       : []),
     ...invariantParts,
@@ -1833,6 +1860,14 @@ export async function runStructural(opts = {}) {
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
   ];
+  // ci-fast (structural python) runs `only` the pytest shards; remaining skips.
+  // Consume the split mode so nested contract suites (which rebuild this
+  // list) don't inherit it and see a filtered pool.
+  const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
+  delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const parts = allParts.filter(
+    part => mode !== (STRUCTURAL_PYTEST_PARTS.includes(part) ? 'skip' : 'only')
+  );
   if (parts.length === 0) {
     return {
       code: 0,
@@ -1979,10 +2014,20 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
+    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    const started = new Map();
+    for (const lane of selectedLanes.filter(l =>
+      LANE_GROUPS.typecheck.includes(l.id)
+    )) {
+      const run = Promise.resolve().then(() => lane.run());
+      run.catch(() => {});
+      started.set(lane.id, [Date.now(), run]);
+    }
+
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
-      const laneStartedAt = Date.now();
+      const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
@@ -2001,7 +2046,7 @@ async function main() {
 
       let outcome;
       try {
-        outcome = await lane.run();
+        outcome = await (run ?? lane.run());
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);

@@ -140,7 +140,10 @@ function getStepRunScript(jobBlock, stepName) {
     stepStart,
     stepEnd === -1 ? lines.length : stepEnd
   );
-  const runStart = stepLines.findIndex(line => line === '        run: |');
+  // `run: &anchor |` shares the script with ci-fast (structural python).
+  const runStart = stepLines.findIndex(line =>
+    /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
+  );
   expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
   return stepLines
     .slice(runStart + 1)
@@ -186,12 +189,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -231,9 +234,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -427,7 +430,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
-      expect(job, jobId).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
       expect(job, jobId).not.toContain('always()');
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
@@ -491,7 +494,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(3);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(4);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -792,10 +795,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "github.event_name == 'merge_group' && matrix.shard == '4/10'"
-    );
-    expect(unitTests).toContain(
-      "github.event_name != 'merge_group' && matrix.shard == '1/10'"
+      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
@@ -1552,6 +1552,10 @@ ${selectedGateScript}`,
       'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
     );
     expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    // Non-saving runs skip the cache write; push must still persist it.
+    expect(step('Build exact combined head')).toContain(
+      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
+    );
     expect(buildLayout).not.toContain('pull_request_target');
     expect(buildLayout).not.toContain('secrets.');
   });
@@ -1640,6 +1644,7 @@ ${selectedGateScript}`,
     // Same web build and public mock env as the combined head build.
     const build = stepIn(warm, 'Build web for cache');
     expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
+    expect(warm).not.toContain('TURBO_ENGINE_READ_ONLY');
     const envLines = step =>
       step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
     const ciBuild = stepIn(buildLayout, 'Build exact combined head');

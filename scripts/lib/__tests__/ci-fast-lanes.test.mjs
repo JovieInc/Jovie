@@ -22,6 +22,7 @@ import {
   runDesignConformance,
   runStructural,
   STRUCTURAL_DEFAULT_CONCURRENCY,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -87,6 +88,10 @@ describe('CI control selector', () => {
       expect(scriptCommand).toBeDefined();
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
+      );
+      // The structural lane relies on this run instead of repeating it.
+      expect(scriptCommand.split(' ')).toContain(
+        'lib/__tests__/merge-group-workflow-contract.test.mjs'
       );
       expect(scriptCommand).toContain('--coverage');
     } finally {
@@ -317,6 +322,29 @@ describe('runStructural screenshot contract discovery', () => {
     }
   );
 
+  // #18718: web merge groups keep the receipt in Unit Tests only.
+  it.each([
+    ['pull_request', 'operations', '.github/workflows/ci.yml', 1],
+    ['pull_request', 'web', 'apps/web/app/page.tsx', 0],
+    ['merge_group', 'operations', '.github/workflows/ci.yml', 1],
+    ['merge_group', 'web,operations', '.github/workflows/ci.yml', 0],
+  ])(
+    'runs the Playwright receipt on %s (%s) for %s: %i',
+    async (event, lanes, path, expected) => {
+      process.env.GITHUB_EVENT_NAME = event;
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ changedFileList: [path], execute });
+      const receipt = execute.mock.calls.filter(([command]) =>
+        command.endsWith(
+          'ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+        )
+      );
+      expect(receipt).toHaveLength(expected);
+    }
+  );
+
   it('stops before later structural commands when the screenshot contract fails', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'operations';
@@ -369,6 +397,22 @@ describe('runStructural screenshot contract discovery', () => {
         ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
       )
     ).toBe(true);
+  });
+
+  it('splits the structural pytest shards between two hosted jobs', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async mode => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', mode);
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const [all, only] = [await run(''), await run('only')];
+    expect(only).toEqual(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1));
+    expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
   });
 
   it('uses the default executor on the structural skip path', async () => {
