@@ -376,7 +376,7 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | `session-start.sh` | Session start | Verifies Node/pnpm versions, installs deps, builds gstack |
-| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if typecheck, Biome lint, server boundaries, or affected tests fail |
+| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if Biome (changed files), web typecheck, server boundaries, or changed web test files fail; checks the session cwd |
 
 ## Agent Autonomy: When to Ask vs. Just Do It
 
