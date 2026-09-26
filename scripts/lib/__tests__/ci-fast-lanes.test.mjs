@@ -88,6 +88,10 @@ describe('CI control selector', () => {
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
       );
+      // The structural lane relies on this run instead of repeating it.
+      expect(scriptCommand.split(' ')).toContain(
+        'lib/__tests__/merge-group-workflow-contract.test.mjs'
+      );
       expect(scriptCommand).toContain('--coverage');
     } finally {
       rmSync(directory, { recursive: true, force: true });
