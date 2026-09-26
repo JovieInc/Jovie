@@ -1,10 +1,18 @@
+import type { MemorySourceType } from '@/lib/db/schema/memory';
+
 /**
- * Verified profile facts → bios and press boilerplate (JOV-6344).
- * `subjectEntityId`/`evidence[].sourceRecordId` reuse canonical memory
- * entity/source-record ids. Generation paraphrases supported facts only:
- * it never strengthens a claim, infers publication permission, or treats
- * confidence as verification. Approval, verification, and permission are
- * separate gates.
+ * Verified profile facts (JOV-6344)
+ *
+ * Turns the memory entity/evidence graph into attributable profile proof:
+ * candidate facts bound to canonical entity IDs and source records, a
+ * lifecycle that separates approval from verification and publication
+ * permission, and deterministic bio/press-boilerplate generation with
+ * sentence-to-evidence traceability.
+ *
+ * Invariant: generation may select and paraphrase supported facts for an
+ * audience; it may not strengthen a claim beyond its evidence, infer
+ * publication permission, or turn a confidence score into verification.
+ * Unavailable claims are omitted, never manufactured.
  */
 
 export type ProfileFactStatus =
@@ -14,260 +22,372 @@ export type ProfileFactStatus =
   | 'stale'
   | 'revoked';
 
-export type PublicationPermission = 'none' | 'internal' | 'public';
+export type PublicationPermission = 'private' | 'internal' | 'public';
 
-export type ProfileFactKind =
-  | 'role'
-  | 'membership'
-  | 'metric'
-  | 'release_credit'
-  | 'award'
-  | 'profile';
+export type FactConfidence = 'low' | 'medium' | 'high';
+
+export interface ProfileFactWindow {
+  readonly start: string;
+  readonly end?: string;
+}
+
+export interface ProfileFactClaim {
+  /** What is claimed, e.g. 'all-time Spotify streams'. */
+  readonly label: string;
+  /** Exact value. Deliberately rounded display uses `displayValue` only. */
+  readonly value: number | string;
+  readonly unit?: string;
+  readonly window?: ProfileFactWindow;
+}
 
 export interface ProfileFactEvidence {
-  /** memory_source_records.id */
+  /** Canonical memory_source_records.id */
   readonly sourceRecordId: string;
-  readonly locator: string;
+  readonly sourceType: MemorySourceType;
+  /** Where in the source the claim is supported (URL, doc anchor, line). */
+  readonly location?: string;
   readonly note?: string;
+  /** Private-source facts stay private unless `publication` is 'public'. */
+  readonly visibility: 'public' | 'private';
 }
 
 export interface ProfileFact {
   readonly id: string;
+  /** Canonical memory_entities.id for the subject. */
   readonly subjectEntityId: string;
-  readonly subjectStatus: 'candidate' | 'confirmed' | 'rejected' | 'merged';
-  readonly kind: ProfileFactKind;
-  /** Specific role/relationship, e.g. 'founder_of'. */
-  readonly predicate: string;
-  /** Related entity/object display name, e.g. 'Jovie'. */
-  readonly object?: string;
-  readonly value?: number;
-  readonly unit?: string;
-  readonly window?: string;
-  /** Exact claim as supported by the evidence. */
-  readonly claim: string;
+  readonly subjectName: string;
+  /** Specific role/relationship, e.g. 'founder', 'member', 'writer'. */
+  readonly relation?: string;
+  /** Object of the relation, e.g. 'Jovie'. */
+  readonly objectName?: string;
+  /**
+   * Rendered sentence fragment bound to the evidence, e.g.
+   * 'is the founder of Jovie'. Generated output uses this verbatim;
+   * it must not assert more than `claim` + `evidence` support.
+   */
+  readonly phrase: string;
+  readonly claim: ProfileFactClaim;
   readonly evidence: readonly ProfileFactEvidence[];
   readonly observedAt: string;
   readonly verifiedAt?: string;
+  /** After this instant the fact is treated as stale pending re-check. */
+  readonly expiresAt?: string;
   readonly limitations?: readonly string[];
-  readonly confidence: 'low' | 'medium' | 'high';
+  readonly confidence: FactConfidence;
+  status: ProfileFactStatus;
+  publication: PublicationPermission;
+  /**
+   * Human-approved wording. Approval is orthogonal to verification:
+   * approved wording on an unverified fact does not make it eligible.
+   */
+  approvedWording?: string;
+  /**
+   * Groups overlapping observations of the same underlying quantity so
+   * generators dedupe instead of double-counting (e.g. two providers
+   * reporting the same all-time stream count).
+   */
+  readonly aggregateKey?: string;
+  /** Audience/topic tags used only for relevance selection. */
+  readonly topics?: readonly string[];
+}
+
+export type ResolvedFactStatus = ProfileFactStatus | 'publication_eligible';
+
+export interface ResolvedFact {
+  readonly fact: ProfileFact;
+  /** Effective lifecycle state after applying staleness. */
   readonly status: ProfileFactStatus;
-  readonly publication: PublicationPermission;
+  readonly publicationEligible: boolean;
+  readonly reasons: readonly string[];
 }
 
-const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 } as const;
-
-/**
- * Public-surface gate: confirmed subject + verified claim + explicit public
- * permission + cited source records. Anything less is omitted, not softened.
- */
-export function isPublicationEligible(fact: ProfileFact): boolean {
-  return (
-    fact.subjectStatus === 'confirmed' &&
-    fact.status === 'verified' &&
-    fact.publication === 'public' &&
-    fact.evidence.length > 0 &&
-    fact.evidence.every(ref => ref.sourceRecordId.length > 0)
-  );
-}
-
-function omissionReason(fact: ProfileFact): string {
-  if (fact.subjectStatus !== 'confirmed')
-    return `subject entity is ${fact.subjectStatus}, not confirmed`;
-  if (fact.status !== 'verified') return `fact status is ${fact.status}`;
-  if (fact.publication !== 'public')
-    return `publication permission is ${fact.publication}`;
-  return 'no source-record evidence';
-}
-
-export function selectEligibleFacts(facts: readonly ProfileFact[]): {
-  eligible: ProfileFact[];
-  omitted: { fact: ProfileFact; reason: string }[];
-} {
-  const eligible: ProfileFact[] = [];
-  const omitted: { fact: ProfileFact; reason: string }[] = [];
-  for (const fact of facts) {
-    if (isPublicationEligible(fact)) eligible.push(fact);
-    else omitted.push({ fact, reason: omissionReason(fact) });
-  }
-  return { eligible, omitted };
-}
-
-/** Overlapping metrics are never summed; keep one best fact per key. */
-export function dedupeMetrics(
-  facts: readonly ProfileFact[]
-): readonly ProfileFact[] {
-  const best = new Map<string, ProfileFact>();
-  const rest: ProfileFact[] = [];
-  for (const fact of facts) {
-    if (fact.kind !== 'metric') {
-      rest.push(fact);
-      continue;
-    }
-    const key = `${fact.predicate} ${fact.unit ?? ''}`;
-    const current = best.get(key);
-    if (
-      !current ||
-      CONFIDENCE_RANK[fact.confidence] > CONFIDENCE_RANK[current.confidence] ||
-      (fact.confidence === current.confidence &&
-        (fact.verifiedAt ?? fact.observedAt) >
-          (current.verifiedAt ?? current.observedAt))
-    ) {
-      best.set(key, fact);
-    }
-  }
-  return [...rest, ...best.values()];
-}
-
-export type BoilerplateAudience = 'press' | 'investor' | 'general';
-
-const AUDIENCE_KINDS: Record<BoilerplateAudience, readonly ProfileFactKind[]> =
-  {
-    press: ['profile', 'role', 'release_credit', 'metric', 'award'],
-    investor: ['profile', 'role', 'membership', 'metric'],
-    general: ['profile', 'role', 'membership', 'release_credit', 'metric'],
-  };
-
-/** Recipient relevance filter; never edits fact fields. */
-export function selectFactsForAudience(
-  facts: readonly ProfileFact[],
-  audience: BoilerplateAudience = 'general'
-): readonly ProfileFact[] {
-  return dedupeMetrics(selectEligibleFacts(facts).eligible).filter(fact =>
-    AUDIENCE_KINDS[audience].includes(fact.kind)
-  );
-}
-
-export interface BoilerplateSentence {
-  readonly text: string;
-  /** Fact ids this sentence paraphrases; traceability to evidence. */
-  readonly factIds: readonly string[];
-}
-
-export interface GeneratedBoilerplate {
-  readonly id: string;
-  readonly subjectEntityId: string;
-  readonly subjectName: string;
-  readonly audience: BoilerplateAudience;
-  readonly sentences: readonly BoilerplateSentence[];
-  readonly text: string;
-  readonly omittedFactIds: readonly string[];
-  readonly generatedAt: string;
-  readonly status: 'draft' | 'approved' | 'needs_reapproval' | 'withdrawn';
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  founder_of: 'founder of',
-  artist_on: 'artist',
-  member_of: 'member of',
+const CONFIDENCE_RANK: Record<FactConfidence, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
 };
 
-function renderSentence(
-  subjectName: string,
-  fact: ProfileFact
-): BoilerplateSentence | null {
-  const factIds = [fact.id];
-  const role = ROLE_LABELS[fact.predicate] ?? fact.predicate;
-  const join = (...parts: (string | undefined)[]) =>
-    `${parts.filter(Boolean).join(' ')}.`;
-  switch (fact.kind) {
-    case 'role':
-    case 'membership':
-      return {
-        text: join(
-          subjectName,
-          'is',
-          fact.kind === 'role' ? 'the' : 'a',
-          role,
-          fact.object
-        ),
-        factIds,
-      };
-    case 'metric': {
-      const value = fact.unit ? `${fact.value} ${fact.unit}` : `${fact.value}`;
-      const window = fact.window ? ` (${fact.window})` : '';
-      return {
-        text: `${fact.object ?? 'The catalog'} has ${value}${window}.`,
-        factIds,
-      };
-    }
-    case 'release_credit':
-      return {
-        text: join(
-          subjectName,
-          'is credited as',
-          role.replace(/ of$/, ''),
-          'on',
-          fact.object
-        ),
-        factIds,
-      };
-    case 'award':
-    case 'profile':
-      return {
-        text: fact.claim.endsWith('.') ? fact.claim : `${fact.claim}.`,
-        factIds,
-      };
-    default:
-      return null;
+export function resolveFact(
+  fact: ProfileFact,
+  now: Date = new Date()
+): ResolvedFact {
+  const reasons: string[] = [];
+  let status = fact.status;
+
+  if (status === 'revoked') {
+    reasons.push('fact revoked');
+  } else if (status === 'contradicted') {
+    reasons.push('contradictory evidence');
+  } else if (
+    status !== 'candidate' &&
+    fact.expiresAt != null &&
+    new Date(fact.expiresAt).getTime() <= now.getTime()
+  ) {
+    status = 'stale';
+    reasons.push('evidence window expired');
   }
+
+  if (status === 'candidate') {
+    reasons.push('not verified');
+  }
+  if (fact.evidence.length === 0) {
+    reasons.push('no evidence');
+  }
+  if (fact.publication !== 'public') {
+    reasons.push(`publication permission is ${fact.publication}`);
+  }
+
+  const publicationEligible =
+    status === 'verified' &&
+    fact.publication === 'public' &&
+    fact.evidence.length > 0;
+
+  return { fact, status, publicationEligible, reasons };
+}
+
+export interface SelectFactsOptions {
+  readonly subjectEntityId: string;
+  readonly now?: Date;
+  /**
+   * Restrict selection to facts carrying at least one of these topic tags.
+   * Relevance filter only — it never alters the fact or its wording.
+   */
+  readonly topics?: readonly string[];
+  readonly maxFacts?: number;
 }
 
 /**
- * Render a short bio/press boilerplate from publication-eligible facts for
- * one subject. Unsupported facts are omitted, never paraphrased in.
+ * Resolve subject ambiguity by binding strictly to `subjectEntityId` —
+ * a same-name different-person entity is excluded. Dedupe overlapping
+ * sources in the same `aggregateKey` (keeps the most confident, then most
+ * recently verified) so aggregate counts are never double-counted.
  */
-export function generateBoilerplate(input: {
-  readonly id: string;
-  readonly subjectEntityId: string;
-  readonly subjectName: string;
-  readonly audience?: BoilerplateAudience;
-  readonly facts: readonly ProfileFact[];
-  readonly generatedAt: string;
-}): GeneratedBoilerplate {
-  const audience = input.audience ?? 'general';
-  const selected = selectFactsForAudience(
-    input.facts.filter(fact => fact.subjectEntityId === input.subjectEntityId),
-    audience
-  );
-  const sentences: BoilerplateSentence[] = [];
-  const used = new Set<string>();
-  for (const fact of selected) {
-    const sentence = renderSentence(input.subjectName, fact);
-    if (sentence) {
-      sentences.push(sentence);
-      used.add(fact.id);
+export function selectEligibleFacts(
+  facts: readonly ProfileFact[],
+  options: SelectFactsOptions
+): ResolvedFact[] {
+  const now = options.now ?? new Date();
+  const topics = options.topics ? new Set(options.topics) : null;
+
+  const eligible = facts
+    .filter(f => f.subjectEntityId === options.subjectEntityId)
+    .filter(
+      f =>
+        topics == null || f.topics == null || f.topics.some(t => topics.has(t))
+    )
+    .map(f => resolveFact(f, now))
+    .filter(r => r.publicationEligible);
+
+  const byAggregate = new Map<string, ResolvedFact>();
+  const singles: ResolvedFact[] = [];
+  for (const resolved of eligible) {
+    const key = resolved.fact.aggregateKey;
+    if (key == null) {
+      singles.push(resolved);
+      continue;
+    }
+    const existing = byAggregate.get(key);
+    if (
+      existing == null ||
+      CONFIDENCE_RANK[resolved.fact.confidence] >
+        CONFIDENCE_RANK[existing.fact.confidence] ||
+      (resolved.fact.confidence === existing.fact.confidence &&
+        (resolved.fact.verifiedAt ?? '') > (existing.fact.verifiedAt ?? ''))
+    ) {
+      byAggregate.set(key, resolved);
     }
   }
+
+  const all = [...singles, ...byAggregate.values()];
+  return options.maxFacts != null ? all.slice(0, options.maxFacts) : all;
+}
+
+export interface GeneratedSentence {
+  readonly text: string;
+  readonly factId: string;
+  readonly evidenceSourceRecordIds: readonly string[];
+}
+
+export type DerivativeKind = 'bio' | 'pitch' | 'boilerplate';
+
+export type DerivativeStatus =
+  | 'draft'
+  | 'approved'
+  | 'needs_reapproval'
+  | 'withdrawn';
+
+export interface DerivativeVersion {
+  readonly at: string;
+  readonly status: DerivativeStatus;
+  readonly sentences: readonly GeneratedSentence[];
+  readonly note?: string;
+}
+
+export interface GeneratedDerivative {
+  readonly kind: DerivativeKind;
+  readonly subjectEntityId: string;
+  readonly audience?: string;
+  readonly sentences: readonly GeneratedSentence[];
+  status: DerivativeStatus;
+  /** Audit trail; approved versions are retained after later revocation. */
+  readonly versions: readonly DerivativeVersion[];
+}
+
+/**
+ * Lint a sentence against its source fact: every numeric token in the
+ * rendered text must equal the claim's exact value (or an explicitly
+ * declared rounded `displayValue`). This is the guard against
+ * embellishing paraphrases — a paraphrase that inflates the number,
+ * adds an unsupported count, or upgrades units is rejected.
+ */
+export function lintSentenceAgainstFact(
+  text: string,
+  fact: ProfileFact & { readonly displayValue?: number | string }
+): string[] {
+  const allowed = new Set<string>();
+  allowed.add(normalizeNumberToken(String(fact.claim.value)));
+  if (fact.displayValue != null) {
+    allowed.add(normalizeNumberToken(String(fact.displayValue)));
+  }
+  if (fact.claim.window != null) {
+    for (const endpoint of [fact.claim.window.start, fact.claim.window.end]) {
+      if (endpoint != null) {
+        for (const token of endpoint.match(/\d+/g) ?? []) {
+          allowed.add(token);
+        }
+      }
+    }
+  }
+
+  const violations: string[] = [];
+  for (const match of text.match(/\d[\d,.]*/g) ?? []) {
+    const normalized = normalizeNumberToken(match);
+    if (!allowed.has(normalized)) {
+      violations.push(`unsupported numeric claim '${match}' in '${text}'`);
+    }
+  }
+  return violations;
+}
+
+function normalizeNumberToken(token: string): string {
+  return token.replace(/[.,]/g, '');
+}
+
+function renderSentence(fact: ProfileFact): GeneratedSentence {
+  const subject = fact.subjectName;
+  const phrase = fact.phrase.trim().replace(/\.+$/, '');
   return {
-    id: input.id,
-    subjectEntityId: input.subjectEntityId,
-    subjectName: input.subjectName,
-    audience,
+    text: `${subject} ${phrase}.`,
+    factId: fact.id,
+    evidenceSourceRecordIds: [
+      ...new Set(fact.evidence.map(e => e.sourceRecordId)),
+    ],
+  };
+}
+
+export interface GenerateDerivativeOptions extends SelectFactsOptions {
+  readonly kind: DerivativeKind;
+  readonly audience?: string;
+}
+
+/**
+ * Select publication-eligible facts for the subject and render one
+ * traceable sentence per fact. Facts that are not eligible are omitted —
+ * never replaced with manufactured completeness. Selection can be
+ * audience-relevant via `topics` without changing any fact.
+ */
+export function generateDerivative(
+  facts: readonly ProfileFact[],
+  options: GenerateDerivativeOptions
+): GeneratedDerivative {
+  const selected = selectEligibleFacts(facts, options);
+  const sentences: GeneratedSentence[] = [];
+  for (const { fact } of selected) {
+    const sentence = renderSentence(fact);
+    const violations = lintSentenceAgainstFact(sentence.text, fact);
+    if (violations.length > 0) {
+      throw new Error(
+        `Generated sentence exceeds its evidence: ${violations.join('; ')}`
+      );
+    }
+    sentences.push(sentence);
+  }
+  const at = new Date().toISOString();
+  return {
+    kind: options.kind,
+    subjectEntityId: options.subjectEntityId,
+    audience: options.audience,
     sentences,
-    text: sentences.map(s => s.text).join(' '),
-    omittedFactIds: input.facts
-      .filter(fact => !used.has(fact.id))
-      .map(fact => fact.id),
-    generatedAt: input.generatedAt,
     status: 'draft',
+    versions: [{ at, status: 'draft', sentences, note: 'generated' }],
   };
 }
 
 /**
- * Mark a derivative `needs_reapproval` when any paraphrased fact lost
- * publication eligibility; prior versions are kept by callers for audit.
+ * Record human approval of wording. Approval does not verify any claim —
+ * it only marks the current sentence set as approved.
  */
-export function revalidateBoilerplate(
-  artifact: GeneratedBoilerplate,
-  currentFacts: readonly ProfileFact[]
-): GeneratedBoilerplate {
-  if (artifact.status === 'withdrawn') return artifact;
-  const byId = new Map(currentFacts.map(fact => [fact.id, fact]));
-  const supported = artifact.sentences.every(sentence =>
-    sentence.factIds.every(id => {
-      const fact = byId.get(id);
-      return fact !== undefined && isPublicationEligible(fact);
-    })
-  );
-  return supported ? artifact : { ...artifact, status: 'needs_reapproval' };
+export function approveDerivative(
+  derivative: GeneratedDerivative,
+  at: string = new Date().toISOString()
+): GeneratedDerivative {
+  return {
+    ...derivative,
+    status: 'approved',
+    versions: [
+      ...derivative.versions,
+      { at, status: 'approved', sentences: derivative.sentences },
+    ],
+  };
+}
+
+/**
+ * Apply updated fact states to a generated derivative. Revocation or
+ * contradiction of an underlying fact withdraws the affected sentences
+ * and marks the derivative for reapproval; prior versions remain in the
+ * audit trail.
+ */
+export function applyFactStates(
+  derivative: GeneratedDerivative,
+  facts: readonly ProfileFact[],
+  at: string = new Date().toISOString()
+): { derivative: GeneratedDerivative; withdrawnFactIds: string[] } {
+  const byId = new Map(facts.map(f => [f.id, f]));
+  const withdrawnFactIds: string[] = [];
+  const kept: GeneratedSentence[] = [];
+
+  for (const sentence of derivative.sentences) {
+    const fact = byId.get(sentence.factId);
+    const eligible = fact != null && resolveFact(fact).publicationEligible;
+    if (eligible) {
+      kept.push(sentence);
+    } else {
+      withdrawnFactIds.push(sentence.factId);
+    }
+  }
+
+  if (withdrawnFactIds.length === 0) {
+    return { derivative, withdrawnFactIds };
+  }
+
+  const status: DerivativeStatus =
+    kept.length === 0 ? 'withdrawn' : 'needs_reapproval';
+
+  return {
+    derivative: {
+      ...derivative,
+      sentences: kept,
+      status,
+      versions: [
+        ...derivative.versions,
+        {
+          at,
+          status,
+          sentences: kept,
+          note: `withdrew facts: ${withdrawnFactIds.join(', ')}`,
+        },
+      ],
+    },
+    withdrawnFactIds,
+  };
 }
