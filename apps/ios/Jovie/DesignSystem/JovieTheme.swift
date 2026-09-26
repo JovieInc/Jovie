@@ -164,6 +164,10 @@ enum JovieMotion {
   static let subtleDuration: Double = 0.15
   static let slowDuration: Double = 0.25
   static let cinematicDuration: Double = 0.42
+  /// Ambient loops (activity indicators like chat thinking dots) may exceed
+  /// the 300ms UI ladder but still draw from a token. One direction of the
+  /// breathe is `ambientDuration`; a full cycle is 2x.
+  static let ambientDuration: Double = 1.4
 
   /// --ease-subtle @ 150ms — hover/press/color micro-changes.
   static let subtle = Animation.timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)
