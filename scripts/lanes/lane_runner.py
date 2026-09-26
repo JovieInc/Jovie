@@ -148,6 +148,10 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  Do not mark it ready or merge it: an independent gate does that after verifying.",
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
+        "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
+        "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
+        "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
+        "  `gh pr create --draft`.",
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
 

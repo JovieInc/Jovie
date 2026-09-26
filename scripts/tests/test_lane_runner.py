@@ -72,6 +72,12 @@ class PromptTest(unittest.TestCase):
                        "Do not mark it ready or merge it", "NOT-SHIPPABLE"):
             self.assertIn(needle, prompt)
 
+    def test_contract_forbids_interactive_skill_workflows(self):
+        prompt = lane.render_prompt(issue(), "codex/jov-1", "")
+        self.assertIn("Never stop to ask", prompt)
+        self.assertIn("Do not run gstack", prompt)
+        self.assertIn("gh pr create --draft", prompt)
+
     def test_reports_missing_gbrain_instead_of_inventing_context(self):
         self.assertIn("GBrain unavailable", lane.render_prompt(issue(), "b", ""))
 
@@ -676,10 +682,15 @@ class FixRedTest(unittest.TestCase):
         ready = {**self.pr(number=9), "isDraft": False}
         self.assertEqual(lane.unverified_pr([ready, draft], {})["number"], 5)
         self.assertIsNone(lane.unverified_pr([draft], {"5": "h1"}))
+        saved = (lane.claimed_elsewhere, lane.post_claim)
+        lane.claimed_elsewhere, lane.post_claim = (lambda *a, **k: False), (lambda *a, **k: None)  # no GitHub in CI
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
-            self.assertEqual(lane.claim_adoptable_pr(host, "hyperagent", [draft])["number"], 5)
-            self.assertIsNone(lane.claim_adoptable_pr(host, "hyperagent", [draft]))
+            try:
+                self.assertEqual(lane.claim_adoptable_pr(host, "hyperagent", [draft])["number"], 5)
+                self.assertIsNone(lane.claim_adoptable_pr(host, "hyperagent", [draft]))
+            finally:
+                lane.claimed_elsewhere, lane.post_claim = saved
 
     def test_adopt_gates_the_pr_head_and_leaves_a_receipt(self):
         real_sh, real_gate = lane.sh, lane.gate_pr
@@ -695,7 +706,7 @@ class FixRedTest(unittest.TestCase):
 
     def test_a_timed_out_adopt_is_not_counted_as_verified(self):
         real_sh, real_gate = lane.sh, lane.gate_pr
-        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")  # claim list reads as empty
         lane.gate_pr = lambda host, pr, worktree, log: {"verdict": "gate-timeout", "pr": pr["number"],
                                                         "reasons": ["gate-timeout:2400s:x1"]}
         with tempfile.TemporaryDirectory() as tmp:
