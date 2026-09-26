@@ -4003,6 +4003,7 @@ JSON
                   if [[ "$args" == *"enablePullRequestAutoMerge"* ]]; then echo 1 >"$state_file"; echo '{{"data":{{"enablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
                   if [[ "$args" == *"dequeuePullRequest"* ]]; then echo 0 >"$state_file"; echo '{{"data":{{"dequeuePullRequest":{{"mergeQueueEntry":null}}}}}}'; exit 0; fi
                   if [[ "$args" == *"disablePullRequestAutoMerge"* ]]; then echo '{{"data":{{"disablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueEjectionHistory"* ]]; then printf '%s\n' '{{"data":{{"repository":{{"pullRequest":{{"timelineItems":{{"nodes":[]}}}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueuePullRequestState"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequest:$state}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueCanonicalMembership"* ]]; then
                     if [[ "$queued" != 1 ]]; then echo '{{"data":{{"repository":{{"pullRequest":{{"id":"PR_kwDO_native_904","number":904,"state":"OPEN","isDraft":false,"headRefOid":"'"$head"'","headRefName":"codex/controller-repair","baseRefName":"main","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","labels":{{"nodes":[]}},"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null,"timelineItems":{{"nodes":[],"pageInfo":{{"hasNextPage":false}}}}}}}}}}}}'; exit 0; fi

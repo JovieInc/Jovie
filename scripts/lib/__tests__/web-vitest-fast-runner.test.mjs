@@ -59,5 +59,7 @@ describe('web test:fast runner', () => {
       'Expected a single value for option "--passWithNoTests"'
     );
     expect(output).toContain('capitalizeFirst.test.ts');
-  }, 20_000);
+    // Real pnpm -> turbo --force -> web Vitest boot: measured 7.8s idle and
+    // 17.7s under ci-fast CPU contention, too close to the former 20s budget.
+  }, 60_000);
 });

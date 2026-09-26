@@ -3,7 +3,7 @@
 // @coverage-via apps/web/tests/components/dashboard/organisms/onboarding-v2-performance.test.tsx
 
 import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
-import { ArrowRight, Disc3, Music2, RefreshCw } from 'lucide-react';
+import { ArrowRight, AudioLines, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -2007,7 +2007,7 @@ export function OnboardingV2Form({
                       />
                     ) : (
                       <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-0 text-tertiary-token'>
-                        <Disc3 className='h-5 w-5' />
+                        <AudioLines className='h-5 w-5' />
                       </div>
                     )}
                     <div className='min-w-0'>

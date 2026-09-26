@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import {
   CircleHelp,
-  Disc3,
+  Layers,
   MessageCircle,
   Search,
   SlidersHorizontal,
@@ -104,7 +104,7 @@ function HeaderSearchResultIcon({
     return <CircleHelp className='h-3.5 w-3.5' aria-hidden='true' />;
   }
 
-  return <Disc3 className='h-3.5 w-3.5' aria-hidden='true' />;
+  return <Layers className='h-3.5 w-3.5' aria-hidden='true' />;
 }
 
 function getHeaderSearchResultRowClassName(isSelected: boolean) {

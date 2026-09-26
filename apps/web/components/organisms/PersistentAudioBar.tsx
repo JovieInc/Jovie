@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { AudioLines, Play, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Play } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,13 +14,6 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
-import {
-  readAudioBarDismissed,
-  shouldShowAudioBar,
-  subscribeAudioBarDismissal,
-  writeAudioBarDismissed,
-} from '@/components/shell/audio-bar-dismissal';
-import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
   APP_ROUTES,
@@ -39,11 +31,12 @@ import {
 
 const SHELL_AUDIO_BAR_TRANSITION =
   'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
+// Flat player (founder spec 2026-09-25 #1): no border to transition anymore.
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
-  'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+  'transition-[max-height,opacity,transform,background-color] duration-cinematic ease-cinematic';
 /** Docked now-playing chip — flat, no elevation into the content canvas (JOV-3511). */
 const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 rounded-md border-0 bg-transparent px-1 py-1 shadow-none transition-[opacity] duration-cinematic ease-cinematic';
+  'max-w-56 border-0 bg-transparent px-1 py-1 shadow-none transition-[opacity] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -52,28 +45,57 @@ function isLyricsRoutePath(pathname: string | null): boolean {
   );
 }
 
+/**
+ * PlayerVisibilityToggle — the sole affordance for opening/closing the
+ * compact player once a track is active (founder spec 2026-09-25). Subtle
+ * when closed, more prominent while open. 28px visible control, 44px hit
+ * area via the invisible `before:` pseudo-element (canonical touch-target
+ * pattern — see `.claude/rules/ui.md` "Inclusion and Component Ownership").
+ */
+function PlayerVisibilityToggle({
+  open,
+  onClick,
+}: {
+  readonly open: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-label={open ? 'Hide Player' : 'Show Player'}
+      aria-expanded={open}
+      data-testid='player-visibility-toggle'
+      className={cn(
+        'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        open
+          ? 'border border-subtle bg-surface-1/40 text-primary-token'
+          : 'text-quaternary-token hover:text-secondary-token'
+      )}
+    >
+      {open ? (
+        <ChevronDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+      ) : (
+        <ChevronUp className='h-3.5 w-3.5' strokeWidth={2.25} />
+      )}
+    </button>
+  );
+}
+
 export function PersistentAudioBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const {
-    playbackState,
-    toggleTrack,
-    playNext,
-    playPrevious,
-    seek,
-    stop,
-    onError,
-  } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, playNext, playPrevious, seek, onError } =
+    useTrackAudioPlayer();
   const prefersReducedMotion = useReducedMotion();
   const [imgError, setImgError] = useState(false);
-  const [barCollapsed, setBarCollapsed] = useState(false);
-  // The player shell is a global affordance even before a track is selected.
-  // Keep its idle slot mounted at zero height; the tray itself only opens on an
-  // explicit player shortcut so route content never gains surprise chrome.
-  const [idleTrayOpen, setIdleTrayOpen] = useState(false);
-  const [dismissed, setDismissed] = useState(() => readAudioBarDismissed());
-  const [waveformOn, setWaveformOn] = useState(true);
+  // Compact is the default surface for an active track (founder spec
+  // 2026-09-25). The bottom-right PlayerVisibilityToggle opens/closes it;
+  // there is no idle tray — the player is simply absent until a track loads.
+  const [playerOpen, setPlayerOpen] = useState(true);
+  const [waveformOn, setWaveformOn] = useState(false);
   // Cinematic reveal (JOV-3487): the shell bar lands into place from the
   // bottom on first play. Starts un-revealed so the CSS transition has an
   // off-screen "from" frame to interpolate from; flips to revealed on the
@@ -99,7 +121,7 @@ export function PersistentAudioBar() {
   }, [playbackState.artworkUrl]);
 
   useEffect(() => {
-    setBarCollapsed(false);
+    setPlayerOpen(true);
   }, [playbackState.activeTrackId]);
 
   // Drive the cinematic reveal. No active track → no reveal (un-revealed so
@@ -147,13 +169,6 @@ export function PersistentAudioBar() {
     toggleTrack,
   ]);
 
-  const handleDismiss = useCallback(() => {
-    writeAudioBarDismissed(true);
-    stop();
-  }, [stop]);
-
-  useEffect(() => subscribeAudioBarDismissal(setDismissed), []);
-
   const handleCloseLyrics = useCallback(() => {
     router.push(
       resolveLyricsReturnRoute(
@@ -185,12 +200,9 @@ export function PersistentAudioBar() {
 
   const activeTrackId = playbackState.activeTrackId;
   const hasActiveTrack = Boolean(activeTrackId);
-  const showPlayerBar = shouldShowAudioBar({
-    dismissed,
-    hasActiveTrack,
-    explicitPlay: false,
-  });
-  const compactPlayerVisible = showPlayerBar && barCollapsed;
+  // Idle (nothing loaded): the player is absent entirely — zero reserved
+  // space, no layout shift of main content (founder spec 2026-09-25 #5).
+  const compactPlayerVisible = hasActiveTrack && !playerOpen;
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -206,19 +218,11 @@ export function PersistentAudioBar() {
         return;
       }
 
-      if (event.key === 'Escape' && !hasActiveTrack && idleTrayOpen) {
-        event.preventDefault();
-        setIdleTrayOpen(false);
-        return;
-      }
+      if (!hasActiveTrack) return;
 
       if (event.key === '`' && plainKey) {
         event.preventDefault();
-        if (hasActiveTrack) {
-          setBarCollapsed(value => !value);
-        } else {
-          setIdleTrayOpen(value => !value);
-        }
+        setPlayerOpen(value => !value);
         return;
       }
 
@@ -229,15 +233,9 @@ export function PersistentAudioBar() {
         !event.shiftKey
       ) {
         event.preventDefault();
-        if (hasActiveTrack) {
-          setBarCollapsed(value => !value);
-        } else {
-          setIdleTrayOpen(value => !value);
-        }
+        setPlayerOpen(value => !value);
         return;
       }
-
-      if (!hasActiveTrack) return;
 
       if (event.key === ' ' && plainKey) {
         event.preventDefault();
@@ -264,13 +262,12 @@ export function PersistentAudioBar() {
     handleOpenLyrics,
     handleToggle,
     hasActiveTrack,
-    idleTrayOpen,
     pathname,
     playbackState.hasLyrics,
   ]);
 
   useEffect(() => {
-    if (!showPlayerBar || !activeTrackId) {
+    if (!hasActiveTrack || !activeTrackId) {
       resetAudioChromeSnapshot();
       return;
     }
@@ -280,95 +277,16 @@ export function PersistentAudioBar() {
       compactPlayerVisible,
       fullPlayerVisible: !compactPlayerVisible,
     });
-  }, [activeTrackId, compactPlayerVisible, showPlayerBar]);
+  }, [activeTrackId, compactPlayerVisible, hasActiveTrack]);
 
   useEffect(() => {
     return resetAudioChromeSnapshot;
   }, []);
 
-  if (!showPlayerBar || !activeTrackId) {
-    const isLibraryRoute = pathname === APP_ROUTES.LIBRARY;
-    const idleTray = (testId: string, className?: string) => (
-      <section
-        aria-hidden={!idleTrayOpen}
-        aria-label='Playback Controls'
-        inert={idleTrayOpen ? undefined : true}
-        className={cn(
-          'shrink-0 overflow-hidden bg-(--app-shell-content-surface)',
-          idleTrayOpen
-            ? 'border-t border-(--app-shell-border)'
-            : 'border-t border-transparent',
-          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME,
-          className
-        )}
-        data-testid={testId}
-        data-mobile-audio-surface={
-          testId === 'audio-surface-idle-shell-mobile' ? 'true' : undefined
-        }
-        style={{
-          maxHeight: idleTrayOpen ? 'var(--app-shell-audio-bar-max-height)' : 0,
-          opacity: idleTrayOpen ? 1 : 0,
-          transform: prefersReducedMotion
-            ? 'translateY(0)'
-            : idleTrayOpen
-              ? 'translateY(0)'
-              : 'translateY(10px)',
-          pointerEvents: idleTrayOpen ? 'auto' : 'none',
-          transition: prefersReducedMotion
-            ? 'none'
-            : SHELL_AUDIO_BAR_TRANSITION,
-        }}
-      >
-        <div
-          className='flex items-center justify-between gap-4 px-4 py-3 lg:px-6'
-          style={{ minHeight: 'var(--app-shell-audio-bar-max-height)' }}
-        >
-          <div className='flex min-w-0 items-center gap-3'>
-            <AudioLines
-              aria-hidden='true'
-              className='h-4 w-4 shrink-0 text-quaternary-token opacity-50'
-              strokeWidth={1.5}
-            />
-            <div className='min-w-0'>
-              <p className='text-sm font-medium text-secondary-token'>
-                Nothing playing
-              </p>
-              <p className='text-pretty text-xs leading-4 text-tertiary-token'>
-                {isLibraryRoute
-                  ? 'Choose a track to start playback.'
-                  : 'Choose a track from Library to start playback.'}
-              </p>
-            </div>
-          </div>
-          <div className='flex shrink-0 items-center gap-1'>
-            {!isLibraryRoute ? (
-              <Button
-                size='sm'
-                variant='link'
-                onClick={() => router.push(APP_ROUTES.LIBRARY)}
-              >
-                Open Library
-              </Button>
-            ) : null}
-            <IconBtn
-              label='Close Playback Controls'
-              tooltipSide='top'
-              tone='ghost'
-              onClick={() => setIdleTrayOpen(false)}
-            >
-              <X aria-hidden='true' className='h-3.5 w-3.5' />
-            </IconBtn>
-          </div>
-        </div>
-      </section>
-    );
-
-    return (
-      <>
-        {idleTray('audio-surface-idle-shell-desktop', 'hidden lg:block')}
-        {idleTray('audio-surface-idle-shell-mobile', 'lg:hidden')}
-      </>
-    );
+  if (!hasActiveTrack || !activeTrackId) {
+    // Idle: player absent, zero reserved space, no layout shift of main
+    // content (founder spec 2026-09-25 #5). There is nothing to toggle open.
+    return null;
   }
 
   const isLoading = playbackState.playbackStatus === 'loading';
@@ -395,7 +313,9 @@ export function PersistentAudioBar() {
       aria-hidden='false'
       data-mobile-audio-surface='true'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--app-shell-content-surface) backdrop-blur-xl px-3 py-2',
+        // Flat: no border/blur "card" chrome — shares the main content
+        // panel's own surface tone instead (founder spec 2026-09-25 #1).
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 bg-(--app-shell-content-surface) px-3 py-2',
         className
       )}
     >
@@ -469,16 +389,6 @@ export function PersistentAudioBar() {
           label={playButtonLabel}
           size='persistent'
         />
-
-        {/* Dismiss button — 24px visible, 44px touch target via before pseudo-element */}
-        <button
-          type='button'
-          onClick={handleDismiss}
-          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring before:absolute before:-inset-2.5 before:content-[""]'
-          aria-label='Dismiss Player'
-        >
-          <X className='h-3.5 w-3.5' />
-        </button>
       </div>
     </section>
   );
@@ -488,6 +398,8 @@ export function PersistentAudioBar() {
     title: playbackState.trackTitle ?? '',
     artist: playbackState.artistName ?? '',
     hasLyrics: playbackState.hasLyrics,
+    bpm: playbackState.bpm,
+    musicalKey: playbackState.musicalKey,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
   const nowPlayingTrack = {
@@ -498,88 +410,100 @@ export function PersistentAudioBar() {
 
   return (
     <>
-      {/* Full docked player — sits below main content inside the shell frame.
-          When minimized, height collapses to 0 and the sidebar mini takes over
-          (JOV-3511: never full + mini at once; no elevated float into canvas). */}
-      <div
-        data-testid='audio-surface-expanded-shell'
-        data-shell-audio-surface='persistent-expanded'
-        aria-hidden={barCollapsed}
-        className={cn(
-          'hidden shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface) lg:block',
-          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
-        )}
-        style={{
-          maxHeight: barCollapsed ? 0 : 'var(--app-shell-audio-bar-max-height)',
-          opacity: revealed && !barCollapsed ? 1 : 0,
-          transform: !revealed
-            ? 'translateY(100%)'
-            : barCollapsed
-              ? 'translateY(10px)'
-              : 'translateY(0)',
-          // Keyed on collapse only — the reveal is purely visual (transform +
-          // opacity), so the bar stays interactive the instant it mounts
-          // rather than waiting out the slide-in.
-          pointerEvents: barCollapsed ? 'none' : 'auto',
-          transition: SHELL_AUDIO_BAR_TRANSITION,
-        }}
-      >
-        <div className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-center gap-3 px-4 py-1.5 lg:px-6'>
-          <SidebarNowPlaying
-            track={nowPlayingTrack}
-            isPlaying={playbackState.isPlaying}
-            onPlay={handleToggle}
-            playOverlayVisible={false}
-            className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
-          />
-          <AudioBar
-            isPlaying={playbackState.isPlaying}
-            onPlay={handleToggle}
-            onPrevious={
-              playbackState.hasPrevious
-                ? () => playPrevious().catch(() => {})
-                : undefined
-            }
-            onNext={
-              playbackState.hasNext
-                ? () => playNext().catch(() => {})
-                : undefined
-            }
-            onCollapse={() => setBarCollapsed(true)}
-            onDismiss={handleDismiss}
-            currentTime={playbackState.currentTime}
-            duration={playbackState.duration}
-            onSeek={seek}
-            waveformOn={waveformOn}
-            onToggleWaveform={() => setWaveformOn(current => !current)}
-            lyricsActive={pathname === lyricsPath}
-            onOpenLyrics={
-              playbackState.hasLyrics ? handleOpenLyrics : undefined
-            }
-            track={shellTrack}
-            className='min-w-0 px-0 py-0'
+      {/* Desktop player host — sits below main content, sharing its surface
+          tone (flat: no separate card border/radius/shadow). The visibility
+          toggle is always present here so a closed player can be reopened;
+          the bar itself collapses to 0 height when closed and the sidebar
+          mini takes over (JOV-3511: never full + mini at once). */}
+      <div className='hidden shrink-0 bg-(--app-shell-content-surface) lg:block'>
+        <div className='flex items-center justify-end px-4 py-1 lg:px-6'>
+          <PlayerVisibilityToggle
+            open={playerOpen}
+            onClick={() => setPlayerOpen(value => !value)}
           />
         </div>
+        <div
+          data-testid='audio-surface-expanded-shell'
+          data-shell-audio-surface='persistent-expanded'
+          aria-hidden={!playerOpen}
+          className={cn(
+            'overflow-hidden',
+            SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+          )}
+          style={{
+            maxHeight: playerOpen ? 'var(--app-shell-audio-bar-max-height)' : 0,
+            opacity: revealed && playerOpen ? 1 : 0,
+            transform: prefersReducedMotion
+              ? 'translateY(0)'
+              : !revealed
+                ? 'translateY(100%)'
+                : playerOpen
+                  ? 'translateY(0)'
+                  : 'translateY(10px)',
+            // Keyed on open state only — the reveal is purely visual
+            // (transform + opacity), so the bar stays interactive the
+            // instant it mounts rather than waiting out the slide-in.
+            pointerEvents: playerOpen ? 'auto' : 'none',
+            transition: prefersReducedMotion
+              ? 'none'
+              : SHELL_AUDIO_BAR_TRANSITION,
+          }}
+        >
+          <div className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-center gap-3 px-4 py-1.5 lg:px-6'>
+            <SidebarNowPlaying
+              track={nowPlayingTrack}
+              isPlaying={playbackState.isPlaying}
+              onPlay={handleToggle}
+              playOverlayVisible={false}
+              className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
+            />
+            <AudioBar
+              isPlaying={playbackState.isPlaying}
+              onPlay={handleToggle}
+              onPrevious={
+                playbackState.hasPrevious
+                  ? () => playPrevious().catch(() => {})
+                  : undefined
+              }
+              onNext={
+                playbackState.hasNext
+                  ? () => playNext().catch(() => {})
+                  : undefined
+              }
+              currentTime={playbackState.currentTime}
+              duration={playbackState.duration}
+              onSeek={seek}
+              waveformOn={waveformOn}
+              onToggleWaveform={() => setWaveformOn(current => !current)}
+              lyricsActive={pathname === lyricsPath}
+              onOpenLyrics={
+                playbackState.hasLyrics ? handleOpenLyrics : undefined
+              }
+              track={shellTrack}
+              className='min-w-0 px-0 py-0'
+            />
+          </div>
+        </div>
+        {/* Compact surface is intentionally empty: mini chrome lives in the
+            sidebar bridge when the player is closed (JOV-3511). Kept as a
+            zero-height slot so tests and chrome-state consumers still see
+            the transition without a second visible player. */}
+        <div
+          data-testid='audio-surface-compact-shell'
+          data-shell-audio-surface='persistent-compact'
+          aria-hidden={playerOpen}
+          className={cn(
+            'overflow-hidden',
+            SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+          )}
+          style={{
+            maxHeight: 0,
+            opacity: 0,
+            pointerEvents: 'none',
+            transition: SHELL_AUDIO_BAR_TRANSITION,
+          }}
+        />
       </div>
-      {/* Compact surface is intentionally empty: mini chrome lives in the
-          sidebar bridge when the full bar is minimized (JOV-3511). Kept as a
-          zero-height slot so tests and chrome-state consumers still see the
-          minimize transition without a second visible player. */}
-      <div
-        data-testid='audio-surface-compact-shell'
-        data-shell-audio-surface='persistent-compact'
-        aria-hidden={!barCollapsed}
-        className={cn(
-          'hidden shrink-0 overflow-hidden lg:block',
-          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
-        )}
-        style={{
-          maxHeight: 0,
-          opacity: 0,
-          pointerEvents: 'none',
-          transition: SHELL_AUDIO_BAR_TRANSITION,
-        }}
-      />
       {mobileBar('lg:hidden')}
     </>
   );

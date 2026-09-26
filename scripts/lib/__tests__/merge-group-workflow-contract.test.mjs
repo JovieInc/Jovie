@@ -87,6 +87,10 @@ const CLAUDE_REVIEW_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/claude-review.yml'),
   'utf8'
 );
+const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),
+  'utf8'
+);
 const MEMBER_POLICY = readFileSync(
   resolve(REPO_ROOT, 'scripts/lib/merge-group-member-policy.mjs'),
   'utf8'
@@ -1493,6 +1497,124 @@ ${selectedGateScript}`,
     expect(buildLayout).not.toContain('secrets.');
   });
 
+  it('writes the Build+Layout Turbopack cache only from a trusted-main warmer with the identical key', () => {
+    const warm = NEXT_BUILD_CACHE_WARM_WORKFLOW;
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const stepIn = (block, name) => {
+      const start = block.indexOf(`      - name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = block.indexOf('\n      - ', start + 1);
+      return block.slice(start, next === -1 ? undefined : next);
+    };
+    const stepAt = name => warm.indexOf(`      - name: ${name}\n`);
+    const keyLines = step =>
+      step
+        .split('\n')
+        .filter(line => line.includes('-next-build-web-v1-'))
+        .map(line => line.trim());
+
+    // Triggers: only push to main and manual dispatch. No PR, fork,
+    // merge-group or workflow_run code can reach the save step.
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:/m
+    );
+    for (const trigger of [
+      'pull_request',
+      'pull_request_target',
+      'merge_group',
+      'workflow_run',
+      'schedule',
+    ]) {
+      expect(header).not.toMatch(new RegExp(`^\\s+${trigger}:`, 'm'));
+    }
+    expect(header).toMatch(/^permissions:\n {2}contents: read\n\n/m);
+    expect(header).toContain('group: next-build-cache-warm-${{ github.ref }}');
+    expect(warm).not.toContain('secrets.');
+    expect(warm).not.toContain('TURBO_TOKEN');
+    expect(warm).toContain('persist-credentials: false');
+    expect(warm).toContain('runs-on: ubuntu-latest');
+
+    const job = getJobBlock(warm, 'warm');
+    expect(job).toContain("github.ref == 'refs/heads/main' &&");
+    expect(job).toContain(
+      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+    );
+
+    // Key scheme is byte-identical to the Build + Layout restore.
+    const ciRestore = stepIn(
+      buildLayout,
+      'Restore Next build cache (read-only)'
+    );
+    const lookup = stepIn(warm, "Look up today's Next build cache");
+    const restore = stepIn(warm, 'Restore newest Next build cache');
+    expect(keyLines(ciRestore)).toHaveLength(3);
+    expect(keyLines(restore)).toEqual(keyLines(ciRestore));
+    expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
+    const dayRun = step =>
+      step.split('\n').find(line => line.trim().startsWith('run:'));
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache day'))).toBe(
+      dayRun(stepIn(buildLayout, 'Resolve Next build cache day'))
+    );
+    for (const step of [lookup, restore]) {
+      expect(step).toContain('path: apps/web/.next/cache/turbopack');
+    }
+
+    // Lookup-only early exit: nothing heavy runs on an exact-key hit.
+    expect(lookup).toContain('lookup-only: true');
+    expect(lookup).not.toMatch(/^\s+if:/m);
+    const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
+    const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
+    expect(stepAt("Look up today's Next build cache")).toBeLessThan(setupAt);
+    expect(
+      warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
+    ).toContain(miss);
+    for (const name of [
+      'Restore newest Next build cache',
+      'Build web for cache',
+      'Measure Next build cache (trusted main only)',
+    ]) {
+      expect(stepIn(warm, name), name).toContain(miss);
+    }
+
+    // Same web build and public mock env as the combined head build.
+    const build = stepIn(warm, 'Build web for cache');
+    expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
+    const envLines = step =>
+      step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
+    const ciBuild = stepIn(buildLayout, 'Build exact combined head');
+    expect(envLines(build).length).toBeGreaterThan(0);
+    expect(envLines(build)).toEqual(envLines(ciBuild));
+
+    // Size/symlink guard and a single trusted-main save of the primary key.
+    const measure = stepIn(
+      warm,
+      'Measure Next build cache (trusted main only)'
+    );
+    const save = stepIn(warm, 'Save Next build cache (trusted main only)');
+    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
+    expect(measure).toContain('must not be a symlink');
+    expect(stepAt('Build web for cache')).toBeLessThan(
+      stepAt('Save Next build cache (trusted main only)')
+    );
+    expect(save).toContain(
+      "if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}"
+    );
+    expect(save).toContain('path: apps/web/.next/cache/turbopack');
+    expect(save).toContain(
+      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
+    );
+    expect(warm.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    expect(warm).not.toContain('uses: actions/cache@');
+
+    // Every pinned action SHA is one ci.yml already uses.
+    const pins = source =>
+      new Set(source.match(/uses: actions\/[\w/-]+@[0-9a-f]{40}/g));
+    const ciPins = pins(CI_WORKFLOW);
+    expect(pins(warm).size).toBeGreaterThan(0);
+    for (const pin of pins(warm)) expect(ciPins.has(pin), pin).toBe(true);
+  });
+
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
     const workflowHeader = IOS_CI_WORKFLOW.slice(
       0,
@@ -2869,12 +2991,21 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-describe('Storybook Surface Matrix shallow diff-base history', () => {
+// Each case builds a 40+ commit fixture repo with real git subprocesses;
+// the default 5s timeout flaked under load and ejected merge-queue groups.
+describe('Storybook Surface Matrix shallow diff-base history', {
+  timeout: 30_000,
+}, () => {
   const tempRoots = [];
 
   afterEach(() => {
     for (const root of tempRoots.splice(0)) {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 
@@ -2956,6 +3087,11 @@ describe('Storybook Surface Matrix shallow diff-base history', () => {
       `file://${origin}`,
       work,
     ]);
+    // Each `git fetch` otherwise spawns a detached `git maintenance run
+    // --auto` that can still be writing .git/objects when afterEach removes
+    // the fixture (ENOTEMPTY in merge-group Structural Contract).
+    git(work, ['config', 'maintenance.auto', 'false']);
+    git(work, ['config', 'gc.auto', '0']);
     expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('true');
     expect(git(work, ['rev-parse', 'HEAD'])).toBe(head);
     return { work, shas, sibling, head };
