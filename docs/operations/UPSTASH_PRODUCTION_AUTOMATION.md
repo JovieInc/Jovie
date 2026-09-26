@@ -34,6 +34,27 @@ consume the returned credential in-process, update only Vercel production
 canary plus web and iOS authentication before declaring success. Never print or
 persist the returned credential in logs or artifacts.
 
+## Quota headroom monitoring (JOV-5022)
+
+`node scripts/upstash-production-operator.mjs quota` verifies the bound
+database identity, reads `total_monthly_requests` from the stats endpoint,
+and evaluates it against the verified 500,000 monthly request ceiling
+(`auto_upgrade` is false, so the ceiling is a hard failure point, not a
+billing threshold). It prints a JSON receipt with `percentUsed`,
+`breachedThreshold`, and `status`, then exits `2` when any alert threshold —
+70%, 85%, or 95% — is crossed. Malformed or missing usage data fails closed.
+
+`.github/workflows/upstash-quota-headroom.yml` runs this every 6 hours on a
+declared schedule (enablement and the Production `UPSTASH_EMAIL`,
+`UPSTASH_API_KEY`, and `SLACK_WEBHOOK_URL` secrets are operational
+prerequisites). A breached threshold routes one Slack alert through the
+existing Production webhook — the founder/owner route — and leaves the run
+red. The monthly usage counter resets with the provider billing period.
+
+This monitor is read-only and alert-only. Choosing and applying the capacity
+remedy (upgrade, plan change, or traffic reduction) remains a human-gated
+billing decision; nothing here mutates the database, plan, or credentials.
+
 ## Runtime canary and alerts
 
 The existing hourly `redisOperability` sub-job in `/api/cron/frequent` executes

@@ -248,6 +248,48 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MODULE.UNKNOWN_MAIN_SHA)
 
+    def test_non_jovie_lane_binds_main_to_combined_status(self):
+        """JOV-5340: sibling repos have no "Main Release Ready" job; main
+        health binds to the repo's own combined commit status."""
+        def github_response(repo: str, endpoint: str):
+            self.assertEqual(repo, "JovieInc/LogYourBody")
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "success"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "ci",
+                            "status": "completed",
+                            "conclusion": "success",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/LogYourBody")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["name"], "combined-commit-status")
+
+        def failing_response(repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "failure"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {"check_runs": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=failing_response):
+            red = MODULE.observe_main("JovieInc/gbrain")
+
+        self.assertEqual(red["status"], "red")
+
 
 class ProductionHealthTests(unittest.TestCase):
     def test_default_uses_the_dedicated_deploy_health_contract(self):
@@ -338,6 +380,37 @@ class ProductionHealthTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "red")
         self.assertEqual(observed["reportedStatus"], {"unexpected": True})
+
+    def test_non_jovie_repo_does_not_inherit_the_jovie_production_url(self):
+        """JOV-5340: LYB/Symphony/gbrain must not observe jov.ie's SHA."""
+        for repo in ("JovieInc/LogYourBody", "JovieInc/gbrain", "itstimwhite/symphony"):
+            with self.subTest(repo=repo):
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {
+                            "JOVIE_PRODUCTION_HEALTH_URL": "",
+                            "GEM_PRIORITY_GATE_REPO": "",
+                            "GEM_PR_DRAIN_REPO": "",
+                        },
+                    ),
+                    mock.patch.object(sys, "argv", [str(GATE), "--repo", repo]),
+                ):
+                    args = MODULE.parse_args()
+                self.assertIsNone(args.production_url)
+
+    def test_repository_bound_production_binds_deployed_sha_to_main(self):
+        bound = MODULE.repository_bound_production(
+            {"status": "green", "sha": MAIN_SHA}
+        )
+        self.assertEqual(bound["status"], "green")
+        self.assertEqual(bound["deployedSha"], MAIN_SHA)
+        self.assertEqual(
+            bound["source"], "repository-main-no-production-lane"
+        )
+        unbound = MODULE.repository_bound_production({"status": "unknown"})
+        self.assertEqual(unbound["status"], "unknown")
+        self.assertIsNone(unbound["deployedSha"])
 
 
 MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
@@ -2079,6 +2152,71 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_green_factory_keeps_the_isolated_ui_docs_lane_open(self):
+        """JOV-5340: GREEN must not strand isolated UI/docs promotion behind
+        the full suite; the lane stays additive while mode stays normal."""
+        receipt = self.evaluate(GREEN_SIGNALS)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["isolatedPromotionAdmission"]["activities"],
+            ["ready-for-merge", "native-merge-queue", "merge"],
+        )
+        self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
+        projection = subprocess.run(
+            ["python3", str(ROOT / "scripts/symphony/fleet_admission_receipt.py")],
+            input=json.dumps(receipt), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(projection.returncode, 0, projection.stderr)
+
+    def test_green_below_target_leases_off_green_ready_without_lane_receipt(self):
+        """New leases key off greenReadyPrs < target, not eligiblePrs and not
+        capacity evidence; a missing lane-capacity receipt is not a veto."""
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = None
+        signals["queue"] = {
+            "repository": "JovieInc/Jovie",
+            "status": "known",
+            "eligiblePrs": 40,
+            "greenReadyPrs": 12,
+            "target": 15,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
+        self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
+
+    def test_contradictory_lane_receipt_still_vetoes_new_leases(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            **GREEN_SIGNALS["queue"],
+            "eligiblePrs": 40,
+            "greenReadyPrs": 12,
+            "laneCapacity": lane_capacity(7),
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+        # At-or-above target holds leases even without a lane receipt.
+        signals["queue"] = {
+            "repository": "JovieInc/Jovie",
+            "status": "known",
+            "eligiblePrs": 40,
+            "greenReadyPrs": 15,
+            "target": 15,
+        }
+        self.assertFalse(
+            self.evaluate(signals)["workAdmission"]["newIssueLeaseAllowed"]
+        )
+
     def test_lane_receipt_classifies_ci_separately_from_product_paths(self):
         now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
         receipt = MODULE.build_lane_capacity_receipt(
@@ -3541,72 +3679,6 @@ class QueueSnapshotIsolationTests(unittest.TestCase):
 
 class PerRepoSignalTests(unittest.TestCase):
     """JOV-5340: sibling lanes never consume Jovie's release gate or prod SHA."""
-
-    def test_non_jovie_main_keys_off_combined_status(self):
-        calls: list[str] = []
-
-        def fake_gh(repo: str, path: str) -> dict[str, object]:
-            calls.append(path)
-            if path == "branches/main":
-                return {"commit": {"sha": "a" * 40}}
-            if path.endswith("/status"):
-                return {"state": "success"}
-            raise AssertionError(f"unexpected gh call: {path}")
-
-        with mock.patch.object(MODULE, "gh_json", side_effect=fake_gh):
-            observed = MODULE.observe_main("JovieInc/LogYourBody")
-
-        self.assertEqual(observed["status"], "green")
-        self.assertEqual(observed["sha"], "a" * 40)
-        self.assertEqual(observed["sourceGate"]["name"], "combined-status")
-        self.assertFalse(any("check-runs" in path for path in calls))
-        self.assertFalse(any("actions/runs" in path for path in calls))
-
-    def test_non_jovie_lane_ignores_jovie_production_url(self):
-        now = MODULE.datetime(2026, 9, 26, 12, 0, tzinfo=MODULE.UTC)
-        with tempfile.TemporaryDirectory() as tmp:
-            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
-            state_dir.mkdir()
-            args = argparse.Namespace(
-                repo="JovieInc/LogYourBody",
-                queue_target=15,
-                production_url=MODULE.DEFAULT_PRODUCTION_HEALTH_URL,
-                symphony_url="http://127.0.0.1:4041/api/v1/state",
-                lease_guard_bin="/bin/false",
-                state_dir=state_dir,
-                integrity_receipt=None,
-                concurrency_evidence=None,
-                independent_review_receipt=None,
-            )
-            with (
-                mock.patch.object(
-                    MODULE, "observe_main", return_value={"status": "green", "sha": "a" * 40}
-                ),
-                mock.patch.object(MODULE, "observe_concurrency", return_value={"accepted": False}),
-                mock.patch.object(MODULE, "observe_closure_health", return_value={}),
-                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
-                mock.patch.object(MODULE, "observe_controller", return_value={"status": "failed"}),
-                mock.patch.object(MODULE, "observe_integrity", return_value={"status": "clear"}),
-                mock.patch.object(MODULE, "observe_queue", return_value={"status": "unknown"}),
-                mock.patch.object(MODULE, "observe_ci_audit", return_value={}),
-                mock.patch.object(
-                    MODULE,
-                    "refresh_independent_review_receipt",
-                    return_value={"accepted": False},
-                ),
-                mock.patch.object(MODULE, "observe_lease", return_value={"status": "unknown"}),
-                mock.patch.object(
-                    MODULE,
-                    "observe_production",
-                    side_effect=AssertionError("jov.ie must not be observed for LYB"),
-                ) as production_observer,
-            ):
-                signals = MODULE.observe_signals(args, now)
-
-        production_observer.assert_not_called()
-        self.assertEqual(signals["production"]["status"], "unknown")
-        self.assertEqual(signals["production"]["repository"], "JovieInc/LogYourBody")
-        self.assertNotIn("deployedSha", signals["production"])
 
     def test_non_jovie_lane_honors_explicit_production_url(self):
         now = MODULE.datetime(2026, 9, 26, 12, 0, tzinfo=MODULE.UTC)
