@@ -150,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
