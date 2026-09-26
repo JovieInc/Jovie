@@ -4533,9 +4533,12 @@ jobs:
       # 14 shards: at 10, balanced ~325-file shards took 155-176s of Vitest on
       # the slower hosted runners (max job ~250s); 14 cuts that to ~125s for
       # ~4 extra runner-minutes of fixed setup per run.
+      # 'packages/ui' is its own entry (same setup, same gate result) that runs
+      # only the @jovie/ui suite: chained after 4/14's Vitest it made that shard
+      # the critical path (192s vs <=180s elsewhere); alone it ends in ~80s.
       max-parallel: 120
       matrix:
-        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14']
+        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14', 'packages/ui']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -4561,7 +4564,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
+          # Full history for vitest --changed (names via commit graph); the
+          # packages/ui entry runs no --changed/--affected selection.
+          fetch-depth: ${{ matrix.shard == 'packages/ui' && 1 || 0 }}
           filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
           clean: true
 
@@ -4602,24 +4607,24 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Setup Playwright warm path
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         id: quarantine
         run: node .github/scripts/quarantine-ledger.mjs emit-github-output
 
       - name: Run unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         env:
           # Isolated forks start a fresh process per test file, so each jsdom
           # file re-parses jsdom's ~1,000 modules (the jsdom environment is
           # ~35% of shard worker time). Vitest flushes each fork's V8 compile
           # cache on stop, so later forks load bytecode instead of re-parsing.
           # Entries failing Node's source-hash check recompile, and Vitest
-          # drops the cache itself under v8 coverage. The quarantine and
-          # packages/ui steps below reuse this per-job directory.
+          # drops the cache itself under v8 coverage. The quarantine step
+          # below reuses this per-job directory.
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -4690,11 +4695,11 @@ jobs:
           retention-days: 7
 
       - name: Run packages/ui unit tests
-        # Not sharded: one shard runs it, not every shard. Its cost is preloaded
-        # on 4/14 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        # Not sharded: only the dedicated 'packages/ui' matrix entry runs it, in
+        # parallel with the web shards (so no CI_RESERVED_MS entry is needed).
         env:
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/14'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Preserve failed unit-shard diagnosis
@@ -4720,7 +4725,7 @@ jobs:
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
-        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
