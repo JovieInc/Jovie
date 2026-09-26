@@ -15,6 +15,10 @@ vi.mock('./OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => null,
 }));
 
+vi.mock('./OvieActivityFeedPanel', () => ({
+  OvieActivityFeedPanel: () => null,
+}));
+
 vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
 }));
@@ -54,6 +58,11 @@ const snapshot: OvieMacHudSnapshot = {
     items: [],
     truncated: false,
     errorMessage: null,
+  },
+  activity: {
+    receipts: [],
+    receiptsAvailable: false,
+    publicUpdates: [],
   },
   generatedAtIso: '2026-09-16T00:00:00.000Z',
 };

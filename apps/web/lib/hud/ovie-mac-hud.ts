@@ -81,11 +81,24 @@ export type OvieMacHudInFlightPullRequests = {
   errorMessage: string | null;
 };
 
+export type OvieMacHudActivity = {
+  /** Raw receipt entries, re-parsed on read so the feed never trusts count math. */
+  receipts: readonly unknown[];
+  receiptsAvailable: boolean;
+  /** Curated public changelog updates (JOV-6203 projection). */
+  publicUpdates: readonly {
+    title: string;
+    date: string;
+    url: string;
+  }[];
+};
+
 export type OvieMacHudSnapshot = {
   alive: OvieMacHudAliveMetric;
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  activity: OvieMacHudActivity;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -574,6 +587,7 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  activity?: OvieMacHudActivity;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
@@ -589,6 +603,11 @@ export function composeOvieMacHudSnapshot(input: {
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    activity: input.activity ?? {
+      receipts: [],
+      receiptsAvailable: input.shippingAvailable ?? true,
+      publicUpdates: [],
+    },
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };
