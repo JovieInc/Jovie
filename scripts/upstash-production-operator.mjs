@@ -49,13 +49,17 @@ export function verifyJovieProductionDatabase(database) {
   return actual;
 }
 
+/**
+ * @param {unknown} monthlyRequests
+ * @param {number} [limit]
+ */
 export function evaluateQuotaHeadroom(
   monthlyRequests,
   limit = JOVIE_PRODUCTION_REDIS.monthlyRequestLimit
 ) {
   if (
     !Number.isInteger(monthlyRequests) ||
-    monthlyRequests < 0 ||
+    /** @type {number} */ (monthlyRequests) < 0 ||
     !Number.isInteger(limit) ||
     limit <= 0
   ) {
@@ -63,7 +67,8 @@ export function evaluateQuotaHeadroom(
       'Quota headroom requires non-negative integer usage and a positive integer limit'
     );
   }
-  const percent = (monthlyRequests / limit) * 100;
+  const used = /** @type {number} */ (monthlyRequests);
+  const percent = (used / limit) * 100;
   const breachedThreshold =
     [...QUOTA_ALERT_THRESHOLDS].reverse().find(t => percent >= t) ?? null;
   return Object.freeze({
@@ -113,7 +118,9 @@ export function createUpstashProductionOperator({
     async quota() {
       const database = await request('database');
       const identity = verifyJovieProductionDatabase(database);
-      const stats = await request('stats');
+      const stats = /** @type {{ total_monthly_requests?: number } | undefined} */ (
+        await request('stats')
+      );
       const headroom = evaluateQuotaHeadroom(stats?.total_monthly_requests);
       return { identity, headroom };
     },
