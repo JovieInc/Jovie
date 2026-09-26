@@ -311,6 +311,17 @@ export async function inspectSummerCard(
   return toSummerKanbanCard(normalized, now) ?? undefined;
 }
 
+function statusForSummerRouting(
+  routingState: OvieRoutingState
+): OvieInitiative['status'] {
+  if (routingState === 'blocked') return 'blocked';
+  if (routingState === 'unavailable') return 'failed';
+  if (routingState === 'done' || routingState === 'landed')
+    return 'implemented';
+  if (routingState === 'in_progress') return 'executing';
+  return 'accepted';
+}
+
 export async function transitionSummerCard(
   store: OperatingStore,
   input: {
@@ -343,16 +354,7 @@ export async function transitionSummerCard(
       input.routingState === 'blocked'
         ? (input.blocker ?? current.blocker)
         : undefined,
-    status:
-      input.routingState === 'blocked'
-        ? 'blocked'
-        : input.routingState === 'unavailable'
-          ? 'failed'
-          : input.routingState === 'done' || input.routingState === 'landed'
-            ? 'implemented'
-            : input.routingState === 'in_progress'
-              ? 'executing'
-              : 'accepted',
+    status: statusForSummerRouting(input.routingState),
   };
   await store.putInitiative(next);
   return next;

@@ -90,7 +90,7 @@ function readErrorCode(error: unknown): string | undefined {
   if (typeof candidate.message === 'string') {
     // Better Auth errors sometimes carry the code in `message` as
     // `"code: ..."` — fall through to that.
-    const match = candidate.message.match(/^([a-z_]+):/i);
+    const match = /^([a-z_]+):/i.exec(candidate.message);
     if (match) return match[1].toLowerCase();
   }
   return undefined;

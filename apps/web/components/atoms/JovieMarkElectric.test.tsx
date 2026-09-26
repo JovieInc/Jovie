@@ -1,6 +1,10 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { JOVIE_ICON_VIEW_BOX } from '@/components/atoms/jovie-icon-path';
+import {
+  JOVIE_ICON_PATH,
+  JOVIE_ICON_VIEW_BOX,
+} from '@/components/atoms/jovie-icon-path';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
 import { JovieMarkElectric } from './JovieMarkElectric';
 
 vi.mock('@/lib/hooks/useReducedMotion', () => ({
@@ -18,7 +22,12 @@ describe('JovieMarkElectric', () => {
     const { container } = render(<JovieMarkElectric />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
+    expect(JOVIE_ICON_PATH).toBe(JOVIE_PATH);
+    expect(JOVIE_ICON_VIEW_BOX).toBe(
+      `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`
+    );
     expect(svg?.getAttribute('viewBox')).toBe(JOVIE_ICON_VIEW_BOX);
+    expect(svg?.querySelector('path')?.getAttribute('d')).toBe(JOVIE_PATH);
   });
 
   it('is decorative — aria-hidden on the wrapper', () => {

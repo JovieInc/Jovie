@@ -118,6 +118,11 @@ describe('Memory Core services', () => {
       identities: [sharedIdentity],
       evidence: [{ sourceRecordId: otherSource.id }],
     });
+    const otherEntity = await store.getEntity(otherScope, other.entityId);
+    expect(otherEntity?.metadata).toMatchObject({
+      evidenceSourceRecordIds: [otherSource.id],
+    });
+    expect(otherEntity?.metadata).not.toHaveProperty('origin');
     const local = await resolver.resolve(memoryFixtureScope, {
       type: 'artist',
       name: 'Local Scoped Artist',

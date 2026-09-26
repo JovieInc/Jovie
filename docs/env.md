@@ -88,6 +88,18 @@ Server-side API key for Vercel AI Gateway chat completions. On Vercel
 authenticates via OIDC (`VERCEL_OIDC_TOKEN` is auto-injected at runtime).
 Local development and CI keep using the static key via Doppler.
 
+Album art image generation uses this same Gateway auth. It does not read
+`XAI_API_KEY`. On Vercel, leave `AI_GATEWAY_API_KEY` unset and let OIDC cover
+the call. The model id is `ALBUM_ART_GATEWAY_IMAGE_MODEL` in
+`apps/web/lib/constants/ai-models.ts` (`spacexai/grok-imagine-image`).
+
+### `ALBUM_ART_IMAGE_MODEL`
+
+Optional override for the album-art Gateway model. Set a `provider/model` id
+only when swapping models without a code change. Bare ids (the old direct-xAI
+slug `grok-imagine-image`) are ignored. Unset in production unless you intend
+to override the constant.
+
 ### `FX_AI_GATEWAY_API_KEY`
 
 Dedicated GitHub Actions repository secret for the draft Rolling CI Dispatch FX

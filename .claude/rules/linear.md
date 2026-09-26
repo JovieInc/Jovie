@@ -1,5 +1,5 @@
 ---
-paths: ["scripts/backlog-orchestrator/**", "scripts/hermes/**", "docs/PR_FLOW.md"]
+paths: ["scripts/backlog-orchestrator/**", "scripts/symphony/**", "docs/PR_FLOW.md"]
 ---
 
 # Linear: Issue Gating + Ownership Contract

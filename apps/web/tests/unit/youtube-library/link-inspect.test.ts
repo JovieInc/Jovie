@@ -22,7 +22,11 @@ function inspect(description: string | null, extra = {}) {
   });
 }
 
-function snippet(description: string, failReadback = false) {
+function snippet(
+  description: string,
+  failReadback = false,
+  nullReadback = false
+) {
   let live = {
     id: ID,
     etag: 'etag-1',
@@ -37,6 +41,7 @@ function snippet(description: string, failReadback = false) {
   return {
     writes,
     async getVideo() {
+      if (nullReadback && writes.length === 1) return null;
       if (failReadback && writes.length === 1) {
         return {
           ...live,
@@ -65,7 +70,11 @@ function approval(description: string) {
 }
 
 async function apply(description: string, extra: Record<string, unknown> = {}) {
-  const writer = snippet(description, extra.failReadback === true);
+  const writer = snippet(
+    description,
+    extra.failReadback === true,
+    extra.nullReadback === true
+  );
   const result = await applyYouTubeLink({
     videoId: ID,
     videoUrl: VIDEO,
@@ -131,6 +140,12 @@ describe('YouTube Jovie link inspect/apply', () => {
       error: 'readback-mismatch',
     });
     expect(rolled.writer.writes.at(-1)).toBe('Directed by Ada.');
+    const missingReadback = await apply('Directed by Ada.', {
+      nullReadback: true,
+    });
+    expect(missingReadback.result).toMatchObject({
+      error: 'readback-mismatch',
+    });
     const a = await apply('Need a link');
     const b = await apply('Need a link', {
       auth: { state: 'revoked' },

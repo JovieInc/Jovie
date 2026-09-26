@@ -39,7 +39,38 @@ function fixture() {
     `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >>"${rotateLog}"\nprintf '%s' "${'${LINEAR_API_KEY-}'}" >"${rotateEnv}"\n`
   );
   chmodSync(stub, 0o755);
-  return { root, workspace, accounts, rotateLog, rotateEnv, stub };
+  // Since #17545 (1ff1064137) pickup-check enforces native admission: a live
+  // Linear read, a git workspace bound to the product origin, and installed
+  // dispatch-preflight/lease-guard binaries. Those gates are covered by
+  // scripts/symphony/tests/native-admission-consumers.test.py; like the
+  // provider-runtime fixture in that PR, this launcher fixture supplies an
+  // admitting controller and records that the router consulted it while
+  // holding the inherited issue lease on FD 9.
+  const pickupLog = join(root, 'pickup-calls.txt');
+  const pickup = join(root, 'pickup-admit.py');
+  writeFileSync(
+    pickup,
+    [
+      '#!/usr/bin/env python3',
+      'import os, sys',
+      'fd = os.environ.get("SYMPHONY_ISSUE_LEASE_FD")',
+      'os.fstat(9)',
+      `with open(${JSON.stringify(pickupLog)}, "a") as log:`,
+      '    log.write(" ".join(sys.argv[1:]) + f" lease-fd={fd}\\n")',
+      '',
+    ].join('\n')
+  );
+  chmodSync(pickup, 0o755);
+  return {
+    root,
+    workspace,
+    accounts,
+    rotateLog,
+    rotateEnv,
+    stub,
+    pickup,
+    pickupLog,
+  };
 }
 
 function issueWithReceipt(title) {
@@ -59,13 +90,18 @@ function issueWithReceipt(title) {
   return { issue, route: decision.route };
 }
 
-function runRouter({ root, workspace, accounts, stub }, issue) {
+function runRouter(
+  { root, workspace, accounts, stub, pickup },
+  issue,
+  extraEnv = {}
+) {
   const issueFile = join(root, 'issue.json');
   writeFileSync(issueFile, JSON.stringify(issue));
   return execFileSync('bash', [ROUTER, 'app-server'], {
     cwd: workspace,
     env: {
       ...process.env,
+      ...extraEnv,
       SYMPHONY_ROUTING_ISSUE_FILE: issueFile,
       SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
       SYMPHONY_WORKSPACE: workspace,
@@ -73,10 +109,7 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
       SYMPHONY_FALLBACK_LEASE_DIR: join(root, 'fallback-leases'),
       SYMPHONY_OPEN_PR_INDEX: 'empty',
       LINEAR_API_KEY: 'tracker-secret-must-not-reach-agent',
-      SYMPHONY_CODEX_EXHAUSTED: new URL(
-        '../../symphony/symphony-codex-exhausted.py',
-        import.meta.url
-      ).pathname,
+      SYMPHONY_CODEX_EXHAUSTED: pickup,
       CODEX_ACCOUNTS_ROOT: accounts,
       CODEX_ACCOUNTS_STATE: join(accounts, 'state.json'),
     },
@@ -144,6 +177,10 @@ describe('Symphony launcher closed loop', () => {
     try {
       const { issue, route } = issueWithReceipt('Repair fleet architecture');
       runRouter(env, issue);
+      assert.equal(
+        readFileSync(env.pickupLog, 'utf8'),
+        'pickup-check JOV-5029 lease-fd=9\n'
+      );
       const args = readFileSync(env.rotateLog, 'utf8');
       assert.match(args, /model=\\?"gpt-5\.6-terra\\?"|model="gpt-5\.6-terra"/);
       assert.match(args, /app-server/);
@@ -153,6 +190,22 @@ describe('Symphony launcher closed loop', () => {
       );
       assert.equal(materialized.fingerprint, route.fingerprint);
       assert.equal(materialized.model, 'gpt-5.6-terra');
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
+  it('hands off to codex-rotate without waiting out the preflight heartbeat interval', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Repair fleet architecture');
+      const startedAt = Date.now();
+      runRouter(env, issue, { SYMPHONY_ROUTER_HEARTBEAT_SECONDS: '30' });
+      const elapsedMs = Date.now() - startedAt;
+      assert.match(readFileSync(env.rotateLog, 'utf8'), /app-server/);
+      // A foreground `sleep` in the heartbeat loop deferred its TERM trap, so
+      // every launch waited up to one full interval (30s here) after preflight.
+      assert.ok(elapsedMs < 10_000, `launch took ${elapsedMs}ms`);
     } finally {
       rmSync(env.root, { recursive: true, force: true });
     }
@@ -174,10 +227,7 @@ describe('Symphony launcher closed loop', () => {
           SYMPHONY_CODEX_ROTATE: env.stub,
           SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
           SYMPHONY_OPEN_PR_INDEX: 'empty',
-          SYMPHONY_CODEX_EXHAUSTED: new URL(
-            '../../symphony/symphony-codex-exhausted.py',
-            import.meta.url
-          ).pathname,
+          SYMPHONY_CODEX_EXHAUSTED: env.pickup,
           CODEX_ACCOUNTS_ROOT: env.accounts,
           CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
         },
@@ -214,10 +264,7 @@ describe('Symphony launcher closed loop', () => {
               SYMPHONY_CODEX_ROTATE: env.stub,
               SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
               SYMPHONY_OPEN_PR_INDEX: 'empty',
-              SYMPHONY_CODEX_EXHAUSTED: new URL(
-                '../../symphony/symphony-codex-exhausted.py',
-                import.meta.url
-              ).pathname,
+              SYMPHONY_CODEX_EXHAUSTED: env.pickup,
               CODEX_ACCOUNTS_ROOT: env.accounts,
               CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
             },
@@ -326,17 +373,22 @@ describe('Symphony launcher closed loop', () => {
       );
       await new Promise(resolve => setTimeout(resolve, 80));
       try {
+        // #17303 (a8bb357f0a) made a busy shared issue claim a retryable
+        // issue-lease-busy exit 75, and #17545 moved pickup-check behind the
+        // claim, so admission must never run while another provider holds it.
         assert.throws(
           () => runRouter(env, issue),
           error => {
-            assert.equal(/** @type {any} */ (error).status, 78);
+            assert.equal(/** @type {any} */ (error).status, 75);
             assert.match(
               String(/** @type {any} */ (error).stderr),
-              /fallback-lease-held/
+              /SYMPHONY_LAUNCHER_FAILURE.*class=issue-lease-busy.*retryable=true/
             );
             return true;
           }
         );
+        assert.throws(() => readFileSync(env.pickupLog, 'utf8'));
+        assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
       } finally {
         try {
           process.kill(-holder.pid, 'SIGTERM');

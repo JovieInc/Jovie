@@ -429,8 +429,7 @@ function decisionTurn(
     forceTurnCap: Boolean(parsedBand) || latestText.trim().length >= 8,
   });
   if (decision.kind === 'instant_access') {
-    events.push(proposeNextStepEvent(decision));
-    events.push({
+    events.push(proposeNextStepEvent(decision), {
       toolName: 'proposeCheckout',
       input: {},
       output: {

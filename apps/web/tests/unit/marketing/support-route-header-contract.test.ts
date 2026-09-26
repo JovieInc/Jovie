@@ -36,7 +36,7 @@ describe('support route header contract', () => {
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
-    expect(headerSource).toContain('NAV_LINK_BY_LABEL.Artists');
+    expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');
