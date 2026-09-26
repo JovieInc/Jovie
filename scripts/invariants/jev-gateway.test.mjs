@@ -42,7 +42,13 @@ const options = (extra = {}) => ({
 
 test('binds every stage, artifact, scope, text and rubric to immutable request', () => {
   for (const stage of Object.keys(JEV_RUBRICS))
-    assert.ok(prepareJevRequest({ ...input, stage }).fingerprint);
+    assert.ok(
+      prepareJevRequest({
+        ...input,
+        stage,
+        labels: stage === 'task-cluster' ? ['lyrics'] : undefined,
+      }).fingerprint
+    );
   for (const delta of [
     { sourceSha: 'c'.repeat(40) },
     { artifactSha256: 'd'.repeat(64) },
@@ -365,4 +371,50 @@ test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and 
     })
   );
   assert.equal(calls, 1);
+});
+
+const clusterInput = {
+  ...input,
+  stage: 'task-cluster',
+  state: 'Task: "register splits with PRO"',
+  labels: ['rights-royalty-registration', 'editorial-pitching'],
+};
+
+test('task-cluster freezes a bounded label choice and rejects forged labels', async () => {
+  const req = prepareJevRequest(clusterInput);
+  assert.throws(() => req.labels.push('late'));
+  const criteria = req.questions.alignment.criteria;
+  for (const slug of [...clusterInput.labels, 'unclassified'])
+    assert.ok(Object.hasOwn(criteria, slug));
+  assert.ok(!Object.hasOwn(criteria, 'supported'));
+  assert.notEqual(
+    prepareJevRequest({ ...clusterInput, labels: ['lyrics'] }).fingerprint,
+    req.fingerprint
+  );
+  for (const labels of [
+    undefined,
+    'lyrics',
+    [],
+    Array.from({ length: 65 }, (_, i) => `cluster-${i}`),
+    ['Not A Slug'],
+    ['unclassified'],
+    ['lyrics', 'lyrics'],
+  ])
+    assert.throws(() => prepareJevRequest({ ...clusterInput, labels }));
+  const opt = choice => ({
+    ...options(),
+    approval: { ...options().approval, fingerprint: req.fingerprint },
+    readCurrentFingerprint: () => req.fingerprint,
+    transport: async () => result(choice),
+  });
+  assert.equal(
+    (await runJevEvaluation(clusterInput, opt('lyrics'))).status,
+    'invalid-response'
+  );
+  for (const choice of ['editorial-pitching', 'unclassified']) {
+    assert.equal(
+      (await runJevEvaluation(clusterInput, opt(choice))).alignment,
+      choice
+    );
+  }
 });
