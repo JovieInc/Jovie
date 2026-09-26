@@ -102,6 +102,25 @@ export function createSmartLinkContentTag(profileId: string): string {
 }
 
 /**
+ * Create a user+profile-scoped release cache tag (JOV-6272).
+ *
+ * The single canonical tag for every unstable_cache entry in the release
+ * matrix/entity family (lib/releases/release-matrix-loader.ts) and the single
+ * tag every release mutation revalidates. Keying on (userId, profileId) —
+ * never the profile handle — means a handle rename cannot split the cache:
+ * the tag, and every invalidation of it, is invariant under handle changes.
+ *
+ * Both ids are app `users.id` / `creator_profiles.id` UUIDs from the
+ * authenticated session — never caller-supplied values.
+ */
+export function createReleaseCacheTag(
+  userId: string,
+  profileId: string
+): string {
+  return `releases:${userId}:${profileId}`;
+}
+
+/**
  * Characters invalid in HTTP header field values (RFC 7230 §3.2.6).
  * Strips control characters except tab (0x09) that would crash response headers.
  * Cache tags with user-provided input (usernames, slugs) must be sanitized.
