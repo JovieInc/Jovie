@@ -44,25 +44,37 @@ vi.mock('@/components/molecules/drawer', () => ({
     readonly children?: React.ReactNode;
     readonly testId?: string;
   }) => <div data-testid={testId}>{children}</div>,
-  EntityHeaderCard: ({
-    children,
-    image,
-    meta,
+  EntityHeader: ({
+    thumbnail,
     title,
+    details,
+    statusGlyph,
+    actions,
     'data-testid': testId,
   }: {
-    readonly children?: React.ReactNode;
-    readonly image?: React.ReactNode;
-    readonly meta?: React.ReactNode;
+    readonly thumbnail?: React.ReactNode;
     readonly title?: React.ReactNode;
+    readonly details?: React.ReactNode;
+    readonly statusGlyph?: React.ReactNode;
+    readonly actions?: React.ReactNode;
     readonly 'data-testid'?: string;
   }) => (
-    <div data-testid={testId}>
-      {image}
-      {title}
-      {meta}
-      {children}
+    <div data-testid={testId ?? 'entity-header'}>
+      {thumbnail}
+      <h2>{title}</h2>
+      <div>
+        {details}
+        {statusGlyph}
+      </div>
+      {actions}
     </div>
+  ),
+  EntityHeaderStatusGlyph: ({ label }: { readonly label?: string }) => (
+    <span
+      data-testid='entity-header-status-glyph'
+      role='img'
+      aria-label={label}
+    />
   ),
 }));
 
@@ -118,11 +130,23 @@ vi.mock('@/components/shell/MetaPill', () => ({
 }));
 
 vi.mock('@/components/shell/StatusBadge', () => ({
-  StatusBadge: () => null,
-}));
-
-vi.mock('@/components/shell/TypeBadge', () => ({
-  TypeBadge: () => null,
+  STATUS_CHIP: {
+    live: { label: 'Live', dot: '', text: '', tooltip: 'Live on DSPs' },
+    scheduled: {
+      label: 'Scheduled',
+      dot: '',
+      text: '',
+      tooltip: 'Scheduled for release',
+    },
+    announced: {
+      label: 'Announced',
+      dot: '',
+      text: '',
+      tooltip: 'Publicly announced',
+    },
+    draft: { label: 'Draft', dot: '', text: '', tooltip: 'Draft' },
+    hidden: { label: 'Hidden', dot: '', text: '', tooltip: 'Hidden' },
+  },
 }));
 
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
@@ -171,6 +195,49 @@ describe('ReleaseSidebarSections', () => {
 
     expect(screen.getByTestId('release-header-card')).toBeTruthy();
     expect(screen.getByText('Midnight Drive')).toBeTruthy();
+  });
+
+  it('exposes the release status via an icon-only glyph, never a visible word', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    const glyph = screen.getByTestId('entity-header-status-glyph');
+    expect(glyph).toHaveAttribute('aria-label', 'Live');
+    // The status word must never render as plain visible text in the rail.
+    expect(screen.queryByText('Live')).toBeNull();
+  });
+
+  it('shows the drop date, track count, and DSP stack in the header meta strip instead of the metadata list', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('release-header-meta-strip')).toBeTruthy();
   });
 
   it('uses one canonical artwork geometry and contain-fit contract', () => {
