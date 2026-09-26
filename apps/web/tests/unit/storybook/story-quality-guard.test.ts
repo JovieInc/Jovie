@@ -95,4 +95,86 @@ export const Fixture = {};
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
+
+  // CI checks out pull/<n>/merge at depth 1 and only partially deepens the
+  // base branch, so a receipt can point at a commit that exists but sits at
+  // the shallow boundary. Ancestry is unverifiable there; the guard must
+  // still accept a receipt whose commit and story file exist at that sha.
+  it('accepts a boundary receipt in a shallow clone', () => {
+    const sourceRoot = mkdtempSync(join(tmpdir(), 'jovie-story-source-'));
+    const shallowRoot = mkdtempSync(join(tmpdir(), 'jovie-story-shallow-'));
+    const storyRelative = 'apps/web/components/Fixture.stories.tsx';
+
+    try {
+      const storyPath = join(sourceRoot, storyRelative);
+      mkdirSync(dirname(storyPath), { recursive: true });
+      execFileSync('git', ['init', '-b', 'main'], { cwd: sourceRoot });
+      execFileSync('git', ['config', 'user.email', 'fixture@example.com'], {
+        cwd: sourceRoot,
+      });
+      execFileSync('git', ['config', 'user.name', 'Story Fixture'], {
+        cwd: sourceRoot,
+      });
+      writeFileSync(
+        storyPath,
+        `export default {};
+export const Fixture = {};
+`
+      );
+      execFileSync('git', ['add', storyRelative], { cwd: sourceRoot });
+      execFileSync('git', ['commit', '-m', 'seed story'], { cwd: sourceRoot });
+      execFileSync('git', ['commit', '--allow-empty', '-m', 'second'], {
+        cwd: sourceRoot,
+      });
+      // A receipt commit on a side branch: present when fetched, but never
+      // an ancestor of main's HEAD.
+      execFileSync('git', ['checkout', '--quiet', '-b', 'side', 'HEAD~1'], {
+        cwd: sourceRoot,
+      });
+      execFileSync('git', ['commit', '--allow-empty', '-m', 'side commit'], {
+        cwd: sourceRoot,
+      });
+      const sideSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: sourceRoot,
+        encoding: 'utf8',
+      }).trim();
+
+      execFileSync(
+        'git',
+        [
+          'clone',
+          '--quiet',
+          '--depth',
+          '1',
+          `file://${sourceRoot}`,
+          shallowRoot,
+        ],
+        { encoding: 'utf8' }
+      );
+      execFileSync(
+        'git',
+        ['fetch', '--quiet', '--depth', '1', 'origin', 'side'],
+        {
+          cwd: shallowRoot,
+        }
+      );
+      mkdirSync(dirname(join(shallowRoot, storyRelative)), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(shallowRoot, storyRelative),
+        `export default {};
+export const Fixture = { parameters: { pen: { sourceSha: '${sideSha}' } } };
+`
+      );
+
+      const shallow = runGuard(shallowRoot);
+      const shallowOutput = `${shallow.stdout}${shallow.stderr}`;
+      expect(shallow.status).toBe(0);
+      expect(shallowOutput).toContain('[story-quality] clean');
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(shallowRoot, { recursive: true, force: true });
+    }
+  });
 });

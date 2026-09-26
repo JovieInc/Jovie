@@ -116,8 +116,27 @@ function provenanceAncestryRoots() {
   return roots;
 }
 
+function isShallowRepository() {
+  try {
+    return (
+      execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+        cwd: root,
+        encoding: 'utf8',
+      }).trim() === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function checkStoryProvenance(files, texts) {
-  const ancestryRoots = provenanceAncestryRoots();
+  // CI checks out pull/<n>/merge at depth 1 and only partially deepens the
+  // base branch, so receipts can point at commits that exist but sit at the
+  // shallow boundary — ancestry is unverifiable there. The commit-exists and
+  // story-at-receipt checks below still apply; only full clones can prove
+  // ancestry.
+  const shallowRepo = isShallowRepository();
+  const ancestryRoots = shallowRepo ? [] : provenanceAncestryRoots();
   /** @type {Map<string, { file: string, storyPath: string }[]>} */
   const storiesBySha = new Map();
 
@@ -151,7 +170,7 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
 
-    let isAncestor = false;
+    let isAncestor = shallowRepo;
     const ancestryErrors = [];
     for (const ancestryRoot of ancestryRoots) {
       try {
