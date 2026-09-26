@@ -330,7 +330,7 @@ Noir Ion anchors below).
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
 | Text secondary | `#5A606A` | `#5a606a` | Body text, labels |
 | Text tertiary | `#666C76` | `#666c76` | Descriptions, meta |
-| Text quaternary | `#737982` | `#737982` | Placeholders |
+| Text quaternary | `#6A7078` | `#6A7078` | Placeholders |
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
@@ -355,7 +355,7 @@ prior anchors without a second theme provider).
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
 | Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
-| Text tertiary | `#7D8593` | `--color-text-quaternary-token` | Placeholders |
+| Text tertiary | `#858B96` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
