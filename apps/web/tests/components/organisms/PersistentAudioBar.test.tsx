@@ -28,6 +28,7 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
+const prefetch = vi.fn();
 let pathname = '/app';
 let searchParams = new URLSearchParams();
 
@@ -73,7 +74,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, prefetch }),
 }));
 
 let mockPrefersReducedMotion = false;
@@ -149,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
@@ -494,6 +496,37 @@ describe('PersistentAudioBar', () => {
         from: '/app/chat/thread-1?panel=profile',
       })
     );
+  });
+
+  it('prefetches the lyrics route on pointer and keyboard intent', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    const lyricsButton = screen.getByRole('button', { name: 'Lyrics' });
+    fireEvent.pointerEnter(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    prefetch.mockClear();
+    fireEvent.focus(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+  });
+
+  it('does not prefetch the lyrics route when the track has no lyrics', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
+    expect(prefetch).not.toHaveBeenCalled();
   });
 
   it('closes the canonical lyrics button back to the last non-lyrics route', async () => {

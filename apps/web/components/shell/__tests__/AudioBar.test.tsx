@@ -43,6 +43,23 @@ describe('AudioBar', () => {
     expect(screen.getByLabelText(/^Lyrics/)).toBeInTheDocument();
   });
 
+  it('fires onLyricsIntent on pointer enter and keyboard focus', () => {
+    const onLyricsIntent = vi.fn();
+    render(
+      <AudioBar
+        {...baseProps}
+        track={{ ...baseTrack, hasLyrics: true }}
+        onOpenLyrics={() => {}}
+        onLyricsIntent={onLyricsIntent}
+      />
+    );
+    const button = screen.getByLabelText(/^Lyrics/);
+    fireEvent.pointerEnter(button);
+    expect(onLyricsIntent).toHaveBeenCalledTimes(1);
+    fireEvent.focus(button);
+    expect(onLyricsIntent).toHaveBeenCalledTimes(2);
+  });
+
   it('labels the lyrics button as a close action when active', () => {
     render(
       <AudioBar
