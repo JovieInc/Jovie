@@ -1715,6 +1715,10 @@ jobs:
           # PRs, including test-only edits. Merge groups already force this lane.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
+          # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
+          # skip PRs, so these contracts run here (#18718).
+          STRUCTURAL_CONTROL_PATTERN+='|^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$|symphony/jobs/ci-failure-diagnosis)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)'
+
           # Invariant-scanned sources must run invariants:check (#18182 added a
           # readFileSync to apps/desktop/src/main.ts unchecked). Derived from the
           # invariants' own scan roots; a node failure fails this step closed.
