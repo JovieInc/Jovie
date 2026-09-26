@@ -1639,6 +1639,7 @@ jobs:
         timeout-minutes: 10
         env: &base-fetch-await-env
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          EVENT_NAME: ${{ github.event_name }}
           BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
         run: &base-fetch-await |
           set -euo pipefail
@@ -1663,6 +1664,16 @@ jobs:
           if ! git rev-parse --verify --quiet "refs/remotes/origin/${BASE_BRANCH}^{commit}" > /dev/null; then
             echo "::error title=Base-branch fetch::origin/${BASE_BRANCH} is missing"
             exit 1
+          fi
+          # A pull_request checkout is a merge onto the base as it was at
+          # checkout; the fetch above can land a newer base. Diffs against
+          # origin/<base> would then count commits merged since checkout as
+          # this PR's changes, so pin the ref to the merge's first parent.
+          if [[ "$EVENT_NAME" == 'pull_request' ]] \
+            && git rev-parse --verify --quiet 'HEAD^2^{commit}' > /dev/null \
+            && git merge-base --is-ancestor 'HEAD^1' "refs/remotes/origin/${BASE_BRANCH}"; then
+            git update-ref "refs/remotes/origin/${BASE_BRANCH}" "$(git rev-parse 'HEAD^1')"
+            echo "Pinned origin/${BASE_BRANCH} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
           fi
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
