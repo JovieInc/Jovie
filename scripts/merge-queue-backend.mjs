@@ -1269,6 +1269,7 @@ async function pollEnrollmentPostcondition({
  *   postconditionAttempts?: number,
  *   postconditionDelayMs?: number,
  *   wait?: (milliseconds: number) => Promise<void>,
+ *   flakeRerunReceipt?: string,
  * }} [input]
  */
 export async function enrollPullRequest({
