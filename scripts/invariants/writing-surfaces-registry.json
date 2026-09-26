@@ -9,7 +9,7 @@
     "Extends the existing capability/policy inventory pattern (JOV-5917: encode capabilities and policies, register instances, generic adapters) with writing coverage. This is a registry plus validator, not a new service.",
     "Advisory transport is the artifact-bound Jev Gateway integration from JOV-6465 (scripts/invariants/jev-gateway.mjs, modality 'text'). No alternative HTTP adapter is created.",
     "Whole-message generation that streams to a reader before any review is recorded as 'post-generation-advisory' review, never as gated.",
-    "Weekly/manual advisory slop-gate policy is preserved; this registry adds no recurring automation and no fleet dispatch.",
+    "The weekly advisory Slop Gate is retired: @jovie/copy owns copy rules (canon/VOICE.md) and the deterministic copy-gate ci-fast lane blocks new violations on changed customer-facing lines. This registry adds no recurring automation and no fleet dispatch.",
     "Coverage reports a denominator and a reviewed version. There is no blanket 'everywhere' claim."
   ],
   "coverage": {
@@ -357,7 +357,8 @@
       "purpose": "Give the executing agent a bounded task-local contract",
       "evidenceSources": [
         ".claude/rules/gstack.md",
-        "prompts/copywriting-audit.md",
+        ".claude/skills/copywriting/SKILL.md",
+        "packages/copy/rules.ts",
         "apps/eve-pilot/identities/summer/instructions.md",
         "canon/VOICE.md"
       ],

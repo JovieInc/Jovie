@@ -65,6 +65,7 @@ cleanup_old_branches*.sh
 !apps/web/scripts/sync-standalone-assets.mjs
 !apps/web/scripts/ensure-sharp-runtime-traces.mjs
 !apps/web/scripts/resolve-package-json.mjs
+!apps/web/scripts/stage-runtime-data.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
 !apps/web/scripts/

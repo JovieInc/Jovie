@@ -230,6 +230,26 @@ describe('buildPublicProfileMetadata', () => {
     settings: null,
   };
 
+  it('noindexes an empty profile with no public release (JOV-6611)', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: { ...minimalProfile, display_name: 'Cris Rosa' },
+      genres: null,
+      hasPublicRelease: false,
+    });
+    expect(meta.robots).toMatchObject({ index: false, follow: false });
+  });
+
+  it('keeps a profile with a public release, or unknown release state, indexable', () => {
+    for (const hasPublicRelease of [true, undefined]) {
+      const meta = buildPublicProfileMetadata({
+        profile: { ...minimalProfile, display_name: 'Tim White' },
+        genres: null,
+        hasPublicRelease,
+      });
+      expect(meta.robots).toMatchObject({ index: true, follow: true });
+    }
+  });
+
   it('returns Metadata with title equal to username when display_name is null', () => {
     const meta = buildPublicProfileMetadata({
       profile: minimalProfile,

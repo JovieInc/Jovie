@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -33,7 +34,6 @@ function extractLivePrPredicates(source) {
 describe('agent QC wire honesty (JOV-5235)', () => {
   const pipeline = readRepo('.github/workflows/agent-pipeline.yml');
   const landing = readRepo('.github/workflows/agent-landing-sweep.yml');
-  const slop = readRepo('.github/workflows/slop-gate.yml');
   const autoPr = readRepo('.github/workflows/auto-pr-on-push.yml');
   const architecture = readRepo('docs/AGENT_OS_ARCHITECTURE.md');
 
@@ -53,13 +53,13 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     );
   });
 
-  it('keeps Slop Gate post-merge informational and off PR Ready', () => {
-    expect(slop).toMatch(/^\s*schedule:/m);
-    expect(slop).toMatch(/^\s*workflow_dispatch:/m);
-    expect(slop).not.toMatch(/^\s*pull_request(_target)?:/m);
-    expect(slop).not.toMatch(/^\s*merge_group:/m);
-    expect(slop).toMatch(/post-merge informational/i);
-    expect(slop).not.toMatch(/flip to blocking/i);
+  it('retires Slop Gate for the deterministic copy-gate ci-fast lane', () => {
+    // @jovie/copy owns copy rules (canon/VOICE.md); the weekly Python smell
+    // report is gone and its check names must never be pinned or required.
+    expect(existsSync(join(repoRoot, '.github/workflows/slop-gate.yml'))).toBe(
+      false
+    );
+    expect(readRepo('scripts/ci-fast-lanes.mjs')).toContain("id: 'copy-gate'");
     expect(REQUIRED_CHECK_NAMES.map(check => check.context)).not.toContain(
       'Slop Gate (advisory)'
     );

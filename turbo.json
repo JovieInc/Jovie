@@ -25,9 +25,14 @@
         "!**/tests/**",
         "!**/__tests__/**",
         "!**/coverage/**",
-        "!**/playwright-report/**"
+        "!**/playwright-report/**",
+        "$TURBO_ROOT$/CHANGELOG.md",
+        "$TURBO_ROOT$/docs/FEATURE_REGISTRY.md",
+        "$TURBO_ROOT$/scripts/symphony/symphony-codex-account-control.py",
+        "$TURBO_ROOT$/apps/eve-pilot/identities/*/instructions.md"
       ],
       "outputs": [
+        "runtime-data/**",
         ".next/standalone/**",
         ".next/static/**",
         ".next/server/**",

@@ -674,30 +674,51 @@ export function evaluateFleetGate(
   const queueRepositoryCapacity = queueRepository
     ? scopedLaneCapacity?.repositories?.[queueRepository]
     : null;
-  const queueRepositoryCapacityAvailable = Boolean(
-    queueRepositoryCapacity &&
-      queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
+  const laneCapacity = evidence?.queue?.laneCapacity;
+  const laneCapacityReceiptValid = Boolean(
+    queueRepository &&
+      laneCapacity &&
+      typeof laneCapacity === 'object' &&
+      !Array.isArray(laneCapacity) &&
+      laneCapacity.schema === 'jovie-lane-capacity/v2' &&
+      laneCapacity.repositories &&
+      typeof laneCapacity.repositories === 'object' &&
+      !Array.isArray(laneCapacity.repositories)
   );
-  // JOV-5340: GREEN leases key off greenReadyPrs < target; no fresh
-  // laneCapacity receipt required.
-  const newMutationAllowed =
+  const queueRepositoryCapacityConsistent = Boolean(
+    laneCapacityReceiptValid &&
+      queueRepositoryCapacity &&
+      queueRepositoryCapacity.ready === greenReadyPrs &&
+      queueRepositoryCapacity.budget === queueTarget
+  );
+  // Mirror gem-priority-gate (JOV-5340): a lane-capacity receipt vetoes new
+  // leases only when present and contradictory; an absent or unscoped
+  // receipt must not freeze a lane below queue backpressure.
+  const queueRepositoryCapacityAvailable =
     queueBelowBackpressure &&
-    (queueRepositoryCapacityAvailable || state === FLEET_GATE_STATE.GREEN);
+    (!laneCapacityReceiptValid || queueRepositoryCapacityConsistent);
+  const newMutationAllowed =
+    queueShapeValid && queueRepositoryCapacityAvailable;
   // merge-speed-fast-ui-lanes-v1: a bound-GREEN fleet also admits isolated
   // UI/docs promotion on source-bound gates.
   const isolatedPromotionAllowed =
-    (state === FLEET_GATE_STATE.GREEN && reviewAdmission.allowed) ||
-    (state === FLEET_GATE_STATE.AMBER &&
-      reviewAdmission.allowed &&
-      controllerFresh &&
-      controllerStatus === 'green' &&
-      mainStatus === 'green' &&
-      productionStatus === 'red' &&
-      ['clear', 'resolved'].includes(integrityStatus) &&
-      queueBelowBackpressure &&
-      reasons.every(
-        reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
-      ));
+    reviewAdmission.allowed &&
+    controllerFresh &&
+    controllerStatus === 'green' &&
+    mainStatus === 'green' &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    queueBelowBackpressure &&
+    ((state === FLEET_GATE_STATE.GREEN &&
+      productionStatus === 'green' &&
+      deploymentBound(
+        evidence?.main?.sha,
+        evidence?.production?.deployedSha
+      )) ||
+      (state === FLEET_GATE_STATE.AMBER &&
+        productionStatus === 'red' &&
+        reasons.every(
+          reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+        )));
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]

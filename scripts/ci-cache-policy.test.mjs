@@ -15,7 +15,6 @@ test('Python workflows cache the pinned pytest dependency set', () => {
     '.github/workflows/ci.yml',
     '.github/workflows/actionlint.yml',
     '.github/workflows/brand-scrub.yml',
-    '.github/workflows/slop-gate.yml',
   ]) {
     const workflow = read(file);
     assert.match(workflow, /cache: pip/, `${file} must restore pip downloads`);

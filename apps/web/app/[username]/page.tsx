@@ -605,7 +605,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status, creatorClerkId } = profileResult;
+  const { profile, genres, status, creatorClerkId, latestRelease } =
+    profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -619,5 +620,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     profile,
     genres,
     isClaimed: creatorClerkId !== null,
+    // latestRelease uses the public release-eligibility predicate, so null
+    // means the profile has no publicly eligible release.
+    hasPublicRelease: latestRelease !== null,
   });
 }

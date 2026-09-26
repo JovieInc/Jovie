@@ -27,6 +27,8 @@
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
+ *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
+ *     non-zero stops starting structural commands (fail-fast)
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -95,13 +97,27 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // production-marker-state coverage gate (operations structural command), and
 // every unit test in the quarantine ledger (Unit Tests reruns those with
 // retries under continue-on-error).
+const PLAYWRIGHT_RECEIPT_CI_TEST =
+  'tests/unit/ci/playwright-artifact-secrets.test.ts';
 const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
-  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  PLAYWRIGHT_RECEIPT_CI_TEST,
   'tests/unit/ci/production-marker-state.test.ts',
 ]);
 // Run by name in the web structural parts so it executes even while it sits in
 // the quarantine ledger.
 const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+// Web Unit Tests run the Playwright receipt only for web merge groups/pushes
+// (never PRs), so #18718 broke it unseen. Run it here when they will not.
+const PLAYWRIGHT_RECEIPT_INPUTS =
+  /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
+export function selectPlaywrightReceipt(event, selected, changed) {
+  if (event === 'pull_request') {
+    return (
+      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    );
+  }
+  return event !== 'workflow_dispatch' && !selected.has('web');
+}
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
   runElsewhere = []
@@ -156,7 +172,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
  * @param {string} body
  */
 const structuralPythonRegression = body =>
-  `if python3 -c "import coverage, pytest" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi`;
+  `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
 /** Files of the structural pytest suite (one collection, sharded below). */
 export const STRUCTURAL_PYTEST_FILES = Object.freeze([
@@ -183,12 +199,38 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
   'TestDrainPrQueueWiring or TestNativeAdmissionReceiptReconciliation';
 
 /** @param {string} shard @param {string} expression */
+// The suite spawns thousands of short-lived jq/gh/node processes, so it is
+// CPU-bound on process startup: pytest-xdist spreads each shard over two
+// workers. Two, not auto: both shards run concurrently on the 4 vCPU
+// structural python job; more workers measured slower (JovieInc/Jovie#18657).
 const structuralPytestShard = (shard, expression) =>
-  `python3 -m pytest --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
+  `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
 export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
   structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
   structuralPytestShard('b', `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`),
+]);
+const STRUCTURAL_PYTEST_PARTS = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(
+  structuralPythonRegression
+);
+/**
+ * Commands ci-fast (structural python) runs instead of remaining: the pytest
+ * shards plus the two longest node-only suites (55s + 46s wall of remaining's
+ * CPU-bound pool, which the python job finished ~145s ahead of).
+ */
+const STRUCTURAL_PYTHON_JOB_PARTS = new Set([
+  ...STRUCTURAL_PYTEST_PARTS,
+  'pnpm invariants:check',
+  'pnpm ci:control:test',
+]);
+
+/**
+ * Prefixes of the @jovie/web Vitest runs that ci-fast (structural web) takes
+ * from remaining's pool alongside the web product lane (runStructural).
+ */
+export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
+  'pnpm --filter @jovie/web exec ',
+  'pnpm --dir apps/web exec ',
 ]);
 
 /**
@@ -207,7 +249,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
     ].join(' && ')
   ),
-  ...STRUCTURAL_PYTEST_SHARD_COMMANDS.map(structuralPythonRegression),
+  ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
@@ -230,6 +272,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
@@ -260,6 +303,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
+  'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/agent-config-health.test.mjs',
   'scripts/lib/__tests__/agentcookie.test.mjs',
@@ -426,7 +470,7 @@ const LANES = [
     id: 'profile-admission',
     name: 'Public Profile Admission',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     run: runProfileAdmission,
   },
   {
@@ -1152,7 +1196,7 @@ function runTypecheck() {
       };
     }
   }
-  return shell('pnpm turbo typecheck --affected --force');
+  return shellAsync('pnpm turbo typecheck --affected --force');
 }
 
 function runWebTestsTypecheck() {
@@ -1189,7 +1233,10 @@ function runWebTestsTypecheck() {
       };
     }
   }
-  return shell(WEB_TESTS_TYPECHECK_COMMAND);
+  // Own lock so it overlaps app tsc instead of queueing behind it.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
 }
 
 function runScriptsTypecheck() {
@@ -1466,6 +1513,10 @@ const STRUCTURAL_LONG_POLES = Object.freeze([
   'python3 -m pytest ',
   'pnpm invariants:check',
   'run-governor-bounded-codex-selector.sh',
+  // 2026-09-26 merge groups: 42s and 38s, the slowest web commands. List
+  // order started the 42s one 16th of 22, so it set the web-only wall.
+  'lib/__tests__/component-live-storybook-certification.test.mjs',
+  'YoutubeThumbnailsLanding.test.tsx',
 ]);
 
 const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
@@ -1560,9 +1611,11 @@ export function structuralLocks(command) {
  * in-flight commands finish. A synchronous executor completes before the next
  * command is considered, so it behaves exactly like the old serial loop.
  * `first` lists indexes (long poles) to start ahead of list order; they never
- * jump an earlier command that shares one of their locks.
+ * jump an earlier command that shares one of their locks. `stop` is consulted
+ * before each start; once it returns true nothing new starts (in-flight
+ * commands still finish) and the unstarted commands stay undefined.
  * @param {readonly string[]} commands
- * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number}} opts
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean}} opts
  * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
  * @typedef {{code: number, output: string}} ExecResult
  */
@@ -1583,6 +1636,7 @@ export function runCommandPool(commands, opts) {
   const held = new Set();
   let running = 0;
   let failed = false;
+  let stopped = false;
   let pumping = false;
   let repump = false;
 
@@ -1632,14 +1686,18 @@ export function runCommandPool(commands, opts) {
       pumping = true;
       do {
         repump = false;
-        while (!failed && running < concurrency) {
+        while (!failed && !stopped && running < concurrency) {
+          if (pending.length > 0 && opts.stop?.()) {
+            stopped = true;
+            break;
+          }
           const slot = pending.findIndex(index => !blocked(index));
           if (slot === -1) break;
           start(pending.splice(slot, 1)[0]);
         }
       } while (repump);
       pumping = false;
-      if (running === 0 && (failed || pending.length === 0)) {
+      if (running === 0 && (failed || stopped || pending.length === 0)) {
         resolveAll(results);
       }
     };
@@ -1671,7 +1729,26 @@ export function formatStructuralTimings(timings, wallMs) {
   ].join('\n');
 }
 
-/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>}} [opts] */
+/**
+ * ci-fast (remaining) runs this lane while its cheap lanes still run in the
+ * background; their exit status lands in CI_FAST_STRUCTURAL_ABORT_STATUS_FILE.
+ * A non-zero status keeps fail-fast: no further structural command starts and
+ * the lane reports skipped, as when an earlier in-process lane failed. The
+ * workflow's await step still fails the job on that status. A missing file
+ * (lanes still running, or a job without background lanes) never aborts.
+ */
+export function earlierLaneFailed(
+  statusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE
+) {
+  if (!statusFile || !failFastEnabled()) return false;
+  try {
+    return readFileSync(statusFile, 'utf8').trim() !== '0';
+  } catch {
+    return false;
+  }
+}
+
+/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>, stop?: () => boolean}} [opts] */
 export async function runStructural(opts = {}) {
   const execute = opts.execute ?? shellAsync;
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
@@ -1726,7 +1803,8 @@ export async function runStructural(opts = {}) {
     SCRIPT_CONTRACT_VITEST_COMMAND,
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
+    // merge-group-workflow-contract runs in ci:control:test's Vitest run.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1808,7 +1886,7 @@ export async function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
-  const parts = [
+  const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
           webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
@@ -1822,6 +1900,11 @@ export async function runStructural(opts = {}) {
           // Targeting Vitest directly also fails closed when the file cannot
           // be resolved or contains no tests.
           `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          ...(selectPlaywrightReceipt(event, selected, changed)
+            ? [
+                `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${PLAYWRIGHT_RECEIPT_CI_TEST}`,
+              ]
+            : []),
         ]
       : []),
     ...invariantParts,
@@ -1829,6 +1912,31 @@ export async function runStructural(opts = {}) {
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
   ];
+  // ci-fast (structural python) runs `only` its parts; remaining skips them.
+  // ci-fast (structural web) does the same for the web product lane plus
+  // every @jovie/web Vitest run (~200s of remaining's ~445s CPU-bound sum);
+  // those share apps/web coverage locks, so they stay together in one job.
+  // Consume the split modes so nested contract suites (which rebuild this
+  // list) don't inherit them and see a filtered pool.
+  const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
+  delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const webMode = process.env.CI_FAST_STRUCTURAL_WEB;
+  delete process.env.CI_FAST_STRUCTURAL_WEB;
+  // Same for the fail-fast status file: the runner's own contract suite runs
+  // runStructural and must not abort on this job's cheap-lane status.
+  const abortStatusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
+  delete process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
+  const webJobParts = new Set([
+    ...webParts,
+    ...allParts.filter(part =>
+      STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => part.startsWith(prefix))
+    ),
+  ]);
+  const parts = allParts.filter(
+    part =>
+      mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only') &&
+      webMode !== (webJobParts.has(part) ? 'skip' : 'only')
+  );
   if (parts.length === 0) {
     return {
       code: 0,
@@ -1845,6 +1953,7 @@ export async function runStructural(opts = {}) {
     execute,
     concurrency,
     locks: parts.map(structuralLocks),
+    stop: opts.stop ?? (() => earlierLaneFailed(abortStatusFile)),
     // Serial runs gain nothing from reordering; keep strict list order there.
     first:
       concurrency > 1
@@ -1872,6 +1981,17 @@ export async function runStructural(opts = {}) {
         parts.length,
         code
       ),
+      timings,
+      wallMs,
+    };
+  }
+  // findIndex, not some(): unstarted commands are holes in the results array.
+  if (results.findIndex(result => result === undefined) !== -1) {
+    return {
+      code: 0,
+      output:
+        'skipped: earlier lane failed (fail-fast; background ci-fast lanes exited non-zero)\n',
+      skipped: true,
       timings,
       wallMs,
     };
@@ -1975,10 +2095,20 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
+    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    const started = new Map();
+    for (const lane of selectedLanes.filter(l =>
+      LANE_GROUPS.typecheck.includes(l.id)
+    )) {
+      const run = Promise.resolve().then(() => lane.run());
+      run.catch(() => {});
+      started.set(lane.id, [Date.now(), run]);
+    }
+
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
-      const laneStartedAt = Date.now();
+      const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
@@ -1997,7 +2127,7 @@ async function main() {
 
       let outcome;
       try {
-        outcome = await lane.run();
+        outcome = await (run ?? lane.run());
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);

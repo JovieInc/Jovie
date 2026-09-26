@@ -3,6 +3,7 @@ export interface CreditedArtistCandidate {
   readonly name: string;
   readonly spotifyId: string;
   readonly imageUrl: string | null;
+  readonly musicbrainzId: string | null;
 }
 
 export interface SpotifyArtistProfileData {

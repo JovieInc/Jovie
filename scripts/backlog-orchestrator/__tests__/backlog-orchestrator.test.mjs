@@ -1220,6 +1220,23 @@ describe('deterministic Symphony admission boundary', () => {
       ),
       true
     );
+    // A contradictory receipt vetoes new leases even below backpressure.
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+
+    // An absent receipt must not freeze a below-target lane (JOV-5340).
+    const missingReceipt = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(missingReceipt.workAdmission.newIssueLeaseAllowed, true);
 
     const staleSchema = admitter.evaluateFleetGate(
       fleetEvidence({
@@ -1577,6 +1594,21 @@ describe('deterministic Symphony admission boundary', () => {
       maxConcurrent: 1,
       authority: 'canonical-merge-queue-controller',
     });
+  });
+
+  it('denies the isolated lane on GREEN when production is not bound to main', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: {
+          status: 'green',
+          deployedSha: 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
   });
 
   it('denies the isolated lane when integrity, controller, queue, or production evidence is ambiguous', () => {
