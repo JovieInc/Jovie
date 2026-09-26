@@ -121,10 +121,7 @@ export default async function InterstitialPage({
           />
 
           <p className='text-center text-xs text-tertiary-token'>
-            This confirmation helps protect against automated access.
-          </p>
-
-          <p className='text-center text-xs text-tertiary-token'>
+            This confirmation helps protect against automated access.{' '}
             <Link
               href={`${APP_ROUTES.REPORT}?type=wrapped_link&target=${encodeURIComponent(shortId)}`}
               className='underline underline-offset-2 hover:text-secondary-token'

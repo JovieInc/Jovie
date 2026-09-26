@@ -1,13 +1,7 @@
 import { BASE_URL } from '@/constants/app';
 import { ABUSE_EMAIL, SECURITY_EMAIL } from '@/constants/domains';
 
-/**
- * security.txt — RFC 9116 security contact file.
- *
- * Served at /.well-known/security.txt so researchers and users can find
- * monitored intake channels for vulnerabilities and abuse (including
- * phishing profiles and malicious smart links hosted on Jovie).
- */
+/** security.txt — RFC 9116 contact file for vulnerability/abuse intake. */
 
 export const revalidate = false;
 export const dynamic = 'force-static';

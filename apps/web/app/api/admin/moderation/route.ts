@@ -40,7 +40,7 @@ async function requireAdmin() {
   return { adminUserId: entitlements.userId };
 }
 
-/** GET /api/admin/moderation — pending abuse/security reports (JOV-6599). */
+/** GET — pending abuse/security reports (JOV-6599). */
 export async function GET(request: Request) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** POST /api/admin/moderation — authorized takedown of a reported target. */
+/** POST — authorized takedown of a reported target. */
 export async function POST(request: Request) {
   const { adminUserId, error } = await requireAdmin();
   if (error) return error;

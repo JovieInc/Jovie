@@ -6,22 +6,14 @@ import { ReportForm } from './ReportForm';
 
 export const metadata: Metadata = {
   title: 'Report abuse or a security issue',
-  description:
-    'Report a Jovie profile, smart link, or page for abuse, phishing, impersonation, or a security issue.',
-  robots: {
-    index: false,
-    follow: false,
-  },
+  robots: { index: false, follow: false },
 };
 
-interface ReportPageProps {
-  readonly searchParams: Promise<{
-    type?: string;
-    target?: string;
-  }>;
-}
-
-export default async function ReportPage({ searchParams }: ReportPageProps) {
+export default async function ReportPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ type?: string; target?: string }>;
+}) {
   const { type, target } = await searchParams;
 
   return (

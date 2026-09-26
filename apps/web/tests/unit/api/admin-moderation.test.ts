@@ -28,13 +28,10 @@ const admin = {
   userId: 'admin-1',
 };
 
-function postRequest(body: unknown) {
-  return new Request('http://localhost/api/admin/moderation', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
+const URL_ = 'http://localhost/api/admin/moderation';
+const get = (q = '') => new Request(`${URL_}${q}`);
+const postRequest = (body: unknown) =>
+  new Request(URL_, { method: 'POST', body: JSON.stringify(body) });
 
 describe('GET /api/admin/moderation', () => {
   beforeEach(() => {
@@ -47,7 +44,7 @@ describe('GET /api/admin/moderation', () => {
     hoisted.getCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: false,
     });
-    const res = await GET(new Request('http://localhost/api/admin/moderation'));
+    const res = await GET(get());
     expect(res.status).toBe(401);
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
@@ -58,15 +55,13 @@ describe('GET /api/admin/moderation', () => {
       isAdmin: false,
       userId: 'u1',
     });
-    const res = await GET(new Request('http://localhost/api/admin/moderation'));
+    const res = await GET(get());
     expect(res.status).toBe(403);
     expect(hoisted.listAbuseReports).not.toHaveBeenCalled();
   });
 
   it('lists reports for admins and clamps the limit', async () => {
-    const res = await GET(
-      new Request('http://localhost/api/admin/moderation?limit=999')
-    );
+    const res = await GET(get('?limit=999'));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reports: [{ id: 'r1' }] });
     expect(hoisted.listAbuseReports).toHaveBeenCalledWith(200);
@@ -74,7 +69,7 @@ describe('GET /api/admin/moderation', () => {
 
   it('returns 500 when the queue read fails', async () => {
     hoisted.listAbuseReports.mockRejectedValue(new Error('db down'));
-    const res = await GET(new Request('http://localhost/api/admin/moderation'));
+    const res = await GET(get());
     expect(res.status).toBe(500);
     expect(hoisted.captureError).toHaveBeenCalled();
   });
@@ -117,12 +112,7 @@ describe('POST /api/admin/moderation', () => {
   });
 
   it('rejects malformed JSON', async () => {
-    const res = await POST(
-      new Request('http://localhost/api/admin/moderation', {
-        method: 'POST',
-        body: '{bad',
-      })
-    );
+    const res = await POST(new Request(URL_, { method: 'POST', body: '{bad' }));
     expect(res.status).toBe(400);
   });
 

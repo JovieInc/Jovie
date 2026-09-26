@@ -7,28 +7,48 @@ import type {
   ReportTargetType,
 } from '@/lib/validation/schemas/report';
 
-const TARGET_TYPE_OPTIONS = [
-  { value: 'profile', label: 'Profile' },
-  { value: 'smart_link', label: 'Smart Link' },
-  { value: 'wrapped_link', label: 'Wrapped Link' },
-  { value: 'page', label: 'Other Jovie Page' },
-] as const satisfies ReadonlyArray<{
-  value: ReportTargetType;
-  label: string;
-}>;
+const TARGET_TYPE_OPTIONS = (
+  [
+    ['profile', 'Profile'],
+    ['smart_link', 'Smart Link'],
+    ['wrapped_link', 'Wrapped Link'],
+    ['page', 'Other Jovie Page'],
+  ] as const
+).map(([value, label]) => ({ value: value as ReportTargetType, label }));
 
-const CATEGORY_OPTIONS = [
-  { value: 'phishing', label: 'Phishing Or Scam' },
-  { value: 'impersonation', label: 'Impersonation' },
-  { value: 'abuse', label: 'Abuse Or Harassment' },
-  { value: 'security', label: 'Security Issue' },
-  { value: 'other', label: 'Other' },
-] as const satisfies ReadonlyArray<{
-  value: ReportCategory;
-  label: string;
-}>;
+const CATEGORY_OPTIONS = (
+  [
+    ['phishing', 'Phishing Or Scam'],
+    ['impersonation', 'Impersonation'],
+    ['abuse', 'Abuse Or Harassment'],
+    ['security', 'Security Issue'],
+    ['other', 'Other'],
+  ] as const
+).map(([value, label]) => ({ value: value as ReportCategory, label }));
 
 const SUCCESS_MESSAGE = 'Thanks — we received your report and will review it.';
+
+function Field({
+  children,
+  htmlFor,
+  label,
+}: Readonly<{
+  children: React.ReactNode;
+  htmlFor: string;
+  label: string;
+}>) {
+  return (
+    <div className='space-y-1.5'>
+      <label
+        htmlFor={htmlFor}
+        className='text-xs font-medium text-secondary-token'
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 export interface ReportFormProps {
   readonly initialTargetType?: string;
@@ -40,7 +60,7 @@ export function ReportForm({
   initialTarget,
 }: ReportFormProps) {
   const validTargetType = TARGET_TYPE_OPTIONS.some(
-    option => option.value === initialTargetType
+    ({ value }) => value === initialTargetType
   )
     ? (initialTargetType as ReportTargetType)
     : 'page';
@@ -101,13 +121,7 @@ export function ReportForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
-      <div className='space-y-1.5'>
-        <label
-          htmlFor='report-target-type'
-          className='text-xs font-medium text-secondary-token'
-        >
-          What are you reporting?
-        </label>
+      <Field htmlFor='report-target-type' label='What Are You Reporting?'>
         <NativeSelect
           id='report-target-type'
           options={TARGET_TYPE_OPTIONS}
@@ -116,15 +130,9 @@ export function ReportForm({
             setTargetType(event.target.value as ReportTargetType)
           }
         />
-      </div>
+      </Field>
 
-      <div className='space-y-1.5'>
-        <label
-          htmlFor='report-target'
-          className='text-xs font-medium text-secondary-token'
-        >
-          Profile handle, link, or page URL
-        </label>
+      <Field htmlFor='report-target' label='Profile Handle, Link, Or Page URL'>
         <Input
           id='report-target'
           value={target}
@@ -133,30 +141,18 @@ export function ReportForm({
           required
           maxLength={500}
         />
-      </div>
+      </Field>
 
-      <div className='space-y-1.5'>
-        <label
-          htmlFor='report-category'
-          className='text-xs font-medium text-secondary-token'
-        >
-          Category
-        </label>
+      <Field htmlFor='report-category' label='Category'>
         <NativeSelect
           id='report-category'
           options={CATEGORY_OPTIONS}
           value={category}
           onChange={event => setCategory(event.target.value as ReportCategory)}
         />
-      </div>
+      </Field>
 
-      <div className='space-y-1.5'>
-        <label
-          htmlFor='report-details'
-          className='text-xs font-medium text-secondary-token'
-        >
-          Details (optional)
-        </label>
+      <Field htmlFor='report-details' label='Details (Optional)'>
         <Textarea
           id='report-details'
           value={details}
@@ -165,15 +161,9 @@ export function ReportForm({
           maxLength={2000}
           rows={4}
         />
-      </div>
+      </Field>
 
-      <div className='space-y-1.5'>
-        <label
-          htmlFor='report-email'
-          className='text-xs font-medium text-secondary-token'
-        >
-          Your email (optional)
-        </label>
+      <Field htmlFor='report-email' label='Your Email (Optional)'>
         <Input
           id='report-email'
           type='email'
@@ -182,7 +172,7 @@ export function ReportForm({
           placeholder='Only if you want a follow-up'
           maxLength={320}
         />
-      </div>
+      </Field>
 
       {error ? (
         <p className='text-xs text-destructive' role='alert'>

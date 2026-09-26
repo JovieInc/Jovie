@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
-/**
- * Public abuse/security report intake (JOV-6599). Shared by the /report
- * form, POST /api/report, and the admin takedown route.
- */
+/** Public abuse/security report intake (JOV-6599); shared by /report,
+ * POST /api/report, and the admin takedown route. */
 export const reportTargetTypes = [
   'profile',
   'smart_link',

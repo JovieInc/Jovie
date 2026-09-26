@@ -110,17 +110,11 @@ export function SmartLinkPoweredByFooter({
           <span>Powered by</span>
           <span className='font-semibold'>Jovie</span>
         </Link>
-        <span
-          aria-hidden='true'
-          className='text-2xs text-neutral-700 dark:text-muted-foreground/70'
-        >
-          ·
-        </span>
         <Link
           href={reportHref}
           className='inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
         >
-          Report
+          <span aria-hidden='true'>{'· '}</span>Report
         </Link>
       </div>
     </footer>

@@ -1,11 +1,7 @@
 /**
- * Public Abuse/Security Report Intake (POST /api/report)
- *
- * Receives reports from the "Report" links on profiles, smart links, and
- * wrapped /out/ links. Each valid submission lands in the moderation queue
- * (feedback_items, source='abuse_report') for admin review and takedown.
- * Responses are intentionally generic — reporters never learn moderation
- * state or internal identifiers. Rate limit: publicClickLimiter per IP.
+ * Public abuse/security report intake (POST /api/report, JOV-6599).
+ * Lands in feedback_items (source='abuse_report') for admin takedown.
+ * Responses stay generic — reporters never learn moderation state or IDs.
  */
 
 export const runtime = 'nodejs';

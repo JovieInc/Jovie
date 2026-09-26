@@ -27,7 +27,7 @@ export interface ModerationTakedownInput {
   readonly reason?: string;
 }
 
-/** `{releaseSlug}--{profileId}` tail parse, mirroring `app/r/[slug]/page.tsx`. */
+/** `{slug}--{profileId}` tail parse, mirroring `app/r/[slug]/page.tsx`. */
 function profileIdFromSmartLinkSlug(slug: string): string | null {
   const i = slug.lastIndexOf('--');
   return i === -1 ? null : slug.slice(i + 2) || null;
@@ -36,8 +36,7 @@ function profileIdFromSmartLinkSlug(slug: string): string | null {
 async function disableWrappedLinks(where: SQL, now: Date) {
   const rows = await db
     .update(wrappedLinks)
-    // Expiring a link makes getWrappedLink treat it as gone, so /out/<id>
-    // and /go/<id> stop resolving everywhere. No schema change required.
+    // Expiry makes getWrappedLink treat the link as gone (/out, /go 404).
     .set({ expiresAt: now })
     .where(where)
     .returning({ id: wrappedLinks.id });
@@ -45,14 +44,9 @@ async function disableWrappedLinks(where: SQL, now: Date) {
 }
 
 /**
- * Apply an admin takedown (JOV-6599).
- *
- * - `wrapped_link`: expires the wrapped link so /out/<id> and /go/<id> 404.
- * - `profile` / `smart_link`: unpublishes the profile AND expires every
- *   wrapped link created by its owner/claimants, killing wrapped outbound
- *   destinations with the page.
- * - Marks matching pending abuse reports resolved and writes an
- *   `admin_audit_log` row for traceability.
+ * Apply an admin takedown (JOV-6599): expire the wrapped link (or, for
+ * profile/smart_link, unpublish the profile and expire all owner links),
+ * resolve matching pending abuse reports, and write an audit row.
  */
 export async function applyModerationTakedown(input: ModerationTakedownInput) {
   const now = new Date();
@@ -111,8 +105,7 @@ export async function applyModerationTakedown(input: ModerationTakedownInput) {
     }
   }
 
-  // Resolve matching pending abuse reports (queue rows are feedback_items
-  // with source='abuse_report'); 'dismissed' is the closed status there.
+  // Resolve pending abuse reports (feedback_items, source='abuse_report').
   const reportConditions = [
     eq(feedbackItems.source, ABUSE_REPORT_SOURCE),
     eq(feedbackItems.status, 'pending'),
