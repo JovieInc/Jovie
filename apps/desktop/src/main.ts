@@ -1226,9 +1226,41 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+// Resolved once at startup (see preloadDesktopBootSplashWordmark) so the
+// splash builder stays synchronous without a thread-blocking file read.
+let desktopBootSplashWordmarkDataUrl: string | null = null;
+
+function resolveDesktopBootSplashWordmarkPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'Jovie-Wordmark-Cream.svg')
+    : path.join(
+        __dirname,
+        '..',
+        '..',
+        'web',
+        'public',
+        'brand',
+        'Jovie-Wordmark-Cream.svg'
+      );
+}
+
+async function preloadDesktopBootSplashWordmark(): Promise<void> {
+  try {
+    const wordmark = await fs.promises.readFile(
+      resolveDesktopBootSplashWordmarkPath()
+    );
+    desktopBootSplashWordmarkDataUrl = `data:image/svg+xml;base64,${wordmark.toString('base64')}`;
+  } catch {
+    // Keep first paint usable if a development or damaged package lacks the asset.
+    desktopBootSplashWordmarkDataUrl = null;
+  }
+}
+
 function buildDesktopBootSplashHtml(): string {
-  const markPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
+  const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
+  const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
+  const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -1236,17 +1268,30 @@ function buildDesktopBootSplashHtml(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jovie</title>
     <style>
-      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-mark-cream: ${markCream}; }
-      html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); }
-      body { display: grid; place-items: center; overflow: hidden; }
-      .mark { width: ${markPx}px; height: ${markPx}px; color: var(--system-b-mark-cream); }
+      :root { color-scheme: dark; --mac-canvas: ${SYSTEM_B_DESKTOP_TOKENS.macCinematicCanvas}; --mac-ion: #11AFFF; --mac-cream: ${markCream}; }
+      html, body { margin: 0; width: 100%; min-height: 100%; background: var(--mac-canvas); }
+      body { min-height: 100vh; overflow: hidden; color: var(--mac-cream); font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+      main { position: relative; display: grid; min-height: 100vh; place-items: center; isolation: isolate; background: radial-gradient(ellipse 78% 34% at 52% -8%, rgba(17,175,255,.30), transparent 76%), radial-gradient(ellipse 44% 24% at 88% 4%, rgba(17,175,255,.18), transparent 80%), var(--mac-canvas); }
+      main::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 90% at 50% 46%, transparent 55%, rgba(3,4,7,.72)); }
+      .corner-mark { position: absolute; top: min(32px, 1.43vw); right: min(32px, 1.43vw); width: min(${cornerMarkPx}px, 1.786vw); height: min(${cornerMarkPx}px, 1.786vw); opacity: ${cornerMarkOpacity}; color: var(--mac-cream); }
+      .lockup-area { position: relative; display: grid; justify-items: center; gap: min(24px, 1.07vw); width: 100%; }
+      .lockup { display: flex; width: min(249px, 11.12vw); align-items: center; justify-content: flex-start; gap: min(12px, .536vw); white-space: nowrap; }
+      .wordmark { display: block; width: min(104px, 4.64vw); height: auto; flex: none; }
+      .fallback-mark { width: min(32px, 1.43vw); height: min(32px, 1.43vw); color: var(--mac-cream); }
+      .suffix { font-size: min(38px, 1.7vw); line-height: 1.15; font-weight: 400; letter-spacing: -.8px; }
+      .progress { width: min(120px, 5.36vw); height: 2px; overflow: hidden; background: rgba(255,255,255,.2); }
+      .progress::before { content: ""; display: block; width: min(44px, 1.96vw); height: 2px; background: var(--mac-ion); }
     </style>
   </head>
   <body>
-    <main role="main" aria-label="Jovie is loading" data-desktop-splash="splash-b">
-      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+    <main role="main" aria-label="Jovie for Mac is loading" data-desktop-splash="cinematic">
+      <svg class="corner-mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
+      <div class="lockup-area" aria-hidden="true">
+        ${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}
+        <div class="progress"></div>
+      </div>
     </main>
   </body>
 </html>`;
@@ -2816,7 +2861,12 @@ app.whenReady().then(async () => {
     return;
   }
 
+  // The first window paints the boot splash, so the cached wordmark must be
+  // resolved before createWindow runs. Start it alongside window-state
+  // hydration; the preload never rejects (it falls back to the mark).
+  const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark();
   await hydrateWindowState();
+  await bootSplashWordmarkReady;
 
   // macOS menu bar extra (NSStatusItem via Electron Tray)
   if (process.platform === 'darwin') {

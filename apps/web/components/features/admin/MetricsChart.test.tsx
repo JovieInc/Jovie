@@ -25,16 +25,18 @@ describe('MetricsChart consumer states', () => {
   });
 
   it.each([
-    [[10, 20], '+100.0%', '15', '20'],
-    [[20, 10], '-50.0%', '15', '20'],
-    [[0, 0], '+0.0%', '0', '0'],
+    [[10, 20], '+100.0%', '15', '20', 'text-success'],
+    [[20, 10], '-50.0%', '15', '20', 'text-error'],
+    [[0, 0], '+0.0%', '0', '0', 'text-tertiary-token'],
   ])(
     'renders truthful delta, average and peak for %j',
-    (values, delta, average, peak) => {
+    (values, delta, average, peak, directionClass) => {
       render(<MetricsChart points={points(values as number[])} />);
-      expect(
-        screen.getByText(/Daily active users changed/).parentElement
-      ).toHaveTextContent(delta as string);
+      const deltaNode = screen.getByText(
+        /Daily active users changed/
+      ).parentElement;
+      expect(deltaNode).toHaveTextContent(delta as string);
+      expect(deltaNode).toHaveClass(directionClass as string);
       expect(screen.getByText('Average DAU').parentElement).toHaveTextContent(
         average as string
       );

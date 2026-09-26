@@ -172,7 +172,7 @@ export function resolveValue(
   while (out.includes('var(')) {
     if (guard > 50) return null;
     guard += 1;
-    const m = out.match(VAR_RE);
+    const m = VAR_RE.exec(out);
     if (!m) return null;
     const [full, name, fallback] = m;
     const stored = table.get(name);
@@ -230,7 +230,7 @@ export function parseColor(value: string): ParsedColor | null {
   if (v === 'transparent') return { luminance: 0, alpha: 0 };
 
   // #rgb / #rgba / #rrggbb / #rrggbbaa
-  const hex = v.match(/^#([0-9a-f]{3,8})$/);
+  const hex = /^#([0-9a-f]{3,8})$/.exec(v);
   if (hex) {
     let h = hex[1];
     if (h.length === 3 || h.length === 4) {
@@ -245,7 +245,7 @@ export function parseColor(value: string): ParsedColor | null {
   }
 
   // rgb()/rgba() — comma or space syntax, optional % units
-  const rgb = v.match(/^rgba?\(([^)]+)\)$/);
+  const rgb = /^rgba?\(([^)]+)\)$/.exec(v);
   if (rgb) {
     const parts = rgb[1]
       .replaceAll('/', ' ')
@@ -268,7 +268,7 @@ export function parseColor(value: string): ParsedColor | null {
   }
 
   // lch(L% C H [/ alpha]) — Y depends only on L*
-  const lch = v.match(/^lch\(([^)]+)\)$/);
+  const lch = /^lch\(([^)]+)\)$/.exec(v);
   if (lch) {
     const [main, alphaPart] = lch[1].split('/');
     const parts = main.trim().split(/\s+/);
@@ -280,7 +280,7 @@ export function parseColor(value: string): ParsedColor | null {
 
   // oklch(L C H [/ alpha]) — exact only for (near-)achromatic colors,
   // where Oklab lightness relates to Y as Y ≈ L^3.
-  const oklch = v.match(/^oklch\(([^)]+)\)$/);
+  const oklch = /^oklch\(([^)]+)\)$/.exec(v);
   if (oklch) {
     const [main, alphaPart] = oklch[1].split('/');
     const parts = main.trim().split(/\s+/);

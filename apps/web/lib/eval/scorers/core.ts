@@ -321,13 +321,19 @@ const rubricResult = (
   score: number,
   caseName: string,
   detail: string
-): ScorerResult => ({
-  criterion,
-  verdict: score >= 4 ? 'pass' : score >= 3 ? 'soft-fail' : 'fail',
-  score,
-  reason: `[${caseName}] ${criterion} ${detail}=${score}`,
-  flagged: score < 4,
-});
+): ScorerResult => {
+  let verdict: ScorerVerdict;
+  if (score >= 4) verdict = 'pass';
+  else if (score >= 3) verdict = 'soft-fail';
+  else verdict = 'fail';
+  return {
+    criterion,
+    verdict,
+    score,
+    reason: `[${caseName}] ${criterion} ${detail}=${score}`,
+    flagged: score < 4,
+  };
+};
 
 const absentRubric = (
   criterion: RubricCriterion,
