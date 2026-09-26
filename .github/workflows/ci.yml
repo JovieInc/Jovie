@@ -1353,6 +1353,24 @@ jobs:
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
       - uses: ./.github/actions/setup-playwright
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+      # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
+      # (PR run 36197543391). Restore the Build + Layout Turbopack cache that
+      # only trusted push-to-main runs write; this job never saves it. The path
+      # is compiler state only, and Turbopack revalidates every entry against
+      # this job's own inputs and env, so the rendered output is unchanged.
+      - name: Resolve Next build cache day
+        id: next-build-cache-day
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Restore Next build cache (read-only)
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
       - name: Build homepage for rendered snapshot compare
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
         run: pnpm turbo build --filter=@jovie/web
