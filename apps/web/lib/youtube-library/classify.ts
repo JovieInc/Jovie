@@ -98,11 +98,9 @@ export function classifyYouTubeVideo(
     if (hasMusicVideoTitle)
       signals.push('title matches official/music-video pattern');
     // Distributor block is YouTube's own auto-generated art-track marker.
-    const confidence = matchedDistributorBlock
-      ? hasMusicVideoTitle
-        ? 0.9
-        : 0.85
-      : 0.7;
+    let confidence = 0.7;
+    if (matchedDistributorBlock && hasMusicVideoTitle) confidence = 0.9;
+    else if (matchedDistributorBlock) confidence = 0.85;
     return {
       contentType: 'music_video',
       confidence,
