@@ -1654,3 +1654,83 @@ def test_env_example_in_trace_is_not_treated_as_a_credential(tmp_path: Path) -> 
     result = _run_deploy(tmp_path, env)
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("dangling", [False, True])
+def test_prebuilt_upload_fails_closed_on_file_symlink_trace_targets(
+    tmp_path: Path, dangling: bool
+) -> None:
+    """Function traces that name a file symlink (the JOV-6576
+    public/product-screenshots include) are packed as symlink entries, and
+    Vercel's remote build fails at "Extracting deployment files" on every
+    retry. The deploy must refuse before uploading anything."""
+
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    catalog = tmp_path / "apps/web/screenshot-catalog/current"
+    catalog.mkdir(parents=True)
+    if not dangling:
+        (catalog / "public-profile-desktop.png").write_bytes(b"png")
+    link = "apps/web/public/product-screenshots/profile-desktop.png"
+    export = tmp_path / link
+    export.parent.mkdir(parents=True)
+    export.symlink_to("../../screenshot-catalog/current/public-profile-desktop.png")
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(
+        json.dumps({"filePathMap": {"CHANGELOG.md": "CHANGELOG.md", link: link}})
+    )
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert "file symlinks" in result.stderr
+    assert link in result.stderr
+    assert not (tmp_path / "vercel-calls").exists()
+
+
+def test_prebuilt_upload_allows_directory_symlink_trace_targets(tmp_path: Path) -> None:
+    """pnpm's node_modules layer is traced as directory links in every build,
+    including the last successful 56.3.2 deploy; those must still upload."""
+
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    package = tmp_path / "node_modules/.pnpm/next@16/node_modules/next"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text("{}")
+    link = tmp_path / "apps/web/node_modules/next"
+    link.parent.mkdir(parents=True)
+    link.symlink_to("../../../node_modules/.pnpm/next@16/node_modules/next")
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(
+        json.dumps(
+            {
+                "filePathMap": {
+                    "CHANGELOG.md": "CHANGELOG.md",
+                    "apps/web/node_modules/next": "apps/web/node_modules/next",
+                    "apps/web/screenshot.png": "CHANGELOG.md",
+                }
+            }
+        )
+    )
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+
+
+def test_every_prebuilt_build_dereferences_function_trace_links() -> None:
+    """Each workflow that feeds vercel-prebuilt-deploy.sh must run the
+    materializer between `vercel build` and the deploy preflight."""
+
+    invocation = "node .github/scripts/materialize-vercel-static.mjs"
+    for workflow_path, deploy_marker in (
+        (PRODUCTION_RELEASE_WORKFLOW, "- name: Deploy (staging preview, prebuilt)"),
+        (CI_WORKFLOW, "- name: Deploy (PR preview, fast deployment for UI-only changes)"),
+    ):
+        workflow = workflow_path.read_text()
+        deploy = workflow.index(deploy_marker)
+        build = workflow.rindex("./node_modules/.bin/vercel build", 0, deploy)
+        materialize = workflow.index(invocation, build)
+        assert build < materialize < deploy, workflow_path.name

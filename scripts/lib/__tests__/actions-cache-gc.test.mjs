@@ -123,6 +123,30 @@ describe('Actions cache GC', () => {
     );
   });
 
+  it('rolls the Build+Layout Next build cache like a turbo family', () => {
+    expect(turboFamily('Linux-next-build-web-v1-abc-20260922')).toBe(
+      'Linux-next-build-web'
+    );
+    expect(turboFamily('jovie-production-next-cache-v1-Linux-abc')).toBeNull();
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: new Set(['refs/heads/main']),
+      usage: { active_caches_count: 10, active_caches_size_in_bytes: 1000 },
+      caches: [1, 2, 3].map(day =>
+        cache({
+          id: day,
+          ref: 'refs/heads/main',
+          key: `Linux-next-build-web-v1-abc-2026082${day}`,
+          last_accessed_at: `2026-08-2${day}T11:00:00Z`,
+        })
+      ),
+    });
+    expect(plan.evict.map(item => [item.id, item.reason])).toEqual([
+      [1, 'turbo_surplus'],
+    ]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([2, 3]);
+  });
+
   it('does not smash a recently used live playwright cache under budget', () => {
     const plan = planCacheGc({
       nowMs: now,

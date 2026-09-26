@@ -136,6 +136,10 @@ interface ProfileDesktopSurfaceProps {
   /** Fired once the desktop surface has mounted so the layout shell can
    *  retire the compact a11y tree (JOV-6434). */
   readonly onReady?: () => void;
+  /** The surface is server-rendered inside the display:none desktop shell on
+   *  mobile so cold desktop loads paint the real composition (JOV-6452). While
+   *  hidden, portaled overlays (modal drawer, auto-open alerts) stay closed. */
+  readonly overlaysEnabled?: boolean;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -282,6 +286,7 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
   onReady,
+  overlaysEnabled = true,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => {
@@ -1010,7 +1015,10 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {canGetUpdates && activeMode === 'subscribe' && !isSubscribed ? (
+        {canGetUpdates &&
+        activeMode === 'subscribe' &&
+        !isSubscribed &&
+        overlaysEnabled ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'
@@ -1023,7 +1031,7 @@ export function ProfileDesktopSurface({
         ) : null}
 
         <ProfileUnifiedDrawer
-          open={drawerOpen}
+          open={drawerOpen && overlaysEnabled}
           onOpenChange={onDrawerOpenChange}
           view={drawerView}
           onViewChange={onDrawerViewChange}

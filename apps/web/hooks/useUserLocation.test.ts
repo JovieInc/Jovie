@@ -59,23 +59,23 @@ describe('useUserLocation permission modes', () => {
     expect(getCurrentPosition).not.toHaveBeenCalled();
   });
 
-  it.each([
-    'prompt',
-    'denied',
-  ] as const)('never opens geolocation when granted-only permission is %s', async permissionState => {
-    const { getCurrentPosition, query } = installNavigator({
-      permissionState,
-    });
+  it.each(['prompt', 'denied'] as const)(
+    'never opens geolocation when granted-only permission is %s',
+    async permissionState => {
+      const { getCurrentPosition, query } = installNavigator({
+        permissionState,
+      });
 
-    const { result } = renderHook(() =>
-      useUserLocation({ permissionMode: 'granted-only' })
-    );
+      const { result } = renderHook(() =>
+        useUserLocation({ permissionMode: 'granted-only' })
+      );
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(query).toHaveBeenCalledWith({ name: 'geolocation' });
-    expect(getCurrentPosition).not.toHaveBeenCalled();
-    expect(result.current.location).toBeNull();
-  });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(query).toHaveBeenCalledWith({ name: 'geolocation' });
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+      expect(result.current.location).toBeNull();
+    }
+  );
 
   it('reads location when permission was already granted', async () => {
     const { getCurrentPosition } = installNavigator({

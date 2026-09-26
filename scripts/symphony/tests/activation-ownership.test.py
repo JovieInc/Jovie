@@ -14,6 +14,10 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
+# The helper lazily imports its sibling emit_gem_service_attestation; resolve
+# it the same way sibling suites do instead of relying on an earlier suite in
+# the runtime proof gate having already put scripts/symphony on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 HELPER = ROOT / "scripts/symphony/symphony_official_runtime.py"
 UNIT = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 SPEC = importlib.util.spec_from_file_location("symphony_official_runtime", HELPER)

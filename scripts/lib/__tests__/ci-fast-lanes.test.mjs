@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BIOME_TOOLCHAIN_FILES,
+  biomeNeedsFullTree,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
   extractDiagnosticLines,
@@ -628,6 +630,21 @@ exit 0
       }
     }
   );
+});
+
+describe('biomeNeedsFullTree', () => {
+  it('lints the whole tree when Biome config or version can change', () => {
+    for (const file of BIOME_TOOLCHAIN_FILES) {
+      expect(biomeNeedsFullTree(['apps/web/a.ts', file])).toBe(true);
+    }
+  });
+
+  it('keeps ordinary PRs on changed-files lint', () => {
+    expect(biomeNeedsFullTree([])).toBe(false);
+    expect(
+      biomeNeedsFullTree(['apps/web/package.json', 'apps/web/lib/utils.ts'])
+    ).toBe(false);
+  });
 });
 
 describe('webCiContractTestsCommand', () => {

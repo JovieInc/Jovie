@@ -15,7 +15,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { materializeStatic } from './materialize-vercel-static.mjs';
+import {
+  dereferenceFunctionFileLinks,
+  materializeStatic,
+} from './materialize-vercel-static.mjs';
 import { artifactSnapshot } from './production-input-provenance.mjs';
 
 const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -255,4 +258,127 @@ test('CLI materializes the build before artifact hashing in both release targets
         workflow.indexOf(hash, start) > materialize
     );
   }
+});
+
+function withFunctionConfig(f, name, filePathMap) {
+  const path = f.put(
+    `.vercel/output/functions/${name}.func/.vc-config.json`,
+    JSON.stringify({ runtime: 'nodejs22.x', filePathMap })
+  );
+  return {
+    path,
+    read: () => JSON.parse(readFileSync(path, 'utf8')).filePathMap,
+  };
+}
+
+test('dereferences file-symlink trace targets that break Vercel tgz extraction', t => {
+  const f = fixture(t);
+  // Real shape from JOV-6576: outputFileTracingIncludes pulls the public
+  // screenshot export links into the admin screenshot functions.
+  f.put(
+    'apps/web/screenshot-catalog/current/public-profile-desktop.png',
+    'png'
+  );
+  const exportLink = 'apps/web/public/product-screenshots/profile-desktop.png';
+  f.link(
+    exportLink,
+    '../../screenshot-catalog/current/public-profile-desktop.png'
+  );
+  f.put('node_modules/.pnpm/next@16/node_modules/next/package.json', '{}');
+  f.link(
+    'apps/web/node_modules/next',
+    '../../../node_modules/.pnpm/next@16/node_modules/next'
+  );
+  f.put('CHANGELOG.md', '# log');
+  const admin = withFunctionConfig(f, 'admin/screenshots', {
+    [exportLink]: exportLink,
+    'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    'CHANGELOG.md': 'CHANGELOG.md',
+  });
+  // Next writes aliases such as page.rsc.func as links to the real function.
+  f.link(
+    '.vercel/output/functions/admin/screenshots.rsc.func',
+    'screenshots.func'
+  );
+
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  assert.deepEqual(admin.read(), {
+    [exportLink]:
+      'apps/web/screenshot-catalog/current/public-profile-desktop.png',
+    'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    'CHANGELOG.md': 'CHANGELOG.md',
+  });
+  // The source export link is untouched; only the upload map changes.
+  assert.equal(lstatSync(resolve(f.root, exportLink)).isSymbolicLink(), true);
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('dereferences every checked-in public export link a trace can include', t => {
+  const f = fixture(t);
+  const names = execFileSync('git', ['ls-files', '-s', 'apps/web/public'], {
+    cwd: repo,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(line => line.startsWith('120000 '))
+    .map(line => line.split('\t')[1]);
+  assert.ok(names.length >= 6);
+  const map = {};
+  for (const name of names) {
+    const source = resolve(repo, name);
+    f.put(join(dirname(name), readlinkSync(source)), readFileSync(source));
+    f.link(name, readlinkSync(source));
+    map[name] = name;
+  }
+  const config = withFunctionConfig(f, 'api/admin/screenshots', map);
+  assert.equal(dereferenceFunctionFileLinks(f.root), names.length);
+  for (const [key, value] of Object.entries(config.read())) {
+    assert.equal(lstatSync(resolve(f.root, value)).isFile(), true, key);
+    assert.deepEqual(
+      readFileSync(resolve(f.root, value)),
+      readFileSync(resolve(repo, key))
+    );
+  }
+});
+
+for (const kind of ['dangling', 'escape', 'outside-root']) {
+  test(`refuses ${kind} function trace link before rewriting any config`, t => {
+    const f = fixture(t);
+    f.put('real.txt', 'bytes');
+    f.link('good-link.txt', 'real.txt');
+    const good = withFunctionConfig(f, 'a-good', {
+      'good-link.txt': 'good-link.txt',
+    });
+    const before = readFileSync(good.path, 'utf8');
+    if (kind === 'dangling') {
+      f.link('bad-link.txt', 'absent.txt');
+      withFunctionConfig(f, 'z-bad', { 'bad-link.txt': 'bad-link.txt' });
+    } else if (kind === 'escape') {
+      f.link('bad-link.txt', resolve(tmpdir()));
+      withFunctionConfig(f, 'z-bad', { 'bad-link.txt': 'bad-link.txt' });
+    } else {
+      withFunctionConfig(f, 'z-bad', { outside: '../outside.txt' });
+    }
+    assert.throws(() => dereferenceFunctionFileLinks(f.root));
+    assert.equal(readFileSync(good.path, 'utf8'), before);
+  });
+}
+
+test('function dereference is a no-op without prebuilt functions', t => {
+  const f = fixture(t);
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('CLI reports dereferenced function trace links', t => {
+  const f = fixture(t);
+  f.put('real.txt', 'bytes');
+  f.link('link.txt', 'real.txt');
+  const config = withFunctionConfig(f, 'index', { 'link.txt': 'link.txt' });
+  const stdout = execFileSync(
+    process.execPath,
+    [resolve(repo, '.github/scripts/materialize-vercel-static.mjs')],
+    { cwd: f.root, encoding: 'utf8' }
+  );
+  assert.match(stdout, /Dereferenced 1 function trace file symlinks/);
+  assert.deepEqual(config.read(), { 'link.txt': 'real.txt' });
 });

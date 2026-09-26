@@ -45,7 +45,8 @@ describe('github_concurrency_pending_replacement', () => {
         ...observed,
         pending: { ...observed.pending, ...patch },
       })
-    ).toBeNull());
+    ).toBeNull()
+  );
 
   it('rejects an unrelated later job', () => {
     expect(
@@ -61,21 +62,23 @@ describe('github_concurrency_pending_replacement', () => {
 });
 
 describe('classifyCiFailure', () => {
-  it.each([
-    'user_test',
-    'ba_dev_creator-ready',
-  ])('classifies Postgres 22P02 for synthetic actor %s as a non-retryable broken fixture', actor => {
-    const diagnosis = classifyCiFailure(
-      `PostgresError: invalid input syntax for type uuid: "${actor}" code: 22P02`
-    );
+  it.each(['user_test', 'ba_dev_creator-ready'])(
+    'classifies Postgres 22P02 for synthetic actor %s as a non-retryable broken fixture',
+    actor => {
+      const diagnosis = classifyCiFailure(
+        `PostgresError: invalid input syntax for type uuid: "${actor}" code: 22P02`
+      );
 
-    expect(diagnosis).toMatchObject({
-      id: 'postgres-synthetic-auth-actor-uuid',
-      classification: 'broken-e2e-fixture',
-      retryable: false,
-    });
-    expect(diagnosis?.remediation).toContain('POST /api/dev/test-auth/session');
-  });
+      expect(diagnosis).toMatchObject({
+        id: 'postgres-synthetic-auth-actor-uuid',
+        classification: 'broken-e2e-fixture',
+        retryable: false,
+      });
+      expect(diagnosis?.remediation).toContain(
+        'POST /api/dev/test-auth/session'
+      );
+    }
+  );
 
   it('does not classify an unrelated 22P02 as an auth fixture failure', () => {
     expect(

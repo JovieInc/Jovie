@@ -221,16 +221,16 @@ describe('Input', () => {
       expect(input.className).toContain('border-error');
     });
 
-    it.each([
-      'grammar',
-      'spelling',
-    ] as const)('preserves the %s aria-invalid reason', reason => {
-      render(<Input aria-invalid={reason} data-testid='input' />);
-      const input = screen.getByTestId('input');
+    it.each(['grammar', 'spelling'] as const)(
+      'preserves the %s aria-invalid reason',
+      reason => {
+        render(<Input aria-invalid={reason} data-testid='input' />);
+        const input = screen.getByTestId('input');
 
-      expect(input).toHaveAttribute('aria-invalid', reason);
-      expect(input.className).toContain('border-error');
-    });
+        expect(input).toHaveAttribute('aria-invalid', reason);
+        expect(input.className).toContain('border-error');
+      }
+    );
 
     it('associates error message with input via aria-describedby', () => {
       render(<Input error='Invalid email' data-testid='input' />);

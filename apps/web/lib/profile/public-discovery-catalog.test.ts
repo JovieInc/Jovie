@@ -147,3 +147,45 @@ describe('artists directory catalog (JOV-6260)', () => {
     expect(toArtistsDirectoryProfiles(null)).toEqual([]);
   });
 });
+
+describe('artists directory catalog (JOV-6126)', () => {
+  it('drops empty profiles and unresolved platform-ID handles from the directory', () => {
+    const profiles = toArtistsDirectoryProfiles([
+      {
+        id: 'duplicate',
+        username: 'timwhite1',
+        handle: 'timwhite1',
+        displayName: 'timwhite',
+        avatarUrl: null,
+        bio: null,
+        isPublic: true,
+        ownerEmail: 'someone@timwhite.audio',
+        hasPublicRelease: false,
+      },
+      {
+        id: 'spotify-id',
+        username: 'artist_5k9ywwwkldouuicvijstpl',
+        handle: 'artist_5k9ywwwkldouuicvijstpl',
+        displayName: 'Dave Edwards',
+        avatarUrl: null,
+        bio: null,
+        isPublic: true,
+        ownerEmail: null,
+        hasPublicRelease: true,
+      },
+      {
+        id: 'artist',
+        username: 'tim',
+        handle: 'tim',
+        displayName: 'Tim White',
+        avatarUrl: '/images/avatars/tim-white.jpg',
+        bio: 'Artist',
+        isPublic: true,
+        ownerEmail: 'tim@timwhite.audio',
+        hasPublicRelease: true,
+      },
+    ]);
+
+    expect(profiles.map(profile => profile.username)).toEqual(['tim']);
+  });
+});

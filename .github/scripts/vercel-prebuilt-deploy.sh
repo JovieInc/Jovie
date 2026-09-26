@@ -140,6 +140,51 @@ if (offenders.size > 0) {
 NODE
 }
 
+# A filePathMap target that is a symlink to a file is packed into the tgz as a
+# symlink entry, and Vercel's remote build then dies at "Extracting deployment
+# files... Error: Unexpected error" on every retry. The build step's
+# materialize-vercel-static.mjs dereferences them; refuse to upload (and burn
+# three remote builds) if any remain. Directory links (pnpm's node_modules
+# layer) are traced by every build and extract fine.
+assert_prebuilt_function_traces_have_no_file_links() {
+  node - <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.cwd();
+const functionsDir = path.join(root, '.vercel', 'output', 'functions');
+const offenders = new Set();
+const walk = dir => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(abs); continue; }
+    if (entry.name !== '.vc-config.json' || !entry.isFile()) continue;
+    let config;
+    try { config = JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { continue; }
+    for (const target of Object.values(config.filePathMap || {})) {
+      const traced = path.join(root, String(target));
+      let stat;
+      try { stat = fs.lstatSync(traced); } catch { continue; }
+      if (!stat.isSymbolicLink()) continue;
+      let resolved;
+      try { resolved = fs.statSync(traced); } catch { resolved = null; }
+      if (!resolved || !resolved.isDirectory()) offenders.add(path.relative(root, traced));
+    }
+  }
+};
+if (fs.existsSync(functionsDir)) walk(functionsDir);
+if (offenders.size > 0) {
+  const sorted = [...offenders].sort();
+  process.stderr.write(
+    `Deploy failed: ${sorted.length} function filePathMap target(s) are file symlinks; `
+    + 'Vercel cannot extract them from the prebuilt archive. Run '
+    + 'node .github/scripts/materialize-vercel-static.mjs after vercel build:\n');
+  for (const offender of sorted.slice(0, 20)) process.stderr.write(`  ${offender}\n`);
+  if (sorted.length > 20) process.stderr.write(`  ... ${sorted.length - 20} more\n`);
+  process.exit(1);
+}
+NODE
+}
+
 run_deploy() {
   local mode="$1"
   shift
@@ -364,6 +409,7 @@ if [ "${#deploy_modes[@]}" -eq 0 ]; then
 fi
 if [ "$has_prebuilt_output" = true ] && [ "$force_source_deploy" != "true" ]; then
   assert_prebuilt_upload_has_no_secrets
+  assert_prebuilt_function_traces_have_no_file_links
 fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0

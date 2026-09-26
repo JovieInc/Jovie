@@ -657,7 +657,9 @@ export function HeaderNav({
                 includePublicLogin={includePublicLoginInMobileNav}
                 publicCtaHref={publicCta?.href}
                 publicCtaLabel={publicCta?.label}
-                authenticatedUserSlot={<UserButton />}
+                authenticatedUserSlot={
+                  <UserButton showUserInfo settingsHref={APP_ROUTES.SETTINGS} />
+                }
               />
             </div>
           )}

@@ -28,6 +28,13 @@ describe('PR visual review workflow', () => {
     );
   });
 
+  it('runs the lane on changes to its own workflow and scripts', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain("- '.github/workflows/pr-visual-review.yml'");
+    expect(workflow).toContain("- '.github/scripts/pr-visual-*.mjs'");
+  });
+
   it('retires automatic paid model review and keeps capture plus uploads (JOV-6232)', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
@@ -45,7 +52,7 @@ describe('PR visual review workflow', () => {
       /pr-visual-review\.mjs review|reviewWithConfiguredBackends|reviewWithBackend/
     );
     expect(workflow.match(/^  [a-z][a-z_-]*:$/gm)).toEqual([
-      '  pull_request_target:',
+      '  pull_request:',
       '  capture:',
     ]);
     expect(workflow).toContain('pr-visual-review-capture.mjs');
@@ -81,6 +88,55 @@ describe('PR visual review workflow', () => {
     expect(capture).toContain('name: Fail on missing evidence upload');
     expect(capture).toContain('if: always()');
     expect(capture).toContain('JOV-5459');
+  });
+
+  describe('trust boundary: PR-controlled code never runs privileged', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const onBlock = workflow.slice(
+      workflow.indexOf('\non:\n'),
+      workflow.indexOf('\npermissions:')
+    );
+
+    it('never pairs a privileged trigger with a PR-head checkout', () => {
+      const checksOutPrHead =
+        /ref:\s*\$\{\{\s*github\.event\.pull_request\.head\.(sha|ref)\s*\}\}/.test(
+          workflow
+        );
+      expect(checksOutPrHead).toBe(true);
+      expect(onBlock).toMatch(/^ {2}pull_request:$/m);
+      expect(onBlock).not.toMatch(/pull_request_target|workflow_run/);
+      expect(workflow).not.toMatch(/^\s*(pull_request_target|workflow_run):/m);
+    });
+
+    it('grants only read access and no secrets to the code-running job', () => {
+      expect(workflow).toMatch(/^permissions: \{\}$/m);
+      const capture = jobBlock(workflow, 'capture');
+      expect(capture).toMatch(/permissions:\n {6}contents: read\n/);
+      expect(workflow).not.toMatch(/:\s*write\b/);
+      expect(workflow).not.toMatch(/secrets\.|secrets: inherit/);
+      expect(workflow).toContain('persist-credentials: false');
+      expect(workflow).not.toMatch(/actions\/cache(\/save)?@/);
+    });
+
+    it('binds evidence to the exact PR head and the live base tip', () => {
+      const capture = jobBlock(workflow, 'capture');
+      expect(capture).toContain('name: Verify exact PR head checkout');
+      expect(capture).toContain("git rev-parse --verify 'HEAD^{commit}'");
+      expect(capture).toContain('fetch-depth: 0');
+      expect(capture).not.toContain('github.event.pull_request.base.sha');
+      expect(capture).toContain(
+        'BASE_REF: ${{ github.event.pull_request.base.ref }}'
+      );
+      expect(capture).toContain("grep -Eq '^[A-Za-z0-9._/-]+$'");
+      expect(capture).toContain('refs/remotes/origin/${BASE_REF}^{commit}');
+      expect(capture).toContain('head_sha: process.env.HEAD_SHA');
+      expect(capture).toContain(
+        'PR_VISUAL_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}'
+      );
+      expect(capture).toContain(
+        'name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}'
+      );
+    });
   });
 
   it('captures homepage stills when locked homepage copy changes (JOV-5960)', () => {

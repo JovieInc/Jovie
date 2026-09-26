@@ -21,15 +21,18 @@ E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`);
   it.each([
     ['success (has_artifact=false)', 'skipped'],
     ['success (has_artifact=true)', 'failure'],
-  ])('does not blame implicit skip propagation when build=%s and Neon=%s', (build, neon) => {
-    expect(
-      diagnoseCiFailure(`ci-build-public: ${build}
+  ])(
+    'does not blame implicit skip propagation when build=%s and Neon=%s',
+    (build, neon) => {
+      expect(
+        diagnoseCiFailure(`ci-build-public: ${build}
 neon-db: ${neon}
 ci-e2e-smoke: skipped
 E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`)
-        .failureClass
-    ).toBe('unknown');
-  });
+          .failureClass
+      ).toBe('unknown');
+    }
+  );
 
   it('diagnoses the paired Storybook setup-import and iframe transport failure', () => {
     const diagnosis = diagnoseCiFailure(`Complete job name: Storybook A11y
@@ -53,9 +56,12 @@ Tests 289 passed (289)`);
     `storybook (chromium)\nFailed to import test file .storybook/vitest.setup.ts\nError [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:crypto`,
     `Storybook A11y\nStorybook packages must use matching versions\n37 passed\n289 passed`,
     `storybook (chromium)\nCannot connect to the iframe\nReceived URL: unknown due to CORS`,
-  ])('does not infer iframe transport from a partial Storybook signature', log => {
-    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
-  });
+  ])(
+    'does not infer iframe transport from a partial Storybook signature',
+    log => {
+      expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+    }
+  );
 
   it('separates Lighthouse protocol transport exhaustion from product assertions', () => {
     const diagnosis = diagnoseCiFailure(`Lighthouse CI (Production)
@@ -699,13 +705,16 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     'runner_failure_class=runner-io-pressure',
     'runner_failure_class=runner-io-pressure-unavailable',
     'runner_spawn_admission=blocked io_full_avg10_pct=49.82',
-  ])('diagnoses I/O-pressure admission without recommending retries: %s', log => {
-    const diagnosis = diagnoseCiFailure(log);
+  ])(
+    'diagnoses I/O-pressure admission without recommending retries: %s',
+    log => {
+      const diagnosis = diagnoseCiFailure(log);
 
-    expect(diagnosis.failureClass).toBe('runner_io_pressure_admission');
-    expect(diagnosis.rootCause).toContain('scale-up was admission-blocked');
-    expect(diagnosis.remediation).toContain('Do not retry or add runners');
-  });
+      expect(diagnosis.failureClass).toBe('runner_io_pressure_admission');
+      expect(diagnosis.rootCause).toContain('scale-up was admission-blocked');
+      expect(diagnosis.remediation).toContain('Do not retry or add runners');
+    }
+  );
 
   it('diagnoses post-admission restore pressure before the generic I/O class', () => {
     const diagnosis = diagnoseCiFailure(
@@ -838,9 +847,12 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
   it.each([
     'You have exceeded the limit of concurrently active endpoints.',
     'HTTP status 402: payment required',
-  ])('does not infer Neon endpoint capacity from a partial signature: %s', log => {
-    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
-  });
+  ])(
+    'does not infer Neon endpoint capacity from a partial signature: %s',
+    log => {
+      expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+    }
+  );
 
   it('does not classify a valid per-job Neon concurrency group as a collision', () => {
     expect(

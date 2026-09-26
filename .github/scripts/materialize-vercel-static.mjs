@@ -3,10 +3,12 @@ import {
   copyFileSync,
   lstatSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
   realpathSync,
   renameSync,
   unlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -119,11 +121,88 @@ export function materializeStatic(root) {
   return pending.length;
 }
 
+// Next adds every file an outputFileTracingIncludes glob matches to the route
+// trace as-is, so a symlinked source file (apps/web/public/product-screenshots
+// links into screenshot-catalog/current) becomes a function filePathMap target
+// that is itself a symlink. The prebuilt tgz archive then carries symlink
+// entries Vercel's remote build cannot extract ("Extracting deployment
+// files... Error: Unexpected error"), which blocked every staging deploy after
+// those includes landed (JOV-6576). Point each such key at the link's real
+// file: the function reads identical bytes at the same path, and the archive
+// holds a regular file. Directory links (pnpm's node_modules layer) predate
+// the regression and stay as traced.
+export function dereferenceFunctionFileLinks(root) {
+  root = realpathSync(root);
+  const functions = resolve(root, '.vercel/output/functions');
+  let functionsStat;
+  try {
+    functionsStat = lstatSync(functions);
+  } catch (error) {
+    if (error.code === 'ENOENT') return 0;
+    throw error;
+  }
+  if (!functionsStat.isDirectory()) {
+    throw new Error('Function artifact root must be a real directory');
+  }
+  const rewrites = [];
+  function walk(directory) {
+    for (const name of readdirSync(directory).sort()) {
+      const path = resolve(directory, name);
+      const stat = lstatSync(path);
+      // Linked .func directories alias a sibling walked on its own.
+      if (stat.isDirectory()) walk(path);
+      if (name !== '.vc-config.json' || !stat.isFile()) continue;
+      const config = JSON.parse(readFileSync(path, 'utf8'));
+      const map = config.filePathMap;
+      if (!map || typeof map !== 'object') continue;
+      let changed = 0;
+      for (const [key, value] of Object.entries(map)) {
+        const traced = resolve(root, String(value));
+        inside(root, traced);
+        let tracedStat;
+        try {
+          tracedStat = lstatSync(traced);
+        } catch (error) {
+          if (error.code === 'ENOENT') continue; // Not a link; CLI reports it.
+          throw error;
+        }
+        if (!tracedStat.isSymbolicLink()) continue;
+        let target;
+        try {
+          target = realpathSync(traced);
+        } catch {
+          throw new Error(`Function trace link is dangling: ${value}`);
+        }
+        inside(root, target);
+        const targetStat = lstatSync(target);
+        if (targetStat.isDirectory()) continue;
+        if (!targetStat.isFile()) {
+          throw new Error(`Function trace link target is not a file: ${value}`);
+        }
+        map[key] = relative(root, target).split(sep).join('/');
+        changed += 1;
+      }
+      if (changed > 0) rewrites.push({ path, config, changed });
+    }
+  }
+  walk(functions);
+  // Validate every config before rewriting any of them.
+  let total = 0;
+  for (const { path, config, changed } of rewrites) {
+    writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+    total += changed;
+  }
+  return total;
+}
+
 if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   console.log(
     `Materialized ${materializeStatic(process.cwd())} Vercel static symlinks.`
+  );
+  console.log(
+    `Dereferenced ${dereferenceFunctionFileLinks(process.cwd())} function trace file symlinks.`
   );
 }

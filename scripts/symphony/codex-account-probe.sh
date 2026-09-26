@@ -163,6 +163,25 @@ def process_children():
     return children
 
 
+def exited(pid):
+    """True once pid has terminated, including as an unreaped zombie.
+
+    kill(pid, 0) succeeds for a zombie, so a child that already died on
+    SIGTERM would otherwise look alive until the whole grace deadline passed.
+    A zombie keeps its pid reserved until it is reaped, so treating it as
+    exited here cannot make a later signal reach a recycled pid.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except (OSError, IndexError):
+        return False
+    return state in ("Z", "X")
+
+
 def terminate_tree(process, _tree_token):
     descendants = set()
     pidfds = {}
@@ -205,13 +224,7 @@ def terminate_tree(process, _tree_token):
             remember(pid)
             send(pid, signal.SIGCONT)
             send(pid, signal.SIGTERM)
-        alive = []
-        for pid in targets:
-            try:
-                os.kill(pid, 0)
-                alive.append(pid)
-            except ProcessLookupError:
-                pass
+        alive = [pid for pid in targets if not exited(pid)]
         if not alive:
             break
         time.sleep(0.02)

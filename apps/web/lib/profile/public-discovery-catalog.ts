@@ -1,13 +1,15 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, exists } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { filterPublicDiscoveryIdentities } from './public-profile-indexing-policy';
+import { publicReleaseEligibilitySqlPredicate } from './public-release-eligibility';
 
 export interface ArtistsDirectoryCatalogProfile {
   readonly id: string;
@@ -22,6 +24,7 @@ export interface ArtistsDirectoryCatalogRow
   readonly isPublic?: boolean | null;
   readonly ownerEmail?: string | null;
   readonly handle?: string | null;
+  readonly hasPublicRelease?: boolean | null;
 }
 
 export type ArtistsDirectoryCatalogResult =
@@ -65,6 +68,17 @@ async function queryArtistsDirectoryCatalog(): Promise<ArtistsDirectoryCatalogRe
         bio: creatorProfiles.bio,
         isPublic: creatorProfiles.isPublic,
         ownerEmail: users.email,
+        hasPublicRelease: drizzleSql<boolean>`${exists(
+          db
+            .select({ one: drizzleSql`1` })
+            .from(discogReleases)
+            .where(
+              and(
+                eq(discogReleases.creatorProfileId, creatorProfiles.id),
+                publicReleaseEligibilitySqlPredicate()
+              )
+            )
+        )}`,
       })
       .from(creatorProfiles)
       .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -88,7 +102,7 @@ async function queryArtistsDirectoryCatalog(): Promise<ArtistsDirectoryCatalogRe
 
 export const loadArtistsDirectoryProfiles = unstable_cache(
   queryArtistsDirectoryCatalog,
-  ['artists-directory-v1'],
+  ['artists-directory-v2'],
   {
     revalidate: 3600,
     tags: [CACHE_TAGS.ARTISTS_DIRECTORY, CACHE_TAGS.PUBLIC_PROFILE],
