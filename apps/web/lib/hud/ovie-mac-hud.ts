@@ -81,11 +81,22 @@ export type OvieMacHudInFlightPullRequests = {
   errorMessage: string | null;
 };
 
+export type OvieMacHudReceiptedShip = {
+  linearIssue: string;
+  symphonyRef: string;
+  mergeQueueRef: string;
+  prodSha: string;
+  receiptAt: string;
+};
+
+export const OVIE_MAC_HUD_RECEIPTED_SHIP_LIMIT = 10;
+
 export type OvieMacHudSnapshot = {
   alive: OvieMacHudAliveMetric;
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  receiptedShips: readonly OvieMacHudReceiptedShip[];
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -568,6 +579,17 @@ export function countReceiptedShipsThisWeek(
   return { shipsThisWeek, available: true, detail: SHIPPING_DETAIL };
 }
 
+export function recentReceiptedShips(
+  entries: readonly unknown[],
+  limit: number = OVIE_MAC_HUD_RECEIPTED_SHIP_LIMIT
+): readonly OvieMacHudReceiptedShip[] {
+  return entries
+    .map(parseReceiptedShip)
+    .filter((ship): ship is OvieMacHudReceiptedShip => ship !== null)
+    .sort((a, b) => Date.parse(b.receiptAt) - Date.parse(a.receiptAt))
+    .slice(0, limit);
+}
+
 export function composeOvieMacHudSnapshot(input: {
   alive: OvieMacHudAliveInput;
   growth: OvieMacHudGrowthInput;
@@ -589,6 +611,10 @@ export function composeOvieMacHudSnapshot(input: {
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    receiptedShips:
+      input.shippingAvailable === false
+        ? []
+        : recentReceiptedShips(input.shippingEntries),
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };

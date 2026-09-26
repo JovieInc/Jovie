@@ -15,6 +15,10 @@ vi.mock('@/components/features/admin/hud/OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => <div data-testid='operational-tasks-panel' />,
 }));
 
+vi.mock('@/components/features/admin/hud/CompanyActivityFeed', () => ({
+  CompanyActivityFeed: () => <div data-testid='company-activity-feed' />,
+}));
+
 vi.mock('@/components/features/admin/hud/SymphonyCodexAccountControl', () => ({
   SymphonyCodexAccountControl: () => (
     <div data-testid='ovie-codex-account-control'>Codex Accounts</div>
@@ -84,6 +88,7 @@ const BASE: OvieMacHudSnapshot = {
       },
     ],
   },
+  receiptedShips: [],
   generatedAtIso: '2026-08-22T00:00:00.000Z',
 };
 
@@ -123,6 +128,7 @@ describe('OvieMacHud', () => {
     expect(
       screen.getByRole('link', { name: 'Talk To Summer' })
     ).toHaveAttribute('href', '/app/ov/chat');
+    expect(screen.getByTestId('company-activity-feed')).toBeInTheDocument();
   });
 
   it('keeps the three-card grid reserved when numbers are unavailable', () => {

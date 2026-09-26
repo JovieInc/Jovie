@@ -15,6 +15,10 @@ vi.mock('./OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => null,
 }));
 
+vi.mock('./CompanyActivityFeed', () => ({
+  CompanyActivityFeed: () => <div data-testid='company-activity-feed' />,
+}));
+
 vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
 }));
@@ -55,6 +59,7 @@ const snapshot: OvieMacHudSnapshot = {
     truncated: false,
     errorMessage: null,
   },
+  receiptedShips: [],
   generatedAtIso: '2026-09-16T00:00:00.000Z',
 };
 
@@ -62,5 +67,10 @@ describe('OvieMacHud', () => {
   it('exposes a visible Close control back to the canonical shell', () => {
     render(<OvieMacHud snapshot={snapshot} />);
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('renders the company activity feed below the hero metrics', () => {
+    render(<OvieMacHud snapshot={snapshot} />);
+    expect(screen.getByTestId('company-activity-feed')).toBeInTheDocument();
   });
 });
