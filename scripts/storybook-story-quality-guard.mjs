@@ -99,7 +99,9 @@ function provenanceAncestryRoots() {
   // both prove the commit is in the shipped history of this change.
   const roots = ['HEAD'];
   const candidates = [
-    process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : null,
+    process.env.GITHUB_BASE_REF
+      ? `origin/${process.env.GITHUB_BASE_REF}`
+      : null,
     'origin/main',
   ];
   for (const ref of candidates) {
