@@ -93,15 +93,18 @@ describe('audio analysis registries', () => {
     ['A', 'minor', 'A minor', '8A', '1m'],
     ['A#', 'minor', 'A# minor', '3A', '8m'],
     ['B', 'minor', 'B minor', '10A', '3m'],
-  ] as const)('normalizes %s %s into traditional, Camelot, and Open Key notation', (tonic, mode, traditional, camelot, openKey) => {
-    expect(createCanonicalMusicalKey(tonic, mode)).toEqual({
-      tonic,
-      mode,
-      traditional,
-      camelot,
-      openKey,
-    });
-  });
+  ] as const)(
+    'normalizes %s %s into traditional, Camelot, and Open Key notation',
+    (tonic, mode, traditional, camelot, openKey) => {
+      expect(createCanonicalMusicalKey(tonic, mode)).toEqual({
+        tonic,
+        mode,
+        traditional,
+        camelot,
+        openKey,
+      });
+    }
+  );
 
   it('rejects non-canonical musical key values at runtime boundaries', () => {
     expect(() =>
@@ -194,26 +197,23 @@ describe('analysis provenance and worker request contract', () => {
     expect(() => sha256ContentHash(value)).toThrow(new TypeError(message));
   });
 
-  it.each([
-    '2026-07-22',
-    '2026-07-22T20:15:30Z',
-    'not-a-date',
-  ])('rejects a non-canonical analysis timestamp', value => {
-    expect(() => isoTimestamp(value)).toThrow(
-      new TypeError('analysis timestamp must be canonical ISO-8601 UTC')
-    );
-  });
+  it.each(['2026-07-22', '2026-07-22T20:15:30Z', 'not-a-date'])(
+    'rejects a non-canonical analysis timestamp',
+    value => {
+      expect(() => isoTimestamp(value)).toThrow(
+        new TypeError('analysis timestamp must be canonical ISO-8601 UTC')
+      );
+    }
+  );
 
-  it.each([
-    -0.01,
-    1.01,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-  ])('rejects invalid analysis confidence %s', value => {
-    expect(() => analysisConfidence(value)).toThrow(
-      new RangeError('analysis confidence must be between 0 and 1')
-    );
-  });
+  it.each([-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid analysis confidence %s',
+    value => {
+      expect(() => analysisConfidence(value)).toThrow(
+        new RangeError('analysis confidence must be between 0 and 1')
+      );
+    }
+  );
 
   it('rejects missing analyzer identity and model metadata', () => {
     const base = {

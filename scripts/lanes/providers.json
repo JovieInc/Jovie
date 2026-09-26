@@ -13,7 +13,9 @@
       "--model",
       "swe-2-medium",
       "--permission-mode",
-      "dangerous"
+      "dangerous",
+      "--respect-workspace-trust",
+      "false"
     ]
   },
   "claude": {

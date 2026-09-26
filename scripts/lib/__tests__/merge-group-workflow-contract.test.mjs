@@ -214,6 +214,11 @@ function workflowDeclaresReadyForReviewType(source) {
   return false;
 }
 
+const BLOBLESS_BASE_FETCH_JOBS = new Set([
+  'ci-exact-head-coverage',
+  'ci-profile-admission-browser',
+]);
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -533,6 +538,18 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs first, fail-fast, in the same step.
+    expect(ovieBuild).toContain('set -euo pipefail');
+    expect(
+      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
+    ).toBeLessThan(
+      ovieBuild.indexOf(
+        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
+      )
+    );
+    expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
+    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -796,6 +813,15 @@ describe('merge_group workflow contract', () => {
     expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
+    // The event PR base SHA goes stale on synchronize; the PR diff base is the
+    // merge base with the fetched base tip, the queue keeps its exact base.
+    expect(coverage).not.toContain('github.event.pull_request.base.sha');
+    expect(coverage).toContain(
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(coverage).toContain(
+      'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+    );
     expect(coverage).toContain('.applicable');
     expect(coverage).toContain(
       'pnpm --filter @jovie/web test:coverage --changed'
@@ -833,13 +859,13 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
       const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-      // Exact-head Coverage reads history only through the ratchet diff, so
-      // it skips historical blobs (pinned separately below). Jobs whose
-      // guards read historical blobs keep the full unshallow.
-      const expectedFetch =
-        jobId === 'ci-exact-head-coverage'
-          ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
-          : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
+      // These jobs read history only through a tree diff (the profile-browser
+      // selector's --name-only --no-renames diff, and Exact-head Coverage's
+      // ratchet diff), so they skip historical blobs (each pinned separately
+      // below). Jobs whose guards read historical blobs keep the full unshallow.
+      const expectedFetch = BLOBLESS_BASE_FETCH_JOBS.has(jobId)
+        ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+        : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
       expect(fetchScript, jobId).toContain(expectedFetch);
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
@@ -851,6 +877,31 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('keeps the blobless profile-browser selector a blob-free tree diff', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-profile-admission-browser');
+    const selectStep = job.slice(
+      job.indexOf('      - name: Select public-profile browser admission'),
+      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
+    );
+    expect(selectStep).toContain('id: profile-browser');
+    // Lazy promisor fetches are disabled, so a blob read would fail closed
+    // instead of silently downloading history.
+    expect(selectStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+    const diffs = selectStep.match(/git diff [^\n]*/g) ?? [];
+    expect(diffs).toHaveLength(1);
+    // Rename detection is the only blob reader for --name-only; --no-renames
+    // keeps the diff to commits and trees the blobless fetch provides.
+    expect(diffs[0]).toContain(
+      'git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD --'
+    );
+    expect(selectStep).not.toMatch(/git (?:blame|show|log -p|cat-file -p)/);
+    expect(selectStep).not.toMatch(/git diff [^\n]*(?:--stat|-p\b|--patch)/);
+    // Credentials stay step-scoped: no checkout-level blob filter or
+    // persisted token that later test code could reuse.
+    expect(job).not.toContain('filter: blob:none');
+    expect(job).toContain('persist-credentials: false');
   });
 
   it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
@@ -904,8 +955,15 @@ describe('merge_group workflow contract', () => {
     expect(fetchStep).toContain(
       "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
     );
+    // The prefetch diffs from the resolved base (PR merge base with the base
+    // tip, or the exact merge-group base), which later steps then consume.
+    expect(fetchStep).toContain('id: coverage-base');
     expect(fetchStep).toContain(
-      "COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
+    expect(fetchScript).toContain(
+      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
     );
     // The base-commit check must not be satisfiable by a promisor fetch.
     const verifyStep = job.slice(
@@ -2120,8 +2178,14 @@ ${selectedGateScript}`,
     expect(sourceSizeGuard).toContain('persist-credentials: false');
     expect(sourceSizeGuard).toContain('fetch-depth: 0');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
+    // The event base SHA goes stale on long-lived PRs; judge the PR against
+    // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
+    expect(sourceSizeGuard).not.toContain('github.event.pull_request.base.sha');
     expect(sourceSizeGuard).toContain(
-      'PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'
+      'PR_BASE_REF: ${{ github.event.pull_request.base.ref }}'
+    );
+    expect(sourceSizeGuard).toContain(
+      'PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}'
     );
     expect(sourceSizeGuard).toContain(
       'PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}'
@@ -2459,7 +2523,7 @@ describe('PR Size Guard merge-base comparison', () => {
     const mergeBaseOutput = join(root, 'merge-base-output');
     const env = {
       ...process.env,
-      PR_BASE_SHA: eventBase,
+      PR_BASE_REF: 'main',
       PR_HEAD_SHA: head,
       GITHUB_OUTPUT: mergeBaseOutput,
     };
@@ -2473,7 +2537,9 @@ describe('PR Size Guard merge-base comparison', () => {
       }
     );
     expect(resolved.status, resolved.stderr || resolved.stdout).toBe(0);
-    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(`sha=${ancestor}\n`);
+    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(
+      `base_tip=${eventBase}\nsha=${ancestor}\n`
+    );
 
     const shallowWork = join(root, 'shallow-work');
     git(root, [
@@ -2545,7 +2611,8 @@ describe('PR Size Guard merge-base comparison', () => {
     expect(readFileSync(screenshotOutput, 'utf8')).toBe('');
 
     for (const badEnv of [
-      { PR_BASE_SHA: 'invalid' },
+      { PR_BASE_REF: 'main;true' },
+      { PR_BASE_REF: 'no-such-base' },
       { PR_HEAD_SHA: ancestor },
     ]) {
       writeFileSync(mergeBaseOutput, '');

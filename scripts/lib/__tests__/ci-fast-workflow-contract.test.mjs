@@ -1140,8 +1140,17 @@ describe('ci-fast bounded parallel workflow', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
     expect(preflight).toContain(
-      'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
+      'run: node scripts/lockfile-specifier-preflight.mjs'
     );
+    expect(preflight).toContain(
+      'run: node scripts/verify-workflow-references.mjs'
+    );
+    // Dependency-free preflight: plain setup-node from .nvmrc, no pnpm install.
+    expect(preflight).toMatch(
+      /uses: actions\/setup-node@[0-9a-f]{40} # v\d+[\s\S]*node-version-file: '\.nvmrc'/
+    );
+    expect(preflight).not.toContain('setup-node-pnpm');
+    expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
