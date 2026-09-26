@@ -5,6 +5,10 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
+// Call the workspace Biome binary directly: `pnpm exec` adds ~0.8s of pnpm
+// startup per call, which pushed this suite past Vitest's 5s budget under
+// ci-fast CPU contention.
+const BIOME_BIN = resolve(REPO_ROOT, 'node_modules/.bin/biome');
 const BIOME_CONFIG = readFileSync(resolve(REPO_ROOT, 'biome.json'), 'utf8');
 const FORMER_WHOLE_FILE_EXEMPTIONS = [
   'LoadingSpinner.tsx',
@@ -73,11 +77,10 @@ const REMAINING_GLOB_A11Y_INCLUDES = [
 ];
 
 function runBiome(paths) {
-  return spawnSync(
-    'pnpm',
-    ['exec', 'biome', 'check', '--reporter=json', ...paths],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
-  );
+  return spawnSync(BIOME_BIN, ['check', '--reporter=json', ...paths], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
 }
 
 function parseBiomeReport(result) {
@@ -87,8 +90,13 @@ function parseBiomeReport(result) {
   return JSON.parse(raw.slice(start));
 }
 
-function a11yCategories(report) {
-  return (report.diagnostics ?? []).map(item => item.category);
+function a11yCategoriesByPath(report) {
+  const byPath = new Map();
+  for (const item of report.diagnostics ?? []) {
+    const path = item.location?.path;
+    byPath.set(path, [...(byPath.get(path) ?? []), item.category]);
+  }
+  return byPath;
 }
 
 describe('Biome a11y exemption scope', () => {
@@ -133,14 +141,17 @@ describe('Biome a11y exemption scope', () => {
   it('fails committed deliberate-red siblings when biome actually sees them', () => {
     const dir = mkdtempSync(join(tmpdir(), 'biome-a11y-red-'));
     try {
-      for (const rel of RED_FIXTURE_PATHS) {
+      const probes = RED_FIXTURE_PATHS.map(rel => {
         const source = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
         expect(source).toContain('data-deliberate-red');
         const file = join(dir, `${rel.replaceAll('/', '__')}.probe.tsx`);
         writeFileSync(file, source);
-        const result = runBiome([file]);
-        const cats = a11yCategories(parseBiomeReport(result));
-        expect(cats.join('\n')).toMatch(
+        return file;
+      });
+      // One Biome process for every probe; each file must still fail on its own.
+      const byPath = a11yCategoriesByPath(parseBiomeReport(runBiome(probes)));
+      for (const file of probes) {
+        expect((byPath.get(file) ?? []).join('\n'), file).toMatch(
           /lint\/a11y\/(noStaticElementInteractions|noNoninteractiveElementInteractions|useKeyWithClickEvents)/
         );
       }
