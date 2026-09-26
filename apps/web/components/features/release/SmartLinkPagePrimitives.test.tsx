@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SmartLinkArtworkCard } from './SmartLinkPagePrimitives';
+import {
+  SmartLinkArtworkCard,
+  SmartLinkPoweredByFooter,
+} from './SmartLinkPagePrimitives';
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt: string; readonly className?: string }) => (
@@ -26,5 +29,31 @@ describe('SmartLinkArtworkCard', () => {
     const icon = container.querySelector('svg.lucide-audio-lines');
     expect(icon).toBeTruthy();
     expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
+});
+
+describe('SmartLinkPoweredByFooter', () => {
+  it('links to the abuse report flow for smart links', () => {
+    render(<SmartLinkPoweredByFooter />);
+
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      '/report?type=smart_link'
+    );
+    expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
+      'href',
+      '/'
+    );
+  });
+
+  it('honours a custom report href', () => {
+    render(
+      <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
+    );
+
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      '/report?type=smart_link&target=abc'
+    );
   });
 });
