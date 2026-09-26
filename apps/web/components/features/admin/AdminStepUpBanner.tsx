@@ -42,7 +42,7 @@ export function AdminStepUpBanner() {
   return (
     <div
       role='status'
-      className='flex min-h-10 items-center gap-3 border-b border-subtle bg-surface-1 px-4 py-2 text-[13px] text-secondary-token'
+      className='flex min-h-10 items-center gap-3 border-b border-subtle bg-surface-1 px-4 py-2 text-sm text-secondary-token'
     >
       <Fingerprint className='h-4 w-4 shrink-0' aria-hidden='true' />
       <span className='min-w-0 flex-1 truncate'>
