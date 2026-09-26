@@ -18,6 +18,10 @@ vi.mock('@/features/dashboard/organisms/SettingsNotificationsSection', () => ({
   ),
 }));
 
+vi.mock('./SessionManagementCard', () => ({
+  SessionManagementCard: () => <div data-testid='sessions-card' />,
+}));
+
 describe('AccountSettingsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,8 +74,9 @@ describe('AccountSettingsSection', () => {
     );
     expect(screen.getByTestId('appearance-section')).toBeTruthy();
     expect(screen.getByTestId('notifications-section')).toBeTruthy();
+    expect(screen.getByTestId('sessions-card')).toBeTruthy();
+    expect(screen.getByText(/^sessions$/i)).toBeTruthy();
     expect(screen.queryByText(/connected accounts/i)).toBeNull();
-    expect(screen.queryByText(/^sessions$/i)).toBeNull();
   });
 
   it('shows a loading skeleton while the session is pending', () => {

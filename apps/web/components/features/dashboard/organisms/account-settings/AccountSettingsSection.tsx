@@ -4,15 +4,18 @@
  * AccountSettingsSection
  *
  * Better Auth–backed account summary for Settings → Account.
- * Shows the authenticated identity from the live session plus supported
- * appearance/notification preferences. Full email/provider/session mutation
- * parity is deferred (legacy Clerk resource controls intentionally removed).
+ * Shows the authenticated identity from the live session, active-session
+ * management (JOV-6592), plus supported appearance/notification preferences.
+ * Email/connected-provider mutation parity is still deferred (legacy Clerk
+ * resource controls intentionally removed).
  */
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
 import { useUserSafe } from '@/hooks/useJovieAuth';
+
+import { SessionManagementCard } from './SessionManagementCard';
 
 function AccountIdentitySummary() {
   const { user, isLoaded, isSignedIn } = useUserSafe();
@@ -98,6 +101,9 @@ export function AccountSettingsSection({
     <div className='space-y-4' data-testid='account-settings-section'>
       <SettingsPanel title='Signed In As' bodyClassName='px-4 py-4 sm:px-5'>
         <AccountIdentitySummary />
+      </SettingsPanel>
+      <SettingsPanel title='Sessions'>
+        <SessionManagementCard />
       </SettingsPanel>
       <SettingsAppearanceSection />
       <SettingsNotificationsSection isGrowth={isGrowth} />
