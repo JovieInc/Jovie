@@ -14,12 +14,17 @@ import { pathToFileURL } from 'node:url';
 const ROOT = resolve(import.meta.dirname, '..');
 const PROBE_FILE = 'apps/web/lib/utils.ts';
 
-// ponytail: flat budgets with ~2x headroom over hosted-runner timings; move to
-// a lockfile like .github/ci-harness/duration-ratchet.json if tuning gets busy.
+// ~2x the ubuntu-latest baseline (2026-09-25, run 36212094867): secrets 4.4s
+// (incl. first-run binary download), lint-staged 4.1s, others ≤2.2s, total
+// 11.7s. ponytail: flat constants; move to a lockfile like
+// .github/ci-harness/duration-ratchet.json if tuning gets busy.
 export const BUDGETS = Object.freeze({
-  stepSeconds: 10,
-  stepOverrides: Object.freeze({ 'pnpm exec lint-staged': 20 }),
-  preCommitTotalSeconds: 45,
+  stepSeconds: 5,
+  stepOverrides: Object.freeze({
+    'bash scripts/security/scan-secrets.sh pre-commit': 10,
+    'pnpm exec lint-staged': 10,
+  }),
+  preCommitTotalSeconds: 25,
 });
 
 export const PRE_PUSH_STEP = 'bash scripts/hooks/pre-push-gate.sh publication';

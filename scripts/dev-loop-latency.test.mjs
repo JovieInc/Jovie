@@ -41,26 +41,26 @@ test('the real pre-commit hook yields the known rungs', () => {
 test('flags slow rungs, failing rungs and total overruns', () => {
   const ok = evaluateBudgets([
     { step: 'bash a.sh', seconds: 1, code: 0 },
-    { step: 'pnpm exec lint-staged', seconds: 15, code: 0 },
-    { step: PRE_PUSH_STEP, seconds: 9, code: 0 },
+    { step: 'pnpm exec lint-staged', seconds: 8, code: 0 },
+    { step: PRE_PUSH_STEP, seconds: 4, code: 0 },
   ]);
   assert.deepEqual(ok.breaches, []);
 
   const slow = evaluateBudgets([
-    { step: 'node skill-gate --staged', seconds: 20, code: 0 },
+    { step: 'node skill-gate --staged', seconds: 7, code: 0 },
     { step: 'bash b.sh', seconds: 1, code: 3 },
   ]);
   assert.equal(slow.breaches.length, 2);
-  assert.match(slow.breaches[0], /20\.0s > 10s/);
+  assert.match(slow.breaches[0], /7\.0s > 5s/);
   assert.match(slow.breaches[1], /exited 3/);
 
   const total = evaluateBudgets(
     Array.from({ length: 6 }, (_, i) => ({
       step: `s${i}`,
-      seconds: 9,
+      seconds: 4.5,
       code: 0,
     }))
   );
-  assert.match(total.breaches.at(-1), /pre-commit total: 54\.0s > 45s/);
-  assert.equal(BUDGETS.preCommitTotalSeconds, 45);
+  assert.match(total.breaches.at(-1), /pre-commit total: 27\.0s > 25s/);
+  assert.equal(BUDGETS.preCommitTotalSeconds, 25);
 });
