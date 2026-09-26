@@ -666,7 +666,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
-            args = MODULE.argparse.Namespace(
+            args = argparse.Namespace(
                 repo="JovieInc/Jovie",
                 queue_target=15,
                 production_url="https://example.test/api/health/deploy",
@@ -3263,6 +3263,67 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
+    def test_green_fleet_admits_the_isolated_ui_docs_lane(self):
+        # JOV-5340: isolation is not reserved for production-red. A GREEN
+        # fleet advertises the source-bound isolated UI/docs lane; the
+        # exact-head isolated receipt downstream still gates each PR.
+        receipt = self.evaluate(GREEN_SIGNALS)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
+        self.assertEqual(receipt["isolatedPromotionAdmission"]["maxConcurrent"], 1)
+
+    def test_eligible_only_queue_does_not_block_green_leases(self):
+        # JOV-5340 measured miss: leases key off greenReadyPrs, never
+        # eligiblePrs. A snapshot without a green count is an observation
+        # gap (coerced to 0), not a full queue.
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            "repository": "JovieInc/Jovie",
+            "status": "known",
+            "eligiblePrs": 28,
+            "target": 15,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_green_below_target_leases_without_lane_capacity_receipt(self):
+        # JOV-5340: a missing lane-capacity receipt must not require
+        # capacity_fresh; the queue's own ready<target admits the lease.
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            "repository": "JovieInc/Jovie",
+            "status": "known",
+            "eligiblePrs": 20,
+            "greenReadyPrs": 12,
+            "target": 15,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_inconsistent_lane_capacity_receipt_still_fails_closed(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            "repository": "JovieInc/Jovie",
+            "status": "known",
+            "eligiblePrs": 12,
+            "greenReadyPrs": 12,
+            "target": 15,
+            "laneCapacity": lane_capacity(1),
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
     def test_unbound_production_plus_queue_gap_stays_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
@@ -3476,6 +3537,120 @@ class QueueSnapshotIsolationTests(unittest.TestCase):
                 self.assertEqual(captured["queue"].name, "queue-snapshot.json")
                 self.assertEqual(captured["controller"].name, "controller-snapshot.json")
                 self.assertEqual(captured["review"].name, "independent-review.json")
+
+
+class PerRepoSignalTests(unittest.TestCase):
+    """JOV-5340: sibling lanes never consume Jovie's release gate or prod SHA."""
+
+    def test_non_jovie_main_keys_off_combined_status(self):
+        calls: list[str] = []
+
+        def fake_gh(repo: str, path: str) -> dict[str, object]:
+            calls.append(path)
+            if path == "branches/main":
+                return {"commit": {"sha": "a" * 40}}
+            if path.endswith("/status"):
+                return {"state": "success"}
+            raise AssertionError(f"unexpected gh call: {path}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=fake_gh):
+            observed = MODULE.observe_main("JovieInc/LogYourBody")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], "a" * 40)
+        self.assertEqual(observed["sourceGate"]["name"], "combined-status")
+        self.assertFalse(any("check-runs" in path for path in calls))
+        self.assertFalse(any("actions/runs" in path for path in calls))
+
+    def test_non_jovie_lane_ignores_jovie_production_url(self):
+        now = MODULE.datetime(2026, 9, 26, 12, 0, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            args = argparse.Namespace(
+                repo="JovieInc/LogYourBody",
+                queue_target=15,
+                production_url=MODULE.DEFAULT_PRODUCTION_HEALTH_URL,
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                lease_guard_bin="/bin/false",
+                state_dir=state_dir,
+                integrity_receipt=None,
+                concurrency_evidence=None,
+                independent_review_receipt=None,
+            )
+            with (
+                mock.patch.object(
+                    MODULE, "observe_main", return_value={"status": "green", "sha": "a" * 40}
+                ),
+                mock.patch.object(MODULE, "observe_concurrency", return_value={"accepted": False}),
+                mock.patch.object(MODULE, "observe_closure_health", return_value={}),
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
+                mock.patch.object(MODULE, "observe_controller", return_value={"status": "failed"}),
+                mock.patch.object(MODULE, "observe_integrity", return_value={"status": "clear"}),
+                mock.patch.object(MODULE, "observe_queue", return_value={"status": "unknown"}),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value={}),
+                mock.patch.object(
+                    MODULE,
+                    "refresh_independent_review_receipt",
+                    return_value={"accepted": False},
+                ),
+                mock.patch.object(MODULE, "observe_lease", return_value={"status": "unknown"}),
+                mock.patch.object(
+                    MODULE,
+                    "observe_production",
+                    side_effect=AssertionError("jov.ie must not be observed for LYB"),
+                ) as production_observer,
+            ):
+                signals = MODULE.observe_signals(args, now)
+
+        production_observer.assert_not_called()
+        self.assertEqual(signals["production"]["status"], "unknown")
+        self.assertEqual(signals["production"]["repository"], "JovieInc/LogYourBody")
+        self.assertNotIn("deployedSha", signals["production"])
+
+    def test_non_jovie_lane_honors_explicit_production_url(self):
+        now = MODULE.datetime(2026, 9, 26, 12, 0, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "gem-priority-gate"
+            state_dir.mkdir()
+            args = argparse.Namespace(
+                repo="JovieInc/LogYourBody",
+                queue_target=15,
+                production_url="https://lyb.example.test/api/health/deploy",
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                lease_guard_bin="/bin/false",
+                state_dir=state_dir,
+                integrity_receipt=None,
+                concurrency_evidence=None,
+                independent_review_receipt=None,
+            )
+            with (
+                mock.patch.object(
+                    MODULE, "observe_main", return_value={"status": "green", "sha": "a" * 40}
+                ),
+                mock.patch.object(MODULE, "observe_concurrency", return_value={"accepted": False}),
+                mock.patch.object(MODULE, "observe_closure_health", return_value={}),
+                mock.patch.object(MODULE, "previous_closure_health", return_value=None),
+                mock.patch.object(MODULE, "observe_controller", return_value={"status": "failed"}),
+                mock.patch.object(MODULE, "observe_integrity", return_value={"status": "clear"}),
+                mock.patch.object(MODULE, "observe_queue", return_value={"status": "unknown"}),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value={}),
+                mock.patch.object(
+                    MODULE,
+                    "refresh_independent_review_receipt",
+                    return_value={"accepted": False},
+                ),
+                mock.patch.object(MODULE, "observe_lease", return_value={"status": "unknown"}),
+                mock.patch.object(
+                    MODULE, "observe_production", return_value={"status": "green"}
+                ) as production_observer,
+            ):
+                signals = MODULE.observe_signals(args, now)
+
+        production_observer.assert_called_once_with(
+            "https://lyb.example.test/api/health/deploy"
+        )
+        self.assertEqual(signals["production"]["status"], "green")
 
 
 class IndependentReviewTests(unittest.TestCase):

@@ -53,6 +53,7 @@ from gem_gate_contract import (  # noqa: E402
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
+from gem_gate_contract import _is_jovie_repo as is_jovie_repo  # noqa: E402
 from symphony_proof_context import load_context, validation_args  # noqa: E402
 
 
@@ -64,6 +65,7 @@ INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v2"
+DEFAULT_PRODUCTION_HEALTH_URL = "https://jov.ie/api/health/deploy"
 LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
@@ -375,6 +377,28 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not sha:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
+        combined_state = str(combined.get("state") or "unknown")
+        if not is_jovie_repo(repo):
+            # JOV-5340: Main Release Ready is Jovie's source gate; sibling
+            # lanes (LYB, Symphony, gbrain) have no such check and must key
+            # off their own combined status for the exact main head.
+            status = (
+                "green"
+                if combined_state == "success"
+                else "red"
+                if combined_state in {"failure", "error"}
+                else "unknown"
+            )
+            return {
+                "status": status,
+                "sha": sha,
+                "combinedStatus": combined_state,
+                "sourceGate": {
+                    "name": "combined-status",
+                    "status": "completed",
+                    "conclusion": combined_state,
+                },
+            }
         release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
@@ -387,7 +411,6 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not _real_release_attempts(release_attempts):
             release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
-        combined_state = str(combined.get("state") or "unknown")
         conclusion = latest.get("conclusion")
         if latest.get("status") != "completed":
             status = "unknown"
@@ -1657,7 +1680,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "promotion is frozen while isolated implementation continues.",
                 )
             )
-        green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
+        green_ready_prs = queue.get("greenReadyPrs")
         queue_target = queue.get("target")
         queue_shape_valid = (
             queue.get("status") == "known"
@@ -1752,7 +1775,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     unbound_repair_max_concurrent = unbound_repair_slots(
         fallback_seats, gem_concurrency
     )
-    green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
+    green_ready_prs = queue.get("greenReadyPrs")
     queue_target = queue.get("target")
     queue_shape_valid = (
         queue.get("status") == "known"
@@ -1787,14 +1810,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and repository_capacity.get("ready") < repository_capacity.get("budget")
     )
     isolated_promotion_allowed = (
-        state == "AMBER"
-        and review_allowed
-        and controller.get("status") == "green"
-        and main.get("status") == "green"
-        and production.get("status") == "red"
-        and integrity.get("status") in {"clear", "resolved"}
-        and queue_below_backpressure
-        and all(reason["code"] == "production-not-green" for reason in reasons)
+        # JOV-5340: a GREEN fleet also admits the source-bound isolated
+        # UI/docs lane (exact-head isolated receipt downstream; FAIL mocks
+        # still do not ship). Isolation is not reserved for production-red.
+        state == "GREEN"
+        or (
+            state == "AMBER"
+            and review_allowed
+            and controller.get("status") == "green"
+            and main.get("status") == "green"
+            and production.get("status") == "red"
+            and integrity.get("status") in {"clear", "resolved"}
+            and queue_below_backpressure
+            and all(reason["code"] == "production-not-green" for reason in reasons)
+        )
     )
     hold_intake_allowed = (
         state == "AMBER"
@@ -1843,10 +1872,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             {"controller-failure", "production-deployment-unbound"},
         )
     )
-    if isolated_promotion_allowed:
-        promotion_mode = "isolated-only"
-    elif state == "GREEN":
+    if state == "GREEN":
+        # Normal promotion stays the mode; the isolated UI/docs lane is an
+        # additional admission on GREEN, not a replacement mode (JOV-5340).
         promotion_mode = "normal"
+    elif isolated_promotion_allowed:
+        promotion_mode = "isolated-only"
     elif (
         state == "AMBER"
         and main.get("status") == "red"
@@ -1884,7 +1915,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # Capacity evidence governs mutation seats, not Linear-child intake.
         # Missing useful-turn proofs must not freeze Eve's v2 projection.
         # Queue backpressure (ready >= budget) still holds new leases.
-        new_implementation_allowed = queue_shape_valid and repository_capacity_available
+        # JOV-5340: leases key off greenReadyPrs below target, never
+        # eligiblePrs and never capacity_fresh. A missing lane-capacity
+        # receipt falls back to the queue's own ready<target; a present but
+        # inconsistent receipt still fails closed.
+        new_implementation_allowed = (
+            queue_shape_valid
+            and queue_below_backpressure
+            and (repository_capacity_available or not lane_capacity_valid)
+        )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [
@@ -2792,7 +2831,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--production-url",
         default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")
-        or "https://jov.ie/api/health/deploy",
+        or DEFAULT_PRODUCTION_HEALTH_URL,
     )
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
@@ -2860,9 +2899,32 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         now,
         controller_observation=controller,
     )
+    # JOV-5340: sibling lanes must not inherit the jov.ie production SHA.
+    # A non-Jovie repo binds production only to an explicitly passed
+    # per-repo health URL; the Jovie default/env resolution is ignored.
+    jovie_production_url = (
+        os.environ.get("JOVIE_PRODUCTION_HEALTH_URL") or DEFAULT_PRODUCTION_HEALTH_URL
+    )
+    if is_jovie_repo(args.repo):
+        production_url = args.production_url or jovie_production_url
+    else:
+        production_url = (
+            args.production_url
+            if args.production_url and args.production_url != jovie_production_url
+            else None
+        )
+    production = (
+        observe_production(production_url)
+        if production_url
+        else {
+            "status": "unknown",
+            "repository": args.repo,
+            "reason": "production-health-url-not-configured",
+        }
+    )
     return {
         "main": main,
-        "production": observe_production(args.production_url),
+        "production": production,
         "controller": controller,
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(
