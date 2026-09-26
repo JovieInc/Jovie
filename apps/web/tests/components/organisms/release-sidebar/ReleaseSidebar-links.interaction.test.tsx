@@ -9,11 +9,13 @@ const mockUsePlanGate = vi.fn(() => ({
 const mockFetchReleaseCreditsAction = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
+const mockRouterPrefetch = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
     refresh: mockRouterRefresh,
+    prefetch: mockRouterPrefetch,
   }),
 }));
 
@@ -605,6 +607,39 @@ describe('ReleaseSidebar inspector cards', () => {
       screen.queryByTestId('compact-release-plan-upgrade-card')
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
+  it('prefetches the release tasks route once when the drawer opens', () => {
+    const { rerender } = render(
+      <ReleaseSidebar release={mockRelease} {...defaultProps} />
+    );
+
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
+    expect(mockRouterPrefetch).toHaveBeenCalledWith(
+      '/app/releases/release_1/tasks'
+    );
+
+    // Re-rendering the same release must not re-prefetch.
+    rerender(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
+
+    // Switching releases is a new intent — prefetch the new route once.
+    rerender(
+      <ReleaseSidebar
+        release={{ ...mockRelease, id: 'release_2' }}
+        {...defaultProps}
+      />
+    );
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(2);
+    expect(mockRouterPrefetch).toHaveBeenLastCalledWith(
+      '/app/releases/release_2/tasks'
+    );
+  });
+
+  it('does not prefetch the tasks route when no release is selected', () => {
+    render(<ReleaseSidebar release={null} {...defaultProps} />);
+
+    expect(mockRouterPrefetch).not.toHaveBeenCalled();
   });
 
   it('uses app router navigation for the full release tasks page', async () => {
