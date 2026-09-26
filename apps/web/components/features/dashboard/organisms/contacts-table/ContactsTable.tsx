@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
@@ -9,10 +10,7 @@ import {
   PageToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -85,45 +83,6 @@ export const ContactsTable = memo(function ContactsTable({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedContactId, contacts.length, isSidebarOpen]);
-
-  // Set header actions (add contact button on right)
-  const { setHeaderActions } = useSetHeaderActions();
-
-  // Use ref for onAddContact to keep header actions stable
-  const onAddContactRef = useRef(onAddContact);
-  onAddContactRef.current = onAddContact;
-
-  // Memoize header actions to avoid creating new JSX on every render
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle contact details'
-            label='Details'
-            tooltipLabel='Details'
-          />
-        }
-      >
-        <DashboardHeaderActionButton
-          ariaLabel='Add contact'
-          onClick={() => onAddContactRef.current()}
-          icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Contact'
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    []
-  );
-
-  useEffect(() => {
-    setHeaderActions(headerActions);
-
-    return () => {
-      setHeaderActions(null);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
-  }, [headerActions]);
 
   const columns = useMemo(
     () =>
@@ -236,6 +195,21 @@ export const ContactsTable = memo(function ContactsTable({
                   }`}
             </span>
           }
+          end={
+            <>
+              {selectedContact ? (
+                <DrawerToggleButton
+                  ariaLabel='Toggle contact details'
+                  label='Details'
+                  tooltipLabel='Details'
+                />
+              ) : null}
+              <Button type='button' size='sm' onClick={() => onAddContact()}>
+                <Plus className='h-3.5 w-3.5' aria-hidden='true' />
+                Add Contact
+              </Button>
+            </>
+          }
         />
 
         {/* Scrollable content area */}
@@ -246,6 +220,12 @@ export const ContactsTable = memo(function ContactsTable({
               description='Add bookings, management, and press contacts.'
               presentation='workspace'
               className='min-h-full'
+              actionSlot={
+                <Button type='button' size='sm' onClick={() => onAddContact()}>
+                  <Plus className='h-3.5 w-3.5' aria-hidden='true' />
+                  Add Contact
+                </Button>
+              }
             />
           ) : (
             <UnifiedTable

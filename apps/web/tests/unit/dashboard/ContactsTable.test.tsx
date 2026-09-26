@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -34,8 +35,17 @@ vi.mock('@/components/organisms/table', async importOriginal => {
   return {
     ...actual,
     PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',
-    PageToolbar: ({ start }: { readonly start: ReactNode }) => (
-      <div data-testid='contacts-toolbar'>{start}</div>
+    PageToolbar: ({
+      start,
+      end,
+    }: {
+      readonly start: ReactNode;
+      readonly end?: ReactNode;
+    }) => (
+      <div data-testid='contacts-toolbar'>
+        {start}
+        {end}
+      </div>
     ),
     convertToCommonDropdownItems: vi.fn(() => []),
     UnifiedTable: ({
@@ -118,10 +128,12 @@ function RightPanelOutlet() {
 
 function renderContactsTable(props: ComponentProps<typeof ContactsTable>) {
   return render(
-    <RightPanelProvider>
-      <ContactsTable {...props} />
-      <RightPanelOutlet />
-    </RightPanelProvider>
+    <TooltipProvider>
+      <RightPanelProvider>
+        <ContactsTable {...props} />
+        <RightPanelOutlet />
+      </RightPanelProvider>
+    </TooltipProvider>
   );
 }
 
@@ -170,7 +182,7 @@ describe('ContactsTable', () => {
       'data-first-row-selected',
       'true'
     );
-    expect(setHeaderActions).toHaveBeenCalled();
+    expect(setHeaderActions).not.toHaveBeenCalled();
     expect(setTableMeta).toHaveBeenCalled();
   });
 
@@ -196,7 +208,7 @@ describe('ContactsTable', () => {
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
-  it('keeps the header action as the only add contact CTA for the empty state', () => {
+  it('keeps the same Add Contact action in the toolbar and empty state', () => {
     const onAddContact = vi.fn();
 
     renderContactsTable({
@@ -224,12 +236,14 @@ describe('ContactsTable', () => {
     if (!emptyState) throw new TypeError('Expected canonical empty state');
     expect(emptyState.className).toContain('min-h-full');
     expect(emptyState.parentElement?.className).toContain('flex');
-    expect(emptyState.querySelector('svg')).toBeNull();
-    expect(
-      screen.queryByRole('button', { name: 'Add Contact' })
-    ).not.toBeInTheDocument();
+    expect(emptyState.querySelector('svg')).not.toBeNull();
+    const addContactActions = screen.getAllByRole('button', {
+      name: 'Add Contact',
+    });
+    expect(addContactActions).toHaveLength(2);
+    fireEvent.click(addContactActions[1]!);
 
-    expect(setHeaderActions).toHaveBeenCalledWith(expect.anything());
-    expect(onAddContact).not.toHaveBeenCalled();
+    expect(setHeaderActions).not.toHaveBeenCalled();
+    expect(onAddContact).toHaveBeenCalledTimes(1);
   });
 });

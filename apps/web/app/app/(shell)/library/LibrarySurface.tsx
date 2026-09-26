@@ -89,7 +89,6 @@ import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -109,6 +108,7 @@ import {
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
@@ -723,7 +723,7 @@ const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
 
 export function LibraryLoadingState() {
   return (
-    <PageShell
+    <WorkspacePage
       aria-busy='true'
       aria-label='Loading Library'
       frame='content-container'
@@ -757,7 +757,7 @@ export function LibraryLoadingState() {
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
         containerClassName='h-full'
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
@@ -1351,6 +1351,9 @@ function LibraryToolbar({
   activeFilterCount,
   filterPanel,
   isDesktop,
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
@@ -1368,6 +1371,9 @@ function LibraryToolbar({
   readonly activeFilterCount: number;
   readonly filterPanel: ReactNode;
   readonly isDesktop: boolean;
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
 }) {
   return (
     <PageToolbar
@@ -1401,6 +1407,11 @@ function LibraryToolbar({
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncingSpotify}
+            onSyncSpotify={onSyncSpotify}
+          />
         </>
       }
     />
@@ -1735,6 +1746,45 @@ function LibraryReleaseTable({
   );
 }
 
+function LibraryFirstAction({
+  canSyncSpotify,
+  isSyncing,
+  onSyncSpotify,
+  testId,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncing: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly testId?: string;
+}) {
+  if (!canSyncSpotify) {
+    return (
+      <Button asChild size='sm'>
+        <Link href={APP_ROUTES.RELEASES}>Open Releases</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type='button'
+      size='sm'
+      disabled={isSyncing}
+      onClick={onSyncSpotify}
+      data-testid={testId}
+    >
+      <RefreshCw
+        className={cn(
+          'h-4 w-4',
+          isSyncing && 'animate-spin motion-reduce:animate-none'
+        )}
+        aria-hidden='true'
+      />
+      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1745,12 +1795,25 @@ function EmptyCatalog({
   readonly onSyncSpotify: () => void;
 }) {
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
       data-testid='library-surface'
+      toolbar={
+        <PageToolbar
+          start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
+          end={
+            <LibraryFirstAction
+              canSyncSpotify={canSyncSpotify}
+              isSyncing={isSyncing}
+              onSyncSpotify={onSyncSpotify}
+              testId='library-sync-spotify-toolbar'
+            />
+          }
+        />
+      }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
@@ -1761,37 +1824,15 @@ function EmptyCatalog({
         testId='library-workspace-empty-state'
         className='min-h-90'
         actionSlot={
-          canSyncSpotify ? (
-            <Button
-              type='button'
-              size='sm'
-              disabled={isSyncing}
-              onClick={onSyncSpotify}
-              data-testid='library-sync-spotify-empty-state'
-            >
-              <RefreshCw
-                className={cn(
-                  'h-4 w-4',
-                  isSyncing && 'animate-spin motion-reduce:animate-none'
-                )}
-                aria-hidden='true'
-              />
-              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-            </Button>
-          ) : (
-            <Link
-              href={APP_ROUTES.RELEASES}
-              className={cn(
-                'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-                LIBRARY_BUTTON_FOCUS_CLASS
-              )}
-            >
-              Open Releases
-            </Link>
-          )
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncing}
+            onSyncSpotify={onSyncSpotify}
+            testId='library-sync-spotify-empty-state'
+          />
         }
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
@@ -3078,7 +3119,7 @@ export function LibrarySurface({
   }
 
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
@@ -3102,6 +3143,9 @@ export function LibrarySurface({
           activeFilterCount={activeFilterCount}
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
+          canSyncSpotify={canSyncSpotify}
+          isSyncingSpotify={isSyncingSpotify}
+          onSyncSpotify={handleSyncSpotify}
         />
       }
     >
@@ -3155,6 +3199,6 @@ export function LibrarySurface({
           />
         </div>
       </div>
-    </PageShell>
+    </WorkspacePage>
   );
 }
