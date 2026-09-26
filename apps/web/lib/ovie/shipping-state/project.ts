@@ -1,4 +1,5 @@
 import {
+  type CountMeasurement,
   emptyCounts,
   emptyDurations,
   isExactSha,
@@ -162,22 +163,61 @@ function pickCount(
   return NOT_MEASURED_COUNT;
 }
 
+// A measured zero is truthful only when no authority reports blocked work it
+// cannot classify; one source's empty list must not mask unmarked blocked items.
+function terminalFailures(
+  sources: Readonly<Record<ShippingSourceId, SourceObservation>>
+): CountMeasurement {
+  let zero: CountMeasurement | null = null;
+  for (const sourceId of SHIPPING_SOURCE_IDS) {
+    const count = sources[sourceId].counts.terminalFailures;
+    if (count.state === 'measured-nonzero') return count;
+    if (count.state === 'measured-zero') zero ??= count;
+  }
+  const unmarked = SHIPPING_SOURCE_IDS.some(
+    sourceId =>
+      sources[sourceId].counts.blocked.state === 'measured-nonzero' &&
+      sources[sourceId].counts.terminalFailures.state === 'not-measured'
+  );
+  return unmarked ? NOT_MEASURED_COUNT : (zero ?? NOT_MEASURED_COUNT);
+}
+
+// Subtracting timestamps from unrelated sources fabricates a ship time; measure
+// only across successful observations bound to the same exact build identity.
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
-  if (start == null || end == null) return NOT_MEASURED_DURATION;
-  const startMs = Date.parse(start);
-  const endMs = Date.parse(end);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
-    return NOT_MEASURED_DURATION;
+  for (const end of [
+    sources['live-build-info'],
+    sources['production-controller'],
+  ]) {
+    const sha = end.correlation.sha;
+    if (
+      !SUCCESS_STATES.has(end.state) ||
+      end.sourceTimestamp == null ||
+      !isExactSha(sha)
+    ) {
+      continue;
+    }
+    for (const start of [
+      sources['github-native-merge-queue'],
+      sources['fleet-receipt'],
+    ]) {
+      if (
+        !SUCCESS_STATES.has(start.state) ||
+        start.sourceTimestamp == null ||
+        start.correlation.sha !== sha
+      ) {
+        continue;
+      }
+      const ms =
+        Date.parse(end.sourceTimestamp) - Date.parse(start.sourceTimestamp);
+      if (Number.isFinite(ms) && ms >= 0) {
+        return measuredDuration(Math.round(ms / 1000));
+      }
+    }
   }
-  return measuredDuration(Math.round((endMs - startMs) / 1000));
+  return NOT_MEASURED_DURATION;
 }
 
 function revisionFingerprint(
@@ -367,7 +407,7 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    terminalFailures: terminalFailures(input.sources),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
     operationalTasks: projectOperationalTasks(input),
   };
