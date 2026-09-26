@@ -61,16 +61,6 @@ const TEMPORARY_ALLOWLIST = [
   // text-background -> text-(--color-bg-base) when that debt is cleared.
   'components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx',
   'components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx',
-  // TODO: these shippable components have no adjacent story yet, so any edit
-  // trips component-ship-gate [missing-story]. Swap in a follow-up that adds
-  // the story (and touches the component test):
-  //   NavLink: focus-visible:ring-offset-background -> focus-visible:ring-offset-base
-  //   IngestProfileDropdown, GrowthIntakeComposer: bg-background-elevated -> bg-surface-elevated
-  //   FilterChip: text-background -> text-(--color-bg-base)
-  'components/atoms/NavLink.tsx',
-  'components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx',
-  'components/features/admin/leads/GrowthIntakeComposer.tsx',
-  'components/molecules/filters/FilterChip.tsx',
   // TODO: these are in-scope screens without a screen-certification
   // registration, so any edit trips screen-registration-gate (JOV-INV-018).
   // Swap bg-background -> bg-base in the follow-up that registers them.
