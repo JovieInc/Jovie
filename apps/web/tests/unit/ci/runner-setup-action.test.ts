@@ -1011,15 +1011,23 @@ describe('baked runner prerequisite contract', () => {
 
   it('binds the marker to the pnpm version reported by the host binary', () => {
     const fixture = makeFixture();
+    const env = verifierEnvironment(fixture, process.env, { hostPnpm: true });
     execFileSync(
       process.execPath,
       [verifierPath, '--write-marker', fixture.markerPath],
-      { env: verifierEnvironment(fixture, process.env, { hostPnpm: true }) }
+      { env }
     );
     const marker = JSON.parse(readFileSync(fixture.markerPath, 'utf8')) as {
       readonly pnpmVersion: string;
     };
-    expect(marker.pnpmVersion).toBe(requirements.pnpmVersion);
+    // Compare with what this host's pnpm reports, not the pinned requirement:
+    // the pin is enforced by the drift test below, and a host whose pnpm
+    // differs from the pin must still record its own version.
+    const hostPnpmVersion = execFileSync('pnpm', ['--version'], {
+      encoding: 'utf8',
+      env,
+    }).trim();
+    expect(marker.pnpmVersion).toBe(hostPnpmVersion);
   }, 15_000);
 
   it('falls back on required pnpm version drift', () => {
