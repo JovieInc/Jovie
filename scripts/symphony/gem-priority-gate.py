@@ -1827,6 +1827,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and repository_capacity.get("ready") == green_ready_prs
         and repository_capacity.get("budget") == queue_target
     )
+    # Repository capacity is keyed off greenReadyPrs vs target — not
+    # eligiblePrs and not capacity_fresh. A lane-capacity receipt only
+    # vetoes when present and contradictory; an absent or stale receipt
+    # must not freeze a green lane below target (JOV-5340).
+    repository_capacity_available = queue_below_backpressure and (
+        not lane_capacity_valid or lane_capacity_consistent
+    )
 
     # The isolated UI/docs lane (source-bound mocks, exact head) is a cheap
     # promotion path. It runs while AMBER with production red, and it stays
@@ -1943,15 +1950,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     else:
         # Capacity evidence governs mutation seats, not Linear-child intake.
         # Missing useful-turn proofs must not freeze Eve's v2 projection.
-        # Queue backpressure (ready >= budget) still holds new leases, keyed
-        # off greenReadyPrs — not eligiblePrs and not capacity_fresh. A
-        # lane-capacity receipt only vetoes when present and contradictory;
-        # an absent or stale receipt must not freeze a green lane below
-        # target (JOV-5340).
+        # Queue backpressure (ready >= budget) still holds new leases via
+        # repository_capacity_available above.
         new_implementation_allowed = (
-            queue_shape_valid
-            and queue_below_backpressure
-            and (not lane_capacity_valid or lane_capacity_consistent)
+            queue_shape_valid and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
