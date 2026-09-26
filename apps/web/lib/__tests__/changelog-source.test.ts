@@ -16,6 +16,7 @@ vi.mock('next/cache', () => ({
   },
 }));
 vi.mock('../filesystem-paths', () => ({
+  resolveAppPath: () => '/fixture/apps/web/runtime-data/CHANGELOG.md',
   resolveMonorepoPath: () => '/fixture/CHANGELOG.md',
 }));
 vi.mock('../changelog-parser', () => ({
