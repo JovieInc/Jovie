@@ -188,17 +188,19 @@ def read_text(path: Path) -> str:
         return ""
 
 
-def linear_model(env_file: Path) -> dict:
+def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
+    """Pool counts, triage returns, and the titles of exactly the issues this host is working."""
+    numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
     try:
         client = lane.Linear(env_file)
         data = client.gql(
-            'query($labels:[String!]!){'
+            'query($labels:[String!]!,$numbers:[Float!]!){'
             'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier priority labels{nodes{name}}}}'
-            'active: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier title labels{nodes{name}}}}'
+            'active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
+            '{nodes{identifier title state{name}}}'
             'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS)})
+            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), "numbers": numbers or [0]})
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -227,22 +229,18 @@ def github_model() -> dict:
             if not spec.get("enabled", True):
                 continue
             # One small page per lane: a single 100-PR page with check rollups times out (504).
-            prs += gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "40",
+            # No statusCheckRollup: with dozens of open lane PRs that field makes GitHub 504.
+            prs += gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "60",
                             "--search", f"head:{name}/", "--json",
-                            "number,title,headRefName,isDraft,mergeStateStatus,statusCheckRollup,updatedAt,url"])
+                            "number,title,headRefName,isDraft,mergeStateStatus,updatedAt,url"])
         rows = []
         for pr in prs:
             found = lane.LANE_BRANCH.match(pr["headRefName"])
             if not found:
                 continue
-            checks = Counter()
-            for check in pr.get("statusCheckRollup") or []:
-                conclusion = check.get("conclusion") or check.get("status") or "PENDING"
-                checks["fail" if conclusion in lane.RED else "pending" if conclusion in ("IN_PROGRESS", "QUEUED", "PENDING", "EXPECTED", "WAITING")
-                       else "pass" if conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED") else "other"] += 1
             rows.append({"number": pr["number"], "title": pr["title"], "lane": found.group("lane"),
                          "issue": found.group("issue").upper(), "draft": pr["isDraft"], "merge": pr["mergeStateStatus"],
-                         "checks": dict(checks), "updatedAt": pr["updatedAt"]})
+                         "updatedAt": pr["updatedAt"]})
         model["open"] = sorted(rows, key=lambda r: r["updatedAt"], reverse=True)
     except Exception as error:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
@@ -277,7 +275,7 @@ def github_model() -> dict:
 
 def system_model() -> dict:
     try:
-        load1 = os.getloadavg()[0]
+        load1 = round(os.getloadavg()[0], 1)
     except OSError:
         load1 = None
     disk = os.statvfs("/")
@@ -440,10 +438,10 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
     lines.append(rgb(FG, head, bold=True))
     pipeline_budget = max(4, height - len(lines) - 14)
+    merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}
     for pr in open_prs[:pipeline_budget]:
-        checks = pr["checks"]
-        check_text = (rgb(GREEN, f"✓{checks.get('pass', 0)}") + " " + (rgb(RED, f"✕{checks['fail']}") if checks.get("fail") else rgb(DIM, "✕0"))
-                      + " " + (rgb(ORANGE, f"…{checks['pending']}") if checks.get("pending") else rgb(DIM, "…0")))
+        merge = pr.get("merge") or "UNKNOWN"
+        check_text = rgb(merge_colors.get(merge, DIM), f"{merge.lower():<8}")
         held = local["held"].get(str(pr["number"]))
         note = ""
         if pr["number"] in queued:
@@ -541,14 +539,17 @@ class Remote(threading.Thread):
 
     def run(self):
         while True:
-            self.linear = linear_model(self.host.linear_env)
+            targets = [w["run"]["target"] for w in running_workers(self.host.state) if w["run"]]
+            self.linear = linear_model(self.host.linear_env, targets)
             self.github = github_model()
             time.sleep(REFRESH_REMOTE_S)
 
 
 def build_model(host, remote: Remote | None = None) -> dict:
-    return {"local": local_model(host),
-            "linear": remote.linear if remote else linear_model(host.linear_env),
+    local = local_model(host)
+    targets = [w["run"]["target"] for w in local["workers"] if w["run"]]
+    return {"local": local,
+            "linear": remote.linear if remote else linear_model(host.linear_env, targets),
             "github": remote.github if remote else github_model(),
             "system": system_model()}
 
