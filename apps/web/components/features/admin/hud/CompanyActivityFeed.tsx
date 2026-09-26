@@ -149,7 +149,7 @@ export function CompanyActivityFeedView({
       className='flex flex-col'
       data-testid='ovie-mac-hud-activity-feed'
     >
-      <div className='flex min-h-6 flex-wrap items-center justify-between gap-2 p-3.5 pb-0'>
+      <div className='flex min-h-6 flex-wrap items-center justify-between gap-2 p-3 pb-0'>
         <p className='truncate text-2xs font-semibold tracking-normal text-tertiary-token'>
           Company Activity
         </p>
@@ -164,7 +164,7 @@ export function CompanyActivityFeedView({
         </div>
       </div>
 
-      <div className='mt-3 px-3.5 pb-3.5'>
+      <div className='mt-3 px-3 pb-3'>
         {feed.rows.length > 0 ? (
           <ol
             className='grid max-h-96 gap-1 overflow-auto pr-1'
