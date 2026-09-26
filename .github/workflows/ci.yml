@@ -1874,11 +1874,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Fetch base-branch history
-        # Diff bases need only HEAD's full ancestry plus origin/<base>:
-        # pull_request origin/<base>...HEAD, merge_group base_sha, push
-        # event.before, and guardrail merge-base with origin/<base>.
-        # A full-depth checkout also fetched every branch and tag (~4k ref
-        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # The profile selector reads history only through
+        # `git diff --name-only --no-renames <base> HEAD -- <pathspecs>`, a
+        # pure tree diff: it needs HEAD's full commit/tree ancestry plus
+        # origin/<base>, never historical blobs (rename detection, the only
+        # blob reader, is disabled). A plain --unshallow downloaded every
+        # historical blob (~47s on the hosted runner). --filter=blob:none
+        # keeps every commit and tree, so the selection is identical. The
+        # selector runs with GIT_NO_LAZY_FETCH=1 to prove no promisor fetch.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1886,10 +1889,12 @@ jobs:
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
+        env:
+          GIT_NO_LAZY_FETCH: '1'
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
@@ -1903,7 +1908,7 @@ jobs:
             BASE="HEAD^1"
           fi
 
-          CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only "$BASE" HEAD -- \
+          CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD -- \
             ':(glob)apps/web/app/\[username\]/**' \
             'apps/web/app/(marketing)/renders/profile-admission/**' \
             'apps/web/app/(marketing)/renders/**' \
