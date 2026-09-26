@@ -1774,7 +1774,7 @@ export async function runStructural(opts = {}) {
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
     ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
-    // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
+    // actionlint runs as a dedicated workflow step before this script (.github/scripts/run-actionlint.sh).
   ];
   const webParts = [
     // JOV-6104: measured marketing contracts must run for registry-only edits.
