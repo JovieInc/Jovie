@@ -2436,10 +2436,13 @@ jobs:
       # Turbopack's persistent build cache (Next 16 default) lives under
       # apps/web/.next/cache/turbopack; without it every combined build is a
       # cold ~3 min compile. Merge-group and dispatch runs only restore the
-      # newest trusted main entry. Only push-to-main writes, at most once per
-      # UTC day per dependency hash, after the whole job passes. The path is
-      # compiler state only (no fetch/image cache, no build output), and
-      # Turbopack revalidates every entry against the current inputs.
+      # newest trusted main entry. The writer is next-build-cache-warm.yml,
+      # which runs on every push to main (and manual dispatch on main) and
+      # builds at most once per UTC day per dependency hash; keep its key
+      # scheme identical to this restore. Queue-proven main pushes skip this
+      # job, so the save steps below only fire on a direct-main fallback run.
+      # The path is compiler state only (no fetch/image cache, no build
+      # output), and Turbopack revalidates every entry against current inputs.
       - name: Resolve Next build cache day
         id: next-build-cache-day
         run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"

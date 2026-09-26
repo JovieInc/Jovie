@@ -1,0 +1,117 @@
+name: Next Build Cache Warm
+
+# Writes the Turbopack persistent build cache that CI's "Build + Layout
+# (combined)" job (ci.yml `ci-build-layout`) restores on merge-group and
+# dispatch runs. ci.yml cannot write it: queue-proven main pushes skip Path
+# Changes and therefore skip Build + Layout, so its trusted-main save step
+# almost never runs and every merge-group build compiled cold.
+#
+# Trust boundary: only push to main and a manual dispatch on main run this job.
+# No PR, fork or merge-group code ever reaches the save step, so a PR can never
+# seed compiler state that the merge queue restores. No secrets are used; the
+# build env is the same public mock env the combined job builds with.
+#
+# Cost: at most one real build per UTC day per dependency hash. Every other
+# main push exits after a lookup-only probe of the exact primary key. A new
+# warmer never cancels one that is mid-build; it replaces a pending one.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: next-build-cache-warm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    name: Warm Next build cache
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Same day and key scheme as ci.yml's "Restore Next build cache
+      # (read-only)" step. The day is resolved once so lookup, restore and
+      # save can never straddle UTC midnight with different keys.
+      - name: Resolve Next build cache day
+        id: next-build-cache-day
+        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Look up today's Next build cache
+        id: next-build-cache-lookup
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          lookup-only: true
+      - name: Report existing Next build cache
+        if: ${{ steps.next-build-cache-lookup.outputs.cache-hit == 'true' }}
+        run: echo "::notice::Next build cache for today already exists; nothing to warm."
+      - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
+      - name: Restore newest Next build cache
+        id: next-build-cache
+        if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
+      # Same web build and env as ci.yml "Build exact combined head", so the
+      # compiler state matches what Build + Layout restores. No remote Turbo
+      # credentials: a remote hit would replay outputs without compiling and
+      # leave the Turbopack cache empty.
+      - name: Build web for cache
+        if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Measure Next build cache (trusted main only)
+        id: next-build-cache-size
+        if: ${{ success() && steps.next-build-cache-lookup.outputs.cache-hit != 'true' && steps.next-build-cache.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/web/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          else
+            echo "::warning::Build left no ${cache_root}; nothing to save."
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Next build cache (trusted main only)
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ steps.next-build-cache.outputs.cache-primary-key }}
