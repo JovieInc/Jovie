@@ -177,6 +177,9 @@ class ProviderAndLockTest(unittest.TestCase):
             self.assertTrue(any("{prompt" in arg for arg in spec["cmd"]), name)
             self.assertTrue(spec["health"])
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
+        # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
+        cmd = providers["devin"]["cmd"]
+        self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
 
     def test_template_substitutes_prompt(self):
         self.assertEqual(lane.template(["x", "{prompt_file}"], {"prompt": "p", "prompt_file": "/f"}), ["x", "/f"])
