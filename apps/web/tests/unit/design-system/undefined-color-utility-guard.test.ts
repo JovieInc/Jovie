@@ -52,9 +52,6 @@ const COLOR_UTILITY_PREFIXES = [
 
 // Shrink-only. Do not add entries; fix the class instead.
 const TEMPORARY_ALLOWLIST = [
-  // TODO(#18551): remove once the desktop-auth handoff PR swaps its tokens.
-  'app/(auth)/DesktopAuthRouteHandoff.tsx',
-  'app/desktop-auth/',
   // TODO: these files carry unrelated pre-existing ESLint debt
   // (canonical-ui-label-casing, shadcn/no-restyle) that blocks any staged
   // edit. Swap ring-offset-background -> ring-offset-base and

@@ -2,7 +2,10 @@ import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { defineConfig } from 'vitest/config';
+import {
+  defineConfig,
+  type TestProjectInlineConfiguration,
+} from 'vitest/config';
 import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
@@ -21,6 +24,46 @@ const workspaceRoot = realRoot.includes(`${path.sep}.stryker-tmp${path.sep}`)
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
 dotenv.config({ path: path.resolve(realRoot, '.env.test') });
+
+// DOM-free unit files that run in Vitest's `node` environment instead of
+// paying for a fresh jsdom per file. The list is data, not globs, so adding a
+// file is an explicit opt-in; tests/unit/ci/node-environment-files.test.ts
+// fails when an entry goes stale, unsorted, or starts referencing DOM/React.
+const nodeEnvironmentFiles: string[] = JSON.parse(
+  fs.readFileSync(
+    path.resolve(realRoot, 'tests/node-environment-files.json'),
+    'utf8'
+  )
+);
+// Entries are literal paths; escape glob syntax such as `(marketing)` and
+// `[username]` so each one matches exactly its own file.
+const nodeEnvironmentGlobs = nodeEnvironmentFiles.map(file =>
+  file.replace(/[()[\]{}*?!+@|]/g, '\\$&')
+);
+
+// Two projects over one file set. Both extend the root config below (setup
+// files, aliases, excludes, timeouts); the node project narrows to the listed
+// files and the jsdom project takes the rest, so root selection is unchanged.
+// `--shard` hashes file paths only, so each file still lands in exactly one
+// CI shard.
+const environmentProjects: TestProjectInlineConfiguration[] = [
+  {
+    extends: true,
+    test: {
+      name: 'node',
+      environment: 'node',
+      include: nodeEnvironmentGlobs,
+    },
+  },
+  {
+    extends: true,
+    test: {
+      name: 'jsdom',
+      environment: 'jsdom',
+      exclude: nodeEnvironmentGlobs,
+    },
+  },
+];
 
 // Detect CI environment
 const isCI = process.env.CI === 'true';
@@ -104,6 +147,9 @@ export default defineConfig({
 
     // Optimized environment settings
     environment: 'jsdom',
+
+    // Listed DOM-free files run in `node`; everything else keeps jsdom.
+    projects: environmentProjects,
 
     // Environment variables for tests
     env: {

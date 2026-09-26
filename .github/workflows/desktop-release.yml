@@ -1189,15 +1189,31 @@ jobs:
             exit 1
           fi
 
+      # pnpm must exist before setup-node so `cache: pnpm` can resolve the
+      # store; action-setup reads the root packageManager pin (pnpm@9.15.9).
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-
-      - name: Enable corepack and prepare pnpm
-        run: corepack enable && corepack prepare pnpm@9.15.9 --activate
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Electron and electron-builder re-download their universal runtimes on
+      # every cold macOS VM; restore only those immutable download caches,
+      # never build output (#16891's cache, lost in its merge).
+      - name: Cache Electron downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-downloads-
 
       - name: Prepare private production draft
         if: env.ENVIRONMENT == 'production'

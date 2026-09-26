@@ -280,3 +280,68 @@ describe('public profile discovery eligibility (JOV-6260)', () => {
     expect(filterPublicDiscoveryIdentities(null)).toEqual([]);
   });
 });
+
+describe('JOV-6126 reopen: unresolved platform IDs and empty profiles', () => {
+  it.each(['artist_5k9ywwwkldouuicvijstpl', 'artist_1vj0brinolxrtjuazoujdt'])(
+    'excludes unresolved Spotify artist-ID handle %s from indexing',
+    handle => {
+      expect(getPublicProfileIndexingExclusionReason(handle)).toBe(
+        'unresolved_platform_id_handle'
+      );
+      expect(
+        getPublicProfileIndexingExclusionReason(handle.toUpperCase())
+      ).toBe('unresolved_platform_id_handle');
+      expect(isPublicProfileIndexable(handle, 'Dave Edwards')).toBe(false);
+      expect(getPublicProfileRobots(handle, 'Dave Edwards')).toMatchObject({
+        index: false,
+        follow: false,
+      });
+    }
+  );
+
+  it.each([
+    'artist',
+    'artist_name',
+    'artist_official',
+    'artist-5k9ywwwkldouuicvijstpl',
+  ])(
+    'keeps human handles that only resemble the platform-ID shape: %s',
+    handle => {
+      expect(getPublicProfileIndexingExclusionReason(handle)).toBeNull();
+    }
+  );
+
+  const emptyProfile = {
+    handle: 'crisrosa',
+    displayName: 'Cris Rosa',
+    isPublic: true,
+    ownerEmail: 'cris@rosa.audio',
+    hasPublicRelease: false,
+  } as const;
+
+  it('excludes empty profiles from publication catalogs', () => {
+    expect(
+      getPublicProfileDiscoveryExclusionReason(emptyProfile, {
+        requirePublication: true,
+      })
+    ).toBe('empty_profile');
+    expect(filterPublicDiscoveryIdentities([emptyProfile])).toEqual([]);
+  });
+
+  it('keeps profiles with a release, or with unknown release state, eligible', () => {
+    expect(
+      filterPublicDiscoveryIdentities([
+        { ...emptyProfile, hasPublicRelease: true },
+        {
+          ...emptyProfile,
+          handle: 'unknownstate',
+          hasPublicRelease: undefined,
+        },
+      ]).map(identity => identity.handle)
+    ).toEqual(['crisrosa', 'unknownstate']);
+  });
+
+  it('does not apply the empty-profile rule to direct profile access', () => {
+    expect(isPublicProfileDiscoveryEligible(emptyProfile)).toBe(true);
+  });
+});

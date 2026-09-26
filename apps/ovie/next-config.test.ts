@@ -36,6 +36,18 @@ describe('Ovie deployment configuration', () => {
     }
   });
 
+  it('keeps the build-time typecheck unless CI already ran it separately', async () => {
+    vi.stubEnv('AGENT_OS_WORKFLOWS_ENABLED', 'false');
+    vi.stubEnv('NEXT_IGNORE_TYPECHECK', '');
+    const { default: strict } = await import('./next.config.mjs');
+    expect(strict.typescript.ignoreBuildErrors).toBe(false);
+
+    vi.resetModules();
+    vi.stubEnv('NEXT_IGNORE_TYPECHECK', '1');
+    const { default: ciBuild } = await import('./next.config.mjs');
+    expect(ciBuild.typescript.ignoreBuildErrors).toBe(true);
+  });
+
   it('rejects workflow activation before private-host callback authentication is verified', async () => {
     vi.stubEnv('AGENT_OS_WORKFLOWS_ENABLED', 'true');
     await expect(import('./next.config.mjs')).rejects.toThrow(

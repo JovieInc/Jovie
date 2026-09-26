@@ -25,8 +25,10 @@ export function AudioPlayButton({
   readonly size?: 'bar' | 'compact' | 'persistent';
   readonly className?: string;
 }) {
-  const accessibleLabel =
-    label ?? (isLoading ? 'Loading track' : isPlaying ? 'Pause' : 'Play');
+  let accessibleLabel = 'Play';
+  if (label != null) accessibleLabel = label;
+  else if (isLoading) accessibleLabel = 'Loading track';
+  else if (isPlaying) accessibleLabel = 'Pause';
   const isPersistent = size === 'persistent';
 
   return (

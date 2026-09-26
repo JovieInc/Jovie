@@ -9,9 +9,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('Noir Ion anchors load from design-system.css', () => {
   const anchors = loadAnchors();
-  assert.equal(anchors['--noir-ion-canvas'], '#030407');
-  assert.equal(anchors['--noir-ion-shell'], '#06080d');
-  assert.equal(anchors['--noir-ion-card'], '#0f1420');
+  assert.equal(anchors['--noir-ion-canvas'], '#030406');
+  assert.equal(anchors['--noir-ion-shell'], '#07080a');
+  assert.equal(anchors['--noir-ion-card'], '#131417');
   assert.equal(anchors['--noir-ion-text-primary'], '#f5f7fb');
 });
 
@@ -24,7 +24,7 @@ test('generated export matches repo-root design.tokens.json', () => {
 test('export documents Noir Ion as the generated projection', () => {
   const doc = JSON.parse(generate());
   assert.equal(doc.name, 'Jovie System B (Noir Ion)');
-  assert.equal(doc.color['surface.canvas'].$value, '#030407');
-  assert.equal(doc.color['surface.surface1'].$value, '#0f1420');
+  assert.equal(doc.color['surface.canvas'].$value, '#030406');
+  assert.equal(doc.color['surface.surface1'].$value, '#131417');
   assert.match(doc.$description, /generate-design-tokens-export\.mjs/);
 });
