@@ -7,7 +7,7 @@ import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions/d
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TTL } from '@/lib/cache/tags';
+import { CACHE_TTL, createReleaseCacheTag } from '@/lib/cache/tags';
 import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
   getReleaseForProfileById,
@@ -100,12 +100,16 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
+  // JOV-6272: one cache-key family. Key parts are (userId, profileId) —
+  // identity resolved above, never caller-supplied. The profile handle is a
+  // function argument (smart-link paths need it) but is NOT a key part: a
+  // handle rename must not fork the cache into stale old-handle entries.
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.id, profile.handle),
     ['releases-matrix', userId, profile.id],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleaseCacheTag(userId, profile.id)],
     }
   )();
 }
@@ -135,7 +139,7 @@ async function resolveReleaseEntity(params: {
     ['release-entity', userId, profile.id, params.releaseId],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleaseCacheTag(userId, profile.id)],
     }
   )();
 }
@@ -154,12 +158,15 @@ export async function loadReleaseMatrixForProfile(
 ): Promise<ReleaseViewModel[]> {
   const owned = await requireOwnedReleaseProfile(profile.profileId);
 
+  // Same canonical key as resolveReleaseMatrix: the caller-supplied handle is
+  // used to build view models but deliberately excluded from the cache key
+  // (and the tag) so all matrix entry points share one cache identity.
   return unstable_cache(
     () => fetchReleaseMatrixCore(owned.profileId, profile.profileHandle),
-    ['releases-matrix', owned.userId, owned.profileId, profile.profileHandle],
+    ['releases-matrix', owned.userId, owned.profileId],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleaseCacheTag(owned.userId, owned.profileId)],
     }
   )();
 }
@@ -176,15 +183,10 @@ export async function loadArchivedReleaseMatrixForProfile(
         profile.profileHandle,
         'archived'
       ),
-    [
-      'releases-matrix-archived',
-      owned.userId,
-      owned.profileId,
-      profile.profileHandle,
-    ],
+    ['releases-matrix', owned.userId, owned.profileId, 'archived'],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleaseCacheTag(owned.userId, owned.profileId)],
     }
   )();
 }
