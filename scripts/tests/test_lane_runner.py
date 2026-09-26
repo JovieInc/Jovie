@@ -579,6 +579,40 @@ class FixRedTest(unittest.TestCase):
         self.assertIn("Do not open a new PR", prompt)
         self.assertIn("devin/jov-1", prompt)
 
+    def test_claims_are_visible_across_hosts_through_the_pr(self):
+        real = lane.sh
+        posted, comments = [], []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None, stream=False):
+            if args[:2] == ["gh", "api"]:
+                return SimpleNamespace(returncode=0, stdout="\n".join(comments), stderr="")
+            if args[:3] == ["gh", "pr", "comment"]:
+                posted.append(args[-1])
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        lane.sh = fake
+        try:
+            self.assertFalse(lane.claimed_elsewhere(5, "h1", "fix"))
+            comments.append(f"🤖 lane claim kind=fix sha=h1 host=other at={lane.now_iso()}")
+            self.assertTrue(lane.claimed_elsewhere(5, "h1", "fix"))
+            self.assertFalse(lane.claimed_elsewhere(5, "h1", "gate"))
+            self.assertFalse(lane.claimed_elsewhere(5, "h2", "fix"))
+            comments[:] = [f"🤖 lane claim kind=fix sha=h1 host={lane.HOST} at={lane.now_iso()}"]
+            self.assertFalse(lane.claimed_elsewhere(5, "h1", "fix"), "our own claim never blocks us")
+            comments[:] = ["🤖 lane claim kind=fix sha=h1 host=other at=2020-01-01T00:00:00Z"]
+            self.assertFalse(lane.claimed_elsewhere(5, "h1", "fix"), "stale claims expire")
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                draft = {**self.pr(), "isDraft": True}
+                self.assertEqual(lane.claim_adoptable_pr(host, "devin", [draft])["number"], 5)
+                self.assertTrue(posted and posted[-1].startswith("🤖 lane claim kind=gate sha=h1"))
+                comments[:] = [f"🤖 lane claim kind=gate sha=h1 host=other at={lane.now_iso()}"]
+                host2 = lane.Host(state=Path(tmp) / "b")
+                host2.state.mkdir()
+                self.assertIsNone(lane.claim_adoptable_pr(host2, "devin", [draft]))
+                self.assertIsNone(lane.claim_adoptable_pr(host2, "devin", [draft]), "not retried locally")
+        finally:
+            lane.sh = real
+
     def test_claim_records_attempt_before_work(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
