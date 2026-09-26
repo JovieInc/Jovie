@@ -513,6 +513,21 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Finance (Owner-only personal financial data — JOV-4609)
+export {
+  type FinanceAccount,
+  type FinanceExport,
+  type FinanceInstitution,
+  type FinanceTransaction,
+  financeAccounts,
+  financeExports,
+  financeInstitutions,
+  financeTransactions,
+  type NewFinanceAccount,
+  type NewFinanceExport,
+  type NewFinanceInstitution,
+  type NewFinanceTransaction,
+} from './finance';
 // Identity (Cross-platform artist identity links)
 export {
   type ArtistIdentityLink,
