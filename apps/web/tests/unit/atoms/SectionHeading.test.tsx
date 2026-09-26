@@ -16,14 +16,15 @@ describe('SectionHeading', () => {
     ).toBeInTheDocument();
   });
 
-  it.each([
-    1, 2, 3, 4, 5, 6,
-  ] as const)('renders correct heading level h%i', level => {
-    render(<SectionHeading level={level}>Heading {level}</SectionHeading>);
-    const heading = screen.getByRole('heading', { level });
-    expect(heading).toBeInTheDocument();
-    expect(heading.tagName).toBe(`H${level}`);
-  });
+  it.each([1, 2, 3, 4, 5, 6] as const)(
+    'renders correct heading level h%i',
+    level => {
+      render(<SectionHeading level={level}>Heading {level}</SectionHeading>);
+      const heading = screen.getByRole('heading', { level });
+      expect(heading).toBeInTheDocument();
+      expect(heading.tagName).toBe(`H${level}`);
+    }
+  );
 
   it('applies center alignment class by default', () => {
     render(<SectionHeading>Centered</SectionHeading>);
@@ -49,16 +50,14 @@ describe('SectionHeading', () => {
     expect(heading).toHaveClass('text-2xl');
   });
 
-  it.each([
-    'sm',
-    'md',
-    'lg',
-    'xl',
-  ] as const)('applies size classes for size=%s', size => {
-    render(<SectionHeading size={size}>Sized</SectionHeading>);
-    const heading = screen.getByRole('heading', { name: 'Sized' });
-    expect(heading.className).toBeTruthy();
-  });
+  it.each(['sm', 'md', 'lg', 'xl'] as const)(
+    'applies size classes for size=%s',
+    size => {
+      render(<SectionHeading size={size}>Sized</SectionHeading>);
+      const heading = screen.getByRole('heading', { name: 'Sized' });
+      expect(heading.className).toBeTruthy();
+    }
+  );
 
   it('applies a custom id attribute', () => {
     render(<SectionHeading id='my-section'>With ID</SectionHeading>);

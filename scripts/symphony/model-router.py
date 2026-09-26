@@ -462,6 +462,23 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
             ready.append((rank, mid, m, selected_executor, extra))
     if ready:
         ready.sort(key=lambda item: item[0])
+        try:
+            sys.path.insert(0, str(pathlib.Path.home()))
+            sys.path.insert(0, str(HERE.parent))
+            from jev_model_route import pick_model as _jev_pick
+        except ImportError:
+            _jev_pick = None
+        jev_ids = {item[1] for item in ready}
+        if _jev_pick is not None and jev_ids:
+            subset = {"models": [mm[mid] for mid in jev_ids], "routing_policy": cfg.get("routing_policy")}
+            picked = _jev_pick(
+                {"identifier": workflow, "title": capability, "labels": []},
+                job_type=capability,
+                registry=subset,
+            )
+            chosen = next((item for item in ready if item[1] == picked.get("id")), None)
+            if chosen:
+                ready = [chosen]
         _rank, mid, model, selected_executor, extra = ready[0]
         record_pool_use(st, model.get("pool"))
         if extra.get("channel") == "api":

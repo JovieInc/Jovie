@@ -2,6 +2,7 @@ import {
   buildAiVisibilityMeasurement,
   requireMeasuredAiVisibilityMetric,
 } from '@/lib/aeo/visibility-measurement';
+import { formatEventDateParts } from '@/lib/events/date';
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
@@ -137,6 +138,7 @@ export interface ShowEntityInput {
   readonly venueName?: string | null;
   readonly city?: string | null;
   readonly startDate?: CardDateInput;
+  readonly timezone?: string | null;
   readonly ticketUrl?: string | null;
   readonly status?: EntityStatusTone | null;
   readonly ticketStatus?: TicketStatus | null;
@@ -372,9 +374,8 @@ export function chatTourDateContextToEntityCard(
   };
 }
 
-// Show dates render in UTC everywhere on the profile (card date pills AND the
-// events list) so the two never disagree — local-time formatting split them
-// for evening shows (e.g. "JUL 28" on the card vs "Jul 29" in the list).
+// Legacy date-only/context adapters use UTC; public show cards resolve the
+// venue calendar day through the shared event formatter below.
 const monthFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   timeZone: 'UTC',
@@ -553,7 +554,7 @@ export function aiCrawlerAnalyticsToEntityCard(
 /** Tour date / event → unified model with a date pill. */
 export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
   const preset = KIND_PRESETS.show;
-  const date = toDate(show.startDate);
+  const datePill = formatEventDateParts(show);
   const title = show.title?.trim() || show.venueName?.trim() || 'Show';
   const location = [show.venueName, show.city].filter(Boolean).join(' · ');
   const isCancelled = show.ticketStatus === 'cancelled';
@@ -570,9 +571,7 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
     eyebrow: preset.eyebrow,
     title,
     meta: location || null,
-    datePill: date
-      ? { month: monthFormatter.format(date), day: dayFormatter.format(date) }
-      : null,
+    datePill,
     status: null,
     // A show that cannot sell tickets gets a target-less CTA — the card
     // renders it as plain muted text, never a dead Tickets link.

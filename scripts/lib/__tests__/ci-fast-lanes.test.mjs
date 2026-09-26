@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  BIOME_TOOLCHAIN_FILES,
+  biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -943,6 +945,21 @@ describe('structural command pool', () => {
     expect(rows[2]).toBe("| 2 | 9.0s | exit 3 | `slow 'cmd'` |");
     expect(rows[3]).toBe('| 1 | 1.0s | pass | `fast \\| cmd` |');
     expect(formatStructuralTimings(undefined)).toBe('');
+  });
+});
+
+describe('biomeNeedsFullTree', () => {
+  it('lints the whole tree when Biome config or version can change', () => {
+    for (const file of BIOME_TOOLCHAIN_FILES) {
+      expect(biomeNeedsFullTree(['apps/web/a.ts', file])).toBe(true);
+    }
+  });
+
+  it('keeps ordinary PRs on changed-files lint', () => {
+    expect(biomeNeedsFullTree([])).toBe(false);
+    expect(
+      biomeNeedsFullTree(['apps/web/package.json', 'apps/web/lib/utils.ts'])
+    ).toBe(false);
   });
 });
 
