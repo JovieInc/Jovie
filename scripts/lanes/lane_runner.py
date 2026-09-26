@@ -742,6 +742,8 @@ def failures_path(host: Host) -> Path:
 
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
+    if not spec.get("enabled", True):
+        return 0  # a lane turned off in a newer release stops at its next re-exec
     slot = None
     for index in range(host.slots(name, spec.get("slots", 1))):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)

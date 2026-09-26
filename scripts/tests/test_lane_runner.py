@@ -434,6 +434,15 @@ class WorkerTest(unittest.TestCase):
         self.assertIn("will fix it on that branch", self.linear.comments[-1][1])
         self.assertFalse((self.host.state / "failures.json").exists())
 
+    def test_a_disabled_lane_worker_exits_at_its_next_reexec(self):
+        saved = lane.load_providers
+        lane.load_providers = lambda: {"devin": {"label": "devin", "slots": 1, "enabled": False}}
+        try:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        finally:
+            lane.load_providers = saved
+        self.assertFalse(list((self.host.state / "slots").glob("*.lock")) if (self.host.state / "slots").exists() else [])
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
