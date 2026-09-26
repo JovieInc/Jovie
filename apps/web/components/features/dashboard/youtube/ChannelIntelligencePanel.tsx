@@ -39,7 +39,7 @@ function RankedVideoRow({ video, showTrend = false }: RankedVideoRowProps) {
         />
       ) : (
         <div className='flex h-12 w-20 shrink-0 items-center justify-center rounded-md bg-surface-0'>
-          <Icon name='Disc' className='h-4 w-4 text-tertiary-token' />
+          <Icon name='AudioLines' className='h-4 w-4 text-tertiary-token' />
         </div>
       )}
       <div className='min-w-0 flex-1'>

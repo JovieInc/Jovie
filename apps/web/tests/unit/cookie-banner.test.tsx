@@ -194,6 +194,7 @@ describe('CookieBannerSection', () => {
   it.each([
     ['/tim', true],
     ['/tim/alerts', true],
+    ['//tim//alerts', true],
     ['/dualipa/merch/card-1', true],
     ['/pricing', false],
     ['/artist-profiles', false],

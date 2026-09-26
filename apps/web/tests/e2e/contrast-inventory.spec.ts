@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { test } from './setup';
+import { expect, test } from './setup';
 import {
   buildComponentIndex,
   buildFixClusters,
@@ -102,6 +102,7 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
         test(`contrast:inventory — ${surface.id}/${theme}`, async ({
           page,
         }) => {
+          expect(surface.resolvedPath.length).toBeGreaterThan(0);
           await installPublicRouteMocks(page);
           try {
             await page.goto(surface.resolvedPath, {
@@ -142,6 +143,7 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
     for (const [path, id] of AUTH_ROUTES) {
       for (const theme of ['light', 'dark'] as const) {
         test(`contrast:inventory — ${id}/${theme}`, async ({ page }) => {
+          expect(path.length).toBeGreaterThan(0);
           const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
           try {
             await page.goto(`${baseUrl}${path}`, {
@@ -184,6 +186,8 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
       inventory,
       OUTPUT_DIR
     );
+    expect(jsonPath.length).toBeGreaterThan(0);
+    expect(markdownPath.length).toBeGreaterThan(0);
 
     console.log(
       `[contrast-inventory] wrote ${jsonPath} and ${markdownPath} ` +

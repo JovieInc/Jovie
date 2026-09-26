@@ -24,4 +24,14 @@ describe('SmartLinkArtwork', () => {
     expect(image).not.toHaveClass('object-cover');
     expect(image.closest('[data-artwork-frame="hero"]')).toBeInTheDocument();
   });
+
+  it('uses the banned-icon-safe AudioLines glyph without a src', () => {
+    const { container } = render(
+      <SmartLinkArtwork src={null} alt='Never Say A Word artwork' />
+    );
+
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
 });

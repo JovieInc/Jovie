@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LIVE_CERT_TIMEOUT_MS = 12 * 60 * 1000;
@@ -327,6 +327,21 @@ function ownerIsAlive(lease, rows) {
   return receiptIsAlive(ownerReceiptFromLease(lease), rows);
 }
 
+/**
+ * An optional arm file holds supervision until its owner signals that start-up
+ * finished (the lifecycle harness uses its ready receipt). Until it exists, the
+ * deadline and lost-owner/controller checks cannot race that start-up; a run
+ * whose owner process is already gone is still reaped. Leases without an arm
+ * file (every production run) are supervised from the start.
+ */
+function leaseAwaitsArm(lease) {
+  return (
+    typeof lease.armFile === 'string' &&
+    !existsSync(lease.armFile) &&
+    !isProcessGone(lease.ownerPid)
+  );
+}
+
 function captureOwnedPlaywrightGroups(token, tempRoot, rows) {
   if (!rows) return null;
   return findOwnedPlaywrightBrowsers(rows, token, tempRoot)
@@ -337,7 +352,18 @@ function captureOwnedPlaywrightGroups(token, tempRoot, rows) {
     }));
 }
 
-function mergeOwnedBrowserGroups(...groupLists) {
+const processIdentityKey = receipt =>
+  `${receipt.pid}:${receipt.startedAt}:${receipt.pgid}`;
+
+/**
+ * Merge browser-group captures, oldest first. `ps` can sample a helper between
+ * fork and exec, while it still shows its parent's argv, so a later capture of
+ * the same process identity (pid, start time, pgid) refreshes the recorded
+ * command hash instead of being dropped. Every capture is taken while its
+ * token/profile leader is verified live in the same snapshot, and kill-time
+ * checks still require an exact receipt match, so this never widens targeting.
+ */
+export function mergeOwnedBrowserGroups(...groupLists) {
   const merged = new Map();
   for (const groups of groupLists) {
     for (const group of groups ?? []) {
@@ -347,14 +373,23 @@ function mergeOwnedBrowserGroups(...groupLists) {
         merged.set(key, structuredClone(group));
         continue;
       }
-      const memberKeys = new Set(
-        existing.members.map(
-          member => `${member.pid}:${member.startedAt}:${member.pgid}`
-        )
+      existing.leader = structuredClone(group.leader);
+      const memberIndexes = new Map(
+        existing.members.map((member, index) => [
+          processIdentityKey(member),
+          index,
+        ])
       );
       for (const member of group.members) {
-        const memberKey = `${member.pid}:${member.startedAt}:${member.pgid}`;
-        if (!memberKeys.has(memberKey)) existing.members.push(member);
+        const index = memberIndexes.get(processIdentityKey(member));
+        if (index === undefined) {
+          memberIndexes.set(
+            processIdentityKey(member),
+            existing.members.push(structuredClone(member)) - 1
+          );
+        } else {
+          existing.members[index] = structuredClone(member);
+        }
       }
     }
   }
@@ -478,6 +513,7 @@ export function createStorybookVitestLease(options) {
     ownerStartedAt: options.ownerStartedAt,
     ownerCommandHash: options.ownerCommandHash,
     deadlineAt: options.deadlineAt,
+    armFile: options.armFile ?? null,
     tempRoot: options.tempRoot,
     controllers: options.controllers ?? [],
     browserGroups: options.browserGroups ?? [],
@@ -509,6 +545,11 @@ function readStorybookVitestLease(leasePath) {
       !isSafeToken(lease.token) ||
       !isValidProcessReceipt(ownerReceiptFromLease(lease)) ||
       !isOwnedTempRoot(lease.tempRoot) ||
+      !(
+        lease.armFile === undefined ||
+        lease.armFile === null ||
+        (typeof lease.armFile === 'string' && isAbsolute(lease.armFile))
+      ) ||
       !Array.isArray(lease.controllers) ||
       !lease.controllers.every(isValidProcessReceipt) ||
       !Array.isArray(lease.browserGroups) ||
@@ -564,7 +605,7 @@ export async function reapStaleStorybookVitestLeases(options = {}) {
     if (!name.endsWith('.json')) continue;
     const leasePath = join(leaseDir, name);
     const lease = readStorybookVitestLease(leasePath);
-    if (!lease) continue;
+    if (!lease || leaseAwaitsArm(lease)) continue;
     const ownerAlive = ownerIsAlive(lease, rows);
     const expired =
       typeof lease.deadlineAt === 'number' && Date.now() >= lease.deadlineAt;
@@ -687,6 +728,13 @@ async function runStorybookVitestWatchdog(leasePath) {
       );
       continue;
     }
+    if (leaseAwaitsArm(lease)) {
+      lostOwnerConfirmations = 0;
+      await new Promise(resolve =>
+        setTimeout(resolve, STORYBOOK_VITEST_WATCHDOG_POLL_MS)
+      );
+      continue;
+    }
     const lostOwner =
       !ownerIsAlive(lease, rows) || hasLostController(lease, rows);
     lostOwnerConfirmations = lostOwner ? lostOwnerConfirmations + 1 : 0;
@@ -789,6 +837,7 @@ export async function startStorybookVitestLifecycle(options = {}) {
     ownerStartedAt: ownerReceipt.startedAt,
     ownerCommandHash: ownerReceipt.commandHash,
     deadlineAt: runMode ? Date.now() + timeoutMs : null,
+    armFile: options.armFile,
     tempRoot,
     controllers,
   });

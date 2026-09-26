@@ -21,7 +21,8 @@ export { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from './public-profile-identi
  */
 export type PublicProfileIndexingExclusionReason =
   | PublicProfileIdentityExclusionReason
-  | 'qa_machine_handle';
+  | 'qa_machine_handle'
+  | 'unresolved_platform_id_handle';
 
 export type PublicProfileDiscoveryExclusionReason =
   | PublicProfileIndexingExclusionReason
@@ -29,13 +30,19 @@ export type PublicProfileDiscoveryExclusionReason =
   | 'test_account_email'
   | 'private_or_unpublished'
   | 'unknown_identity'
-  | 'placeholder_identity';
+  | 'placeholder_identity'
+  | 'empty_profile';
 
 export interface PublicProfileDiscoveryIdentity {
   readonly handle?: string | null;
   readonly displayName?: string | null;
   readonly isPublic?: boolean | null;
   readonly ownerEmail?: string | null;
+  /**
+   * Whether the profile has at least one publicly eligible release. Omit when
+   * the source cannot supply it; only an explicit `false` excludes.
+   */
+  readonly hasPublicRelease?: boolean | null;
 }
 
 export interface PublicProfileDiscoveryEligibilityOptions {
@@ -52,7 +59,8 @@ export function getPublicProfileIndexingExclusionReason(
 ): PublicProfileIndexingExclusionReason | null {
   return (
     getPublicProfileIdentityExclusionReason(handle) ??
-    getQaMachineHandleIndexingExclusionReason(handle)
+    getQaMachineHandleIndexingExclusionReason(handle) ??
+    getUnresolvedPlatformIdHandleExclusionReason(handle)
   );
 }
 
@@ -67,7 +75,6 @@ export function getPublicProfileIndexingExclusionReason(
  * never looks like `tmoc` + ~15 chars of base36, and real display names do not
  * end in the `+clerk test` suffix. Revisit only if a genuine collision appears.
  */
-const QA_CLERK_TEST_DISPLAY_NAME_PATTERN = /\+clerk test$/;
 const JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
 const CLERK_TEST_EMAIL_LOCAL_PART_PATTERN = /\+clerk_test(?:\+|$)/;
 
@@ -77,10 +84,26 @@ function getQaMachineHandleIndexingExclusionReason(
   return isOpaqueInternalProfileHandle(handle) ? 'qa_machine_handle' : null;
 }
 
+/**
+ * Unresolved Spotify artist-ID handles (JOV-6126). Ingestion mints
+ * `artist_<22-char Spotify ID>` when no human handle resolves; production then
+ * served `/artist_5k9ywwwkldouuicvijstpl` ("Dave Edwards") as an indexable,
+ * self-canonical page. Raw platform IDs are never canonical public URLs.
+ */
+const UNRESOLVED_SPOTIFY_ARTIST_HANDLE_PATTERN = /^artist_[0-9a-z]{22}$/;
+
+function getUnresolvedPlatformIdHandleExclusionReason(
+  handle: string
+): 'unresolved_platform_id_handle' | null {
+  return UNRESOLVED_SPOTIFY_ARTIST_HANDLE_PATTERN.test(
+    handle.trim().toLowerCase()
+  )
+    ? 'unresolved_platform_id_handle'
+    : null;
+}
+
 function matchesQaClerkTestDisplayName(displayName: string): boolean {
-  return QA_CLERK_TEST_DISPLAY_NAME_PATTERN.test(
-    displayName.trim().toLowerCase()
-  );
+  return displayName.trim().toLowerCase().endsWith('+clerk test');
 }
 
 function isPlaceholderIdentity(handle: string, displayName: string): boolean {
@@ -136,6 +159,12 @@ export function getPublicProfileDiscoveryExclusionReason(
     isPlaceholderIdentity(handle, displayName)
   ) {
     return 'placeholder_identity';
+  }
+
+  // JOV-6126: empty profiles ("No releases listed yet", e.g. duplicate or
+  // test accounts) are thin content and stay out of discovery listings.
+  if (options.requirePublication && identity.hasPublicRelease === false) {
+    return 'empty_profile';
   }
 
   return null;

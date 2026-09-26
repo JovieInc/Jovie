@@ -126,11 +126,11 @@ describe('MarketingHeader', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.header
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
       'href',
-      '/artists'
+      '/about'
     );
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
       'href',
       '/product'
     );
@@ -160,7 +160,7 @@ describe('MarketingHeader', () => {
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Artists', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'About', 'For Artists', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -217,9 +217,9 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
       'href',
-      '/artists'
+      '/about'
     );
     expect(
       screen.getByRole('link', { name: 'Request access' })
@@ -254,7 +254,7 @@ describe('MarketingHeader', () => {
     render(
       <MarketingHeader
         navLinks={[
-          { href: '/artist-profiles', label: 'Product' },
+          { href: '/artist-profiles', label: 'For Artists' },
           { href: '/pricing', label: 'Pricing' },
         ]}
       />
@@ -262,7 +262,7 @@ describe('MarketingHeader', () => {
 
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
       'href',
       '/artist-profiles'
     );

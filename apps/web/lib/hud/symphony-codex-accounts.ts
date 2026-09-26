@@ -45,7 +45,7 @@ export const CODEX_RECONNECT_PHASE_LABELS = {
 } as const satisfies Record<CodexReconnectPhase, string>;
 
 const SECRETISH =
-  /(?:api[_-]?key|token|secret|password|bearer|authorization|access_token|refresh_token)=([^&\s]+)|eyJ[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]+/gi;
+  /(?:api[_-]?key|token|secret|password|bearer|authorization|access_token|refresh_token)=([^&\s]+)|eyJ[A-Z0-9_-]{20,}|sk-[A-Z0-9]+/gi;
 const SESSION_PHASES = [
   'starting',
   'authorization-pending',

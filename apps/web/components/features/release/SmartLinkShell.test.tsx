@@ -23,4 +23,16 @@ describe('SmartLinkShell', () => {
     expect(image).toHaveClass('object-contain');
     expect(image).not.toHaveClass('object-cover');
   });
+
+  it('uses the banned-icon-safe AudioLines glyph without artwork', () => {
+    const { container } = render(
+      <SmartLinkShell artworkUrl={null} showMenuButton={false}>
+        Listen
+      </SmartLinkShell>
+    );
+
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
 });

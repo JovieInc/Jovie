@@ -85,7 +85,7 @@ export async function resolveEntityIds(
   // ── ISNIs ───────────────────────────────────────────────────────────────
   const isnis = (artist.isnis ?? []).filter(Boolean);
   for (const isni of isnis) {
-    const normalized = isni.replace(/[\s\-]/g, '');
+    const normalized = isni.replace(/[\s-]/g, '');
     if (normalized.length === 16) {
       links.push({
         platform: 'isni',

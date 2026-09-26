@@ -41,6 +41,7 @@ function parseArgs(argv) {
     maxConcurrent: 40,
     limit: 200,
     apply: false,
+    allowPaidEscalation: false,
     json: false,
     blockedLabel: DEFAULT_BLOCKED_LABEL,
     requiredChecks: [...DEFAULT_REQUIRED_CHECKS],
@@ -109,6 +110,9 @@ function parseArgs(argv) {
         options.apply = true;
         options.dryRun = false;
         break;
+      case '--allow-paid-escalation':
+        options.allowPaidEscalation = true;
+        break;
       case '--dry-run':
         options.dryRun = true;
         options.apply = false;
@@ -157,6 +161,7 @@ Classifies open PRs and plans safe freshness actions. Defaults to read-only dry-
 Options:
   --dry-run                    Print classification/order/actions without mutations (default)
   --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
+  --allow-paid-escalation      Authorize true-conflict escalation to paid-model FX (manual dispatch only; default denies with no paid fallback)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
   --max-concurrent N           Operator ceiling above adaptive 2→10→40 cohorts (default: 40)
   --limit N                    Max open PRs to inspect, 1-500 (default: 200)

@@ -166,9 +166,7 @@ function shouldSkipAudienceBlockTelemetry(): boolean {
 }
 
 function loadSentry(): Promise<SentryModule> {
-  if (!sentryModulePromise) {
-    sentryModulePromise = import('@sentry/nextjs');
-  }
+  sentryModulePromise ??= import('@sentry/nextjs');
   return sentryModulePromise;
 }
 

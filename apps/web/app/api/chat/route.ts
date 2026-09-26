@@ -181,10 +181,10 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import {
+  AlbumArtGatewayUnconfiguredError,
   buildAlbumArtBackgroundPrompt,
   generateAlbumArtBackgrounds,
-  isXaiConfigured,
-  XaiApiKeyMissingError,
+  isAlbumArtGatewayConfigured,
 } from '@/lib/services/album-art/provider-xai';
 import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
 import {
@@ -1043,7 +1043,7 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      if (!isXaiConfigured()) {
+      if (!isAlbumArtGatewayConfigured()) {
         return {
           success: false as const,
           retryable: false,
@@ -1193,8 +1193,8 @@ function createGenerateAlbumArtTool(params: {
           })),
         };
       } catch (error) {
-        if (error instanceof XaiApiKeyMissingError) {
-          // Provider key may go missing between the early check and the call
+        if (error instanceof AlbumArtGatewayUnconfiguredError) {
+          // Gateway auth may be missing between the early check and the call
           // (e.g. env reload). Treat as feature_disabled, do not capture.
           return {
             success: false as const,
@@ -2525,7 +2525,7 @@ export async function POST(req: Request) {
   );
   const albumArtCapability = resolveAlbumArtCapability({
     featureEnabled: albumArtFeatureEnabled,
-    providerConfigured: isXaiConfigured(),
+    providerConfigured: isAlbumArtGatewayConfigured(),
     entitlements: currentUserEntitlements,
   });
   const retouchCapability = resolveRetouchCapability({

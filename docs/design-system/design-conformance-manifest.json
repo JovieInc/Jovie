@@ -95,6 +95,18 @@
       ],
       "penRootId": null,
       "sourceDigest": "26024026b935734507f62fbca31f53067d93fb7adaed217547210de05368de94"
+    },
+    {
+      "id": "atom.kbd",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/kbd.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/kbd.stories.tsx"],
+      "testSources": ["packages/ui/atoms/kbd.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "c7ce1982a4fcc9aced62b1143fd3e6efb446194f91b6be7c42c11902c2fc1f26"
     }
   ],
   "legacy": {

@@ -140,9 +140,8 @@ export function queuedAckForDestination(destination: OvieDestination): string {
 
 export function ingestOvieItem(
   text: string,
-  options?: { readonly spawn?: SpawnFn }
+  _options?: { readonly spawn?: SpawnFn }
 ): OvieReceipt {
-  void options?.spawn;
   const lane = classifyOvieItem(text);
   const destination = destinationForOvieLane(lane);
   return {
@@ -159,7 +158,6 @@ export function ingestOvieDump(
   items: readonly string[],
   options?: { readonly spawn?: SpawnFn }
 ): OvieReceipt[] {
-  void options?.spawn;
   return items.map(item => ingestOvieItem(item, options));
 }
 

@@ -24,6 +24,13 @@ export interface AuthedAxeSurface {
  *  - earnings: data-dense surface with charts and text overlays
  *  - settings: settings panel with form fields and labels
  *  - onboarding: multi-step flow, first touch for new users
+ *  - library: media-dense surface with artwork overlays, waveforms, and
+ *    text-on-image combinations distinct from the chart/table surfaces above
+ *  - presence: status glyphs, outcome metrics, and connection-rail text on
+ *    colored state indicators — a pattern not exercised by the other surfaces
+ *
+ * chat has its own dedicated coverage (tests/e2e/chat-axe.spec.ts) and is
+ * intentionally not duplicated here.
  *
  * Surfaces that need Pro entitlements use 'creator-ready'.
  * Onboarding uses 'creator' (free/incomplete) to render the actual wizard.
@@ -53,5 +60,17 @@ export const AUTHED_AXE_SURFACES: readonly AuthedAxeSurface[] = [
     readySelectors: ['main', 'h1', 'form', '[data-testid]'],
     persona: 'creator',
     allowRedirect: true,
+  },
+  {
+    id: 'authed-library',
+    path: APP_ROUTES.LIBRARY,
+    readySelectors: ['main', '[data-testid]', 'h1'],
+    persona: 'creator-ready',
+  },
+  {
+    id: 'authed-presence',
+    path: APP_ROUTES.PRESENCE,
+    readySelectors: ['main', '[data-testid]', 'h1'],
+    persona: 'creator-ready',
   },
 ] as const;

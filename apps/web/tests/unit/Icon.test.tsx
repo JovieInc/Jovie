@@ -78,6 +78,26 @@ describe('Icon', () => {
     expect(screen.getByTestId('icon-CheckSquare')).toBeInTheDocument();
   });
 
+  it('registers the banned-icon replacement glyphs (Tim, 2026-09-25)', () => {
+    const names = ['AudioLines', 'Layers', 'Layers2'] as const;
+
+    for (const name of names) {
+      render(<Icon name={name} data-testid={`icon-${name}`} />);
+      expect(screen.getByTestId(`icon-${name}`)).toBeInTheDocument();
+    }
+  });
+
+  it('drops the banned Disc/Disc3/CircleDot glyphs from the registry', () => {
+    const banned = ['Disc', 'Disc3', 'CircleDot'] as const;
+
+    for (const name of banned) {
+      const { container } = render(
+        <Icon name={name as any} data-testid={`icon-${name}`} />
+      );
+      expect(container.firstChild).toBeNull();
+    }
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />

@@ -396,63 +396,63 @@ describe('zero, states, ordering, meanings, cadence', () => {
     });
   });
 
-  it.each([
-    undefined,
-    null,
-  ])('does not infer CI timing when run_started_at is %s', async runStartedAt => {
-    const projection = await publish(
-      baseline({
-        'exact-sha-ci': ok('exact-sha-ci', {
-          status: 'completed',
-          conclusion: 'success',
-          created_at: '2026-08-21T23:50:00.000Z',
-          run_started_at: runStartedAt,
-          updated_at: '2026-08-21T23:56:48.000Z',
-        }),
-      })
-    );
+  it.each([undefined, null])(
+    'does not infer CI timing when run_started_at is %s',
+    async runStartedAt => {
+      const projection = await publish(
+        baseline({
+          'exact-sha-ci': ok('exact-sha-ci', {
+            status: 'completed',
+            conclusion: 'success',
+            created_at: '2026-08-21T23:50:00.000Z',
+            run_started_at: runStartedAt,
+            updated_at: '2026-08-21T23:56:48.000Z',
+          }),
+        })
+      );
 
-    expect(projection.sources['exact-sha-ci'].durations).toEqual({
-      queueWaitMs: { state: 'not-measured', value: null },
-      runDurationMs: { state: 'not-measured', value: null },
-    });
-  });
+      expect(projection.sources['exact-sha-ci'].durations).toEqual({
+        queueWaitMs: { state: 'not-measured', value: null },
+        runDurationMs: { state: 'not-measured', value: null },
+      });
+    }
+  );
 
   it.each([
     { liveSha: null, deployedSha: SHA },
     { liveSha: 'invalid', deployedSha: SHA },
     { liveSha: SHA, deployedSha: null },
     { liveSha: SHA, deployedSha: 'invalid' },
-  ])('does not synthesize exact-build false from $liveSha / $deployedSha', async ({
-    liveSha,
-    deployedSha,
-  }) => {
-    const projection = await publish(
-      baseline({
-        'production-controller': ok(
-          'production-controller',
-          { conclusion: 'success' },
-          {
-            correlation: { sha: deployedSha },
-            measuredMeanings: { productionVerified: true },
-          }
-        ),
-        'live-build-info': ok(
-          'live-build-info',
-          { commitSha: liveSha },
-          {
-            correlation: { sha: liveSha },
-            measuredMeanings: { exactLiveBuild: false },
-          }
-        ),
-      })
-    );
+  ])(
+    'does not synthesize exact-build false from $liveSha / $deployedSha',
+    async ({ liveSha, deployedSha }) => {
+      const projection = await publish(
+        baseline({
+          'production-controller': ok(
+            'production-controller',
+            { conclusion: 'success' },
+            {
+              correlation: { sha: deployedSha },
+              measuredMeanings: { productionVerified: true },
+            }
+          ),
+          'live-build-info': ok(
+            'live-build-info',
+            { commitSha: liveSha },
+            {
+              correlation: { sha: liveSha },
+              measuredMeanings: { exactLiveBuild: false },
+            }
+          ),
+        })
+      );
 
-    expect(projection.meanings.exactLiveBuild).toEqual({
-      state: 'not-measured',
-      value: null,
-    });
-  });
+      expect(projection.meanings.exactLiveBuild).toEqual({
+        state: 'not-measured',
+        value: null,
+      });
+    }
+  );
 
   it('covers each observation state without synthesizing current truth', async () => {
     expect((await publish(baseline())).state).toBe('fresh');
@@ -1445,29 +1445,32 @@ describe('live GitHub shipping reader', () => {
     ['missing run id', { id: null }],
     ['invalid run attempt', { run_attempt: 0 }],
     ['invalid run SHA', { head_sha: 'not-an-exact-sha' }],
-  ])('rejects malformed Production Controller identity: %s', async (_label, overrides) => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(productionRunResponse(overrides));
-    const read = await readWorkflow(
-      {
-        readFile: vi.fn(),
-        fetch: fetchMock,
-        githubToken: 'test-token',
-        githubOwner: 'JovieInc',
-        githubRepo: 'Jovie',
-      },
-      'production-controller',
-      'production-controller.yml'
-    );
+  ])(
+    'rejects malformed Production Controller identity: %s',
+    async (_label, overrides) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(productionRunResponse(overrides));
+      const read = await readWorkflow(
+        {
+          readFile: vi.fn(),
+          fetch: fetchMock,
+          githubToken: 'test-token',
+          githubOwner: 'JovieInc',
+          githubRepo: 'Jovie',
+        },
+        'production-controller',
+        'production-controller.yml'
+      );
 
-    expect(read).toMatchObject({
-      sourceId: 'production-controller',
-      status: 'unavailable',
-      errorCode: 'malformed',
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+      expect(read).toMatchObject({
+        sourceId: 'production-controller',
+        status: 'unavailable',
+        errorCode: 'malformed',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     [
@@ -1590,29 +1593,32 @@ describe('live GitHub shipping reader', () => {
         ),
     ],
     ['jobs transport failure', () => Promise.reject(new Error('offline'))],
-  ])('fails Production Controller unavailable on %s', async (_label, jobsRead) => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(productionRunResponse())
-      .mockImplementationOnce(jobsRead);
+  ])(
+    'fails Production Controller unavailable on %s',
+    async (_label, jobsRead) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(productionRunResponse())
+        .mockImplementationOnce(jobsRead);
 
-    const read = await readWorkflow(
-      {
-        readFile: vi.fn(),
-        fetch: fetchMock,
-        githubToken: 'test-token',
-        githubOwner: 'JovieInc',
-        githubRepo: 'Jovie',
-      },
-      'production-controller',
-      'production-controller.yml'
-    );
+      const read = await readWorkflow(
+        {
+          readFile: vi.fn(),
+          fetch: fetchMock,
+          githubToken: 'test-token',
+          githubOwner: 'JovieInc',
+          githubRepo: 'Jovie',
+        },
+        'production-controller',
+        'production-controller.yml'
+      );
 
-    expect(read).toMatchObject({
-      sourceId: 'production-controller',
-      status: 'unavailable',
-    });
-  });
+      expect(read).toMatchObject({
+        sourceId: 'production-controller',
+        status: 'unavailable',
+      });
+    }
+  );
 });
 
 describe('shipping-state security', () => {
@@ -1628,12 +1634,13 @@ describe('shipping-state security', () => {
     const githubTokens = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_'].map(
       prefix => `${prefix}abcdefghijklmnopqrstuvwxyz012345`
     );
-    const sensitiveMessage = `failed ${githubTokens.join(' ')} github_pat_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef`;
+    const sensitiveMessage = `failed ${githubTokens.join(' ')} GHP_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345 github_pat_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef BEARER ABCDEFGH`;
     expect(sanitizeErrorMessage(sensitiveMessage)).not.toMatch(
-      /gh[pousr]_|github_pat_|Bearer abcdef|\/home\/timwhite/
+      /gh[pousr]_|GHP_|github_pat_|Bearer abcdef|BEARER ABCDEFGH|\/home\/timwhite/i
     );
     for (const unsafe of [
       ...githubTokens,
+      'GHP_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345',
       'github_pat_abcdefghijklmnopqrstuvwxyz012345',
       '/Users/timwhite/private.json',
       'contains whitespace',

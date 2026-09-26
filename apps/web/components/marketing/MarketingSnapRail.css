@@ -85,16 +85,16 @@
 
 .system-b-marketing.dark,
 :root.dark .system-b-marketing {
-  --color-bg-base: #030407;
-  --color-bg-surface-0: #06080d;
-  --color-bg-surface-1: #0f1420;
-  --color-bg-surface-2: #151b2a;
-  --color-bg-surface-3: #1b2436;
-  --color-bg-page: #030407;
+  --color-bg-base: #030406;
+  --color-bg-surface-0: #07080a;
+  --color-bg-surface-1: #131417;
+  --color-bg-surface-2: #1a1b1e;
+  --color-bg-surface-3: #232427;
+  --color-bg-page: #030406;
   --color-bg-hover: rgba(168, 176, 195, 0.06);
   --color-bg-elevated: #0a0d16;
-  --color-bg-input: #0f1420;
-  --color-bg-active: #151b2a;
+  --color-bg-input: #131417;
+  --color-bg-active: #1a1b1e;
   --color-base: var(--color-bg-base);
   --color-surface-0: var(--color-bg-surface-0);
   --color-surface-1: var(--color-bg-surface-1);
@@ -106,9 +106,9 @@
   --color-surface-input: var(--color-bg-input);
   --color-surface-active: var(--color-bg-active);
   --color-text-primary-token: #f5f7fb;
-  --color-text-secondary-token: #d7dce8;
-  --color-text-tertiary-token: #a8b0c3;
-  --color-text-quaternary-token: #7d879d;
+  --color-text-secondary-token: #a0a5af;
+  --color-text-tertiary-token: #8f95a0;
+  --color-text-quaternary-token: #858b96;
   --color-primary-token: var(--color-text-primary-token);
   --color-secondary-token: var(--color-text-secondary-token);
   --color-tertiary-token: var(--color-text-tertiary-token);

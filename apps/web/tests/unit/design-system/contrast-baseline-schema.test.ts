@@ -112,8 +112,8 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
     );
   });
 
-  it('baseline schema is valid when the file exists', () => {
-    if (!existsSync(BASELINE_PATH)) return;
+  it('baseline schema is valid when the file exists', ({ skip }) => {
+    if (!existsSync(BASELINE_PATH)) skip();
 
     const parsed: unknown = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
     expect(isContrastInventory(parsed)).toBe(true);
@@ -166,35 +166,35 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
     }
   });
 
-  it.each([
-    'live',
-    'dangling',
-  ] as const)('refuses a %s symlinked ancestor without deleting outside files', symlinkType => {
-    const root = mkdtempSync(
-      join(realpathSync(os.tmpdir()), 'contrast-ancestor-')
-    );
-    const lexicalRoot = join(root, 'lexical');
-    const outsideDir = join(root, 'outside');
-    const outsideSentinel = join(outsideDir, 'sentinel.txt');
-
-    try {
-      mkdirSync(lexicalRoot);
-      mkdirSync(outsideDir);
-      writeFileSync(outsideSentinel, 'keep');
-      const linkedAncestor = join(lexicalRoot, 'tests');
-      symlinkSync(
-        symlinkType === 'live' ? outsideDir : join(root, 'missing'),
-        linkedAncestor,
-        'dir'
+  it.each(['live', 'dangling'] as const)(
+    'refuses a %s symlinked ancestor without deleting outside files',
+    symlinkType => {
+      const root = mkdtempSync(
+        join(realpathSync(os.tmpdir()), 'contrast-ancestor-')
       );
-      const outputRoot = join(linkedAncestor, 'e2e');
+      const lexicalRoot = join(root, 'lexical');
+      const outsideDir = join(root, 'outside');
+      const outsideSentinel = join(outsideDir, 'sentinel.txt');
 
-      expect(() => resetContrastScreenshotDirectory(outputRoot)).toThrow(
-        'resolves outside its lexical root'
-      );
-      expect(readFileSync(outsideSentinel, 'utf8')).toBe('keep');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+      try {
+        mkdirSync(lexicalRoot);
+        mkdirSync(outsideDir);
+        writeFileSync(outsideSentinel, 'keep');
+        const linkedAncestor = join(lexicalRoot, 'tests');
+        symlinkSync(
+          symlinkType === 'live' ? outsideDir : join(root, 'missing'),
+          linkedAncestor,
+          'dir'
+        );
+        const outputRoot = join(linkedAncestor, 'e2e');
+
+        expect(() => resetContrastScreenshotDirectory(outputRoot)).toThrow(
+          'resolves outside its lexical root'
+        );
+        expect(readFileSync(outsideSentinel, 'utf8')).toBe('keep');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     }
-  });
+  );
 });
