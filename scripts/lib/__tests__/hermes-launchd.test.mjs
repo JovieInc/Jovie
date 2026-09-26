@@ -164,18 +164,25 @@ describe('shipper-gated entrypoint', () => {
 
     expect(entrypoints.length).toBeGreaterThan(0);
 
-    for (const entrypoint of entrypoints) {
-      const result = spawnSync(
-        'python3',
-        ['-m', 'py_compile', join(REPO_ROOT, 'scripts/symphony', entrypoint)],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
-        }
-      );
-      expect(result.stderr).toBe('');
-      expect(result.status).toBe(0);
-    }
+    // One interpreter for every file: py_compile exits non-zero if any file
+    // fails and names it on stderr. Spawning python3 once per entrypoint cost
+    // ~2.6s and timed out under merge-group CPU contention.
+    const result = spawnSync(
+      'python3',
+      [
+        '-m',
+        'py_compile',
+        ...entrypoints.map(entrypoint =>
+          join(REPO_ROOT, 'scripts/symphony', entrypoint)
+        ),
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
+      }
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
   });
 
   it('documents gbrain and grok preflight gates', () => {

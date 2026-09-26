@@ -148,7 +148,7 @@ function SingleModeForm({
         aria-label='Single Profile Input'
       />
       {network === 'spotify' && results.length > 0 ? (
-        <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-background-elevated p-1'>
+        <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-surface-elevated p-1'>
           {results.map(artist => (
             <Button
               key={artist.id}

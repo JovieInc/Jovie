@@ -347,6 +347,24 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
   });
 
+  it('passes planned related tests to the hosted repair coverage run', () => {
+    const workflow = readFileSync(
+      new URL(
+        '../../../.github/workflows/rolling-ci-dispatch.yml',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    const coverageStep = workflow.slice(
+      workflow.indexOf('.coveragePlan.coverageInclude | .[]')
+    );
+    const runEnd = coverageStep.indexOf('test:coverage --changed');
+    expect(runEnd).toBeGreaterThan(0);
+    const beforeRun = coverageStep.slice(0, runEnd);
+    expect(beforeRun).toContain('.coveragePlan.relatedTests // [] | .[]');
+    expect(beforeRun).toContain('export JOVIE_COVERAGE_RELATED_TESTS=');
+  });
+
   it('maps Exact-head --changed onto planned related files only', () => {
     expect(
       rewriteVitestArgs(

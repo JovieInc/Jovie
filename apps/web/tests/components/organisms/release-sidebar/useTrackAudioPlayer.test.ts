@@ -397,6 +397,8 @@ describe('useTrackAudioPlayer', () => {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      bpm: null,
+      musicalKey: null,
       queueLength: 0,
       queueIndex: -1,
       hasNext: false,

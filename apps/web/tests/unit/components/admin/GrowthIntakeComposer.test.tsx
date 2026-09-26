@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GrowthIntakeComposer } from '@/features/admin/leads/GrowthIntakeComposer';
+import { GrowthIntakeComposer } from '@/components/features/admin/leads/GrowthIntakeComposer';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const refreshMock = vi.fn();
@@ -176,6 +176,19 @@ describe('GrowthIntakeComposer', () => {
         screen.getByText('2 created, 1 skipped, 0 errors.')
       ).toBeInTheDocument();
     });
+  });
+
+  it('renders Spotify results on the defined elevated surface token', async () => {
+    const user = userEvent.setup();
+    render(<GrowthIntakeComposer />);
+
+    await user.click(screen.getByRole('button', { name: 'Spotify' }));
+
+    const resultsPanel = screen.getByRole('button', {
+      name: 'Phoebe Bridgers Use',
+    }).parentElement;
+    expect(resultsPanel).toHaveClass('bg-surface-elevated');
+    expect(resultsPanel).not.toHaveClass('bg-background-elevated');
   });
 
   it('uses the selected Spotify result for single-profile ingest', async () => {

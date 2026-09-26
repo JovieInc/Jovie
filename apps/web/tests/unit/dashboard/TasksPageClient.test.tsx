@@ -819,6 +819,20 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('drops the retired Disc3 release glyph (banned icon guard, Tim, 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('Layers,');
+    expect(source).toContain('<Layers className=');
+  });
+
   it('routes table API imports through the v9 compat adapter', () => {
     const source = readFileSync(
       resolve(
