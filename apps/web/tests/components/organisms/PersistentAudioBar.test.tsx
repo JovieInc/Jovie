@@ -28,6 +28,7 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
+const prefetch = vi.fn();
 let pathname = '/app';
 let searchParams = new URLSearchParams();
 
@@ -73,7 +74,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, prefetch }),
 }));
 
 let mockPrefersReducedMotion = false;
@@ -149,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
@@ -546,6 +548,58 @@ describe('PersistentAudioBar', () => {
     await user.click(screen.getByRole('button', { name: 'Close lyrics' }));
 
     expect(push).toHaveBeenCalledWith('/app/releases?tab=scheduled');
+  });
+
+  it('prefetches the lyrics route once when a track with lyrics activates', () => {
+    setPlaying({ hasLyrics: true });
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(prefetch).toHaveBeenCalledTimes(1);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    // Re-rendering with the same track must not re-prefetch.
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(1);
+
+    // A new active track is a new intent — prefetch its lyrics route.
+    setPlaying({ hasLyrics: true, activeTrackId: 'track-2' });
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(2);
+    expect(prefetch).toHaveBeenLastCalledWith(buildLyricsRoute('track-2'));
+  });
+
+  it('does not prefetch the lyrics route for tracks without lyrics or with none active', () => {
+    setPlaying({ hasLyrics: false });
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
+  it('does not prefetch the lyrics route while already on it', () => {
+    setPlaying({ hasLyrics: true });
+    pathname = buildLyricsRoute('track-1');
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
   });
 
   it('keeps the canonical lyrics button hidden when the active track has no lyrics', () => {
