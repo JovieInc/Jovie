@@ -49,10 +49,9 @@ def model(**overrides) -> dict:
                    "fetchedAt": "2026-09-26T21:00:00+00:00"},
         "github": {"ok": True, "errors": {},
                    "open": [{"number": 18724, "title": "JOV-6544 fix(audio): converge now-playing metadata", "lane": "devin",
-                             "issue": "JOV-6544", "draft": False, "merge": "UNSTABLE", "checks": {"pass": 30, "fail": 0, "pending": 2},
-                             "updatedAt": "2026-09-26T20:20:26Z"},
+                             "issue": "JOV-6544", "draft": False, "merge": "UNSTABLE", "updatedAt": "2026-09-26T20:20:26Z"},
                             {"number": 18712, "title": "JOV-6544 fix(web): warm release detail", "lane": "devin", "issue": "JOV-6544",
-                             "draft": True, "merge": "CLEAN", "checks": {"pass": 12, "fail": 1}, "updatedAt": "2026-09-26T18:29:49Z"}],
+                             "draft": True, "merge": "CLEAN", "updatedAt": "2026-09-26T18:29:49Z"}],
                    "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps", "mergedAt": "2026-09-26T20:12:00Z", "lane": "devin"},
                                  {"number": 18759, "title": "fix(lanes): one PR per issue", "mergedAt": "2026-09-26T20:54:50Z", "lane": None}],
                    "queue": {"depth": 2, "entries": [{"number": 18724, "state": "AWAITING_CHECKS", "enqueuedAt": "2026-09-26T20:20:28Z"}]},
@@ -107,6 +106,7 @@ class RenderTest(unittest.TestCase):
     def test_pipeline_attention_and_backlog_rows(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("#18724 devin  JOV-6544", text)
+        self.assertIn("unstable", text)
         self.assertIn("in queue awaiting_checks", text)
         self.assertIn("held: check-failed:pre-push-gate.sh affected", text)
         self.assertIn("✕ dispatch-crash: dispatch failed 3 ticks in a row", text)
