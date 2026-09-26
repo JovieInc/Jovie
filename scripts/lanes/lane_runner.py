@@ -33,6 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import doctor  # noqa: E402  (sibling module of the release)
 REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
@@ -48,7 +50,8 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py"]
+LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_doctor.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
@@ -660,12 +663,18 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     return receipt
 
 
-def lane_prs(name: str) -> list[dict]:
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
-                 "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
-    # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
-    own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
-    return [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
+    """This lane's open PRs (its dated run branches), plus the orphaned PRs of disabled lanes:
+    nobody else will fix or gate those, and any enabled lane can."""
+    providers = load_providers() if providers is None else providers
+    names = [name] + [other for other, spec in providers.items() if not spec.get("enabled", True) and other != name]
+    prs = []
+    for owner in names:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
+                     "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
+        own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
+        prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+    return prs
 
 
 def in_flight_issues() -> frozenset[str]:
@@ -811,16 +820,44 @@ def ensure_full_history(host: Host) -> None:
 
 
 def dispatch(host: Host) -> int:
-    ensure_full_history(host)
-    prune_worktrees(host)
-    for name, spec in load_providers().items():
-        if not spec.get("enabled", True) or cooling(host, name) or not provider_healthy(spec):
-            continue
-        for _ in range(host.slots(name, spec.get("slots", 1))):
-            subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
-                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True)
-    return 0
+    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
+    try:
+        ensure_full_history(host)
+        prune_worktrees(host)
+        for name, spec in load_providers().items():
+            if not spec.get("enabled", True) or cooling(host, name):
+                continue
+            if not provider_healthy(spec):
+                tick["unhealthy"].append(name)
+                continue
+            for _ in range(host.slots(name, spec.get("slots", 1))):
+                subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+                tick["spawned"].append(name)
+    except Exception as error:  # the tick must still leave a receipt the doctor can raise
+        tick["error"] = f"{type(error).__name__}: {error}"[:300]
+    update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
+    try:
+        doctor.run(host, sys.modules[__name__], codex_lane_module())
+    except Exception as error:  # never let the doctor take dispatch down
+        update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
+    return 1 if tick["error"] else 0
+
+
+def read_marker(host: Host) -> str | None:
+    try:
+        return (host.state / "current" / ".tree").read_text().strip()[:7]
+    except OSError:
+        return None
+
+
+def codex_lane_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("codex_lane", HERE / "codex_lane.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def cooling(host: Host, name: str) -> bool:

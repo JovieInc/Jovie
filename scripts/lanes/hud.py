@@ -177,6 +177,7 @@ def local_model(host) -> dict:
         "held": read_json(state / "held.json", {}), "failures": read_json(state / "failures.json", {}),
         "gateTimeouts": read_json(state / "gate-timeouts.json", {}), "requeue": read_json(state / "requeue.json", {}),
         "cooldowns": cooldowns, "codex": accounts, "doctor": read_json(state / "doctor.json", {}),
+        "tick": read_json(state / "tick.json", {}),
         "gateSeats": host.gate_slots, "generatedAt": utcnow().isoformat(),
     }
 
@@ -378,7 +379,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         stale_flags.append("linear stale " + age(linear["fetchedAt"], now))
     release = local.get("release") or "unknown-release"
     hud_state = rgb(GREEN, "hud=release") if local.get("releaseMatchesHud") else rgb(ORANGE, "hud≠release (restarting)")
-    left = rgb(WHITE, "● JOVIE · SYMPHONY", bold=True) + rgb(DIM, f" · lanes {release} on {local['host']} · {hud_state}")
+    tick = local.get("tick") or {}
+    tick_age = age(tick.get("at"), now)
+    tick_note = rgb(RED, f"tick {tick_age} ✕ {tick['error'][:40]}") if tick.get("error") else \
+        rgb(ORANGE if tick_age not in ("never",) and "m" in tick_age and int(tick_age.split("m")[0].split("h")[-1] or 0) >= 5 else DIM, f"tick {tick_age}")
+    left = rgb(WHITE, "● JOVIE · SYMPHONY", bold=True) + rgb(DIM, f" · lanes {release} on {local['host']} · {hud_state} · ") + tick_note
     right = f"{gh_note} · {linear_note}" + ("" if not stale_flags else " · " + rgb(ORANGE, "; ".join(stale_flags))) + rgb(DIM, f" · {now:%H:%M:%S}Z")
     lines.append(pad(left + " " * max(1, width - visible(left) - visible(right)) + right, width))
 
@@ -592,6 +597,10 @@ def main(argv=None) -> int:
             frame = render(build_model(host, remote), width, height)
             sys.stdout.write("\x1b[H" + "\n".join(line + "\x1b[K" for line in frame))
             sys.stdout.flush()
+            try:
+                (host.state / "hud.heartbeat").touch()  # the doctor raises hud-stale when this stops
+            except OSError:
+                pass
             time.sleep(args.interval)
     finally:
         sys.stdout.write("\x1b[?25h")
