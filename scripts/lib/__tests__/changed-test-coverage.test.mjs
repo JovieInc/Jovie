@@ -8,9 +8,11 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
   evaluateChangedLineCoverage,
+  findReferencingTests,
   isCoverageSourcePath,
   parseChangedLines,
   planChangedLineCoverage,
+  resolveTestSpecifierCandidates,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
@@ -92,11 +94,121 @@ describe('changed test coverage', () => {
     expect(emptyPlan.applicable).toBe(false);
     expect(emptySerialized.coverageInclude).toEqual([]);
 
-    const applicablePlan = planChangedLineCoverage({ files: [path] });
+    expect(emptySerialized.relatedTests).toEqual([]);
+
+    const applicablePlan = planChangedLineCoverage({
+      files: [path],
+      testFiles: [],
+    });
     const applicableSerialized = JSON.parse(JSON.stringify(applicablePlan));
     expect(applicablePlan.applicable).toBe(true);
     expect(applicableSerialized.coverageInclude).toEqual(
       toWebCoverageIncludePaths([path])
+    );
+    expect(applicableSerialized.relatedTests).toEqual([]);
+  });
+
+  // Regression: PR #18559 reported 50% because Vitest's `related` graph did
+  // not select the createRequire() test for an ESLint rule, so its changed
+  // lines were "uncovered" although an existing test executes them.
+  it('plans tests that load a changed source outside the Vite module graph', () => {
+    const page = 'apps/web/app/(auth)/auth/native-complete/page.tsx';
+    const rule = 'apps/web/eslint-rules/no-hardcoded-theme-colors.js';
+    const plan = planChangedLineCoverage({
+      files: [page, rule],
+      testFiles: [
+        {
+          path: 'apps/web/tests/unit/app/native-complete-page.test.tsx',
+          source: `const { default: Page } = await import(
+      '../../../app/(auth)/auth/native-complete/page'
+    );`,
+        },
+        {
+          path: 'apps/web/eslint-rules/no-hardcoded-theme-colors.test.ts',
+          source: `const require = createRequire(import.meta.url);
+const rule = require('./no-hardcoded-theme-colors.js');`,
+        },
+        {
+          path: 'apps/web/tests/unit/customer-facing-vendor-copy.test.ts',
+          source: `const FILES = ['app/(auth)/auth/native-complete/page.tsx'];`,
+        },
+        {
+          path: 'apps/web/eslint-rules/other-rule.test.ts',
+          source: `const rule = require('./other-rule.js');`,
+        },
+      ],
+    });
+    expect(plan.relatedTests).toEqual([
+      'eslint-rules/no-hardcoded-theme-colors.test.ts',
+      'tests/unit/app/native-complete-page.test.tsx',
+    ]);
+  });
+
+  it.each([
+    ["import { x } from '@/lib/example';", 'apps/web/tests/unit/a.test.ts'],
+    ["import '../../lib/example';", 'apps/web/tests/unit/a.test.ts'],
+    [
+      "export { x } from '../../lib/example.ts';",
+      'apps/web/tests/unit/a.test.ts',
+    ],
+    ["vi.mock('@/lib/example', () => ({}));", 'apps/web/tests/unit/a.test.ts'],
+    ["await vi.importActual('@/lib/example')", 'apps/web/tests/unit/a.test.ts'],
+    ["vi.doMock(\n  '@/lib/example'\n)", 'apps/web/tests/unit/a.test.ts'],
+    ["require.resolve('./example.js')", 'apps/web/lib/example.test.ts'],
+  ])(
+    'selects a test referencing a changed source via %s',
+    (source, testPath) => {
+      expect(
+        findReferencingTests({
+          changedFiles: [path],
+          testFiles: [{ path: testPath, source }],
+        })
+      ).toEqual([testPath.slice('apps/web/'.length)]);
+    }
+  );
+
+  it.each([
+    [
+      "import { x } from '@/lib/example-other';",
+      'apps/web/tests/unit/a.test.ts',
+    ],
+    ["import { x } from 'lib/example';", 'apps/web/tests/unit/a.test.ts'],
+    ["import { x } from '../lib/example';", 'apps/web/tests/unit/a.test.ts'],
+    ["const p = '@/lib/example';", 'apps/web/tests/unit/a.test.ts'],
+    ["import { x } from '@/lib/example';", 'apps/web/lib/example.helper.ts'],
+    [
+      "import { x } from '../../../../lib/example';",
+      'apps/web/tests/unit/a.test.ts',
+    ],
+  ])('does not select a test for %s', (source, testPath) => {
+    expect(
+      findReferencingTests({
+        changedFiles: [path],
+        testFiles: [{ path: testPath, source }],
+      })
+    ).toEqual([]);
+  });
+
+  it('resolves @/ specifiers through the apps/web Vitest aliases', () => {
+    const testPath = 'apps/web/tests/unit/a.test.ts';
+    expect(
+      resolveTestSpecifierCandidates(testPath, '@/features/foo/Bar')
+    ).toContain('apps/web/components/features/foo/Bar.tsx');
+    expect(
+      resolveTestSpecifierCandidates(testPath, '@/app/(shell)/page')
+    ).toContain('apps/web/app/app/(shell)/page.tsx');
+    expect(resolveTestSpecifierCandidates(testPath, '@/lib/dir')).toContain(
+      'apps/web/lib/dir/index.ts'
+    );
+    expect(resolveTestSpecifierCandidates(testPath, 'react')).toEqual([]);
+  });
+
+  it('plans related tests from the real checkout for a createRequire rule', () => {
+    const plan = planChangedLineCoverage({
+      files: ['apps/web/eslint-rules/no-hardcoded-theme-colors.js'],
+    });
+    expect(plan.relatedTests).toContain(
+      'eslint-rules/no-hardcoded-theme-colors.test.ts'
     );
   });
 
@@ -199,6 +311,9 @@ describe('changed test coverage', () => {
     expect(coverage).toContain('--bail 1');
     expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(coverage).toContain('.coverageInclude // [] | .[]');
+    expect(coverage).toContain('.relatedTests // [] | .[]');
+    expect(coverage).toContain('JOVIE_COVERAGE_RELATED_TESTS');
+    expect(wrapper).toContain('JOVIE_COVERAGE_RELATED_TESTS');
     expect(coverage).toContain(
       'Applicable exact-head coverage plan produced no include paths.'
     );
@@ -251,6 +366,44 @@ describe('changed test coverage', () => {
       'run',
       '--coverage',
     ]);
+  });
+
+  it('adds planned related tests to the same related coverage run (union)', () => {
+    expect(
+      rewriteVitestArgs(
+        ['run', '--coverage', '--changed', 'abc123', '--bail', '1'],
+        String.raw`app/\(auth\)/auth/native-complete/page.tsx`,
+        'eslint-rules/no-hardcoded-theme-colors.test.ts\ntests/unit/app/(auth)/page.test.tsx\n'
+      )
+    ).toEqual([
+      'related',
+      String.raw`app/\(auth\)/auth/native-complete/page.tsx`,
+      'eslint-rules/no-hardcoded-theme-colors.test.ts',
+      String.raw`tests/unit/app/\(auth\)/page.test.tsx`,
+      '--run',
+      '--coverage',
+      '--bail',
+      '1',
+    ]);
+    // Related tests never widen an unplanned run.
+    expect(
+      rewriteVitestArgs(['run', '--coverage'], '', 'lib/example.test.ts')
+    ).toEqual(['run', '--coverage']);
+  });
+
+  it.each([
+    '../outside.test.ts',
+    '/abs/example.test.ts',
+    '--config=evil.test.ts',
+    'lib/example.ts',
+  ])('rejects unsafe related coverage test path %s', relatedTest => {
+    expect(() =>
+      rewriteVitestArgs(
+        ['run', '--coverage', '--changed', 'abc123'],
+        'lib/example.ts',
+        relatedTest
+      )
+    ).toThrow(/Invalid related coverage test path/);
   });
 
   it.each([

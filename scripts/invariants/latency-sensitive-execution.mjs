@@ -19,8 +19,20 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-
+import {
+  ALLOWLIST_PATH,
+  DESKTOP_ENTRY_POINTS,
+  ESLINT_CONFIG_PATH,
+  RUNTIME_ROOTS,
+} from './latency-sensitive-execution-paths.mjs';
 import { readInvariantRegistry } from './registry.mjs';
+
+export {
+  ALLOWLIST_PATH,
+  DESKTOP_ENTRY_POINTS,
+  ESLINT_CONFIG_PATH,
+  RUNTIME_ROOTS,
+};
 
 export const LATENCY_SENSITIVE_INVARIANT_ID = 'JOV-INV-031';
 export const LATENCY_SENSITIVE_SCHEMA = 'jovie-latency-sensitive-execution/v1';
@@ -30,33 +42,10 @@ export const LATENCY_SENSITIVE_CHECK_CLASS = 'thread-blocking';
 export const ROUTE_LATENCY_CHECK_CLASS = 'route-response-latency';
 export const ROUTE_LATENCY_CONTRACT =
   'docs/performance/performance-invariants-v1.md';
-export const ALLOWLIST_PATH =
-  'scripts/invariants/latency-sensitive-execution-allowlist.json';
 export const ALLOWLIST_SCHEMA =
   'jovie-latency-sensitive-execution-allowlist/v1';
-export const ESLINT_CONFIG_PATH = 'apps/web/eslint.config.js';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-
-export const RUNTIME_ROOTS = Object.freeze([
-  'apps/web/app',
-  'apps/web/lib',
-  'apps/web/components',
-  'apps/web/hooks',
-  'apps/web/middleware.ts',
-  'apps/web/proxy.ts',
-  'apps/desktop/src',
-  'packages/ui',
-  'packages/auth-routing',
-  'packages/audio-contracts',
-  'packages/extension-contracts',
-  'packages/agent-transport-contracts',
-]);
-
-export const DESKTOP_ENTRY_POINTS = Object.freeze([
-  'apps/desktop/src/main.ts',
-  'apps/desktop/src/preload.ts',
-]);
 
 export const WORKER_ALLOWLIST_PREFIXES = Object.freeze(['workers/']);
 

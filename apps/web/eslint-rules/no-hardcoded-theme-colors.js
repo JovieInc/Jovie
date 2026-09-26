@@ -177,15 +177,15 @@ module.exports = {
         'See DESIGN.md → "Use tokens, not raw colors".',
       bareBgWhite:
         '`bg-white` without a `dark:bg-*` counterpart may cause invisible text in dark mode. ' +
-        'Use a semantic token (`bg-background` or `bg-surface-1`) or pair with `dark:bg-{dark-surface}`. ' +
+        'Use a semantic token (`bg-base` or `bg-surface-1`) or pair with `dark:bg-{dark-surface}`. ' +
         'See DESIGN.md → "Use tokens, not raw colors".',
       bareBgBlack:
         '`bg-black` without a `dark:bg-*` counterpart may be invisible in dark mode. ' +
-        'Use a semantic token (`bg-background`) or pair with `dark:bg-{light-surface}`. ' +
+        'Use a semantic token (`bg-base`) or pair with `dark:bg-{light-surface}`. ' +
         'See DESIGN.md → "Use tokens, not raw colors".',
       arbitraryHexColor:
         'Arbitrary hex color (e.g. `text-[#fff]`, `bg-[#000]`) bypasses the System B token layer. ' +
-        'Use a semantic token (`text-foreground`, `bg-surface-1`, `border-border`) instead. ' +
+        'Use a semantic token (`text-foreground`, `bg-surface-1`, `border-subtle`) instead. ' +
         'See DESIGN.md → "Use tokens, not raw colors".',
     },
     schema: [],

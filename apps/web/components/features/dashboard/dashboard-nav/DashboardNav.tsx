@@ -450,7 +450,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   <span
                     role='status'
                     aria-label={`${inboxNavigation.pendingCount} pending items`}
-                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-background'
+                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
                   >
                     {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
                   </span>
