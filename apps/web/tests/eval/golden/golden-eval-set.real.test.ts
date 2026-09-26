@@ -171,6 +171,7 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
           recordBudget(result.usage);
 
           try {
+            expect(result.text.length).toBeGreaterThan(0);
             assertAdversarialCaseQuality(result.text, adversarial);
             adversarialResults.push(true);
           } catch (error) {

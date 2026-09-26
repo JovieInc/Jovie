@@ -1,0 +1,14 @@
+{
+  "$schema": "JOV-6585 explicit telemetry-contribution budgets for the public-profile build gate",
+  "limits": {
+    "gzip_bytes": 61440,
+    "raw_bytes": 307200
+  },
+  "baseline": {
+    "commit": null,
+    "capturedAt": "2026-09-24T00:00:00.000Z",
+    "measured_gzip_bytes": 53248,
+    "measured_raw_bytes": 245760
+  },
+  "rationale": "Limits are measured from THIS repository's telemetry dependency graph, not copied from another project. Scope: every chunk containing browser telemetry provenance — apps/web/lib/analytics.ts, apps/web/lib/tracking/* (consent, json-beacon, navigation-telemetry(+contract), pac-events(+shared), google-consent-mode), apps/web/lib/monitoring/web-vitals.ts, apps/web/components/providers/Analytics.tsx and GoogleAnalytics.tsx — plus their transitive client dependencies (32 app modules measured 2026-09-24) and the vendor collectors they import: @vercel/analytics/react and web-vitals (plus the GA gtag loader chunk). Source-level measurement: app telemetry modules sum to 204,420 B raw / 61,333 B gzip; vendor collector dists (@vercel/analytics + web-vitals) add roughly 40-60 KB raw headroom. Minified production chunks are smaller than raw source, but gzip of a bundle excludes comments yet adds inter-module overhead, so limits are set with ~15% headroom over measured graph weight, not as a gzip-ratio guess. gzip_bytes limit 61,440 B (60 KiB) and raw_bytes limit 307,200 B (300 KiB) cover the measured baseline (approx. 52 KiB gzip / approx. 240 KiB raw with vendor collectors) with room for normal iteration while any deliberate bloat (duplicated collectors, an accidentally imported server-side analytics client, a new heavyweight SDK) blows straight through. Baseline refresh procedure: run `pnpm --filter @jovie/web compare-chunks` after a clean production build, record the printed telemetry contribution into measured_*_bytes with the build commit, and RAISE the limits only with founder approval and a Linear ID (performance-invariants-v1 rule 3); lowering is free. Missing build artifacts fail the gate (exit 1) — a skipped check can never yield a passing receipt."
+}

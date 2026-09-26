@@ -25,6 +25,22 @@ describe('mapHermesEventsToAgentRunArtifacts', () => {
     expect(artifacts[0]?.blockedReason).toContain('CI red');
   });
 
+  it('drops a pull request url when the id is not a number', () => {
+    const artifacts = mapHermesEventsToAgentRunArtifacts([
+      {
+        ts: '2026-06-20T12:00:00.000Z',
+        source: 'ship',
+        action: 'ship-done',
+        outcome: 'ok',
+        detail: 'merged',
+        pr: true,
+      },
+    ]);
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]?.pullRequestUrl).toBeNull();
+  });
+
   it('dedupes identical events and caps volume', () => {
     const row = {
       ts: '2026-06-20T12:00:00.000Z',

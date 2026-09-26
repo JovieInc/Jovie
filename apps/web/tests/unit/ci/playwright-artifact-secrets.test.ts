@@ -794,6 +794,9 @@ describe('Playwright artifact secret boundary', () => {
     `,
         ],
         {
+          // The step runs from the repository root in CI; it invokes
+          // repo-relative scripts (scripts/invariants/scanned-paths.mjs).
+          cwd: repoRoot,
           encoding: 'utf8',
           env: {
             ...process.env,
@@ -2487,7 +2490,9 @@ ${fixtureCheckout}
       ).toBe(1);
       expect(existsSync(join(shortWorkspace, 'child-ran'))).toBe(false);
     }
-  }, 20_000);
+    // ~38 sequential guard CLI runs, each with its own env/workspace: 4.1s
+    // alone, 10.8s in the full tests/unit/ci run, 12.1s under CPU contention.
+  }, 45_000);
 
   it('publishes safe nonzero output, immutable unions, and producer image policy', () => {
     const workspace = fixture();

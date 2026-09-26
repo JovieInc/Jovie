@@ -201,16 +201,17 @@ export function classifyThrownToolError(
   toolName: string,
   error: unknown
 ): ToolFailurePayload {
-  const thrownCode =
-    error instanceof Error
-      ? (error as { code?: unknown }).code
-      : error !== null && typeof error === 'object' && 'code' in error
-        ? (error as { code?: unknown }).code
-        : undefined;
+  let thrownCode: unknown;
+  if (error instanceof Error) {
+    thrownCode = (error as { code?: unknown }).code;
+  } else if (error !== null && typeof error === 'object' && 'code' in error) {
+    thrownCode = (error as { code?: unknown }).code;
+  }
   const errorCodeFromThrown = asToolErrorCode(thrownCode);
 
   if (
     errorCodeFromThrown === TOOL_ERROR_CODES.PROVIDER_UNAVAILABLE ||
+    thrownCode === 'ALBUM_ART_GATEWAY_UNCONFIGURED' ||
     thrownCode === 'XAI_API_KEY_MISSING'
   ) {
     return buildToolFailure({
@@ -221,12 +222,12 @@ export function classifyThrownToolError(
     });
   }
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
-        : 'Tool execution failed.';
+  let message = 'Tool execution failed.';
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === 'string') {
+    message = error;
+  }
 
   // TasksUpgradeRequiredError and sibling gate codes are expected plan denials
   // (JOV-3861) — never retry, never treat as generic execution failure.
@@ -284,12 +285,15 @@ export function normalizeToolFailureOutput(
     return null;
   }
 
-  const rawError =
-    typeof output.error === 'string' && output.error.trim().length > 0
-      ? output.error.trim()
-      : typeof output.message === 'string' && output.message.trim().length > 0
-        ? output.message.trim()
-        : 'Tool execution failed.';
+  let rawError = 'Tool execution failed.';
+  if (typeof output.error === 'string' && output.error.trim().length > 0) {
+    rawError = output.error.trim();
+  } else if (
+    typeof output.message === 'string' &&
+    output.message.trim().length > 0
+  ) {
+    rawError = output.message.trim();
+  }
 
   const errorCode =
     asToolErrorCode(output.errorCode) ??

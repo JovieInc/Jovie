@@ -195,6 +195,49 @@ describe('external opportunity detector (JOV-2205)', () => {
     });
     expect(opportunities.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('ranks windows by how soon they start', () => {
+    const windows = [
+      {
+        name: 'Already started',
+        startsAt: '2026-05-14T12:00:00.000Z',
+        score: 0.82,
+      },
+      { name: 'This weekend', startsAt: '2026-05-18T12:00:00.000Z', score: 1 },
+      {
+        name: 'Next fortnight',
+        startsAt: '2026-05-29T12:00:00.000Z',
+        score: 0.94,
+      },
+      { name: 'Next month', startsAt: '2026-06-14T12:00:00.000Z', score: 0.85 },
+      {
+        name: 'Later season',
+        startsAt: '2026-07-15T12:00:00.000Z',
+        score: 0.76,
+      },
+    ] as const;
+
+    for (const window of windows) {
+      const [opportunity] = detectOpportunitiesFromSignals(
+        [
+          {
+            sourceKind: 'event_festival',
+            sourceUrl: 'https://example.com/window',
+            sourceLabel: window.name,
+            artistId: 'artist_tim_white',
+            artistName: 'Tim White',
+            eventName: window.name,
+            startsAt: window.startsAt,
+            observedAt: '2026-05-15T00:00:00.000Z',
+            confidence: 1,
+            expiryAt: '2026-12-01T00:00:00.000Z',
+          },
+        ],
+        { now: NOW }
+      );
+      expect(opportunity?.rankScore).toBe(window.score);
+    }
+  });
 });
 
 describe('fan segment builder (JOV-2207)', () => {
@@ -517,6 +560,38 @@ describe('campaign monitoring (JOV-2212)', () => {
     const resumed = resumeMonitoring(paused, NOW.toISOString());
     expect(resumed.paused).toBe(false);
     expect(resumed.status).not.toBe('paused');
+  });
+
+  it('marks a strong campaign at risk when a channel is off', () => {
+    const counters = {
+      clicks: 200,
+      purchases: 20,
+      replies: 40,
+      optIns: 15,
+      channelStatuses: {
+        jovie_link: 'ok' as const,
+        email: 'ok' as const,
+        sms: 'ok' as const,
+        profile: 'ok' as const,
+        social: 'ok' as const,
+      },
+    };
+    const healthy = buildCampaignHealthSnapshot({
+      campaignId: 'camp_channels',
+      counters,
+      now: NOW.toISOString(),
+    });
+    expect(healthy.status).toBe('healthy');
+
+    const atRisk = buildCampaignHealthSnapshot({
+      campaignId: 'camp_channels',
+      counters: {
+        ...counters,
+        channelStatuses: { ...counters.channelStatuses, email: 'off' },
+      },
+      now: NOW.toISOString(),
+    });
+    expect(atRisk.status).toBe('at_risk');
   });
 
   it('recommends extend window on strong conversion', () => {

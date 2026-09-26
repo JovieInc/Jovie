@@ -251,7 +251,14 @@ describe('interaction performance marks', () => {
     vi.stubGlobal('crypto', {});
     vi.spyOn(Date, 'now').mockReturnValue(1234);
 
-    expect(markInteractionStart('fallback')?.id).toMatch(/^fallback:1234-\d+$/);
+    const first = markInteractionStart('fallback')?.id;
+    const second = markInteractionStart('fallback')?.id;
+    expect(first).toMatch(/^fallback:1234-\d+$/);
+    const firstCount = Number(first?.slice((first ?? '').lastIndexOf('-') + 1));
+    const secondCount = Number(
+      second?.slice((second ?? '').lastIndexOf('-') + 1)
+    );
+    expect(secondCount).toBe(firstCount + 1);
   });
 
   it('returns null when marks or handles are unavailable', async () => {

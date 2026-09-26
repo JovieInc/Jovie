@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  BIOME_TOOLCHAIN_FILES,
+  biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -25,6 +27,14 @@ import {
   structuralLocks,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+import {
+  ALLOWLIST_PATH as LATENCY_ALLOWLIST_PATH,
+  RUNTIME_ROOTS as LATENCY_RUNTIME_ROOTS,
+} from '../../invariants/latency-sensitive-execution-paths.mjs';
+import {
+  INVARIANT_SCANNED_PATHS,
+  isInvariantScannedPath,
+} from '../../invariants/scanned-paths.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
@@ -431,6 +441,106 @@ describe('Summer bridge structural coverage selection', () => {
       output: expect.stringContaining('route coverage floor failed'),
     });
     expect(execute.mock.calls.at(-1)[0]).toBe(SUMMER_BRIDGE_COVERAGE_COMMAND);
+  });
+});
+
+// #18182 added a second readFileSync to apps/desktop/src/main.ts. It classified
+// as mac,web, the structural lane ran without the operations-only
+// invariants:check, the merge group passed, and main went red on JOV-INV-031.
+describe('invariant-scanned structural selection', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  const INVARIANTS = 'pnpm invariants:check';
+  const invariantRuns = execute =>
+    execute.mock.calls.filter(([command]) => command === INVARIANTS).length;
+  const runFor = async (event, files, lanes) => {
+    vi.stubEnv('GITHUB_EVENT_NAME', event);
+    vi.stubEnv('CI_PRODUCT_LANES', lanes.join(','));
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+    const result = await runStructural({ changedFileList: files, execute });
+    return { execute, result };
+  };
+
+  it.each([
+    ['pull_request', 'apps/desktop/src/main.ts'],
+    ['merge_group', 'apps/desktop/src/main.ts'],
+    ['pull_request', 'apps/web/lib/chat/knowledge/topics.ts'],
+    ['merge_group', 'apps/web/lib/chat/knowledge/topics.ts'],
+  ])(
+    'runs invariants:check on %s when only %s changes',
+    async (event, path) => {
+      const lanes = classifyProductLanes([path]).selectedLanes;
+      expect(lanes).not.toContain('operations');
+      const { execute, result } = await runFor(event, [path], lanes);
+      expect(result.code).toBe(0);
+      expect(result.skipped).toBeUndefined();
+      expect(invariantRuns(execute)).toBe(1);
+    }
+  );
+
+  it('fails the lane when the invariant ratchet fails on a mac-only change', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
+    vi.stubEnv('CI_PRODUCT_LANES', 'mac');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn(command =>
+      command === INVARIANTS
+        ? { code: 1, output: 'readFileSync count 2 exceeds allowlist 1\n' }
+        : { code: 0, output: 'ok\n' }
+    );
+    expect(
+      await runStructural({
+        changedFileList: ['apps/desktop/src/main.ts'],
+        execute,
+      })
+    ).toMatchObject({
+      code: 1,
+      output: expect.stringContaining('exceeds allowlist 1'),
+    });
+  });
+
+  it('runs invariants:check once when operations already carries it', async () => {
+    const { execute } = await runFor(
+      'merge_group',
+      ['apps/desktop/src/main.ts', 'scripts/invariants/validate.mjs'],
+      ['mac', 'operations']
+    );
+    expect(invariantRuns(execute)).toBe(1);
+  });
+
+  it('keeps invariants:check off web changes outside every scanned path', async () => {
+    const path = 'apps/web/tests/e2e/public-profile-smoke.spec.ts';
+    expect(isInvariantScannedPath(path)).toBe(false);
+    const { execute } = await runFor(
+      'pull_request',
+      [path],
+      classifyProductLanes([path]).selectedLanes
+    );
+    expect(invariantRuns(execute)).toBe(0);
+  });
+
+  it('covers every latency root and allowlisted file', () => {
+    const allowlist = JSON.parse(
+      readFileSync(join(REPO_ROOT, LATENCY_ALLOWLIST_PATH), 'utf8')
+    );
+    for (const path of [
+      ...Object.keys(allowlist.entries),
+      ...LATENCY_RUNTIME_ROOTS,
+      LATENCY_ALLOWLIST_PATH,
+    ]) {
+      expect(isInvariantScannedPath(path), path).toBe(true);
+    }
+  });
+
+  it('classifies every scanned path into a lane that reaches structural', () => {
+    for (const root of INVARIANT_SCANNED_PATHS) {
+      const file = /\.[a-z]+$/u.test(root) ? root : `${root}/index.ts`;
+      const lanes = classifyProductLanes([file]).selectedLanes;
+      expect(
+        lanes.some(lane => ['operations', 'web', 'mac'].includes(lane)),
+        `${file} -> ${lanes.join(',')}`
+      ).toBe(true);
+    }
   });
 });
 
@@ -944,6 +1054,21 @@ describe('structural command pool', () => {
     expect(rows[2]).toBe("| 2 | 9.0s | exit 3 | `slow 'cmd'` |");
     expect(rows[3]).toBe('| 1 | 1.0s | pass | `fast \\| cmd` |');
     expect(formatStructuralTimings(undefined)).toBe('');
+  });
+});
+
+describe('biomeNeedsFullTree', () => {
+  it('lints the whole tree when Biome config or version can change', () => {
+    for (const file of BIOME_TOOLCHAIN_FILES) {
+      expect(biomeNeedsFullTree(['apps/web/a.ts', file])).toBe(true);
+    }
+  });
+
+  it('keeps ordinary PRs on changed-files lint', () => {
+    expect(biomeNeedsFullTree([])).toBe(false);
+    expect(
+      biomeNeedsFullTree(['apps/web/package.json', 'apps/web/lib/utils.ts'])
+    ).toBe(false);
   });
 });
 

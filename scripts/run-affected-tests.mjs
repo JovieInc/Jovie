@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
@@ -388,6 +389,74 @@ const MERGE_GROUP_ADMISSION_WEB_TESTS = [
 // Run 32547855063 spent 3180.55s collecting V8 coverage before this static
 // ownership contract failed. Keep it in the cheap structural selector so
 // coverage-lane drift fails before an expensive changed-surface collection.
+// Control-plane node:test suites, each with its own per-module coverage gate:
+// [test file, coverage include (null = no coverage gate), thresholds].
+const CI_CONTROL_NODE_COVERAGE_TESTS = [
+  [
+    '.github/scripts/production-continuity.test.mjs',
+    '.github/scripts/production-continuity.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-continuity-dedupe.test.mjs',
+    '.github/scripts/production-continuity-dedupe.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-continuity-checkin.test.mjs',
+    '.github/scripts/production-continuity-checkin.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  ['.github/scripts/production-continuity-workflow.test.mjs', null, []],
+  [
+    '.github/scripts/materialize-vercel-static.test.mjs',
+    '.github/scripts/materialize-vercel-static.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/vercel-output-manifest.test.mjs',
+    '.github/scripts/vercel-output-manifest.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-input-provenance.test.mjs',
+    '.github/scripts/production-input-provenance.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=75',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/symphony/tests/control-bundle-manifest.test.mjs',
+    'scripts/symphony/control-bundle-manifest.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=75',
+      '--test-coverage-functions=90',
+    ],
+  ],
+];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
 ];
@@ -2462,12 +2531,15 @@ export async function runCommandStatus(
     progressIntervalMs = DEFAULT_PROGRESS_INTERVAL_MS,
     label = 'command',
     logger = message => console.log(message),
+    // Concurrent callers buffer each child's output and flush it whole on
+    // exit so parallel stages never interleave their diagnostics.
+    bufferOutput = false,
   } = {}
 ) {
   const commandText = formatCommand(command, args);
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
-    stdio: 'inherit',
+    stdio: bufferOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     env: buildVerificationEnv(),
     detached: process.platform !== 'win32',
   });
@@ -2479,6 +2551,11 @@ export async function runCommandStatus(
     if (process.platform === 'win32') child.kill(signal);
     else if (child.pid) process.kill(-child.pid, signal);
   };
+  const outputChunks = [];
+  if (bufferOutput) {
+    child.stdout?.on('data', chunk => outputChunks.push(chunk));
+    child.stderr?.on('data', chunk => outputChunks.push(chunk));
+  }
   logger(
     `[affected-tests] start ${label} pid=${child.pid ?? 'unknown'} timeoutMs=${timeoutMs} command=${commandText}`
   );
@@ -2509,12 +2586,31 @@ export async function runCommandStatus(
     terminate('SIGKILL');
   }, timeoutMs + 5000);
   killTimer.unref?.();
+  const closed = new Promise(resolveClosed =>
+    child.once('close', resolveClosed)
+  );
   const status = await new Promise(resolveStatus => {
     child.once('exit', (code, signal) =>
       resolveStatus(timedOut ? 124 : (code ?? (signal ? 128 : 1)))
     );
     child.once('error', () => resolveStatus(1));
   });
+  if (bufferOutput) {
+    // Let piped output drain, but never hang on a leaked grandchild that
+    // still holds the pipe open after the command itself exited.
+    let drainTimer;
+    await Promise.race([
+      closed,
+      new Promise(resolveDrain => {
+        drainTimer = setTimeout(resolveDrain, 2000);
+        drainTimer.unref?.();
+      }),
+    ]);
+    clearTimeout(drainTimer);
+    if (outputChunks.length > 0) {
+      process.stdout.write(Buffer.concat(outputChunks));
+    }
+  }
   clearInterval(progressTimer);
   clearTimeout(timeoutTimer);
   clearTimeout(killTimer);
@@ -2610,6 +2706,13 @@ export function buildProjectCreationTestCommand() {
   ];
 }
 
+export function controlCoverageReportsDirectory(
+  name,
+  base = process.env.RUNNER_TEMP || tmpdir()
+) {
+  return `--coverage.reportsDirectory=${resolve(base, 'jovie-control-coverage', name)}`;
+}
+
 export function buildControlCoverageCommands() {
   const nativeCoverageArgs = [
     'exec',
@@ -2638,6 +2741,7 @@ export function buildControlCoverageCommands() {
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',
     '--coverage.thresholds.functions=82',
+    controlCoverageReportsDirectory('native-queue'),
   ];
   const ownerlessCoverageArgs = [
     'exec',
@@ -2651,6 +2755,7 @@ export function buildControlCoverageCommands() {
     '--maxWorkers',
     '1',
     ...OWNERLESS_RECOVERY_COVERAGE_ARGS,
+    controlCoverageReportsDirectory('ownerless-recovery'),
   ];
   return [
     ['pnpm', nativeCoverageArgs],
@@ -2831,7 +2936,13 @@ export function buildControlTestCommands() {
     buildProjectCreationTestCommand(),
     ...buildControlCoverageCommands(),
     ['node', DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS],
-    ['pnpm', DEPENDABOT_POLICY_CONTROL_TEST_ARGS],
+    [
+      'pnpm',
+      [
+        ...DEPENDABOT_POLICY_CONTROL_TEST_ARGS,
+        controlCoverageReportsDirectory('dependabot-update-policy'),
+      ],
+    ],
     // The event test also executes the CLI entrypoint in-process. Its broad
     // manual fleet path predates this slice, so enforce the measured CLI
     // subset separately from the new event validator's per-file 85/75/82 gate.
@@ -2851,6 +2962,7 @@ export function buildControlTestCommands() {
         '--coverage.thresholds.lines=55',
         '--coverage.thresholds.branches=60',
         '--coverage.thresholds.functions=65',
+        controlCoverageReportsDirectory('pr-conflict-cli'),
       ],
     ],
     [
@@ -2866,15 +2978,54 @@ export function buildControlTestCommands() {
         '1',
       ],
     ],
+    ...CI_CONTROL_NODE_COVERAGE_TESTS.map(([file, include, thresholds]) => [
+      'node',
+      include
+        ? [
+            '--test',
+            '--experimental-test-coverage',
+            `--test-coverage-include=${include}`,
+            ...thresholds,
+            file,
+          ]
+        : ['--test', file],
+    ]),
+    ['pnpm', ['run', 'test:rolling-ci-fx:coverage']],
   ];
 }
 
-export async function runControlTestCommands(execute = runCommandStatus) {
-  for (const [command, args] of buildControlTestCommands()) {
-    const status = await execute(command, args);
-    if (status !== 0) return status;
+// The control stages are independent processes, so a bounded pool overlaps
+// the long native-queue Vitest coverage run (the critical path, ~20s) with
+// the ~25s of short, mostly single-threaded stages instead of serializing
+// ~45s of work. Three slots finish the short stages before the long run on a
+// 4-vCPU runner (two slots left them as the tail). Every Vitest coverage
+// stage owns a distinct reports directory so concurrent runs cannot clean
+// each other's coverage temp files.
+export const CONTROL_TEST_CONCURRENCY = 3;
+
+export async function runControlTestCommands(
+  execute = (command, args) =>
+    runCommandStatus(command, args, { bufferOutput: true }),
+  concurrency = CONTROL_TEST_CONCURRENCY
+) {
+  const commands = buildControlTestCommands();
+  let cursor = 0;
+  let failureStatus = 0;
+  async function worker() {
+    while (failureStatus === 0 && cursor < commands.length) {
+      const [command, args] = commands[cursor];
+      cursor += 1;
+      const status = await execute(command, args);
+      if (status !== 0 && failureStatus === 0) failureStatus = status;
+    }
   }
-  return 0;
+  await Promise.all(
+    Array.from(
+      { length: Math.max(1, Math.min(concurrency, commands.length)) },
+      () => worker()
+    )
+  );
+  return failureStatus;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

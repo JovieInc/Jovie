@@ -17,7 +17,7 @@ export interface NavLinkProps
 // with the chrome neutralized (h-auto px-0 py-0), plus the focus treatment
 // the override layer used to win via cascade order.
 const NAV_LINK_CHROME_CLASSES =
-  'h-auto rounded-md px-0 py-0 text-sm font-medium focus-visible:text-primary-token focus-visible:ring-interactive focus-visible:ring-offset-background';
+  'h-auto rounded-md px-0 py-0 text-sm font-medium focus-visible:text-primary-token focus-visible:ring-interactive focus-visible:ring-offset-base';
 
 export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
   (

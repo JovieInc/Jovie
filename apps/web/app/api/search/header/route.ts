@@ -23,8 +23,8 @@ const searchParamsSchema = z.object({
 function escapeLikePattern(value: string): string {
   return value
     .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_');
+    .replaceAll('%', String.raw`\%`)
+    .replaceAll('_', String.raw`\_`);
 }
 
 export async function GET(request: Request) {

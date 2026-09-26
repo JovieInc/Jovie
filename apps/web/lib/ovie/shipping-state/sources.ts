@@ -332,7 +332,9 @@ function operationalTaskTitle(
   if (explicit) return explicit;
   const issueUrl = linearIssueUrl(item.issue_url, issue);
   if (!issueUrl) return issue;
-  const slug = new URL(issueUrl).pathname.split('/').filter(Boolean).at(-1);
+  const slug = new URL(issueUrl).pathname
+    .split('/')
+    .findLast(part => part.length > 0);
   if (!slug || slug.toLowerCase() === issue.toLowerCase()) return issue;
   return slug
     .split('-')

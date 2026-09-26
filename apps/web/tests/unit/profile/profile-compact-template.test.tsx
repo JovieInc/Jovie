@@ -672,6 +672,55 @@ describe('ProfileCompactTemplate', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the release credits drawer from the profile credits trigger', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[
+          { role: 'producer', label: 'Producer', entries: [] },
+          {
+            role: 'main_artist',
+            label: 'Main artist',
+            entries: [
+              {
+                artistId: 'artist-1',
+                name: 'Test Artist',
+                handle: null,
+                role: 'main_artist',
+                position: 0,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+
+    const drawer = await screen.findByRole('dialog', { name: 'Credits' });
+    expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
+    expect(within(drawer).queryByText('Producer')).toBeNull();
+  });
+
+  it('hides the release credits trigger when every credit group is empty', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[{ role: 'producer', label: 'Producer', entries: [] }]}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+  });
+
   it('uses the compact no-media hero geometry when a profile has no real image', () => {
     render(
       <ProfileCompactTemplate
@@ -748,7 +797,11 @@ describe('ProfileCompactTemplate', () => {
     expect(surfaceSlot).toHaveClass('relative', 'min-h-0', 'flex-1');
   });
 
-  it('does not bleed the content scroll region outside home mode', async () => {
+  // Regression: JOV-6573 — Music uses the same padding-box clip as home.
+  // A fixed inset leaves the release rows under the side padding, and
+  // overflow-y-auto computes overflow-x to auto, so a vertical drag pans
+  // sideways. The Music scrollport bleeds to the shell edge and locks x.
+  it('bleeds the Music scroll region to the shell edge and locks horizontal panning', async () => {
     render(
       <ProfileCompactTemplate
         mode='listen'
@@ -759,7 +812,27 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const scrollRegion = screen.getByTestId('profile-content-scroll');
+    expect(scrollRegion.className).toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).toContain('px-(--page-pad)');
+    expect(scrollRegion.className).toContain('overflow-x-clip');
+    expect(scrollRegion.className).toContain('touch-pan-y');
+    expect(scrollRegion.className).toContain('overflow-y-auto');
+    expect(scrollRegion.className).toContain('min-w-0');
+  });
+
+  it('does not bleed the content scroll region on non-music modes', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const scrollRegion = screen.getByTestId('profile-content-scroll');
     expect(scrollRegion.className).not.toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).not.toContain('overflow-x-clip');
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {
@@ -851,7 +924,9 @@ describe('ProfileCompactTemplate', () => {
     const surfaceSlot = banner.nextElementSibling;
 
     expect(shell).toContainElement(banner);
-    expect(banner).toContainElement(screen.getByTestId('test-profile-banner'));
+    expect(banner).toContainElement(
+      within(banner).getByTestId('test-profile-banner')
+    );
     expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
   });
 
@@ -1539,7 +1614,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
+    fireEvent.click(
+      within(screen.getByTestId('profile-compact-surface')).getByRole(
+        'button',
+        { name: 'Music' }
+      )
+    );
 
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
@@ -1837,10 +1917,12 @@ describe('ProfileCompactTemplate', () => {
 
     expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    // The desktop surface is SSR'd alongside the compact surface; CSS picks
+    // the visible one per breakpoint so no loading interstitial exists.
+    expect(
+      screen.getByTestId('mock-profile-desktop-surface')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
   });
 
   it('switches the public profile to the desktop surface at 1180px+', async () => {
@@ -1930,8 +2012,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('data-interactive-ready="true"');
-    expect(html).toContain('data-testid="profile-desktop-loading"');
-    expect(html).toContain('aria-hidden="true"');
+    // JOV-6452: cold desktop loads must paint the real desktop surface straight
+    // from server markup — no "Loading profile…" interstitial between skeleton
+    // and usable profile, and no mobile-shell-only first paint.
+    expect(html).toContain('data-testid="mock-profile-desktop-surface"');
+    expect(html).not.toContain('data-testid="profile-desktop-loading"');
+    expect(html).not.toContain('Loading profile');
     expect(html).not.toContain('aria-busy="true"');
     expect(html).toContain('data-testid="profile-compact-shell"');
     const view = render(
@@ -2071,9 +2157,13 @@ describe('ProfileCompactTemplate', () => {
     }
 
     function drawerOpenHistory(): boolean[] {
-      return mockProfileUnifiedDrawer.mock.calls.map(
+      const history = mockProfileUnifiedDrawer.mock.calls.map(
         call => (call[0] as { readonly open: boolean }).open
       );
+      // The compact drawer stays closed until hydration resolves the layout
+      // (JOV-6452); the invariant is that it never closes again once open.
+      const firstOpen = history.indexOf(true);
+      return firstOpen === -1 ? history : history.slice(firstOpen);
     }
 
     it('keeps the drawer open across a refetch that transiently empties data', async () => {
@@ -2153,7 +2243,7 @@ describe('ProfileCompactTemplate', () => {
         />
       );
 
-      expect(mockProfileUnifiedDrawer.mock.calls[0]?.[0]).toEqual(
+      expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
         expect.objectContaining({ open: true, view: 'pay' })
       );
       expect(mockUseProfileShell.mock.calls[0]?.[0]).toEqual(

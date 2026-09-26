@@ -84,7 +84,7 @@ export type AuthShellHelperSourceIssue =
   | 'branding-bypasses-auth-brand-panel';
 
 function displayOfAuthDesktopOnly(block: string): string | null {
-  const match = block.match(/\.auth-desktop-only\s*\{\s*display:\s*([^;}]+)/);
+  const match = /\.auth-desktop-only\s*\{\s*display:\s*([^;}]+)/.exec(block);
   return match?.[1]?.trim() ?? null;
 }
 
@@ -126,7 +126,7 @@ export function inspectAuthDesktopOnlyCss(
     }
   }
 
-  const defaultRule = css.match(/\.auth-desktop-only\s*\{[^}]*\}/);
+  const defaultRule = /\.auth-desktop-only\s*\{[^}]*\}/.exec(css);
   const defaultIndex = defaultRule ? css.indexOf(defaultRule[0]) : -1;
   const defaultInsideMedia = mediaRanges.some(
     range => defaultIndex >= range.start && defaultIndex <= range.end

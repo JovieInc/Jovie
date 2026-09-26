@@ -11,6 +11,19 @@ on:
   schedule:
     # Hosted API measurement, offset from the deeper scheduled suites.
     - cron: '25 6 * * *'
+  # Causal trigger for the dev-loop job: a change to a local gate lands.
+  push:
+    branches: [main]
+    paths:
+      - '.husky/**'
+      - 'package.json'
+      - 'scripts/check-conflict-markers.sh'
+      - 'scripts/security/scan-secrets.sh'
+      - 'scripts/repo-hygiene-guard.mjs'
+      - 'scripts/skill-governance-guard.mjs'
+      - 'scripts/hooks/**'
+      - 'scripts/dev-loop-latency.mjs'
+      - 'apps/web/scripts/next-proxy-guard.mjs'
   workflow_dispatch:
     inputs:
       sample_limit:
@@ -27,8 +40,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dev-loop:
+    # Local (pre-CI) loop: every .husky/pre-commit rung + pre-push publication
+    # against budgets in scripts/dev-loop-latency.mjs.
+    name: Measure dev-loop hook latency
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Skip unchanged scheduled SHA
+        id: unchanged
+        uses: ./.github/actions/skip-if-unchanged
+        with:
+          workflow: ci-duration-ratchet.yml
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.unchanged.outputs.skip != 'true'
+
+      - name: Time pre-commit and pre-push rungs
+        if: steps.unchanged.outputs.skip != 'true'
+        run: node scripts/dev-loop-latency.mjs
+
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          set -euo pipefail
+          jq -n --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{text: ("Dev-loop latency budget breached (pre-commit/pre-push). <" + $run + "|View summary>")}' \
+            | curl -sS -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"
+
   measure:
     name: Measure p95 gate duration + check ratchet
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:

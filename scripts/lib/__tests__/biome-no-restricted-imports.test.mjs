@@ -5,16 +5,15 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
+// Call the workspace Biome binary directly: `pnpm exec` adds ~0.8s of pnpm
+// startup per call on top of Biome's own ~0.3s.
+const BIOME_BIN = resolve(REPO_ROOT, 'node_modules/.bin/biome');
 
 function runBiome(file) {
-  return spawnSync(
-    'pnpm',
-    ['exec', 'biome', 'check', '--reporter=json', file],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
-  );
+  return spawnSync(BIOME_BIN, ['check', '--reporter=json', file], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
 }
 
 function categories(result) {

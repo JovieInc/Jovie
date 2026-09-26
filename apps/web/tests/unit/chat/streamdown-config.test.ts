@@ -97,7 +97,7 @@ describe('getChatMarkdownStreamdownConfig', () => {
     );
   });
 
-  it('allows h5 and h6 headings', () => {
+  it('keeps h5 and h6 in the static markdown allowlist', () => {
     const config = getChatMarkdownStreamdownConfig(false);
     expect(config.allowedElements).toContain('h5');
     expect(config.allowedElements).toContain('h6');

@@ -1,5 +1,5 @@
 ---
-paths: ["scripts/hermes/**", "docs/hermes/**"]
+paths: ["scripts/symphony/**", "docs/hermes/**"]
 ---
 
 # Hermes on the MacBook Air (Always-On Orchestration Node)

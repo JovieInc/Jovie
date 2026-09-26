@@ -49,17 +49,18 @@ describe('lintVoice', () => {
 });
 
 describe('script lines respect the Jovie voice canon', () => {
-  it.each(
-    SCRIPT_LINES.map(line => [line.key, line] as const)
-  )('%s passes the voice lint', (_key, line) => {
-    const rendered = renderLine(line, {
-      name: 'Test Artist',
-      followers: 12_300,
-      handle: 'testartist',
-    });
-    const result = lintVoice(rendered);
-    expect(result.violations).toEqual([]);
-  });
+  it.each(SCRIPT_LINES.map(line => [line.key, line] as const))(
+    '%s passes the voice lint',
+    (_key, line) => {
+      const rendered = renderLine(line, {
+        name: 'Test Artist',
+        followers: 12_300,
+        handle: 'testartist',
+      });
+      const result = lintVoice(rendered);
+      expect(result.violations).toEqual([]);
+    }
+  );
 
   it('has a lint-clean stream error line', () => {
     expect(lintVoice(STREAM_ERROR_LINE.text).ok).toBe(true);

@@ -167,16 +167,11 @@ function rankScore(
   const soonest = Math.min(...signals.map(s => new Date(s.startsAt).getTime()));
   const daysUntil = (soonest - now.getTime()) / MS_PER_DAY;
   // Prefer windows starting within the next 14 days.
-  const timing =
-    daysUntil < 0
-      ? 0.4
-      : daysUntil <= 3
-        ? 1
-        : daysUntil <= 14
-          ? 0.8
-          : daysUntil <= 30
-            ? 0.5
-            : 0.2;
+  let timing = 0.2;
+  if (daysUntil < 0) timing = 0.4;
+  else if (daysUntil <= 3) timing = 1;
+  else if (daysUntil <= 14) timing = 0.8;
+  else if (daysUntil <= 30) timing = 0.5;
 
   return Number(
     (maxConfidence * 0.6 + timing * 0.3 + diversityBonus + 0.1).toFixed(4)

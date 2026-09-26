@@ -81,7 +81,11 @@ describe('TaskListRow', () => {
       />
     );
 
-    fireEvent.click(getByRole('button', { name: 'QA Release' }));
+    const releaseButton = getByRole('button', { name: 'QA Release' });
+    expect(releaseButton.querySelector('svg')).toHaveClass('lucide-layers');
+    expect(releaseButton.querySelector('svg')).not.toHaveClass('lucide-disc-3');
+
+    fireEvent.click(releaseButton);
 
     expect(onOpenRelease).toHaveBeenCalledWith(mockTask);
     expect(getByTestId('task-list-row-task-1')).toHaveAttribute(
@@ -212,9 +216,9 @@ describe('TaskListRow', () => {
         onOpenRelease={vi.fn()}
       />
     );
-    expect(
-      within(done.container).getByTestId('task-list-row-task-1').className
-    ).toContain('opacity-75');
+    const doneRow = within(done.container).getByTestId('task-list-row-task-1');
+    expect(doneRow.className).toContain('opacity-75');
+    expect(doneRow.className).not.toContain('opacity-60');
 
     const cancelled = render(
       <TaskListRow
@@ -223,9 +227,11 @@ describe('TaskListRow', () => {
         onOpenRelease={vi.fn()}
       />
     );
-    expect(
-      within(cancelled.container).getByTestId('task-list-row-task-1').className
-    ).toContain('opacity-60');
+    const cancelledRow = within(cancelled.container).getByTestId(
+      'task-list-row-task-1'
+    );
+    expect(cancelledRow.className).toContain('opacity-60');
+    expect(cancelledRow.className).not.toContain('opacity-75');
 
     const live = render(
       <TaskListRow

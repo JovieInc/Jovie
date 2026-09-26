@@ -446,11 +446,10 @@ function sanitizeProperties(
 export async function trackServerEvent(
   event: string,
   properties?: Record<string, unknown>,
-  distinctId?: string
+  _distinctId?: string
 ): Promise<ServerAnalyticsDelivery> {
   // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
   // contract and never persists the raw distinct id.
-  void distinctId;
 
   if (!isKnownEvent(event)) {
     Sentry.captureException(new Error('Unknown server analytics event'), {
