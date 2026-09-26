@@ -103,21 +103,29 @@ describe('Admin Creator Social Links API', () => {
         hasAdvancedFeatures: true,
         canRemoveBranding: true,
       });
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue([
-              {
-                id: 'link_1',
-                label: 'Instagram',
-                platform: 'instagram',
-                platformType: 'social',
-                url: 'https://instagram.com/test',
-              },
-            ]),
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockResolvedValue([
+                {
+                  id: 'link_1',
+                  label: 'Instagram',
+                  platform: 'instagram',
+                  platformType: 'social',
+                  url: 'https://instagram.com/test',
+                },
+              ]),
+            }),
           }),
-        }),
-      });
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ settings: null }]),
+            }),
+          }),
+        });
 
       const request = new NextRequest(
         'http://localhost/api/admin/creator-social-links?profileId=profile_123'
