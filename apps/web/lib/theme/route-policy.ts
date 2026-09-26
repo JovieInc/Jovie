@@ -16,6 +16,7 @@ export const THEME_ROUTE_POLICY = {
     '/artist-profiles',
     '/artist-profile',
     '/artist-notifications',
+    '/solutions/artists',
     '/download',
     '/pay',
     '/voice',
