@@ -100,8 +100,21 @@ enum ChatTranscriptWindow {
   static let overscanRowCount = 5
   static let initialMessageLimit = 40
 
+  /// Hard cap on messages persisted per conversation (JOV-5144). The
+  /// persisted snapshot is re-encoded whole on every turn and loaded into
+  /// memory at launch, so an unbounded history grows resident RAM without
+  /// limit and can trip the Jetsam watchdog. Older rows stay available via
+  /// load-earlier (`before` cursor) and never need to live in the cache.
+  static let maxPersistedMessagesPerConversation = 200
+
   static func visibleTail<T>(_ items: [T]) -> [T] {
     Array(items.suffix(initialMessageLimit))
+  }
+
+  /// Bound persisted history to the newest `maxPersistedMessagesPerConversation`
+  /// rows so the cached snapshot stays a fixed size (JOV-5144).
+  static func persistedTail<T>(_ items: [T]) -> [T] {
+    Array(items.suffix(maxPersistedMessagesPerConversation))
   }
 
   static func hasOlderHistory(cachedCount: Int, fetchedHasMore: Bool) -> Bool {
