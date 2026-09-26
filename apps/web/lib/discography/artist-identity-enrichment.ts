@@ -146,7 +146,10 @@ function pickMusicBrainzArtistByIsrcSupport(
   if (ranked.length === 0) return { kind: 'not_found' };
   const tied = ranked.filter(e => e.count === ranked[0].count);
   if (tied.length > 1) {
-    return { kind: 'conflicted', candidates: tied.map(e => e.mbid).sort() };
+    return {
+      kind: 'conflicted',
+      candidates: tied.map(e => e.mbid).sort((a, b) => a.localeCompare(b)),
+    };
   }
   return { kind: 'matched', mbid: ranked[0].mbid, isrcCount: ranked[0].count };
 }
