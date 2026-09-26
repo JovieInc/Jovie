@@ -368,21 +368,6 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_slop_gate_is_post_merge_informational() -> None:
-    """Copy smell stays off PR Ready; taste is post-ship."""
-    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "schedule:" in trigger_block
-    assert "workflow_dispatch:" in trigger_block
-    assert "pull_request" not in trigger_block
-    assert "ci-harness/manifest.json" in workflow
-    assert "continue-on-error: true" in workflow
-    assert "HEAD~1" not in workflow
-    assert "--before='7 days ago'" in workflow
-
-
 def test_agent_pipeline_retires_dead_qc_wires() -> None:
     """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
     workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
@@ -442,7 +427,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         "actionlint.yml",
         "brand-scrub.yml",
         "ci.yml",
-        "slop-gate.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert install_command in workflow, workflow_name
