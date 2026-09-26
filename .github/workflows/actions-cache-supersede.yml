@@ -7,6 +7,10 @@ name: Actions Cache Supersede
 on:
   schedule:
     - cron: '11,41 * * * *'
+  # GitHub throttles scheduled runs (hours-long gaps observed), so also run
+  # after each main push. Push runs stay dry-run until a logged pass is reviewed.
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       apply:
@@ -18,7 +22,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: actions-cache-supersede
+  group: actions-cache-supersede-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
