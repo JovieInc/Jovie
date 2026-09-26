@@ -640,6 +640,58 @@ struct ChatRepositoryTests {
     #expect(repository.lastErrorMessage == nil)
   }
 
+  /// JOV-5144: the persisted snapshot must stay bounded. Load-earlier pages
+  /// accumulate into the timeline; persisting the whole thing grows resident
+  /// RAM without limit (watchdog kills). The cache must keep only the newest
+  /// `ChatTranscriptWindow.maxPersistedMessagesPerConversation` rows.
+  @Test func persistCacheBoundsPersistedHistoryToThePersistedWindow() async {
+    let suiteName = "ie.jov.Jovie.tests.chat-repo-persist-bound"
+    let cache = ChatCache(defaults: UserDefaults(suiteName: suiteName)!)
+    let client = ScriptedChatClient(
+      sendTurnResult: .success([]),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .success(
+        MobileConversationDetailResponse(
+          conversation: MobileConversationRecord(
+            id: "conv_bound",
+            title: "Bounded",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-01T00:00:00.000Z"
+          ),
+          messages: (1...250).map { index in
+            MobileConversationMessage(
+              id: "msg_bound_\(index)",
+              role: index.isMultiple(of: 2) ? "assistant" : "user",
+              content: "Bounded \(index)",
+              clientMessageId: "client_bound_\(index)",
+              turnId: "turn_bound_\(index)",
+              turnStatus: "completed",
+              createdAt: "2026-06-01T00:00:\(String(format: "%02d", index % 60)).000Z",
+              requiresWebHandoff: false
+            )
+          },
+          hasMore: true
+        )
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_persist_bound",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    // Fetch window persist path (openConversation persists detail.messages).
+    await repository.openConversation("conv_bound")
+
+    let fetchedSnapshot = await cache.load(for: "user_repo_persist_bound")
+    let fetchedRows = fetchedSnapshot?.messagesByConversationID["conv_bound"] ?? []
+    #expect(fetchedRows.count == ChatTranscriptWindow.maxPersistedMessagesPerConversation)
+    // Newest rows survive the bound; oldest rows drop.
+    #expect(fetchedRows.first?.content == "Bounded 51")
+    #expect(fetchedRows.last?.content == "Bounded 250")
+  }
+
   @Test func openConversationPaintsCachedTailThenFetchesWindow() async {
     let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-cache-first")!)
     let cachedMessages = (1...45).map { index in
