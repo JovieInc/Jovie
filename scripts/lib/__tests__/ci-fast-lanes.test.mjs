@@ -22,6 +22,7 @@ import {
   runDesignConformance,
   runStructural,
   STRUCTURAL_DEFAULT_CONCURRENCY,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -373,6 +374,22 @@ describe('runStructural screenshot contract discovery', () => {
         ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
       )
     ).toBe(true);
+  });
+
+  it('splits the structural pytest shards between two hosted jobs', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async mode => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', mode);
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const [all, only] = [await run(''), await run('only')];
+    expect(only).toEqual(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1));
+    expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
   });
 
   it('uses the default executor on the structural skip path', async () => {
