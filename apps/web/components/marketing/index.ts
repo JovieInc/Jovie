@@ -38,6 +38,11 @@ export type {
   MarketingHeroCta,
   MarketingHeroLandingProps,
   MarketingHeroProps,
+  MarketingHeroPublicClaimProps,
+  MarketingHeroPublicDesktopProps,
+  MarketingHeroPublicDeveloperProps,
+  MarketingHeroPublicMobileProps,
+  MarketingHeroPublicProps,
   MarketingHeroShellProps,
 } from './MarketingHero';
 export { MarketingHero } from './MarketingHero';
