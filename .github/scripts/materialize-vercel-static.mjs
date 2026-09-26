@@ -130,7 +130,8 @@ export function materializeStatic(root) {
 // those includes landed (JOV-6576). Point each such key at the link's real
 // file: the function reads identical bytes at the same path, and the archive
 // holds a regular file. Directory links (pnpm's node_modules layer) stay as
-// traced, but files traced through one are re-pointed at their real path.
+// traced, but files traced through one are re-pointed at their real path, and a
+// link whose target uploads nothing is dropped.
 export function dereferenceFunctionFileLinks(root) {
   root = realpathSync(root);
   const functions = resolve(root, '.vercel/output/functions');
@@ -144,7 +145,9 @@ export function dereferenceFunctionFileLinks(root) {
   if (!functionsStat.isDirectory()) {
     throw new Error('Function artifact root must be a real directory');
   }
-  const rewrites = [];
+  const configs = [];
+  // Directory links kept as traced, keyed by config, with their real target.
+  const directoryLinks = [];
   function walk(directory) {
     for (const name of readdirSync(directory).sort()) {
       const path = resolve(directory, name);
@@ -190,20 +193,49 @@ export function dereferenceFunctionFileLinks(root) {
         }
         inside(root, target);
         const targetStat = lstatSync(target);
-        if (targetStat.isDirectory()) continue;
+        if (targetStat.isDirectory()) {
+          directoryLinks.push({
+            map,
+            key,
+            target: relative(root, target).split(sep).join('/'),
+          });
+          continue;
+        }
         if (!targetStat.isFile()) {
           throw new Error(`Function trace link target is not a file: ${value}`);
         }
         map[key] = relative(root, target).split(sep).join('/');
         changed += 1;
       }
-      if (changed > 0) rewrites.push({ path, config, changed });
+      configs.push({ path, config, map, changed });
     }
   }
   walk(functions);
+  // The upload is .vercel/output plus the union of every filePathMap value, so
+  // a directory link whose target holds none of those values arrives dangling.
+  // Vercel then fails "Deploying outputs" with ENOENT (pnpm's hoisted
+  // supports-color and statsig's optional linux-x64-musl binary). Nothing in
+  // such a target was traced, so no function reads it: drop the link.
+  const uploaded = new Set();
+  for (const { map } of configs) {
+    for (const value of Object.values(map)) {
+      // Every value and each of its ancestor directories.
+      for (let path = String(value); path && !uploaded.has(path); ) {
+        uploaded.add(path);
+        path = path.slice(0, Math.max(path.lastIndexOf('/'), 0));
+      }
+    }
+  }
+  const changes = new Map(configs.map(entry => [entry.map, entry]));
+  for (const { map, key, target } of directoryLinks) {
+    if (uploaded.has(target)) continue;
+    delete map[key];
+    changes.get(map).changed += 1;
+  }
   // Validate every config before rewriting any of them.
   let total = 0;
-  for (const { path, config, changed } of rewrites) {
+  for (const { path, config, changed } of configs) {
+    if (changed === 0) continue;
     writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
     total += changed;
   }
