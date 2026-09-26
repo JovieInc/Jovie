@@ -42,7 +42,7 @@ function EnrichmentRow({
   readonly warning?: boolean;
 }) {
   return (
-    <div className='flex items-center justify-between gap-2 text-xs leading-[18px]'>
+    <div className='flex items-center justify-between gap-2 text-xs leading-4.5'>
       <span className='text-secondary-token'>{label}</span>
       <span
         className={
