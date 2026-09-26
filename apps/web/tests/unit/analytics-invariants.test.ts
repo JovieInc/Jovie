@@ -370,7 +370,7 @@ describe('typed missing-data states never become zero', () => {
           {
             key: 'total_clicks',
             reading: { state: 'unavailable' },
-            grain: count().grain,
+            grain: count(0).grain,
           },
           { ...count(12), key: 'listen_clicks' },
         ]),

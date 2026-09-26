@@ -28,7 +28,7 @@ const hoisted = vi.hoisted(() => {
   const selectMock = vi.fn(() => ({ from: selectFromMock }));
 
   const insertReturningMock = vi.fn();
-  const insertOnConflictDoNothingMock = vi.fn(() => ({
+  const insertOnConflictDoNothingMock = vi.fn((_config?: unknown) => ({
     returning: insertReturningMock,
   }));
   const insertValuesMock = vi.fn(() => ({
@@ -291,7 +291,7 @@ describe('chat turn service', () => {
     // Force the SELECT chain to resolve to the existing assistant row.
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockResolvedValueOnce([existingAssistant]),
-      then: (onFulfilled: (value: unknown) => unknown) =>
+      then: (onFulfilled?: (value: unknown) => unknown) =>
         Promise.resolve([existingAssistant]).then(onFulfilled),
     });
 
@@ -325,7 +325,7 @@ describe('chat turn service', () => {
     // No existing assistant row.
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockResolvedValueOnce([]),
-      then: (onFulfilled: (value: unknown) => unknown) =>
+      then: (onFulfilled?: (value: unknown) => unknown) =>
         Promise.resolve([]).then(onFulfilled),
     });
     hoisted.insertReturningMock.mockResolvedValueOnce([
@@ -361,7 +361,10 @@ describe('chat turn service', () => {
   it('persistTerminalAssistantMessage fails soft when the DB write throws', async () => {
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockRejectedValueOnce(new Error('column does not exist')),
-      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+      then: (
+        onFulfilled?: (value: unknown) => unknown,
+        onRejected?: (reason: unknown) => unknown
+      ) =>
         Promise.reject(new Error('column does not exist')).then(
           onFulfilled,
           onRejected
@@ -554,7 +557,10 @@ describe('chat turn service', () => {
   it('marks an ephemeral terminal assistant result as not durable', async () => {
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockRejectedValueOnce(new Error('db unavailable')),
-      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+      then: (
+        onFulfilled?: (value: unknown) => unknown,
+        onRejected?: (reason: unknown) => unknown
+      ) =>
         Promise.reject(new Error('db unavailable')).then(
           onFulfilled,
           onRejected

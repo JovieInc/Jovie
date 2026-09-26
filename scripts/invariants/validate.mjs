@@ -11,6 +11,10 @@ import { validateLatencySensitiveExecution } from './latency-sensitive-execution
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
+import {
+  readWritingSurfacesRegistry,
+  validateWritingSurfaces,
+} from './writing-surfaces.mjs';
 // JOV-INV-029 is composed here so every CI invariant run checks the lifecycle.
 // JOV-INV-031 is composed here so every CI invariant run checks thread-blocking.
 // JOV-INV-032 is composed here so every CI invariant run checks iOS web scroll jank.
@@ -52,6 +56,9 @@ const doneSprintErrors = await validateDoneSprintInvariants({
   mode: 'source',
 });
 const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
+// JOV-6475 composes the writing-surface coverage registry the same way: it
+// validates that every named delivery surface maps to a contract and owner.
+const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),
@@ -62,6 +69,7 @@ const errors = [
   ...iosScrollErrors.map(error => `ios-web-no-scroll-jank: ${error}`),
   ...doneSprintErrors.map(error => `done-sprint: ${error}`),
   ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
+  ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 
 const ok = errors.length === 0 && result.blockers.length === 0;

@@ -37,8 +37,14 @@ import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
   affectsJovieTypecheck,
+  affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+
+export { affectsWebTestTypecheck };
+
+export const WEB_TESTS_TYPECHECK_COMMAND =
+  'pnpm --filter=@jovie/web run typecheck:tests';
 
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
@@ -65,6 +71,16 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+/** Customer-facing copy surfaces gated by @jovie/copy (policy: canon/VOICE.md). */
+export const COPY_GATE_PATHS = Object.freeze([
+  'apps/web/content/**',
+  'apps/web/data/*Copy.ts',
+  'apps/web/lib/email/templates/**',
+  'apps/web/lib/chat/onboarding-script/**',
+]);
+export const COPY_GATE_COMMAND =
+  'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
+
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -133,6 +149,71 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
  * is not run by any CI entry point; add new node:test files to the first list
  * and new scripts-root Vitest files to the second (or to a narrower command).
  */
+/**
+ * Hosted structural Python regressions share one dependency policy: CI must
+ * have pytest + coverage.py (installed from .github/requirements/pytest.txt);
+ * a local checkout without them skips with a notice.
+ * @param {string} body
+ */
+const structuralPythonRegression = body =>
+  `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
+
+/** Files of the structural pytest suite (one collection, sharded below). */
+export const STRUCTURAL_PYTEST_FILES = Object.freeze([
+  'scripts/tests/test_gh_retry.py',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+  'scripts/tests/test_brand_scrub.py',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/tests/test_runner_routing.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+  'scripts/tests/test_symphony_reconciler_runtime.py',
+]);
+
+/**
+ * The structural pytest suite (420 tests, 132s of one hosted run) was the
+ * lane's longest single command, so the bounded pool could not shorten it.
+ * Two shards over the identical file list select `-k EXPR` and
+ * `-k "not (EXPR)"`: every collected test matches exactly one of them, so the
+ * pair runs precisely the original suite. EXPR names the heaviest
+ * test_gh_retry.py classes (~half the measured suite time); a rename that
+ * empties the first shard fails it (pytest exit 5) instead of dropping tests.
+ * Each shard owns its basetemp and skips the shared repo-root .pytest_cache.
+ */
+export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
+  'TestDrainPrQueueWiring or TestNativeAdmissionReceiptReconciliation';
+
+/** @param {string} shard @param {string} expression */
+// The suite spawns thousands of short-lived jq/gh/node processes, so it is
+// CPU-bound on process startup: pytest-xdist spreads each shard over two
+// workers. Two, not auto: both shards run concurrently in the structural pool
+// on 4 vCPU, and a fourth concurrent worker measured slower (JovieInc/Jovie#18657).
+const structuralPytestShard = (shard, expression) =>
+  `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
+
+export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
+  structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
+  structuralPytestShard('b', `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`),
+]);
+
+/**
+ * Structural Python regressions, split so the pool can overlap them. Each
+ * command keeps its original `&&` dependencies (coverage run → report).
+ */
+export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
+  structuralPythonRegression(
+    [
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"',
+      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
+    ].join(' && ')
+  ),
+  ...STRUCTURAL_PYTEST_SHARD_COMMANDS.map(structuralPythonRegression),
+]);
+
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   '.claude/hooks/post-task-validate.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -157,6 +238,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
@@ -295,6 +377,12 @@ const LANES = [
     run: runTypecheck,
   },
   {
+    id: 'web-tests-typecheck',
+    name: 'Web Tests Typecheck (shrink-only baseline)',
+    nextLocalCommand: WEB_TESTS_TYPECHECK_COMMAND,
+    run: runWebTestsTypecheck,
+  },
+  {
     id: 'scripts-typecheck',
     name: 'Scripts Typecheck (shrink-only baseline)',
     nextLocalCommand: 'pnpm run typecheck:scripts',
@@ -351,6 +439,12 @@ const LANES = [
     run: runBillingCoverage,
   },
   {
+    id: 'copy-gate',
+    name: 'Copy gate (changed customer-facing lines)',
+    nextLocalCommand: COPY_GATE_COMMAND,
+    run: runCopyGate,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -377,7 +471,7 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * selector to retain the historical all-lanes behavior.
  */
 export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze(['typecheck']),
+  typecheck: Object.freeze(['typecheck', 'web-tests-typecheck']),
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
@@ -391,6 +485,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'profile-admission',
     'billing-coverage',
+    'copy-gate',
     'structural',
   ]),
 });
@@ -586,6 +681,36 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+/**
+ * Delta copy gate: only lines this change adds are judged, so legacy copy debt
+ * stays advisory while new slop, harm, legal, or ToS violations cannot land.
+ * An unreadable diff fails closed.
+ */
+export function runCopyGate() {
+  const files = changedFiles(COPY_GATE_PATHS);
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Copy gate: changed-file diff unreadable; failing closed\n',
+    };
+  }
+  if (files.length === 0) {
+    return {
+      code: 0,
+      output: 'Copy gate skipped (no customer-facing copy changed)\n',
+      skipped: true,
+    };
+  }
+  const base = process.env.GITHUB_BASE_REF || 'main';
+  const diffBase =
+    shell(`git rev-parse --verify origin/${base}`).code === 0
+      ? `origin/${base}`
+      : process.env.TURBO_SCM_BASE || 'HEAD^1';
+  return shell(
+    `pnpm exec tsx packages/copy/cli.ts check --diff-base ${diffBase} ${files.map(file => `'${file}'`).join(' ')}`
+  );
 }
 
 export function listAllChangedFiles(cwd = REPO_ROOT) {
@@ -863,6 +988,43 @@ function runTypecheck() {
     }
   }
   return shell('pnpm turbo typecheck --affected --force');
+}
+
+function runWebTestsTypecheck() {
+  // The shrink-only apps/web test graph (tests/, scripts/, allowJs helpers)
+  // rotted while nothing in CI ran it. Source-PR preselection
+  // (run_jovie_typecheck) already counts its JS and baseline inputs via
+  // affectsWebTestTypecheck, so a 'false' receipt means none changed.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Web tests typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
+  if (event === 'pull_request') {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsWebTestTypecheck(file))) {
+      return {
+        code: 0,
+        output: 'No web test typecheck inputs changed\n',
+        skipped: true,
+      };
+    }
+  }
+  return shell(WEB_TESTS_TYPECHECK_COMMAND);
 }
 
 function runScriptsTypecheck() {
@@ -1193,7 +1355,8 @@ function vitestRoot(dir, segment) {
  * Shared writable state a structural command touches; commands sharing a lock
  * never overlap. Vitest cleans and rewrites its coverage reportsDirectory
  * (default `<root>/coverage`; relative dirs nest inside it), coverage.py data
- * is keyed by COVERAGE_FILE, and pytest owns the repo-root `.pytest_cache`.
+ * is keyed by COVERAGE_FILE, and pytest owns the repo-root `.pytest_cache`
+ * (unless `-p no:cacheprovider` turns the cache off for that invocation).
  */
 export function structuralLocks(command) {
   const locks = new Set();
@@ -1214,7 +1377,14 @@ export function structuralLocks(command) {
     for (const match of segment.matchAll(/COVERAGE_FILE=("[^"]+"|\S+)/gu)) {
       locks.add(`pycoverage:${match[1].replaceAll('"', '')}`);
     }
-    if (/python3 -m pytest\b/u.test(segment)) locks.add('pytest-cache');
+    // `python3 -m pytest` and `coverage run -m pytest` both write the shared
+    // cache unless the cache plugin is disabled for that invocation.
+    if (
+      /(?:^|\s)-m pytest\b/u.test(segment) &&
+      !/(?:^|\s)-p no:cacheprovider\b/u.test(segment)
+    ) {
+      locks.add('pytest-cache');
+    }
   }
   return [...locks].sort();
 }
@@ -1435,11 +1605,7 @@ export async function runStructural(opts = {}) {
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    // The structural pytest suite spawns thousands of short-lived jq/gh/node
-    // processes (~170s serial on 4 vCPU); pytest-xdist `-n 3` spreads it over
-    // three workers (~64s locally). Three, not auto: on 4 vCPU a fourth worker
-    // was slower (~74s) and the pool already overlaps two other commands.
-    'if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest -n 3 --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi',
+    ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [

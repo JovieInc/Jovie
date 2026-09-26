@@ -69,7 +69,15 @@ function approval(description: string) {
   });
 }
 
-async function apply(description: string, extra: Record<string, unknown> = {}) {
+type ApplyInput = Parameters<typeof applyYouTubeLink>[0];
+interface ApplyOptions {
+  readonly failReadback?: boolean;
+  readonly nullReadback?: boolean;
+  readonly approval?: ApplyInput['approval'];
+  readonly auth?: ApplyInput['auth'];
+}
+
+async function apply(description: string, extra: ApplyOptions = {}) {
   const writer = snippet(
     description,
     extra.failReadback === true,
