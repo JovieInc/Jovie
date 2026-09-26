@@ -31,6 +31,18 @@ Event-driven: a worker that finishes re-execs the current release and pulls the 
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
 
+## Nothing fails silently
+
+`doctor.py` runs at the end of every dispatch tick. It judges the tick receipt
+(`tick.json`), the ledger, slot locks, Codex accounts, the Linear pool, GitHub quota,
+disk and the HUD heartbeat, and writes `doctor.json` (the HUD's NEEDS ATTENTION row).
+Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony doctor:
+<key>") so Summer routes it; when the condition clears the issue is commented and moved
+to Done; a key that fires again within six hours reopens the same issue. Keys:
+`tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
+`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `github-quota`,
+`hud-stale`.
+
 ## Codex lane
 
 `codex_lane.py run` picks the least-recently-used ChatGPT-authenticated profile under
