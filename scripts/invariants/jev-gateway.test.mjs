@@ -44,7 +44,15 @@ const options = (extra = {}) => ({
 
 test('binds every stage, artifact, scope, text and rubric to immutable request', () => {
   for (const stage of Object.keys(JEV_RUBRICS))
-    assert.ok(prepareJevRequest({ ...input, stage }).fingerprint);
+    assert.ok(
+      prepareJevRequest({
+        ...input,
+        stage,
+        ...(stage === 'classify'
+          ? { decision: { labels: ['editorial-pitching'] } }
+          : {}),
+      }).fingerprint
+    );
   for (const delta of [
     { sourceSha: 'c'.repeat(40) },
     { artifactSha256: 'd'.repeat(64) },
@@ -497,4 +505,94 @@ test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and 
     })
   );
   assert.equal(calls, 1);
+});
+
+const classifyInput = {
+  sourceSha: 'a'.repeat(40),
+  artifactSha256: 'b'.repeat(64),
+  scope: 'release-task-cluster-pilot',
+  stage: 'classify',
+  modality: 'text',
+  state: 'Release task text: "Pitch to Spotify editorial"',
+  decision: {
+    labels: ['editorial-pitching', 'dj-promotion'],
+    labelDescriptions: { 'editorial-pitching': 'Editorial Pitching' },
+  },
+};
+const classifyRequest = prepareJevRequest(classifyInput);
+const classifyOptions = (extra = {}) =>
+  options({
+    approval: {
+      ...options().approval,
+      fingerprint: classifyRequest.fingerprint,
+    },
+    readCurrentFingerprint: () => classifyRequest.fingerprint,
+    ...extra,
+  });
+
+test('classify stage freezes a bounded label allowlist bound to the fingerprint', () => {
+  const criteria = classifyRequest.questions.alignment.criteria;
+  assert.deepEqual(Object.keys(criteria).sort(), [
+    'dj-promotion',
+    'editorial-pitching',
+    'unclassified',
+  ]);
+  assert.equal(criteria['editorial-pitching'], 'Editorial Pitching');
+  assert.equal(
+    criteria['dj-promotion'],
+    'Candidate label for the supplied task.'
+  );
+  assert.deepEqual(classifyRequest.decision.labels, [
+    'editorial-pitching',
+    'dj-promotion',
+  ]);
+  assert.notEqual(
+    prepareJevRequest({
+      ...classifyInput,
+      decision: { labels: ['editorial-pitching', 'radio-xm'] },
+    }).fingerprint,
+    classifyRequest.fingerprint
+  );
+  assert.throws(() => {
+    Object.defineProperty(criteria, 'unclassified', { value: 'pick one' });
+  });
+  for (const decision of [
+    undefined,
+    {},
+    { labels: [] },
+    { labels: ['unclassified'] },
+    { labels: ['a', 'a'] },
+    { labels: ['Not A Slug'] },
+    { labels: [42] },
+    { labels: Array.from({ length: 65 }, (_, i) => `label-${i}`) },
+    'x',
+  ]) {
+    assert.throws(() => prepareJevRequest({ ...classifyInput, decision }));
+  }
+  assert.throws(() =>
+    prepareJevRequest({
+      ...input,
+      decision: { labels: ['editorial-pitching'] },
+    })
+  );
+});
+
+test('classify evaluation returns a bounded label or abstains without a shadow', async () => {
+  const picked = await runJevEvaluation(
+    classifyInput,
+    classifyOptions({ transport: async () => result('editorial-pitching') })
+  );
+  assert.equal(picked.status, 'evaluated');
+  assert.equal(picked.alignment, 'editorial-pitching');
+  assert.equal(picked.shadow, null);
+  const abstained = await runJevEvaluation(
+    classifyInput,
+    classifyOptions({ transport: async () => result('unclassified') })
+  );
+  assert.equal(abstained.alignment, 'unclassified');
+  const outOfSet = await runJevEvaluation(
+    classifyInput,
+    classifyOptions({ transport: async () => result('made-up-slug') })
+  );
+  assert.equal(outOfSet.status, 'invalid-response');
 });
