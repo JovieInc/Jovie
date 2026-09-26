@@ -132,6 +132,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
  * and new scripts-root Vitest files to the second (or to a narrower command).
  */
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  '.claude/hooks/post-task-validate.test.mjs',
   'scripts/agent-context/check.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',

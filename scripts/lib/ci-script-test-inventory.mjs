@@ -98,6 +98,9 @@ export function listScriptTestFiles(repoRoot) {
     }
   };
   walk(join(repoRoot, 'scripts'));
+  // Claude Code hooks gate every agent session; their contracts must run too.
+  const hooksDir = join(repoRoot, '.claude/hooks');
+  if (existsSync(hooksDir)) walk(hooksDir);
   return out.sort();
 }
 
