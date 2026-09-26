@@ -690,6 +690,47 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
+    const binDir = join(repo, 'bin');
+    try {
+      mkdirSync(binDir);
+      // Each call waits for the other to start; a serial runner exits 9.
+      writeFileSync(
+        join(binDir, 'pnpm'),
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
+      );
+      chmodSync(join(binDir, 'pnpm'), 0o755);
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'typecheck',
+            CI_FAST_LANES_OUT: join(repo, 'out.json'),
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            GITHUB_EVENT_NAME: 'workflow_dispatch',
+            TYPECHECK_SINGLEFLIGHT_DIR: '',
+            PATH: `${binDir}:${process.env.PATH}`,
+          },
+        }
+      );
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      const { lanes } = JSON.parse(
+        readFileSync(join(repo, 'out.json'), 'utf8')
+      );
+      expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
+        ['typecheck', 'dir='],
+        ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+      ]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     {
       name: 'a product-owned root script changes',
