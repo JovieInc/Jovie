@@ -924,20 +924,20 @@ describe('ci-fast bounded parallel workflow', () => {
       /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
-    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo');
+    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
     expect(restore).toContain(
-      `key: jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
+      `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
     expect(restore).toContain(
-      `jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\n`
+      `jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\n`
     );
     expect(restore).toMatch(
-      /\n\s+jovie-web-tsbuildinfo-v1-\$\{\{ runner\.os \}\}-\s*$/
+      /\n\s+jovie-web-tsbuildinfo-v2-\$\{\{ runner\.os \}\}-\s*$/
     );
     expect(record).toContain(
-      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}"
+      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo*') }}"
     );
 
     // Order: restore before the lanes, save after them.
@@ -953,7 +953,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(`uses: actions/cache/save@${cacheSha}`);
     expect(save).toContain("steps.lanes.outcome == 'success' &&");
     expect(save).toContain(
-      "hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash"
+      "hashFiles('apps/web/.cache/tsbuildinfo*') != steps.web-tsbuildinfo-restored.outputs.hash"
     );
     expect(save).toContain(
       "((github.event_name == 'push' && github.ref == 'refs/heads/main') ||"
@@ -972,6 +972,38 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}'
     );
+
+    // tsc-cache-warm.yml seeds main (merge_group can read main, not PRs):
+    // trusted triggers, no secrets, same path and fallbacks, save after tsc.
+    const warm = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/tsc-cache-warm.yml'),
+      'utf8'
+    );
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:\n {2}contents: read\n\n/m
+    );
+    expect(warm).toContain("github.ref == 'refs/heads/main' &&");
+    expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
+    expect(warm).toContain('persist-credentials: false');
+    const keys = body =>
+      body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
+    const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
+    const [warmKey, ...warmFallbacks] = keys(warm).map(line => line.trim());
+    expect(warmFallbacks).toEqual(ciFallbacks);
+    expect(warmKey.replace(/h\$\{\{ steps\.hour\.outputs\.hour }}$/, '')).toBe(
+      ciKey.replace('${{ github.sha }}', '')
+    );
+    expect(
+      warm.match(/path: apps\/web\/\.cache\/tsbuildinfo\*\n/g)
+    ).toHaveLength(2);
+    const order = [
+      'Restore web tsc incremental state',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'uses: actions/cache/save@',
+      'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
+    ].map(marker => warm.indexOf(marker));
+    expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');

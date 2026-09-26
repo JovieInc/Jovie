@@ -1520,15 +1520,15 @@ jobs:
           needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: apps/web/.cache/tsbuildinfo
-          key: jovie-web-tsbuildinfo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json') }}-${{ github.sha }}
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-${{ github.sha }}
           restore-keys: |
-            jovie-web-tsbuildinfo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json') }}-
-            jovie-web-tsbuildinfo-v1-${{ runner.os }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Record restored web tsc state
         id: web-tsbuildinfo-restored
         if: steps.web-tsbuildinfo.outcome == 'success'
-        run: echo "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}" >> "$GITHUB_OUTPUT"
+        run: echo "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo*') }}" >> "$GITHUB_OUTPUT"
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -1540,20 +1540,21 @@ jobs:
       # Save only after a green lane that actually rewrote the buildinfo, and
       # only from trusted refs: main pushes and same-repository PRs. GitHub
       # scopes each cache to the ref that wrote it, so a PR never seeds state
-      # main restores; merge_group and fork PRs are restore-only.
+      # main restores; merge_group and fork PRs are restore-only. Main pushes
+      # skip this job, so tsc-cache-warm.yml seeds main for merge_group.
       - name: Save web tsc incremental state
         if: >-
           steps.lanes.outcome == 'success' &&
           steps.web-tsbuildinfo.outcome == 'success' &&
-          hashFiles('apps/web/.cache/tsbuildinfo') != '' &&
-          hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash &&
+          hashFiles('apps/web/.cache/tsbuildinfo*') != '' &&
+          hashFiles('apps/web/.cache/tsbuildinfo*') != steps.web-tsbuildinfo-restored.outputs.hash &&
           ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository))
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: apps/web/.cache/tsbuildinfo
+          path: apps/web/.cache/tsbuildinfo*
           key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
