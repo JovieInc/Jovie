@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
-import { useAdminSocialLinksQuery } from '@/lib/queries';
+import {
+  type AdminSocialEnrichment,
+  useAdminSocialLinksQuery,
+} from '@/lib/queries';
 import type { Contact } from '@/types';
 import { mapProfileToContact } from './utils';
 
@@ -47,6 +50,8 @@ interface UseContactHydrationReturn {
   refetchSocialLinks: () => void;
   handleContactChange: (updated: Contact) => void;
   isLoading: boolean;
+  /** JOV-6529 identity-enrichment receipt for the selected profile. */
+  enrichment: AdminSocialEnrichment | null;
 }
 
 /**
@@ -68,13 +73,16 @@ export function useContactHydration({
   );
 
   const {
-    data: socialLinks,
+    data: socialLinksResult,
     isLoading,
     refetch,
   } = useAdminSocialLinksQuery({
     profileId: selectedId ?? undefined,
     enabled: enabled && !!selectedId,
   });
+
+  const socialLinks = socialLinksResult?.links;
+  const enrichment = socialLinksResult?.enrichment ?? null;
 
   // Track previous social links to avoid unnecessary state updates
   const prevSocialLinksRef = useRef(socialLinks);
@@ -138,5 +146,6 @@ export function useContactHydration({
     refetchSocialLinks,
     handleContactChange,
     isLoading,
+    enrichment,
   };
 }

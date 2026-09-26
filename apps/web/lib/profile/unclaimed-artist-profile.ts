@@ -1,9 +1,43 @@
 const STRUCTURED_CREDIT_SOURCE = 'structured_spotify_release_credit' as const;
 
+// verified = corroborated by >=2 independent sources; unverified = single
+// trusted source bound to the exact provider ID; conflicted = sources
+// disagree; not_found = checked and nothing found.
+export type UnclaimedArtistFieldState =
+  | 'verified'
+  | 'unverified'
+  | 'conflicted'
+  | 'not_found';
+
+// `not_checked` = the pass never ran (outage/budget/legacy); distinct from
+// `not_found` = the pass ran and found nothing.
+export type UnclaimedArtistEnrichmentStatus =
+  | 'not_checked'
+  | 'not_found'
+  | 'verified'
+  | 'conflicted';
+
+export interface UnclaimedArtistEnrichmentReceipt {
+  readonly status: UnclaimedArtistEnrichmentStatus;
+  readonly checkedAt: string;
+
+  readonly sources: readonly string[];
+  /** Per-platform field state. */
+  readonly fields: Record<string, UnclaimedArtistFieldState>;
+
+  readonly conflicts: readonly string[];
+
+  readonly musicbrainzId?: string | null;
+  // Minimum evidence contract: false stays reachable via /artists/:artistId
+  // but is not promoted as a finished profile.
+  readonly shareReady: boolean;
+}
+
 export interface StructuredCreditProfileMarker {
   readonly artistRegistryId: string;
   readonly claimedAt?: string;
   readonly consentObtained: boolean;
+  readonly enrichment?: UnclaimedArtistEnrichmentReceipt;
   readonly ownershipVerified: boolean;
   readonly provider: 'spotify';
   readonly providerArtistId: string;
@@ -61,6 +95,44 @@ export function isUnclaimedStructuredCreditProfile(settings: unknown): boolean {
     marker.ownershipVerified === false &&
     marker.representationVerified === false &&
     marker.consentObtained === false
+  );
+}
+
+// Record a receipt without touching claim/ownership fields; returns the
+// original settings for claimed or foreign markers (never overwritten).
+export function recordUnclaimedArtistEnrichment(
+  settings: Record<string, unknown>,
+  receipt: UnclaimedArtistEnrichmentReceipt
+): Record<string, unknown> {
+  const marker = readStructuredCreditProfileMarker(settings);
+  if (marker?.state !== 'unclaimed') return settings;
+
+  return {
+    ...settings,
+    unclaimedArtistProfile: {
+      ...marker,
+      enrichment: receipt,
+    },
+  };
+}
+
+// Defaults to `not_checked` for markers predating the pass.
+export function getUnclaimedArtistEnrichmentStatus(
+  settings: unknown
+): UnclaimedArtistEnrichmentStatus {
+  const marker = readStructuredCreditProfileMarker(settings);
+  return marker?.enrichment?.status ?? 'not_checked';
+}
+
+export function readUnclaimedArtistEnrichmentReceipt(
+  settings: unknown
+): UnclaimedArtistEnrichmentReceipt | null {
+  return readStructuredCreditProfileMarker(settings)?.enrichment ?? null;
+}
+
+export function isUnclaimedProfileShareReady(settings: unknown): boolean {
+  return (
+    readStructuredCreditProfileMarker(settings)?.enrichment?.shareReady === true
   );
 }
 

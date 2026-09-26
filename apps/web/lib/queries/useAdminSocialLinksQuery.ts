@@ -24,6 +24,22 @@ export interface AdminSocialLink {
   url: string;
   platform: string;
   platformType: string;
+  verificationStatus?: string | null;
+}
+
+/**
+ * Identity-enrichment summary for an unclaimed profile (JOV-6529).
+ * `status` distinguishes `not_checked`, `not_found`, `conflicted`, and
+ * `verified` so the Social pane is never a bare empty list.
+ */
+export interface AdminSocialEnrichment {
+  status: 'not_checked' | 'not_found' | 'verified' | 'conflicted';
+  checkedAt: string;
+  sources: string[];
+  fields: Record<string, string>;
+  conflicts: string[];
+  musicbrainzId?: string | null;
+  shareReady: boolean;
 }
 
 /**
@@ -32,7 +48,13 @@ export interface AdminSocialLink {
 interface AdminSocialLinksResponse {
   success: boolean;
   links?: AdminSocialLink[];
+  enrichment?: AdminSocialEnrichment | null;
   error?: string;
+}
+
+export interface AdminSocialLinksResult {
+  links: AdminSocialLink[];
+  enrichment: AdminSocialEnrichment | null;
 }
 
 /**
@@ -47,7 +69,7 @@ export interface UseAdminSocialLinksQueryOptions {
 async function fetchAdminSocialLinks(
   profileId: string,
   signal?: AbortSignal
-): Promise<AdminSocialLink[]> {
+): Promise<AdminSocialLinksResult> {
   const url = `/api/admin/creator-social-links?profileId=${encodeURIComponent(profileId)}`;
 
   const response = await fetchWithTimeout<AdminSocialLinksResponse>(url, {
@@ -58,7 +80,7 @@ async function fetchAdminSocialLinks(
     throw new Error(response.error ?? 'Failed to fetch social links');
   }
 
-  return response.links;
+  return { links: response.links, enrichment: response.enrichment ?? null };
 }
 
 /**

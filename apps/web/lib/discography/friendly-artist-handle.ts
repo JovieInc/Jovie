@@ -39,7 +39,8 @@ export interface FriendlyArtistHandleCandidate {
   readonly source:
     | 'registry_artist_name'
     | 'provider_display_name'
-    | 'primary_name_token';
+    | 'primary_name_token'
+    | 'identity_evidence';
 }
 
 /** Why a proposed candidate was rejected by the deterministic policy. */
@@ -87,6 +88,15 @@ export function normalizeArtistNameToHandleBase(name: string): string {
 export function composeFriendlyArtistHandleCandidates(input: {
   readonly registryName: string | null | undefined;
   readonly providerArtist: SpotifyArtistProfileData | undefined;
+  /**
+   * Deterministic identity-enrichment evidence (JOV-6529): social handles and
+   * official-domain stems resolved through exact provider-ID chains. These
+   * rank BELOW name-derived signals — enrichment corroborates identity but a
+   * handle on a social network never outranks the artist's canonical name.
+   */
+  readonly identityEvidence?: {
+    readonly handleCandidates?: readonly string[];
+  } | null;
 }): ComposedFriendlyArtistHandles {
   const accepted: FriendlyArtistHandleCandidate[] = [];
   const rejected: RejectedFriendlyHandleCandidate[] = [];
@@ -97,6 +107,10 @@ export function composeFriendlyArtistHandleCandidates(input: {
   }> = [
     { source: 'registry_artist_name', name: input.registryName },
     { source: 'provider_display_name', name: input.providerArtist?.name },
+    ...(input.identityEvidence?.handleCandidates ?? []).map(handle => ({
+      source: 'identity_evidence' as const,
+      name: handle,
+    })),
   ];
 
   const seen = new Set<string>();
@@ -152,6 +166,14 @@ export function composeFriendlyArtistHandleCandidates(input: {
 }
 
 function rankOf(candidate: FriendlyArtistHandleCandidate): number {
-  // Registry name outranks provider display name at equal specificity.
-  return candidate.source === 'registry_artist_name' ? 0 : 1;
+  // Registry name outranks provider display name, which outranks enrichment
+  // evidence at equal specificity.
+  switch (candidate.source) {
+    case 'registry_artist_name':
+      return 0;
+    case 'provider_display_name':
+      return 1;
+    default:
+      return 2;
+  }
 }

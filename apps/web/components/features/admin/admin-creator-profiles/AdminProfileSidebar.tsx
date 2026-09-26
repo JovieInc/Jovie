@@ -21,6 +21,7 @@ import {
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { AdminSocialEnrichment } from '@/lib/queries';
 import type { Contact } from '@/types';
 import { AlgorithmHealthPanel } from './AlgorithmHealthPanel';
 
@@ -42,9 +43,45 @@ function mapContactLinksToPreviewLinks(contact: Contact): PreviewPanelLink[] {
   }));
 }
 
+const ENRICHMENT_STATUS_LABELS: Record<
+  AdminSocialEnrichment['status'],
+  string
+> = {
+  verified: 'Identity enrichment: verified',
+  conflicted: 'Identity enrichment: conflicted',
+  not_found: 'Identity enrichment: nothing found',
+  not_checked: 'Identity enrichment: not checked',
+};
+
+function IdentityEnrichmentNote({
+  enrichment,
+}: {
+  readonly enrichment: AdminSocialEnrichment | null;
+}) {
+  if (!enrichment) return null;
+  return (
+    <div className='mb-1' data-testid='admin-creator-enrichment-status'>
+      <p className='text-xs text-secondary-token'>
+        {ENRICHMENT_STATUS_LABELS[enrichment.status]}
+      </p>
+      {enrichment.conflicts.length > 0 ? (
+        <p className='mt-0.5 text-xs text-tertiary-token'>
+          {enrichment.conflicts.join(' · ')}
+        </p>
+      ) : null}
+      {enrichment.status !== 'not_checked' && !enrichment.shareReady ? (
+        <p className='mt-0.5 text-xs text-tertiary-token'>
+          Below share-ready evidence bar — reachable by artist ID only.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 interface AdminProfileSidebarProps {
   readonly profile: AdminCreatorProfileRow | null;
   readonly contact: Contact | null;
+  readonly enrichment?: AdminSocialEnrichment | null;
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly contextMenuItems?: CommonDropdownItem[];
@@ -53,6 +90,7 @@ interface AdminProfileSidebarProps {
 export function AdminProfileSidebar({
   profile,
   contact,
+  enrichment,
   isOpen,
   onClose,
   contextMenuItems,
@@ -180,7 +218,6 @@ export function AdminProfileSidebar({
             ariaLabel='Creator profile sidebar view'
           />
         }
-        contentClassName='pt-2'
       >
         {selectedCategory === 'about' ? (
           <ProfileAboutTab
@@ -201,11 +238,16 @@ export function AdminProfileSidebar({
           />
         ) : null}
         {selectedCategory !== 'about' && selectedCategory !== 'algorithm' ? (
-          <ProfileLinkList
-            links={links}
-            selectedCategory={selectedCategory as CategoryOption}
-            surface='plain'
-          />
+          <>
+            {selectedCategory === 'social' ? (
+              <IdentityEnrichmentNote enrichment={enrichment ?? null} />
+            ) : null}
+            <ProfileLinkList
+              links={links}
+              selectedCategory={selectedCategory as CategoryOption}
+              surface='plain'
+            />
+          </>
         ) : null}
       </DrawerTabbedCard>
     </EntitySidebarShell>

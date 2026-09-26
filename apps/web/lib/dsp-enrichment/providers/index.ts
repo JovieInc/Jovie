@@ -49,6 +49,7 @@ export {
 // MusicBrainz Provider
 export {
   bulkLookupMusicBrainzByIsrc,
+  findMusicBrainzArtistIdsByUrl,
   getMusicBrainzArtist,
   getMusicBrainzStats,
   isMusicBrainzAvailable,

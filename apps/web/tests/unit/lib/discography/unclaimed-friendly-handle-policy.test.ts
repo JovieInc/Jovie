@@ -57,6 +57,44 @@ describe('JOV-6528 handle policy: friendly first, opaque fallback last', () => {
     expect(isEncodedUnclaimedArtistHandle(fallback)).toBe(true);
   });
 
+  it('consumes enrichment identity evidence below name-derived signals', () => {
+    const { accepted } = composeFriendlyArtistHandleCandidates({
+      registryName: 'Fedde Le Grand',
+      providerArtist: { id: 'sp-fedde', name: 'Fedde Le Grand' },
+      identityEvidence: { handleCandidates: ['officialfedde'] },
+    });
+
+    const handles = accepted.map(c => c.handle);
+    expect(handles).toContain('officialfedde');
+    // Evidence corroborates identity; it never outranks the canonical name.
+    expect(handles.indexOf('feddelegrand')).toBeLessThan(
+      handles.indexOf('officialfedde')
+    );
+  });
+
+  it('uses enrichment evidence when name signals produce nothing valid', () => {
+    const { accepted } = composeFriendlyArtistHandleCandidates({
+      registryName: null,
+      providerArtist: undefined,
+      identityEvidence: { handleCandidates: ['feddelegrand'] },
+    });
+
+    expect(accepted.map(c => c.handle)).toEqual(['feddelegrand']);
+  });
+
+  it('rejects enrichment evidence that fails the username contract', () => {
+    const { accepted, rejected } = composeFriendlyArtistHandleCandidates({
+      registryName: 'Fedde Le Grand',
+      providerArtist: undefined,
+      identityEvidence: { handleCandidates: ['!!!'] },
+    });
+
+    expect(accepted.map(c => c.handle)).not.toContain('!!!');
+    expect(
+      rejected.some(r => r.source === 'identity_evidence' && r.handle === '!!!')
+    ).toBe(true);
+  });
+
   it('never proposes the a_* shape as a friendly candidate', () => {
     const { accepted } = composeFriendlyArtistHandleCandidates({
       registryName: 'a username that looks opaque a_1234567890123456789012345',

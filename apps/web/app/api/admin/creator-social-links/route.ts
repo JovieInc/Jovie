@@ -15,6 +15,10 @@ import {
   IdempotencyError,
   withIdempotency,
 } from '@/lib/idempotency';
+import {
+  isUnclaimedStructuredCreditProfile,
+  readUnclaimedArtistEnrichmentReceipt,
+} from '@/lib/profile/unclaimed-artist-profile';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
@@ -44,6 +48,7 @@ type SocialLinkRow = {
   url: string;
   platform: string;
   platformType: string;
+  verificationStatus: string | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -72,22 +77,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const rows = await db
-      .select({
-        id: socialLinks.id,
-        label: socialLinks.displayText,
-        url: socialLinks.url,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          not(eq(socialLinks.state, 'rejected'))
+    const [rows, profile] = await Promise.all([
+      db
+        .select({
+          id: socialLinks.id,
+          label: socialLinks.displayText,
+          url: socialLinks.url,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          verificationStatus: socialLinks.verificationStatus,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profileId),
+            not(eq(socialLinks.state, 'rejected'))
+          )
         )
-      )
-      .orderBy(asc(socialLinks.sortOrder));
+        .orderBy(asc(socialLinks.sortOrder)),
+      db
+        .select({ settings: creatorProfiles.settings })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId))
+        .limit(1)
+        .then(result => result[0] ?? null),
+    ]);
 
     const mapped: SocialLinkRow[] = rows.map(row => ({
       id: row.id,
@@ -95,10 +109,27 @@ export async function GET(request: NextRequest) {
       url: row.url,
       platform: row.platform,
       platformType: row.platformType,
+      verificationStatus: row.verificationStatus,
     }));
 
+    // JOV-6529: the Social pane distinguishes not_checked / not_found /
+    // conflicted / verified from a bare empty list. Only unclaimed structured-
+    // credit profiles carry the enrichment contract; claimed profiles return
+    // null so the drawer falls back to the plain link list.
+    const settings = profile?.settings;
+    const enrichment = isUnclaimedStructuredCreditProfile(settings)
+      ? (readUnclaimedArtistEnrichmentReceipt(settings) ?? {
+          status: 'not_checked' as const,
+          checkedAt: '',
+          sources: [],
+          fields: {},
+          conflicts: [],
+          shareReady: false,
+        })
+      : null;
+
     return NextResponse.json(
-      { success: true, links: mapped },
+      { success: true, links: mapped, enrichment },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -258,6 +289,7 @@ export async function PUT(request: NextRequest) {
             url: socialLinks.url,
             platform: socialLinks.platform,
             platformType: socialLinks.platformType,
+            verificationStatus: socialLinks.verificationStatus,
           })
           .from(socialLinks)
           .where(
@@ -274,6 +306,7 @@ export async function PUT(request: NextRequest) {
           url: row.url,
           platform: row.platform,
           platformType: row.platformType,
+          verificationStatus: row.verificationStatus,
         }));
 
         return NextResponse.json(
