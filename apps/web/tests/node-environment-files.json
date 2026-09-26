@@ -529,7 +529,6 @@
   "tests/unit/api/admin/feature-flags.test.ts",
   "tests/unit/api/admin/hud/founder-funnel.route.test.ts",
   "tests/unit/api/admin/hud/ovie-launchers.route.test.ts",
-  "tests/unit/api/admin/hud/shipping-velocity.route.test.ts",
   "tests/unit/api/admin/hud/symphony-codex-accounts.route.test.ts",
   "tests/unit/api/admin/impersonate.test.ts",
   "tests/unit/api/admin/investors-links-id.test.ts",
