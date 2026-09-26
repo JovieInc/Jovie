@@ -1,11 +1,13 @@
 import { AlertTriangle } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { WrappedLinkMissingState } from '@/components/organisms/WrappedLinkMissingState';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWrappedLink } from '@/lib/services/link-wrapping';
 import { getCategoryDescription } from '@/lib/utils/domain-categorizer';
 import { createChallengeToken } from '@/lib/utils/url-encryption.server';
@@ -120,6 +122,15 @@ export default async function InterstitialPage({
 
           <p className='text-center text-xs text-tertiary-token'>
             This confirmation helps protect against automated access.
+          </p>
+
+          <p className='text-center text-xs text-tertiary-token'>
+            <Link
+              href={`${APP_ROUTES.REPORT}?type=wrapped_link&target=${encodeURIComponent(shortId)}`}
+              className='underline underline-offset-2 hover:text-secondary-token'
+            >
+              Report this link
+            </Link>
           </p>
         </div>
       </ContentSurfaceCard>

@@ -73,6 +73,16 @@ export function Footer({
   const config = variantConfigs[variant];
 
   if (variant === 'profile') {
+    const profileLegalLinks = artistHandle
+      ? [
+          ...PROFILE_LEGAL_LINKS,
+          {
+            href: `${APP_ROUTES.REPORT}?type=profile&target=${encodeURIComponent(artistHandle)}`,
+            label: 'Report',
+          },
+        ]
+      : PROFILE_LEGAL_LINKS;
+
     return (
       <footer className={`${config.containerClass} ${className}`}>
         <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
@@ -89,7 +99,7 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={PROFILE_LEGAL_LINKS}
+            links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
             linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
@@ -99,7 +109,7 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={PROFILE_LEGAL_LINKS}
+            links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
             linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />

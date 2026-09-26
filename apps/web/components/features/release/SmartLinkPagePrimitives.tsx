@@ -5,6 +5,7 @@ import {
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkAmbientGlowProps {
@@ -96,16 +97,32 @@ export function SmartLinkArtistName({
   );
 }
 
-export function SmartLinkPoweredByFooter() {
+export function SmartLinkPoweredByFooter({
+  reportHref = `${APP_ROUTES.REPORT}?type=smart_link`,
+}: Readonly<{ reportHref?: string }>) {
   return (
     <footer className='shrink-0 pb-5 pt-3 text-center'>
-      <Link
-        href='/'
-        className='smart-link-powered-by inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
-      >
-        <span>Powered by</span>
-        <span className='font-semibold'>Jovie</span>
-      </Link>
+      <div className='inline-flex items-center gap-2'>
+        <Link
+          href='/'
+          className='smart-link-powered-by inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
+        >
+          <span>Powered by</span>
+          <span className='font-semibold'>Jovie</span>
+        </Link>
+        <span
+          aria-hidden='true'
+          className='text-2xs text-neutral-700 dark:text-muted-foreground/70'
+        >
+          ·
+        </span>
+        <Link
+          href={reportHref}
+          className='inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
+        >
+          Report
+        </Link>
+      </div>
     </footer>
   );
 }

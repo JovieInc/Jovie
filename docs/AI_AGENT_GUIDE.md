@@ -55,6 +55,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/leads/[id]` | PATCH | Admin | Update lead |
 | `/api/admin/leads/keywords` | GET | Admin | Lead keywords |
 | `/api/admin/leads/qualify` | POST | Admin | Qualify leads |
+| `/api/admin/moderation` | GET/POST | Admin | List abuse reports / takedown profile+wrapped links |
 | `/api/admin/overview` | GET | Admin | Admin dashboard overview |
 | `/api/admin/roles` | POST | Admin | Manage user roles |
 | `/api/admin/screenshots/[filename]` | GET | Admin | Serve screenshot |
@@ -258,6 +259,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/referrals/apply` | POST | Better Auth | Apply referral code |
 | `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
 | `/api/referrals/stats` | GET | Better Auth | Referral stats |
+| `/api/report` | POST | Public | Submit abuse/security report (rate-limited) |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
 | `/api/suggestions` | GET | Better Auth | Profile suggestions |
 | `/api/suggestions/avatars/[id]/dismiss` | POST | Better Auth | Dismiss avatar suggestion |
