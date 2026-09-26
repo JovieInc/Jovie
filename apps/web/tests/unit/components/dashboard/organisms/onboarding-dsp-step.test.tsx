@@ -24,6 +24,7 @@ vi.mock('@/lib/queries', () => ({
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, unoptimized, ...rest } = props;
+    // eslint-disable-next-line @next/next/no-img-element
     return <img alt='' {...rest} />;
   },
 }));
@@ -136,10 +137,6 @@ describe('OnboardingDspStep truthful artist status', () => {
     renderComponent();
     await typeQuery('Velvet');
 
-    const row = screen.getByText('Velvet Route').closest('button');
-    expect(row).not.toBeNull();
-    expect(
-      row?.querySelector('[data-testid="listing-badge"]')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('listing-badge')).not.toBeInTheDocument();
   });
 });

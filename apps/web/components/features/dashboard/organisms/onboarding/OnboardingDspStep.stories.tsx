@@ -12,10 +12,11 @@ const meta = {
         'prompt',
         'isTransitioning',
         'onConnected',
-        // Callback parameters of onConnected, not component props.
+        'onSkip',
         'releases',
         'artistName',
-        'onSkip',
+        'spotifyArtistId',
+        'spotifyUrl',
         'disabled',
         'isLoading',
       ],

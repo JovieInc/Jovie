@@ -173,10 +173,15 @@ export function presentArtistStatus(
     return presentReservedForArtist();
   }
 
-  // Availability outranks the plain listing, including an unknown check.
-  // Unknown must offer retry instead of a listing badge or a false Available.
-  if (management === 'claimed_flag_only' || management === 'none') {
+  if (
+    (management === 'claimed_flag_only' || management === 'none') &&
+    availability !== 'unknown'
+  ) {
     return presentAvailability(availability);
+  }
+
+  if (management === 'claimed_flag_only' || management === 'none') {
+    return presentUnmanagedListing();
   }
 
   // Unreachable with the current evidence union — every management value is
