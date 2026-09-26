@@ -39,15 +39,16 @@ describe('TaskBoard geometry', () => {
     );
   });
 
-  it.each([
-    0, 1, 3, 4,
-  ])('uses the same responsive grid contract for %s visible columns', columnCount => {
-    const expectedColumnCount = Math.max(columnCount, 1);
+  it.each([0, 1, 3, 4])(
+    'uses the same responsive grid contract for %s visible columns',
+    columnCount => {
+      const expectedColumnCount = Math.max(columnCount, 1);
 
-    expect(getTaskBoardGridTemplate(columnCount)).toBe(
-      `repeat(${expectedColumnCount}, minmax(0, 1fr))`
-    );
-  });
+      expect(getTaskBoardGridTemplate(columnCount)).toBe(
+        `repeat(${expectedColumnCount}, minmax(0, 1fr))`
+      );
+    }
+  );
 
   it('keeps board create actions at 32px on desktop with mobile hit room', () => {
     const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
@@ -56,6 +57,14 @@ describe('TaskBoard geometry', () => {
     expect(source).toContain('before:h-11 before:w-11');
     expect(source).toContain('sm:before:h-8 sm:before:w-8');
     expect(source).not.toContain('inline-flex h-7 w-7 shrink-0');
+  });
+});
+
+describe('banned icon guard (Tim, 2026-09-25)', () => {
+  it('drops the retired Disc3 release-title glyph', () => {
+    const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('<Layers className=');
   });
 });
 

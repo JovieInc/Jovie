@@ -131,16 +131,22 @@ jobs:
       - name: Resolve exact PR merge base
         id: pr-merge-base
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # The event's pull_request base SHA is not refreshed when the PR head
+        # is pushed, so on a long-lived PR it names a days-old base. Judge the
+        # PR against the base branch tip the full-history checkout fetched.
         run: |
           set -euo pipefail
-          [[ "$PR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$PR_BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
           [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
           [[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]] || exit 1
           [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
-          merge_bases="$(git merge-base --all "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          base_tip="$(git rev-parse --verify "refs/remotes/origin/$PR_BASE_REF^{commit}")"
+          [[ "$base_tip" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          merge_bases="$(git merge-base --all "$base_tip" "$PR_HEAD_SHA")"
           [[ "$merge_bases" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "base_tip=$base_tip" >> "$GITHUB_OUTPUT"
           echo "sha=$merge_bases" >> "$GITHUB_OUTPUT"
 
       - name: Enforce projected combined-tree byte budget
@@ -149,7 +155,7 @@ jobs:
         # PR's byte delta) here so an over-budget PR fails before admission, and
         # warn when the projection is above 95% of the budget.
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}
           PR_MERGE_BASE: ${{ steps.pr-merge-base.outputs.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         # Run the budget policy from the base tip, not the PR head: a PR cut

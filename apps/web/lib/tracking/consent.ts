@@ -1,3 +1,6 @@
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { parseConsentCookieValue } from '@/lib/cookies/consent-state';
+
 /**
  * Tracking Consent Utilities
  *
@@ -13,6 +16,18 @@ export type ConsentState =
 
 const CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 const CONSENT_STORAGE_KEY = 'jovie_tracking_consent';
+
+function isConsentRequiredForCurrentVisitor(): boolean {
+  try {
+    return globalThis.document.cookie
+      .split(';')
+      .some(cookie =>
+        cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=1`)
+      );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if Global Privacy Control is enabled
@@ -101,10 +116,10 @@ export function isTrackingAllowed(): boolean {
 /**
  * Check if marketing tracking is allowed.
  *
- * Reads the granular consent object from localStorage (jv_cc).
- * Returns true if marketing consent has NOT been explicitly rejected.
- * This means: no cookie = allowed (fire by default), marketing: true = allowed,
- * marketing: false = blocked.
+ * Reads the granular consent object from localStorage (jv_cc). In regions that
+ * require consent, only a valid affirmative marketing choice allows tracking.
+ * Elsewhere, preserve the existing default-allow behavior unless marketing was
+ * explicitly rejected.
  */
 export function isMarketingAllowed(): boolean {
   if (globalThis.window === undefined) return false;
@@ -116,13 +131,18 @@ export function isMarketingAllowed(): boolean {
   const legacyState = getConsentState();
   if (legacyState === 'rejected') return false;
 
+  const consentRequired = isConsentRequiredForCurrentVisitor();
   try {
     const raw = globalThis.localStorage?.getItem('jv_cc');
-    if (!raw) return true; // No consent interaction yet — fire by default
+    if (!raw) return !consentRequired;
+    if (consentRequired) {
+      return parseConsentCookieValue(raw)?.marketing === true;
+    }
+
     const parsed = JSON.parse(raw);
     return parsed?.marketing !== false;
   } catch {
-    return true; // Malformed data — treat as no consent interaction
+    return !consentRequired;
   }
 }
 
@@ -144,10 +164,7 @@ export function isAnalyticsAllowed(): boolean {
   try {
     const raw = globalThis.localStorage?.getItem('jv_cc');
     if (!raw) {
-      const bannerRequired = globalThis.document.cookie
-        .split(';')
-        .some(cookie => cookie.trim().startsWith('jv_cc_required=1'));
-      return !bannerRequired;
+      return !isConsentRequiredForCurrentVisitor();
     }
 
     const parsed = JSON.parse(raw);

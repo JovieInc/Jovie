@@ -183,6 +183,23 @@ describe('workflow capture server state machine', () => {
     expect(database.row?.status).toBe('pending');
   });
 
+  it('refuses a stored row that is not a workflow capture', async () => {
+    const request = await createRequest();
+    database.row = { ...database.row, kind: 'other.action' };
+
+    await expect(
+      mutateWorkflowCapture({
+        captureId: request.captureId,
+        userId: USER_ID,
+        mutation: { action: 'revoke' },
+      })
+    ).rejects.toMatchObject({ code: 'not-found', status: 404 });
+
+    expect(database.updateSet).not.toHaveBeenCalled();
+    expect(database.row?.status).toBe('pending');
+    expect(database.row?.kind).toBe('other.action');
+  });
+
   it('verifies the private blob before attaching an upload receipt', async () => {
     const request = await createRequest();
     const pathname = `workflow-captures/${USER_ID}/${request.captureId}/workflow.webm`;

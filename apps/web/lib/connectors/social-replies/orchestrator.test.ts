@@ -108,6 +108,34 @@ describe('social reply batch contract', () => {
     }
   });
 
+  it('rejects drafts that break the copy floor, keeping the customer voice', () => {
+    const blocked = socialReplyBatchRequestSchema.safeParse({
+      batchId: 'batch-floor',
+      targets: [
+        target(1, {
+          draftedText: 'Buy streams from my guy, guaranteed 10k plays',
+        }),
+        target(2, { draftedText: "you're an idiot lol" }),
+      ],
+    });
+    expect(blocked.success).toBe(false);
+    if (!blocked.success) {
+      const messages = blocked.error.issues
+        .map(issue => issue.message)
+        .join(' ');
+      expect(messages).toContain('artificial-engagement');
+      expect(messages).toContain('directed-abuse');
+    }
+
+    const casual = socialReplyBatchRequestSchema.safeParse({
+      batchId: 'batch-voice',
+      targets: [
+        target(1, { draftedText: 'ayy thank u 🔥 new one drops friday' }),
+      ],
+    });
+    expect(casual.success).toBe(true);
+  });
+
   it('is draft-only by default and never calls an adapter', async () => {
     const adapter = adapterWith();
     const receipt = await runSocialReplyBatch(

@@ -37,6 +37,9 @@ const PANEL_CLASS_NAME =
   'rounded-(--profile-card-radius) border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-(--profile-panel-shadow) backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
 const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
+// Cancels the Music scrollport's --page-pad so full-bleed rows meet the
+// shell edge. A fixed -mx-4 undershoots that padding and gets clipped.
+const MUSIC_BLEED_CLASS_NAME = '-mx-(--page-pad) min-w-0 pb-2';
 
 interface ProfilePrimaryTabPanelProps {
   readonly mode: Exclude<ProfilePrimaryTab, 'profile'>;
@@ -418,7 +421,7 @@ export function ProfilePrimaryTabPanel({
     if (musicSurface.kind === 'catalog') {
       return (
         <div
-          className='-mx-4 space-y-4 pb-2'
+          className={cn(MUSIC_BLEED_CLASS_NAME, 'space-y-4')}
           data-testid='profile-primary-tab-releases'
         >
           <div>
@@ -440,7 +443,10 @@ export function ProfilePrimaryTabPanel({
 
     return (
       <div
-        className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
+        className={cn(
+          MUSIC_BLEED_CLASS_NAME,
+          'flex min-h-full flex-col space-y-0'
+        )}
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>

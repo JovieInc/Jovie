@@ -36,7 +36,9 @@ function base64UrlEncodeJson(value: Record<string, unknown>): string {
 
 /** Doppler stores the .p8 with literal `\n` sequences; restore real newlines. */
 function normalizePrivateKeyPem(raw: string): string {
-  return raw.includes('\\n') ? raw.replaceAll('\\n', '\n') : raw;
+  return raw.includes(String.raw`\n`)
+    ? raw.replaceAll(String.raw`\n`, '\n')
+    : raw;
 }
 
 export function generateAppleClientSecret(): string {

@@ -151,7 +151,7 @@ def _run_same_token_rest_fixture(
               admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
               changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
               changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
-              explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+              explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
               prove-receipt) echo '{{"ok":false,"explanation":{{"reason":"not-queued"}},"state":{{"queued":false}}}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
@@ -980,7 +980,7 @@ def _write_release_wave_drain_fixture(
                   changelog-drain) printf '%s\\n' '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   changelog-inventory) printf '%s\\n' '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   front-churn) printf '%s\\n' '{{"action":"allow","reason":"no classified failure"}}' ;;
-                  explain-selector) printf '%s\\n' '{{"observed":true,"queued":false,"eligible":false,"reason":"release-wave-hold"}}' ;;
+                  explain-selector) cat >/dev/null; printf '%s\\n' '{{"observed":true,"queued":false,"eligible":false,"reason":"release-wave-hold"}}' ;;
                   unmergeable-reenqueue) printf '%s\\n' '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   enroll)
                     printf 'enroll %s\\n' "${{3:-}}" >>'{logs["enroll"]}'
@@ -2816,7 +2816,7 @@ class TestDrainPrQueueWiring:
                   admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
-                  explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+                  explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -2940,6 +2940,26 @@ class TestDrainPrQueueWiring:
         assert "-native-queue on #101" in result.stdout
         assert int(paths["rest"].read_text(encoding="utf-8")) == 3
         assert int(paths["enroll"].read_text(encoding="utf-8")) == 1
+        assert int(paths["dequeue"].read_text(encoding="utf-8")) == 1
+
+    def test_selector_fixture_drains_snapshot_pipe_when_writer_is_starved(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The drain pipes SNAP into `node ... explain-selector` under
+        # `set -o pipefail`; the real backend reads stdin to EOF. A fixture that
+        # exits without reading lets a CPU-starved `echo "$SNAP"` hit SIGPIPE,
+        # killing the drain silently with 141. Delay only that JSON-array write
+        # (an exported function shadows the echo builtin) to force the race.
+        monkeypatch.setenv(
+            "BASH_FUNC_echo%%",
+            '() { if [[ "${1:-}" == "["* ]]; then sleep 0.1; fi; builtin echo "$@"; }',
+        )
+        result, paths, _, _ = _run_same_token_rest_fixture(
+            tmp_path, rest_mode="valid", post_hold=True
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "queue-noop: selector: exact admission #101" in result.stderr
         assert int(paths["dequeue"].read_text(encoding="utf-8")) == 1
 
     @pytest.mark.parametrize(
@@ -3983,6 +4003,7 @@ JSON
                   if [[ "$args" == *"enablePullRequestAutoMerge"* ]]; then echo 1 >"$state_file"; echo '{{"data":{{"enablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
                   if [[ "$args" == *"dequeuePullRequest"* ]]; then echo 0 >"$state_file"; echo '{{"data":{{"dequeuePullRequest":{{"mergeQueueEntry":null}}}}}}'; exit 0; fi
                   if [[ "$args" == *"disablePullRequestAutoMerge"* ]]; then echo '{{"data":{{"disablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueEjectionHistory"* ]]; then printf '%s\n' '{{"data":{{"repository":{{"pullRequest":{{"timelineItems":{{"nodes":[]}}}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueuePullRequestState"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequest:$state}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueCanonicalMembership"* ]]; then
                     if [[ "$queued" != 1 ]]; then echo '{{"data":{{"repository":{{"pullRequest":{{"id":"PR_kwDO_native_904","number":904,"state":"OPEN","isDraft":false,"headRefOid":"'"$head"'","headRefName":"codex/controller-repair","baseRefName":"main","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","labels":{{"nodes":[]}},"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null,"timelineItems":{{"nodes":[],"pageInfo":{{"hasNextPage":false}}}}}}}}}}}}'; exit 0; fi

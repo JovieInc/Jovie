@@ -13,10 +13,7 @@ import type {
   HeaderContext as CoreHeaderContext,
   RowData,
 } from '@tanstack/react-table';
-import {
-  createColumnHelper as createColumnHelperCore,
-  flexRender,
-} from '@tanstack/react-table';
+import { createColumnHelper as createColumnHelperCore } from '@tanstack/react-table';
 import type { LegacyFeatures } from '@tanstack/react-table/legacy';
 
 export type {
@@ -30,6 +27,7 @@ export type {
   SortingState,
   Updater,
 } from '@tanstack/react-table';
+export { flexRender } from '@tanstack/react-table';
 export type {
   LegacyCell as Cell,
   LegacyColumn as Column,
@@ -49,8 +47,6 @@ export {
   getSortedRowModel,
   useLegacyTable as useReactTable,
 } from '@tanstack/react-table/legacy';
-export { flexRender };
-
 /**
  * v8-style `createColumnHelper<TData>()`. The `/legacy` entry is marked
  * `'use client'`, so `legacyCreateColumnHelper` cannot run at module scope in

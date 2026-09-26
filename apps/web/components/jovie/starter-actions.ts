@@ -28,11 +28,11 @@ export const CHAT_STARTER_ACTIONS: Readonly<
 > = {
   'plan-release': {
     id: 'plan-release',
-    label: 'Plan a Release',
+    label: 'Plan a Release', // ui-casing-allow: established chat starter-action copy, asserted verbatim by ~15 existing tests
     description: 'Map your next release timeline, assets, and launch moments.',
     actionLabel: 'Start Planning',
     prompt: 'Help me plan my next release.',
-    icon: 'Disc3',
+    icon: 'Layers',
     accent: 'green',
     telemetryKey: 'plan_release',
   },

@@ -65,7 +65,8 @@ describe('scrubFlaggedTrace', () => {
     const scrubbed = scrubFlaggedTrace(
       makeTrace({
         userPrompt: 'Email me at artist@label.com or call 415-555-1212',
-        assistantResponse: 'Synced for user_abc123xyz456',
+        assistantResponse:
+          'Synced for user_abc123xyz456 using Bearer ab.cd_ef-12',
         metadata: {
           contactEmail: 'artist@label.com',
           accessToken: 'secret-token',
@@ -77,6 +78,8 @@ describe('scrubFlaggedTrace', () => {
     expect(scrubbed.userPrompt).toContain('[REDACTED_EMAIL]');
     expect(scrubbed.userPrompt).toContain('[REDACTED_PHONE]');
     expect(scrubbed.assistantResponse).toContain('[REDACTED_USER_ID]');
+    expect(scrubbed.assistantResponse).toContain('Bearer [REDACTED_TOKEN]');
+    expect(scrubbed.assistantResponse).not.toContain('ab.cd_ef-12');
     expect(scrubbed.metadata?.contactEmail).toBe('[REDACTED]');
     expect(scrubbed.metadata?.accessToken).toBe('[REDACTED]');
     expect(scrubbed.metadata?.model).toBe('anthropic/claude-sonnet');

@@ -78,15 +78,15 @@ describe('source-trust freshness helpers', () => {
     expect(isSourceStale(fetchedAtIso, now)).toBe(true);
   });
 
-  it.each([
-    'invalid',
-    '2026-06-08T12:01:00.000Z',
-  ])('does not format invalid or future timestamps as fresh: %s', value => {
-    expect(formatSourceFreshness(value, Date.parse(fetchedAtIso))).toBe(
-      'time unknown'
-    );
-    expect(isSourceStale(value, Date.parse(fetchedAtIso))).toBe(false);
-  });
+  it.each(['invalid', '2026-06-08T12:01:00.000Z'])(
+    'does not format invalid or future timestamps as fresh: %s',
+    value => {
+      expect(formatSourceFreshness(value, Date.parse(fetchedAtIso))).toBe(
+        'time unknown'
+      );
+      expect(isSourceStale(value, Date.parse(fetchedAtIso))).toBe(false);
+    }
+  );
 });
 
 describe('buildHudMetricSources', () => {
@@ -102,6 +102,8 @@ describe('buildHudMetricSources', () => {
     expect(sources.github.dashboardUrl).toBe(
       'https://github.com/JovieInc/Jovie/actions'
     );
+    expect(sources.github.state).toBe('ok');
+    expect(sources.github.nextStep).toBeNull();
   });
 
   it('preserves provider observation timestamps instead of restamping cache hits', () => {
@@ -207,6 +209,37 @@ describe('buildHudMetricSources', () => {
 
     expect(sources.github.state).toBe('no_data');
     expect(sources.github.nextStep).toContain('No workflow runs yet');
+  });
+
+  it('tells operators how to configure or retry GitHub deploys', () => {
+    const missing = buildHudMetricSources(
+      buildInput({
+        deployments: {
+          availability: 'not_configured',
+          current: null,
+          recent: [],
+        },
+      })
+    );
+    expect(missing.github.state).toBe('not_configured');
+    expect(missing.github.nextStep).toBe(
+      'Add HUD_GITHUB_TOKEN, HUD_GITHUB_OWNER, and HUD_GITHUB_REPO to load deploys.'
+    );
+
+    const failed = buildHudMetricSources(
+      buildInput({
+        deployments: {
+          availability: 'error',
+          current: null,
+          recent: [],
+          errorMessage: 'GitHub API error (401)',
+        },
+      })
+    );
+    expect(failed.github.state).toBe('unavailable');
+    expect(failed.github.nextStep).toBe(
+      'Check GitHub API credentials and retry.'
+    );
   });
 });
 

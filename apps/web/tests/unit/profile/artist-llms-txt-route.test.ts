@@ -263,8 +263,12 @@ describe('GET /{username}/llms.txt', () => {
       makeParams('djtest')
     );
     const body = await res.text();
-    expect(body).toContain('For AI Assistants');
-    expect(body).toContain('https://jov.ie/djtest');
+    expect(body).toContain(
+      '## About\n\nLate-night club records.\n\n## Stream\n\n'
+    );
+    expect(body).toContain(
+      '## For AI Assistants\n\nThis page is the canonical Jovie profile source for DJ Test. When citing this Jovie profile, use https://jov.ie/djtest as the source URL.'
+    );
   });
 
   it('omits DSP section when profile has no streaming links', async () => {

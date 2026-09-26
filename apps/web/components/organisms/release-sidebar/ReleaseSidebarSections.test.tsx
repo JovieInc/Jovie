@@ -24,15 +24,19 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerMediaThumb: ({
     imageClassName,
     sizeClassName,
+    fallback,
   }: {
     readonly imageClassName?: string;
     readonly sizeClassName?: string;
+    readonly fallback?: React.ReactNode;
   }) => (
     <div
       data-testid='release-artwork-thumb'
       data-image-class={imageClassName}
       className={sizeClassName}
-    />
+    >
+      {fallback}
+    </div>
   ),
   DrawerSection: ({ children }: { readonly children?: React.ReactNode }) => (
     <section>{children}</section>
@@ -44,22 +48,37 @@ vi.mock('@/components/molecules/drawer', () => ({
     readonly children?: React.ReactNode;
     readonly testId?: string;
   }) => <div data-testid={testId}>{children}</div>,
-  EntityHeaderCard: ({
-    children,
-    image,
+  EntityHeader: ({
+    thumbnail,
     title,
+    details,
+    statusGlyph,
+    actions,
     'data-testid': testId,
   }: {
-    readonly children?: React.ReactNode;
-    readonly image?: React.ReactNode;
+    readonly thumbnail?: React.ReactNode;
     readonly title?: React.ReactNode;
+    readonly details?: React.ReactNode;
+    readonly statusGlyph?: React.ReactNode;
+    readonly actions?: React.ReactNode;
     readonly 'data-testid'?: string;
   }) => (
-    <div data-testid={testId}>
-      {image}
-      {title}
-      {children}
+    <div data-testid={testId ?? 'entity-header'}>
+      {thumbnail}
+      <h2>{title}</h2>
+      <div>
+        {details}
+        {statusGlyph}
+      </div>
+      {actions}
     </div>
+  ),
+  EntityHeaderStatusGlyph: ({ label }: { readonly label?: string }) => (
+    <span
+      data-testid='entity-header-status-glyph'
+      role='img'
+      aria-label={label}
+    />
   ),
 }));
 
@@ -90,7 +109,22 @@ vi.mock('@/components/shell/DropDateChip', () => ({
 }));
 
 vi.mock('@/components/shell/DspAvatarStack', () => ({
-  DspAvatarStack: () => null,
+  DspAvatarStack: ({
+    dsps,
+  }: {
+    readonly dsps?: ReadonlyArray<{
+      readonly glyph: string;
+      readonly id: string;
+    }>;
+  }) => (
+    <div>
+      {dsps?.map(dsp => (
+        <span key={dsp.id} data-testid={`dsp-glyph-${dsp.id}`}>
+          {dsp.glyph}
+        </span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/shell/MetaPill', () => ({
@@ -100,11 +134,23 @@ vi.mock('@/components/shell/MetaPill', () => ({
 }));
 
 vi.mock('@/components/shell/StatusBadge', () => ({
-  StatusBadge: () => null,
-}));
-
-vi.mock('@/components/shell/TypeBadge', () => ({
-  TypeBadge: () => null,
+  STATUS_CHIP: {
+    live: { label: 'Live', dot: '', text: '', tooltip: 'Live on DSPs' },
+    scheduled: {
+      label: 'Scheduled',
+      dot: '',
+      text: '',
+      tooltip: 'Scheduled for release',
+    },
+    announced: {
+      label: 'Announced',
+      dot: '',
+      text: '',
+      tooltip: 'Publicly announced',
+    },
+    draft: { label: 'Draft', dot: '', text: '', tooltip: 'Draft' },
+    hidden: { label: 'Hidden', dot: '', text: '', tooltip: 'Hidden' },
+  },
 }));
 
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
@@ -155,6 +201,49 @@ describe('ReleaseSidebarSections', () => {
     expect(screen.getByText('Midnight Drive')).toBeTruthy();
   });
 
+  it('exposes the release status via an icon-only glyph, never a visible word', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    const glyph = screen.getByTestId('entity-header-status-glyph');
+    expect(glyph).toHaveAttribute('aria-label', 'Live');
+    // The status word must never render as plain visible text in the rail.
+    expect(screen.queryByText('Live')).toBeNull();
+  });
+
+  it('shows the drop date, track count, and DSP stack in the header meta strip instead of the metadata list', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('release-header-meta-strip')).toBeTruthy();
+  });
+
   it('uses one canonical artwork geometry and contain-fit contract', () => {
     render(
       <ReleaseEntityHeader
@@ -179,6 +268,76 @@ describe('ReleaseSidebarSections', () => {
     expect(artwork).toHaveAttribute('data-image-class', 'object-contain');
     expect(preview).toHaveClass('rounded-xs');
     expect(preview).not.toHaveClass('rounded-lg');
+  });
+
+  it('uses the banned-icon-safe AudioLines glyph for the missing-artwork fallback', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('icon-AudioLines')).toBeTruthy();
+    expect(screen.queryByTestId('icon-Disc3')).toBeNull();
+  });
+
+  it('takes the provider glyph from the first letter or digit', () => {
+    render(
+      <ReleaseEntityHeader
+        release={
+          {
+            ...mockRelease,
+            providers: [
+              {
+                key: 'spotify',
+                url: 'https://open.spotify.com/album/1',
+                label: 'ignored',
+                source: 'manual',
+                updatedAt: '2026-01-01',
+                path: '/spotify',
+                isPrimary: true,
+              },
+              {
+                key: 'tidal',
+                url: 'https://tidal.com/album/1',
+                label: '!!!',
+                source: 'manual',
+                updatedAt: '2026-01-01',
+                path: '/tidal',
+                isPrimary: false,
+              },
+            ],
+          } as Release
+        }
+        artistName='Example Artist'
+        providerConfig={
+          {
+            spotify: { label: '— Spotify', accent: '#1db954' },
+          } as typeof providerConfig
+        }
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('dsp-glyph-spotify')).toHaveTextContent('S');
+    expect(screen.getByTestId('dsp-glyph-tidal')).toHaveTextContent('T');
   });
 
   it('keeps editable release artwork on the same xl artwork contract', () => {

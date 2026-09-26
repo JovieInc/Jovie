@@ -176,6 +176,34 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the marketing support route for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/support/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-support'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-support',
+      platform: 'web',
+      owner: 'marketing-support',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-support',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers public SmartLink release and track pages', () => {
     assert.equal(
       kindOf('apps/web/app/[username]/[slug]/page.tsx'),

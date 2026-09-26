@@ -91,6 +91,87 @@ describe('self-hosted runner setup action', () => {
     );
   });
 
+  describe('GitHub-hosted installed-tree cache', () => {
+    const stepBlock = (name: string) =>
+      action.match(
+        new RegExp(
+          `- name: ${name.replace(/[.()]/g, '\\$&')}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
+        )
+      )?.groups?.step ?? '';
+    const restoreStep = stepBlock(
+      'Restore installed node_modules (GitHub-hosted)'
+    );
+    const saveStep = stepBlock('Save installed node_modules (GitHub-hosted)');
+    const cachedPaths = [
+      '          node_modules',
+      '          apps/*/node_modules',
+      '          packages/*/node_modules',
+      '          workers/*/node_modules',
+    ].join('\n');
+
+    it('restores only on GitHub-hosted runners, pinned, with an exact key', () => {
+      expect(restoreStep).toContain('id: node-modules-cache');
+      expect(restoreStep).toContain(
+        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
+      );
+      expect(restoreStep).toContain(
+        'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+      );
+      expect(restoreStep).toContain(cachedPaths);
+      // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
+      // workspace, patches and .npmrc, and no prefix match may restore.
+      expect(restoreStep).toContain(
+        "key: pnpm-node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+      );
+      expect(restoreStep).not.toContain('restore-keys');
+    });
+
+    it('skips the store restore and pnpm fetch only on an exact hit', () => {
+      const setupNodeStep = stepBlock('Setup Node.js with pnpm cache');
+      expect(setupNodeStep).toContain(
+        "steps.node-modules-cache.outputs.cache-hit != 'true' && 'pnpm' || ''"
+      );
+      expect(stepBlock('Warm pnpm store')).toContain(
+        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
+      );
+      // The frozen install still runs on a hit and re-verifies the tree.
+      const installStep = stepBlock('Install dependencies');
+      expect(installStep).not.toContain('if:');
+      expect(installStep).toContain('pnpm install --frozen-lockfile');
+    });
+
+    it('saves right after install, only from trusted same-repository refs', () => {
+      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
+        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
+      );
+      expect(action.trimEnd().endsWith(saveStep.trimEnd())).toBe(true);
+      expect(saveStep).toContain(
+        'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+      );
+      expect(saveStep).toContain(
+        "steps.node-modules-cache.outcome == 'success' &&"
+      );
+      expect(saveStep).toContain(
+        "steps.node-modules-cache.outputs.cache-hit != 'true' &&"
+      );
+      expect(saveStep).toContain("(github.event_name == 'push' ||");
+      expect(saveStep).toContain(
+        "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
+      );
+      for (const untrusted of [
+        'pull_request_target',
+        'workflow_run',
+        'merge_group',
+      ]) {
+        expect(saveStep).not.toContain(`== '${untrusted}'`);
+      }
+      expect(saveStep).toContain(cachedPaths);
+      expect(saveStep).toContain(
+        'key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}'
+      );
+    });
+  });
+
   it('disables cache teardown only for the exact Mac product lane', () => {
     expect(action).toMatch(
       /package_cache:\n\s+description:[^\n]+\n\s+required: false\n\s+default: 'true'/

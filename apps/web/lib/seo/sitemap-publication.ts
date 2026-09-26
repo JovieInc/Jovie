@@ -52,8 +52,7 @@ export function toContentRevisionDate(
   value: Date | string | number | null | undefined
 ): Date | undefined {
   if (value == null || value === '') return undefined;
-  const date =
-    value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date;
 }
@@ -177,7 +176,7 @@ export function collectSitemapInventoryViolations(
     ) {
       violations.push(`request-time lastmod on unchanged page: ${path}`);
     }
-    const handle = path.split('/').filter(Boolean)[0];
+    const handle = path.split('/').find(segment => segment.length > 0);
     if (handle && isOpaqueInternalProfileHandle(handle)) {
       violations.push(`QA identity included: ${path}`);
     }

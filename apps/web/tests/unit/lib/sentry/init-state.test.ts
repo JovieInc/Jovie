@@ -118,15 +118,12 @@ describe('isPublicRoute (from init)', () => {
     expect(isPublicRoute(pathname)).toBe(true);
   });
 
-  it.each([
-    '/app',
-    '/app/dashboard',
-    '/account',
-    '/billing',
-    '/onboarding',
-  ])('should not match dashboard route: %s', pathname => {
-    expect(isPublicRoute(pathname)).toBe(false);
-  });
+  it.each(['/app', '/app/dashboard', '/account', '/billing', '/onboarding'])(
+    'should not match dashboard route: %s',
+    pathname => {
+      expect(isPublicRoute(pathname)).toBe(false);
+    }
+  );
 });
 
 // ============================================================================
@@ -144,9 +141,12 @@ describe('detectSentryMode', () => {
     ['/onboarding', 'full'],
     ['/onboarding/step-2', 'full'],
     ['/sso-callback', 'full'],
-  ] as const)('should return "full" for dashboard route: %s', (pathname, expected) => {
-    expect(detectSentryMode(pathname)).toBe(expected);
-  });
+  ] as const)(
+    'should return "full" for dashboard route: %s',
+    (pathname, expected) => {
+      expect(detectSentryMode(pathname)).toBe(expected);
+    }
+  );
 
   it.each([
     ['/', 'lite'],
@@ -156,9 +156,12 @@ describe('detectSentryMode', () => {
     ['/claim', 'lite'],
     ['/beyonce', 'lite'],
     ['/taylor-swift', 'lite'],
-  ] as const)('should return "lite" for public route: %s', (pathname, expected) => {
-    expect(detectSentryMode(pathname)).toBe(expected);
-  });
+  ] as const)(
+    'should return "lite" for public route: %s',
+    (pathname, expected) => {
+      expect(detectSentryMode(pathname)).toBe(expected);
+    }
+  );
 
   it('should return "lite" for unknown routes (safe default)', () => {
     expect(detectSentryMode('/some-random-path')).toBe('lite');

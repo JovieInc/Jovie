@@ -1,30 +1,19 @@
 import type { Metadata } from 'next';
-import {
-  SUPPORT_FAQ_ITEMS,
-  SupportPageContent,
-} from '@/components/organisms/SupportPageContent';
+import { SupportPageContent } from '@/components/organisms/SupportPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { SUPPORT_FAQ_ITEMS, SUPPORT_SEO_COPY } from '@/data/supportCopy';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
 export const metadata: Metadata = {
   title: 'Support',
-  description:
-    'Get help with Jovie. Browse documentation, find answers to common questions, or contact our support team.',
-  keywords: [
-    'Jovie support',
-    'Jovie help',
-    'Jovie documentation',
-    'music smart links help',
-    'artist profile support',
-    'Jovie contact',
-  ],
+  description: SUPPORT_SEO_COPY.description,
+  keywords: [...SUPPORT_SEO_COPY.keywords],
   alternates: {
     canonical: `${BASE_URL}/support`,
   },
   openGraph: {
     title: `Support - ${APP_NAME}`,
-    description:
-      'Get help with Jovie. Browse documentation, find answers to common questions, or contact our support team.',
+    description: SUPPORT_SEO_COPY.description,
     url: `${BASE_URL}/support`,
     type: 'website',
   },
