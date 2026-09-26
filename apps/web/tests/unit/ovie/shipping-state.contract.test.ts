@@ -1743,3 +1743,201 @@ describe('shipping-state security', () => {
     );
   });
 });
+
+describe('truthful terminal-failure and ship-time semantics', () => {
+  it('never aliases blocked work as a terminal failure', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [
+            { issue_identifier: 'JOV-1' },
+            { issue_identifier: 'JOV-2' },
+          ],
+        }),
+      })
+    );
+
+    expect(projection.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+    expect(projection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('measures terminal failures only from dead-letter evidence', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [],
+          deadLetterCount: 3,
+        }),
+      })
+    );
+
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 3,
+    });
+    expect(
+      projection.sources['symphony-runtime'].counts.terminalFailures
+    ).toEqual({ state: 'measured-nonzero', value: 3 });
+  });
+
+  it.each([0, 2])(
+    'measures dead-letter receipts at the named authority dir: %i',
+    async receiptCount => {
+      const names = Array.from(
+        { length: receiptCount },
+        (_, index) => `JOV-${index + 1}.json`
+      );
+      const readDir = vi.fn(async () => names);
+      const readFile = vi.fn(async () =>
+        JSON.stringify({
+          schema: 'symphony-issue-dead-letter/v1',
+          status: 'dead-lettered',
+          issue: 'JOV-1',
+        })
+      );
+      const readers = createLiveShippingStateReaders({
+        readFile,
+        readDir,
+        fetch: vi.fn(async () =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                generated_at: T0,
+                running: [],
+                retrying: [],
+                blocked: [],
+              }),
+              { status: 200 }
+            )
+          )
+        ),
+      });
+
+      const read = await readers['symphony-runtime']();
+      expect(read).toMatchObject({
+        status: 'ok',
+        payload: { deadLetterCount: receiptCount },
+      });
+      const projection = await publish({ 'symphony-runtime': read });
+      expect(projection.terminalFailures).toEqual(
+        receiptCount === 0
+          ? { state: 'measured-zero', value: 0 }
+          : { state: 'measured-nonzero', value: receiptCount }
+      );
+    }
+  );
+
+  it('measures a missing dead-letter dir as zero and malformed receipts as partial', async () => {
+    const stateResponse = () =>
+      new Response(
+        JSON.stringify({
+          generated_at: T0,
+          running: [],
+          retrying: [],
+          blocked: [],
+        }),
+        { status: 200 }
+      );
+
+    const missingDir = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      readDir: vi.fn(async () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }),
+      fetch: vi.fn(async () => Promise.resolve(stateResponse())),
+    });
+    const emptyRead = await missingDir['symphony-runtime']();
+    expect(emptyRead).toMatchObject({
+      status: 'ok',
+      payload: { deadLetterCount: 0 },
+    });
+    const emptyProjection = await publish({ 'symphony-runtime': emptyRead });
+    expect(emptyProjection.terminalFailures).toEqual({
+      state: 'measured-zero',
+      value: 0,
+    });
+
+    resetShippingStatePublisher();
+    const malformed = createLiveShippingStateReaders({
+      readFile: vi.fn(async () => '{not-json'),
+      readDir: vi.fn(async () => ['JOV-9.json']),
+      fetch: vi.fn(async () => Promise.resolve(stateResponse())),
+    });
+    const partialRead = await malformed['symphony-runtime']();
+    expect(partialRead).toMatchObject({ status: 'ok', truncated: true });
+    expect(partialRead.payload).not.toHaveProperty('deadLetterCount');
+    const partialProjection = await publish({
+      'symphony-runtime': partialRead,
+    });
+    expect(partialProjection.sources['symphony-runtime'].state).toBe(
+      'degraded'
+    );
+    expect(partialProjection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('requires matched work/build identity before computing ship time', async () => {
+    const matching = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [] },
+          {
+            sourceTimestamp: T0,
+            correlation: { sha: SHA },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          {
+            sourceTimestamp: '2026-08-22T00:04:00.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+          }
+        ),
+      })
+    );
+    expect(matching.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 240,
+    });
+
+    resetShippingStatePublisher();
+    const unmatched = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [] },
+          {
+            sourceTimestamp: T0,
+            correlation: { sha: SHA_B },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          {
+            sourceTimestamp: '2026-08-22T00:04:00.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+          }
+        ),
+      })
+    );
+    expect(unmatched.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+});
