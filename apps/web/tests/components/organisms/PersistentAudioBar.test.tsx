@@ -28,6 +28,7 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
+const prefetch = vi.fn();
 let pathname = '/app';
 let searchParams = new URLSearchParams();
 
@@ -73,7 +74,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, prefetch }),
 }));
 
 let mockPrefersReducedMotion = false;
@@ -149,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };

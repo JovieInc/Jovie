@@ -285,6 +285,7 @@ export function TrackSidebar({
       id: track.id,
       title: track.title,
       audioUrl: playableUrl,
+      releaseId: track.releaseId,
       releaseTitle: track.releaseTitle,
       artworkUrl: track.releaseArtworkUrl,
       hasLyrics: Boolean(track.lyrics?.trim()),

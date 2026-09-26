@@ -182,7 +182,7 @@ This project includes comprehensive guidelines for AI coding tools:
 
 ### For Cursor and Other AI Tools
 
-- See [.cursorrules](.cursorrules) for guidelines
+- See [AGENTS.md](AGENTS.md) for guidelines
 - Follow the native integration approach
 - Maintain security best practices
 

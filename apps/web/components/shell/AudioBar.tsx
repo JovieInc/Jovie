@@ -88,6 +88,7 @@ export function AudioBar({
   onToggleWaveform,
   lyricsActive,
   onOpenLyrics,
+  onPrefetchLyrics,
   track,
   className,
 }: {
@@ -107,6 +108,9 @@ export function AudioBar({
   readonly onToggleWaveform?: () => void;
   readonly lyricsActive?: boolean;
   readonly onOpenLyrics?: () => void;
+  /** Intent hook — fires on hover/focus of the lyrics toggle so the caller can
+   * warm the lyrics route before click (JOV-6544). */
+  readonly onPrefetchLyrics?: () => void;
   readonly track: AudioBarTrack;
   readonly className?: string;
 }) {
@@ -172,6 +176,8 @@ export function AudioBar({
           label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
           shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
+          onMouseEnter={onPrefetchLyrics}
+          onFocus={onPrefetchLyrics}
           active={lyricsActive}
           tooltipSide='top'
           tone='ghost'

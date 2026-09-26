@@ -11,6 +11,9 @@ export interface IconBtnProps {
   readonly children: React.ReactNode;
   readonly label: string;
   readonly onClick?: () => void;
+  /** Intent signals (e.g. route prefetch on hover/focus). Optional. */
+  readonly onMouseEnter?: () => void;
+  readonly onFocus?: () => void;
   readonly active?: boolean;
   readonly shortcut?: ShortcutHint;
   readonly tooltipSide?: 'top' | 'bottom' | 'right' | 'left';
@@ -23,6 +26,8 @@ export function IconBtn({
   children,
   label,
   onClick,
+  onMouseEnter,
+  onFocus,
   active,
   shortcut,
   tooltipSide = 'bottom',
@@ -36,6 +41,8 @@ export function IconBtn({
       <button
         type='button'
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onFocus={onFocus}
         data-testid={testId}
         className={cn(
           // Square at rest (no border); full circle + soft fill on hover only (JOV-3511).
