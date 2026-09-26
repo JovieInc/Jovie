@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -218,18 +219,25 @@ describe('live public profile lock', () => {
       'data-layout',
       'compact'
     );
+    // The desktop surface is server-rendered (hidden) on mobile (JOV-6452);
+    // jsdom ignores the CSS that hides it, so scope to the compact slot.
+    const compact = within(
+      screen
+        .getByTestId('public-profile-layout-shell')
+        .querySelector('.public-profile-layout-compact-slot') as HTMLElement
+    );
     for (const label of ['Home', 'Music', 'Shows', 'About', 'Menu']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+      expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    fireEvent.click(compact.getByRole('button', { name: 'Release credits' }));
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('profile-drawer-overlay'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(compact.getByRole('button', { name: 'Menu' }));
     expect(
       await screen.findByRole('menuitem', { name: 'Share Profile' })
     ).toBeInTheDocument();
