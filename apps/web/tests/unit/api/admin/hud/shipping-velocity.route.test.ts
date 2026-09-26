@@ -358,46 +358,51 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   it.each([
     ['future', '2026-08-30T12:00:00.001Z'],
     ['invalid', 'not-a-timestamp'],
-  ])('refetches instead of serving a %s cache timestamp', async (_label, cachedAt) => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
-    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
-    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
-    hoisted.env.HUD_GITHUB_REPO = 'jovie';
-    hoisted.getRedis.mockReturnValue({
-      get: vi.fn().mockResolvedValue({
-        data: [],
-        range: '7d',
-        cachedAt,
-        observation: 'empty',
-      }),
-      set: vi.fn(),
-    });
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          data: {
-            repository: {
-              pullRequests: {
-                nodes: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
+  ])(
+    'refetches instead of serving a %s cache timestamp',
+    async (_label, cachedAt) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+      hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+      hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+      hoisted.env.HUD_GITHUB_REPO = 'jovie';
+      hoisted.getRedis.mockReturnValue({
+        get: vi.fn().mockResolvedValue({
+          data: [],
+          range: '7d',
+          cachedAt,
+          observation: 'empty',
+        }),
+        set: vi.fn(),
+      });
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: {
+              repository: {
+                pullRequests: {
+                  nodes: [],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
               },
             },
-          },
-        }),
-        { status: 200 }
-      )
-    );
-    vi.stubGlobal('fetch', fetchMock);
+          }),
+          { status: 200 }
+        )
+      );
+      vi.stubGlobal('fetch', fetchMock);
 
-    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
-    const response = await GET(
-      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
-    );
+      const { GET } = await import(
+        '@/app/api/admin/hud/shipping-velocity/route'
+      );
+      const response = await GET(
+        new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+      );
 
-    expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('fails unavailable instead of projecting malformed GitHub data as zero', async () => {
     hoisted.env.HUD_GITHUB_TOKEN = 'test-token';

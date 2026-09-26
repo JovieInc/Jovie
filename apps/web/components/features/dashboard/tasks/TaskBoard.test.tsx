@@ -39,15 +39,16 @@ describe('TaskBoard geometry', () => {
     );
   });
 
-  it.each([
-    0, 1, 3, 4,
-  ])('uses the same responsive grid contract for %s visible columns', columnCount => {
-    const expectedColumnCount = Math.max(columnCount, 1);
+  it.each([0, 1, 3, 4])(
+    'uses the same responsive grid contract for %s visible columns',
+    columnCount => {
+      const expectedColumnCount = Math.max(columnCount, 1);
 
-    expect(getTaskBoardGridTemplate(columnCount)).toBe(
-      `repeat(${expectedColumnCount}, minmax(0, 1fr))`
-    );
-  });
+      expect(getTaskBoardGridTemplate(columnCount)).toBe(
+        `repeat(${expectedColumnCount}, minmax(0, 1fr))`
+      );
+    }
+  );
 
   it('keeps board create actions at 32px on desktop with mobile hit room', () => {
     const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');

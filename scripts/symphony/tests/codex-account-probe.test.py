@@ -487,6 +487,44 @@ class CodexAccountProbeTests(unittest.TestCase):
         self.assertGreater(path.stat().st_mtime, before)
         self.assertTrue(home_log.read_text().strip().endswith("account-b"))
 
+    def test_rpc_teardown_does_not_wait_out_the_deadline_on_an_exited_server(self):
+        # Regression: the app-server exits (or dies on SIGTERM) as soon as the
+        # read is answered, but stays an unreaped zombie of the probe until
+        # teardown reaps it. kill(pid, 0) succeeds on a zombie, so teardown
+        # used to treat it as alive and burn its full 1s grace deadline on
+        # every probe. Measure from the answer to the probe's exit.
+        path = self.write_ready_state()
+        answered = self.root / "answered-at"
+        server = self.root / "exiting-codex"
+        server.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys, time\n"
+            "for line in sys.stdin:\n"
+            "    message = json.loads(line)\n"
+            "    if message.get('method') == 'initialize':\n"
+            "        print(json.dumps({'id': message['id'], 'result': {}}), flush=True)\n"
+            "    elif message.get('method') == 'account/rateLimits/read':\n"
+            "        with open(os.environ['ANSWERED_FILE'], 'w') as out:\n"
+            "            out.write(repr(time.time()))\n"
+            "        print(json.dumps({'id': message['id'], 'result': {'rateLimits': {'primary': {'usedPercent': 10.0, 'resetsAt': 0}}}}), flush=True)\n"
+            "        break\n"
+        )
+        server.chmod(0o755)
+        result = self.run_probe(
+            CODEX_ACCOUNT_PROBE_MODE="refresh-freshness",
+            CODEX_REAL_BIN=str(server),
+            ANSWERED_FILE=str(answered),
+        )
+        finished = time.time()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(path.read_text())["capacityObservationSource"],
+            "app_server_rate_limits_read/v1",
+        )
+        # The old teardown could not return in under its 1s grace deadline;
+        # a drained teardown plus the state commit takes ~0.1-0.2s.
+        self.assertLess(finished - float(answered.read_text()), 0.8)
+
     def test_refresh_leaves_stale_state_untouched_when_exhausted_or_unknown(self):
         path = self.write_ready_state()
         before = path.read_bytes()
