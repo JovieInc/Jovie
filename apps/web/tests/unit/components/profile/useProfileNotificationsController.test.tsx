@@ -6,25 +6,6 @@ import { useProfileNotificationsController } from '@/components/organisms/hooks/
 const mockStatusQuery = vi.fn();
 const mockUnsubscribeMutation = vi.fn();
 
-// simple localStorage mock for JSDOM-less env
-const localStore: Record<string, string> = {};
-global.localStorage = {
-  getItem: (key: string) => localStore[key] ?? null,
-  setItem: (key: string, value: string) => {
-    localStore[key] = value;
-  },
-  removeItem: (key: string) => {
-    delete localStore[key];
-  },
-  clear: () => {
-    Object.keys(localStore).forEach(k => delete localStore[k]);
-  },
-  key: (index: number) => Object.keys(localStore)[index] ?? null,
-  get length() {
-    return Object.keys(localStore).length;
-  },
-} as unknown as Storage;
-
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useNotificationStatusQuery: (...args: unknown[]) => mockStatusQuery(...args),
   useUnsubscribeNotificationsMutation: () => ({

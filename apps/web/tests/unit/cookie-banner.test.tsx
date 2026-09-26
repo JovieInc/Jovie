@@ -106,7 +106,9 @@ describe('CookieActions', () => {
       'height',
       'padding',
     ] as const) {
-      expect(acceptAll).toHaveStyle({ [property]: rejectAll.style[property] });
+      // Compare authored inline styles: jsdom 30 resolves undefined var()
+      // tokens to initial computed values, which toHaveStyle would compare.
+      expect(acceptAll.style[property]).toBe(rejectAll.style[property]);
     }
     expect(rejectAll).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
     expect(customize).toHaveStyle({ borderRadius: 'var(--radius-sm)' });

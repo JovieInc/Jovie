@@ -44,10 +44,11 @@ const multipleSizes: AvatarSize[] = [
 describe('ProfilePhotoContextMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // jsdom 30's Blob has no stream(), so undici's Response cannot read it.
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        new Response(new Blob(['ok']), {
+        new Response(new TextEncoder().encode('ok'), {
           status: 200,
           headers: { 'content-type': 'image/png' },
         })

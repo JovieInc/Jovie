@@ -35,8 +35,13 @@ describe('convertHeicToJpeg', () => {
       lastModified: 123,
     });
     mockHeic2any.mockRejectedValue(new Error('Unsupported HEIC variant'));
+    // jsdom 30's Blob has no stream(), so undici's Response cannot read it;
+    // raw bytes plus the content-type header model the same response.
     mockFetchWithTimeoutResponse.mockResolvedValue(
-      new Response(new Blob(['jpeg'], { type: 'image/jpeg' }), { status: 200 })
+      new Response(new TextEncoder().encode('jpeg'), {
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' },
+      })
     );
 
     const converted = await convertHeicToJpeg(heic);

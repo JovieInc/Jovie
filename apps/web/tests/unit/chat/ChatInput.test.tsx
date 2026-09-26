@@ -17,6 +17,7 @@ import {
 } from '@/components/features/chat/Composer';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import * as largeTextPaste from '@/lib/chat/large-text-paste';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -410,7 +411,9 @@ describe('ChatInput', () => {
 
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
-    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
+    expect(surface.style.maxWidth).toBe(
+      serializedDeclaration('max-width', 'min(calc(100vw - 32px), 45rem)')
+    );
     expect(surface.style.borderRadius).toBe('9999px');
 
     expect(screen.getByTestId('chat-composer-input-row').className).toContain(

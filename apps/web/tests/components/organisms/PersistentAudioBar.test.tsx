@@ -21,6 +21,7 @@ import {
 } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const playNext = vi.fn().mockResolvedValue(undefined);
@@ -173,7 +174,9 @@ describe('PersistentAudioBar', () => {
     for (const surface of idleSurfaces) {
       expect(surface).toHaveAttribute('aria-hidden', 'true');
       expect(surface).toHaveAttribute('inert');
-      expect(surface.style.maxHeight).toBe('0');
+      expect(surface.style.maxHeight).toBe(
+        serializedDeclaration('max-height', '0')
+      );
       expect(surface.style.pointerEvents).toBe('none');
     }
     // The idle tray stays in document flow so opening it reserves shell space

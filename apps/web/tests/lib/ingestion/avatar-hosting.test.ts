@@ -31,13 +31,15 @@ describe('avatar-hosting copyAvatarToBlob', () => {
   });
 
   it('handles missing content-type header without toLowerCase crash', async () => {
+    // jsdom 30's Blob has no stream(), so undici's Response cannot read it.
+    // A raw byte body likewise carries no content-type header.
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(new Blob(['avatar-bytes']), { status: 200 })
-        )
+      vi.fn().mockResolvedValue(
+        new Response(new TextEncoder().encode('avatar-bytes'), {
+          status: 200,
+        })
+      )
     );
 
     const result = await copyAvatarToBlob(

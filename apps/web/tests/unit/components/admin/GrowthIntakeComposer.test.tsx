@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrowthIntakeComposer } from '@/features/admin/leads/GrowthIntakeComposer';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const refreshMock = vi.fn();
 const ingestMutateAsyncMock = vi.fn();
@@ -193,7 +194,9 @@ describe('GrowthIntakeComposer', () => {
     });
 
     await user.click(
-      screen.getByRole('button', { name: 'Phoebe Bridgers Use' })
+      screen.getByRole('button', {
+        name: segmentedAccessibleName('Phoebe Bridgers', 'Use'),
+      })
     );
     await user.click(screen.getByRole('button', { name: 'Create Profile' }));
 
