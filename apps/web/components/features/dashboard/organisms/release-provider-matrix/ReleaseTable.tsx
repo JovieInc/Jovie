@@ -240,7 +240,7 @@ export function ReleaseTable({
       return (
         <div className='system-b-release-table-empty-state mx-4 my-3 flex flex-col'>
           <TableEmptyState
-            icon={<Icon name='Disc3' className='h-6 w-6' />}
+            icon={<Icon name='Layers' className='h-6 w-6' />}
             heading='No releases found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />
@@ -297,7 +297,7 @@ export function ReleaseTable({
       emptyState={
         <div className='system-b-release-table-empty-state m-3 flex flex-col'>
           <TableEmptyState
-            icon={<Icon name='Disc3' className='h-6 w-6' />}
+            icon={<Icon name='Layers' className='h-6 w-6' />}
             heading='No releases found'
             description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           />

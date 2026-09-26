@@ -26,9 +26,10 @@
  *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
+ *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,6 +65,16 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+/** Customer-facing copy surfaces gated by @jovie/copy (policy: canon/VOICE.md). */
+export const COPY_GATE_PATHS = Object.freeze([
+  'apps/web/content/**',
+  'apps/web/data/*Copy.ts',
+  'apps/web/lib/email/templates/**',
+  'apps/web/lib/chat/onboarding-script/**',
+]);
+export const COPY_GATE_COMMAND =
+  'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
+
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -351,6 +362,12 @@ const LANES = [
     run: runBillingCoverage,
   },
   {
+    id: 'copy-gate',
+    name: 'Copy gate (changed customer-facing lines)',
+    nextLocalCommand: COPY_GATE_COMMAND,
+    run: runCopyGate,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -391,6 +408,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'profile-admission',
     'billing-coverage',
+    'copy-gate',
     'structural',
   ]),
 });
@@ -586,6 +604,36 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+/**
+ * Delta copy gate: only lines this change adds are judged, so legacy copy debt
+ * stays advisory while new slop, harm, legal, or ToS violations cannot land.
+ * An unreadable diff fails closed.
+ */
+export function runCopyGate() {
+  const files = changedFiles(COPY_GATE_PATHS);
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Copy gate: changed-file diff unreadable; failing closed\n',
+    };
+  }
+  if (files.length === 0) {
+    return {
+      code: 0,
+      output: 'Copy gate skipped (no customer-facing copy changed)\n',
+      skipped: true,
+    };
+  }
+  const base = process.env.GITHUB_BASE_REF || 'main';
+  const diffBase =
+    shell(`git rev-parse --verify origin/${base}`).code === 0
+      ? `origin/${base}`
+      : process.env.TURBO_SCM_BASE || 'HEAD^1';
+  return shell(
+    `pnpm exec tsx packages/copy/cli.ts check --diff-base ${diffBase} ${files.map(file => `'${file}'`).join(' ')}`
+  );
 }
 
 export function listAllChangedFiles(cwd = REPO_ROOT) {
@@ -1095,9 +1143,250 @@ function runProfileAdmission() {
   return shell(LANE_COMMANDS['profile-admission']);
 }
 
-/** @param {{changedFileList?: readonly string[], execute?: (command: string) => {code: number, output: string}}} [opts] */
-export function runStructural(opts = {}) {
-  const execute = opts.execute ?? shell;
+/** Async twin of shell() so structural commands can overlap. */
+function shellAsync(command) {
+  return new Promise(resolveResult => {
+    const stdout = [];
+    const stderr = [];
+    const child = spawn(command, {
+      shell: true,
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.on('data', chunk => stdout.push(chunk));
+    child.stderr.on('data', chunk => stderr.push(chunk));
+    child.on('error', error =>
+      resolveResult({ code: 1, output: String(error) })
+    );
+    child.on('close', code =>
+      resolveResult({
+        code: code ?? 1,
+        output: `${Buffer.concat(stdout)}${Buffer.concat(stderr)}`,
+      })
+    );
+  });
+}
+
+/** Sized for GitHub ubuntu-latest (4 vCPU / 16 GB); CI web Vitest is 1 fork. */
+export const STRUCTURAL_DEFAULT_CONCURRENCY = 3;
+
+export function structuralConcurrency(value) {
+  const parsed = Number(String(value ?? '').trim());
+  return Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : STRUCTURAL_DEFAULT_CONCURRENCY;
+}
+
+/**
+ * Measured long poles (2026-09-25 local 4 vCPU: 224s, 170s, 126s of a 913s
+ * serial sum). Starting them first keeps the tail from waiting on one late
+ * command. A stale entry only loses the head start; output order is unchanged.
+ */
+const STRUCTURAL_LONG_POLES = Object.freeze([
+  'python3 -m pytest ',
+  'pnpm invariants:check',
+  'run-governor-bounded-codex-selector.sh',
+]);
+
+const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
+/** Entry points whose child commands are invisible in package.json text. */
+const OPAQUE_ENTRY_LOCKS = Object.freeze([
+  // Runs scripts Vitest suites with the default scripts/coverage directory.
+  ['scripts/run-affected-tests.mjs --control', 'coverage:scripts'],
+]);
+
+function packageScripts(dir) {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, dir, 'package.json'), 'utf8')
+    );
+    return pkg.scripts ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Expand `pnpm [--filter X] [run] <script>` aliases into [dir, segment] pairs. */
+function expandSegments(command, dir = '.', depth = 0) {
+  const segments = [];
+  for (const raw of command.split(/&&|\|\||;/u)) {
+    const segment = raw.trim();
+    const alias =
+      /^pnpm(?:\s+--filter(?:=|\s+)(\S+))?(?:\s+run)?\s+([\w:-]+)$/u.exec(
+        segment
+      );
+    const aliasDir = alias?.[1] ? PACKAGE_DIRS[alias[1]] : dir;
+    const body = alias && aliasDir && packageScripts(aliasDir)[alias[2]];
+    if (body && depth < 5) {
+      segments.push(...expandSegments(body, aliasDir, depth + 1));
+    } else {
+      segments.push([dir, segment]);
+    }
+  }
+  return segments;
+}
+
+function vitestRoot(dir, segment) {
+  if (/--filter(?:=|\s+)@jovie\/web\b|--dir\s+apps\/web\b/u.test(segment)) {
+    return 'apps/web';
+  }
+  if (/--root\s+scripts\b|--config\s+scripts\/vitest/u.test(segment)) {
+    return 'scripts';
+  }
+  return dir;
+}
+
+/**
+ * Shared writable state a structural command touches; commands sharing a lock
+ * never overlap. Vitest cleans and rewrites its coverage reportsDirectory
+ * (default `<root>/coverage`; relative dirs nest inside it), coverage.py data
+ * is keyed by COVERAGE_FILE, and pytest owns the repo-root `.pytest_cache`.
+ */
+export function structuralLocks(command) {
+  const locks = new Set();
+  for (const [dir, segment] of expandSegments(command)) {
+    for (const [entry, lock] of OPAQUE_ENTRY_LOCKS) {
+      if (segment.includes(entry)) locks.add(lock);
+    }
+    if (/\bvitest\b/u.test(segment) && /--coverage\b/u.test(segment)) {
+      const reports = /--coverage\.reportsDirectory=("[^"]+"|\S+)/u
+        .exec(segment)?.[1]
+        ?.replaceAll('"', '');
+      locks.add(
+        reports && /^(?:\/|\$\{RUNNER_TEMP)/u.test(reports)
+          ? `coverage:${reports}`
+          : `coverage:${vitestRoot(dir, segment)}`
+      );
+    }
+    for (const match of segment.matchAll(/COVERAGE_FILE=("[^"]+"|\S+)/gu)) {
+      locks.add(`pycoverage:${match[1].replaceAll('"', '')}`);
+    }
+    if (/python3 -m pytest\b/u.test(segment)) locks.add('pytest-cache');
+  }
+  return [...locks].sort();
+}
+
+/**
+ * Run commands with bounded concurrency. Commands sharing a lock run one at a
+ * time in list order. After the first failure no new command starts, but
+ * in-flight commands finish. A synchronous executor completes before the next
+ * command is considered, so it behaves exactly like the old serial loop.
+ * `first` lists indexes (long poles) to start ahead of list order; they never
+ * jump an earlier command that shares one of their locks.
+ * @param {readonly string[]} commands
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number}} opts
+ * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
+ * @typedef {{code: number, output: string}} ExecResult
+ */
+export function runCommandPool(commands, opts) {
+  const { execute, concurrency } = opts;
+  const locks = opts.locks ?? commands.map(() => []);
+  const now = opts.now ?? Date.now;
+  const results = new Array(commands.length);
+  const first = new Set(opts.first ?? []);
+  const pending = commands
+    .map((_, index) => index)
+    .sort((a, b) => Number(first.has(b)) - Number(first.has(a)) || a - b);
+  const blocked = index =>
+    locks[index].some(lock => held.has(lock)) ||
+    pending.some(
+      other => other < index && locks[other].some(l => locks[index].includes(l))
+    );
+  const held = new Set();
+  let running = 0;
+  let failed = false;
+  let pumping = false;
+  let repump = false;
+
+  return new Promise(resolveAll => {
+    const finish = (index, startedAt, result) => {
+      running -= 1;
+      for (const lock of locks[index]) held.delete(lock);
+      const code = Number.isInteger(result?.code) ? result.code : 1;
+      results[index] = {
+        code,
+        output: String(result?.output ?? ''),
+        durationMs: Math.max(0, now() - startedAt),
+      };
+      if (code !== 0) failed = true;
+      pump();
+    };
+    const start = index => {
+      running += 1;
+      for (const lock of locks[index]) held.add(lock);
+      const startedAt = now();
+      const onError = error =>
+        finish(index, startedAt, {
+          code: 1,
+          output:
+            error instanceof Error
+              ? error.stack || error.message
+              : String(error),
+        });
+      let result;
+      try {
+        result = execute(commands[index]);
+      } catch (error) {
+        onError(error);
+        return;
+      }
+      if (result instanceof Promise) {
+        result.then(value => finish(index, startedAt, value), onError);
+      } else {
+        finish(index, startedAt, result);
+      }
+    };
+    const pump = () => {
+      if (pumping) {
+        repump = true;
+        return;
+      }
+      pumping = true;
+      do {
+        repump = false;
+        while (!failed && running < concurrency) {
+          const slot = pending.findIndex(index => !blocked(index));
+          if (slot === -1) break;
+          start(pending.splice(slot, 1)[0]);
+        }
+      } while (repump);
+      pumping = false;
+      if (running === 0 && (failed || pending.length === 0)) {
+        resolveAll(results);
+      }
+    };
+    pump();
+  });
+}
+
+/** Markdown table of structural command wall times, slowest first. */
+export function formatStructuralTimings(timings, wallMs) {
+  if (!timings?.length) return '';
+  const total = timings.reduce((sum, t) => sum + t.durationMs, 0);
+  const seconds = ms => `${(ms / 1000).toFixed(1)}s`;
+  const rows = [...timings]
+    .sort((a, b) => b.durationMs - a.durationMs || a.index - b.index)
+    .map(t => {
+      const label = commandLabel(t.command, 100)
+        .replaceAll('|', '\\|')
+        .replaceAll('`', "'");
+      const result = t.code === 0 ? 'pass' : `exit ${t.code}`;
+      return `| ${t.index + 1} | ${seconds(t.durationMs)} | ${result} | \`${label}\` |`;
+    });
+  const wall = Number.isFinite(wallMs) ? `wall ${seconds(wallMs)}, ` : '';
+  return [
+    `#### Structural command timings (${wall}sum ${seconds(total)}, ${timings.length} commands)`,
+    '',
+    '| # | Time | Result | Command |',
+    '| --- | --- | --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
+/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>}} [opts] */
+export async function runStructural(opts = {}) {
+  const execute = opts.execute ?? shellAsync;
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
     return {
       code: 0,
@@ -1258,24 +1547,48 @@ export function runStructural(opts = {}) {
     };
   }
 
-  let combined = '';
-  for (const [index, cmd] of parts.entries()) {
-    const result = execute(cmd);
-    combined += result.output;
-    if (result.code !== 0) {
-      return {
-        code: result.code,
-        output: structuralFailureExcerpt(
-          cmd,
-          result.output,
-          index,
-          parts.length,
-          result.code
-        ),
-      };
-    }
+  const concurrency =
+    opts.concurrency ??
+    structuralConcurrency(process.env.CI_FAST_STRUCTURAL_CONCURRENCY);
+  const startedAt = Date.now();
+  const results = await runCommandPool(parts, {
+    execute,
+    concurrency,
+    locks: parts.map(structuralLocks),
+    // Serial runs gain nothing from reordering; keep strict list order there.
+    first:
+      concurrency > 1
+        ? parts.flatMap((command, index) =>
+            STRUCTURAL_LONG_POLES.some(pole => command.includes(pole))
+              ? [index]
+              : []
+          )
+        : [],
+  });
+  const wallMs = Date.now() - startedAt;
+  const timings = results.flatMap((result, index) =>
+    result ? [{ index, command: parts[index], ...result }] : []
+  );
+  // First failure in list order, not completion order.
+  const failedIndex = results.findIndex(result => result && result.code !== 0);
+  if (failedIndex !== -1) {
+    const { code, output } = results[failedIndex];
+    return {
+      code,
+      output: structuralFailureExcerpt(
+        parts[failedIndex],
+        output,
+        failedIndex,
+        parts.length,
+        code
+      ),
+      timings,
+      wallMs,
+    };
   }
-  return { code: 0, output: combined };
+  // Deterministic list order regardless of completion order.
+  const combined = results.map(result => result.output).join('');
+  return { code: 0, output: combined, timings, wallMs };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -1289,7 +1602,7 @@ function annotateFailure(lane, logExcerpt) {
   if (short) console.error(`::error::${short}`);
 }
 
-function writeSummary(results, groupId) {
+function writeSummary(results, groupId, timingTables = []) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
 
@@ -1315,6 +1628,7 @@ function writeSummary(results, groupId) {
       lines.push('```');
     }
   }
+  for (const table of timingTables) lines.push('', table);
   lines.push('');
   appendFileSync(summaryPath, `${lines.join('\n')}\n`);
 }
@@ -1355,10 +1669,12 @@ function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
 
-function main() {
+async function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
   const results = [];
+  /** @type {string[]} */
+  const timingTables = [];
   /** @type {string | undefined} */
   let setupError;
   const failFast = failFastEnabled();
@@ -1391,7 +1707,7 @@ function main() {
 
       let outcome;
       try {
-        outcome = lane.run();
+        outcome = await lane.run();
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);
@@ -1421,6 +1737,14 @@ function main() {
       } else if (logExcerpt && status !== 'success') {
         console.log(logExcerpt);
       }
+      const timingTable = formatStructuralTimings(
+        outcome.timings,
+        outcome.wallMs
+      );
+      if (timingTable) {
+        console.log(`\n${timingTable}`);
+        timingTables.push(timingTable);
+      }
 
       results.push({
         id: lane.id,
@@ -1437,7 +1761,7 @@ function main() {
     console.error(`[ci-fast] setup failed: ${setupError}`);
   }
 
-  writeSummary(results, laneGroup);
+  writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
 
   if (setupError) {
@@ -1459,5 +1783,5 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 ) {
-  main();
+  await main();
 }

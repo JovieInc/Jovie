@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
   chmodSync,
   existsSync,
@@ -11,13 +12,20 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { selectLanes } from '../../ci-fast-lanes.mjs';
+import {
+  STRUCTURAL_DEFAULT_CONCURRENCY,
+  selectLanes,
+} from '../../ci-fast-lanes.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
     await importOriginal()
   );
-  return { ...actual, spawnSync: vi.fn(actual.spawnSync) };
+  return {
+    ...actual,
+    spawn: vi.fn(actual.spawn),
+    spawnSync: vi.fn(actual.spawnSync),
+  };
 });
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -37,6 +45,7 @@ const tempRoots = [];
 
 afterEach(() => {
   vi.mocked(spawnSync).mockRestore();
+  vi.mocked(spawn).mockRestore();
   vi.unstubAllEnvs();
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -638,34 +647,34 @@ describe('production release supersession execution', () => {
 });
 
 describe('required structural release regression dispatch', () => {
-  it.each([0, 23])('propagates operational selector exit %s', exitCode => {
+  it.each([0, 23])('propagates operational exit %s', async exitCode => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     const commands = [];
-    vi.mocked(spawnSync).mockImplementation(command => {
+    const target = 'production-release-supersession.test.mjs';
+    vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      return {
-        status: command.includes('production-release-supersession.test.mjs')
-          ? exitCode
-          : 0,
-        stdout: '',
-        stderr: '',
-        pid: 0,
-        signal: null,
-        output: [null, '', ''],
-      };
+      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
+      const child = /** @type {any} */ (new EventEmitter());
+      child.stdout = child.stderr = new EventEmitter();
+      const code = command.includes(target) ? exitCode : 0;
+      setImmediate(() => child.emit('close', code));
+      return child;
     });
     const lane = selectLanes('remaining').find(
       item => item.id === 'structural'
     );
-    const result = lane.run();
-    const index = commands.findIndex(command =>
-      command.includes('production-release-supersession.test.mjs')
-    );
+    const result = await lane.run();
+    const index = commands.findIndex(command => command.includes(target));
     expect(index).toBeGreaterThanOrEqual(0);
     expect(commands[index]).toContain('pnpm exec vitest --root scripts');
     expect(result.code).toBe(exitCode);
-    if (exitCode) expect(index).toBe(commands.length - 1);
+    // Fail fast: only commands already in flight may follow the failure.
+    if (exitCode) {
+      expect(commands.length - 1 - index).toBeLessThan(
+        STRUCTURAL_DEFAULT_CONCURRENCY
+      );
+    }
   });
 });

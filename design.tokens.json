@@ -57,15 +57,15 @@
       "$type": "color"
     },
     "text.secondary": {
-      "$value": "#d7dce8",
+      "$value": "#a0a5af",
       "$type": "color"
     },
     "text.tertiary": {
-      "$value": "#a8b0c3",
+      "$value": "#8f95a0",
       "$type": "color"
     },
     "text.quaternary": {
-      "$value": "#7d879d",
+      "$value": "#858b96",
       "$type": "color"
     },
     "text.disabled": {

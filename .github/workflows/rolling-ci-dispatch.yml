@@ -640,6 +640,8 @@ jobs:
           include=$(jq -er '.coveragePlan.coverageInclude | .[]' "$RUNNER_TEMP/hosted-repair/test-plan.json")
           test -n "$include"
           export JOVIE_COVERAGE_INCLUDE="$include"
+          related_tests=$(jq -r '.coveragePlan.relatedTests // [] | .[]' "$RUNNER_TEMP/hosted-repair/test-plan.json")
+          export JOVIE_COVERAGE_RELATED_TESTS="$related_tests"
           BASE_SHA=$(jq -er '.baseSha' "$RUNNER_TEMP/hosted-repair/test-plan.json")
           timeout --kill-after=20s 17m \
             pnpm --filter @jovie/web test:coverage --changed "$BASE_SHA" --bail 1
