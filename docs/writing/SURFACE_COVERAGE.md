@@ -90,8 +90,9 @@ sends that skip `socialReplyBatchRequestSchema` validation.
 
 Uncovered paths carry `rollout` slices routed to an accountable owner through
 JOV-3720. Coverage always reports a denominator and a reviewed version; no
-blanket "everywhere" claim is allowed. The weekly/manual advisory slop-gate
-policy is preserved; this issue adds no recurring automation.
+blanket "everywhere" claim is allowed. The weekly advisory Slop Gate is
+retired; `@jovie/copy` and the deterministic `copy-gate` ci-fast lane replace it
+(see `canon/VOICE.md`). This issue adds no recurring automation.
 
 ## GBrain authoring
 
