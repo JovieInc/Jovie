@@ -12,11 +12,6 @@ export const COMPANY_ACTIVITY_ROW_LIMIT = 24;
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
 
-/**
- * Exact work states exposed on the company activity feed. A merged PR is
- * never presented as deployed/public without a matching receipt or curated
- * digest row.
- */
 export const COMPANY_ACTIVITY_STATES = [
   'queued',
   'in-progress',
@@ -56,7 +51,6 @@ export type CompanyActivityRow = {
   readonly detail: string | null;
   readonly prNumber: number | null;
   readonly prUrl: string | null;
-  /** True only when a dogfood receipt claims this work done. */
   readonly receipted: boolean;
   readonly occurredAt: string | null;
   readonly href: string | null;
@@ -261,10 +255,6 @@ function compareRows(a: CompanyActivityRow, b: CompanyActivityRow): number {
   return a.id.localeCompare(b.id);
 }
 
-/**
- * Project the shared release-update sources into one company activity feed.
- * Missing sources degrade to their own status; they never invent rows.
- */
 export function composeCompanyActivity(input: {
   readonly operationalTasks?: OperationalTaskFeed | null;
   readonly pullRequests: OvieMacHudInFlightPullRequests;

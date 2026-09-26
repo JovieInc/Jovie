@@ -211,10 +211,6 @@ export async function getOvieMacHudInFlightPullRequests(): Promise<OvieMacHudInF
   }
 }
 
-/**
- * Curated public "What's New" rows for the activity feed (JOV-5322). These
- * come from the customer changelog projection, never from raw PR titles.
- */
 async function readPublicDigest(): Promise<OvieMacHudPublicDigest> {
   try {
     const releases = await getChangelogReleases();
