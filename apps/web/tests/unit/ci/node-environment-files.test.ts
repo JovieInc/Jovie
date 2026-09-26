@@ -14,10 +14,13 @@ const listedFiles: unknown = JSON.parse(readFileSync(listPath, 'utf8'));
 // any reference to the DOM, browser APIs, React, components, hooks, or an
 // explicit environment pragma keeps a file on jsdom. A listed file that starts
 // matching must be removed from the list (or rewritten to stay DOM-free).
+// Word boundaries keep identifiers such as `windowStart`, `readFile(`,
+// `clientTurnId` and `vi.useFakeTimers(` from reading as DOM or hook usage;
+// every listed file is also verified to pass under node before it is added.
 const DOM_OR_REACT_REFERENCE = new RegExp(
   [
-    'document',
-    'window',
+    '\\bdocument\\b',
+    '\\bwindow\\b',
     'navigator',
     'localStorage',
     'sessionStorage',
@@ -28,7 +31,7 @@ const DOM_OR_REACT_REFERENCE = new RegExp(
     'requestAnimationFrame',
     'IntersectionObserver',
     'ResizeObserver',
-    'location\\.',
+    'location\\??\\.',
     'jsdom',
     'DOMParser',
     'renderHook',
@@ -53,10 +56,10 @@ const DOM_OR_REACT_REFERENCE = new RegExp(
     'React',
     'jsx',
     '\\bhooks?/',
-    'use[A-Z]\\w+\\(',
+    '(?<!vi\\.)\\buse[A-Z]\\w+\\(',
     '@vitest-environment',
     'FormData',
-    'File\\(',
+    '\\bFile\\(',
     'DOMException',
     'atob',
     'btoa',
@@ -68,7 +71,7 @@ const DOM_OR_REACT_REFERENCE = new RegExp(
     "from '\\./[A-Z]",
     "from '@/lib/hooks",
     'posthog-js',
-    'client',
+    '\\bclient\\b',
   ].join('|')
 );
 
@@ -109,6 +112,30 @@ describe('tests/node-environment-files.json', () => {
       return match ? [`${entry} (references "${match[0]}")`] : [];
     });
     expect(domBound).toEqual([]);
+  });
+
+  it('flags DOM and hook usage but not identifiers that only contain the words', () => {
+    for (const domUsage of [
+      'window.scrollTo(0, 0);',
+      "if (typeof window === 'undefined') return;",
+      "document.createElement('textarea');",
+      'const origin = globalThis.location?.origin;',
+      "new File(['a'], 'a.txt');",
+      'const [open, setOpen] = useState(false);',
+      "import { createAuthClient } from '@/lib/auth/client';",
+      "'use client';",
+    ]) {
+      expect(domUsage).toMatch(DOM_OR_REACT_REFERENCE);
+    }
+    for (const lookalike of [
+      "const windowStart = new Date('2026-01-01');",
+      "await request('/api/library/documents');",
+      "const source = await readFile('package.json', 'utf8');",
+      'vi.useFakeTimers();',
+      "const input = { clientTurnId: 'turn-1' };",
+    ]) {
+      expect(lookalike).not.toMatch(DOM_OR_REACT_REFERENCE);
+    }
   });
 
   it('lists only files that use no jest-dom matchers', () => {
