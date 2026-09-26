@@ -622,9 +622,26 @@ function structuralFailureExcerpt(command, output, index, count, code) {
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
 
+/**
+ * Files whose change can alter Biome's verdict on untouched files (config or
+ * the pinned Biome version). Linting only the changed files would let a
+ * formatter bump leave drift in every file the bump PR didn't touch (#18071).
+ */
+export const BIOME_TOOLCHAIN_FILES = Object.freeze([
+  'biome.json',
+  'biome.jsonc',
+  'package.json',
+  'pnpm-lock.yaml',
+]);
+
+export function biomeNeedsFullTree(changed) {
+  return changed.some(file => BIOME_TOOLCHAIN_FILES.includes(file));
+}
+
 function runBiome() {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch') {
+  const toolchain = changedFiles([...BIOME_TOOLCHAIN_FILES]);
+  if (event !== 'workflow_dispatch' && !biomeNeedsFullTree(toolchain ?? [])) {
     const files = changedFiles([
       '*.ts',
       '*.tsx',
