@@ -35,6 +35,13 @@ export interface ChangelogRelease {
   date: string;
   summary: string;
   sections: ChangelogSection;
+  /**
+   * 'release' = CalVer heading `## [26.9.5] - …`; 'daily' = date-keyed digest
+   * heading `## [YYYY-MM-DD]` (JOV-5762). Daily digests get stable date
+   * permalinks/IDs and never a fake `v` prefix; version-check only reads
+   * CalVer headings, so digests cannot mutate VERSION or tags.
+   */
+  kind: 'release' | 'daily';
 }
 
 export interface ChangelogParseResult {
@@ -55,6 +62,7 @@ export type ChangelogInlineNode =
     };
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SECTION_HEADING_RE = /^### (Featured|Added|Changed|Fixed|Removed)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
@@ -179,6 +187,20 @@ export function changelogInlineText(value: string): string {
   return parseChangelogInline(value).map(inlineNodeText).join('');
 }
 
+type ReleaseIdentity = Pick<ChangelogRelease, 'kind' | 'version'>;
+
+/** Display label: `v26.9.5` for CalVer releases, `2026-09-26` for digests. */
+export function changelogReleaseLabel(release: ReleaseIdentity): string {
+  return release.kind === 'daily' ? release.version : `v${release.version}`;
+}
+
+/** Stable anchor/feed ID segment — daily digests never get a fake `v`. */
+export function changelogReleaseAnchor(release: ReleaseIdentity): string {
+  return release.kind === 'daily'
+    ? `daily-${release.version}`
+    : `v${release.version}`;
+}
+
 /** Try to parse a version heading; returns a new release or 'unreleased' sentinel. */
 function parseVersionHeading(
   line: string
@@ -187,9 +209,10 @@ function parseVersionHeading(
   if (!match) return null;
   const [, version, date] = match;
   if (version.toLowerCase() === 'unreleased') return 'unreleased';
+  const daily = DATE_KEY_RE.test(version) && isValidDate(version);
   return {
     version,
-    date: date && isValidDate(date) ? date : '',
+    date: daily ? version : date && isValidDate(date) ? date : '',
     summary: '',
     sections: {
       featured: [],
@@ -198,6 +221,7 @@ function parseVersionHeading(
       fixed: [],
       removed: [],
     },
+    kind: daily ? 'daily' : 'release',
   };
 }
 

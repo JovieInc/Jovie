@@ -137,6 +137,7 @@ describe('sitemap', () => {
     getChangelogReleases.mockResolvedValue([
       {
         version: '26.8.0',
+        kind: 'release',
         date: '2026-08-14',
         summary: 'A concise release.',
         sections: {

@@ -18,6 +18,7 @@
 import { isInternalEntry } from './changelog-filter-rules.mjs';
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
 const FEATURED_SECTION_HEADING_RE =
   /^### (Featured|Added|Changed|Fixed|Removed)$/;
@@ -35,13 +36,14 @@ const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
  * @param {string} markdown - Raw CHANGELOG.md content
  * @param {{ includeFeatured?: boolean }} [options] - `includeFeatured`
  *   recognizes `### Featured` as a section (default false; see file header).
- * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
+ * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]>, kind: 'daily' | 'release' }> }}
  */
 export function parseChangelog(markdown, { includeFeatured = false } = {}) {
   const sectionHeadingRe = includeFeatured
     ? FEATURED_SECTION_HEADING_RE
     : SECTION_HEADING_RE;
   const lines = markdown.split('\n');
+  /** @type {Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]>, kind: 'daily' | 'release' }>} */
   const releases = [];
   const unreleased = {
     raw: '',
@@ -64,14 +66,24 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
       } else {
+        // Date-keyed headings are daily digests (JOV-5762): stable date
+        // permalinks, no fake `v` prefix, invisible to CalVer version-check.
+        const daily =
+          DATE_KEY_RE.test(version) &&
+          !Number.isNaN(Date.parse(`${version}T00:00:00Z`)) &&
+          new Date(`${version}T00:00:00Z`).toISOString().slice(0, 10) ===
+            version;
         currentBlock = releases.length;
         releases.push({
           version,
-          date: date || '',
+          date: daily ? version : date || '',
           raw: '',
           summary: '',
           sections: {},
           internalSections: {},
+          kind: /** @type {'daily' | 'release'} */ (
+            daily ? 'daily' : 'release'
+          ),
         });
       }
       continue;
@@ -136,7 +148,7 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
  * Get the latest (first) release after [Unreleased].
  *
  * @param {string} markdown
- * @returns {{ version: string, date: string, raw: string, sections: Record<string, string[]> } | null}
+ * @returns {{ version: string, date: string, raw: string, sections: Record<string, string[]>, kind: 'daily' | 'release' } | null}
  */
 export function getLatestRelease(markdown) {
   const { releases } = parseChangelog(markdown);

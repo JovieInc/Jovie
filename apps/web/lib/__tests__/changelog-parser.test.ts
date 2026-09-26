@@ -569,3 +569,56 @@ describe('parseChangelogInline', () => {
     ]);
   });
 });
+
+describe('daily digest headings (JOV-5762)', () => {
+  const DAILY_CHANGELOG = `# Changelog
+
+## [Unreleased]
+
+## [2026-09-26]
+
+> One verified daily digest.
+
+### Added
+
+- Search your name on the homepage to see matching artists.
+
+## [26.9.5] - 2026-09-14
+
+### Fixed
+
+- Profile page loading speed improved
+`;
+
+  it('parses a date-keyed heading as a daily digest, not a CalVer release', () => {
+    const result = parseChangelogDocument(DAILY_CHANGELOG);
+    expect(result.releases[0]).toMatchObject({
+      version: '2026-09-26',
+      date: '2026-09-26',
+      kind: 'daily',
+    });
+    expect(result.releases[1]).toMatchObject({
+      version: '26.9.5',
+      kind: 'release',
+    });
+  });
+
+  it('daily digests keep internal entries excluded and get date permalinks', async () => {
+    const { changelogReleaseAnchor, changelogReleaseLabel } = await import(
+      '../changelog-parser'
+    );
+    const [daily] = parseChangelog(DAILY_CHANGELOG);
+    expect(changelogReleaseLabel(daily)).toBe('2026-09-26');
+    expect(changelogReleaseAnchor(daily)).toBe('daily-2026-09-26');
+    expect(changelogReleaseLabel({ version: '26.9.5', kind: 'release' })).toBe(
+      'v26.9.5'
+    );
+  });
+
+  it('rejects invalid date keys as daily headings', () => {
+    const md = '## [2026-13-40]\n\n### Added\n- Something\n';
+    const result = parseChangelogDocument(md);
+    expect(result.sourceReleases[0]?.kind).toBe('release');
+    expect(result.sourceReleases[0]?.date).toBe('');
+  });
+});

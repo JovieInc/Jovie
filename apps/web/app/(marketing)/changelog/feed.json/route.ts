@@ -30,7 +30,8 @@ export async function GET() {
       _jovie: {
         tertiary: formatCustomerChangelogTertiary(
           entry.date,
-          entry.technicalVersion
+          entry.technicalVersion,
+          entry.technicalKind
         ),
       },
     })),

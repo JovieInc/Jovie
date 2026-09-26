@@ -1,4 +1,8 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import {
+  type ChangelogRelease,
+  changelogReleaseAnchor,
+} from '@/lib/changelog-parser';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
   formatCustomerChangelogTertiary,
@@ -8,8 +12,11 @@ import {
 // Fully static
 export const revalidate = false;
 
-export function atomEntryId(version: string): string {
-  return `${BASE_URL}/changelog#v${version}`;
+export function atomEntryId(
+  version: string,
+  kind: ChangelogRelease['kind'] = 'release'
+): string {
+  return `${BASE_URL}/changelog#${changelogReleaseAnchor({ version, kind })}`;
 }
 
 function versionPageUrl(version: string): string {
@@ -36,14 +43,15 @@ export async function GET() {
         : new Date().toISOString();
       const tertiary = formatCustomerChangelogTertiary(
         entry.date,
-        entry.technicalVersion
+        entry.technicalVersion,
+        entry.technicalKind
       );
       const contentHtml = `<p>${escapeXml(entry.summary)}</p>`;
 
       return `
     <entry>
       <title>${escapeXml(entry.title)}</title>
-      <id>${escapeXml(atomEntryId(entry.technicalVersion))}#${escapeXml(entry.slug)}</id>
+      <id>${escapeXml(atomEntryId(entry.technicalVersion, entry.technicalKind))}#${escapeXml(entry.slug)}</id>
       <link href="${escapeXml(versionPageUrl(entry.technicalVersion))}" rel="alternate"/>
       <updated>${updated}</updated>
       <summary>${escapeXml(tertiary)}</summary>

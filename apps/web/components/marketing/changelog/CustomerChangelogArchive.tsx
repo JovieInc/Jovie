@@ -93,7 +93,8 @@ function EntryRow({
 }) {
   const tertiary = formatCustomerChangelogTertiary(
     entry.date,
-    entry.technicalVersion
+    entry.technicalVersion,
+    entry.technicalKind
   );
   const hasLevel2 = Boolean(entry.explanation) || entry.supporting.length > 0;
   const hasLevel3 = entry.technical.length > 0;

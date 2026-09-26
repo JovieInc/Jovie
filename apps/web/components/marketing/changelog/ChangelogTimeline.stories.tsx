@@ -7,6 +7,7 @@ import '@/app/(marketing)/changelog/changelog-editorial.css';
 const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
   {
     version: '26.7.0',
+    kind: 'release',
     date: '2026-07-21',
     summary: 'A focused set of **public-facing** workflow improvements.',
     sections: {
@@ -19,6 +20,7 @@ const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
   },
   {
     version: '26.6.0',
+    kind: 'release',
     date: '2026-06-28',
     summary: 'Reliability and accessibility refinements.',
     sections: {

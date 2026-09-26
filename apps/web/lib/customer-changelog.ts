@@ -71,6 +71,7 @@ export const CustomerChangelogEntrySchema = z.object({
   availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
   media: CustomerChangelogMediaSchema,
   technicalVersion: z.string().min(1),
+  technicalKind: z.enum(['release', 'daily']).optional(),
   explanation: z.string(),
   supporting: z.array(z.string()),
   technical: z.array(z.string()),
@@ -184,14 +185,22 @@ export function splitCustomerChangelogOutcome(entry: string): {
   return { title: text, explanation: '' };
 }
 
-function slugify(title: string, version: string, index: number): string {
+function slugify(
+  title: string,
+  release: Pick<ChangelogRelease, 'kind' | 'version'>,
+  index: number
+): string {
   const base =
     title
       .toLowerCase()
       .replaceAll(/[^a-z0-9]+/g, '-')
       .replaceAll(/^-+|-+$/g, '')
       .slice(0, 48) || 'update';
-  return `${base}-v${version.replaceAll('.', '-')}-${index}`;
+  const suffix =
+    release.kind === 'daily'
+      ? `daily-${release.version}`
+      : `v${release.version.replaceAll('.', '-')}`;
+  return `${base}-${suffix}-${index}`;
 }
 
 function inferCapabilities(text: string): string[] {
@@ -237,10 +246,11 @@ export function formatCustomerChangelogDate(iso: string): string {
 
 export function formatCustomerChangelogTertiary(
   date: string,
-  version: string
+  version: string,
+  kind: 'release' | 'daily' = 'release'
 ): string {
   const formattedDate = formatCustomerChangelogDate(date);
-  const versionLabel = `v${version}`;
+  const versionLabel = kind === 'daily' ? version : `v${version}`;
   return formattedDate ? `${formattedDate} · ${versionLabel}` : versionLabel;
 }
 
@@ -271,7 +281,7 @@ export function projectCustomerChangelog(
         entries.push(
           CustomerChangelogEntrySchema.parse({
             title,
-            slug: slugify(title, release.version, index),
+            slug: slugify(title, release, index),
             date: release.date,
             summary,
             category: SECTION_CATEGORY[section],
@@ -280,6 +290,7 @@ export function projectCustomerChangelog(
             availability: 'ga',
             media: null,
             technicalVersion: release.version,
+            technicalKind: release.kind,
             explanation,
             supporting: [],
             technical,

@@ -11,6 +11,7 @@ vi.mock('@/lib/changelog-source', () => ({ getChangelogSnapshot }));
 
 const RELEASE_FIXTURE = {
   version: '26.8.0',
+  kind: 'release' as const,
   date: '2026-08-14',
   summary: 'A concise release summary.',
   sections: {
@@ -18,6 +19,20 @@ const RELEASE_FIXTURE = {
     added: ['**Review qualified brand deals:** Open your `Inbox`.'],
     changed: [],
     fixed: ['The Mac app recovers from blank screens.'],
+    removed: [],
+  },
+};
+
+const DAILY_FIXTURE = {
+  version: '2026-09-26',
+  kind: 'daily' as const,
+  date: '2026-09-26',
+  summary: '',
+  sections: {
+    featured: [],
+    added: ['Daily digest entry.'],
+    changed: [],
+    fixed: [],
     removed: [],
   },
 };
@@ -65,6 +80,23 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
     });
   });
 
+  it('labels daily digests by date without a fake v prefix', async () => {
+    getChangelogSnapshot.mockResolvedValue({
+      releases: [DAILY_FIXTURE],
+      sourceReleases: [DAILY_FIXTURE],
+      unpublishedReleases: [],
+    });
+    const { GET } = await import(
+      '../../../app/(marketing)/changelog/feed.json/route'
+    );
+    const body = await (await GET()).json();
+
+    expect(body.items[0]._jovie.tertiary).toBe(
+      'September 26, 2026 · 2026-09-26'
+    );
+    expect(body.items[0]._jovie.tertiary).not.toContain('v2026');
+  });
+
   it('publishes one Atom entry per customer outcome using the outcome title and tertiary line', async () => {
     const { GET, atomEntryId } = await import(
       '../../../app/(marketing)/changelog/feed.xml/route'
@@ -84,5 +116,8 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
       '<link href="https://jov.ie/changelog/26.8.0" rel="alternate"/>'
     );
     expect(atomEntryId('26.8.0')).toBe('https://jov.ie/changelog#v26.8.0');
+    expect(atomEntryId('2026-09-26', 'daily')).toBe(
+      'https://jov.ie/changelog#daily-2026-09-26'
+    );
   });
 });

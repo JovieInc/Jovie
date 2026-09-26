@@ -6,12 +6,14 @@ import { CircleMinus, Sparkles, Star, TrendingUp, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
-import type {
-  ChangelogInlineNode,
-  ChangelogRelease,
-  ChangelogSection,
+import {
+  type ChangelogInlineNode,
+  type ChangelogRelease,
+  type ChangelogSection,
+  changelogReleaseAnchor,
+  changelogReleaseLabel,
+  parseChangelogInline,
 } from '@/lib/changelog-parser';
-import { parseChangelogInline } from '@/lib/changelog-parser';
 
 const INITIAL_RELEASE_COUNT = 25;
 const RELEASE_BATCH_SIZE = 25;
@@ -258,7 +260,7 @@ export function ChangelogTimeline({
         {visibleReleases.map((release, releaseIndex) => (
           <article
             key={`${release.version}-${release.date ?? 'unreleased'}`}
-            id={`v${release.version}`}
+            id={changelogReleaseAnchor(release)}
             className='border-t border-subtle py-12 first:border-t-0 first:pt-0'
             aria-posinset={releaseIndex + 1}
             aria-setsize={releases.length}
@@ -270,8 +272,8 @@ export function ChangelogTimeline({
                     href={`/changelog/${encodeURIComponent(release.version)}`}
                     className='font-mono text-sm font-medium text-accent underline-offset-4 transition-colors duration-subtle hover:underline'
                   >
-                    {/* ui-casing-allow: semantic version string */}v
-                    {release.version}
+                    {/* ui-casing-allow: semantic version string */}
+                    {changelogReleaseLabel(release)}
                   </Link>
                   {release.date && (
                     <span className='text-xs text-quaternary-token'>
