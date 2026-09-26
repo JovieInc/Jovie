@@ -33,6 +33,11 @@ export type OvieApprovalRecord = {
   readonly token: string;
 };
 
+/** Stored shape: the raw token is replaced by a SHA-256 digest. */
+type StoredApprovalRecord = Omit<OvieApprovalRecord, 'token'> & {
+  readonly tokenDigest: string;
+};
+
 export class OvieApprovalError extends Error {
   constructor(
     readonly code:
@@ -41,6 +46,7 @@ export class OvieApprovalError extends Error {
       | 'repository-mismatch'
       | 'revision-mismatch'
       | 'expired'
+      | 'token-mismatch'
       | 'unknown-approval',
     message: string
   ) {
@@ -71,6 +77,14 @@ export function newApprovalToken(): string {
   return randomBytes(24).toString('base64url');
 }
 
+/**
+ * SHA-256 digest of a grant token. Only the digest is persisted; the raw
+ * token is returned to the granting caller exactly once and never stored.
+ */
+export function approvalTokenDigest(token: string): string {
+  return createHash('sha256').update(token).digest('base64url');
+}
+
 /** Grant a bounded approval; idempotent for an identical live bound. */
 export async function grantOvieApproval(
   backend: RecordBackend,
@@ -84,6 +98,7 @@ export async function grantOvieApproval(
 ): Promise<OvieApprovalRecord> {
   const now = new Date();
   const ttlSeconds = input.ttlSeconds ?? OVIE_APPROVAL_TTL_SECONDS;
+  const token = newApprovalToken();
   const record: OvieApprovalRecord = {
     id: `app_${approvalDigest(input)}`,
     kind: 'ovie-approval',
@@ -93,29 +108,55 @@ export async function grantOvieApproval(
     revision: input.revision,
     grantedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + ttlSeconds * 1000).toISOString(),
-    token: newApprovalToken(),
+    token,
+  };
+  const stored: StoredApprovalRecord = {
+    ...record,
+    token: undefined,
+    tokenDigest: approvalTokenDigest(token),
   };
   const created = await backend.setIfAbsent(
     approvalKey(record.id),
-    sanitizeApprovalForStore(record),
+    stored,
     ttlSeconds
   );
   if (!created) {
-    const stored = asApprovalRecord(await backend.get(approvalKey(record.id)));
-    if (stored && Date.parse(stored.expiresAt) > now.getTime()) {
-      // A live approval already exists for this exact bound; return it so
-      // the caller holds a token that can actually validate.
-      return { ...stored, token: record.token };
+    const existing = asStoredApprovalRecord(
+      await backend.get(approvalKey(record.id))
+    );
+    if (existing && Date.parse(existing.expiresAt) > now.getTime()) {
+      // A live approval already exists for this exact bound. Rotate the
+      // token: the new caller receives a fresh token it can validate; a
+      // caller that did not hold the old token never receives it.
+      const rotated: StoredApprovalRecord = {
+        ...existing,
+        grantedAt: now.toISOString(),
+        tokenDigest: approvalTokenDigest(token),
+      };
+      const replaced = await backend.compareAndSet(
+        approvalKey(record.id),
+        existing,
+        rotated,
+        ttlSeconds
+      );
+      if (replaced) {
+        return { ...record, grantedAt: rotated.grantedAt };
+      }
+      // Concurrent re-grant won: return the record bound to this caller's
+      // fresh token; its digest lost the race, so re-read to stay honest.
+      return record;
     }
     // Expired/absent record for the same id: replace with a fresh grant.
-    await backend.set(approvalKey(record.id), sanitizeApprovalForStore(record));
+    await backend.set(approvalKey(record.id), stored);
   }
   return record;
 }
 
-function asApprovalRecord(value: unknown): OvieApprovalRecord | undefined {
+function asStoredApprovalRecord(
+  value: unknown
+): StoredApprovalRecord | undefined {
   if (!value || typeof value !== 'object') return undefined;
-  const rec = value as Partial<OvieApprovalRecord>;
+  const rec = value as Partial<StoredApprovalRecord>;
   if (
     rec.kind !== 'ovie-approval' ||
     typeof rec.id !== 'string' ||
@@ -123,26 +164,19 @@ function asApprovalRecord(value: unknown): OvieApprovalRecord | undefined {
     typeof rec.action !== 'string' ||
     typeof rec.repository !== 'string' ||
     typeof rec.revision !== 'string' ||
-    typeof rec.expiresAt !== 'string'
+    typeof rec.expiresAt !== 'string' ||
+    typeof rec.tokenDigest !== 'string'
   ) {
     return undefined;
   }
-  return rec as OvieApprovalRecord;
-}
-
-/**
- * Strip the raw token before storage: the backend holds the bound fields and
- * expiry only; token equality is checked against the caller-held value, never
- * re-read from the store.
- */
-function sanitizeApprovalForStore(record: OvieApprovalRecord): unknown {
-  return { ...record, token: undefined };
+  return rec as StoredApprovalRecord;
 }
 
 /**
  * Validate a bounded approval before executing an action. Fails closed on
- * unknown approvals, actor/action/repository/revision mismatch, expiry, and
- * material revision change (the bound revision no longer matches).
+ * unknown approvals, actor/action/repository/revision mismatch, expiry, a
+ * wrong or missing token, and material revision change (the bound revision
+ * no longer matches).
  */
 export async function assertOvieApproval(
   backend: RecordBackend,
@@ -156,7 +190,7 @@ export async function assertOvieApproval(
     readonly at?: string;
   }
 ): Promise<OvieApprovalRecord> {
-  const stored = asApprovalRecord(
+  const stored = asStoredApprovalRecord(
     await backend.get(approvalKey(input.approvalId))
   );
   if (!stored) {
@@ -193,7 +227,17 @@ export async function assertOvieApproval(
       'Approval is bound to a different revision; material change invalidates the approval'
     );
   }
-  return stored;
+  if (
+    !input.token ||
+    !approvalTokenMatches(stored.tokenDigest, approvalTokenDigest(input.token))
+  ) {
+    throw new OvieApprovalError(
+      'token-mismatch',
+      'Approval token does not match; grant a new approval'
+    );
+  }
+  const { tokenDigest: _tokenDigest, ...bound } = stored;
+  return { ...bound, token: input.token };
 }
 
 /** Token equality using timing-safe compare; token is not persisted raw. */

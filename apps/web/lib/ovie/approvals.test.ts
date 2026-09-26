@@ -43,11 +43,31 @@ describe('bounded Ovie approvals (JOV-6557)', () => {
     const first = await grant(backend);
     const second = await grant(backend);
     expect(second.id).toBe(first.id);
-    // Same live bound: the stored record is returned so the caller's token
-    // is the one that validates.
+    // Same live bound: the re-grant rotates the token, so a later caller
+    // holds a fresh token that validates and the earlier grant's token
+    // no longer does.
+    expect(second.token).not.toBe(first.token);
     expect(second.actor).toBe(first.actor);
-    expect(second.grantedAt).toBe(first.grantedAt);
     expect(second.expiresAt).toBe(first.expiresAt);
+    const secondValidated = await assertOvieApproval(backend, {
+      actor,
+      action,
+      repository,
+      revision,
+      approvalId: second.id,
+      token: second.token,
+    });
+    expect(secondValidated.id).toBe(second.id);
+    await expect(
+      assertOvieApproval(backend, {
+        actor,
+        action,
+        repository,
+        revision,
+        approvalId: first.id,
+        token: first.token,
+      })
+    ).rejects.toThrow(/token/i);
   });
 
   it('fails closed on an unknown approval', async () => {
@@ -164,5 +184,56 @@ describe('bounded Ovie approvals (JOV-6557)', () => {
     expect(approvalTokenMatches(token, token)).toBe(true);
     expect(approvalTokenMatches(token, token.slice(0, -1) + 'x')).toBe(false);
     expect(approvalTokenMatches(token, 'short')).toBe(false);
+  });
+
+  it('rejects a forged token on an otherwise-valid bound (JOV-6557 token exposure negative test)', async () => {
+    const backend = memoryApprovalBackend();
+    const approval = await grant(backend);
+    // The approval id is deterministic from non-secret bound fields, so a
+    // caller that never held the token must still fail closed.
+    await expect(
+      assertOvieApproval(backend, {
+        actor,
+        action,
+        repository,
+        revision,
+        approvalId: approval.id,
+        token: 'forged-token-value-1234567890',
+      })
+    ).rejects.toThrow(OvieApprovalError);
+    await expect(
+      assertOvieApproval(backend, {
+        actor,
+        action,
+        repository,
+        revision,
+        approvalId: approval.id,
+        token: 'forged-token-value-1234567890',
+      })
+    ).rejects.toThrow(/token/i);
+    await expect(
+      assertOvieApproval(backend, {
+        actor,
+        action,
+        repository,
+        revision,
+        approvalId: approval.id,
+        token: '',
+      })
+    ).rejects.toThrow(/token/i);
+  });
+
+  it('never persists a replayable raw token: the stored record carries only a digest', async () => {
+    const records = new Map<string, unknown>();
+    const backend = memoryApprovalBackend({ records });
+    const approval = await grant(backend);
+    const stored = records.get(`ovie:approval:v1:${approval.id}`) as Record<
+      string,
+      unknown
+    >;
+    expect(stored).toBeDefined();
+    expect(stored.token).toBeUndefined();
+    expect(typeof stored.tokenDigest).toBe('string');
+    expect(String(stored.tokenDigest)).not.toContain(approval.token);
   });
 });
