@@ -1,3 +1,8 @@
+import type { CustomerChangelogEntry } from '@/lib/customer-changelog';
+import {
+  composeOvieActivityFeed,
+  type OvieActivityFeed,
+} from '@/lib/hud/ovie-activity-feed';
 import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
 
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
@@ -86,6 +91,7 @@ export type OvieMacHudSnapshot = {
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  activityFeed: OvieActivityFeed;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -574,21 +580,32 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  digestEntries?: readonly CustomerChangelogEntry[];
+  digestAvailable?: boolean;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
 }): OvieMacHudSnapshot {
+  const inFlightPullRequests =
+    input.inFlightPullRequests ??
+    emptyOvieMacHudInFlightPullRequests('not_configured');
+  const shippingAvailable = input.shippingAvailable ?? true;
   return {
     alive: computeDefaultAlive(input.alive),
     growth: computeWowGrowth(input.growth),
     shipping: countReceiptedShipsThisWeek(
       input.shippingEntries,
       input.nowMs ?? Date.parse(input.generatedAtIso),
-      input.shippingAvailable ?? true
+      shippingAvailable
     ),
-    inFlightPullRequests:
-      input.inFlightPullRequests ??
-      emptyOvieMacHudInFlightPullRequests('not_configured'),
+    inFlightPullRequests,
+    activityFeed: composeOvieActivityFeed({
+      pullRequests: inFlightPullRequests,
+      shippingEntries: input.shippingEntries,
+      shippingAvailable,
+      digestEntries: input.digestEntries ?? [],
+      digestAvailable: input.digestAvailable ?? false,
+    }),
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };

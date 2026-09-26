@@ -3,6 +3,11 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import { getChangelogReleases } from '@/lib/changelog-source';
+import {
+  type CustomerChangelogEntry,
+  projectCustomerChangelog,
+} from '@/lib/customer-changelog';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
@@ -207,16 +212,35 @@ export async function getOvieMacHudInFlightPullRequests(): Promise<OvieMacHudInF
   }
 }
 
+async function readDigestEntries(): Promise<{
+  readonly entries: readonly CustomerChangelogEntry[];
+  readonly available: boolean;
+}> {
+  try {
+    const releases = await getChangelogReleases();
+    return {
+      entries: projectCustomerChangelog(releases),
+      available: releases.length > 0,
+    };
+  } catch (error) {
+    await captureError('Ovie Mac HUD digest entries failed', error, {
+      context: 'ovie_mac_hud_activity_digest',
+    });
+    return { entries: [], available: false };
+  }
+}
+
 export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
+  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr, digest] =
     await Promise.all([
       getAdminStripeOverviewMetrics(),
       getAdminMercuryMetrics(),
       getOvieMacHudInFlightPullRequests(),
       getLybDailyMrr(new Date(nowMs)),
+      readDigestEntries(),
     ]);
   const shipping = readShippingEntries();
   const financialAvailable =
@@ -257,6 +281,8 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    digestEntries: digest.entries,
+    digestAvailable: digest.available,
     lybMrr,
     generatedAtIso,
     nowMs,

@@ -6,6 +6,7 @@ import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
+import { OvieActivityFeed } from '@/components/features/admin/hud/OvieActivityFeed';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { SymphonyCodexAccountControl } from '@/components/features/admin/hud/SymphonyCodexAccountControl';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
@@ -235,6 +236,7 @@ export function OvieMacHud({
           </div>
           <InFlightPullRequestsPanel pullRequests={inFlightPullRequests} />
         </section>
+        <OvieActivityFeed feed={snapshot.activityFeed} />
         <DesignProposalReviewPanel />
       </main>
     </div>
