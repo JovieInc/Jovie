@@ -265,7 +265,9 @@ export async function readGemAuthority(
 ): Promise<AuthorityRead | null> {
   const base = io.gemAuthorityUrl;
   if (!base || !GEM_RESIDENT_SOURCES.has(sourceId)) return null;
-  const url = `${base.replace(/\/+$/, '')}${GEM_AUTHORITY_PATH}/${sourceId}`;
+  let trimmedBase = base;
+  while (trimmedBase.endsWith('/')) trimmedBase = trimmedBase.slice(0, -1);
+  const url = `${trimmedBase}${GEM_AUTHORITY_PATH}/${sourceId}`;
   try {
     const response = await io.fetch(url, {
       method: 'GET',
@@ -809,14 +811,16 @@ export function createLiveShippingStateReaders(
           : null;
       // The bridge serves the lease signal directly; the fleet receipt file
       // nests it under signals.lease.
+      const fleetCapacityPayload =
+        fleet?.status === 'ok' &&
+        fleet.payload &&
+        isRecord(fleet.payload.capacity)
+          ? fleet.payload
+          : null;
       const leasePayload =
         signals && isRecord(signals.lease)
           ? signals.lease
-          : fleet?.status === 'ok' &&
-              fleet.payload &&
-              isRecord(fleet.payload.capacity)
-            ? fleet.payload
-            : null;
+          : fleetCapacityPayload;
       if (fleet?.status === 'ok' && leasePayload) {
         const lease = leasePayload;
         const capacity = isRecord(lease.capacity) ? lease.capacity : null;

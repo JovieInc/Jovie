@@ -144,17 +144,19 @@ export function interpretCounts(
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
   if (sourceId === 'symphony-runtime' || sourceId === 'symphony-task') {
+    // Terminal failures are a distinct authority list/count. Blocked work is
+    // still retryable; it must never stand in for a terminal failure.
+    const terminalFailures = Array.isArray(payload.failed)
+      ? measuredCount(payload.failed.length)
+      : countFromNumber(payload.terminalFailures);
+    const terminalListFailures = Array.isArray(payload.terminal)
+      ? measuredCount(payload.terminal.length)
+      : terminalFailures;
     return {
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
-      // Terminal failures are a distinct authority list/count. Blocked work is
-      // still retryable; it must never stand in for a terminal failure.
-      terminalFailures: Array.isArray(payload.failed)
-        ? measuredCount(payload.failed.length)
-        : Array.isArray(payload.terminal)
-          ? measuredCount(payload.terminal.length)
-          : countFromNumber(payload.terminalFailures),
+      terminalFailures: terminalListFailures,
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,
