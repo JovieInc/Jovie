@@ -2052,5 +2052,58 @@ class ModelPolicyContractTests(unittest.TestCase):
         self.assertNotIn("agent", arguments)
 
 
+# CI runs this file as two parallel shards. The coverage shard measures
+# gem-repo-drain-cycle.py; the installer shard holds classes that never import
+# it but spawn ~130 processes per test. Selection is "everything minus this
+# explicit list", so a newly added class always lands in the coverage shard.
+SHARD_ENV = "GEM_CONTRACT_SHARD"
+INSTALLER_SHARD_CLASSES = ("FleetControllerInstallerContractTests",)
+
+
+def _contract_classes() -> list[type[unittest.TestCase]]:
+    return [
+        value
+        for value in globals().values()
+        if isinstance(value, type)
+        and issubclass(value, unittest.TestCase)
+        and value.__module__ == __name__
+    ]
+
+
+def _shard_classes(shard: str) -> list[type[unittest.TestCase]]:
+    classes = _contract_classes()
+    if shard == "all":
+        return classes
+    if shard == "installer":
+        return [cls for cls in classes if cls.__name__ in INSTALLER_SHARD_CLASSES]
+    if shard == "coverage":
+        return [cls for cls in classes if cls.__name__ not in INSTALLER_SHARD_CLASSES]
+    raise ValueError(f"{SHARD_ENV} must be all, coverage, or installer; got {shard!r}")
+
+
+class ShardPartitionContractTests(unittest.TestCase):
+    def test_every_class_runs_in_exactly_one_ci_shard(self):
+        names = {cls.__name__ for cls in _contract_classes()}
+        self.assertTrue(set(INSTALLER_SHARD_CLASSES) <= names, "stale installer shard entry")
+        coverage = [cls.__name__ for cls in _shard_classes("coverage")]
+        installer = [cls.__name__ for cls in _shard_classes("installer")]
+        self.assertEqual(sorted(installer), sorted(INSTALLER_SHARD_CLASSES))
+        self.assertIn(type(self).__name__, coverage)
+        self.assertFalse(set(coverage) & set(installer))
+        self.assertEqual(sorted(coverage + installer), sorted(names))
+        with self.assertRaises(ValueError):
+            _shard_classes("unknown")
+
+
+def load_tests(loader, standard_tests, pattern):
+    shard = os.environ.get(SHARD_ENV, "all")
+    suite = unittest.TestSuite()
+    for cls in _shard_classes(shard):
+        suite.addTests(loader.loadTestsFromTestCase(cls))
+    if suite.countTestCases() == 0:
+        raise RuntimeError(f"{SHARD_ENV}={shard} selected no tests")
+    return suite
+
+
 if __name__ == "__main__":
     unittest.main()
