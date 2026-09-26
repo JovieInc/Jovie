@@ -55,18 +55,15 @@ describe('overnight-qa ledger', () => {
     );
   });
 
-  it.each([
-    '../escape',
-    'nested/run',
-    'nested\\run',
-    '/tmp/escape',
-    '.',
-  ])('rejects hostile run id %s before joining the run root', runId => {
-    const paths = createPaths('/tmp/overnight-qa-safe-root');
-    expect(() => getRunDirectory(runId, paths)).toThrow(
-      /single safe path segment/
-    );
-  });
+  it.each(['../escape', 'nested/run', 'nested\\run', '/tmp/escape', '.'])(
+    'rejects hostile run id %s before joining the run root',
+    runId => {
+      const paths = createPaths('/tmp/overnight-qa-safe-root');
+      expect(() => getRunDirectory(runId, paths)).toThrow(
+        /single safe path segment/
+      );
+    }
+  );
 
   it('round-trips state, queue, run artifacts, and stop signaling', async () => {
     const root = await mkdtemp(join(tmpdir(), 'overnight-qa-ledger-'));

@@ -271,17 +271,16 @@ function projectOperationalTasks(input: {
   const last = input.lastKnown?.operationalTasks;
   const currentUsable = SUCCESS_STATES.has(source.state);
   const tasks = currentUsable ? currentTasks : (last?.tasks ?? []);
-  const syncState: OperationalTaskFeed['syncState'] = !input.publishing
-    ? last
-      ? 'stale'
-      : 'failed'
-    : source.state === 'fresh'
-      ? 'fresh'
-      : currentUsable || last
-        ? 'stale'
-        : source.state === 'unknown'
-          ? 'syncing'
-          : 'failed';
+  let syncState: OperationalTaskFeed['syncState'] = 'failed';
+  if (!input.publishing) {
+    syncState = last ? 'stale' : 'failed';
+  } else if (source.state === 'fresh') {
+    syncState = 'fresh';
+  } else if (currentUsable || last) {
+    syncState = 'stale';
+  } else if (source.state === 'unknown') {
+    syncState = 'syncing';
+  }
   return {
     canonicalSource: 'linear',
     cacheMode: 'local-reconciled',
@@ -314,16 +313,17 @@ export function projectShippingState(input: {
     SHIPPING_SOURCE_IDS.map(sourceId => input.sources[sourceId].state)
   );
   const deadline = freshnessDeadline(input.observationTimestamp);
-  const state = input.publishing
-    ? observationFreshness(
-        input.observationTimestamp,
-        deadline,
-        input.nowIso,
-        combined
-      )
-    : input.lastKnown
-      ? 'stale'
-      : 'unavailable';
+  let state: ObservationState = 'unavailable';
+  if (input.publishing) {
+    state = observationFreshness(
+      input.observationTimestamp,
+      deadline,
+      input.nowIso,
+      combined
+    );
+  } else if (input.lastKnown) {
+    state = 'stale';
+  }
   const successful = SHIPPING_SOURCE_IDS.some(sourceId =>
     SUCCESS_STATES.has(input.sources[sourceId].state)
   );

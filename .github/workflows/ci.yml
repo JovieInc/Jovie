@@ -1497,6 +1497,31 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$output"
+      # Web tsc is ~90% of this lane and already runs `--incremental` into
+      # apps/web/.cache/tsbuildinfo, but every hosted job started cold. The
+      # buildinfo is compiler state, not a verdict: tsc re-hashes every input
+      # file and compares compiler options, then re-checks changed files and
+      # their dependents, so a restored file cannot replay a stale success
+      # (JOV-3499 still holds: turbo keeps --force and never replays a cached
+      # task). Measured on 4 vCPU: cold 160-167s; warm no-op or leaf edit
+      # 18-20s; widely imported signature change ~cold. Same error set warm
+      # and cold on a deliberately broken file.
+      - name: Restore web tsc incremental state
+        id: web-tsbuildinfo
+        if: >-
+          github.event_name != 'pull_request' ||
+          needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo
+          key: jovie-web-tsbuildinfo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json') }}-${{ github.sha }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json') }}-
+            jovie-web-tsbuildinfo-v1-${{ runner.os }}-
+      - name: Record restored web tsc state
+        id: web-tsbuildinfo-restored
+        if: steps.web-tsbuildinfo.outcome == 'success'
+        run: echo "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}" >> "$GITHUB_OUTPUT"
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -1505,6 +1530,24 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
+      # Save only after a green lane that actually rewrote the buildinfo, and
+      # only from trusted refs: main pushes and same-repository PRs. GitHub
+      # scopes each cache to the ref that wrote it, so a PR never seeds state
+      # main restores; merge_group and fork PRs are restore-only.
+      - name: Save web tsc incremental state
+        if: >-
+          steps.lanes.outcome == 'success' &&
+          steps.web-tsbuildinfo.outcome == 'success' &&
+          hashFiles('apps/web/.cache/tsbuildinfo') != '' &&
+          hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash &&
+          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo
+          key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -1591,7 +1634,7 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
-          STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
+          STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/lanes/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
 
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
@@ -2408,6 +2451,25 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      # Turbopack's persistent build cache (Next 16 default) lives under
+      # apps/web/.next/cache/turbopack; without it every combined build is a
+      # cold ~3 min compile. Merge-group and dispatch runs only restore the
+      # newest trusted main entry. Only push-to-main writes, at most once per
+      # UTC day per dependency hash, after the whole job passes. The path is
+      # compiler state only (no fetch/image cache, no build output), and
+      # Turbopack revalidates every entry against the current inputs.
+      - name: Resolve Next build cache day
+        id: next-build-cache-day
+        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Restore Next build cache (read-only)
+        id: next-build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -2487,6 +2549,35 @@ jobs:
           path: apps/web/test-results/
           allow-markdown: 'true'
           retention-days: 3
+      - name: Measure Next build cache (trusted main only)
+        id: next-build-cache-size
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-build-cache.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/web/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Next build cache (trusted main only)
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ steps.next-build-cache.outputs.cache-primary-key }}
 
   ci-build-ovie:
     name: Ovie Build (combined)
@@ -2566,9 +2657,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The effective coalesced-head diff base may be older than the direct
-          # queue parent; the changed-component gate must have its full ancestry.
-          fetch-depth: 0
+          # Exact head only. The merge-group certification helper deepens
+          # HEAD's own ancestry until the (possibly older, coalesced-head)
+          # diff base is reachable, instead of fetching every branch here.
+          fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
@@ -2602,7 +2694,8 @@ jobs:
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
-                  --config=playwright.config.storybook.ts --project=chromium --reporter=line
+                  --config=playwright.config.storybook.ts --project=chromium --reporter=line \
+                  --workers=2
               exit 0
             fi
             sleep 2
@@ -4315,8 +4408,13 @@ jobs:
           # Each ephemeral runner has 2 CPUs. Match Vitest forks to that quota so
           # two five-shard PR cohorts use 20 workers across 20 allocated CPUs
           # instead of oversubscribing the shared Docker/NVMe host with 30.
+          # --fileParallelism is required for those two forks to exist: the
+          # fast config keeps CI files serial (fileParallelism: !isCI), which
+          # silently clamps maxWorkers to 1 and left one of the two CPUs idle.
+          # Shard 1/10 on 2 pinned CPUs: 557s serial -> 336s parallel, same
+          # 318 files / 2277 tests. In-file tests stay serial (maxConcurrency 1).
           export NODE_OPTIONS="--max-old-space-size=3072"
-          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2 --fileParallelism"
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
           # Use shard-specific output file so Codecov Test Analytics receives all 10 shards
@@ -4442,24 +4540,37 @@ jobs:
           persist-credentials: false
 
       - name: Fetch base-branch history
-        # Diff bases need only HEAD's full ancestry plus origin/<base>:
-        # pull_request origin/<base>...HEAD, merge_group base_sha, push
-        # event.before, and guardrail merge-base with origin/<base>.
-        # A full-depth checkout also fetched every branch and tag (~4k ref
-        # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # Exact-head coverage reads history only through the changed-line
+        # ratchet: `git diff <base>...<head> -- apps/web` in
+        # scripts/lib/changed-test-coverage.mjs. That needs HEAD's full
+        # commit and tree ancestry (for the merge base) plus the apps/web
+        # blobs the diff touches, not every historical blob. A plain
+        # --unshallow downloaded ~1.5 GiB of history blobs (~47s on the
+        # hosted runner). --filter=blob:none keeps every commit and tree, so
+        # merge-base and diff output are identical, and fetches in ~5s.
+        # persist-credentials is false, so the ratchet's blobs are prefetched
+        # here with the one-shot auth header, then the same diff is replayed
+        # with lazy fetching disabled to prove later steps need no promisor
+        # fetch. Unit shards already run the suite on a blob:none checkout.
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
+          GIT_NO_LAZY_FETCH=1 git diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
 
       - name: Verify exact coverage head and diff base
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         env:
+          GIT_NO_LAZY_FETCH: '1'
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
@@ -5823,6 +5934,7 @@ jobs:
             sleep 10
             if [ "$i" -eq 3 ]; then exit 1; fi
           done
+          node .github/scripts/materialize-vercel-static.mjs
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0

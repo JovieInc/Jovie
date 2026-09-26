@@ -157,6 +157,30 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayoutJob).toContain('Run deterministic layout behavior guard');
   });
 
+  it('runs the combined Storybook surface matrix on two workers of a 4-vCPU hosted runner', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-surfaces');
+    const storybookConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/playwright.config.storybook.ts'),
+      'utf8'
+    );
+
+    // Public-repo ubuntu-latest has 4 vCPU: one Vite dev server plus two
+    // Chromium workers. The specs write only per-test evidence names and
+    // compare (never update) committed baselines, so workers stay isolated.
+    expect(storybookJob).toContain('runs-on: ubuntu-latest');
+    expect(storybookJob).toMatch(
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line \\\n\s+--workers=2\n/
+    );
+    expect(storybookJob).not.toContain('--update-snapshots');
+    expect(storybookJob).not.toMatch(/--retries|--repeat-each|--shard/);
+    // The config keeps its CI retry budget and one-worker default for every
+    // other Storybook lane; only this lane opts into two workers.
+    expect(storybookConfig).toContain('fullyParallel: true');
+    expect(storybookConfig).toContain('retries: isCI ? 2 : 0');
+    expect(storybookConfig).toContain('workers: isCI ? 1 : undefined');
+  });
+
   it('keeps refresh self-healing and makes missing-baseline compare fail-closed', () => {
     const workflow = readFileSync(visualRegressionWorkflowPath, 'utf8');
     const ciWorkflow = readFileSync(workflowPath, 'utf8');
