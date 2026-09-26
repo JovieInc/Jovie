@@ -2505,11 +2505,15 @@ jobs:
         if: hashFiles('apps/ovie/package.json') != ''
       # This guard permits the trusted-classifier prerequisite to land before
       # the app. Once present, Ovie must independently build and typecheck.
+      # The standalone typecheck checks the same tsconfig program that
+      # `next build` would re-check (~38s on hosted runners), so the build
+      # skips only that duplicate pass; set -e keeps it fail-closed.
       - name: Build independent Ovie app
         if: hashFiles('apps/ovie/package.json') != ''
         run: |
+          set -euo pipefail
           pnpm --filter @jovie/ovie typecheck
-          pnpm --filter @jovie/ovie build
+          NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build
           test -f apps/ovie/.next/BUILD_ID
           test -f apps/ovie/.next/standalone/apps/ovie/server.js
           test ! -d apps/ovie/.next/standalone/apps/docs/app

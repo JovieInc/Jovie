@@ -529,6 +529,18 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs first, fail-fast, in the same step.
+    expect(ovieBuild).toContain('set -euo pipefail');
+    expect(
+      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
+    ).toBeLessThan(
+      ovieBuild.indexOf(
+        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
+      )
+    );
+    expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
+    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
