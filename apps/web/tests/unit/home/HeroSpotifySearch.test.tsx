@@ -781,4 +781,38 @@ describe('HeroSpotifySearch', () => {
       expect(input).toHaveAttribute('aria-expanded', 'true');
     });
   });
+
+  // JOV-6553: claimed ≠ membership. The badge must never claim the artist
+  // is "On Jovie" — expected copy authored from the approved contract.
+  describe('truthful artist status (JOV-6553)', () => {
+    it('claimed artists show a truthful listing badge, never "On Jovie"', async () => {
+      mockHookReturn.results = ARTISTS.map(artist => ({
+        ...artist,
+        isClaimed: artist.id === 'artist-1',
+      }));
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+
+      const badge = screen.getByTestId('listing-badge');
+      expect(badge).toHaveTextContent('Jovie listing');
+      expect(badge.textContent).not.toContain('On Jovie');
+    });
+
+    it('unclaimed artists show no listing badge', async () => {
+      mockHookReturn.results = ARTISTS.map(artist => ({
+        ...artist,
+        isClaimed: artist.id === 'artist-1',
+      }));
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Phoebe');
+
+      const row = screen.getByText('Phoebe Bridgers').closest('button');
+      expect(row).not.toBeNull();
+      expect(
+        row?.querySelector('[data-testid="listing-badge"]')
+      ).not.toBeInTheDocument();
+    });
+  });
 });

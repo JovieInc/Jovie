@@ -29,6 +29,19 @@ const FORBIDDEN_PUBLIC_OFFERS = Object.freeze([
   '/signup?plan=pro&interval=year',
   '/signup?plan=pro&interval=annual',
 ]);
+const ARTIST_VISIBILITY_OFFER_CONTRACT_ID =
+  'artist-visibility-offer-contract-v1';
+const FORBIDDEN_PRICING_PAGE_MARKERS = Object.freeze([
+  '$149',
+  '149/mo',
+  'Max Early Access',
+  'marketing-pricing-plan-max',
+]);
+const REQUIRED_PRICING_PAGE_MARKERS = Object.freeze([
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+  '$199',
+  'Request access',
+]);
 const FORBIDDEN_DIRECTORY_IDENTITIES = Object.freeze([
   'e2e+jordan@example.com',
   '+clerk_test',
@@ -52,6 +65,7 @@ export const SEED_DONE_INVARIANTS = Object.freeze([
       "plan === 'pro' && validateBillingInterval(interval) === 'month'",
       'Only monthly Pro is available for new subscriptions',
       'rejects stale annual and Max signup offers',
+      ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
     ]),
     forbidden: FORBIDDEN_PUBLIC_OFFERS,
   }),
@@ -182,6 +196,22 @@ export async function rescanProduction({
         if (body.includes(forbidden)) {
           errors.push(
             `done-sprint JOV-6218: production ${url} still offers ${forbidden}`
+          );
+        }
+      }
+    }
+    if (path === '/pricing') {
+      for (const marker of FORBIDDEN_PRICING_PAGE_MARKERS) {
+        if (body.includes(marker)) {
+          errors.push(
+            `done-sprint JOV-6218: production ${url} still shows ${marker} (${ARTIST_VISIBILITY_OFFER_CONTRACT_ID})`
+          );
+        }
+      }
+      for (const marker of REQUIRED_PRICING_PAGE_MARKERS) {
+        if (!body.includes(marker)) {
+          errors.push(
+            `done-sprint JOV-6218: production ${url} missing ${marker} (${ARTIST_VISIBILITY_OFFER_CONTRACT_ID})`
           );
         }
       }

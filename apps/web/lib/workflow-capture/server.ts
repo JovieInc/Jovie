@@ -127,7 +127,7 @@ export async function loadOwnedWorkflowCapture(
     )
     .limit(1);
   const payload = WorkflowCaptureRequestPayloadSchema.safeParse(row?.payload);
-  if (!row || row.kind !== WORKFLOW_CAPTURE_REQUEST_KIND || !payload.success) {
+  if (row?.kind !== WORKFLOW_CAPTURE_REQUEST_KIND || !payload.success) {
     throw new WorkflowCaptureError('not-found', 404);
   }
   return {

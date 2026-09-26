@@ -13,6 +13,8 @@ files:
 extraResources:
   - from: build/build-identity.json
     to: build-identity.json
+  - from: ../web/public/brand/Jovie-Wordmark-Cream.svg
+    to: Jovie-Wordmark-Cream.svg
 mac:
   category: public.app-category.music
   darkModeSupport: true

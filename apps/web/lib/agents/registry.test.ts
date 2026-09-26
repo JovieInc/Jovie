@@ -54,13 +54,14 @@ describe('PUBLIC_SKILL_REGISTRY', () => {
     expect(skill.metadata).not.toBeNull();
   });
 
-  it.each(
-    skills
-  )('%s is backfilled as ga/1.0.0-class lifecycle', (_key, skill) => {
-    expect(skill.lifecycle).toBe('ga');
-    expect(skill.activeVersion).toBe(skill.version);
-    expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/);
-  });
+  it.each(skills)(
+    '%s is backfilled as ga/1.0.0-class lifecycle',
+    (_key, skill) => {
+      expect(skill.lifecycle).toBe('ga');
+      expect(skill.activeVersion).toBe(skill.version);
+      expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/);
+    }
+  );
 
   describe('retouch skill', () => {
     const retouch = PUBLIC_SKILL_REGISTRY.retouch;

@@ -170,7 +170,7 @@ const ext = (p: string) => {
   const i = b.lastIndexOf('.');
   return i <= 0 ? '' : b.slice(i).toLowerCase();
 };
-const clamp01 = (n: number) => (Number.isNaN(n) || n < 0 ? 0 : n > 1 ? 1 : n);
+const clamp01 = (n: number) => (Number.isNaN(n) || n < 0 ? 0 : Math.min(n, 1));
 const snip = (t: string) => {
   const s = t.trim().replaceAll(/\s+/g, ' ');
   return s.length <= 160 ? s : `${s.slice(0, 157)}…`;
@@ -475,8 +475,10 @@ function buildProposals(params: {
 }): DesignTasteFixProposal[] {
   const errors = params.findings.filter(f => f.severity === 'error');
   const warnings = params.findings.filter(f => f.severity === 'warning');
-  const line = (f: DesignTasteFinding) =>
-    `- **${f.ruleId}** (${f.severity}) \`${f.line == null ? f.filePath : `${f.filePath}:${f.line}`}\` — ${f.message}`;
+  const line = (f: DesignTasteFinding) => {
+    const location = f.line == null ? f.filePath : `${f.filePath}:${f.line}`;
+    return `- **${f.ruleId}** (${f.severity}) \`${location}\` — ${f.message}`;
+  };
   const pr: DesignTasteFixProposal = {
     kind: 'pr-comment',
     title: 'Design/Taste department review',
@@ -499,12 +501,18 @@ function buildProposals(params: {
   const branch = `agent/design-taste-autofix-${params.runId}`
     .replaceAll(/[^a-zA-Z0-9._/-]+/g, '-')
     .slice(0, 120);
+  const errorLines = errors
+    .map(finding => {
+      const lineSuffix = finding.line ? `:${finding.line}` : '';
+      return `- [${finding.ruleId}] ${finding.filePath}${lineSuffix} — ${finding.remediation}`;
+    })
+    .join('\n');
   return [
     pr,
     {
       kind: 'auto-fix-branch',
       title: 'Design/Taste auto-fix branch proposal',
-      body: `Auto-fix proposal (do not merge unattended).\n${errors.map(f => `- [${f.ruleId}] ${f.filePath}${f.line ? `:${f.line}` : ''} — ${f.remediation}`).join('\n')}\nBranch: \`${branch}\``,
+      body: `Auto-fix proposal (do not merge unattended).\n${errorLines}\nBranch: \`${branch}\``,
       branchName: branch,
       findingIds: errors.map(f => f.id),
     },

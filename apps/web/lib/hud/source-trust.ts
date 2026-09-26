@@ -189,6 +189,19 @@ function buildSentrySourceTrust(
   };
 }
 
+function githubNextStep(state: HudMetricSourceState): string | null {
+  if (state === 'not_configured') {
+    return 'Add HUD_GITHUB_TOKEN, HUD_GITHUB_OWNER, and HUD_GITHUB_REPO to load deploys.';
+  }
+  if (state === 'unavailable') {
+    return 'Check GitHub API credentials and retry.';
+  }
+  if (state === 'no_data') {
+    return 'No workflow runs yet — open GitHub Actions to inspect the pipeline.';
+  }
+  return null;
+}
+
 function buildGithubSourceTrust(
   deployments: HudDeployments,
   fetchedAtIso: string,
@@ -219,14 +232,7 @@ function buildGithubSourceTrust(
     errorMessage: deployments.errorMessage ?? null,
     dashboardUrl,
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add HUD_GITHUB_TOKEN, HUD_GITHUB_OWNER, and HUD_GITHUB_REPO to load deploys.'
-        : state === 'unavailable'
-          ? 'Check GitHub API credentials and retry.'
-          : state === 'no_data'
-            ? 'No workflow runs yet — open GitHub Actions to inspect the pipeline.'
-            : null,
+    nextStep: githubNextStep(state),
   };
 }
 
