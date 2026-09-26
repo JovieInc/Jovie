@@ -776,6 +776,141 @@ struct ChatRepositoryTests {
     #expect(repository.hasMoreOlder == false)
   }
 
+  @Test func loadOlderMessagesCursorsFromOldestMessageInMultiMessageWindow() async {
+    // Server windows arrive oldest-first, so `messages.first` is the oldest
+    // row. Guard the cursor contract with a multi-message page (JOV-6210).
+    let oldestVisible = MobileConversationMessage(
+      id: "msg_window_oldest",
+      role: "user",
+      content: "Oldest visible",
+      clientMessageId: "client_window_oldest",
+      turnId: "turn_window_oldest",
+      turnStatus: "completed",
+      createdAt: "2026-05-20T00:00:00.000Z",
+      requiresWebHandoff: false
+    )
+    let newestVisible = MobileConversationMessage(
+      id: "msg_window_newest",
+      role: "assistant",
+      content: "Newest visible",
+      clientMessageId: "client_window_newest",
+      turnId: "turn_window_newest",
+      turnStatus: "completed",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      requiresWebHandoff: false
+    )
+    let record = MobileConversationRecord(
+      id: "conv_window",
+      title: "Windowed",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    )
+    let client = ScriptedPagedChatClient(
+      pages: [
+        nil: MobileConversationDetailResponse(
+          conversation: record,
+          messages: [oldestVisible, newestVisible],
+          hasMore: true
+        ),
+        "2026-05-20T00:00:00.000Z": MobileConversationDetailResponse(
+          conversation: record,
+          messages: [],
+          hasMore: false
+        ),
+      ]
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-window-cursor")!),
+      userID: "user_repo_window_cursor",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.openConversation("conv_window")
+    await repository.loadOlderMessages()
+
+    #expect(client.lastFetchBefore == "2026-05-20T00:00:00.000Z")
+  }
+
+  @Test func loadOlderMessagesAfterRestartPreservesCachedServerTimestamps() async {
+    // The cache round-trip must keep each row's server `createdAt`; if it is
+    // rewritten to the persist time, `olderCursor` lands after the cached
+    // window and load-earlier re-fetches the current page (JOV-6210).
+    let suite = "ie.jov.Jovie.tests.chat-repo-restart-paging"
+    let userID = "user_repo_restart_paging"
+    let cache = ChatCache(defaults: UserDefaults(suiteName: suite)!)
+    let record = MobileConversationRecord(
+      id: "conv_restart",
+      title: "Restart",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    )
+    let window = (1...45).map { index in
+      MobileConversationMessage(
+        id: "msg_restart_\(index)",
+        role: index.isMultiple(of: 2) ? "assistant" : "user",
+        content: "History \(index)",
+        clientMessageId: "client_restart_\(index)",
+        turnId: "turn_restart_\(index)",
+        turnStatus: "completed",
+        createdAt: "2026-05-01T00:00:\(String(format: "%02d", index)).000Z",
+        requiresWebHandoff: false
+      )
+    }
+
+    // First launch: fetch the window, then send so `persistCache()` persists
+    // via the timeline -> message round-trip rather than the raw detail page.
+    let firstClient = ScriptedChatClient(
+      sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .success(
+        MobileConversationDetailResponse(
+          conversation: record,
+          messages: window,
+          hasMore: true
+        )
+      )
+    )
+    let first = ChatRepository(
+      client: firstClient,
+      cache: cache,
+      userID: userID,
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+    await first.openConversation("conv_restart")
+    await first.send(text: "Latest question")
+
+    let persisted = await cache.load(for: userID)
+    #expect(
+      persisted?.messagesByConversationID["conv_restart"]?.first?.createdAt
+        == "2026-05-01T00:00:01.000Z"
+    )
+
+    // Relaunch: hydrate from cache, then load earlier. The cached window has
+    // 47 rows (45 fetched + user/assistant from the send), so the visible tail
+    // starts at cached index 7 — "History 8" at 2026-05-01T00:00:08.000Z.
+    let secondClient = ScriptedPagedChatClient(
+      pages: [
+        "2026-05-01T00:00:08.000Z": MobileConversationDetailResponse(
+          conversation: record,
+          messages: [],
+          hasMore: false
+        ),
+      ]
+    )
+    let second = ChatRepository(
+      client: secondClient,
+      cache: cache,
+      userID: userID,
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+    await second.bootstrap()
+
+    #expect(second.hasMoreOlder)
+    await second.loadOlderMessages()
+    #expect(secondClient.lastFetchBefore == "2026-05-01T00:00:08.000Z")
+  }
+
   @Test func sendInterruptsInFlightTurnWhenComposerSendsAgain() async {
     let client = GateableSendChatClient()
     let repository = ChatRepository(

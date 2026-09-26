@@ -74,6 +74,11 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   var handoffURL: URL?
   var turnId: String? = nil
   var eveWorkId: String? = nil
+  /// Server `createdAt` for rows that came from a fetched/cached window.
+  /// `nil` for locally-composed rows (send, eyes-free, fixtures); the cache
+  /// round-trip stamps those at persist time. Preserving it keeps
+  /// `olderCursor` pointing at real history after a restart (JOV-6210).
+  var createdAt: String? = nil
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
