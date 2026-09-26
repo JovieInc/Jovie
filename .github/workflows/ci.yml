@@ -1595,21 +1595,68 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: Fetch base-branch history
+      - name: Start base-branch history fetch
         # Diff bases need only HEAD's full ancestry plus origin/<base>:
         # pull_request origin/<base>...HEAD, merge_group base_sha, push
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # Guards in this job read historical blobs (git show <merge-base>:path,
+        # rename-detecting diffs), so the fetch stays full, not blobless. It
+        # runs in the background while dependencies install instead of
+        # serially before them; "Fetch base-branch history" below waits for
+        # it and fails closed before any history consumer runs.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          mkdir -p "$BASE_FETCH_DIR"
+          rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
+          (
+            set +e
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+            echo "$?" > "$BASE_FETCH_DIR/status.tmp"
+            mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
+          ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
+          echo "Base-branch history fetch started in the background (pid $!)."
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Fetch base-branch history
+        # Await the background fetch. Fails closed on a non-zero fetch exit,
+        # no exit status within the deadline, a still-shallow clone, or a
+        # missing origin/<base> ref.
+        shell: bash
+        timeout-minutes: 10
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 540); do
+            [[ -f "$BASE_FETCH_DIR/status" ]] && break
+            sleep 1
+          done
+          cat "$BASE_FETCH_DIR/fetch.log" 2>/dev/null || true
+          if [[ ! -f "$BASE_FETCH_DIR/status" ]]; then
+            echo "::error title=Base-branch fetch::background fetch did not finish within 540s"
+            exit 1
+          fi
+          fetch_status="$(cat "$BASE_FETCH_DIR/status")"
+          if [[ "$fetch_status" != '0' ]]; then
+            echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
+            exit 1
+          fi
+          if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
+            echo "::error title=Base-branch fetch::checkout is still shallow"
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/remotes/origin/${BASE_BRANCH}^{commit}" > /dev/null; then
+            echo "::error title=Base-branch fetch::origin/${BASE_BRANCH} is missing"
+            exit 1
+          fi
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
