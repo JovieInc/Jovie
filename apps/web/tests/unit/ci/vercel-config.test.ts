@@ -253,7 +253,6 @@ describe('Vercel function config', () => {
     const runtimePaths = [
       'CHANGELOG.md',
       'docs/FEATURE_REGISTRY.md',
-      'scripts/symphony/symphony-codex-account-control.py',
       'apps/eve-pilot/identities/jovie/instructions.md',
       'apps/eve-pilot/identities/summer/instructions.md',
       'apps/web/content/legal/cookies.md',
@@ -286,7 +285,6 @@ describe('Vercel function config', () => {
       expect.arrayContaining([
         '../../CHANGELOG.md',
         '../../docs/FEATURE_REGISTRY.md',
-        '../../scripts/symphony/symphony-codex-account-control.py',
         '../../apps/eve-pilot/identities/jovie/instructions.md',
         '../../apps/eve-pilot/identities/summer/instructions.md',
         'tests/quarantine.json',

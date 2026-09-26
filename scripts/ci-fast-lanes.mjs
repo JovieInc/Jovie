@@ -120,8 +120,6 @@ export function webCiContractTestsCommand(
     .join('');
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
 }
-export const ROUTE_PREP_COVERAGE_COMMAND =
-  'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
@@ -972,7 +970,6 @@ export function runStructural(opts = {}) {
 
   const selected = selectedProductLanes();
   const operationsParts = [
-    ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'pnpm invariants:check',
@@ -994,39 +991,11 @@ export function runStructural(opts = {}) {
     'python3 .github/scripts/test-security-suppression-audit.py',
     // The Gem contract is embedded in the broader Symphony controller suite.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
-    'python3 scripts/symphony/tests/run-hud-proof-gate.py',
-    'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
-    'python3 scripts/symphony/tests/run-safe-restart-gate.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
-    'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage run --branch scripts/symphony/tests/upstream-burrito-payload.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage report --include="*/scripts/symphony/verify_upstream_burrito_payload.py" --show-missing --precision=2 --fail-under=90',
-    'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
-    'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
-    'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
-    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/symphony/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage run --branch scripts/symphony/tests/closure-health.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage report --include="*/scripts/symphony/closure_health.py" --show-missing --precision=2 --fail-under=85',
-    'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
-    'bash scripts/symphony/tests/align-runner-source-revision.test.sh',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
-    'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
-    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-bottleneck-producer.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_bottleneck_producer.py" --show-missing --precision=2 --fail-under=80; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local Summer bottleneck producer coverage"; fi',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
-    'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi',
-    'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs',
-    'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-    'python3 scripts/symphony/tests/run-model-state-gate.py',
-    'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
-    'python3 scripts/symphony/tests/run-summer-publisher-gate.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-ci-audit.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-ci-audit.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-ci-audit.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_ci_audit.py" --show-missing --precision=2 --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage report --include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage report --include="*/scripts/symphony/hyperagent/lifecycle.py" --show-missing --precision=2 --fail-under=95',
-    'python3 scripts/symphony/tests/symphony-github-poke.test.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [

@@ -86,11 +86,6 @@ cleanup_old_branches*.sh
 !/docs/
 /docs/*
 !/docs/FEATURE_REGISTRY.md
-!/scripts/
-/scripts/*
-!/scripts/symphony/
-/scripts/symphony/*
-!/scripts/symphony/symphony-codex-account-control.py
 !apps/eve-pilot/identities/jovie/instructions.md
 !apps/eve-pilot/identities/summer/instructions.md
 

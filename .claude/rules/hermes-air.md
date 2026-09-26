@@ -2,6 +2,10 @@
 paths: ["scripts/symphony/**", "docs/hermes/**"]
 ---
 
+> Moved 2026-09-25: every `scripts/symphony/**` path below now lives in the private
+> `JovieInc/symphony-control` repo at the same path.
+
+
 # Hermes on the MacBook Air (Always-On Orchestration Node)
 
 Operating contract for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.

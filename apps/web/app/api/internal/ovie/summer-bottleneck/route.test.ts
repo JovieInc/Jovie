@@ -1,6 +1,4 @@
-import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify as nodeVerify } from 'node:crypto';
-import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -40,6 +38,7 @@ import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { SummerPinInvalidError } from '@/lib/ovie/summer-production-pin';
 import * as summerShadowClient from '@/lib/ovie/summer-shadow-client';
+import publisherGolden from './__fixtures__/summer-publisher-snapshots.json';
 import { POST } from './route';
 
 const NOW = '2026-09-04T20:00:00.000Z';
@@ -163,63 +162,22 @@ function request(body: unknown) {
 
 // Exercise the actual publisher composition, using only its synthetic test inputs.
 // No host observation, credential access, or submission runs in this subprocess.
+// Golden outputs of the Symphony publisher (JovieInc/symphony-control
+// scripts/symphony/tests/summer-publisher-admissions.test.py). symphony-control's
+// summer-publisher-golden test regenerates them and fails on any contract drift.
+const PUBLISHER_SNAPSHOTS = publisherGolden.snapshots as Record<
+  string,
+  unknown
+>;
+
 function publisherSnapshot(
   providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN',
   ciAuditV2 = false
 ) {
-  const fixturePath = resolve(
-    process.cwd(),
-    '../../scripts/symphony/tests/summer-publisher-admissions.test.py'
-  );
-  return JSON.parse(
-    execFileSync(
-      'python3',
-      [
-        '-c',
-        `import json, runpy, sys
-fixture = runpy.run_path(sys.argv[1])
-case = fixture['TaskAdmissionPublicationTests']()
-case.setUp()
-for row in case.audit['classes']:
-    row['blockedSince'] = fixture['FRESH_AT']
-case.reference.update(mode='isolated-cli', issueId='11111111-1111-4111-8111-111111111111',
-    ownerId='22222222-2222-4222-8222-222222222222', issueRevision=fixture['FRESH_AT'],
-    repository='JovieInc/Jovie', pr=1, head=fixture['MAIN_SHA'],
-    workspace='/fixture/owned-repair', writerUnit='fixture-repair.service')
-if sys.argv[2]:
-    provider_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('existing-pr-repair.test.py')))
-    provider_case = provider_fixture['RepairTests']()
-    clock = provider_fixture['mock'].patch.object(
-        provider_fixture['repair'].time, 'time', return_value=fixture['NOW'].timestamp())
-    clock.start()
-    try:
-        provider_case.setUp()
-        provider_case.stack.enter_context(provider_fixture['mock'].patch.object(
-            provider_fixture['repair'], '_iso_now', return_value=fixture['NOW'].isoformat()))
-        _task, payload, config = provider_case.allowance_fixture()
-        if sys.argv[2] == 'HELD':
-            config['creditUsagePercent'] = 100
-        elif sys.argv[2] == 'UNKNOWN':
-            config.pop('creditUsagePercent')
-        case.observed.update(provider_fixture['repair'].observe_grok_allowance(payload,
-            opener=lambda *_args, **_kwargs: provider_case.allowance_response(config)))
-    finally:
-        provider_case.doCleanups()
-        clock.stop()
-if sys.argv[3]:
-    ci_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('summer-ci-audit.test.py')))
-    case.fleet['signals']['ciAudit'] = ci_fixture['fixture'](
-        [ci_fixture['check'](completed_at=fixture['FRESH_AT'])], clock=lambda: fixture['NOW'])
-print(json.dumps(fixture['MODULE'].compose_snapshot(case.fleet, case.runtime,
-    fixture['NOW'], case.attestation, existing_repair=case.reference,
-    task_admissions=case.observed)))`,
-        fixturePath,
-        providerState ?? '',
-        ciAuditV2 ? 'v2' : '',
-      ],
-      { encoding: 'utf8', timeout: 5000 }
-    )
-  );
+  const key = providerState ?? (ciAuditV2 ? 'ciAuditV2' : 'default');
+  return structuredClone(PUBLISHER_SNAPSHOTS[key]) as ReturnType<
+    typeof JSON.parse
+  >;
 }
 
 function fixtureProjection(

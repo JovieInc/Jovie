@@ -66,10 +66,7 @@ const TERMINAL_STATES = new Set([
 export const OFFICIAL_TIER_POLICY = TIER_POLICY;
 
 const registry = JSON.parse(
-  readFileSync(
-    new URL('../symphony/config/model-registry.json', import.meta.url),
-    'utf8'
-  )
+  readFileSync(new URL('./config/model-registry.json', import.meta.url), 'utf8')
 );
 const MODEL_BY_ID = Object.freeze(
   Object.fromEntries(

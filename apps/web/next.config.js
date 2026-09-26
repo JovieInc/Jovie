@@ -64,7 +64,6 @@ const nextConfig = {
     '/*': [
       '../../CHANGELOG.md',
       '../../docs/FEATURE_REGISTRY.md',
-      '../../scripts/symphony/symphony-codex-account-control.py',
       '../../apps/eve-pilot/identities/jovie/instructions.md',
       '../../apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',

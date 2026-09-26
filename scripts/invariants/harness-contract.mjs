@@ -9,6 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ownedHere } from './registry.mjs';
 
 export const HARNESS_CONTRACT_INVARIANT_ID = 'JOV-INV-024';
 export const HARNESS_CONTRACT_SCHEMA = 'jovie-harness-contract/v1';
@@ -157,7 +158,11 @@ export function validateHarnessContract(registry, options = {}) {
         `harness-policy-owner:${id}: policy owner must be ${HARNESS_POLICY_OWNER}`
       );
     }
-    if (hasText(principle?.gate?.path) && !fileExists(principle.gate.path)) {
+    if (
+      hasText(principle?.gate?.path) &&
+      ownedHere(principle.gate) &&
+      !fileExists(principle.gate.path)
+    ) {
       errors.push(
         `harness-gate-missing:${id}: gate ${principle.gate.path} does not exist`
       );

@@ -108,7 +108,6 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(result.status, result.stderr).toBe(scenario.expected);
       const invoked = readFileSync(calls, 'utf8');
       if (scenario.available) {
-        expect(invoked).toContain('-m coverage run --branch');
         const pytestInvocation = invoked
           .split('\n')
           .find(call => call.startsWith('-m pytest '));
@@ -119,9 +118,7 @@ describe('ci-fast bounded parallel workflow', () => {
             'scripts/tests/test_vercel_prebuilt_deploy.py',
             'scripts/tests/test_brand_scrub.py',
             'scripts/tests/test_agent_workflow_hygiene.py',
-            'scripts/tests/test_runner_routing.py',
-            'scripts/tests/test_symphony_ui_pilot_runtime.py',
-            'scripts/tests/test_symphony_reconciler_runtime.py -v',
+            'scripts/tests/test_runner_routing.py -v',
           ].join(' ')
         );
       } else {
@@ -180,70 +177,6 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(CI_FAST_SOURCE).toContain(
       "...(selected.has('mac') ? macParts : [])"
-    );
-  });
-
-  it('selects the enforced shutdown proof for runtime-only PRs', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = remaining.match(
-      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
-    )?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'scripts/symphony/symphony_official_runtime.py',
-      'scripts/symphony/tests/run-runtime-proof-gate.py',
-      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-    ]) {
-      const match = spawnSync('grep', ['-Eq', pattern], {
-        input: `${path}\n`,
-        encoding: 'utf8',
-      });
-      expect(match.status, path).toBe(0);
-    }
-    expect(CI_FAST_SOURCE).toContain(
-      "'python3 scripts/symphony/tests/run-runtime-proof-gate.py'"
-    );
-  });
-
-  it('selects and runs alignment regressions for source-only changes', () => {
-    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'scripts/symphony/align-runner-source-revision.sh',
-      'scripts/symphony/tests/align-runner-source-revision.test.sh',
-    ]) {
-      expect(
-        spawnSync('grep', ['-Eq', pattern], {
-          input: `${path}\n`,
-          encoding: 'utf8',
-        }).status,
-        path
-      ).toBe(0);
-    }
-    expect(CI_FAST_SOURCE).toContain(
-      "'bash scripts/symphony/tests/align-runner-source-revision.test.sh'"
-    );
-  });
-
-  it('runs Linux restart boundary tests when the helper or its proof changes', () => {
-    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'scripts/symphony/symphony-elixir-safe-restart',
-      'scripts/symphony/tests/run-safe-restart-gate.py',
-      'scripts/symphony/tests/symphony-safe-restart.test.py',
-    ]) {
-      const result = spawnSync('grep', ['-Eq', pattern], {
-        input: `${path}\n`,
-        encoding: 'utf8',
-      });
-      expect(result.status, path).toBe(0);
-    }
-    expect(CI_FAST_SOURCE).toContain(
-      "'python3 scripts/symphony/tests/run-safe-restart-gate.py'"
     );
   });
 
@@ -743,33 +676,6 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
   });
 
-  it('runs the official Symphony recovery ownership contract with exact changed-line coverage', () => {
-    expect(PACKAGE_JSON.scripts['invariants:check']).toContain(
-      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage"'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
-    );
-  });
-
-  it('runs the Astra readiness contract with branch coverage', () => {
-    expect(CI_FAST_SOURCE).toContain(
-      'python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      '--include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90'
-    );
-  });
-
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
@@ -1176,145 +1082,6 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs route-prep behavior coverage for probe and router edits', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = [
-      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
-    ]
-      .map(match => match[1])
-      .find(part => part.includes('run-route-prep-coverage-gate'))
-      ?.replace(/^\|/, '');
-    expect(pattern).toBeTruthy();
-    for (const path of [
-      'scripts/symphony/codex-account-probe.sh',
-      'scripts/symphony/symphony-agent-router',
-      'scripts/symphony/tests/codex-account-probe.test.py',
-      'scripts/symphony/tests/symphony-agent-router.test.py',
-      'scripts/symphony/tests/run-route-prep-coverage-gate.py',
-    ]) {
-      const selected = spawnSync('grep', ['-qE', pattern], {
-        input: `${path}\n`,
-      });
-      expect(selected.status, path).toBe(0);
-    }
-    for (const path of [
-      'scripts/symphony/symphony-agent-router-extra',
-      'scripts/symphony/symphony-codex-router',
-      'scripts/symphony/tests/codex-recovery-ci.sh',
-      'README.md',
-    ]) {
-      const selected = spawnSync('grep', ['-qE', pattern], {
-        input: `${path}\n`,
-      });
-      expect(selected.status, path).toBe(1);
-    }
-    expect(CI_FAST_SOURCE).toContain(
-      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
-    );
-    const coverage = WORKFLOW.slice(
-      WORKFLOW.indexOf('  ci-exact-head-coverage:'),
-      WORKFLOW.indexOf('  ci-a11y:')
-    );
-    expect(coverage).toContain("github.event_name == 'pull_request'");
-    expect(coverage).toContain("github.event_name == 'merge_group'");
-    expect(coverage).toContain('has_route_prep_coverage_changes');
-    expect(coverage).toContain(
-      'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py'
-    );
-    expect(remaining).toContain('github.event_name }}" != "pull_request"');
-    expect(remaining).toContain('echo "skip=false"');
-  });
-
-  it('runs native queue delivery regressions with coverage for executor changes', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    expect(remaining).toContain(
-      '(run-native-queue-execution|native-queue-starvation-execute(\\.test)?)\\.mjs$'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs'
-    );
-  });
-
-  it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-
-    expect(remaining).toContain(
-      'install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\\.sh$'
-    );
-    expect(remaining).toContain('jovie-symphony-workspace(-create)?$');
-    expect(remaining).toContain('gbrain-runtime-assets|merge-group');
-    expect(CI_FAST_SOURCE).toContain(
-      'GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts'
-    );
-    expect(CI_FAST_SOURCE).toContain('--precision=2 --fail-under=78');
-    expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
-    expect(CI_FAST_SOURCE).not.toContain('elif [[');
-    expect(remaining).toContain('jovie-symphony-workspace\\.test\\.py$');
-    expect(remaining).toContain('_gem_workspace_migrate)\\.py$');
-    expect(remaining).toContain('summer_bottleneck_producer\\.py$');
-    expect(remaining).toContain('summer-bottleneck-producer\\.test\\.py$');
-    expect(remaining).toContain(
-      'summer-symphony-outbox-(consumer(\\.test)?|contract\\.test)\\.mjs$'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs'
-    );
-    for (const gemContractCommand of [
-      'python3 scripts/symphony/tests/run-hud-proof-gate.py',
-      'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
-      'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
-      'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
-      'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-      'coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
-      'python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py',
-      'coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
-      'python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py',
-      'coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
-      'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
-      'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'python3 scripts/symphony/tests/run-model-state-gate.py',
-      'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
-      'python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py',
-      'python3 scripts/symphony/tests/symphony-github-poke.test.py',
-    ]) {
-      expect(CI_FAST_SOURCE).toContain(gemContractCommand);
-    }
-    expect(CI_FAST_SOURCE).toContain(
-      '--include="*/scripts/symphony/hyperagent/lifecycle.py" --show-missing --precision=2 --fail-under=95'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs'
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs'
-    );
-  });
-
   it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ci-fast-lanes-'));
     const outPath = join(dir, 'ci-fast-lanes.json');
@@ -1678,7 +1445,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/closure_health.py',
       'scripts/symphony/control-bundle-manifest.mjs',
       'scripts/symphony/config/gem-repo-registry.json',
-      'scripts/symphony/config/model-registry.json',
+      'scripts/backlog-orchestrator/config/model-registry.json',
       'scripts/symphony/evaluate-fleet-gate.sh',
       'scripts/symphony/fleet_admission_receipt.py',
       'scripts/symphony/gem-disk-reclaim.py',
@@ -1961,53 +1728,6 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 });
 
-it('runs the pinned Symphony selector for governor-bounded-codex intake edits', () => {
-  const remaining = jobBlock(
-    'ci-fast-remaining',
-    'ci-profile-admission-browser'
-  );
-  const pattern = [
-    ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
-  ]
-    .map(match => match[1])
-    .join('');
-  for (const path of [
-    'scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
-    'scripts/symphony/tests/governor_bounded_codex_intake_test.exs',
-  ]) {
-    const selected = spawnSync('grep', ['-qE', pattern], {
-      input: `${path}\n`,
-    });
-    expect(selected.status, path).toBe(0);
-  }
-  expect(CI_FAST_SOURCE).toContain(
-    'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh'
-  );
-});
-
-it('runs the attestation observation coverage gate for publisher-only edits', () => {
-  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
-  const selected = new RegExp(pattern);
-  expect(
-    selected.test('scripts/symphony/emit_gem_service_attestation.py')
-  ).toBe(true);
-  expect(
-    selected.test('scripts/symphony/tests/gem-service-attestation.test.py')
-  ).toBe(true);
-  expect(CI_FAST_SOURCE).toContain(
-    'coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py'
-  );
-  expect(CI_FAST_SOURCE).toContain(
-    'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
-  );
-  expect(
-    selected.test('scripts/symphony/install-gem-service-attestation.sh')
-  ).toBe(true);
-  expect(
-    selected.test('scripts/symphony/systemd/gem-service-attestation.service')
-  ).toBe(true);
-});
-
 it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
   const selected = new RegExp(pattern);
@@ -2129,207 +1849,4 @@ it('selects and enforces offline failure behavior coverage for module-only and t
       `--coverage.thresholds.${metric}`
     );
   }
-});
-
-describe('Symphony selector toolchain cache', () => {
-  const SELECTOR =
-    'scripts/symphony/tests/run-governor-bounded-codex-selector.sh';
-  const CACHE_PATHS = [
-    '${{ runner.temp }}/symphony-selector-beam',
-    '${{ runner.temp }}/symphony-selector-mix-home',
-    '${{ runner.temp }}/symphony-selector-src/elixir/deps',
-    '${{ runner.temp }}/symphony-selector-src/elixir/_build/test',
-  ];
-  const remaining = () =>
-    jobBlock('ci-fast-remaining', 'ci-profile-admission-browser');
-
-  function step(block, name) {
-    const start = block.indexOf(`      - name: ${name}\n`);
-    expect(start, `missing step ${name}`).toBeGreaterThanOrEqual(0);
-    const next = block.indexOf('\n      - name: ', start + 1);
-    return block.slice(start, next === -1 ? block.length : next);
-  }
-
-  function printCacheKey() {
-    const out = execFileSync('bash', [SELECTOR, '--print-cache-key'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
-    return Object.fromEntries(
-      out
-        .trim()
-        .split('\n')
-        .map(line => [
-          line.slice(0, line.indexOf('=')),
-          line.slice(line.indexOf('=') + 1),
-        ])
-    );
-  }
-
-  it('restores an exact key built from the pin, BEAM versions, platform and script hash', () => {
-    const block = remaining();
-    expect(step(block, 'Resolve Symphony selector cache key')).toContain(
-      `bash ${SELECTOR} --print-cache-key >> "$GITHUB_OUTPUT"`
-    );
-    const restore = step(block, 'Restore Symphony selector cache');
-    expect(restore).toContain(
-      'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
-    );
-    for (const output of ['platform', 'otp', 'elixir', 'pin']) {
-      expect(restore).toContain(
-        `\${{ steps.selector-cache-key.outputs.${output} }}`
-      );
-    }
-    expect(restore).toContain('${{ runner.os }}');
-    expect(restore).toContain(`\${{ hashFiles('${SELECTOR}') }}`);
-    // Exact key only: another pin or toolchain must never seed build outputs.
-    expect(restore).not.toContain('restore-keys');
-    for (const path of CACHE_PATHS) expect(restore).toContain(path);
-
-    const key = printCacheKey();
-    const runtime = readFileSync(
-      resolve(REPO_ROOT, 'scripts/symphony/symphony_official_runtime.py'),
-      'utf8'
-    );
-    expect(key.pin).toBe(
-      runtime.match(/OFFICIAL_SYMPHONY_GIT_SHA = "([0-9a-f]{40})"/)?.[1]
-    );
-    expect(key.otp).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(key.elixir).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(key.platform).toMatch(/^[a-z]+-[\d.]+-\w+$/);
-  });
-
-  it('points the selector at the cached paths and saves only from main pushes', () => {
-    const block = remaining();
-    const keyAt = block.indexOf('- name: Resolve Symphony selector cache key');
-    const restoreAt = block.indexOf('- name: Restore Symphony selector cache');
-    const laneAt = block.indexOf('- name: Run structural ci-fast lane');
-    const saveAt = block.indexOf('- name: Save Symphony selector cache');
-    expect(keyAt).toBeGreaterThan(0);
-    expect(restoreAt).toBeGreaterThan(keyAt);
-    expect(laneAt).toBeGreaterThan(restoreAt);
-    expect(saveAt).toBeGreaterThan(laneAt);
-
-    const lane = step(block, 'Run structural ci-fast lane');
-    expect(lane).toContain(
-      'SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam'
-    );
-    expect(lane).toContain(
-      'MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix'
-    );
-    expect(lane).toContain(
-      'HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex'
-    );
-    // Overriding the checkout would skip the pinned clone entirely.
-    expect(block).not.toContain('SYMPHONY_SELECTOR_CHECKOUT');
-    expect(readFileSync(resolve(REPO_ROOT, SELECTOR), 'utf8')).toContain(
-      'CHECKOUT="${RUNNER_TEMP:-/tmp}/symphony-selector-src"'
-    );
-
-    const ready = step(block, 'Check Symphony selector cache outputs');
-    expect(ready).toContain("github.event_name == 'push'");
-    expect(ready).toContain("github.ref == 'refs/heads/main'");
-    expect(ready).toContain("steps.selector-cache.outputs.cache-hit != 'true'");
-    const save = step(block, 'Save Symphony selector cache');
-    expect(save).toContain(
-      "if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}"
-    );
-    expect(save).toContain('continue-on-error: true');
-    expect(save).toContain(
-      'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
-    );
-    expect(save).toContain(
-      'key: ${{ steps.selector-cache.outputs.cache-primary-key }}'
-    );
-    for (const path of CACHE_PATHS) expect(save).toContain(path);
-  });
-
-  function runSelectorWithStubs(installedOtp) {
-    const { pin, otp, elixir } = printCacheKey();
-    const otpMajor = otp.split('.')[0];
-    const root = mkdtempSync(join(tmpdir(), 'selector-cache-'));
-    try {
-      const log = join(root, 'calls.log');
-      const stubs = join(root, 'stubs');
-      const prefix = join(root, 'symphony-selector-beam');
-      const elixirDir = join(root, 'symphony-selector-src', 'elixir');
-      for (const dir of [
-        stubs,
-        join(prefix, 'bin'),
-        join(prefix, 'otp', 'bin'),
-        join(prefix, 'otp', 'releases', otpMajor),
-        join(elixirDir, 'deps', 'jason'),
-        join(elixirDir, '_build', 'test', 'lib'),
-      ]) {
-        mkdirSync(dir, { recursive: true });
-      }
-      const stub = (file, body) => {
-        writeFileSync(file, `#!/usr/bin/env bash\n${body}\n`);
-        chmodSync(file, 0o755);
-      };
-      stub(
-        join(stubs, 'git'),
-        [
-          `echo "git $*" >> "${log}"`,
-          'if [[ "$1" == clone ]]; then mkdir -p "${@: -1}/.git"; exit 0; fi',
-          'if [[ "$3" == checkout ]]; then mkdir -p "$2/elixir/test/symphony_elixir"; fi',
-          `if [[ "$3" == rev-parse ]]; then echo "${pin}"; fi`,
-          'exit 0',
-        ].join('\n')
-      );
-      stub(join(stubs, 'curl'), `echo "curl $*" >> "${log}"; exit 22`);
-      stub(join(prefix, 'otp', 'bin', 'erl'), 'exit 0');
-      stub(
-        join(prefix, 'bin', 'elixir'),
-        `printf 'Erlang/OTP ${otpMajor}\\n\\nElixir ${elixir} (compiled with Erlang/OTP ${otpMajor})\\n'`
-      );
-      stub(join(prefix, 'bin', 'mix'), `echo "mix $*" >> "${log}"`);
-      writeFileSync(
-        join(prefix, 'otp', 'releases', otpMajor, 'OTP_VERSION'),
-        `${installedOtp ?? otp}\n`
-      );
-      writeFileSync(join(elixirDir, '_build', 'test', 'lib', 'marker'), 'x');
-      const result = spawnSync('bash', [SELECTOR], {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        env: {
-          PATH: `${stubs}:/usr/bin:/bin`,
-          HOME: root,
-          RUNNER_TEMP: root,
-          SYMPHONY_ELIXIR_PREFIX: prefix,
-        },
-      });
-      return {
-        result,
-        calls: existsSync(log) ? readFileSync(log, 'utf8') : '',
-        build: existsSync(join(elixirDir, '_build', 'test', 'lib', 'marker')),
-        deps: existsSync(join(elixirDir, 'deps', 'jason')),
-        parked: existsSync(join(root, 'symphony-selector-src.restored')),
-      };
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }
-
-  it('reuses a verified warm toolchain and restored build outputs without downloads', () => {
-    const run = runSelectorWithStubs();
-    expect(run.result.status, run.result.stderr).toBe(0);
-    expect(run.result.stdout).toContain('symphony-selector-beam=warm');
-    expect(run.calls).not.toContain('curl');
-    expect(run.calls).toMatch(/git clone .*JovieInc\/symphony\.git/);
-    expect(run.calls).toContain('mix local.hex --force --if-missing');
-    expect(run.calls).toContain('mix local.rebar --force --if-missing');
-    expect(run.calls).toContain('mix deps.get');
-    expect(run.build).toBe(true);
-    expect(run.deps).toBe(true);
-    expect(run.parked).toBe(false);
-  });
-
-  it('reinstalls instead of trusting a restored toolchain whose OTP drifted', () => {
-    const run = runSelectorWithStubs('26.2.5');
-    expect(run.result.status).not.toBe(0);
-    expect(run.result.stdout).not.toContain('symphony-selector-beam=warm');
-    expect(run.calls).toMatch(/curl .*builds\.hex\.pm\/builds\/otp\//);
-    expect(run.calls).not.toContain('mix ');
-  });
 });

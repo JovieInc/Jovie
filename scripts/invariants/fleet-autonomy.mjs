@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INVARIANTS_REPO, ownedHere } from './registry.mjs';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const PATHS = Object.freeze({
-  gate: 'scripts/symphony/gem-priority-gate.py',
+  gate: 'scripts/symphony/gem-priority-gate.py', // owned by JovieInc/symphony-control
   drain: 'scripts/drain-pr-queue.sh',
   backend: 'scripts/merge-queue-backend.mjs',
   workflow: '.github/workflows/pr-targets-main.yml',
@@ -22,10 +23,15 @@ const RETIRED_QUEUE_LABEL = /then add `merge-queue`/;
 /** JOV-INV-023: fleet observation gaps and non-main PR bases must not freeze shipping. */
 export function validateFleetAutonomy(
   repoRoot = DEFAULT_ROOT,
-  { readFile = path => readFileSync(resolve(repoRoot, path), 'utf8') } = {}
+  {
+    readFile = path => readFileSync(resolve(repoRoot, path), 'utf8'),
+    repo = INVARIANTS_REPO,
+  } = {}
 ) {
   const errors = [];
-  const gate = readFile(PATHS.gate);
+  // The Gem priority gate lives in the Symphony control plane and is checked there.
+  const gateHere = ownedHere({ repo: 'JovieInc/symphony-control' }, repo);
+  const gate = gateHere ? readFile(PATHS.gate) : null;
   const drain = readFile(PATHS.drain);
   const backend = readFile(PATHS.backend);
   const workflow = readFile(PATHS.workflow);
@@ -33,14 +39,15 @@ export function validateFleetAutonomy(
   const command = readFile(PATHS.command);
   const nur = readFile(PATHS.nur);
 
-  if (!gate.includes('def observe_main_release_ready_jobs')) {
+  if (gateHere && !gate.includes('def observe_main_release_ready_jobs')) {
     errors.push(
       'gem-priority-gate.py must observe Main Release Ready from the CI workflow job when check-runs omit it'
     );
   }
   if (
-    !gate.includes('queue-observation-gap') ||
-    !gate.includes('bound_green_factory')
+    gateHere &&
+    (!gate.includes('queue-observation-gap') ||
+      !gate.includes('bound_green_factory'))
   ) {
     errors.push(
       'gem-priority-gate.py must treat a missing queue snapshot as an observation gap, not a hold'

@@ -129,29 +129,6 @@
     "scripts/skill-governance-guard.mjs": {
       "TS2339": 1
     },
-    "scripts/symphony/jobs/agent-config-health.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/agentcookie-sync.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/ci-failure-monitor.ts": {
-      "TS1470": 2
-    },
-    "scripts/symphony/jobs/codex-issue-shipper.ts": {
-      "TS2339": 1,
-      "TS2345": 1
-    },
-    "scripts/symphony/jobs/daily-briefing.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/gbrain-health-summary.ts": {
-      "TS1470": 1,
-      "TS2345": 4
-    },
-    "scripts/symphony/jobs/pr-stuck-monitor.ts": {
-      "TS1470": 1
-    },
     "scripts/turnstile-config.ts": {
       "TS1470": 1,
       "TS2540": 8
