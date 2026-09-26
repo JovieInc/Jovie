@@ -1,0 +1,160 @@
+{
+  "schema": "jovie.capability-benchmark-registry/v1",
+  "issue": "JOV-2966",
+  "auditedAt": "2026-09-26T00:00:00Z",
+  "evidenceLifecycleIssue": "JOV-5916",
+  "secondLedger": false,
+  "summary": "Benchmark-and-decision lifecycle for consequential internal capabilities versus external state of the art. Evidence producers feed the canonical evidence lifecycle in JOV-5916; this registry owns only the benchmark object, sourcing decision, and capacity contract. No second ledger, no clock-based sweep, no router rewrite is authorized.",
+  "triggerPolicy": {
+    "clockSweep": false,
+    "materialEvents": [
+      "external-capability-discovered",
+      "external-capability-materially-changed",
+      "internal-capability-changed",
+      "workload-failure-or-cost-changed",
+      "customer-or-founder-reported-gap",
+      "pending-decision-needs-comparison",
+      "benchmark-evidence-expired"
+    ],
+    "lowValueAccumulation": {
+      "bySemanticSignature": true,
+      "threshold": "accumulate until relevance or expected value crosses threshold"
+    }
+  },
+  "evidenceProducers": [
+    {
+      "id": "idea-radar",
+      "canonicalLifecycle": "JOV-5916",
+      "note": "Weekly idea-discovery sweep emits signals into the canonical evidence lifecycle; it is not a benchmark authority."
+    },
+    {
+      "id": "competitor-monitoring",
+      "canonicalLifecycle": "JOV-5916"
+    },
+    {
+      "id": "last30days",
+      "canonicalLifecycle": "JOV-5916"
+    },
+    {
+      "id": "github-release-watchers",
+      "canonicalLifecycle": "JOV-5916"
+    },
+    {
+      "id": "papers-and-curated-research",
+      "canonicalLifecycle": "JOV-5916"
+    },
+    {
+      "id": "vendor-announcements",
+      "canonicalLifecycle": "JOV-5916"
+    },
+    {
+      "id": "founder-customer-observations",
+      "canonicalLifecycle": "JOV-5916"
+    }
+  ],
+  "domains": [
+    {
+      "id": "code-review-verification",
+      "status": "defined",
+      "capability": "Code review / implementation verification",
+      "userOutcome": "Real bugs caught before merge at acceptable false-positive, latency, and cost burden.",
+      "taskSuite": {
+        "id": "jovie-code-review-benchmark",
+        "version": "2026-09-26.0",
+        "ref": "versioned task set to be materialized from landed-fix history and seeded-bug fixtures before the first run; the suite id and version are pinned here so rerun comparisons stay cohort-stable",
+        "groundTruth": "independent rubric over known injected and historically confirmed defects; marketing claims never count as proof",
+        "adversarialCases": [
+          "noisy-diff low-signal changes",
+          "architecture-boundary violations invisible to diff-only review",
+          "security-sensitive paths",
+          "runtime/exact-head behavior vs diff-only confidence",
+          "duplicate and contradictory findings"
+        ]
+      },
+      "metrics": [
+        "real-bugs-caught-pre-merge",
+        "false-positive-burden",
+        "review-depth-coverage",
+        "time-cost-to-actionable-review",
+        "duplicate-noise",
+        "learning-from-accepted-rejected-findings",
+        "exact-head-runtime-verification"
+      ],
+      "candidates": [
+        {
+          "id": "internal-review-stack",
+          "kind": "internal",
+          "version": "main",
+          "provenance": "Jovie internal review machinery: scripts/agent/preflight, autoplan review pipeline, and in-repo review skills on exact HEAD"
+        },
+        {
+          "id": "external-managed-challenger",
+          "kind": "external",
+          "version": "verify-at-run",
+          "provenance": "a managed code-review vendor (e.g. the system referred to as CodeRabbit); current identity, version, and capability must be verified before results count",
+          "identityVerified": false
+        },
+        {
+          "id": "open-source-challenger",
+          "kind": "open-source",
+          "version": "verify-at-run",
+          "provenance": "a public code-review agent repository; pin the exact tag/commit and verify identity at run time",
+          "identityVerified": false
+        }
+      ],
+      "decision": {
+        "id": "code-review-verification-2026-09-26",
+        "state": "retain-internal-only",
+        "scope": "capability-benchmark-run",
+        "expectedEconomics": "status quo until the first shadow/replay run produces certified outcome and cost evidence",
+        "dependencyRisk": "none added; external challenger runs only as signal, not a runtime dependency",
+        "reversibility": "fully reversible; no production review path depends on the challenger",
+        "reEvaluateTrigger": "first versioned task-suite run completes, or any material trigger event for this domain",
+        "decidedAt": "2026-09-26T00:00:00Z",
+        "expiresAt": "2026-12-26T00:00:00Z"
+      }
+    }
+  ],
+  "sourcingStates": [
+    "build",
+    "adopt",
+    "buy",
+    "integrate",
+    "adapt",
+    "distill-learn",
+    "open-source",
+    "productize-license",
+    "retain-internal-only",
+    "retire"
+  ],
+  "oviEscalation": {
+    "onlyFounderJudgment": true,
+    "founderJudgmentScopes": [
+      "portfolio-allocation-change",
+      "new-product-or-company",
+      "credential-or-billing-boundary"
+    ],
+    "inboxFields": [
+      "evidence",
+      "benchmarkResult",
+      "recommendation",
+      "confidence",
+      "cost",
+      "proposedBoundedAction",
+      "capacityImpact"
+    ],
+    "routineAuthority": "autonomous adoption with an outcome receipt"
+  },
+  "insideOut": {
+    "internalWinIsNotACompany": true,
+    "demandTestBeforeBuild": true,
+    "killCriteriaRequired": true,
+    "assetHypothesisSink": "JOV-5945",
+    "portfolioSink": "JOV-5949"
+  },
+  "capacity": {
+    "preemptible": true,
+    "revenuePathBlockers": ["JOV-5911", "JOV-5912"],
+    "receiptSchema": "jovie.capability-benchmark.capacity-receipt/v1"
+  }
+}
