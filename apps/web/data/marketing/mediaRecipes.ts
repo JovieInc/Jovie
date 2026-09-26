@@ -194,8 +194,8 @@ export const DARK_GLASS_MEDIA_RECIPE = {
     shellMixPercent: 82,
     scrolledShellMixPercent: 90,
     shellToken: '--noir-ion-shell',
-    darkShellHex: '#06080D',
-    darkCanvasHex: '#030407',
+    darkShellHex: '#07080A',
+    darkCanvasHex: '#030406',
     borderToken: '--noir-ion-border-subtle',
     borderStrongToken: '--noir-ion-border-default',
     textToken: '--noir-ion-text-primary',
@@ -370,7 +370,7 @@ export const MARKETING_MEDIA_RECIPE_SOURCE_MATRIX: Readonly<
 export const MARKETING_MEDIA_RECIPE_ACCENTS: Readonly<
   Record<MarketingMediaRecipeId, MarketingMediaAccentReference>
 > = {
-  'dark-glass': { token: '--noir-ion-shell', hex: '#06080D' },
+  'dark-glass': { token: '--noir-ion-shell', hex: '#07080A' },
   'compact-glass': { token: '--system-b-cinematic-black', hex: '#06070A' },
   'soft-editorial-background': {
     token: '--system-b-text-primary',
