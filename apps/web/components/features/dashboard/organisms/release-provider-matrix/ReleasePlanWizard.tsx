@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/release-tasks/release-plan-wizard.test.tsx
+
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
