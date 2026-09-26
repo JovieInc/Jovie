@@ -794,7 +794,7 @@ describe('Playwright artifact secret boundary', () => {
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step
-        .split('        run: |\n')[1]
+        .split(/ {8}run: (?:&[\w-]+ )?\|\n/)[1]
         .replaceAll('${{ github.event_name }}', 'pull_request')
         .replaceAll('${{ github.base_ref }}', 'main');
       const directory = fixture();
