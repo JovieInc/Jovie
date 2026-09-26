@@ -228,10 +228,3 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 1
-
-      - name: Run check-in HUD and official burrito contracts
-        run: |
-          set -euo pipefail
-          python3 scripts/symphony/tests/gem-checkin-hud.test.py
-          python3 scripts/symphony/tests/hold-autoresolve.test.py
-          python3 scripts/symphony/tests/symphony-burrito-workflow.test.py

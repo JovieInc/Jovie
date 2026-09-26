@@ -2,6 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** Bindings name their repo when they live outside JovieInc/Jovie (e.g. the Symphony control
+ * plane). Each repo verifies only its own bindings; INVARIANTS_REPO selects which. */
+export const INVARIANTS_REPO = process.env.INVARIANTS_REPO || 'JovieInc/Jovie';
+export function ownedHere(binding, repo = INVARIANTS_REPO) {
+  return (binding?.repo || 'JovieInc/Jovie') === repo;
+}
+
 export const INVARIANT_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const INVARIANT_REGISTRY_SCHEMA = 'jovie-invariant-registry/v1';
 export const INVARIANT_STATES = new Set(['binding', 'adopted', 'superseded']);
@@ -155,6 +162,8 @@ export function validateInvariantRegistry(
     }
 
     for (const consumer of verifyBindings ? consumers || [] : []) {
+      // Cross-repo bindings are verified by the owning repo's CI against the same canon.
+      if (!ownedHere(consumer)) continue;
       const path = resolve(repoRoot, consumer.path || '');
       if (
         !hasText(consumer.name) ||
@@ -179,6 +188,7 @@ export function validateInvariantRegistry(
     for (const evidence of verifyBindings
       ? [...(invariant?.evidence?.tests || []), ...(deliberateRed || [])]
       : []) {
+      if (!ownedHere(evidence)) continue;
       const path = resolve(repoRoot, evidence.path || '');
       if (
         !hasText(evidence.path) ||

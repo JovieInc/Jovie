@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-09-26T15:14:14.657Z",
-  "totalErrors": 140,
+  "generatedAt": "2026-09-26T16:52:49.020Z",
+  "totalErrors": 119,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -54,17 +54,11 @@
       "TS2307": 1,
       "TS2584": 8
     },
-    "scripts/lib/__tests__/agent-config-health.test.mjs": {
-      "TS2345": 1
-    },
     "scripts/lib/__tests__/automation-verify.test.mjs": {
       "TS2345": 1
     },
     "scripts/lib/__tests__/ci-harness.test.mjs": {
       "TS2345": 1
-    },
-    "scripts/lib/__tests__/codex-issue-shipper.test.mjs": {
-      "TS2345": 3
     },
     "scripts/lib/__tests__/main-release-readiness.test.mjs": {
       "TS2322": 5
@@ -74,9 +68,6 @@
     },
     "scripts/lib/__tests__/qa-swarm.test.mjs": {
       "TS2345": 5
-    },
-    "scripts/lib/__tests__/ship-ledger.test.mjs": {
-      "TS2339": 4
     },
     "scripts/lib/ci-duration-ratchet.mjs": {
       "TS2353": 1
@@ -128,29 +119,6 @@
     },
     "scripts/skill-governance-guard.mjs": {
       "TS2339": 1
-    },
-    "scripts/symphony/jobs/agent-config-health.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/agentcookie-sync.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/ci-failure-monitor.ts": {
-      "TS1470": 2
-    },
-    "scripts/symphony/jobs/codex-issue-shipper.ts": {
-      "TS2339": 1,
-      "TS2345": 1
-    },
-    "scripts/symphony/jobs/daily-briefing.ts": {
-      "TS1470": 1
-    },
-    "scripts/symphony/jobs/gbrain-health-summary.ts": {
-      "TS1470": 1,
-      "TS2345": 4
-    },
-    "scripts/symphony/jobs/pr-stuck-monitor.ts": {
-      "TS1470": 1
     },
     "scripts/turnstile-config.ts": {
       "TS1470": 1,

@@ -447,15 +447,6 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-functions=90',
     ],
   ],
-  [
-    'scripts/symphony/tests/control-bundle-manifest.test.mjs',
-    'scripts/symphony/control-bundle-manifest.mjs',
-    [
-      '--test-coverage-lines=90',
-      '--test-coverage-branches=75',
-      '--test-coverage-functions=90',
-    ],
-  ],
 ];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
@@ -706,7 +697,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/workflows/ci.yml',
   'docs/PR_FLOW.md',
   'scripts/symphony/config/gem-repo-registry.json',
-  'scripts/symphony/config/model-registry.json',
+  'scripts/backlog-orchestrator/config/model-registry.json',
   'scripts/symphony/closure_health.py',
   'scripts/symphony/gem-disk-reclaim.py',
   'scripts/symphony/gem-symphony-workspace-boot-simulate',
@@ -882,7 +873,7 @@ const SYMPHONY_AGENT_ROUTER_LANE = new Set([
 ]);
 const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
-  'scripts/symphony/config/model-registry.json',
+  'scripts/backlog-orchestrator/config/model-registry.json',
   'scripts/symphony/model-router.py',
   'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
   'scripts/symphony/tests/test-model-router.py',
@@ -896,7 +887,7 @@ const SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS = [
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/symphony/config/gem-repo-registry.json',
-  'scripts/symphony/config/model-registry.json',
+  'scripts/backlog-orchestrator/config/model-registry.json',
   'scripts/symphony/closure_health.py',
   'scripts/symphony/gem-disk-reclaim.py',
   'scripts/symphony/gem-pr-drain.py',
@@ -1027,14 +1018,14 @@ const PR_SIZE_GUARD_TESTS = [
 const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const NEON_ATTEMPT_ARTIFACT_MANIFEST = new Set([
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const NEON_ATTEMPT_ARTIFACT_TESTS = [
@@ -1042,7 +1033,7 @@ const NEON_ATTEMPT_ARTIFACT_TESTS = [
 ];
 const NEON_ATTEMPT_ARTIFACT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
   '.github/workflows/ci.yml',
@@ -1053,21 +1044,21 @@ const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const GOLDEN_PATH_SMOKE_CONTRACT_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
 const GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_ANCHORS = new Set([
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
@@ -1082,8 +1073,8 @@ const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
   'apps/web/tests/unit/metrics-layer-guard-logic.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ]);
 const SCANNER_LOAD_REPAIR_MANIFEST = new Set([
@@ -1097,14 +1088,14 @@ const SCANNER_LOAD_REPAIR_WEB_TESTS = [
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
 ];
 const SCANNER_LOAD_REPAIR_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ];
 const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
   'apps/web/scripts/test-performance-profiler.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
   'apps/web/app/api/dev/test-auth/session/route.ts',
@@ -1119,15 +1110,15 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/lib/auth/test-mode.test.ts',
   'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
   'scripts/symphony/jobs/ci-failure-monitor.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/symphony/lib/ci-failure-classifier.ts',
   'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
 ]);
 const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
   'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
   'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
@@ -1141,14 +1132,14 @@ const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
   'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/README.md',
@@ -1158,8 +1149,8 @@ const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -1172,20 +1163,20 @@ const RUNNER_IO_PRESSURE_V2_MANIFEST = new Set([
   '.github/workflows/runner-autoscaler-canary.yml',
   'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
 const RUNNER_IO_PRESSURE_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const RUNNER_PREREQUISITE_CONTRACT_TESTS = [
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
 ];
 const RUNNER_PREREQUISITE_CONTROL_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
@@ -1207,8 +1198,8 @@ const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = new Set([
   '.github/runner-image/verify-prerequisites.mjs',
   '.github/workflows/ci.yml',
   ...RUNNER_PREREQUISITE_CONTRACT_TESTS,
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -1220,8 +1211,8 @@ const LAYOUT_GUARD_CONTRACT_MANIFEST = new Set([
   '.github/scripts/layout-guard-manifest.mjs',
   '.github/scripts/layout-guard-manifest.test.mjs',
   '.github/workflows/ci.yml',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/ci-failure-diagnosis.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -1230,7 +1221,7 @@ const LAYOUT_GUARD_CONTRACT_ROOT_TESTS = [
 ];
 const LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 
 function isInvestorNoteIngestionInput(file) {

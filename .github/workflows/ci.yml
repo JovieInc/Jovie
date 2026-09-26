@@ -67,19 +67,6 @@ env:
   # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
-  proof-v2-substrate:
-    name: Validate exact PR head proof v2
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - run: python3 scripts/symphony/tests/run-proof-gate.py
-      - name: Verify Codex account recovery and lease boundaries
-        run: bash scripts/symphony/tests/codex-recovery-ci.sh
-
   runner-image-offline-proof:
     name: Build and verify runner image offline
     if: >-
@@ -1695,6 +1682,7 @@ jobs:
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
           STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/lanes/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/backlog-orchestrator/config/model-registry\.json$'
 
           # Typed company composition must run its real coverage gate on future edits too.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/summer-commissioning/'
@@ -1708,7 +1696,6 @@ jobs:
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
 
           # Codex intake selection must execute the pinned Symphony scheduler.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/tests/run-governor-bounded-codex-selector\.sh$|^scripts/symphony/tests/governor_bounded_codex_intake_test\.exs$'
 
           # Conflict event policy, entrypoint, and proof changes always run the
           # existing structural control selector with exact-path coverage.
@@ -1716,7 +1703,6 @@ jobs:
 
           # Route-prep capacity refresh must run both behavior suites on source
           # PRs, including test-only edits. Merge groups already force this lane.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
           # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
           # skip PRs, so these contracts run here (#18718).
@@ -1820,27 +1806,6 @@ jobs:
       - name: Setup Playwright (Chromium)
         if: ${{ success() && (steps.structural.outputs.skip != 'true' || steps.storybook-browser.outputs.run == 'true') }}
         uses: ./.github/actions/setup-playwright
-      # The pinned Symphony selector otherwise downloads OTP/Elixir, reinstalls
-      # Hex/rebar and recompiles deps on every structural run. The exact-key
-      # cache holds only outputs derived from the selector pin, OTP/Elixir
-      # versions and platform; the selector re-verifies them before reuse.
-      # This job only restores. Queue-proven main pushes skip this job, so
-      # symphony-selector-cache-warm.yml writes the entry from trusted main.
-      - name: Resolve Symphony selector cache key
-        id: selector-cache-key
-        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        run: bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh --print-cache-key >> "$GITHUB_OUTPUT"
-      - name: Restore Symphony selector cache
-        id: selector-cache
-        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ runner.temp }}/symphony-selector-beam
-            ${{ runner.temp }}/symphony-selector-mix-home
-            ${{ runner.temp }}/symphony-selector-src/elixir/deps
-            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
-          key: symphony-selector-v1-${{ runner.os }}-${{ steps.selector-cache-key.outputs.platform }}-otp-${{ steps.selector-cache-key.outputs.otp }}-elixir-${{ steps.selector-cache-key.outputs.elixir }}-${{ steps.selector-cache-key.outputs.pin }}-${{ hashFiles('scripts/symphony/tests/run-governor-bounded-codex-selector.sh') }}
       - name: Await ci-fast lanes
         id: lanes
         if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}
@@ -1861,9 +1826,6 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes-structural.json
-          SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam
-          MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix
-          HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex
         run: node scripts/ci-fast-lanes.mjs
       - name: Run selected Storybook browser proof
         id: storybook-browser-test
@@ -4837,9 +4799,6 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Run route-prep behavior coverage
-        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true'
-        run: python3 scripts/symphony/tests/run-route-prep-coverage-gate.py
 
   ci-a11y:
     name: A11y (axe)

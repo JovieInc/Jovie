@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ownedHere } from './registry.mjs';
 
 export const PR_LIFECYCLE_INVARIANT_ID = 'JOV-INV-029';
 export const PR_LIFECYCLE_SCHEMA = 'jovie-pr-lifecycle/v1';
@@ -22,7 +23,12 @@ export const REQUIRED_PHASES = Object.freeze([
 ]);
 
 const REQUIRED_BINDINGS = Object.freeze([
-  ['scripts/symphony/WORKFLOW.md', 'jovie-pr-lifecycle/v1'],
+  // Symphony's workflow lives in JovieInc/symphony-control and is verified there.
+  [
+    'scripts/symphony/WORKFLOW.md',
+    'jovie-pr-lifecycle/v1',
+    'JovieInc/symphony-control',
+  ],
   ['scripts/backlog-orchestrator/delivery-state-machine.mjs', 'JOV-INV-029'],
   ['scripts/lib/writer-owned-pr-promotion.mjs', 'JOV-INV-029'],
   ['scripts/native-merge-intent.mjs', 'JOV-INV-029'],
@@ -83,7 +89,8 @@ export function validatePrLifecycleContract(
     errors.push('pr-lifecycle-merge-proves-activation');
   if (contract.onlyDispatchExclusion !== 'no-symphony')
     errors.push('pr-lifecycle-dispatch-exclusion');
-  for (const [path, marker] of REQUIRED_BINDINGS) {
+  for (const [path, marker, repo] of REQUIRED_BINDINGS) {
+    if (!ownedHere({ repo })) continue;
     let source;
     try {
       source = readFile(path);

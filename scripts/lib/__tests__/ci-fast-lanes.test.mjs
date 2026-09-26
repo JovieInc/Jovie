@@ -17,7 +17,6 @@ import {
   LANE_COMMANDS,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
-  ROUTE_PREP_COVERAGE_COMMAND,
   runCommandPool,
   runDesignConformance,
   runStructural,
@@ -84,7 +83,12 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
-        .find(command => command.startsWith('exec vitest --root scripts '));
+        // The control pool runs commands concurrently, so match the suite, not the order.
+        .find(
+          command =>
+            command.startsWith('exec vitest --root scripts ') &&
+            command.includes('--coverage.include=merge-queue-backend.mjs')
+        );
       expect(scriptCommand).toBeDefined();
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
@@ -383,20 +387,6 @@ describe('runStructural screenshot contract discovery', () => {
       WEB_CI_CONTRACT_TESTS_COMMAND,
       STRUCTURAL_RUNNER_COVERAGE_COMMAND,
     ]);
-  });
-
-  it('runs route-prep behavior coverage for the operations structural lane', async () => {
-    process.env.GITHUB_EVENT_NAME = 'merge_group';
-    process.env.CI_PRODUCT_LANES = 'operations';
-    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
-    const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
-
-    expect((await runStructural({ execute })).code).toBe(0);
-    expect(
-      execute.mock.calls.some(
-        ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
-      )
-    ).toBe(true);
   });
 
   it('splits the structural python job parts between two hosted jobs', async () => {
@@ -925,7 +915,6 @@ describe('structural command pool', () => {
     const parallel = await startOrder(3);
     const head = parallel.slice(0, 3).join('\n');
     expect(head).toContain('pnpm invariants:check');
-    expect(head).toContain('run-governor-bounded-codex-selector.sh');
     expect(head).toContain('python3 -m pytest ');
     // Both complementary pytest shards are long poles.
     expect(
@@ -1389,7 +1378,7 @@ describe('failing test identities in lane excerpts', () => {
 
   it('names node:test failures with Subtest ancestry and assertion fields', async () => {
     const { header, annotation } = await structuralFailure(
-      'summer-symphony-outbox-consumer.test.mjs',
+      'gate-next-hold.test.mjs',
       NODE_FAILURE
     );
     expect(header.slice(1)).toEqual([

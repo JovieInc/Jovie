@@ -1,0 +1,1048 @@
+{
+  "schema": "summer-publisher-golden-snapshots/v1",
+  "snapshots": {
+    "ALLOWED": {
+      "eventId": "summer_aaaaaaaaaaaa_a6782049c14a9298",
+      "observedAt": "2026-09-05T19:30:00Z",
+      "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
+      "signals": {
+        "admissions": {
+          "authorityScope": "observed-class-admission-task-acceptance-required",
+          "downstreamHealth": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "newImplementation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "ownedRemediation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "providerEligibility": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "push": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "repository": "JovieInc/Jovie",
+          "schema": "jovie.eve.summer-admissions-projection/v1"
+        },
+        "ciAudit": {
+          "classes": [
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:affected-only-unit-selection",
+              "id": "affected-only-unit-selection",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "open"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:auto-enroll-self-cancel-churn",
+              "id": "auto-enroll-self-cancel-churn",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-cascade-coalescing",
+              "id": "controller-cascade-coalescing",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-check-run-pagination-cap",
+              "id": "controller-check-run-pagination-cap",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:merge-group-flake-baseline-ratchet",
+              "id": "merge-group-flake-baseline-ratchet",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:obsolete-unaffected-native-lanes",
+              "id": "obsolete-unaffected-native-lanes",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            }
+          ],
+          "observedAt": "2026-09-05T19:29:00Z",
+          "schema": "jovie-ci-bottleneck-audit/v1",
+          "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "closure": {
+          "blockedSince": null,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "openPullRequests": 0,
+          "schema": "jovie.eve.summer-closure-projection/v1",
+          "sourceDigest": "328caf060e8a8aa6f22f9d89f4e3677eccbd61fbd0747692a2fdb9885f67bf88",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-closure-health/v1",
+          "status": "healthy"
+        },
+        "existingRepair": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expiresAt": "2026-09-05T20:00:00Z",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "identifier": "JOV-6224",
+          "issueId": "11111111-1111-4111-8111-111111111111",
+          "issueRevision": "2026-09-05T19:29:00Z",
+          "mode": "isolated-cli",
+          "ownerId": "22222222-2222-4222-8222-222222222222",
+          "pr": 1,
+          "repository": "JovieInc/Jovie",
+          "workspace": "/fixture/owned-repair",
+          "writerUnit": "fixture-repair.service"
+        },
+        "queue": {
+          "blockedSince": null,
+          "eligibleCleanPrs": 0,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedPrs": 0,
+          "schema": "jovie.eve.summer-queue-projection/v1",
+          "sourceDigest": "eee09446edd73ceeef62eb98a8429cb97cad522c5194a1611b3f22a499188779",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "github-merge-queue-entry/v1"
+        },
+        "release": {
+          "blockedSince": "2026-09-05T19:29:00Z",
+          "mainSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedAt": "2026-09-05T19:29:00Z",
+          "productionSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-release-projection/v1",
+          "sourceDigest": "fde4f7b42bd263d2d59fec47e4859a8b079e09a38c502ac07da1201cb65b95a4",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-controller-snapshot/v1",
+          "unverifiedMerges": 1
+        },
+        "runner": {
+          "blockedSince": null,
+          "capacityAvailable": 1,
+          "capacitySource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-lease-guard-report/v1",
+            "sourceDigest": "540737ede2004bff3e6fea9e73237225c345693cc18372b7cf8ca57b3023c1c2",
+            "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedWork": 0,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-runner-projection/v1",
+          "sourceDigest": "74c000b70a1857fd16580cb6c82934607746fdf2bd22de5030c4eef2909a7ae6",
+          "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceSchema": "symphony-runner-projection/v1",
+          "workSource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-runtime-state/v1",
+            "sourceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "taskAdmissions": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "downstreamHealth": {
+            "expiresAt": "2026-09-05T20:00:00Z",
+            "observedAt": "2026-09-05T19:29:00Z",
+            "reason": "observed-target-available",
+            "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "state": "ALLOWED"
+          },
+          "providerEligibility": {
+            "expiresAt": "2026-09-05T19:34:59+00:00",
+            "observedAt": "2026-09-05T19:30:00+00:00",
+            "reason": "provider-included-allowance-observed",
+            "sourceDigest": "6a7670d27c01cb718319babf5a3c82a009e7c222bfc1e4795ae8245fbfb464f2",
+            "state": "ALLOWED"
+          },
+          "providerObservation": {
+            "accountUserId": "95834901-90c9-4bf0-a85a-6f73192cd9ee",
+            "authPoolIdentity": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "executableDigest": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+            "includedRemainingPercent": 76,
+            "model": "grok-4.6",
+            "outputDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "provider": "grok",
+            "providerGrantDigest": "941900ebbac8f215a5f511cf286793df51348e2fd7da7fd8b5fe7d31db4197cf",
+            "quotaObservedAt": "2026-09-05T19:30:00+00:00",
+            "quotaSourceDigest": "c1e555919566cb667ed5919991cc50e0d1814b2882d90c19a2152f1c7ef0e4f5",
+            "routerDigest": "a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf"
+          },
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "runtimeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "schema": "jovie.eve.summer-task-admissions/v1",
+          "selectedId": "affected-only-unit-selection",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "sourceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "HELD": {
+      "eventId": "summer_aaaaaaaaaaaa_e6bdd43d28968f50",
+      "observedAt": "2026-09-05T19:30:00Z",
+      "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
+      "signals": {
+        "admissions": {
+          "authorityScope": "observed-class-admission-task-acceptance-required",
+          "downstreamHealth": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "newImplementation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "ownedRemediation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "providerEligibility": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "push": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "repository": "JovieInc/Jovie",
+          "schema": "jovie.eve.summer-admissions-projection/v1"
+        },
+        "ciAudit": {
+          "classes": [
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:affected-only-unit-selection",
+              "id": "affected-only-unit-selection",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "open"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:auto-enroll-self-cancel-churn",
+              "id": "auto-enroll-self-cancel-churn",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-cascade-coalescing",
+              "id": "controller-cascade-coalescing",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-check-run-pagination-cap",
+              "id": "controller-check-run-pagination-cap",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:merge-group-flake-baseline-ratchet",
+              "id": "merge-group-flake-baseline-ratchet",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:obsolete-unaffected-native-lanes",
+              "id": "obsolete-unaffected-native-lanes",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            }
+          ],
+          "observedAt": "2026-09-05T19:29:00Z",
+          "schema": "jovie-ci-bottleneck-audit/v1",
+          "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "closure": {
+          "blockedSince": null,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "openPullRequests": 0,
+          "schema": "jovie.eve.summer-closure-projection/v1",
+          "sourceDigest": "328caf060e8a8aa6f22f9d89f4e3677eccbd61fbd0747692a2fdb9885f67bf88",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-closure-health/v1",
+          "status": "healthy"
+        },
+        "existingRepair": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expiresAt": "2026-09-05T20:00:00Z",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "identifier": "JOV-6224",
+          "issueId": "11111111-1111-4111-8111-111111111111",
+          "issueRevision": "2026-09-05T19:29:00Z",
+          "mode": "isolated-cli",
+          "ownerId": "22222222-2222-4222-8222-222222222222",
+          "pr": 1,
+          "repository": "JovieInc/Jovie",
+          "workspace": "/fixture/owned-repair",
+          "writerUnit": "fixture-repair.service"
+        },
+        "queue": {
+          "blockedSince": null,
+          "eligibleCleanPrs": 0,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedPrs": 0,
+          "schema": "jovie.eve.summer-queue-projection/v1",
+          "sourceDigest": "eee09446edd73ceeef62eb98a8429cb97cad522c5194a1611b3f22a499188779",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "github-merge-queue-entry/v1"
+        },
+        "release": {
+          "blockedSince": "2026-09-05T19:29:00Z",
+          "mainSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedAt": "2026-09-05T19:29:00Z",
+          "productionSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-release-projection/v1",
+          "sourceDigest": "fde4f7b42bd263d2d59fec47e4859a8b079e09a38c502ac07da1201cb65b95a4",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-controller-snapshot/v1",
+          "unverifiedMerges": 1
+        },
+        "runner": {
+          "blockedSince": null,
+          "capacityAvailable": 1,
+          "capacitySource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-lease-guard-report/v1",
+            "sourceDigest": "540737ede2004bff3e6fea9e73237225c345693cc18372b7cf8ca57b3023c1c2",
+            "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedWork": 0,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-runner-projection/v1",
+          "sourceDigest": "74c000b70a1857fd16580cb6c82934607746fdf2bd22de5030c4eef2909a7ae6",
+          "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceSchema": "symphony-runner-projection/v1",
+          "workSource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-runtime-state/v1",
+            "sourceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "taskAdmissions": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "downstreamHealth": {
+            "expiresAt": "2026-09-05T20:00:00Z",
+            "observedAt": "2026-09-05T19:29:00Z",
+            "reason": "observed-target-available",
+            "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "state": "ALLOWED"
+          },
+          "providerEligibility": {
+            "expiresAt": "2026-09-05T19:34:59+00:00",
+            "observedAt": "2026-09-05T19:30:00+00:00",
+            "reason": "provider-included-allowance-exhausted",
+            "sourceDigest": "8260d2d7d6d9aae17e4aabc98fdef196a7b5c09a71ceaa470444845e1468b9df",
+            "state": "HELD"
+          },
+          "providerObservation": {
+            "accountUserId": "95834901-90c9-4bf0-a85a-6f73192cd9ee",
+            "authPoolIdentity": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "executableDigest": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+            "includedRemainingPercent": 0,
+            "model": "grok-4.6",
+            "outputDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "provider": "grok",
+            "providerGrantDigest": "5b24ae16035a6d6c632ce0ee3a743062ec8a830120c3e78ff1da1d8b5062fdbf",
+            "quotaObservedAt": "2026-09-05T19:30:00+00:00",
+            "quotaSourceDigest": "bc54fa8427913c1780f88f7f33f95dc323557a9c3ec7d42c0a0341ba2e6a7ac3",
+            "routerDigest": "a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf"
+          },
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "runtimeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "schema": "jovie.eve.summer-task-admissions/v1",
+          "selectedId": "affected-only-unit-selection",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "sourceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "UNKNOWN": {
+      "eventId": "summer_aaaaaaaaaaaa_3a4cd3975a79a09d",
+      "observedAt": "2026-09-05T19:30:00Z",
+      "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
+      "signals": {
+        "admissions": {
+          "authorityScope": "observed-class-admission-task-acceptance-required",
+          "downstreamHealth": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "newImplementation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "ownedRemediation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "providerEligibility": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "push": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "repository": "JovieInc/Jovie",
+          "schema": "jovie.eve.summer-admissions-projection/v1"
+        },
+        "ciAudit": {
+          "classes": [
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:affected-only-unit-selection",
+              "id": "affected-only-unit-selection",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "open"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:auto-enroll-self-cancel-churn",
+              "id": "auto-enroll-self-cancel-churn",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-cascade-coalescing",
+              "id": "controller-cascade-coalescing",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-check-run-pagination-cap",
+              "id": "controller-check-run-pagination-cap",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:merge-group-flake-baseline-ratchet",
+              "id": "merge-group-flake-baseline-ratchet",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:obsolete-unaffected-native-lanes",
+              "id": "obsolete-unaffected-native-lanes",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            }
+          ],
+          "observedAt": "2026-09-05T19:29:00Z",
+          "schema": "jovie-ci-bottleneck-audit/v1",
+          "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "closure": {
+          "blockedSince": null,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "openPullRequests": 0,
+          "schema": "jovie.eve.summer-closure-projection/v1",
+          "sourceDigest": "328caf060e8a8aa6f22f9d89f4e3677eccbd61fbd0747692a2fdb9885f67bf88",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-closure-health/v1",
+          "status": "healthy"
+        },
+        "existingRepair": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expiresAt": "2026-09-05T20:00:00Z",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "identifier": "JOV-6224",
+          "issueId": "11111111-1111-4111-8111-111111111111",
+          "issueRevision": "2026-09-05T19:29:00Z",
+          "mode": "isolated-cli",
+          "ownerId": "22222222-2222-4222-8222-222222222222",
+          "pr": 1,
+          "repository": "JovieInc/Jovie",
+          "workspace": "/fixture/owned-repair",
+          "writerUnit": "fixture-repair.service"
+        },
+        "queue": {
+          "blockedSince": null,
+          "eligibleCleanPrs": 0,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedPrs": 0,
+          "schema": "jovie.eve.summer-queue-projection/v1",
+          "sourceDigest": "eee09446edd73ceeef62eb98a8429cb97cad522c5194a1611b3f22a499188779",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "github-merge-queue-entry/v1"
+        },
+        "release": {
+          "blockedSince": "2026-09-05T19:29:00Z",
+          "mainSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedAt": "2026-09-05T19:29:00Z",
+          "productionSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-release-projection/v1",
+          "sourceDigest": "fde4f7b42bd263d2d59fec47e4859a8b079e09a38c502ac07da1201cb65b95a4",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-controller-snapshot/v1",
+          "unverifiedMerges": 1
+        },
+        "runner": {
+          "blockedSince": null,
+          "capacityAvailable": 1,
+          "capacitySource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-lease-guard-report/v1",
+            "sourceDigest": "540737ede2004bff3e6fea9e73237225c345693cc18372b7cf8ca57b3023c1c2",
+            "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedWork": 0,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-runner-projection/v1",
+          "sourceDigest": "74c000b70a1857fd16580cb6c82934607746fdf2bd22de5030c4eef2909a7ae6",
+          "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceSchema": "symphony-runner-projection/v1",
+          "workSource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-runtime-state/v1",
+            "sourceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "taskAdmissions": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "downstreamHealth": {
+            "expiresAt": "2026-09-05T20:00:00Z",
+            "observedAt": "2026-09-05T19:29:00Z",
+            "reason": "observed-target-available",
+            "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "state": "ALLOWED"
+          },
+          "providerEligibility": {
+            "expiresAt": null,
+            "observedAt": null,
+            "reason": "provider-included-allowance-unavailable",
+            "sourceDigest": null,
+            "state": "UNKNOWN"
+          },
+          "providerObservation": null,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "runtimeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "schema": "jovie.eve.summer-task-admissions/v1",
+          "selectedId": "affected-only-unit-selection",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "sourceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "ciAuditV2": {
+      "eventId": "summer_aaaaaaaaaaaa_b5cb358eef2b3c13",
+      "observedAt": "2026-09-05T19:30:00Z",
+      "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
+      "signals": {
+        "admissions": {
+          "authorityScope": "observed-class-admission-task-acceptance-required",
+          "downstreamHealth": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "newImplementation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "ownedRemediation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "providerEligibility": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "push": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "repository": "JovieInc/Jovie",
+          "schema": "jovie.eve.summer-admissions-projection/v1"
+        },
+        "ciAudit": {
+          "classes": [
+            {
+              "action": "remediate-selected-ci-audit-class",
+              "handle": "audit:affected-only-units",
+              "id": "affected-only-unit-selection",
+              "impact-rule": "affected-unit-paths-only",
+              "owner": "ci-risk-classifier",
+              "state": "open"
+            }
+          ],
+          "excludedClasses": [
+            {
+              "id": "auto-enroll-self-cancel-churn",
+              "reason": "mapping-unaccepted"
+            },
+            {
+              "id": "controller-cascade-coalescing",
+              "reason": "mapping-unaccepted"
+            },
+            {
+              "id": "controller-check-run-pagination-cap",
+              "reason": "mapping-unaccepted"
+            },
+            {
+              "id": "merge-group-flake-baseline-ratchet",
+              "reason": "mapping-unaccepted"
+            },
+            {
+              "id": "obsolete-unaffected-native-lanes",
+              "reason": "mapping-unaccepted"
+            }
+          ],
+          "measurements": [
+            {
+              "checkId": 1,
+              "checkName": "ci-fast (profile browser)",
+              "completedAt": "2026-09-05T19:29:00Z",
+              "conclusion": "failure",
+              "dispatchable": false,
+              "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "nonDispatchableReasons": [
+                "class-unmapped",
+                "owner-unaccepted",
+                "impact-rule-unaccepted",
+                "action-unaccepted"
+              ],
+              "pr": null,
+              "repository": "JovieInc/Jovie"
+            }
+          ],
+          "observedAt": "2026-09-05T19:30:00Z",
+          "sample": {
+            "checkRunsObserved": 1,
+            "complete": true,
+            "failuresObserved": 1,
+            "failuresOmitted": 0,
+            "reasons": [],
+            "targetsOmitted": 0
+          },
+          "schema": "jovie-ci-bottleneck-audit/v2",
+          "sourceDigest": "cd977452804cafc1dc53761b2e1bf5fdd632e47f93a689615dde435471b60a7e",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "closure": {
+          "blockedSince": null,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "openPullRequests": 0,
+          "schema": "jovie.eve.summer-closure-projection/v1",
+          "sourceDigest": "328caf060e8a8aa6f22f9d89f4e3677eccbd61fbd0747692a2fdb9885f67bf88",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-closure-health/v1",
+          "status": "healthy"
+        },
+        "existingRepair": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expiresAt": "2026-09-05T20:00:00Z",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "identifier": "JOV-6224",
+          "issueId": "11111111-1111-4111-8111-111111111111",
+          "issueRevision": "2026-09-05T19:29:00Z",
+          "mode": "isolated-cli",
+          "ownerId": "22222222-2222-4222-8222-222222222222",
+          "pr": 1,
+          "repository": "JovieInc/Jovie",
+          "workspace": "/fixture/owned-repair",
+          "writerUnit": "fixture-repair.service"
+        },
+        "queue": {
+          "blockedSince": null,
+          "eligibleCleanPrs": 0,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedPrs": 0,
+          "schema": "jovie.eve.summer-queue-projection/v1",
+          "sourceDigest": "eee09446edd73ceeef62eb98a8429cb97cad522c5194a1611b3f22a499188779",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "github-merge-queue-entry/v1"
+        },
+        "release": {
+          "blockedSince": "2026-09-05T19:29:00Z",
+          "mainSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedAt": "2026-09-05T19:29:00Z",
+          "productionSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-release-projection/v1",
+          "sourceDigest": "fde4f7b42bd263d2d59fec47e4859a8b079e09a38c502ac07da1201cb65b95a4",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-controller-snapshot/v1",
+          "unverifiedMerges": 1
+        },
+        "runner": {
+          "blockedSince": null,
+          "capacityAvailable": 1,
+          "capacitySource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-lease-guard-report/v1",
+            "sourceDigest": "540737ede2004bff3e6fea9e73237225c345693cc18372b7cf8ca57b3023c1c2",
+            "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedWork": 0,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-runner-projection/v1",
+          "sourceDigest": "74c000b70a1857fd16580cb6c82934607746fdf2bd22de5030c4eef2909a7ae6",
+          "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceSchema": "symphony-runner-projection/v1",
+          "workSource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-runtime-state/v1",
+            "sourceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "taskAdmissions": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "downstreamHealth": {
+            "expiresAt": "2026-09-05T20:00:00Z",
+            "observedAt": "2026-09-05T19:29:00Z",
+            "reason": "observed-target-available",
+            "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "state": "ALLOWED"
+          },
+          "providerEligibility": {
+            "expiresAt": null,
+            "observedAt": null,
+            "reason": "provider-quota-observation-unavailable",
+            "sourceDigest": null,
+            "state": "UNKNOWN"
+          },
+          "providerObservation": null,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "runtimeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "schema": "jovie.eve.summer-task-admissions/v1",
+          "selectedId": "affected-only-unit-selection",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "sourceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "default": {
+      "eventId": "summer_aaaaaaaaaaaa_9ac0842461da2637",
+      "observedAt": "2026-09-05T19:30:00Z",
+      "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
+      "signals": {
+        "admissions": {
+          "authorityScope": "observed-class-admission-task-acceptance-required",
+          "downstreamHealth": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "newImplementation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "ownedRemediation": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "providerEligibility": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "symphony-concurrency/v1",
+            "state": "UNKNOWN"
+          },
+          "push": {
+            "observedAt": null,
+            "reason": "source-evidence-unavailable",
+            "sourceDigest": null,
+            "sourceRevision": null,
+            "sourceSchema": "jovie-fleet-gate/v1",
+            "state": "UNKNOWN"
+          },
+          "repository": "JovieInc/Jovie",
+          "schema": "jovie.eve.summer-admissions-projection/v1"
+        },
+        "ciAudit": {
+          "classes": [
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:affected-only-unit-selection",
+              "id": "affected-only-unit-selection",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "open"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:auto-enroll-self-cancel-churn",
+              "id": "auto-enroll-self-cancel-churn",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-cascade-coalescing",
+              "id": "controller-cascade-coalescing",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:controller-check-run-pagination-cap",
+              "id": "controller-check-run-pagination-cap",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:merge-group-flake-baseline-ratchet",
+              "id": "merge-group-flake-baseline-ratchet",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            },
+            {
+              "blockedSince": "2026-09-05T19:29:00Z",
+              "handle": "ci:obsolete-unaffected-native-lanes",
+              "id": "obsolete-unaffected-native-lanes",
+              "impact": 10,
+              "owner": "ci-owner",
+              "state": "implemented"
+            }
+          ],
+          "observedAt": "2026-09-05T19:29:00Z",
+          "schema": "jovie-ci-bottleneck-audit/v1",
+          "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "closure": {
+          "blockedSince": null,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "openPullRequests": 0,
+          "schema": "jovie.eve.summer-closure-projection/v1",
+          "sourceDigest": "328caf060e8a8aa6f22f9d89f4e3677eccbd61fbd0747692a2fdb9885f67bf88",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-closure-health/v1",
+          "status": "healthy"
+        },
+        "existingRepair": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expiresAt": "2026-09-05T20:00:00Z",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "identifier": "JOV-6224",
+          "issueId": "11111111-1111-4111-8111-111111111111",
+          "issueRevision": "2026-09-05T19:29:00Z",
+          "mode": "isolated-cli",
+          "ownerId": "22222222-2222-4222-8222-222222222222",
+          "pr": 1,
+          "repository": "JovieInc/Jovie",
+          "workspace": "/fixture/owned-repair",
+          "writerUnit": "fixture-repair.service"
+        },
+        "queue": {
+          "blockedSince": null,
+          "eligibleCleanPrs": 0,
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedPrs": 0,
+          "schema": "jovie.eve.summer-queue-projection/v1",
+          "sourceDigest": "eee09446edd73ceeef62eb98a8429cb97cad522c5194a1611b3f22a499188779",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "github-merge-queue-entry/v1"
+        },
+        "release": {
+          "blockedSince": "2026-09-05T19:29:00Z",
+          "mainSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedAt": "2026-09-05T19:29:00Z",
+          "productionSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-release-projection/v1",
+          "sourceDigest": "fde4f7b42bd263d2d59fec47e4859a8b079e09a38c502ac07da1201cb65b95a4",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchema": "jovie-controller-snapshot/v1",
+          "unverifiedMerges": 1
+        },
+        "runner": {
+          "blockedSince": null,
+          "capacityAvailable": 1,
+          "capacitySource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-lease-guard-report/v1",
+            "sourceDigest": "540737ede2004bff3e6fea9e73237225c345693cc18372b7cf8ca57b3023c1c2",
+            "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "observedAt": "2026-09-05T19:29:00Z",
+          "queuedWork": 0,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "schema": "jovie.eve.summer-runner-projection/v1",
+          "sourceDigest": "74c000b70a1857fd16580cb6c82934607746fdf2bd22de5030c4eef2909a7ae6",
+          "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceSchema": "symphony-runner-projection/v1",
+          "workSource": {
+            "observedAt": "2026-09-05T19:29:00Z",
+            "schema": "symphony-runtime-state/v1",
+            "sourceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "taskAdmissions": {
+          "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "downstreamHealth": {
+            "expiresAt": "2026-09-05T20:00:00Z",
+            "observedAt": "2026-09-05T19:29:00Z",
+            "reason": "observed-target-available",
+            "sourceDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "state": "ALLOWED"
+          },
+          "providerEligibility": {
+            "expiresAt": null,
+            "observedAt": null,
+            "reason": "provider-quota-observation-unavailable",
+            "sourceDigest": null,
+            "state": "UNKNOWN"
+          },
+          "providerObservation": null,
+          "runtimeGeneration": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "runtimeInvocationId": "cccccccccccccccccccccccccccccccc",
+          "runtimeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "schema": "jovie.eve.summer-task-admissions/v1",
+          "selectedId": "affected-only-unit-selection",
+          "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "sourceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "source": "JovieInc/symphony-control scripts/symphony/tests/summer-publisher-admissions.test.py"
+}

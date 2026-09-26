@@ -260,7 +260,6 @@
         "apps/eve-pilot/identities/summer/instructions.md",
         "apps/eve-pilot/identities/jovie/instructions.md",
         "scripts/summer-commissioning/registry.json",
-        "scripts/symphony/model-router.py",
         "canon/FLEET.md",
         "canon/VOICE.md"
       ],

@@ -7,6 +7,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import {
+  createDefaultCodexAccountControlRunner,
   inspectSymphonyCodexAccounts,
   reconnectSymphonyCodexAccount,
 } from './symphony-codex-accounts.server';
@@ -79,5 +80,17 @@ describe('symphony-codex-accounts.server', () => {
       phase: 'authorization-pending',
       account: 'meetjovie',
     });
+  });
+});
+
+describe('default helper runner', () => {
+  it('fails closed without spawning when the moved helper is not configured', async () => {
+    vi.stubEnv('JOVIE_CODEX_ACCOUNT_CONTROL_HELPER', '');
+    await expect(
+      createDefaultCodexAccountControlRunner()(['inspect'], 1_000)
+    ).resolves.toEqual({ stdout: '', status: 2 });
+    const snapshot = await inspectSymphonyCodexAccounts();
+    expect(snapshot.availability).toBe('unavailable');
+    vi.unstubAllEnvs();
   });
 });

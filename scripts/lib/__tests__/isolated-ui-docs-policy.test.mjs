@@ -438,12 +438,6 @@ describe('isolated UI/docs promotion policy', () => {
       resolve(REPO_ROOT, 'scripts/lib/isolated-ui-docs-policy.mjs'),
       'utf8'
     );
-    const evaluateFleetGate = readFileSync(
-      resolve(REPO_ROOT, 'scripts/symphony/evaluate-fleet-gate.sh'),
-      'utf8'
-    );
-
-    expect(evaluateFleetGate).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(
       "needs.fleet-promotion.outputs.deployment_allowed == 'true'"

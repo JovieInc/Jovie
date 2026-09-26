@@ -2,7 +2,6 @@ import 'server-only';
 
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { captureError } from '@/lib/error-tracking';
 import {
   isSafeSshHost,
@@ -23,13 +22,10 @@ const UNAVAILABLE = 'Gem Codex account control is unavailable.';
 const SSH_ARGS =
   '-o BatchMode=yes -o ConnectTimeout=2 -o StrictHostKeyChecking=yes';
 
+// The helper lives in JovieInc/symphony-control; point this at a local checkout's
+// scripts/symphony/symphony-codex-account-control.py. Unset reads as unavailable.
 function helperPath(): string {
-  const configured = process.env.JOVIE_CODEX_ACCOUNT_CONTROL_HELPER;
-  if (configured) return configured;
-  const cwd = process.cwd();
-  return cwd.endsWith('/apps/web')
-    ? join(cwd, '../../scripts/symphony/symphony-codex-account-control.py')
-    : join(cwd, 'scripts/symphony/symphony-codex-account-control.py');
+  return process.env.JOVIE_CODEX_ACCOUNT_CONTROL_HELPER ?? '';
 }
 
 export type CodexAccountControlRunner = (
@@ -68,6 +64,7 @@ function spawnWithTimeout(
 
 export function createDefaultCodexAccountControlRunner(): CodexAccountControlRunner {
   return async (args, timeoutMs) => {
+    if (!helperPath()) return { stdout: '', status: 2 };
     if (process.env.JOVIE_CODEX_ACCOUNT_CONTROL_LOCAL === '1') {
       return spawnWithTimeout('python3', [helperPath(), ...args], timeoutMs);
     }

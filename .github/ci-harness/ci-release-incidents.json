@@ -672,8 +672,9 @@
       "failureMode": "GBrain readiness returns a misleading pool-saturation message for wedged or DNS-broken DB sessions.",
       "regression": {
         "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+        "command": "pnpm exec vitest run scripts/lib/__tests__/gbrain-health-summary.test.mjs",
+        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs",
+        "repo": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "scheduled-control-plane",
@@ -894,8 +895,9 @@
       "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
       "regression": {
         "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+        "command": "pnpm exec vitest run scripts/lib/__tests__/gbrain-health-summary.test.mjs",
+        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs",
+        "repo": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "operator-bootstrap",

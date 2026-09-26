@@ -1,8 +1,0 @@
-[Unit]
-Description=Reconcile deferred Jovie Symphony workspace cleanup
-After=local-fs.target
-RequiresMountsFor=/srv/worktrees /srv/models /srv/cache /srv/scratch /srv/git
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/jovie-symphony-workspace reconcile-cleanup

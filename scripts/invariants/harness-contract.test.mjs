@@ -109,13 +109,27 @@ describe('JOV-INV-024 harness contract', () => {
 
   it('deliberate red H-04: a gate path that does not exist fails closed', () => {
     const registry = clone();
-    harnessPrinciple(registry, 'H-04').gate.path = 'scripts/does-not-exist.mjs';
+    // A local (untagged) gate: cross-repo gates are verified by their owning repo.
+    harnessPrinciple(registry, 'H-04').gate = {
+      path: 'scripts/does-not-exist.mjs',
+    };
     const errors = validateHarnessContract(
       registry,
       passFs({ fileExists: path => path !== 'scripts/does-not-exist.mjs' })
     );
     assert.ok(
       errors.some(error => error.includes('harness-gate-missing:H-04'))
+    );
+  });
+
+  it('skips gates owned by another repo', () => {
+    const registry = clone();
+    const errors = validateHarnessContract(
+      registry,
+      passFs({ fileExists: path => !path.startsWith('scripts/symphony/') })
+    );
+    assert.ok(
+      !errors.some(error => error.includes('harness-gate-missing:H-04'))
     );
   });
 
