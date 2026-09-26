@@ -208,30 +208,32 @@ async function readNamedJson(
   }
 }
 
-async function readNamedUrl(
+async function fetchAuthorityPayload(
   io: LiveIo,
   sourceId: ShippingSourceId,
   url: string,
+  label: string,
+  headers: Record<string, string>,
   timeoutMs: number
 ): Promise<AuthorityRead> {
   try {
     const response = await io.fetch(url, {
       method: 'GET',
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.status === 401 || response.status === 403) {
       return failedRead(
         sourceId,
         'unauthorized',
-        `named authority returned ${response.status}`
+        `${label} returned ${response.status}`
       );
     }
     if (!response.ok) {
       return failedRead(
         sourceId,
         'unavailable',
-        `named authority returned ${response.status}`,
+        `${label} returned ${response.status}`,
         { errorCode: `http-${response.status}` }
       );
     }
@@ -240,7 +242,7 @@ async function readNamedUrl(
       return failedRead(
         sourceId,
         'error',
-        'named authority payload was not an object',
+        `${label} payload was not an object`,
         { errorCode: 'malformed' }
       );
     }
@@ -248,9 +250,25 @@ async function readNamedUrl(
   } catch (error) {
     return disconnectedRead(
       sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
+      error instanceof Error ? error.message : `${label} unreachable`
     );
   }
+}
+
+async function readNamedUrl(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number
+): Promise<AuthorityRead> {
+  return fetchAuthorityPayload(
+    io,
+    sourceId,
+    url,
+    'named authority',
+    {},
+    timeoutMs
+  );
 }
 
 /**
@@ -268,50 +286,16 @@ export async function readGemAuthority(
   let trimmedBase = base;
   while (trimmedBase.endsWith('/')) trimmedBase = trimmedBase.slice(0, -1);
   const url = `${trimmedBase}${GEM_AUTHORITY_PATH}/${sourceId}`;
-  try {
-    const response = await io.fetch(url, {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        ...(io.gemAuthorityToken
-          ? { authorization: `Bearer ${io.gemAuthorityToken}` }
-          : {}),
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return failedRead(
-        sourceId,
-        'unauthorized',
-        `Gem authority bridge returned ${response.status}`
-      );
-    }
-    if (!response.ok) {
-      return failedRead(
-        sourceId,
-        'unavailable',
-        `Gem authority bridge returned ${response.status}`,
-        { errorCode: `http-${response.status}` }
-      );
-    }
-    const payload: unknown = await response.json();
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'Gem authority bridge payload was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okFileRead(sourceId, payload);
-  } catch (error) {
-    return disconnectedRead(
-      sourceId,
-      error instanceof Error
-        ? error.message
-        : 'Gem authority bridge unreachable'
-    );
-  }
+  return fetchAuthorityPayload(
+    io,
+    sourceId,
+    url,
+    'Gem authority bridge',
+    io.gemAuthorityToken
+      ? { authorization: `Bearer ${io.gemAuthorityToken}` }
+      : {},
+    timeoutMs
+  );
 }
 
 async function githubFetch(
