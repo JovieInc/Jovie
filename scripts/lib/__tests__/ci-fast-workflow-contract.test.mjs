@@ -1082,7 +1082,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(block).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
       );
-      expect(block).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(block).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
       expect(block).not.toContain('always()');
       expect(block).toMatch(/needs\.ci-path-changes\.result == 'success'/);
       expect(block).toMatch(/github\.event_name != 'merge_group'/);
@@ -1884,7 +1884,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -1903,10 +1903,23 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \]\]/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
+  });
+
+  it('runs the structural pytest shards in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const python = jobBlock('ci-fast-structural-python', 'ci-knip');
+    const aliases = python.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
+    expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
   });
 
   it('runs a bounded public-profile admission subset on source and merge-group heads', () => {
