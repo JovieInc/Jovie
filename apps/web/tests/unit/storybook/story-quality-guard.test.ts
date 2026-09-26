@@ -95,4 +95,43 @@ export const Fixture = {};
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
+  it('fails closed with the git error instead of a false provenance verdict', () => {
+    // Not a git repository: every provenance git call exits 128. That is an
+    // execution error, never "missing commit" or "not an ancestor".
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'jovie-story-git-error-'));
+    const storyPath = join(
+      fixtureRoot,
+      'apps/web/components/Fixture.stories.tsx'
+    );
+    const sha = 'a'.repeat(40);
+
+    try {
+      mkdirSync(dirname(storyPath), { recursive: true });
+      writeFileSync(
+        storyPath,
+        `export default {};
+export const Fixture = { parameters: { pen: { sourceSha: '${sha}' } } };
+`
+      );
+      const result = spawnSync(process.execPath, [guardPath], {
+        cwd: fixtureRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_CEILING_DIRECTORIES: dirname(fixtureRoot),
+          STORYBOOK_QUALITY_ROOT: fixtureRoot,
+        },
+      });
+      const output = `${result.stdout}${result.stderr}`;
+      expect(result.status).toBe(1);
+      expect(output).toContain('story-provenance-git-error');
+      expect(output).toContain(
+        `git rev-parse --verify --quiet ${sha}^{commit}`
+      );
+      expect(output).not.toContain('story-provenance-commit');
+      expect(output).not.toContain('story-provenance-ancestor');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
 });
