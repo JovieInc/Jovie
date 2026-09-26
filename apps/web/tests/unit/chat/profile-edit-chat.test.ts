@@ -83,37 +83,39 @@ describe('Profile edit via chat: deterministic execution (no LLM)', () => {
       ['my display name should be Cool Artist', 'Cool Artist'],
     ];
 
-    it.each(
-      nameChangeMessages
-    )('classifies "%s" as PROFILE_UPDATE_NAME (deterministic)', (message, _expectedName) => {
-      const intent = classifyIntent(message);
-      expect(intent).not.toBeNull();
-      expect(intent!.category).toBe(IntentCategory.PROFILE_UPDATE_NAME);
-      expect(isDeterministicIntent(intent)).toBe(true);
-    });
+    it.each(nameChangeMessages)(
+      'classifies "%s" as PROFILE_UPDATE_NAME (deterministic)',
+      (message, _expectedName) => {
+        const intent = classifyIntent(message);
+        expect(intent).not.toBeNull();
+        expect(intent!.category).toBe(IntentCategory.PROFILE_UPDATE_NAME);
+        expect(isDeterministicIntent(intent)).toBe(true);
+      }
+    );
 
-    it.each(
-      nameChangeMessages
-    )('executes "%s" via DB mutation, not LLM', async (message, expectedName) => {
-      const intent = classifyIntent(message);
-      expect(intent).not.toBeNull();
+    it.each(nameChangeMessages)(
+      'executes "%s" via DB mutation, not LLM',
+      async (message, expectedName) => {
+        const intent = classifyIntent(message);
+        expect(intent).not.toBeNull();
 
-      const result = await routeIntent(intent!, mockHandlerContext);
+        const result = await routeIntent(intent!, mockHandlerContext);
 
-      // Mutation was called with the expected name
-      expect(mockUpdateProfileByClerkId).toHaveBeenCalledWith(
-        mockHandlerContext.clerkUserId,
-        { displayName: expectedName }
-      );
+        // Mutation was called with the expected name
+        expect(mockUpdateProfileByClerkId).toHaveBeenCalledWith(
+          mockHandlerContext.clerkUserId,
+          { displayName: expectedName }
+        );
 
-      // LLM was never invoked
-      expect(mockStreamText).not.toHaveBeenCalled();
+        // LLM was never invoked
+        expect(mockStreamText).not.toHaveBeenCalled();
 
-      // Result confirms success
-      expect(result).not.toBeNull();
-      expect(result!.success).toBe(true);
-      expect(result!.message).toContain(expectedName);
-    });
+        // Result confirms success
+        expect(result).not.toBeNull();
+        expect(result!.success).toBe(true);
+        expect(result!.message).toContain(expectedName);
+      }
+    );
   });
 
   describe('Bio updates', () => {
@@ -136,30 +138,32 @@ describe('Profile edit via chat: deterministic execution (no LLM)', () => {
       ],
     ];
 
-    it.each(
-      bioUpdateMessages
-    )('classifies "%s" as PROFILE_UPDATE_BIO (deterministic)', (message, _expectedBio) => {
-      const intent = classifyIntent(message);
-      expect(intent).not.toBeNull();
-      expect(intent!.category).toBe(IntentCategory.PROFILE_UPDATE_BIO);
-      expect(isDeterministicIntent(intent)).toBe(true);
-    });
+    it.each(bioUpdateMessages)(
+      'classifies "%s" as PROFILE_UPDATE_BIO (deterministic)',
+      (message, _expectedBio) => {
+        const intent = classifyIntent(message);
+        expect(intent).not.toBeNull();
+        expect(intent!.category).toBe(IntentCategory.PROFILE_UPDATE_BIO);
+        expect(isDeterministicIntent(intent)).toBe(true);
+      }
+    );
 
-    it.each(
-      bioUpdateMessages
-    )('executes bio update "%s" via DB mutation, not LLM', async (message, expectedBio) => {
-      const intent = classifyIntent(message);
-      expect(intent).not.toBeNull();
+    it.each(bioUpdateMessages)(
+      'executes bio update "%s" via DB mutation, not LLM',
+      async (message, expectedBio) => {
+        const intent = classifyIntent(message);
+        expect(intent).not.toBeNull();
 
-      const result = await routeIntent(intent!, mockHandlerContext);
+        const result = await routeIntent(intent!, mockHandlerContext);
 
-      expect(mockUpdateProfileByClerkId).toHaveBeenCalledWith(
-        mockHandlerContext.clerkUserId,
-        { bio: expectedBio }
-      );
-      expect(mockStreamText).not.toHaveBeenCalled();
-      expect(result!.success).toBe(true);
-    });
+        expect(mockUpdateProfileByClerkId).toHaveBeenCalledWith(
+          mockHandlerContext.clerkUserId,
+          { bio: expectedBio }
+        );
+        expect(mockStreamText).not.toHaveBeenCalled();
+        expect(result!.success).toBe(true);
+      }
+    );
   });
 
   describe('Extracted data correctness', () => {
