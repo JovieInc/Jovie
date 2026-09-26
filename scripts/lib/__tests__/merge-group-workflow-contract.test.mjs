@@ -2802,7 +2802,13 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-describe('Storybook Surface Matrix shallow diff-base history', () => {
+// Each test builds a real 42-commit origin and runs bounded deepen/unshallow
+// fetches over file:// (~1.5-4s on an idle 4-vCPU runner). The 5s default
+// times out when ci:control:test shares the runner with other structural
+// commands, so budget real git I/O explicitly.
+describe('Storybook Surface Matrix shallow diff-base history', {
+  timeout: 30_000,
+}, () => {
   const tempRoots = [];
 
   afterEach(() => {
