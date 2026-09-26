@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPublicRun,
+  getPublicDspSignals,
+  PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
   PUBLIC_REQUALIFICATION_SCOPE,
   publicRequalificationEventType,
   runFromMetadata,
@@ -44,6 +46,7 @@ function qualification(): QualificationResult {
 function spotify(): SpotifyLeadEnrichment {
   return {
     status: 'enriched',
+    reason: null,
     artistId: 'artist123',
     spotifyPopularity: 30,
     spotifyFollowers: 900,
@@ -64,6 +67,26 @@ describe('public requalification contract', () => {
     );
   });
 
+  it('counts distinct supported public DSP links and ignores unsupported links', () => {
+    expect(
+      getPublicDspSignals([
+        { platformId: 'spotify', url: 'https://open.spotify.com/artist/1' },
+        { platformId: 'spotify', url: 'https://open.spotify.com/album/2' },
+        { platformId: 'apple_music', url: 'https://music.apple.com/artist/1' },
+        { platformId: 'apple_music', url: 'https://music.apple.com/album/2' },
+        { platformId: 'soundcloud', url: 'https://soundcloud.com/artist' },
+        { platformId: 'bandcamp', url: 'https://artist.bandcamp.com' },
+        { platformId: 'instagram', url: 'https://instagram.com/artist' },
+        { platformId: 'unsupported', url: 'https://example.com/other' },
+        { url: 'https://example.com/missing-platform' },
+      ])
+    ).toEqual({
+      dspPlatformCount: 3,
+      hasAppleMusicId: true,
+      hasSoundCloudId: true,
+    });
+  });
+
   it('builds a public run without serializing private contact data', () => {
     const run = buildPublicRun({
       candidateId: 'lead-public-artist',
@@ -78,6 +101,7 @@ describe('public requalification contract', () => {
 
     expect(run.contract).toBe('jovie.acquisition-candidate-run/v1');
     expect(run.requestedScope).toBe(PUBLIC_REQUALIFICATION_SCOPE);
+    expect(run.fitInputVersion).toBe(PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION);
     expect(run.runId).toMatch(
       /^premade-profile-certification-v1:lead-public-artist:[0-9a-f]{64}$/
     );
@@ -92,6 +116,53 @@ describe('public requalification contract', () => {
       'https://linktr.ee/publicartist',
       'https://open.spotify.com/artist/artist123',
     ]);
+  });
+
+  it('maps public DSP presence into fit inputs and preserves it in the digest', () => {
+    const base = buildPublicRun({
+      candidateId: 'lead-public-artist',
+      candidateKey: 'publicartist',
+      profileUrl: 'https://linktr.ee/publicartist',
+      qualification: qualification(),
+      spotify: spotify(),
+      existingRepresentation: false,
+      observedAt: new Date('2026-09-12T22:30:00.000Z'),
+      previousAttemptRunId: null,
+    });
+    const publicLinks = [
+      ...qualification().allLinks,
+      {
+        url: 'https://music.apple.com/artist/artist123',
+        platformId: 'apple_music',
+      },
+      {
+        url: 'https://music.apple.com/artist/artist123?duplicate=1',
+        platformId: 'apple_music',
+      },
+      { url: 'https://soundcloud.com/publicartist', platformId: 'soundcloud' },
+      { url: 'https://publicartist.bandcamp.com', platformId: 'bandcamp' },
+    ];
+    const withDspLinks = buildPublicRun({
+      candidateId: 'lead-public-artist',
+      candidateKey: 'publicartist',
+      profileUrl: 'https://linktr.ee/publicartist',
+      qualification: { ...qualification(), allLinks: publicLinks },
+      spotify: spotify(),
+      existingRepresentation: false,
+      observedAt: new Date('2026-09-12T22:30:00.000Z'),
+      previousAttemptRunId: null,
+    });
+
+    expect(withDspLinks.fitScoreBreakdown.multiDspPresence).toBe(5);
+    expect(withDspLinks.fitScoreBreakdown.meta?.dspPlatformCount).toBe(3);
+    expect(withDspLinks.fitScoreBreakdown.hasContactEmail).toBe(0);
+    expect(withDspLinks.sourceRevision).not.toBe(base.sourceRevision);
+    expect(withDspLinks.publicObservation.qualification.allLinks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ platformId: 'apple_music' }),
+        expect.objectContaining({ platformId: 'soundcloud' }),
+      ])
+    );
   });
 
   it('backfills the current attempt key when reading legacy metadata', () => {

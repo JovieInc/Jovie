@@ -5,8 +5,9 @@ import {
   type BoundedFetchRetryOptions,
   BoundedFetchTimeoutError,
   boundedFetch,
-  isRetryableTransportError,
 } from '@/lib/http/bounded-fetch';
+
+export { isRetryableTransportError } from '@/lib/http/bounded-fetch';
 
 export class ServerFetchTimeoutError extends BoundedFetchTimeoutError {
   constructor(message: string, timeoutMs: number, context: string) {
@@ -18,8 +19,6 @@ export class ServerFetchTimeoutError extends BoundedFetchTimeoutError {
 export type ServerFetchRetryOptions = BoundedFetchRetryOptions;
 
 type ServerFetchOptions = BoundedFetchOptions;
-
-export { isRetryableTransportError };
 
 export async function serverFetch(
   input: RequestInfo | URL,

@@ -77,6 +77,12 @@ describe('symphony-codex-accounts', () => {
         'token=secret-live access_token=redacted-token-material'
       )
     ).not.toMatch(/secret-live|redacted-token-material/);
+    expect(
+      stripCodexAccountSecrets('eyjabcdefghijklmnopqrstuvwxyz sk-abcDEF123456')
+    ).toBe('[redacted] [redacted]');
+    expect(
+      stripCodexAccountSecrets('eyJABCDEFGHIJKLMNOPQRSTUVWXYZ SK-ABCDEF123456')
+    ).toBe('[redacted] [redacted]');
     const snapshot = emptyCodexAccountControlSnapshot('unavailable', 'down');
     expect(reconnectPhaseFromSnapshot(snapshot, 'jovie')).toBe('confirmation');
     expect(reconnectPhaseFromSnapshot(snapshot, null)).toBe('idle');

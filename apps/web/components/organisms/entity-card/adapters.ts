@@ -15,7 +15,9 @@ import type {
   EntityStatusTone,
 } from './types';
 
-function toDate(value: Date | string | null | undefined): Date | null {
+type CardDateInput = Date | string | null;
+
+function toDate(value: CardDateInput | undefined): Date | null {
   if (!value) {
     return null;
   }
@@ -76,7 +78,7 @@ export interface ReleaseEntityInput {
   readonly title: string;
   readonly slug: string;
   readonly artworkUrl?: string | null;
-  readonly releaseDate?: Date | string | null;
+  readonly releaseDate?: CardDateInput;
   /** e.g. "single" | "album" | "ep" | "video". */
   readonly releaseType?: string | null;
 }
@@ -134,7 +136,7 @@ export interface ShowEntityInput {
   readonly title?: string | null;
   readonly venueName?: string | null;
   readonly city?: string | null;
-  readonly startDate?: Date | string | null;
+  readonly startDate?: CardDateInput;
   readonly ticketUrl?: string | null;
   readonly status?: EntityStatusTone | null;
   readonly ticketStatus?: TicketStatus | null;
@@ -332,7 +334,7 @@ export interface ChatTourDateContextInput {
   readonly title?: string | null;
   readonly venueName?: string | null;
   readonly city?: string | null;
-  readonly startDate?: Date | string | null;
+  readonly startDate?: CardDateInput;
 }
 
 /** Chat rail tour-date context chip → compact EntityCard (no navigation). */

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import {
   ARTIST_VISIBILITY_OFFER,
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+  FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS,
   FREE_PROFILE_TRUTH,
   formatAnnualMonthlyEquivalent,
   formatPublicPriceDisplay,
@@ -24,6 +26,29 @@ import {
 } from './offer-truth';
 
 describe('Artist Visibility offer contract', () => {
+  it('locks artist-visibility-offer-contract-v1 to Pro $199 without a public Max price', () => {
+    expect(ARTIST_VISIBILITY_OFFER_CONTRACT_ID).toBe(
+      'artist-visibility-offer-contract-v1'
+    );
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
+    expect(getPublicPriceClaims().map(claim => claim.plan)).toEqual([
+      'free',
+      'pro',
+      'enterprise',
+    ]);
+    expect(getPublicPriceClaim('pro')).toMatchObject({
+      priceUsd: 199,
+      ctaLabel: 'Request access',
+      selfService: false,
+    });
+    expect(FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS).toEqual([
+      '$149',
+      '149/mo',
+      'Max Early Access',
+      'marketing-pricing-plan-max',
+    ]);
+  });
+
   it('uses the same $199 monthly price in public claims and Pro entitlements', () => {
     expect(getPaidPlanPriceUsd('pro', 'month')).toBe(199);
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).toEqual({

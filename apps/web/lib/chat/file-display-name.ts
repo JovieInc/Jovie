@@ -38,11 +38,11 @@ export function filenameFromUrlOrName(
 function extractPathBasename(url: string): string | null {
   try {
     const pathname = new URL(url).pathname;
-    const segment = pathname.split('/').filter(Boolean).at(-1);
+    const segment = pathname.split('/').findLast(part => part.length > 0);
     return segment ?? null;
   } catch {
     const withoutQuery = url.split(/[?#]/u)[0] ?? url;
-    const segment = withoutQuery.split('/').filter(Boolean).at(-1);
+    const segment = withoutQuery.split('/').findLast(part => part.length > 0);
     return segment ?? null;
   }
 }

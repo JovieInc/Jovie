@@ -524,7 +524,7 @@ describe('ReleaseSidebar DSP card interactions', () => {
 
     await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(
-      screen.queryByTestId('release-sidebar-add-dsp-link')
+      screen.getByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();
     await user.click(
       screen.getByRole('button', { name: 'Actions for Spotify' })

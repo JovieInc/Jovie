@@ -206,6 +206,56 @@ describe('EntityCard', () => {
     );
   });
 
+  it('keeps the shell padding for compact, big, landscape media, and landscape alerts', () => {
+    const alerts: EntityCardModel = {
+      id: 'a1',
+      kind: 'alerts',
+      title: 'Alerts',
+      imageAlt: 'Alerts',
+    };
+
+    const compact = render(
+      <EntityCard model={merchModel} treatment='compact' />
+    );
+    expect(compact.getByTestId('entity-card-merch').className).toContain(
+      'gap-3'
+    );
+    expect(compact.getByTestId('entity-card-merch').className).toContain('p-3');
+    compact.unmount();
+
+    const big = render(<EntityCard model={merchModel} treatment='big' />);
+    expect(big.getByTestId('entity-card-merch').className).toContain(
+      'gap-0 overflow-hidden p-0'
+    );
+    big.unmount();
+
+    const landscape = render(
+      <EntityCard
+        model={merchModel}
+        treatment='detailed'
+        anatomy='profile-landscape'
+      />
+    );
+    expect(landscape.getByTestId('entity-card-merch').className).toContain(
+      'gap-0 overflow-hidden p-1.5'
+    );
+    landscape.unmount();
+
+    const alertCard = render(
+      <EntityCard
+        model={alerts}
+        treatment='detailed'
+        anatomy='profile-landscape'
+      />
+    );
+    expect(alertCard.getByTestId('entity-card-alerts').className).toContain(
+      'gap-0 overflow-hidden p-0'
+    );
+    expect(alertCard.getByTestId('entity-card-alerts').className).not.toContain(
+      'p-1.5'
+    );
+  });
+
   it('keeps legacy content-driven sizing when no shape is provided', () => {
     render(<EntityCard model={merchModel} treatment='compact' />);
     const card = screen.getByTestId('entity-card-merch');
@@ -533,5 +583,48 @@ describe('ProfilePacCard landscape states', () => {
 
     const action = screen.getByRole('link', { name: /listen/i });
     expect(action.parentElement).toHaveClass('mt-auto', 'shrink-0');
+  });
+
+  it('shows the subscribed state without an error line after email signup', async () => {
+    mockSubscribeToNotifications.mockResolvedValue({ ok: true });
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: '/preview.mp3',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        artPriority
+      />
+    );
+
+    const card = screen.getByTestId('profile-pac');
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'prompt'));
+    fireEvent.change(screen.getByRole('textbox', { name: /email address/i }), {
+      target: { value: 'fan@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
+
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'success'));
+    expect(screen.getByText("You're in")).toBeInTheDocument();
+    expect(
+      screen.getByText('Watch your inbox for Tim White updates.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/didn't go through/i)).toBeNull();
+    expect(
+      screen.queryByRole('textbox', { name: /email address/i })
+    ).toBeNull();
+    expect(mockSubscribeToNotifications).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artistId: 'artist-1',
+        channel: 'email',
+        email: 'fan@example.com',
+        source: 'profile_pac',
+      })
+    );
   });
 });

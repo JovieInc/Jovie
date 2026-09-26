@@ -15,18 +15,29 @@ function workflow(file) {
   return readFileSync(join(WORKFLOWS, file), 'utf8');
 }
 
-/** @param {string} file @param {string} name */
-function step(file, name) {
-  const block = workflow(file)
+/** @param {string} file @param {string} job */
+function jobBlock(file, job) {
+  const text = workflow(file);
+  const start = text.indexOf(`\n  ${job}:\n`);
+  if (start === -1) throw new Error(`${file}: job "${job}" is missing`);
+  const rest = text.slice(start + 1);
+  const end = rest.slice(1).search(/\n  [A-Za-z0-9_-]+:\n/u);
+  return end === -1 ? rest : rest.slice(0, end + 1);
+}
+
+/** Step names repeat across jobs; pass `job` to scope the lookup. */
+/** @param {string} file @param {string} name @param {string} [job] */
+function step(file, name, job) {
+  const block = (job ? jobBlock(file, job) : workflow(file))
     .split(/\n(?=      - name: )/u)
     .find(candidate => candidate.startsWith(`      - name: ${name}\n`));
   if (!block) throw new Error(`${file}: step "${name}" is missing`);
   return block;
 }
 
-/** @param {string} file @param {string} name */
-function stepRunScript(file, name) {
-  const body = step(file, name).match(/\n {8}run: \|\n((?: {10}.*\n?)+)/u)?.[1];
+/** @param {string} file @param {string} name @param {string} [job] */
+function stepRunScript(file, name, job) {
+  const body = step(file, name, job).match(/\n {8}run: \|\n((?: {10}.*\n?)+)/u)?.[1];
   if (!body) throw new Error(`${file}: step "${name}" has no run block`);
   return body.replace(/^ {10}/gmu, '');
 }
@@ -56,7 +67,7 @@ afterEach(() => {
  * feature:     root -> feature-work -> merge(main)
  * The event base SHA stays at `root` (stale) after the PR merges main.
  */
-function staleBaseRepo({ mergeMain = true } = {}) {
+function staleBaseRepo({ mergeMain = true, shallow = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'stale-pr-base-'));
   dirs.push(root);
   const origin = join(root, 'origin');
@@ -72,7 +83,15 @@ function staleBaseRepo({ mergeMain = true } = {}) {
   git(origin, ['checkout', '-q', 'feature']);
   if (mergeMain) git(origin, ['merge', '-q', '--no-edit', 'main']);
   const head = git(origin, ['rev-parse', 'HEAD']);
-  execFileSync('git', ['clone', '-q', `file://${origin}`, clone]);
+  // `shallow` mirrors the fetch-depth: 1 checkout the CI fetch step unshallows.
+  git(origin, ['config', 'uploadpack.allowFilter', 'true']);
+  execFileSync('git', [
+    'clone',
+    '-q',
+    ...(shallow ? ['--depth', '1', '--branch', 'feature'] : []),
+    `file://${origin}`,
+    clone,
+  ]);
   git(clone, ['checkout', '-q', head]);
   const output = join(root, 'github-output');
   writeFileSync(output, '');
@@ -107,7 +126,23 @@ function changedFiles(cwd, base, head) {
 }
 
 describe('exact-head coverage diff base (ci.yml)', () => {
-  const COVERAGE_STEP = 'Verify exact coverage head and diff base';
+  // The base is resolved in the fetch step so its blob prefetch replays the
+  // ratchet's real diff; later steps consume steps.coverage-base.outputs.sha.
+  const RESOLVE_STEP = 'Fetch base-branch history';
+  const JOB = 'ci-exact-head-coverage';
+
+  /** @param {ReturnType<typeof staleBaseRepo>} repo @param {Record<string, string>} env */
+  function runResolve(repo, env) {
+    return runStep(stepRunScript('ci.yml', RESOLVE_STEP, JOB), repo.clone, {
+      GH_TOKEN: 'test-token',
+      EVENT_NAME: 'pull_request',
+      EXPECTED_HEAD: repo.head,
+      MERGE_GROUP_BASE: '',
+      BASE_BRANCH: 'main',
+      GITHUB_OUTPUT: repo.output,
+      ...env,
+    });
+  }
 
   it('never diffs coverage against the event base SHA', () => {
     const coverage = workflow('ci.yml').slice(
@@ -115,27 +150,25 @@ describe('exact-head coverage diff base (ci.yml)', () => {
       workflow('ci.yml').indexOf('  ci-a11y:')
     );
     expect(coverage).not.toContain('github.event.pull_request.base.sha');
-    expect(step('ci.yml', COVERAGE_STEP)).toContain('id: coverage-base');
-    expect(
-      step('ci.yml', 'Run exact-head coverage and changed-behavior ratchet')
-    ).toContain('COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}');
+    expect(step('ci.yml', RESOLVE_STEP, JOB)).toContain('id: coverage-base');
+    for (const name of [
+      'Verify exact coverage head and diff base',
+      'Run exact-head coverage and changed-behavior ratchet',
+    ]) {
+      expect(step('ci.yml', name, JOB), name).toContain(
+        'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+      );
+    }
   });
 
   it('charges only the PR changes after the PR merged main', () => {
-    const repo = staleBaseRepo();
+    const repo = staleBaseRepo({ shallow: true });
+    const result = runResolve(repo, {});
+    expect(result.status, result.stderr).toBe(0);
     // The bug: the stale event base charges main's commit to the PR.
     expect(changedFiles(repo.clone, repo.staleBase, repo.head)).toContain(
       'main-moves-on.txt'
     );
-
-    const result = runStep(stepRunScript('ci.yml', COVERAGE_STEP), repo.clone, {
-      EVENT_NAME: 'pull_request',
-      EXPECTED_HEAD: repo.head,
-      MERGE_GROUP_BASE: '',
-      PR_BASE_REF: 'main',
-      GITHUB_OUTPUT: repo.output,
-    });
-    expect(result.status, result.stderr).toBe(0);
     expect(outputs(repo.output).sha).toBe(repo.mainTip);
     expect(changedFiles(repo.clone, repo.mainTip, repo.head)).toEqual([
       'feature-work.txt',
@@ -143,75 +176,62 @@ describe('exact-head coverage diff base (ci.yml)', () => {
   });
 
   it('uses the fork point, not the tip, when main advanced past the PR', () => {
-    const repo = staleBaseRepo({ mergeMain: false });
-    const result = runStep(stepRunScript('ci.yml', COVERAGE_STEP), repo.clone, {
-      EVENT_NAME: 'pull_request',
-      EXPECTED_HEAD: repo.head,
-      MERGE_GROUP_BASE: '',
-      PR_BASE_REF: 'main',
-      GITHUB_OUTPUT: repo.output,
-    });
+    const repo = staleBaseRepo({ mergeMain: false, shallow: true });
+    const result = runResolve(repo, {});
     expect(result.status, result.stderr).toBe(0);
     // A tip base would make `vitest --changed` see main's newer file.
     expect(outputs(repo.output).sha).toBe(repo.staleBase);
   });
 
-  it('keeps the exact merge-group base and fails closed on bad input', () => {
-    const repo = staleBaseRepo();
-    const script = stepRunScript('ci.yml', COVERAGE_STEP);
-    const ok = runStep(script, repo.clone, {
+  it('keeps the exact merge-group base', () => {
+    const repo = staleBaseRepo({ shallow: true });
+    const ok = runResolve(repo, {
       EVENT_NAME: 'merge_group',
-      EXPECTED_HEAD: repo.head,
       MERGE_GROUP_BASE: repo.forkWork,
-      PR_BASE_REF: '',
-      GITHUB_OUTPUT: repo.output,
     });
     expect(ok.status, ok.stderr).toBe(0);
     expect(outputs(repo.output).sha).toBe(repo.forkWork);
+  });
 
-    for (const bad of [
-      { EVENT_NAME: 'pull_request', PR_BASE_REF: 'main;true' },
-      { EVENT_NAME: 'pull_request', PR_BASE_REF: 'no-such-base' },
-      {
-        EVENT_NAME: 'pull_request',
-        PR_BASE_REF: 'main',
-        EXPECTED_HEAD: repo.staleBase,
-      },
-      { EVENT_NAME: 'merge_group', MERGE_GROUP_BASE: 'invalid' },
-    ]) {
-      writeFileSync(repo.output, '');
-      const failed = runStep(script, repo.clone, {
-        EXPECTED_HEAD: repo.head,
-        MERGE_GROUP_BASE: '',
-        PR_BASE_REF: 'main',
-        GITHUB_OUTPUT: repo.output,
-        ...bad,
-      });
-      expect(failed.status, JSON.stringify(bad)).not.toBe(0);
-      expect(readFileSync(repo.output, 'utf8')).toBe('');
-    }
+  it.each([
+    { EVENT_NAME: 'pull_request', BASE_BRANCH: 'main;true' },
+    { EVENT_NAME: 'pull_request', BASE_BRANCH: 'no-such-base' },
+    { EVENT_NAME: 'pull_request', EXPECTED_HEAD: 'stale-base' },
+    { EVENT_NAME: 'merge_group', MERGE_GROUP_BASE: 'invalid' },
+  ])('fails closed on bad input %j', bad => {
+    const repo = staleBaseRepo({ shallow: true });
+    const env = { ...bad };
+    if (env.EXPECTED_HEAD === 'stale-base') env.EXPECTED_HEAD = repo.staleBase;
+    const failed = runResolve(repo, env);
+    expect(failed.status, JSON.stringify(bad)).not.toBe(0);
+    expect(readFileSync(repo.output, 'utf8')).toBe('');
   });
 });
 
 describe('PR visual review routing base (pr-visual-review.yml)', () => {
   const FILE = 'pr-visual-review.yml';
-  const RESOLVE_STEP = 'Resolve PR base branch tip';
+  const ROUTE_STEP = 'Route changed files';
 
-  it('routes from the resolved base tip, not the event base SHA', () => {
+  /** The Route step's base resolution, up to where it hands BASE_SHA on. */
+  function resolveScript() {
+    const script = stepRunScript(FILE, ROUTE_STEP);
+    const cut = script.indexOf('export BASE_SHA\n');
+    if (cut === -1) throw new Error(`${FILE}: Route step no longer exports BASE_SHA`);
+    return `${script.slice(0, cut)}echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"\n`;
+  }
+
+  it('routes from the base branch tip, not the event base SHA', () => {
     expect(workflow(FILE)).not.toContain('github.event.pull_request.base.sha');
-    expect(step(FILE, 'Route changed files')).toContain(
-      'BASE_SHA: ${{ steps.base-tip.outputs.sha }}'
-    );
     // Trust boundary: the base comes from the base repository's branch ref.
-    expect(step(FILE, RESOLVE_STEP)).toContain(
-      'PR_BASE_REF: ${{ github.event.pull_request.base.ref }}'
+    expect(step(FILE, ROUTE_STEP)).toContain(
+      'BASE_REF: ${{ github.event.pull_request.base.ref }}'
     );
   });
 
   it('routes only the PR changes after the PR merged main', () => {
     const repo = staleBaseRepo();
-    const result = runStep(stepRunScript(FILE, RESOLVE_STEP), repo.clone, {
-      PR_BASE_REF: 'main',
+    const result = runStep(resolveScript(), repo.clone, {
+      BASE_REF: 'main',
       GITHUB_OUTPUT: repo.output,
     });
     expect(result.status, result.stderr).toBe(0);
@@ -226,8 +246,8 @@ describe('PR visual review routing base (pr-visual-review.yml)', () => {
     const repo = staleBaseRepo();
     for (const ref of ['main;true', 'no-such-base']) {
       writeFileSync(repo.output, '');
-      const failed = runStep(stepRunScript(FILE, RESOLVE_STEP), repo.clone, {
-        PR_BASE_REF: ref,
+      const failed = runStep(resolveScript(), repo.clone, {
+        BASE_REF: ref,
         GITHUB_OUTPUT: repo.output,
       });
       expect(failed.status, ref).not.toBe(0);

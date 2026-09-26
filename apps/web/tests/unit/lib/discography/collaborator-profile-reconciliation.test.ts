@@ -176,7 +176,7 @@ describe('credited artist profile reconciliation', () => {
           creatorProfileId: null,
         },
       ],
-      [{ usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4' }]
+      [{ usernameNormalized: 'austinleeds' }]
     );
     hoisted.txSelectResults.push(
       [
@@ -194,7 +194,7 @@ describe('credited artist profile reconciliation', () => {
       [
         {
           id: 'created-profile',
-          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+          usernameNormalized: 'austinleeds',
         },
       ],
       [{ id: candidate.artistId }]
@@ -206,7 +206,7 @@ describe('credited artist profile reconciliation', () => {
 
     expect(result).toEqual({
       status: 'created',
-      handle: 'a_eiqd46x3irj64dlgo8a3glau4',
+      handle: 'austinleeds',
     });
     expect(hoisted.getSpotifyArtistsBatch).toHaveBeenCalledWith([
       candidate.spotifyId,
@@ -236,7 +236,7 @@ describe('credited artist profile reconciliation', () => {
       [
         {
           id: 'created-profile',
-          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+          usernameNormalized: 'austinleeds',
         },
       ],
       [{ id: candidate.artistId }]
@@ -263,7 +263,7 @@ describe('credited artist profile reconciliation', () => {
       isVerified: false,
       marketingOptOut: true,
       spotifyId: 'spotify-austin',
-      usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+      usernameNormalized: 'austinleeds',
       settings: {
         unclaimedArtistProfile: expect.objectContaining({
           consentObtained: false,
@@ -274,9 +274,7 @@ describe('credited artist profile reconciliation', () => {
       },
     });
     expect(hoisted.invalidateProfileCache).toHaveBeenCalledWith('owner-handle');
-    expect(hoisted.invalidateProfileCache).toHaveBeenCalledWith(
-      'a_eiqd46x3irj64dlgo8a3glau4'
-    );
+    expect(hoisted.invalidateProfileCache).toHaveBeenCalledWith('austinleeds');
   });
 
   it('fails closed when the owner identity already belongs to another profile', async () => {
@@ -306,7 +304,7 @@ describe('credited artist profile reconciliation', () => {
       [
         {
           id: 'created-profile',
-          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+          usernameNormalized: 'austinleeds',
         },
       ],
       [{ id: candidate.artistId }]
@@ -326,10 +324,7 @@ describe('credited artist profile reconciliation', () => {
       'Credited artist profile cache invalidation skipped without Next store',
       expect.objectContaining({
         creatorProfileId: 'owner-profile',
-        failedHandles: expect.arrayContaining([
-          'owner-handle',
-          'a_eiqd46x3irj64dlgo8a3glau4',
-        ]),
+        failedHandles: expect.arrayContaining(['owner-handle', 'austinleeds']),
       })
     );
   });
@@ -351,7 +346,7 @@ describe('credited artist profile reconciliation', () => {
       [
         {
           id: 'created-profile',
-          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+          usernameNormalized: 'austinleeds',
         },
       ],
       [{ id: candidate.artistId }]
@@ -371,10 +366,7 @@ describe('credited artist profile reconciliation', () => {
       expect.objectContaining({
         source: 'spotify_release_credit',
         creatorProfileId: 'owner-profile',
-        failedHandles: expect.arrayContaining([
-          'owner-handle',
-          'a_eiqd46x3irj64dlgo8a3glau4',
-        ]),
+        failedHandles: expect.arrayContaining(['owner-handle', 'austinleeds']),
       })
     );
   });
@@ -409,7 +401,7 @@ describe('credited artist profile reconciliation', () => {
       [
         {
           id: 'created-profile',
-          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+          usernameNormalized: 'austinleeds',
         },
       ],
       [{ id: candidate.artistId }]

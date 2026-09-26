@@ -31,6 +31,17 @@ describe('profile redesign targets', () => {
   });
 });
 
+describe('runProfileRedesignProposalLoop', () => {
+  it('rejects an unparseable createdAt as a TypeError', async () => {
+    await expect(
+      runProfileRedesignProposalLoop({ createdAt: 'not-a-date' })
+    ).rejects.toThrow(TypeError);
+    await expect(
+      runProfileRedesignProposalLoop({ createdAt: 'not-a-date' })
+    ).rejects.toThrow('Invalid createdAt: not-a-date');
+  });
+});
+
 describe('buildProfileRedesignProposals', () => {
   it('builds pending proposals gated for D2 review', () => {
     const { proposals, skippedRejectedDirections } =

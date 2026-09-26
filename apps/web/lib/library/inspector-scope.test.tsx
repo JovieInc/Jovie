@@ -185,5 +185,18 @@ describe('inspector scope integrity', () => {
         linkedReleaseId: 'release-1',
       }).kind
     ).toBe('track');
+    expect(
+      libraryInspectorSelectionForAsset({
+        id: 'merch-linked',
+        itemKind: 'merch',
+        linkedReleaseId: 'release-1',
+      }).kind
+    ).toBe('track');
+    expect(
+      libraryInspectorSelectionForAsset({
+        id: 'merch-1',
+        itemKind: 'merch',
+      }).kind
+    ).toBe('asset');
   });
 });

@@ -31,6 +31,21 @@ describe('inspector tab keyboard', () => {
     ).toBeNull();
   });
 
+  it('starts from the first enabled tab when the current value is absent', () => {
+    const options = [
+      { value: 'details', label: 'Details' },
+      { value: 'assets', label: 'Assets' },
+      { value: 'links', label: 'Links' },
+    ] as const;
+
+    expect(nextInspectorTabValue(options, 'missing', 'ArrowRight')).toBe(
+      'assets'
+    );
+    expect(nextInspectorTabValue(options, 'missing', 'ArrowLeft')).toBe(
+      'links'
+    );
+  });
+
   it('skips disabled tabs', () => {
     expect(
       nextInspectorTabValue(

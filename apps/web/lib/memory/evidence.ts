@@ -111,7 +111,7 @@ export function mergeMetadata(
   next: Record<string, unknown>
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = {
-    ...(current ?? {}),
+    ...current,
     ...next,
   };
   const evidenceSourceRecordIds = [

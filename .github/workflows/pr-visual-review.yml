@@ -3,8 +3,14 @@ name: PR Visual Review
 # Bounded UI evidence lane. Capture runs on PR code without secrets;
 # JOV-6232: automatic paid model review is retired. Keep capture and uploads.
 # JOV-5459: missing capture evidence (ENOENT) fails the capture job.
+# Trust boundary: this lane builds and executes PR-controlled code, so it runs
+# only on the unprivileged `pull_request` event with a read-only token. Never
+# move it to a privileged PR-target or chained-run trigger: those contexts carry
+# repo secrets, a write-capable token, and the base-branch cache scope. Nothing here
+# needs a privileged step (no comments or checks are posted); evidence ships as
+# a PR-scoped artifact bound to the exact PR head SHA.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize]
     paths:
       - 'apps/web/app/**'
@@ -21,6 +27,9 @@ on:
       - '**/*.scss'
       - 'DESIGN.md'
       - 'canon/DESIGN.md'
+      # Exercise the lane itself when its own workflow or scripts change.
+      - '.github/workflows/pr-visual-review.yml'
+      - '.github/scripts/pr-visual-*.mjs'
 
 permissions: {}
 
@@ -47,33 +56,46 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Evidence must be bound to the exact PR head, never the synthetic merge
+      # ref. Fail closed if the checkout resolved anything else.
+      - name: Verify exact PR head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::Malformed PR head SHA: '$HEAD_SHA'"
+            exit 1
+          fi
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [ "$actual" != "$HEAD_SHA" ]; then
+            echo "::error::Checkout HEAD $actual does not match PR head $HEAD_SHA"
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Playwright Chromium
         run: pnpm --filter @jovie/web exec playwright install --with-deps chromium
 
-      - name: Resolve PR base branch tip
-        id: base-tip
-        env:
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-        # The event's pull_request base SHA is not refreshed when the PR head
-        # is pushed; once the PR merges main, routing from it captures main's
-        # UI changes too. Use the base branch tip the full-history checkout
-        # fetched (a base-repository commit, never PR content).
-        run: |
-          set -euo pipefail
-          [[ "$PR_BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
-          base_tip="$(git rev-parse --verify "refs/remotes/origin/$PR_BASE_REF^{commit}")"
-          [[ "$base_tip" =~ ^[0-9a-f]{40}$ ]] || exit 1
-          echo "sha=$base_tip" >> "$GITHUB_OUTPUT"
-
       - name: Route changed files
         id: route
         env:
-          BASE_SHA: ${{ steps.base-tip.outputs.sha }}
+          # pull_request.base.sha is not refreshed on synchronize; diff against
+          # the real current base tip fetched by the fetch-depth: 0 checkout.
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          if ! printf '%s' "$BASE_REF" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
+            echo "::error::Refusing unsafe base ref: '$BASE_REF'"
+            exit 1
+          fi
+          if ! BASE_SHA="$(git rev-parse --verify --quiet "refs/remotes/origin/${BASE_REF}^{commit}")"; then
+            echo "::error::Base tip refs/remotes/origin/$BASE_REF is missing from the checkout."
+            exit 1
+          fi
+          export BASE_SHA
           merge_base_available=true
           if ! git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt" 2> "$RUNNER_TEMP/merge-base-error.txt"; then
             merge_base_available=false
@@ -95,6 +117,9 @@ jobs:
                 : 'unavailable'
               : 'skipped',
             merge_base_available: process.env.MERGE_BASE_AVAILABLE === 'true',
+            head_sha: process.env.HEAD_SHA,
+            base_ref: process.env.BASE_REF,
+            base_sha: process.env.BASE_SHA,
             files,
           };
           await writeFile(process.env.PR_VISUAL_OUT + '/routing.json', JSON.stringify(output, null, 2));
@@ -139,6 +164,7 @@ jobs:
         continue-on-error: true
         env:
           BASE_URL: http://127.0.0.1:3100
+          PR_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_VISUAL_ROUTES: ${{ steps.route.outputs.routes }}
         run: |
           set -euo pipefail
@@ -155,6 +181,7 @@ jobs:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           SERVER_OUTCOME: ${{ steps.server.outcome }}
           CAPTURE_OUTCOME: ${{ steps.routed_capture.outcome }}
+          PR_VISUAL_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/pr-visual-evidence-gate.mjs
 
       - name: Upload visual evidence
