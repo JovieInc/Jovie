@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMarketingCopyTasteDecision,
   auditMarketingCopyPanel,
+  auditMarketingCopyRenderedCertification,
+  certifyMarketingCopyRendered,
   createEmptyMarketingCopyTasteProfile,
   createMarketingCopyReviewDigest,
   createMarketingCopyTasteInboxItem,
@@ -9,6 +11,7 @@ import {
   type MarketingCopyPageBrief,
   type MarketingCopyPageDraft,
   type MarketingCopyPanelReview,
+  type MarketingCopyRenderedSurface,
 } from '@/data/marketing';
 
 const brief: MarketingCopyPageBrief = {
@@ -134,6 +137,54 @@ describe('marketing copy adversarial panel and taste inbox', () => {
     expect(next.appliedDecisionIds).toEqual(['artist-profiles-hero-1']);
     expect(next.signals.direct.approved).toBe(1);
     expect(next.signals.specific.approved).toBe(1);
+  });
+
+  it('binds panel receipts to the rendered text they certified', () => {
+    const rendered: MarketingCopyRenderedSurface = {
+      pageId: brief.pageId,
+      route: brief.route,
+      sourceVersion: '107b5408301a5f3304c875a6e453221ba3742b29',
+      sections: [
+        {
+          sectionId: 'hero',
+          lines: [
+            {
+              lineId: 'headline',
+              role: 'headline',
+              text: 'One profile for every fan',
+            },
+          ],
+        },
+      ],
+    };
+    const certification = certifyMarketingCopyRendered({
+      brief,
+      draft,
+      rendered,
+      reviews: panelReviews(),
+      certifiedAt: '2026-08-04T20:00:00.000Z',
+    });
+    expect(
+      auditMarketingCopyRenderedCertification(certification, brief, draft, {
+        ...rendered,
+        sections: [
+          {
+            sectionId: 'hero',
+            lines: [
+              {
+                lineId: 'headline',
+                role: 'headline',
+                text: 'One profile for every release',
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'stale-rendered-digest' }),
+      ])
+    );
   });
 
   it('rejects a duplicate decision receipt instead of double-counting taste', () => {
