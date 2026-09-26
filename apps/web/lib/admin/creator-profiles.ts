@@ -14,6 +14,11 @@ import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  type IdentityEnrichmentReceipt,
+  isUnclaimedProfileShareReady,
+  readIdentityEnrichmentReceipt,
+} from '@/lib/profile/identity-enrichment';
 import { escapeLikePattern } from '@/lib/utils/sql';
 import { getHometownFromSettings } from '@/types/db';
 
@@ -49,6 +54,14 @@ export interface AdminCreatorProfileRow {
     url: string;
     displayText: string | null;
   }>;
+  /**
+   * JOV-6529: identity-enrichment receipt for unclaimed profiles. Lets Ovie
+   * distinguish `not_checked`, `not_found`, `conflicted`, and `verified`
+   * instead of a bare empty Social pane.
+   */
+  identityEnrichment?: IdentityEnrichmentReceipt | null;
+  /** Minimum evidence contract met — safe to promote as a finished profile. */
+  shareReady?: boolean;
 }
 
 export type AdminCreatorProfilesSort =
@@ -182,6 +195,8 @@ function mapRowToProfile(
     hometown: getHometownFromSettings(row.settings) ?? null,
     activeSinceYear: row.activeSinceYear ?? null,
     socialLinks: socialLinksMap.get(row.id) ?? [],
+    identityEnrichment: readIdentityEnrichmentReceipt(row.settings),
+    shareReady: isUnclaimedProfileShareReady(row.settings),
   };
 }
 

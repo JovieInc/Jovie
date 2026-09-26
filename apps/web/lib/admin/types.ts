@@ -8,22 +8,26 @@
  * runtime values — those belong in their respective server modules.
  */
 
+// identity-enrichment (JOV-6529)
+export type {
+  EnrichedDestination,
+  IdentityEnrichmentConflict,
+  IdentityEnrichmentReceipt,
+  IdentityEnrichmentStatus,
+} from '@/lib/profile/identity-enrichment';
 // bragging-rights
 export type { AdminBraggingRights } from './bragging-rights';
-
 // creator-profiles
 export type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from './creator-profiles';
-
 // founder-funnel
 export type {
   FounderFunnelData,
   FounderFunnelStage,
   FounderFunnelTimeRange,
 } from './founder-funnel';
-
 // funnel-metrics
 export type { AdminFunnelMetrics } from './funnel-metrics';
 

@@ -39,7 +39,8 @@ export interface FriendlyArtistHandleCandidate {
   readonly source:
     | 'registry_artist_name'
     | 'provider_display_name'
-    | 'primary_name_token';
+    | 'primary_name_token'
+    | 'verified_identity_link';
 }
 
 /** Why a proposed candidate was rejected by the deterministic policy. */
@@ -87,6 +88,13 @@ export function normalizeArtistNameToHandleBase(name: string): string {
 export function composeFriendlyArtistHandleCandidates(input: {
   readonly registryName: string | null | undefined;
   readonly providerArtist: SpotifyArtistProfileData | undefined;
+  /**
+   * Handles observed on artist-controlled destinations discovered by exact
+   * provider-ID identity enrichment (JOV-6529). These are evidence, not
+   * authority: every handle still passes the username contract and
+   * collision resolution below.
+   */
+  readonly identityHandles?: readonly string[];
 }): ComposedFriendlyArtistHandles {
   const accepted: FriendlyArtistHandleCandidate[] = [];
   const rejected: RejectedFriendlyHandleCandidate[] = [];
@@ -97,6 +105,12 @@ export function composeFriendlyArtistHandleCandidates(input: {
   }> = [
     { source: 'registry_artist_name', name: input.registryName },
     { source: 'provider_display_name', name: input.providerArtist?.name },
+    // Verified identity handles are already handle-shaped: rank them as
+    // whole candidates (no token splitting) after name-derived evidence.
+    ...(input.identityHandles ?? []).map(name => ({
+      source: 'verified_identity_link' as const,
+      name,
+    })),
   ];
 
   const seen = new Set<string>();
@@ -152,6 +166,8 @@ export function composeFriendlyArtistHandleCandidates(input: {
 }
 
 function rankOf(candidate: FriendlyArtistHandleCandidate): number {
-  // Registry name outranks provider display name at equal specificity.
+  // Registry name outranks provider display name; verified identity-link
+  // handles rank last since they are handle-shaped rather than name-derived.
+  if (candidate.source === 'verified_identity_link') return 2;
   return candidate.source === 'registry_artist_name' ? 0 : 1;
 }

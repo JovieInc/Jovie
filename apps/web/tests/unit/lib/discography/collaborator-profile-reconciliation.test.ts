@@ -127,7 +127,7 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: hoisted.captureWarning,
 }));
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: hoisted.loggerInfo },
+  logger: { info: hoisted.loggerInfo, warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/lib/profile/public-release-eligibility', () => ({
   publicReleaseEligibilitySqlPredicate: vi.fn(() => 'public-release-only'),

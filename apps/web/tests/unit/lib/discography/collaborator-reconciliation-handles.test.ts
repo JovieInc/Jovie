@@ -91,6 +91,7 @@ vi.mock('@/lib/profile/unclaimed-artist-profile', () => ({
     state: 'unclaimed',
     ...params,
   }),
+  isUnclaimedStructuredCreditProfile: () => false,
 }));
 vi.mock('@/lib/spotify', () => ({
   buildSpotifyArtistUrl: (id: string) =>
