@@ -463,11 +463,16 @@ class RunAgentTest(unittest.TestCase):
             script.write_text("#!/bin/sh\nsleep 30 &\necho $! > child.pid\nwait\n")
             script.chmod(0o755)
             with self.assertRaises(lane.subprocess.TimeoutExpired):
-                lane.run_agent([str(script)], Path(tmp), log, timeout=1)
+                lane.run_agent([str(script)], Path(tmp), log, timeout=4)  # generous: CI hosts fork slowly
             child = int((Path(tmp) / "child.pid").read_text())
-            time.sleep(0.3)
-            with self.assertRaises(ProcessLookupError):
-                os.kill(child, 0)
+            for _ in range(20):  # the group kill is asynchronous; give the kernel a moment
+                time.sleep(0.1)
+                try:
+                    os.kill(child, 0)
+                except ProcessLookupError:
+                    break
+            else:
+                self.fail("background child of the timed-out agent is still alive")
 
     def test_run_agent_returns_the_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
