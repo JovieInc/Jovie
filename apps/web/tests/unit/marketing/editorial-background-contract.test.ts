@@ -142,6 +142,21 @@ describe('marketing editorial background instances (JOV-6249)', () => {
     expect(componentCss).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
+  it('locks the optional bounded-motion keyframe values', () => {
+    // The only motion path (flowing, opt-in) oscillates around the grounded
+    // bloom-B opacity 0.42 and uses real motion tokens; these literals are
+    // pinned here so they cannot drift silently.
+    const component = readWebSource(
+      'components/marketing/MarketingEditorialBackground.tsx'
+    );
+    expect(component).toContain('0% { opacity: 0.32; }');
+    expect(component).toContain('50% { opacity: 0.42; }');
+    expect(component).toContain('100% { opacity: 0.32; }');
+    expect(component).toContain(
+      'calc(var(--ds-motion-cinematic-duration) * 3) var(--ds-motion-subtle-easing) infinite alternate'
+    );
+  });
+
   it('resolves only the registered instances', () => {
     expect(
       getMarketingEditorialBackgroundInstance(
