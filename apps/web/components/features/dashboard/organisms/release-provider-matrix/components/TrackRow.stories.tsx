@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { ComponentType } from 'react';
 import type {
   ProviderKey,
   ReleaseViewModel,
@@ -70,19 +71,19 @@ const tracks: TrackViewModel[] = [
   },
 ];
 
-const columnVisibility = {
-  select: true,
-  release: true,
-  availability: true,
-  metrics: true,
-  primaryIsrc: true,
-  actions: true,
-};
+const padded = [
+  (Story: ComponentType) => (
+    <div className='w-full max-w-md'>
+      <Story />
+    </div>
+  ),
+];
 
 const meta = {
   title: 'Features/Dashboard/Release Provider Matrix/TrackRow',
   component: TrackRow,
   parameters: { layout: 'padded' },
+  decorators: padded,
   args: {
     track,
     release,
@@ -96,29 +97,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Stack: Story = {
-  decorators: [
-    Story => (
-      <div className='w-full max-w-md'>
-        <Story />
-      </div>
-    ),
-  ],
-};
+export const Stack: Story = {};
 
-export const StackSelected: Story = {
-  args: { isSelected: true },
-  decorators: [
-    Story => (
-      <div className='w-full max-w-md'>
-        <Story />
-      </div>
-    ),
-  ],
-};
+export const StackSelected: Story = { args: { isSelected: true } };
 
 export const Table: Story = {
-  args: { renderMode: 'table', columnVisibility },
+  args: {
+    renderMode: 'table',
+    columnVisibility: {
+      select: true,
+      release: true,
+      availability: true,
+      metrics: true,
+      primaryIsrc: true,
+      actions: true,
+    },
+  },
   decorators: [
     Story => (
       <table className='w-full'>
@@ -132,15 +126,13 @@ export const Table: Story = {
 
 export const ContainerStack: Story = {
   render: () => (
-    <div className='w-full max-w-md'>
-      <TrackRowsContainer
-        tracks={tracks}
-        release={release}
-        providerConfig={providerConfig}
-        allProviders={allProviders}
-        columnCount={11}
-        renderMode='stack'
-      />
-    </div>
+    <TrackRowsContainer
+      tracks={tracks}
+      release={release}
+      providerConfig={providerConfig}
+      allProviders={allProviders}
+      columnCount={11}
+      renderMode='stack'
+    />
   ),
 };

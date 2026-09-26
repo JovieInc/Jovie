@@ -6,20 +6,12 @@ import { queryKeys } from '@/lib/queries/keys';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-function makeRelease(
-  overrides: Partial<{
-    id: string;
-    profileId: string;
-    totalTracks: number;
-  }> = {}
-) {
-  return {
-    id: 'release-1',
-    profileId: 'profile-1',
-    totalTracks: 3,
-    ...overrides,
-  };
-}
+const makeRelease = (overrides = {}) => ({
+  id: 'release-1',
+  profileId: 'profile-1',
+  totalTracks: 3,
+  ...overrides,
+});
 
 describe('prefetchReleaseDetailData', () => {
   let queryClient: QueryClient;
@@ -50,14 +42,11 @@ describe('prefetchReleaseDetailData', () => {
     );
   });
 
-  it('does not prefetch when the release has no tracks', () => {
-    prefetchReleaseDetailData(queryClient, makeRelease({ totalTracks: 0 }));
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('does not prefetch without a profile or release id', () => {
-    prefetchReleaseDetailData(queryClient, makeRelease({ profileId: '' }));
-    prefetchReleaseDetailData(queryClient, makeRelease({ id: '' }));
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
+  it.each([{ totalTracks: 0 }, { profileId: '' }, { id: '' }])(
+    'does not prefetch for %o',
+    overrides => {
+      prefetchReleaseDetailData(queryClient, makeRelease(overrides));
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
 });

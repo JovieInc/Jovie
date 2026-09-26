@@ -22,17 +22,13 @@ const saveReleaseMetadata = vi.fn();
 const deleteRelease = vi.fn();
 vi.mock(
   '@/app/app/(shell)/dashboard/releases/actions',
-  async importOriginal => {
-    const actual =
-      await importOriginal<
-        typeof import('@/app/app/(shell)/dashboard/releases/actions')
-      >();
-    return {
-      ...actual,
-      saveReleaseMetadata: (...args: unknown[]) => saveReleaseMetadata(...args),
-      deleteRelease: (...args: unknown[]) => deleteRelease(...args),
-    };
-  }
+  async importOriginal => ({
+    ...(await importOriginal<
+      typeof import('@/app/app/(shell)/dashboard/releases/actions')
+    >()),
+    saveReleaseMetadata: (...args: unknown[]) => saveReleaseMetadata(...args),
+    deleteRelease: (...args: unknown[]) => deleteRelease(...args),
+  })
 );
 
 function makeRelease(
@@ -54,6 +50,10 @@ function makeRelease(
     ...overrides,
   };
 }
+
+const matrixKey = queryKeys.releases.matrix('profile-1');
+const detailKey = (id: string) => queryKeys.releases.detail('profile-1', id);
+const tracksKey = queryKeys.releases.tracks('release-1');
 
 describe('release mutation cache convergence', () => {
   let queryClient: QueryClient;
@@ -77,21 +77,10 @@ describe('release mutation cache convergence', () => {
     const other = makeRelease({ id: 'release-2', title: 'Untouched' });
     const updated = makeRelease({ title: 'New Title' });
 
-    queryClient.setQueryData(queryKeys.releases.matrix('profile-1'), [
-      stale,
-      other,
-    ]);
-    queryClient.setQueryData(
-      queryKeys.releases.detail('profile-1', 'release-1'),
-      stale
-    );
-    queryClient.setQueryData(
-      queryKeys.releases.detail('profile-1', 'release-2'),
-      other
-    );
-    queryClient.setQueryData(queryKeys.releases.tracks('release-1'), [
-      { id: 'track-1', title: 'Song' },
-    ]);
+    queryClient.setQueryData(matrixKey, [stale, other]);
+    queryClient.setQueryData(detailKey('release-1'), stale);
+    queryClient.setQueryData(detailKey('release-2'), other);
+    queryClient.setQueryData(tracksKey, [{ id: 'track-1', title: 'Song' }]);
 
     saveReleaseMetadata.mockResolvedValueOnce(updated);
 
@@ -110,30 +99,21 @@ describe('release mutation cache convergence', () => {
     await waitFor(() => {
       expect(
         queryClient
-          .getQueryData<ReleaseViewModel[]>(
-            queryKeys.releases.matrix('profile-1')
-          )
+          .getQueryData<ReleaseViewModel[]>(matrixKey)
           ?.find(r => r.id === 'release-1')?.title
       ).toBe('New Title');
     });
 
     // Detail cache converges for the mutated release, untouched for others.
     expect(
-      queryClient.getQueryData<ReleaseViewModel>(
-        queryKeys.releases.detail('profile-1', 'release-1')
-      )?.title
+      queryClient.getQueryData<ReleaseViewModel>(detailKey('release-1'))?.title
     ).toBe('New Title');
     expect(
-      queryClient.getQueryData<ReleaseViewModel>(
-        queryKeys.releases.detail('profile-1', 'release-2')
-      )?.title
+      queryClient.getQueryData<ReleaseViewModel>(detailKey('release-2'))?.title
     ).toBe('Untouched');
 
     // Track list for that release is invalidated so an open drawer refetches.
-    expect(
-      queryClient.getQueryState(queryKeys.releases.tracks('release-1'))
-        ?.isInvalidated
-    ).toBe(true);
+    expect(queryClient.getQueryState(tracksKey)?.isInvalidated).toBe(true);
 
     // Now-playing metadata is synced without touching playback.
     expect(updateNowPlayingForRelease).toHaveBeenCalledWith(updated);
@@ -141,14 +121,9 @@ describe('release mutation cache convergence', () => {
 
   it('removes detail and tracks caches when a release is deleted', async () => {
     const release = makeRelease();
-    queryClient.setQueryData(queryKeys.releases.matrix('profile-1'), [release]);
-    queryClient.setQueryData(
-      queryKeys.releases.detail('profile-1', 'release-1'),
-      release
-    );
-    queryClient.setQueryData(queryKeys.releases.tracks('release-1'), [
-      { id: 'track-1' },
-    ]);
+    queryClient.setQueryData(matrixKey, [release]);
+    queryClient.setQueryData(detailKey('release-1'), release);
+    queryClient.setQueryData(tracksKey, [{ id: 'track-1' }]);
 
     deleteRelease.mockResolvedValueOnce({ success: true });
 
@@ -159,18 +134,10 @@ describe('release mutation cache convergence', () => {
     await result.current.mutateAsync({ releaseId: 'release-1' });
 
     await waitFor(() => {
-      expect(
-        queryClient.getQueryData(queryKeys.releases.matrix('profile-1'))
-      ).toEqual([]);
+      expect(queryClient.getQueryData(matrixKey)).toEqual([]);
     });
 
-    expect(
-      queryClient.getQueryData(
-        queryKeys.releases.detail('profile-1', 'release-1')
-      )
-    ).toBeUndefined();
-    expect(
-      queryClient.getQueryData(queryKeys.releases.tracks('release-1'))
-    ).toBeUndefined();
+    expect(queryClient.getQueryData(detailKey('release-1'))).toBeUndefined();
+    expect(queryClient.getQueryData(tracksKey)).toBeUndefined();
   });
 });
