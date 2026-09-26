@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -173,6 +173,114 @@ describe('runProfileRedesignProposalLoop', () => {
     expect(parsed.status).toBe('pending');
     expect(parsed.reviewDecision).toBeNull();
     expect(parsed.dispatchId).toBeNull();
+  });
+
+  it('does not reopen a rejected proposal when the loop re-runs the same day', async () => {
+    const first = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T15:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    const proposalPath = first.writtenPaths[0]!;
+    const reviewed = {
+      ...(JSON.parse(await readFile(proposalPath, 'utf8')) as object),
+      status: 'rejected',
+      reviewedAt: '2026-07-31T16:00:00.000Z',
+      reviewer: 'tim',
+      reviewDecision: 'no',
+      reviewNotes: 'Wrong direction.',
+    };
+    await writeFile(proposalPath, `${JSON.stringify(reviewed, null, 2)}\n`);
+
+    const second = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T18:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    expect(second.writtenPaths).not.toContain(proposalPath);
+    const reread = JSON.parse(await readFile(proposalPath, 'utf8')) as {
+      status: string;
+      reviewer: string;
+      reviewDecision: string;
+      createdAt: string;
+    };
+    expect(reread.status).toBe('rejected');
+    expect(reread.reviewer).toBe('tim');
+    expect(reread.reviewDecision).toBe('no');
+    expect(reread.createdAt).toBe('2026-07-31T15:00:00.000Z');
+  });
+
+  it('does not reopen an approved proposal when the loop re-runs the same day', async () => {
+    const first = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T15:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    const proposalPath = first.writtenPaths[0]!;
+    const reviewed = {
+      ...(JSON.parse(await readFile(proposalPath, 'utf8')) as object),
+      status: 'approved',
+      reviewedAt: '2026-07-31T16:00:00.000Z',
+      reviewer: 'tim',
+      reviewDecision: 'yes',
+    };
+    await writeFile(proposalPath, `${JSON.stringify(reviewed, null, 2)}\n`);
+
+    const second = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T18:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    expect(second.writtenPaths).not.toContain(proposalPath);
+    const reread = JSON.parse(await readFile(proposalPath, 'utf8')) as {
+      status: string;
+    };
+    expect(reread.status).toBe('approved');
+  });
+
+  it('still refreshes pending proposals on re-run', async () => {
+    const first = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T15:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    const proposalPath = first.writtenPaths[0]!;
+    const second = await runProfileRedesignProposalLoop({
+      dayBucket: '2026-07-31',
+      createdAt: '2026-07-31T18:00:00.000Z',
+      kinds: ['owned'],
+      maxProposals: 1,
+      tasteMemoryExcerpt: '',
+      rootDirectory: tempRoot,
+    });
+
+    expect(second.writtenPaths).toContain(proposalPath);
+    const reread = JSON.parse(await readFile(proposalPath, 'utf8')) as {
+      status: string;
+      createdAt: string;
+    };
+    expect(reread.status).toBe('pending');
+    expect(reread.createdAt).toBe('2026-07-31T18:00:00.000Z');
   });
 
   it('supports dry-run without writing files', async () => {
