@@ -94,9 +94,11 @@ export function Wordmark({
   >((acc, letter, i) => {
     const prev = acc[i - 1];
     const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-    const prevAdvance = prev
-      ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-      : 0;
+    let prevAdvance = 0;
+    if (prev) {
+      const pairTrack = prevPair ? WORDMARK_TRACK[prevPair] : 0;
+      prevAdvance = prev.w + pairTrack;
+    }
     const x = (prev?.x ?? 0) + prevAdvance;
     const p = LETTER_PATHS[letter];
     acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });

@@ -212,9 +212,9 @@ describe('TaskListRow', () => {
         onOpenRelease={vi.fn()}
       />
     );
-    expect(
-      within(done.container).getByTestId('task-list-row-task-1').className
-    ).toContain('opacity-75');
+    const doneRow = within(done.container).getByTestId('task-list-row-task-1');
+    expect(doneRow.className).toContain('opacity-75');
+    expect(doneRow.className).not.toContain('opacity-60');
 
     const cancelled = render(
       <TaskListRow
@@ -223,9 +223,11 @@ describe('TaskListRow', () => {
         onOpenRelease={vi.fn()}
       />
     );
-    expect(
-      within(cancelled.container).getByTestId('task-list-row-task-1').className
-    ).toContain('opacity-60');
+    const cancelledRow = within(cancelled.container).getByTestId(
+      'task-list-row-task-1'
+    );
+    expect(cancelledRow.className).toContain('opacity-60');
+    expect(cancelledRow.className).not.toContain('opacity-75');
 
     const live = render(
       <TaskListRow
