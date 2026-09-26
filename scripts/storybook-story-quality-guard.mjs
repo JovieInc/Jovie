@@ -92,7 +92,30 @@ function sourceShaReceipts(text) {
   }));
 }
 
+function provenanceAncestryRoots() {
+  // CI checks out pull/<n>/merge at depth 1 and only unshallows the base
+  // branch, so the merge commit stays shallow and looks like a root commit.
+  // Accept a receipt that is an ancestor of HEAD or of the fetched base ref —
+  // both prove the commit is in the shipped history of this change.
+  const roots = ['HEAD'];
+  const candidates = [
+    process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : null,
+    'origin/main',
+  ];
+  for (const ref of candidates) {
+    if (
+      ref &&
+      !roots.includes(ref) &&
+      gitSucceeds(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
+    ) {
+      roots.push(ref);
+    }
+  }
+  return roots;
+}
+
 async function checkStoryProvenance(files, texts) {
+  const ancestryRoots = provenanceAncestryRoots();
   /** @type {Map<string, { file: string, storyPath: string }[]>} */
   const storiesBySha = new Map();
 
@@ -126,12 +149,18 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
 
-    if (!gitSucceeds(['merge-base', '--is-ancestor', sha, 'HEAD'])) {
+    if (
+      !ancestryRoots.some(root =>
+        gitSucceeds(['merge-base', '--is-ancestor', sha, root])
+      )
+    ) {
       for (const story of stories) {
         add(
           story.file,
           'story-provenance-ancestor',
-          `sourceSha ${sha} is not an ancestor of HEAD; update the receipt to a commit containing this story.`
+          `sourceSha ${sha} is not an ancestor of ${ancestryRoots.join(
+            ' or '
+          )}; update the receipt to a commit containing this story.`
         );
       }
       continue;
