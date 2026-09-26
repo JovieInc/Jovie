@@ -5,8 +5,15 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+interface PersistedSettingsUpdate {
+  readonly updatedAt?: Date;
+  readonly settings?: unknown;
+}
+
 const dbMocks = vi.hoisted(() => {
-  const selectLimit = vi.fn(() => Promise.resolve([]));
+  const selectLimit = vi.fn(
+    (): Promise<ReadonlyArray<Record<string, unknown>>> => Promise.resolve([])
+  );
   const selectWhere = vi.fn(() => ({ limit: selectLimit }));
   const selectLeftJoin = vi.fn(() => ({
     limit: selectLimit,
@@ -14,7 +21,9 @@ const dbMocks = vi.hoisted(() => {
   }));
   const selectFrom = vi.fn(() => ({ leftJoin: selectLeftJoin }));
   const updateWhere = vi.fn(() => Promise.resolve());
-  const updateSet = vi.fn(() => ({ where: updateWhere }));
+  const updateSet = vi.fn((_values: PersistedSettingsUpdate) => ({
+    where: updateWhere,
+  }));
 
   return {
     select: vi.fn(() => ({ from: selectFrom })),
@@ -300,7 +309,7 @@ describe('Notification Preferences', () => {
       expect(setArgs?.settings).toEqual(
         expect.objectContaining({ kind: 'sql' })
       );
-      return setArgs.settings as {
+      return setArgs?.settings as {
         readonly strings: readonly string[];
         readonly values: readonly unknown[];
       };

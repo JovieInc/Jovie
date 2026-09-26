@@ -7,6 +7,8 @@ import { getSessionCookie } from 'better-auth/cookies';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { shouldUseEssentialShellData } from '@/app/app/(shell)/shell-route-matches';
 
+type RatelimitRedis = ConstructorParameters<typeof Ratelimit>[0]['redis'];
+
 const { mockGetSession, mockGetRedis, mockHeaders, mockGetBilling } =
   vi.hoisted(() => ({
     mockGetSession: vi.fn(),
@@ -120,7 +122,7 @@ describe('redis command budget', () => {
   const sessionStore = new Map<string, string>();
   const tally = emptyTally();
   let sessionCookies = '';
-  let auth: ReturnType<typeof betterAuth>;
+  let auth: ReturnType<typeof createBudgetAuth>;
 
   function resetTally(): void {
     tally.get = 0;
@@ -130,8 +132,8 @@ describe('redis command budget', () => {
     tally.eval = 0;
   }
 
-  beforeAll(async () => {
-    auth = betterAuth({
+  function createBudgetAuth() {
+    return betterAuth({
       baseURL: 'http://localhost:3000',
       secret: 'redis-budget-test-secret-32chars',
       database: memoryAdapter({
@@ -162,8 +164,19 @@ describe('redis command budget', () => {
           tally.del += 1;
           sessionStore.delete(key);
         },
+        // Outside the measured session path; fail loudly if it starts using them.
+        async getAndDelete(key) {
+          throw new Error(`unexpected secondaryStorage.getAndDelete(${key})`);
+        },
+        async increment(key) {
+          throw new Error(`unexpected secondaryStorage.increment(${key})`);
+        },
       },
     });
+  }
+
+  beforeAll(async () => {
+    auth = createBudgetAuth();
 
     const signUp = await auth.api.signUpEmail({
       body: {
@@ -314,10 +327,18 @@ describe('redis command budget', () => {
   it('counts one EVALSHA for the public artist limiter, two after NOSCRIPT', async () => {
     const steady = emptyTally();
     const steadyRedis = {
-      evalsha: async () => {
+      // Budgeted limiter path must stay script-only; plain GET/SET would be drift.
+      get: async (key: string) => {
+        throw new Error(`unexpected GET ${key}`);
+      },
+      set: async (key: string) => {
+        throw new Error(`unexpected SET ${key}`);
+      },
+      // Returns the rate-limit script reply; TData is chosen by the caller.
+      evalsha: (async () => {
         steady.evalsha += 1;
         return [1, 100];
-      },
+      }) as RatelimitRedis['evalsha'],
       eval: async () => {
         steady.eval += 1;
         return [1, 100];
@@ -338,6 +359,13 @@ describe('redis command budget', () => {
 
     const coldScript = emptyTally();
     const coldRedis = {
+      // Budgeted limiter path must stay script-only; plain GET/SET would be drift.
+      get: async (key: string) => {
+        throw new Error(`unexpected GET ${key}`);
+      },
+      set: async (key: string) => {
+        throw new Error(`unexpected SET ${key}`);
+      },
       evalsha: async () => {
         coldScript.evalsha += 1;
         throw new Error('NOSCRIPT No matching script. Please use EVAL.');
