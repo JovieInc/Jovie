@@ -699,7 +699,8 @@ final class ChatRepository {
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
       handoffURL: handoffURL,
-      turnId: message.turnId
+      turnId: message.turnId,
+      createdAt: message.createdAt
     )
   }
 
@@ -728,7 +729,12 @@ final class ChatRepository {
         default: return "completed"
         }
       }(),
-      createdAt: ISO8601DateFormatter().string(from: Date()),
+      // Preserve the server timestamp when the row came from a fetched or
+      // cached window (JOV-6210); otherwise `paintCachedWindow` would derive
+      // an `olderCursor` from restart-time timestamps and load-earlier would
+      // refetch the current window instead of older history. Optimistic rows
+      // have no server timestamp yet, so they fall back to now.
+      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }
