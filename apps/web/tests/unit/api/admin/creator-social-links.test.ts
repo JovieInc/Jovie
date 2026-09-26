@@ -138,6 +138,61 @@ describe('Admin Creator Social Links API', () => {
       expect(data.success).toBe(true);
       expect(Array.isArray(data.links)).toBe(true);
     });
+
+    it('returns the enrichment receipt for unclaimed structured-credit profiles', async () => {
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'admin_123',
+        email: 'admin@example.com',
+        isAuthenticated: true,
+        isAdmin: true,
+        isPro: true,
+        hasAdvancedFeatures: true,
+        canRemoveBranding: true,
+      });
+
+      const settings = {
+        unclaimedArtistProfile: {
+          state: 'unclaimed',
+          source: 'structured_spotify_release_credit',
+          artistRegistryId: 'artist_1',
+          provider: 'spotify',
+          providerArtistId: 'spotify_artist_1',
+          ownershipVerified: false,
+          representationVerified: false,
+          consentObtained: false,
+          enrichment: {
+            status: 'verified',
+            checkedAt: '2026-09-26T00:00:00Z',
+            sources: ['musicbrainz', 'official-site'],
+            fields: { instagram: 'verified' },
+            conflicts: [],
+            shareReady: true,
+          },
+        },
+      };
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([]),
+            limit: vi.fn().mockResolvedValue([{ settings }]),
+          }),
+        }),
+      });
+
+      const request = new NextRequest(
+        'http://localhost/api/admin/creator-social-links?profileId=profile_123'
+      );
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.enrichment).toMatchObject({
+        status: 'verified',
+        shareReady: true,
+      });
+    });
   });
 
   describe('PUT /api/admin/creator-social-links', () => {
