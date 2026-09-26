@@ -1,284 +1,304 @@
 import { describe, expect, it } from 'vitest';
+import { TIM_WHITE_SPOTIFY_ID } from '@/lib/spotify/blacklist';
+import {
+  generateProfileCopy,
+  validateParaphrase,
+} from '@/lib/verified-facts/generate';
 import {
   aggregateMetric,
-  eligibleFacts,
+  applyFactChanges,
+  findContradictions,
   isPublicationEligible,
-} from './eligibility';
+  registerDerivative,
+  resolveSubject,
+  revokeFact,
+  setPublicationPermission,
+} from '@/lib/verified-facts/registry';
 import {
-  assessArtifact,
-  generateProfileText,
-  sentenceForFact,
-  validateSentence,
-} from './generate';
-import { TIM_ENTITY_ID, TIM_VERIFIED_FACTS } from './tim-facts';
-import type { GeneratedArtifact, VerifiedFact } from './types';
+  TIM_WHITE_ENTITY_ID,
+  TIM_WHITE_FACTS,
+  TIM_WHITE_SUBJECT,
+  timWhiteBoilerplate,
+} from '@/lib/verified-facts/tim-white';
+import type {
+  FactClaim,
+  ProfileFact,
+  SubjectEntity,
+} from '@/lib/verified-facts/types';
 
-const base: VerifiedFact = {
-  id: 'fact_base',
-  subjectEntityId: TIM_ENTITY_ID,
-  role: 'artist',
-  claim: { kind: 'metric', text: 'x', scope: 'subject' },
-  evidence: [{ sourceRecordId: 'src_a', location: 'loc' }],
-  observedAt: '2026-09-01',
-  limitations: [],
-  confidence: 'high',
-  status: 'verified',
-  publicationPermission: 'granted',
+const NOW = '2026-09-26';
+
+function makeFact(o: Partial<ProfileFact> & { id: string }): ProfileFact {
+  return {
+    subjectEntityId: TIM_WHITE_ENTITY_ID,
+    claim: { kind: 'role', predicate: 'founder-of', value: 'founder' },
+    sources: [{ location: 't://s', refs: [], observedAt: NOW }],
+    limitations: [],
+    confidence: 0.9,
+    status: 'verified',
+    approval: { approved: true },
+    permission: { scope: 'public', grantedAt: NOW },
+    ...o,
+  };
+}
+
+const metric = (id: string, value: number, window?: FactClaim['window']) =>
+  makeFact({
+    id,
+    claim: {
+      kind: 'metric',
+      predicate: 'streams',
+      value,
+      unit: 'streams',
+      window,
+    },
+  });
+
+const GOSPEL_TIM: SubjectEntity = {
+  entityId: 'person:tim-white-gospel',
+  name: 'Tim White',
+  aliases: [],
+  identifiers: { spotifyArtistId: '59NJtiWq8nISIJjDtITQyt' },
 };
+const SUBJECTS = [TIM_WHITE_SUBJECT, GOSPEL_TIM];
 
-const fact = (overrides: Partial<VerifiedFact>): VerifiedFact => ({
-  ...base,
-  ...overrides,
+describe('resolveSubject', () => {
+  it('resolves canonical subject by identifier', () => {
+    const r = resolveSubject(SUBJECTS, TIM_WHITE_SPOTIFY_ID);
+    expect(r).toMatchObject({ status: 'resolved' });
+    if (r.status === 'resolved')
+      expect(r.entity.entityId).toBe(TIM_WHITE_ENTITY_ID);
+  });
+
+  it('returns ambiguous on a shared bare name', () => {
+    const r = resolveSubject(SUBJECTS, 'Tim White');
+    expect(r.status).toBe('ambiguous');
+    if (r.status === 'ambiguous') expect(r.candidates).toHaveLength(2);
+  });
 });
 
-describe('publication eligibility', () => {
-  it('requires verified status, granted permission, and evidence', () => {
-    expect(isPublicationEligible(base)).toBe(true);
-    expect(isPublicationEligible(fact({ status: 'candidate' }))).toBe(false);
+describe('isPublicationEligible', () => {
+  it('requires verification, approval, and live public permission together', () => {
+    expect(isPublicationEligible(makeFact({ id: 'ok' }))).toBe(true);
     expect(
-      isPublicationEligible(fact({ publicationPermission: 'private' }))
+      isPublicationEligible(makeFact({ id: 'c', status: 'candidate' }))
     ).toBe(false);
     expect(
-      isPublicationEligible(fact({ publicationPermission: 'revoked' }))
+      isPublicationEligible(
+        makeFact({ id: 'u', approval: { approved: false } })
+      )
     ).toBe(false);
-    expect(isPublicationEligible(fact({ evidence: [] }))).toBe(false);
+    expect(
+      isPublicationEligible(
+        makeFact({ id: 'p', permission: { scope: 'private' } })
+      )
+    ).toBe(false);
   });
 
   it('approved wording does not verify an unsupported claim', () => {
-    const approvedOnly = fact({
+    const f = makeFact({
+      id: 'x',
       status: 'candidate',
-      approvedText: 'Grammy-nominated artist.',
+      approval: { approved: true, approvedWording: 'Won a Grammy.' },
     });
-    expect(isPublicationEligible(approvedOnly)).toBe(false);
+    expect(isPublicationEligible(f)).toBe(false);
   });
 
-  it('high model confidence does not substitute for verification', () => {
+  it('excludes stale/revoked/contradicted and revoked permission', () => {
+    for (const status of ['stale', 'revoked', 'contradicted'] as const) {
+      expect(isPublicationEligible(makeFact({ id: status, status }))).toBe(
+        false
+      );
+    }
+    const f = revokeFact(makeFact({ id: 'was-public' }), `${NOW}T12:00:00Z`);
+    expect(isPublicationEligible(f)).toBe(false);
+  });
+
+  it('private-source facts stay private until permitted', () => {
+    const f = makeFact({
+      id: 'priv-src',
+      sources: [
+        { location: 't://p', refs: [], observedAt: NOW, privateSource: true },
+      ],
+      permission: { scope: 'public' },
+    });
+    expect(isPublicationEligible(f)).toBe(false);
     expect(
-      isPublicationEligible(fact({ status: 'candidate', confidence: 'high' }))
-    ).toBe(false);
-  });
-});
-
-describe('eligibleFacts', () => {
-  it('excludes wrong-person matches', () => {
-    const other = fact({ id: 'other', subjectEntityId: 'ent_other_tim' });
-    const { eligible } = eligibleFacts([base, other], TIM_ENTITY_ID);
-    expect(eligible.map(f => f.id)).toEqual(['fact_base']);
-  });
-
-  it('does not double-count overlapping stream sources', () => {
-    const spotify = fact({
-      id: 's1',
-      claim: {
-        kind: 'metric',
-        text: 'streams',
-        value: 40_000_000,
-        unit: 'streams',
-        scope: 'subject',
-      },
-      dedupeKey: 'catalog-streams',
-      observedAt: '2026-08-01',
-    });
-    const apple = fact({
-      id: 's2',
-      claim: {
-        kind: 'metric',
-        text: 'streams',
-        value: 30_000_000,
-        unit: 'streams',
-        scope: 'subject',
-      },
-      dedupeKey: 'catalog-streams',
-      observedAt: '2026-09-01',
-    });
-    const { eligible, omitted } = eligibleFacts(
-      [spotify, apple],
-      TIM_ENTITY_ID
-    );
-    expect(eligible).toHaveLength(1);
-    expect(eligible[0].id).toBe('s2');
-    expect(omitted).toEqual([{ factId: 's1', reason: 'duplicate-source' }]);
+      isPublicationEligible(setPublicationPermission(f, 'public', NOW))
+    ).toBe(true);
   });
 });
 
 describe('aggregateMetric', () => {
-  it('sums distinct sources but not overlapping ones', () => {
-    const a = fact({
-      id: 'a',
-      claim: { kind: 'metric', text: 'x', value: 10, unit: 'streams' },
-      dedupeKey: 'k1',
-    });
-    const b = fact({
-      id: 'b',
-      claim: { kind: 'metric', text: 'x', value: 20, unit: 'streams' },
-      dedupeKey: 'k2',
-    });
-    const c = fact({
-      id: 'c',
-      claim: { kind: 'metric', text: 'x', value: 99, unit: 'streams' },
-      dedupeKey: 'k1',
-      observedAt: '2025-01-01',
-    });
-    expect(aggregateMetric([a, b, c], TIM_ENTITY_ID, 'streams')?.value).toBe(
-      30
+  it('does not double-count overlapping sources', () => {
+    const facts = [
+      metric('s1', 40_000_000, { start: '2020-01', end: '2025-12' }),
+      metric('s2', 30_000_000, { start: '2021-06', end: '2026-03' }),
+    ];
+    const agg = aggregateMetric(
+      facts,
+      TIM_WHITE_ENTITY_ID,
+      'streams',
+      'streams'
     );
+    expect(agg.value).toBe(40_000_000);
   });
 
-  it('never counts company acquisition value as founder proceeds', () => {
-    const exit = fact({
-      id: 'exit',
-      role: 'founder',
-      claim: {
-        kind: 'exit',
-        text: 'acquired',
-        value: 50_000_000,
-        unit: 'usd',
-        scope: 'organization',
+  it('sums disjoint windows, ignores unverified facts', () => {
+    const facts = [
+      metric('s1', 10_000_000, { start: '2020-01', end: '2021-12' }),
+      metric('s2', 5_000_000, { start: '2023-01', end: '2024-12' }),
+      {
+        ...metric('s3', 999, { start: '2020-06', end: '2022-06' }),
+        status: 'candidate' as const,
       },
-    });
-    expect(aggregateMetric([exit], TIM_ENTITY_ID, 'usd')).toBeNull();
+    ];
+    const agg = aggregateMetric(
+      facts,
+      TIM_WHITE_ENTITY_ID,
+      'streams',
+      'streams'
+    );
+    expect(agg.value).toBe(15_000_000);
   });
 });
 
-describe('generateProfileText', () => {
-  it('produces Tim boilerplate with sentence-to-evidence traceability', () => {
-    const result = generateProfileText(TIM_VERIFIED_FACTS, TIM_ENTITY_ID);
-    expect(result.sentences.length).toBe(3);
-    for (const sentence of result.sentences) {
-      expect(sentence.factIds.length).toBeGreaterThan(0);
-      expect(sentence.sourceRecordIds.length).toBeGreaterThan(0);
-      expect(validateSentence(sentence, TIM_VERIFIED_FACTS)).toEqual([]);
-    }
-    expect(result.text).toContain('founder of Jovie');
-    expect(result.text).toContain('jov.ie/tim');
-  });
-
-  it('omits contradicted, stale, revoked, and unpermitted facts with reasons', () => {
+describe('findContradictions', () => {
+  it('flags conflicting values on one predicate', () => {
+    const idClaim = (value: string): FactClaim => ({
+      kind: 'identifier',
+      predicate: 'spotify-artist-id',
+      value,
+    });
     const facts = [
-      base,
-      fact({ id: 'c', status: 'contradicted' }),
-      fact({ id: 's', status: 'stale' }),
-      fact({ id: 'r', status: 'revoked' }),
-      fact({ id: 'p', publicationPermission: 'private' }),
+      makeFact({ id: 'a', claim: idClaim('X') }),
+      makeFact({ id: 'b', claim: idClaim('Y') }),
     ];
-    const { omitted } = generateProfileText(facts, TIM_ENTITY_ID);
-    const reasons = Object.fromEntries(omitted.map(o => [o.factId, o.reason]));
-    expect(reasons).toEqual({
-      c: 'contradicted',
-      s: 'stale',
-      r: 'revoked',
-      p: 'no-publication-permission',
-    });
+    expect(findContradictions(facts)).toHaveLength(1);
   });
+});
 
-  it('withholds private-source facts unless explicitly permitted', () => {
-    const privateFact = fact({
-      id: 'priv',
-      evidence: [
-        { sourceRecordId: 'src_gmail', location: 'email', privateSource: true },
-      ],
-      publicationPermission: 'private',
-    });
-    const { sentences, omitted } = generateProfileText(
-      [privateFact],
-      TIM_ENTITY_ID
+describe('validateParaphrase', () => {
+  it('rejects numeric inflation', () => {
+    const v = validateParaphrase(
+      'Passed 120 million streams.',
+      metric('m', 70_000_000)
     );
-    expect(sentences).toHaveLength(0);
-    expect(omitted[0].reason).toBe('no-publication-permission');
+    expect(v.length).toBeGreaterThan(0);
   });
 
-  it('does not attribute a recording award to every contributor', () => {
-    const award = fact({
-      id: 'award',
-      role: 'mixer',
+  it('rejects nomination-to-win upgrade', () => {
+    const f = makeFact({
+      id: 'g',
       claim: {
         kind: 'award',
-        text: 'Grammy-nominated recording.',
-        attributableRole: 'artist',
+        predicate: 'grammy',
+        value: 'a Grammy Award',
+        qualifier: 'nominated',
       },
     });
-    const { sentences, omitted } = generateProfileText([award], TIM_ENTITY_ID);
-    expect(sentences).toHaveLength(0);
-    expect(omitted[0].reason).toBe('wrong-subject');
+    expect(
+      validateParaphrase('Grammy-winning artist.', f).length
+    ).toBeGreaterThan(0);
+    expect(
+      validateParaphrase('Tim White was nominated for a Grammy Award.', f)
+    ).toHaveLength(0);
   });
 
-  it('keeps exact data exact underneath deliberately rounded display', () => {
-    const metric = fact({
-      id: 'm',
-      claim: {
-        kind: 'metric',
-        text: 'Career streams',
-        value: 71_234_567,
-        unit: 'streams',
-      },
-    });
-    const displayRounding = (v: number) => `${Math.round(v / 1e6)}M`;
-    const sentence = sentenceForFact(metric, { displayRounding });
-    expect(metric.claim.value).toBe(71_234_567);
-    expect(sentence.text).toContain('71M');
-    expect(validateSentence(sentence, [metric], { displayRounding })).toEqual(
-      []
+  it('rejects injected superlatives', () => {
+    const v = validateParaphrase(
+      'The sole founder of Jovie.',
+      makeFact({ id: 'r' })
     );
-  });
-
-  it('rejects embellishing paraphrases', () => {
-    const sentence = sentenceForFact(base);
-    const embellished = { ...sentence, text: 'x 70000000 streams' };
-    expect(validateSentence(embellished, [base]).length).toBeGreaterThan(0);
+    expect(v.length).toBeGreaterThan(0);
   });
 });
 
-describe('assessArtifact', () => {
-  const artifact: GeneratedArtifact = {
-    id: 'art1',
-    subjectEntityId: TIM_ENTITY_ID,
-    createdAt: '2026-09-01',
-    approvedAt: '2026-09-01',
-    text: 'Tim White is the founder of Jovie.',
-    sentences: [
-      {
-        text: 'Tim White is the founder of Jovie.',
-        factIds: ['fact_base'],
-        sourceRecordIds: ['src_a'],
-      },
-    ],
-    auditTrail: [
-      {
-        at: '2026-09-01',
-        state: 'current',
-        reason: 'generated',
-        affectedFactIds: [],
-      },
-    ],
-  };
-
-  it('withdraws derivatives when a backing fact is revoked or contradicted', () => {
-    const { state, artifact: next } = assessArtifact(
-      artifact,
-      [fact({ status: 'revoked' })],
-      '2026-09-20'
-    );
-    expect(state).toBe('withdrawn');
-    expect(next.auditTrail).toHaveLength(2);
-    expect(next.auditTrail[1].state).toBe('withdrawn');
-    expect(next.auditTrail[0].state).toBe('current'); // history retained
+describe('generateProfileCopy', () => {
+  it('traced boilerplate omits unverified claims', () => {
+    const copy = timWhiteBoilerplate();
+    expect(copy.text).toContain('founder of Jovie');
+    for (const s of copy.sentences) expect(s.factIds.length).toBeGreaterThan(0);
+    expect(copy.text).not.toContain('Cosmic Gate');
+    expect(
+      copy.omitted.some(
+        o =>
+          o.factId === 'fact:tim-cosmic-gate-collab' &&
+          o.reason === 'unverified'
+      )
+    ).toBe(true);
   });
 
-  it('marks derivatives for reapproval when permission is revoked', () => {
-    const { state } = assessArtifact(
-      artifact,
-      [fact({ publicationPermission: 'revoked' })],
-      '2026-09-20'
+  it('all surfaces share the same eligible facts', () => {
+    const sets = (['bio', 'pitch', 'boilerplate'] as const).map(surface =>
+      generateProfileCopy({
+        subject: TIM_WHITE_SUBJECT,
+        facts: TIM_WHITE_FACTS,
+        surface,
+      }).sentences.flatMap(s => s.factIds)
     );
-    expect(state).toBe('needs-reapproval');
+    for (const ids of sets) expect(new Set(ids)).toEqual(new Set(sets[0]));
   });
 
-  it('marks derivatives for reapproval when a fact goes stale', () => {
-    const { state } = assessArtifact(
-      artifact,
-      [fact({ status: 'stale' })],
-      '2026-09-20'
+  it('never attributes a company fact to the artist', () => {
+    const org: SubjectEntity = {
+      entityId: 'org:jovie',
+      name: 'Jovie',
+      aliases: [],
+      identifiers: {},
+    };
+    const acq = makeFact({
+      id: 'acq',
+      subjectEntityId: 'org:jovie',
+      claim: {
+        kind: 'metric',
+        predicate: 'acquisition-value',
+        value: 50_000_000,
+        unit: 'usd',
+      },
+    });
+    const artist = generateProfileCopy({
+      subject: TIM_WHITE_SUBJECT,
+      facts: [...TIM_WHITE_FACTS, acq],
+      surface: 'bio',
+    });
+    expect(artist.text).not.toContain('50,000,000');
+    expect(
+      generateProfileCopy({ subject: org, facts: [acq], surface: 'bio' }).text
+    ).toContain('50,000,000');
+  });
+
+  it('rounded display keeps exact value underneath', () => {
+    const fact = makeFact({
+      id: 'r',
+      claim: {
+        kind: 'metric',
+        predicate: 'streams',
+        value: 4_213_877,
+        unit: 'streams',
+        displayValue: '4.2 million',
+      },
+    });
+    const copy = generateProfileCopy({
+      subject: TIM_WHITE_SUBJECT,
+      facts: [fact],
+      surface: 'bio',
+    });
+    expect(copy.text).toContain('4.2 million');
+    expect(fact.claim.value).toBe(4_213_877);
+  });
+
+  it('revoked fact marks derivative for reapproval', () => {
+    const copy = timWhiteBoilerplate();
+    const d = registerDerivative('d1', copy, `${NOW}T00:00:00Z`);
+    const revoked = TIM_WHITE_FACTS.map(f =>
+      f.id === 'fact:tim-founder-of-jovie'
+        ? revokeFact(f, `${NOW}T12:00:00Z`)
+        : f
     );
-    expect(state).toBe('needs-reapproval');
+    const updated = applyFactChanges(d, revoked, `${NOW}T12:00:00Z`);
+    expect(updated.status).toBe('needs-reapproval');
+    expect(updated.history.some(e => e.event === 'fact-revoked')).toBe(true);
+    expect(updated.copy).toEqual(copy); // historical copy retained for audit
   });
 });

@@ -1,0 +1,55 @@
+name: TSC Cache Warm
+
+# Seeds the tsc state ci-fast (typecheck) restores in merge_group: main
+# pushes skip that job and merge_group cannot read PR caches. Main only, no
+# secrets or tokens. tsc re-hashes every input, so stale state is safe.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tsc-cache-warm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    name: Warm web tsc cache
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve tsc cache hour
+        id: hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state
+        id: web-tsbuildinfo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-h${{ steps.hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
+      - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.web-tsbuildinfo.outputs.cache-hit != 'true' }}
+      - name: Typecheck web for cache
+        if: ${{ steps.web-tsbuildinfo.outputs.cache-hit != 'true' }}
+        run: |
+          pnpm --filter @jovie/web run typecheck
+          pnpm --filter @jovie/web run typecheck:tests
+      - name: Save web tsc incremental state
+        if: ${{ success() && steps.web-tsbuildinfo.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}

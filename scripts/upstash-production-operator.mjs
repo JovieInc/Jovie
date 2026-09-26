@@ -7,7 +7,12 @@ export const JOVIE_PRODUCTION_REDIS = Object.freeze({
   databaseName: 'Jovie-1',
   endpoint: 'real-kiwi-157253.upstash.io',
   vercelProjectId: 'prj_HPZm5iGtARQ2qef6g2xtjgFIGDVY',
+  // Free-tier monthly request ceiling verified against the provider account;
+  // auto_upgrade is false, so crossing this limit fails commands hard.
+  monthlyRequestLimit: 500_000,
 });
+
+export const QUOTA_ALERT_THRESHOLDS = Object.freeze([70, 85, 95]);
 
 const API_ORIGIN = 'https://api.upstash.com';
 const OPERATIONS = Object.freeze({
@@ -42,6 +47,37 @@ export function verifyJovieProductionDatabase(database) {
     }
   }
   return actual;
+}
+
+/**
+ * @param {unknown} monthlyRequests
+ * @param {number} [limit]
+ */
+export function evaluateQuotaHeadroom(
+  monthlyRequests,
+  limit = JOVIE_PRODUCTION_REDIS.monthlyRequestLimit
+) {
+  if (
+    !Number.isInteger(monthlyRequests) ||
+    /** @type {number} */ (monthlyRequests) < 0 ||
+    !Number.isInteger(limit) ||
+    limit <= 0
+  ) {
+    throw new Error(
+      'Quota headroom requires non-negative integer usage and a positive integer limit'
+    );
+  }
+  const used = /** @type {number} */ (monthlyRequests);
+  const percent = (used / limit) * 100;
+  const breachedThreshold =
+    [...QUOTA_ALERT_THRESHOLDS].reverse().find(t => percent >= t) ?? null;
+  return Object.freeze({
+    monthlyRequests,
+    limit,
+    percentUsed: Number(percent.toFixed(2)),
+    breachedThreshold,
+    status: breachedThreshold === null ? 'ok' : 'alert',
+  });
 }
 
 export function createUpstashProductionOperator({
@@ -79,6 +115,17 @@ export function createUpstashProductionOperator({
       return { identity, stats };
     },
 
+    async quota() {
+      const database = await request('database');
+      const identity = verifyJovieProductionDatabase(database);
+      const stats =
+        /** @type {{ total_monthly_requests?: number } | undefined} */ (
+          await request('stats')
+        );
+      const headroom = evaluateQuotaHeadroom(stats?.total_monthly_requests);
+      return { identity, headroom };
+    },
+
     async resetPassword(confirmation) {
       const requiredConfirmation = `${JOVIE_PRODUCTION_REDIS.databaseId}:${JOVIE_PRODUCTION_REDIS.endpoint}`;
       if (confirmation !== requiredConfirmation) {
@@ -110,6 +157,16 @@ async function main() {
     return;
   }
 
+  if (command === 'quota') {
+    const result = await operator.quota();
+    console.log(
+      JSON.stringify({ database: result.identity, headroom: result.headroom })
+    );
+    // Exit 2 on any breached threshold so schedulers can route the alert.
+    if (result.headroom.status === 'alert') process.exitCode = 2;
+    return;
+  }
+
   if (command === 'reset-password') {
     if (process.env.UPSTASH_ROTATION_EXECUTE !== 'true') {
       throw new Error('UPSTASH_ROTATION_EXECUTE=true is required');
@@ -121,7 +178,7 @@ async function main() {
     return;
   }
 
-  throw new Error('Command must be status or reset-password');
+  throw new Error('Command must be status, quota, or reset-password');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

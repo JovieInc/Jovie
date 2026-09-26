@@ -1,136 +1,139 @@
 /**
- * JOV-6344 — Verified profile facts: bios and press boilerplate from
- * attributable evidence.
- *
- * Extends the memory entity/evidence model (JOV-2706): a candidate fact binds
- * a canonical `memory_entities` subject to a specific claim and the
- * `memory_source_records` that support it. Approval, verification, and
- * publication permission are separate axes — an approved wording never
- * verifies an unsupported claim, and a model confidence score is never
- * verification.
+ * Verified profile facts — domain model (JOV-6344).
+ * Approval, verification, and permission are independent gates: approved
+ * wording never verifies a claim, and model confidence is not verification.
  */
 
-export type VerifiedFactState =
+export type FactStatus =
   | 'candidate'
   | 'verified'
   | 'contradicted'
   | 'stale'
   | 'revoked';
 
-export type PublicationPermission = 'unset' | 'granted' | 'private' | 'revoked';
+export type PublicationScope = 'private' | 'internal' | 'public';
 
-/** Model confidence. Never treated as verification. */
-export type FactConfidence = 'low' | 'medium' | 'high';
-
-export type FactClaimKind =
-  | 'identity'
+export type ClaimKind =
   | 'role'
-  | 'relationship'
+  | 'membership'
+  | 'identifier'
   | 'metric'
   | 'award'
-  | 'membership'
-  | 'exit';
+  | 'relationship';
 
-export interface FactClaim {
-  readonly kind: FactClaimKind;
-  /** Exact supported claim wording. Generation may paraphrase, never strengthen. */
-  readonly text: string;
-  /** Exact numeric value where applicable. Display rounding never mutates this. */
-  readonly value?: number;
-  readonly unit?: string;
-  /** Observation window, e.g. '2024-01-01/2024-12-31' or '2024'. */
-  readonly window?: string;
-  /**
-   * 'organization' claims (e.g. a company acquisition value) belong to the
-   * org, not the subject — they must not be presented as founder proceeds.
-   */
-  readonly scope?: 'subject' | 'organization';
-  /**
-   * For awards/metrics attached to a shared work (a recording, a company):
-   * the role the subject must hold for the claim to be attributable. A
-   * recording's award is not credited to every contributor.
-   */
-  readonly attributableRole?: string;
+export interface ClaimWindow {
+  readonly start?: string;
+  readonly end?: string;
 }
 
-export interface FactEvidence {
-  /** `memory_source_records` id. */
-  readonly sourceRecordId: string;
-  /** Where in the source the claim is supported (path, url, section). */
+export interface FactClaim {
+  readonly kind: ClaimKind;
+  /** Stable predicate, e.g. 'founder-of', 'spotify-artist-id', 'streams'. */
+  readonly predicate: string;
+  /** Exact value — never rounded; rounding lives only in displayValue. */
+  readonly value: string | number;
+  readonly unit?: string;
+  /** Bound qualifier, e.g. org name or 'nominated' vs 'won'. */
+  readonly qualifier?: string;
+  readonly window?: ClaimWindow;
+  readonly displayValue?: string;
+}
+
+export interface FactSource {
+  /** URL, repo path, or document reference. */
   readonly location: string;
-  readonly note?: string;
-  /** Private sources stay private unless publicationPermission is 'granted'. */
+  readonly refs: readonly string[];
+  readonly observedAt: string;
+  readonly verifiedAt?: string;
+  /** Private-source facts stay private unless explicitly permitted. */
   readonly privateSource?: boolean;
 }
 
-export interface VerifiedFact {
-  readonly id: string;
-  /** `memory_entities` id of the person/org this fact is about. */
-  readonly subjectEntityId: string;
-  /** Specific role/relationship the subject holds for this claim. */
-  readonly role: string;
-  readonly claim: FactClaim;
-  readonly evidence: readonly FactEvidence[];
-  readonly observedAt: string;
-  readonly verifiedAt?: string;
-  readonly limitations: readonly string[];
-  readonly confidence: FactConfidence;
-  readonly status: VerifiedFactState;
-  readonly publicationPermission: PublicationPermission;
-  /** Human-approved wording. Approval is not verification. */
-  readonly approvedText?: string;
-  /**
-   * Facts sharing a dedupeKey are overlapping reports of the same underlying
-   * thing (e.g. two platforms' stream counts for one catalog). They must not
-   * be double-counted.
-   */
-  readonly dedupeKey?: string;
-  /** Audiences this fact is relevant to. Empty/absent means all audiences. */
-  readonly audiences?: readonly string[];
+export interface FactApproval {
+  readonly approved: boolean;
+  readonly approvedWording?: string;
+  readonly decidedBy?: string;
+  readonly decidedAt?: string;
 }
+
+export interface FactPermission {
+  readonly scope: PublicationScope;
+  readonly grantedAt?: string;
+  readonly revokedAt?: string;
+}
+
+export interface ProfileFact {
+  readonly id: string;
+  readonly subjectEntityId: string;
+  readonly claim: FactClaim;
+  readonly sources: readonly FactSource[];
+  readonly limitations: readonly string[];
+  /** Model confidence. Not verification. */
+  readonly confidence: number;
+  readonly status: FactStatus;
+  readonly approval: FactApproval;
+  readonly permission: FactPermission;
+}
+
+/** Facts bind `subjectEntityId`, never a name. */
+export interface SubjectEntity {
+  readonly entityId: string;
+  readonly name: string;
+  readonly aliases: readonly string[];
+  readonly identifiers: Readonly<Record<string, string>>;
+}
+
+export type SubjectResolution =
+  | { readonly status: 'resolved'; readonly entity: SubjectEntity }
+  | {
+      readonly status: 'ambiguous';
+      readonly candidates: readonly SubjectEntity[];
+    }
+  | { readonly status: 'unknown' };
 
 export interface GeneratedSentence {
   readonly text: string;
+  /** Sentence-to-evidence traceability. */
   readonly factIds: readonly string[];
-  readonly sourceRecordIds: readonly string[];
 }
 
-export interface OmittedFact {
+export type CopySurface = 'bio' | 'pitch' | 'boilerplate';
+
+export interface OmittedClaim {
   readonly factId: string;
   readonly reason:
-    | 'not-verified'
+    | 'unverified'
     | 'contradicted'
     | 'stale'
     | 'revoked'
-    | 'no-publication-permission'
-    | 'no-evidence'
-    | 'audience-mismatch'
-    | 'wrong-subject'
-    | 'duplicate-source';
+    | 'not-approved'
+    | 'not-permitted';
 }
 
-export interface GeneratedProfileText {
+export interface GeneratedCopy {
+  readonly surface: CopySurface;
   readonly subjectEntityId: string;
-  readonly text: string;
   readonly sentences: readonly GeneratedSentence[];
-  readonly omitted: readonly OmittedFact[];
+  readonly text: string;
+  readonly omitted: readonly OmittedClaim[];
 }
 
-export type ArtifactState = 'current' | 'needs-reapproval' | 'withdrawn';
-
-export interface ArtifactAuditEntry {
+export interface AuditEvent {
   readonly at: string;
-  readonly state: ArtifactState;
-  readonly reason: string;
-  readonly affectedFactIds: readonly string[];
+  readonly event:
+    | 'generated'
+    | 'fact-revoked'
+    | 'fact-contradicted'
+    | 'fact-stale'
+    | 'marked-for-reapproval'
+    | 'withdrawn';
+  readonly detail: string;
 }
 
-export interface GeneratedArtifact {
+/** A generated derivative bound to the facts it consumed. */
+export interface DerivativeRecord {
   readonly id: string;
-  readonly subjectEntityId: string;
-  readonly createdAt: string;
-  readonly approvedAt?: string;
-  readonly text: string;
-  readonly sentences: readonly GeneratedSentence[];
-  readonly auditTrail: readonly ArtifactAuditEntry[];
+  readonly copy: GeneratedCopy;
+  status: 'active' | 'needs-reapproval' | 'withdrawn';
+  readonly history: AuditEvent[];
 }

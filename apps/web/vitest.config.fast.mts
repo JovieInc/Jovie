@@ -7,6 +7,7 @@ import {
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
 import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
+import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
 // so that Vite's @fs handler can locate files when the path contains spaces.
@@ -44,8 +45,8 @@ const nodeEnvironmentGlobs = nodeEnvironmentFiles.map(file =>
 // Two projects over one file set. Both extend the root config below (setup
 // files, aliases, excludes, timeouts); the node project narrows to the listed
 // files and the jsdom project takes the rest, so root selection is unchanged.
-// `--shard` hashes file paths only, so each file still lands in exactly one
-// CI shard.
+// `--shard` partitions resolved files (DurationShardSequencer below), so each
+// file still lands in exactly one CI shard.
 const environmentProjects: TestProjectInlineConfiguration[] = [
   {
     extends: true,
@@ -150,6 +151,12 @@ export default defineConfig({
 
     // Listed DOM-free files run in `node`; everything else keeps jsdom.
     projects: environmentProjects,
+
+    // CI `--shard=n/10` balances files by measured cost
+    // (tests/unit-shard-durations.json) instead of equal file counts, so no
+    // single shard collects the heavy files and gates the matrix. Unsharded
+    // runs keep Vitest's default ordering.
+    sequence: { sequencer: DurationShardSequencer },
 
     // Environment variables for tests
     env: {

@@ -1,170 +1,209 @@
-import { eligibleFacts, isAttributable } from './eligibility';
+import {
+  aggregateMetric,
+  isPublicationEligible,
+  type MetricAggregate,
+} from './registry';
 import type {
-  ArtifactAuditEntry,
-  ArtifactState,
-  GeneratedArtifact,
-  GeneratedProfileText,
+  CopySurface,
+  GeneratedCopy,
   GeneratedSentence,
-  OmittedFact,
-  VerifiedFact,
+  OmittedClaim,
+  ProfileFact,
+  SubjectEntity,
 } from './types';
 
-export interface GenerateOptions {
-  readonly audience?: string;
-  /** Deliberate display rounding; the underlying fact value stays exact. */
-  readonly displayRounding?: (value: number, unit?: string) => string;
+const SURFACE_ORDER: Record<CopySurface, readonly string[]> = {
+  boilerplate: ['role', 'metric', 'award', 'membership', 'identifier'],
+  bio: ['role', 'identifier', 'metric', 'award', 'membership'],
+  pitch: ['metric', 'role', 'award', 'membership', 'identifier'],
+};
+
+function article(value: string): string {
+  return /^[aeiou]/i.test(value) ? 'an' : 'a';
 }
 
-function sourceRecordIds(fact: VerifiedFact): string[] {
-  return [...new Set(fact.evidence.map(e => e.sourceRecordId))];
+function omissionReason(fact: ProfileFact): OmittedClaim['reason'] {
+  if (fact.status === 'contradicted') return 'contradicted';
+  if (fact.status === 'stale') return 'stale';
+  if (fact.status === 'revoked') return 'revoked';
+  if (fact.status !== 'verified') return 'unverified';
+  if (!fact.approval.approved) return 'not-approved';
+  return 'not-permitted';
 }
 
-/**
- * The sentence for a fact is its human-approved wording when present, else
- * the exact claim text. Generation selects and places supported claims; it
- * never invents a stronger one.
- */
-export function sentenceForFact(
-  fact: VerifiedFact,
-  options: GenerateOptions = {}
-): GeneratedSentence {
-  let text = fact.approvedText ?? fact.claim.text;
-  if (
-    options.displayRounding &&
-    fact.claim.value !== undefined &&
-    fact.approvedText === undefined
-  ) {
-    text = `${text} (${options.displayRounding(fact.claim.value, fact.claim.unit)})`;
+function renderSentence(
+  fact: ProfileFact,
+  subject: SubjectEntity,
+  aggregates: Map<string, MetricAggregate>
+): GeneratedSentence | null {
+  const { claim } = fact;
+  const name = subject.name;
+
+  if (fact.approval.approvedWording) {
+    return { text: fact.approval.approvedWording, factIds: [fact.id] };
   }
-  return { text, factIds: [fact.id], sourceRecordIds: sourceRecordIds(fact) };
+
+  switch (claim.kind) {
+    case 'role':
+      return {
+        text: `${name} is ${article(String(claim.value))} ${claim.value}${claim.qualifier ? ` of ${claim.qualifier}` : ''}.`,
+        factIds: [fact.id],
+      };
+    case 'membership':
+      return {
+        text: `${name} is a member of ${claim.value}.`,
+        factIds: [fact.id],
+      };
+    case 'award':
+      return {
+        text: `${name} was ${claim.qualifier ?? 'recognized'} for ${claim.value}.`,
+        factIds: [fact.id],
+      };
+    case 'metric': {
+      const aggregate = aggregates.get(`${claim.predicate}:${claim.unit}`);
+      const display =
+        claim.displayValue ??
+        (aggregate ? aggregate.value : claim.value).toLocaleString('en-US');
+      return {
+        text: `${name}'s work has reached ${display} ${claim.unit ?? ''}.`.replace(
+          /\s+\./,
+          '.'
+        ),
+        factIds: aggregate ? aggregate.factIds : [fact.id],
+      };
+    }
+    case 'identifier':
+      if (claim.predicate === 'public-profile') {
+        return {
+          text: `${name}'s official profile is ${claim.value}.`,
+          factIds: [fact.id],
+        };
+      }
+      return null;
+    default:
+      return null;
+  }
 }
 
-/**
- * Build a short bio / press boilerplate from publication-eligible facts.
- * Each sentence carries its fact ids and source record ids so every claim
- * is traceable. Unsupported facts are omitted with a reason rather than
- * patched over.
- */
-export function generateProfileText(
-  facts: readonly VerifiedFact[],
-  subjectEntityId: string,
-  options: GenerateOptions = {}
-): GeneratedProfileText {
-  const { eligible, omitted } = eligibleFacts(
-    facts,
-    subjectEntityId,
-    options.audience
+// Reject paraphrase that strengthens a claim: numeric inflation,
+// award-outcome upgrades, injected superlatives.
+export function validateParaphrase(
+  text: string,
+  fact: ProfileFact
+): readonly string[] {
+  const violations: string[] = [];
+  const { claim } = fact;
+  const lower = text.toLowerCase();
+
+  if (typeof claim.value === 'number') {
+    for (const match of lower.matchAll(
+      /\b(\d[\d,]*(?:\.\d+)?)\s*(million|billion|thousand)?\b/g
+    )) {
+      const scale =
+        match[2] === 'million'
+          ? 1_000_000
+          : match[2] === 'billion'
+            ? 1_000_000_000
+            : match[2] === 'thousand'
+              ? 1_000
+              : 1;
+      const stated = Number.parseFloat(match[1].replace(/,/g, '')) * scale;
+      // Any stated number above the evidenced value inflates the claim.
+      if (stated > claim.value) {
+        violations.push(
+          `numeric inflation: states ${stated} ${claim.unit ?? ''} but evidence supports ${claim.value}`
+        );
+      }
+    }
+  }
+
+  if (
+    claim.kind === 'award' &&
+    claim.qualifier === 'nominated' &&
+    /\b(won|winner|winning|recipient|awarded)\b/.test(lower)
+  ) {
+    violations.push('award upgrade: evidence supports a nomination, not a win');
+  }
+
+  if (/\b(sole|only ever|first[- ]ever|best)\b/.test(lower)) {
+    violations.push('injected superlative not present in evidence');
+  }
+
+  return violations;
+}
+
+export interface GenerateCopyInput {
+  readonly subject: SubjectEntity;
+  readonly facts: readonly ProfileFact[];
+  readonly surface: CopySurface;
+  readonly maxSentences?: number;
+}
+
+// All surfaces consume the same eligible facts; ordering differs per
+// surface. Unsupported facts are omitted with reasons, never invented.
+export function generateProfileCopy(input: GenerateCopyInput): GeneratedCopy {
+  const { subject, facts, surface } = input;
+  const subjectFacts = facts.filter(
+    fact => fact.subjectEntityId === subject.entityId
   );
 
-  const sentences: GeneratedSentence[] = [];
-  const allOmitted: OmittedFact[] = [...omitted];
+  const eligible = subjectFacts.filter(isPublicationEligible);
+  const omitted: OmittedClaim[] = subjectFacts
+    .filter(fact => !isPublicationEligible(fact))
+    .map(fact => ({ factId: fact.id, reason: omissionReason(fact) }));
 
+  // Precompute metric aggregates so overlapping sources are counted once.
+  const aggregates = new Map<string, MetricAggregate>();
   for (const fact of eligible) {
-    if (!isAttributable(fact)) {
-      allOmitted.push({ factId: fact.id, reason: 'wrong-subject' });
+    if (fact.claim.kind === 'metric' && fact.claim.unit) {
+      const key = `${fact.claim.predicate}:${fact.claim.unit}`;
+      if (!aggregates.has(key)) {
+        aggregates.set(
+          key,
+          aggregateMetric(
+            facts,
+            subject.entityId,
+            fact.claim.predicate,
+            fact.claim.unit
+          )
+        );
+      }
+    }
+  }
+
+  const order = SURFACE_ORDER[surface];
+  const sorted = [...eligible].sort(
+    (a, b) => order.indexOf(a.claim.kind) - order.indexOf(b.claim.kind)
+  );
+
+  const seenMetric = new Set<string>();
+  const sentences: GeneratedSentence[] = [];
+  for (const fact of sorted) {
+    // Render each metric predicate once, from its deduped aggregate.
+    if (fact.claim.kind === 'metric') {
+      const key = `${fact.claim.predicate}:${fact.claim.unit}`;
+      if (seenMetric.has(key)) continue;
+      seenMetric.add(key);
+    }
+    const sentence = renderSentence(fact, subject, aggregates);
+    if (!sentence) continue;
+    const violations = sentence.factIds
+      .map(id => facts.find(candidate => candidate.id === id))
+      .filter((f): f is ProfileFact => Boolean(f))
+      .flatMap(f => validateParaphrase(sentence.text, f));
+    if (violations.length > 0) {
+      omitted.push({ factId: fact.id, reason: 'not-approved' });
       continue;
     }
-    sentences.push(sentenceForFact(fact, options));
+    sentences.push(sentence);
+    if (input.maxSentences && sentences.length >= input.maxSentences) break;
   }
 
   return {
-    subjectEntityId,
-    text: sentences.map(s => s.text).join(' '),
+    surface,
+    subjectEntityId: subject.entityId,
     sentences,
-    omitted: allOmitted,
-  };
-}
-
-/**
- * Every number appearing in a generated sentence must come from a backing
- * fact's exact value (or its deliberately rounded display). Rejects
- * embellishing paraphrases.
- */
-export function validateSentence(
-  sentence: GeneratedSentence,
-  facts: readonly VerifiedFact[],
-  options: GenerateOptions = {}
-): readonly string[] {
-  const problems: string[] = [];
-  const backing = facts.filter(f => sentence.factIds.includes(f.id));
-  const allowed = new Set<string>();
-  for (const fact of backing) {
-    if (fact.claim.value === undefined) continue;
-    allowed.add(String(fact.claim.value));
-    if (options.displayRounding) {
-      allowed.add(options.displayRounding(fact.claim.value, fact.claim.unit));
-    }
-  }
-  const numbersInText = sentence.text.match(/\d[\d,.]*[a-zA-Z]?/g) ?? [];
-  for (const raw of numbersInText) {
-    const normalized = raw.replace(/,/g, '');
-    if (!allowed.has(normalized) && !allowed.has(raw)) {
-      problems.push(
-        `unsupported number "${raw}" in sentence: ${sentence.text}`
-      );
-    }
-  }
-  if (backing.length === 0) {
-    problems.push(`sentence has no backing facts: ${sentence.text}`);
-  }
-  return problems;
-}
-
-/**
- * Reassess a previously generated artifact against current fact states.
- * Revoked or contradicted backing facts withdraw the artifact; stale facts
- * or revoked permission mark it for reapproval. Historical state is kept —
- * an audit entry is appended, never rewritten.
- */
-export function assessArtifact(
-  artifact: GeneratedArtifact,
-  facts: readonly VerifiedFact[],
-  at: string
-): { artifact: GeneratedArtifact; state: ArtifactState } {
-  const backing = facts.filter(fact =>
-    artifact.sentences.some(s => s.factIds.includes(fact.id))
-  );
-
-  const withdrawnIds = backing
-    .filter(f => f.status === 'revoked' || f.status === 'contradicted')
-    .map(f => f.id);
-  const reapprovalIds = backing
-    .filter(
-      f =>
-        f.status === 'stale' ||
-        f.status === 'candidate' ||
-        f.publicationPermission !== 'granted'
-    )
-    .map(f => f.id);
-
-  const state: ArtifactState =
-    withdrawnIds.length > 0
-      ? 'withdrawn'
-      : reapprovalIds.length > 0
-        ? 'needs-reapproval'
-        : 'current';
-
-  const affected = withdrawnIds.length > 0 ? withdrawnIds : reapprovalIds;
-  const reason =
-    state === 'withdrawn'
-      ? 'backing fact revoked or contradicted'
-      : state === 'needs-reapproval'
-        ? 'backing fact stale or publication permission changed'
-        : 'all backing facts remain verified and permitted';
-
-  if (state === 'current' && artifact.auditTrail.length > 0) {
-    const last = artifact.auditTrail[artifact.auditTrail.length - 1];
-    if (last.state === 'current') return { artifact, state };
-  }
-
-  const entry: ArtifactAuditEntry = {
-    at,
-    state,
-    reason,
-    affectedFactIds: affected,
-  };
-  return {
-    artifact: { ...artifact, auditTrail: [...artifact.auditTrail, entry] },
-    state,
+    text: sentences.map(sentence => sentence.text).join(' '),
+    omitted,
   };
 }
