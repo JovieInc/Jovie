@@ -5,8 +5,9 @@ import {
   DesktopAuthHandoffActions,
   type DesktopAuthOpenState,
 } from '@/app/desktop-auth/DesktopAuthClient';
-import { MacCinematicSurface } from '@/app/desktop-auth/MacCinematicSurface';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
 
 interface SearchParamReader {
@@ -47,18 +48,20 @@ export function DesktopAuthRouteHandoff() {
   );
 
   return (
-    <MacCinematicSurface
-      state={openState}
-      testId='desktop-auth-route-handoff'
-      shellKind={AUTH_SHELL_KIND.desktopReturnHandoff}
+    <main
+      className='relative isolate grid min-h-dvh place-items-center bg-background px-6 text-white dark:text-white [color-scheme:dark]'
+      data-desktop-auth-state={openState}
+      data-auth-shell-kind={AUTH_SHELL_KIND.desktopReturnHandoff}
+      data-testid='desktop-auth-route-handoff'
     >
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
+        <BrandLogo aria-hidden size={BRAND_MARK_SIZE.splash} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
         <DesktopAuthHandoffActions
           onOpenStateChange={setOpenState}
           resolveAuthUrl={resolveAuthUrl}
         />
       </section>
-    </MacCinematicSurface>
+    </main>
   );
 }

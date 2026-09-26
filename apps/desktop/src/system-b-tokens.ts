@@ -13,8 +13,4 @@ export const SYSTEM_B_DESKTOP_TOKENS = {
   /** splash-b-everywhere-v1: tiny cream mark. Keep in lockstep with web BRAND_MARK_*. */
   markCream: '#F5F4F0',
   splashMarkSizePx: 32,
-  /** Locked Mac cinematic corner role; web uses BRAND_MARK_SIZE.chrome. */
-  macCornerMarkSizePx: 40,
-  macCornerMarkOpacity: 0.35,
-  macCinematicCanvas: '#030407',
 } as const;
