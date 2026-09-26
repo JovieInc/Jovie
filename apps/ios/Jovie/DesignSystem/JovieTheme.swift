@@ -164,6 +164,10 @@ enum JovieMotion {
   static let subtleDuration: Double = 0.15
   static let slowDuration: Double = 0.25
   static let cinematicDuration: Double = 0.42
+  /// Ambient indicator pulse — constant-motion surfaces only (e.g. the chat
+  /// thinking dots). Not a UI transition; deliberately above the <300ms ladder
+  /// so a repeated cycle reads as calm, not frantic.
+  static let calmDuration: Double = 1.2
 
   /// --ease-subtle @ 150ms — hover/press/color micro-changes.
   static let subtle = Animation.timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)

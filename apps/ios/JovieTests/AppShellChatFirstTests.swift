@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Jovie
 
@@ -302,5 +303,86 @@ struct AppShellChatFirstTests {
     #expect(source.contains("key: AppShellRailSwipeExclusionFramesKey.self"))
     #expect(source.contains(#"value: [proxy.frame(in: .named("app-shell"))]"#))
     #expect(source.contains(".accessibilityIdentifier(\"mobile-chat-merch-scroll\")"))
+  }
+
+  // JOV-6000: the thinking indicator is authoritative-state-bound — it renders
+  // only while an assistant turn is genuinely in flight with nothing to show,
+  // and its motion is bound to app lifecycle so it can never outlive the work.
+  @Test func thinkingIndicatorShowsOnlyForInFlightAssistantWithoutContent() {
+    let inFlight: [MobileChatTimelineStatus] = [.sending, .queued, .running, .retrying, .streaming]
+    for status in inFlight {
+      #expect(
+        MobileChatThinkingIndicator.shouldDisplay(
+          role: .assistant, status: status, hasRenderableContent: false
+        ),
+        "expected thinking indicator for in-flight status \(status)"
+      )
+    }
+
+    let terminal: [MobileChatTimelineStatus] = [.idle, .failed, .canceled, .completed]
+    for status in terminal {
+      #expect(
+        MobileChatThinkingIndicator.shouldDisplay(
+          role: .assistant, status: status, hasRenderableContent: false
+        ) == false,
+        "terminal status \(status) must stop the indicator"
+      )
+    }
+
+    // Any renderable content, or a non-assistant row, suppresses the dots.
+    #expect(
+      MobileChatThinkingIndicator.shouldDisplay(
+        role: .assistant, status: .streaming, hasRenderableContent: true
+      ) == false
+    )
+    #expect(
+      MobileChatThinkingIndicator.shouldDisplay(
+        role: .user, status: .streaming, hasRenderableContent: false
+      ) == false
+    )
+  }
+
+  @Test func thinkingIndicatorAnimationStopsOnBackgroundAndReduceMotion() {
+    // Animating is permitted only while the scene is active and Reduce Motion
+    // is off; backgrounding, disconnecting, or Reduce Motion must stop it so a
+    // stale pulse can never resurrect on foreground/reconnect.
+    #expect(
+      MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .active)
+    )
+    #expect(
+      MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .inactive) == false
+    )
+    #expect(
+      MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .background) == false
+    )
+    #expect(
+      MobileChatThinkingIndicator.shouldAnimate(reduceMotion: true, scenePhase: .active) == false
+    )
+    #expect(MobileChatThinkingIndicator.pulseAnimation(reduceMotion: true) == nil)
+    #expect(MobileChatThinkingIndicator.pulseAnimation(reduceMotion: false) != nil)
+  }
+
+  @Test func thinkingIndicatorCadenceIsCalmUnstaggeredAndFootprintStable() throws {
+    // Calm = slow, synchronized opacity-only pulse: no rapid cycle, no per-dot
+    // phase stagger, no scale/translate. The reserved row height keeps the
+    // thinking → content/error swap from shifting layout.
+    #expect(MobileChatThinkingIndicator.pulseDuration >= 0.8)
+    #expect(MobileChatThinkingIndicator.dimmedOpacity > 0)
+    #expect(MobileChatThinkingIndicator.dimmedOpacity < MobileChatThinkingIndicator.litOpacity)
+    #expect(MobileChatThinkingIndicator.reservedHeight > 0)
+
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatMessageViews.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    #expect(source.contains("scenePhase"))
+    #expect(source.contains(".accessibilityElement(children: .ignore)"))
+    #expect(source.contains(".accessibilityLabel(\"Thinking\")"))
+    #expect(!source.contains(".delay("), "no per-dot phase staggering")
+    #expect(!source.contains("repeatForever(autoreverses: true).delay"))
+    #expect(!source.contains(".scaleEffect"), "no spatial motion")
+    #expect(!source.contains(".offset("), "no spatial motion")
+    #expect(source.contains(".onDisappear"), "must stop when the row leaves")
   }
 }
