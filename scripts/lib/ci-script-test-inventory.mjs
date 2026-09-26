@@ -209,11 +209,16 @@ export async function collectCiCommands(repoRoot, options = {}) {
       (async () => {
         const runner = await import('../run-affected-tests.mjs');
         return runner
-          .buildControlCoverageCommands()
+          .buildControlTestCommands()
           .map(([bin, args]) => [bin, ...args].join(' '));
       });
-    for (const text of await loadControl())
-      commands.push({ source: 'run-affected-tests.mjs --control', text });
+    // `--control` runs every buildControlTestCommands() stage, including
+    // `pnpm run <script>` stages, so follow those scripts too.
+    const control = (await loadControl()).map(text => ({
+      source: 'run-affected-tests.mjs --control',
+      text,
+    }));
+    commands.push(...control, ...expandPackageScripts(control, packageScripts));
   }
   return commands;
 }

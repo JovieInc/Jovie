@@ -30,6 +30,7 @@ import {
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
+import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -1159,21 +1160,26 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
-    const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
-
-    expect(controlTest).toContain(
-      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
+      'node scripts/run-affected-tests.mjs --control'
     );
-    expect(controlTest).toContain(
-      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
-    );
-    expect(controlTest).toContain('--test-coverage-lines=90');
-    expect(controlTest).toContain('--test-coverage-branches=75');
-    expect(controlTest).toContain('--test-coverage-functions=90');
-    expect(controlTest).toContain(
-      '&& node scripts/run-affected-tests.mjs --control'
-    );
-    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const controlStages = buildControlTestCommands();
+    expect(controlStages).toContainEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=75',
+        '--test-coverage-functions=90',
+        'scripts/symphony/tests/control-bundle-manifest.test.mjs',
+      ],
+    ]);
+    expect(controlStages).toContainEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
     const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
