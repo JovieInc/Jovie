@@ -16,7 +16,15 @@ const hoisted = vi.hoisted(() => {
     enrichJobStatus: vi.fn(async () => undefined),
     fetchArtistBySpotifyUrl: vi.fn(),
     isMusicFetchAvailable: vi.fn(() => true),
-    mergeExtraction: vi.fn(async () => ({ inserted: 0, updated: 0 })),
+    mergeExtraction: vi.fn(
+      async (
+        _tx: unknown,
+        _profile: unknown,
+        _extraction: {
+          links: { url: string; evidence?: { signals?: string[] } }[];
+        }
+      ) => ({ inserted: 0, updated: 0 })
+    ),
     profileRows,
     storeRawIdentityLinks: vi.fn(async () => 0),
     tx,
@@ -164,7 +172,9 @@ describe('enrichUnclaimedArtistProfileIdentity', () => {
       input.spotifyUrl,
       expect.any(Array)
     );
-    const [, , extraction] = hoisted.mergeExtraction.mock.calls[0] ?? [];
+    const extraction = hoisted.mergeExtraction.mock.calls[0]?.[2];
+    expect(extraction).toBeDefined();
+    if (!extraction) throw new Error('mergeExtraction was not called');
     expect(extraction.links.map((l: { url: string }) => l.url)).toEqual(
       expect.arrayContaining([
         'https://instagram.com/feddelegrand',
