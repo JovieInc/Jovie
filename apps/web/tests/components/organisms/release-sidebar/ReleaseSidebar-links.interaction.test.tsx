@@ -508,7 +508,6 @@ const mockRelease = {
   id: 'release_1',
   profileId: 'profile_1',
   title: 'Test Release',
-  status: 'released' as const,
   releaseDate: '2025-06-01T00:00:00.000Z',
   artworkUrl: 'https://example.com/art.jpg',
   slug: 'test-release',
@@ -524,6 +523,11 @@ const mockRelease = {
   primaryIsrc: 'USRC17607839',
   genres: ['Indie Pop'],
   canvasStatus: 'not_set' as const,
+};
+
+const mockReleaseWithStatus = {
+  ...mockRelease,
+  status: 'released' as const,
 };
 
 const defaultProps = {
@@ -612,7 +616,7 @@ describe('ReleaseSidebar inspector cards', () => {
 
   it('prefetches the release tasks route once when the drawer opens', () => {
     const { rerender } = render(
-      <ReleaseSidebar release={mockRelease} {...defaultProps} />
+      <ReleaseSidebar release={mockReleaseWithStatus} {...defaultProps} />
     );
 
     expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
@@ -621,13 +625,15 @@ describe('ReleaseSidebar inspector cards', () => {
     );
 
     // Re-rendering the same release must not re-prefetch.
-    rerender(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    rerender(
+      <ReleaseSidebar release={mockReleaseWithStatus} {...defaultProps} />
+    );
     expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
 
     // Switching releases is a new intent — prefetch the new route once.
     rerender(
       <ReleaseSidebar
-        release={{ ...mockRelease, id: 'release_2' }}
+        release={{ ...mockReleaseWithStatus, id: 'release_2' }}
         {...defaultProps}
       />
     );
