@@ -18,6 +18,10 @@ import {
   copyShareableQueryData,
   subscribeCacheFence,
 } from '@/lib/queries/cache-isolation';
+import {
+  classifiedQueryRetry,
+  classifiedQueryRetryDelay,
+} from '@/lib/queries/retry-policy';
 
 declare global {
   interface Window {
@@ -59,7 +63,7 @@ function DevToolsLoader() {
  * Optimized for authenticated app pages with:
  * - 5 min stale time for responsive UX
  * - Background refetching on window focus
- * - Retry with exponential backoff
+ * - Classified retries with bounded backoff (see lib/queries/retry-policy)
  * - 30 min garbage collection
  *
  * Note: Public profile pages use Next.js SSR caching (unstable_cache + ISR)
@@ -77,11 +81,13 @@ const createQueryClientConfig = (): QueryClientConfig => ({
       // Allows instant back-navigation without refetching
       gcTime: 30 * 60 * 1000,
 
-      // Retry failed requests up to 3 times with exponential backoff
-      // Handles transient network issues gracefully.
-      // JOV-6185 owns classified-retry rewrite — do not change this default here.
-      retry: 3,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // Classified retries (JOV-6185): cancellation, auth/validation, and
+      // schema failures stop immediately; only transient network/deadline/
+      // 5xx/429 failures retry, bounded by attempts + backoff/jitter and
+      // Retry-After hints. Query is the single retry owner — the transport
+      // never retries internally.
+      retry: classifiedQueryRetry,
+      retryDelay: classifiedQueryRetryDelay,
 
       // Refetch on window focus in production only
       // Keeps data fresh when users switch tabs back to the app

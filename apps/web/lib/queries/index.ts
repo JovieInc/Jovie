@@ -111,6 +111,18 @@ export {
 } from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
+// Classified retry policy (JOV-6185)
+export {
+  CLASSIFIED_QUERY_RETRY,
+  classifiedQueryRetry,
+  classifiedQueryRetryDelay,
+  isRetryableQueryError,
+  QUERY_MAX_RETRIES,
+  QUERY_RETRY_AFTER_MAX_MS,
+  QUERY_RETRY_BASE_DELAY_MS,
+  QUERY_RETRY_MAX_DELAY_MS,
+  retryAfterDelayMs,
+} from './retry-policy';
 // Account mutations (GDPR)
 export {
   useDeleteAccountMutation,
