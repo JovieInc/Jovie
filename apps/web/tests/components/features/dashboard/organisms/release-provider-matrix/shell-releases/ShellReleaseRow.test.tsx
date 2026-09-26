@@ -209,6 +209,7 @@ describe('ShellReleaseRow audio affordance', () => {
       title: 'Lost in the Light',
       audioUrl: 'https://cdn.example.com/preview.mp3',
       isrc: 'USX9P2400001',
+      releaseId: 'r1',
       releaseTitle: 'Lost in the Light',
       artistName: 'Bahamas',
       artworkUrl: 'https://x.invalid/a.jpg',
