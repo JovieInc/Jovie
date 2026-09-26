@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ApprovalCheck } from '@/lib/ovie/mcp/approvals';
 import {
   APPROVAL_SCHEMA,
   ApprovalError,
@@ -20,7 +21,7 @@ const BASE = {
   expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
 } as const;
 
-const checkFor = (overrides: Partial<typeof BASE> = {}) => ({
+const checkFor = (overrides: Partial<ApprovalCheck> = {}) => ({
   action: BASE.action,
   repository: BASE.repository,
   branch: BASE.branch,
