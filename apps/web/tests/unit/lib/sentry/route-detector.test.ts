@@ -116,22 +116,19 @@ describe('isPublicRoute', () => {
     expect(isPublicRoute(pathname)).toBe(true);
   });
 
-  it.each([
-    '/app',
-    '/app/dashboard',
-    '/account',
-    '/billing',
-    '/onboarding',
-  ])('should return false for dashboard route: %s', pathname => {
-    expect(isPublicRoute(pathname)).toBe(false);
-  });
+  it.each(['/app', '/app/dashboard', '/account', '/billing', '/onboarding'])(
+    'should return false for dashboard route: %s',
+    pathname => {
+      expect(isPublicRoute(pathname)).toBe(false);
+    }
+  );
 
-  it.each([
-    '/api/users',
-    '/api/health',
-  ])('should return false for API route: %s', pathname => {
-    expect(isPublicRoute(pathname)).toBe(false);
-  });
+  it.each(['/api/users', '/api/health'])(
+    'should return false for API route: %s',
+    pathname => {
+      expect(isPublicRoute(pathname)).toBe(false);
+    }
+  );
 });
 
 // ============================================================================
@@ -139,24 +136,19 @@ describe('isPublicRoute', () => {
 // ============================================================================
 
 describe('isProfileRoute', () => {
-  it.each([
-    '/beyonce',
-    '/taylor-swift',
-    '/some-artist',
-    '/artist-name/listen',
-  ])('should return true for profile route: %s', pathname => {
-    expect(isProfileRoute(pathname)).toBe(true);
-  });
+  it.each(['/beyonce', '/taylor-swift', '/some-artist', '/artist-name/listen'])(
+    'should return true for profile route: %s',
+    pathname => {
+      expect(isProfileRoute(pathname)).toBe(true);
+    }
+  );
 
-  it.each([
-    '/',
-    '/app',
-    '/artists',
-    '/api/users',
-    '/billing',
-  ])('should return false for non-profile route: %s', pathname => {
-    expect(isProfileRoute(pathname)).toBe(false);
-  });
+  it.each(['/', '/app', '/artists', '/api/users', '/billing'])(
+    'should return false for non-profile route: %s',
+    pathname => {
+      expect(isProfileRoute(pathname)).toBe(false);
+    }
+  );
 
   it('should handle hyphenated usernames', () => {
     expect(isProfileRoute('/my-artist-name')).toBe(true);
@@ -176,22 +168,19 @@ describe('isProfileRoute', () => {
 // ============================================================================
 
 describe('isApiRoute', () => {
-  it.each([
-    '/api/users',
-    '/api/health',
-    '/api/track',
-  ])('should return true for API route: %s', pathname => {
-    expect(isApiRoute(pathname)).toBe(true);
-  });
+  it.each(['/api/users', '/api/health', '/api/track'])(
+    'should return true for API route: %s',
+    pathname => {
+      expect(isApiRoute(pathname)).toBe(true);
+    }
+  );
 
-  it.each([
-    '/',
-    '/app',
-    '/artists',
-    '/beyonce',
-  ])('should return false for non-API route: %s', pathname => {
-    expect(isApiRoute(pathname)).toBe(false);
-  });
+  it.each(['/', '/app', '/artists', '/beyonce'])(
+    'should return false for non-API route: %s',
+    pathname => {
+      expect(isApiRoute(pathname)).toBe(false);
+    }
+  );
 });
 
 // ============================================================================
@@ -211,14 +200,12 @@ describe('isExplicitPublicRoute', () => {
     expect(isExplicitPublicRoute(pathname)).toBe(true);
   });
 
-  it.each([
-    '/beyonce',
-    '/taylor-swift',
-    '/app',
-    '/account',
-  ])('should return false for non-explicit public route: %s', pathname => {
-    expect(isExplicitPublicRoute(pathname)).toBe(false);
-  });
+  it.each(['/beyonce', '/taylor-swift', '/app', '/account'])(
+    'should return false for non-explicit public route: %s',
+    pathname => {
+      expect(isExplicitPublicRoute(pathname)).toBe(false);
+    }
+  );
 });
 
 // ============================================================================
@@ -274,24 +261,31 @@ describe('getSdkMode', () => {
     ['/account', 'full'],
     ['/billing', 'full'],
     ['/onboarding', 'full'],
-  ] as const)('should return "full" for dashboard route: %s', (pathname, expected) => {
-    expect(getSdkMode(pathname)).toBe(expected);
-  });
+  ] as const)(
+    'should return "full" for dashboard route: %s',
+    (pathname, expected) => {
+      expect(getSdkMode(pathname)).toBe(expected);
+    }
+  );
 
   it.each([
     ['/', 'lite'],
     ['/artists', 'lite'],
     ['/beyonce', 'lite'],
     ['/waitlist', 'lite'],
-  ] as const)('should return "lite" for public route: %s', (pathname, expected) => {
-    expect(getSdkMode(pathname)).toBe(expected);
-  });
+  ] as const)(
+    'should return "lite" for public route: %s',
+    (pathname, expected) => {
+      expect(getSdkMode(pathname)).toBe(expected);
+    }
+  );
 
-  it.each([
-    ['/api/users', 'none'],
-  ] as const)('should return "none" for API route: %s', (pathname, expected) => {
-    expect(getSdkMode(pathname)).toBe(expected);
-  });
+  it.each([['/api/users', 'none']] as const)(
+    'should return "none" for API route: %s',
+    (pathname, expected) => {
+      expect(getSdkMode(pathname)).toBe(expected);
+    }
+  );
 
   it('should handle case variations consistently', () => {
     expect(getSdkMode('/APP')).toBe('full');

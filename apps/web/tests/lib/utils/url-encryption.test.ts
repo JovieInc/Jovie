@@ -27,6 +27,7 @@ const scryptSpy = vi
   });
 
 import {
+  decryptUrl as clientDecryptUrl,
   type EncryptionResult,
   extractDomain,
   generateShortId,
@@ -366,5 +367,18 @@ describe('URL Encryption', () => {
       expect(sanitizeUrlForLogging('not-a-url')).toBe('[Invalid URL]');
       expect(sanitizeUrlForLogging('')).toBe('[Invalid URL]');
     });
+  });
+
+  it('keeps the client decrypt stub from returning the stored payload', () => {
+    const payload: EncryptionResult = {
+      encrypted: Buffer.from('https://secret.example/path').toString('base64'),
+      iv: 'iv',
+      authTag: 'tag',
+      salt: 'salt',
+    };
+
+    expect(() => clientDecryptUrl(payload)).toThrow(
+      '[url-encryption] decryptUrl is server-only. Import from @/lib/utils/url-encryption.server'
+    );
   });
 });

@@ -284,22 +284,20 @@ describe('classifyQueueDeferredHold', () => {
     });
   });
 
-  it.each([
-    'hold',
-    'gated',
-    'needs-conflict-resolution',
-    'risk:high',
-  ])('holds untyped PRs with machine gate %s', label => {
-    expect(
-      classifyQueueDeferredHold({
-        receipt: null,
-        labels: ['queue-deferred', label],
-      })
-    ).toEqual({
-      releasable: false,
-      detail: `mechanical-hold:${label}`,
-    });
-  });
+  it.each(['hold', 'gated', 'needs-conflict-resolution', 'risk:high'])(
+    'holds untyped PRs with machine gate %s',
+    label => {
+      expect(
+        classifyQueueDeferredHold({
+          receipt: null,
+          labels: ['queue-deferred', label],
+        })
+      ).toEqual({
+        releasable: false,
+        detail: `mechanical-hold:${label}`,
+      });
+    }
+  );
 
   it('still holds unknown typed reasons even when the PR is otherwise ready', () => {
     expect(

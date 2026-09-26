@@ -161,7 +161,7 @@ export function validateSitemapXmlBody(body: string): SitemapHttpGuardResult {
     if (!/<loc>[^<]+<\/loc>/.test(block)) {
       violations.push(`sitemap.xml url[${index}] is missing <loc>`);
     }
-    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/)?.[1];
+    const lastmod = /<lastmod>([^<]*)<\/lastmod>/.exec(block)?.[1];
     if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
       violations.push(`sitemap.xml url[${index}] has an invalid <lastmod>`);
     }

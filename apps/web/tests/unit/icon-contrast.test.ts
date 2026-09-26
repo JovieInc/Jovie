@@ -58,11 +58,11 @@ const SURFACES = {
   },
   dark: {
     // Jovie Noir Ion (JOV-4635)
-    base: '#030407',
-    'surface-0': '#06080d',
-    'surface-1': '#0f1420',
-    'surface-2': '#151b2a',
-    'surface-3': '#1b2436',
+    base: '#030406',
+    'surface-0': '#07080a',
+    'surface-1': '#131417',
+    'surface-2': '#1a1b1e',
+    'surface-3': '#232427',
   },
 } as const;
 
@@ -178,7 +178,7 @@ function socialLinkColors(
   }
 
   // hover and active: mirrors SocialLink.tsx hoverColor logic
-  const hoverBg = isDark ? '#0f1420' : '#fcfcfc';
+  const hoverBg = isDark ? '#131417' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(brandHex)
       ? '#ffffff'
@@ -203,7 +203,7 @@ function dspIconColors(
   surface: 'surface-1' | 'surface-2'
 ): ColorPair {
   const isDark = theme === 'dark';
-  const bgHex = isDark ? '#0f1420' : '#fcfcfc';
+  const bgHex = isDark ? '#131417' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(`#${brandHex}`)
       ? '#ffffff'

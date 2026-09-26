@@ -354,8 +354,11 @@ export const ServerEnvSchema = z.object({
   EVE_CORE_CHAT_URL: z.string().url().optional(),
   EVE_CORE_CHAT_AUTH_TOKEN: z.string().optional(),
 
-  // xAI / Grok image generation
+  // Direct xAI key for voice bake-off and video scripts. Album art does not
+  // read this; it authenticates through the AI Gateway (OIDC or
+  // AI_GATEWAY_API_KEY).
   XAI_API_KEY: z.string().optional(),
+  /** Optional Gateway image-model override (`provider/model`). Bare ids are ignored. */
   ALBUM_ART_IMAGE_MODEL: z.string().optional(),
   ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
   ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),

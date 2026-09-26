@@ -136,14 +136,10 @@ export function parseHumanHoldoutSet(raw: unknown): HumanHoldoutSet {
     }
 
     const humanLabel = assertJudgeLabel(entry.humanLabel, 'humanLabel', id);
-    const notes =
-      entry.notes === undefined
-        ? undefined
-        : typeof entry.notes === 'string'
-          ? entry.notes
-          : (() => {
-              throw new Error(`Holdout item "${id}" has invalid notes`);
-            })();
+    let notes: string | undefined;
+    if (entry.notes === undefined) notes = undefined;
+    else if (typeof entry.notes === 'string') notes = entry.notes;
+    else throw new Error(`Holdout item "${id}" has invalid notes`);
 
     items.push({ id, caseId, humanLabel, notes });
   }

@@ -4899,7 +4899,7 @@
   --sidebar-muted-foreground: 125 135 157;
   --sidebar-surface: var(--app-shell-sidebar-background-rgb);
   --sidebar-surface-hover: 168 176 195 / 0.06;
-  --sidebar-input-background: 15 20 32 / 1;
+  --sidebar-input-background: 19 20 23 / 1;
   --sidebar-input-border: 168 176 195 / 0.16;
   --sidebar-item-foreground: 215 220 232;
   --sidebar-item-icon: 125 135 157;
