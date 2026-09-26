@@ -625,6 +625,64 @@ describe('Profile AEO content', () => {
     );
   });
 
+  // JOV-6199 Wave 3 — sparse/unclaimed honesty: FAQ slots that would assert
+  // an unknown as filler ("does not list … yet") are omitted entirely.
+  it('omits the latest-release FAQ when no listed release backs it', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      latestRelease: null,
+      releases: [],
+      tourDates: [],
+      merchCards: [],
+      now,
+    });
+
+    expect(
+      content.faqs.some(faq => faq.question.includes('latest release'))
+    ).toBe(false);
+    expect(
+      content.faqs.some(faq => faq.answer.includes('does not list a release'))
+    ).toBe(false);
+  });
+
+  it('omits the origin FAQ when no hometown, origin, or location is known', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        location: null,
+        hometown: null,
+      },
+      tourDates: [],
+      merchCards: [],
+      now,
+    });
+
+    expect(content.faqs.some(faq => faq.question.includes('from'))).toBe(false);
+    expect(
+      content.faqs.some(faq =>
+        faq.answer.includes('does not list a hometown or origin')
+      )
+    ).toBe(false);
+  });
+
+  it('omits every FAQ on a fully sparse unclaimed profile', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        location: null,
+        hometown: null,
+      },
+      latestRelease: null,
+      releases: [],
+      tourDates: [],
+      merchCards: [],
+      now,
+    });
+
+    expect(content.faqs).toEqual([]);
+    expect(validateProfileAeoContent(content)).toEqual([]);
+  });
+
   it('uses profile DSP URL columns for the listen row when no social links exist', () => {
     const content = buildProfileAeoContent({
       artist: baseArtist,

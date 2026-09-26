@@ -167,6 +167,16 @@ export const __profileHomeRailTestUtils = {
   getS2OrderedItems,
 };
 
+/**
+ * Editorial Home cap (JOV-6199 Wave 3): the compact Home rail carries at most
+ * one featured story/action (the PAC card) plus two secondary modules. The
+ * trailing capture card counts toward the secondary cap, so non-featured
+ * catalog rows compete for the remaining slots with the capture card.
+ * Full catalog surfaces on Music — the rail is an editorial cut, not the
+ * catalog.
+ */
+export const PROFILE_HOME_SECONDARY_MODULE_CAP = 2;
+
 export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
@@ -313,18 +323,31 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       );
     }
 
-    return [
-      ...featuredItems,
+    // Editorial Home cap (JOV-6199 Wave 3): at most two secondary modules
+    // after the featured slot. The trailing capture card also counts toward
+    // this cap, so it is reserved a slot whenever it will render — the
+    // remaining catalog rows compete for what is left. Full catalog surfaces
+    // on Music; the rail is an editorial cut.
+    const captureCardRenders = showAlertsCard && !isSubscribed ? 1 : 0;
+    const secondarySlots = Math.max(
+      PROFILE_HOME_SECONDARY_MODULE_CAP - captureCardRenders,
+      0
+    );
+
+    const secondaryModules = [
       ...getS2OrderedItems({
         assignedSlot: profilePacAssignment.s2Slot,
         merchItems,
         showItems,
       }),
       ...releaseItems,
-    ];
+    ].slice(0, secondarySlots);
+
+    return [...featuredItems, ...secondaryModules];
   }, [
     artist.handle,
     featuredPlaylistFallback,
+    isSubscribed,
     latestRelease,
     merchCards,
     nearbyTourDateId,
@@ -332,6 +355,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     profilePacAssignment.s2Slot,
     releases,
     releaseVisibility?.show,
+    showAlertsCard,
     upcomingTourDates,
   ]);
 

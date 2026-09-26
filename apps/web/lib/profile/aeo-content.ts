@@ -820,19 +820,22 @@ function buildStructuredCollaboratorParagraph(
   };
 }
 
-function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
+function buildOriginFaq(artist: Artist): ProfileAeoFaqItem | null {
   const origin = getOrigin(artist);
   const location = cleanText(artist.location);
   const hometown = cleanText(artist.hometown);
-  let answer: string;
 
-  if (hometown && location && hometown !== location) {
-    answer = `${artist.name} is from ${hometown}; the profile also lists ${location} as their current location.`;
-  } else if (origin) {
-    answer = `${artist.name} is from ${origin}.`;
-  } else {
-    answer = `${artist.name}'s public Jovie profile does not list a hometown or origin yet; the canonical profile handle is @${artist.handle}.`;
+  // Sparse/unclaimed honesty (JOV-6199 Wave 3): when nothing is known
+  // about the origin, omit the FAQ rather than filling it with an
+  // "does not list … yet" placeholder. Unknown facts stay unknown.
+  if (!origin && !hometown && !location) {
+    return null;
   }
+
+  const answer =
+    hometown && location && hometown !== location
+      ? `${artist.name} is from ${hometown}; the profile also lists ${location} as their current location.`
+      : `${artist.name} is from ${origin}.`;
 
   return {
     question: `Where is ${artist.name} from?`,
@@ -846,7 +849,7 @@ function buildLatestReleaseFaq(params: {
   readonly latestRelease?: AeoReleaseFact | null;
   readonly releases: readonly PublicRelease[];
   readonly socialLinks: readonly LegacySocialLink[];
-}): ProfileAeoFaqItem {
+}): ProfileAeoFaqItem | null {
   const { artist, latestRelease, releases, socialLinks } = params;
   const releaseDate = formatDate(latestRelease?.releaseDate);
   const releaseType = formatReleaseType(latestRelease?.releaseType);
@@ -855,9 +858,15 @@ function buildLatestReleaseFaq(params: {
     ? Math.max(releases.length, 1)
     : releases.length;
   const releasedOn = releaseDate ? ` released on ${releaseDate}` : '';
-  const answer = latestRelease?.title
-    ? `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`
-    : `${artist.name}'s public Jovie profile does not list a release yet. Use the profile's listening links for current music updates.`;
+
+  // Sparse/unclaimed honesty (JOV-6199 Wave 3): omit the latest-release FAQ
+  // when no listed release backs it. The old filler answer ("does not list a
+  // release yet") asserted an unknown as a pseudo-fact.
+  if (!latestRelease?.title) {
+    return null;
+  }
+
+  const answer = `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`;
 
   return {
     question: `What is ${artist.name}'s latest release?`,

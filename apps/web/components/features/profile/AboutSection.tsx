@@ -1,11 +1,20 @@
 'use client';
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { EntityMentionText } from './EntityMentionText';
+
+export interface AboutSelectedCredit {
+  /** Display name (credit name when set, otherwise canonical artist name). */
+  readonly name: string;
+  /** Normalized Jovie handle of the linked public creator profile. */
+  readonly handle: string;
+}
 
 interface AboutSectionProps {
   readonly artist: Artist;
@@ -17,6 +26,17 @@ interface AboutSectionProps {
    * server-side). Falls back to plain text when omitted.
    */
   readonly bioSegments?: readonly EntityMentionSegment[];
+  /**
+   * Selected credits (JOV-6199 Wave 3): linked collaborators with public
+   * Jovie profiles, shown on About as a consistent destination. Sparse
+   * profiles without credits omit the row entirely.
+   */
+  readonly selectedCredits?: readonly AboutSelectedCredit[];
+  /**
+   * Booking/contact rows for the About destination (JOV-6199 Wave 3).
+   * Passes the obfuscated public contact payload — never raw emails.
+   */
+  readonly bookingContacts?: readonly PublicContact[];
 }
 
 function sanitizeFilename(value: string): string {
@@ -67,6 +87,8 @@ export function AboutSection({
   pressPhotos = [],
   allowPhotoDownloads = false,
   bioSegments,
+  selectedCredits = [],
+  bookingContacts = [],
 }: AboutSectionProps) {
   const hasBio = Boolean(artist.tagline);
   const hasLocation = Boolean(artist.location);
@@ -78,8 +100,16 @@ export function AboutSection({
   const hasGenres = uniqueGenres.length > 0;
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
+  const hasCredits = selectedCredits.length > 0;
+  const hasBooking = bookingContacts.length > 0;
 
-  const hasContent = hasBio || hasMetadata || hasGenres || hasPressPhotos;
+  const hasContent =
+    hasBio ||
+    hasMetadata ||
+    hasGenres ||
+    hasPressPhotos ||
+    hasCredits ||
+    hasBooking;
 
   if (!hasContent) {
     return (
@@ -140,6 +170,56 @@ export function AboutSection({
               </span>
             );
           })}
+        </div>
+      )}
+
+      {hasCredits && (
+        <div data-testid='profile-about-selected-credits'>
+          <h2 className='mb-2 text-app font-caption text-white/70'>
+            Selected Credits
+          </h2>
+          <ul className='flex flex-wrap gap-2'>
+            {selectedCredits.map(credit => (
+              <li key={`${credit.handle}-${credit.name}`}>
+                <Link
+                  href={`/${credit.handle}`}
+                  prefetch={false}
+                  className='inline-flex min-h-9 items-center rounded-full border border-(--profile-status-pill-border) bg-(--profile-status-pill-bg) px-3 text-2xs font-caption text-(--profile-status-pill-fg) transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+                >
+                  {credit.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {hasBooking && (
+        <div data-testid='profile-about-booking-contacts'>
+          <h2 className='mb-2 text-app font-caption text-white/70'>
+            Booking &amp; Contact
+          </h2>
+          <ul className='space-y-1.5'>
+            {bookingContacts.map(contact => (
+              <li
+                key={contact.id}
+                className='flex flex-wrap items-center gap-x-2 gap-y-1 text-app text-white/50'
+              >
+                <span className='font-medium text-white/70'>
+                  {contact.roleLabel}
+                </span>
+                {contact.contactName ? (
+                  <span>· {contact.contactName}</span>
+                ) : null}
+                {contact.companyLabel ? (
+                  <span>· {contact.companyLabel}</span>
+                ) : null}
+                {contact.territoryCount > 0 ? (
+                  <span>· {contact.territorySummary}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { BASE_URL } from '@/constants/app';
 import { AboutView } from '@/features/profile/views/AboutView';
 import { buildViewMetadata } from '@/features/profile/views/metadata';
 import { ProfileIntentPage } from '@/features/profile/views/ProfileIntentPage';
+import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getCreditedArtistsWithProfiles } from '@/lib/discography/artist-queries';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import {
@@ -55,12 +56,15 @@ export default async function AboutPage({ params }: Props) {
   const allowPhotoDownloads =
     profileSettings.allowProfilePhotoDownloads === true;
 
-  // Entity-linked bio: resolve this profile's own releases + credited artists
-  // with public Jovie profiles, then link mentions in the tagline. Failures
-  // degrade to plain text.
-  const bioSegments = await (async () => {
+  // Entity-linked bio + About destination rows (JOV-6199 Wave 3): resolve
+  // this profile's own releases, credited artists with public Jovie
+  // profiles, and public booking contacts once. Bio mentions link through
+  // the credited artists; the same query backs the Selected Credits row;
+  // contacts render the obfuscated public payload — never raw emails.
+  // Sparse profiles omit each row that has no data. Failures degrade to a
+  // plain-text bio with no credits/booking rows.
+  const [bioSegments, selectedCredits, bookingContacts] = await (async () => {
     const tagline = artist.tagline?.trim();
-    if (!tagline) return undefined;
     try {
       const [releases, creditedArtists] = await Promise.all([
         getReleasesForProfileLite(profile.id),
@@ -74,14 +78,21 @@ export default async function AboutPage({ params }: Props) {
         })),
         artists: creditedArtists,
       };
-      return linkEntityMentions(tagline, context);
+      const segments = tagline
+        ? linkEntityMentions(tagline, context)
+        : undefined;
+      return [
+        segments,
+        creditedArtists,
+        toPublicContacts(result.contacts, artist.name),
+      ] as const;
     } catch (error) {
       logger.error(
         'Error building entity-linked bio segments',
         { error, profileId: profile.id, route: '/[username]/about' },
         'public-profile'
       );
-      return undefined;
+      return [undefined, [], []] as const;
     }
   })();
 
@@ -97,6 +108,8 @@ export default async function AboutPage({ params }: Props) {
         pressPhotos={[...result.pressPhotos]}
         allowPhotoDownloads={allowPhotoDownloads}
         bioSegments={bioSegments}
+        selectedCredits={selectedCredits}
+        bookingContacts={bookingContacts}
       />
     </ProfileIntentPage>
   );

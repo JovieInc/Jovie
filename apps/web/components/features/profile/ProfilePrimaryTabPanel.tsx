@@ -29,9 +29,11 @@ import type { AvailableDSP } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
+import type { AboutSelectedCredit } from './AboutSection';
 
 const PANEL_CLASS_NAME =
   'rounded-(--profile-card-radius) border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-(--profile-panel-shadow) backdrop-blur-2xl';
@@ -58,6 +60,10 @@ interface ProfilePrimaryTabPanelProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Linked collaborators for the About Selected Credits row (JOV-6199). */
+  readonly selectedCredits?: readonly AboutSelectedCredit[];
+  /** Booking/contact rows for the About destination (JOV-6199). */
+  readonly bookingContacts?: readonly PublicContact[];
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
@@ -359,6 +365,8 @@ export function ProfilePrimaryTabPanel({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  selectedCredits = [],
+  bookingContacts = [],
   tourDates = [],
   releases = [],
   catalogLoadFailed = false,
@@ -538,6 +546,8 @@ export function ProfilePrimaryTabPanel({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          selectedCredits={selectedCredits}
+          bookingContacts={bookingContacts}
         />
       </div>
     </div>

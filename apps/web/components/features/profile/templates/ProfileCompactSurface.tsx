@@ -933,6 +933,7 @@ export function ProfileCompactSurface({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                bookingContacts={hasContacts ? contacts : []}
                 tourDates={tourDates}
                 releases={releases}
                 catalogLoadFailed={catalogLoadFailed}

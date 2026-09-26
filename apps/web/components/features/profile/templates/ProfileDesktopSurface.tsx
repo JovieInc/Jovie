@@ -612,57 +612,66 @@ export function ProfileDesktopSurface({
             </div>
           </DesktopSurfaceCard>
 
-          <DesktopSurfaceCard
-            title='All Releases'
-            actionLabel={
-              musicSurface.kind === 'catalog' ? 'View all releases' : undefined
-            }
-            onAction={
-              musicSurface.kind === 'catalog'
-                ? () => onModeSelect('listen')
-                : undefined
-            }
-          >
-            <div className='space-y-2'>
-              {visibleReleases.length > 0 ? (
-                visibleReleases.slice(0, 4).map(release => (
-                  <a
-                    key={release.id}
-                    href={
-                      release.slug
-                        ? `/${artist.handle}/${release.slug}`
-                        : undefined
-                    }
-                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
-                  >
-                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
-                      <ImageWithFallback
-                        src={release.artworkUrl}
-                        alt={release.title}
-                        fill
-                        sizes='56px'
-                        className='object-cover'
-                        fallbackVariant='release'
-                      />
-                    </div>
-                    <div className='min-w-0'>
-                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
-                        {release.title}
-                      </p>
-                      <p className='truncate text-app text-white/44'>
-                        {formatReleaseMeta(
-                          release.releaseType,
-                          release.releaseDate
-                        )}
-                      </p>
-                    </div>
-                  </a>
-                ))
-              ) : (
-                <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-              )}
-            </div>
-          </DesktopSurfaceCard>
+          {/* Editorial Home cap (JOV-6199 Wave 3): the desktop secondary grid
+              carries at most two content modules when the capture side rail
+              renders (capture counts toward the secondary-module cap), so the
+              All Releases preview card drops when capture is on — the full
+              catalog surfaces on Music. */}
+          {canGetUpdates ? null : (
+            <DesktopSurfaceCard
+              title='All Releases'
+              actionLabel={
+                musicSurface.kind === 'catalog'
+                  ? 'View all releases'
+                  : undefined
+              }
+              onAction={
+                musicSurface.kind === 'catalog'
+                  ? () => onModeSelect('listen')
+                  : undefined
+              }
+            >
+              <div className='space-y-2'>
+                {visibleReleases.length > 0 ? (
+                  visibleReleases.slice(0, 4).map(release => (
+                    <a
+                      key={release.id}
+                      href={
+                        release.slug
+                          ? `/${artist.handle}/${release.slug}`
+                          : undefined
+                      }
+                      className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    >
+                      <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
+                        <ImageWithFallback
+                          src={release.artworkUrl}
+                          alt={release.title}
+                          fill
+                          sizes='56px'
+                          className='object-cover'
+                          fallbackVariant='release'
+                        />
+                      </div>
+                      <div className='min-w-0'>
+                        <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
+                          {release.title}
+                        </p>
+                        <p className='truncate text-app text-white/44'>
+                          {formatReleaseMeta(
+                            release.releaseType,
+                            release.releaseDate
+                          )}
+                        </p>
+                      </div>
+                    </a>
+                  ))
+                ) : (
+                  <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
+                )}
+              </div>
+            </DesktopSurfaceCard>
+          )}
         </div>
       </div>
 
@@ -936,6 +945,7 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          bookingContacts={hasContacts ? contacts : []}
         />
       </DesktopSurfaceCard>
     ) : (
