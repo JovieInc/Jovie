@@ -3,10 +3,12 @@ import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
-import { AdminStepUpBannerWrapper } from '@/features/admin/AdminStepUpBannerWrapper';
+import { AdminStepUpBanner } from '@/features/admin/AdminStepUpBanner';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
+import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
@@ -73,6 +75,12 @@ export async function DashboardShellContent({
     return <UnavailablePage />;
   }
 
+  // Admin APIs need a passkey step-up on this session (JOV-4806). Decided
+  // here so the unlock bar paints on first render.
+  const needsAdminStepUp =
+    dashboardData.isAdmin &&
+    !(await hasRecentAdminMfaReverification(await getCachedAuth()));
+
   if (
     shouldRedirectToOnboarding(pathname) &&
     dashboardData.needsOnboarding &&
@@ -92,7 +100,7 @@ export async function DashboardShellContent({
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
-      <AdminStepUpBannerWrapper isAdmin={dashboardData.isAdmin} />
+      {needsAdminStepUp ? <AdminStepUpBanner /> : null}
       <DashboardDataProvider value={dashboardData}>
         <DashboardLoadTracker pathname={pathname} userId={userId} />
         <ProfileCompletionRedirect />
