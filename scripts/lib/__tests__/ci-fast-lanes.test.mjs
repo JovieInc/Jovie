@@ -452,12 +452,12 @@ describe('invariant-scanned structural selection', () => {
   const INVARIANTS = 'pnpm invariants:check';
   const invariantRuns = execute =>
     execute.mock.calls.filter(([command]) => command === INVARIANTS).length;
-  const runFor = (event, files, lanes) => {
+  const runFor = async (event, files, lanes) => {
     vi.stubEnv('GITHUB_EVENT_NAME', event);
     vi.stubEnv('CI_PRODUCT_LANES', lanes.join(','));
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
-    const result = runStructural({ changedFileList: files, execute });
+    const result = await runStructural({ changedFileList: files, execute });
     return { execute, result };
   };
 
@@ -466,16 +466,19 @@ describe('invariant-scanned structural selection', () => {
     ['merge_group', 'apps/desktop/src/main.ts'],
     ['pull_request', 'apps/web/lib/chat/knowledge/topics.ts'],
     ['merge_group', 'apps/web/lib/chat/knowledge/topics.ts'],
-  ])('runs invariants:check on %s when only %s changes', (event, path) => {
-    const lanes = classifyProductLanes([path]).selectedLanes;
-    expect(lanes).not.toContain('operations');
-    const { execute, result } = runFor(event, [path], lanes);
-    expect(result.code).toBe(0);
-    expect(result.skipped).toBeUndefined();
-    expect(invariantRuns(execute)).toBe(1);
-  });
+  ])(
+    'runs invariants:check on %s when only %s changes',
+    async (event, path) => {
+      const lanes = classifyProductLanes([path]).selectedLanes;
+      expect(lanes).not.toContain('operations');
+      const { execute, result } = await runFor(event, [path], lanes);
+      expect(result.code).toBe(0);
+      expect(result.skipped).toBeUndefined();
+      expect(invariantRuns(execute)).toBe(1);
+    }
+  );
 
-  it('fails the lane when the invariant ratchet fails on a mac-only change', () => {
+  it('fails the lane when the invariant ratchet fails on a mac-only change', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
     vi.stubEnv('CI_PRODUCT_LANES', 'mac');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
@@ -485,7 +488,7 @@ describe('invariant-scanned structural selection', () => {
         : { code: 0, output: 'ok\n' }
     );
     expect(
-      runStructural({
+      await runStructural({
         changedFileList: ['apps/desktop/src/main.ts'],
         execute,
       })
@@ -495,8 +498,8 @@ describe('invariant-scanned structural selection', () => {
     });
   });
 
-  it('runs invariants:check once when operations already carries it', () => {
-    const { execute } = runFor(
+  it('runs invariants:check once when operations already carries it', async () => {
+    const { execute } = await runFor(
       'merge_group',
       ['apps/desktop/src/main.ts', 'scripts/invariants/validate.mjs'],
       ['mac', 'operations']
@@ -504,10 +507,10 @@ describe('invariant-scanned structural selection', () => {
     expect(invariantRuns(execute)).toBe(1);
   });
 
-  it('keeps invariants:check off web changes outside every scanned path', () => {
+  it('keeps invariants:check off web changes outside every scanned path', async () => {
     const path = 'apps/web/tests/e2e/public-profile-smoke.spec.ts';
     expect(isInvariantScannedPath(path)).toBe(false);
-    const { execute } = runFor(
+    const { execute } = await runFor(
       'pull_request',
       [path],
       classifyProductLanes([path]).selectedLanes
