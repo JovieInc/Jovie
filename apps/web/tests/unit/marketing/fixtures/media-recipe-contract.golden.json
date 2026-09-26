@@ -1,14 +1,24 @@
 {
-  "schema": "jovie-marketing-media-recipe/v1",
-  "version": "approved-chrome-v1",
+  "schema": "jovie-marketing-media-recipe/v2",
+  "version": "approved-chrome-v2",
   "visualStandard": "newer-hero / premium bar",
   "bloomDecisionRef": "gbrain:design/jovie-newer-hero-bloom-b-founder-locked-2026-09-17",
-  "approvedRecipeIds": ["dark-glass", "flowing-accent"],
+  "approvedRecipeIds": [
+    "dark-glass",
+    "compact-glass",
+    "soft-editorial-background",
+    "flowing-accent"
+  ],
   "darkGlass": {
     "penContractId": "GTcgO",
     "masterId": "eoUUU",
     "presentation": "marketing-glass",
-    "opticalGridPx": { "outer": 64, "pill": 44, "cta": 28, "chromeMark": 20 },
+    "opticalGridPx": {
+      "outer": 64,
+      "pill": 44,
+      "cta": 28,
+      "chromeMark": 20
+    },
     "heightRem": 2.75,
     "heightPx": 44,
     "shellMixPercent": 82,
@@ -16,8 +26,8 @@
     "blurPx": 20,
     "saturatePercent": 165,
     "backdropFilter": "blur(20px) saturate(165%)",
-    "darkShellHex": "#07080A",
-    "darkCanvasHex": "#030406"
+    "darkShellHex": "#06080D",
+    "darkCanvasHex": "#030407"
   },
   "flowingAccent": {
     "viewBox": "0 0 1200 24",
@@ -30,5 +40,99 @@
     "bloomBackgroundToken": "--color-accent-blue-subtle",
     "bloomBackgroundRgba": "rgba(17, 175, 255, 0.12)",
     "reducedMotion": "static-glow-only"
+  },
+  "compactGlass": {
+    "css": "apps/web/components/marketing/artist-profile/captureShared.css",
+    "selector": ".artist-profile-audience-pill",
+    "shell": "color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent)",
+    "shellToken": "--system-b-cinematic-black",
+    "shellHex": "#06070A",
+    "blurPx": 14,
+    "backdropFilter": "blur(14px)",
+    "minHeightRem": 3,
+    "maxWidth": "min(21rem, calc(100vw - 4rem))",
+    "radius": "9999px",
+    "fontSizePx": 12.5
+  },
+  "softEditorialBackground": {
+    "css": "apps/web/app/(home)/home.css",
+    "selector": ".homepage-editorial-hero__light-well",
+    "component": "apps/web/components/homepage/HomepageEditorialHero.tsx",
+    "width": "min(80rem, 120vw)",
+    "height": "min(42rem, 62vw)",
+    "radius": "50%",
+    "centerPosition": "top 48% / left 50% translate(-50%, -50%)",
+    "opacity": 0.5,
+    "blurToken": "--space-8",
+    "blurPx": 32,
+    "underlightInset": "42% 14% auto",
+    "underlightBlurToken": "--space-12",
+    "underlightBlurPx": 48
+  },
+  "sourceMatrix": {
+    "dark-glass": [
+      "real-capture",
+      "registered-live-presentation"
+    ],
+    "compact-glass": [
+      "real-capture",
+      "registered-live-presentation"
+    ],
+    "soft-editorial-background": [
+      "real-capture",
+      "generated-artwork"
+    ],
+    "flowing-accent": [
+      "real-capture",
+      "generated-artwork"
+    ]
+  },
+  "accents": {
+    "dark-glass": {
+      "token": "--noir-ion-shell",
+      "hex": "#06080D"
+    },
+    "compact-glass": {
+      "token": "--system-b-cinematic-black",
+      "hex": "#06070A"
+    },
+    "soft-editorial-background": {
+      "token": "--system-b-text-primary",
+      "hex": "#F7F8F8"
+    },
+    "flowing-accent": {
+      "token": "--system-b-accent-cyan",
+      "hex": "#22C1FC"
+    }
+  },
+  "safeAreas": {
+    "dark-glass": "device-frame-inset",
+    "compact-glass": "device-frame-inset",
+    "soft-editorial-background": "full-bleed-editorial",
+    "flowing-accent": "full-bleed-editorial"
+  },
+  "motionFallbacks": {
+    "dark-glass": "fade-only",
+    "compact-glass": "no-motion",
+    "soft-editorial-background": "no-motion",
+    "flowing-accent": "static-glow-only"
+  },
+  "outputProfiles": {
+    "dark-glass": [
+      "marketing-web",
+      "email",
+      "social-card"
+    ],
+    "compact-glass": [
+      "marketing-web",
+      "social-card"
+    ],
+    "soft-editorial-background": [
+      "marketing-web"
+    ],
+    "flowing-accent": [
+      "marketing-web",
+      "social-card"
+    ]
   }
 }

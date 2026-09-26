@@ -4,16 +4,25 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   auditMarketingMediaRecipeDecision,
+  COMPACT_GLASS_MEDIA_RECIPE,
   DARK_GLASS_MEDIA_RECIPE,
   FLOWING_ACCENT_MEDIA_RECIPE,
   formatMarketingMediaRecipesForPrompt,
   JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
+  MARKETING_MEDIA_RECIPE_ACCENTS,
   MARKETING_MEDIA_RECIPE_FOUNDER_LOCK,
   MARKETING_MEDIA_RECIPE_IDS,
+  MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS,
+  MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES,
+  MARKETING_MEDIA_RECIPE_SAFE_AREAS,
+  MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
+  type MarketingMediaRecipeInput,
   resolveMarketingMediaRecipeForExport,
+  SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
+  validateMarketingMediaRecipeInput,
 } from '@/data/marketing';
 import golden from './fixtures/media-recipe-contract.golden.json';
 
@@ -31,7 +40,7 @@ function codes(
 }
 
 describe('marketing media recipe contract (JOV-6246)', () => {
-  it('locks the approved dark-glass and flowing-accent golden fixture', () => {
+  it('locks the four approved recipes in the golden fixture', () => {
     expect(JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA).toBe(golden.schema);
     expect(JOVIE_MARKETING_MEDIA_RECIPE_VERSION).toBe(golden.version);
     expect(MARKETING_MEDIA_RECIPE_IDS).toEqual(golden.approvedRecipeIds);
@@ -71,6 +80,49 @@ describe('marketing media recipe contract (JOV-6246)', () => {
       bloomBackgroundRgba: FLOWING_ACCENT_MEDIA_RECIPE.bloom.backgroundRgba,
       reducedMotion: FLOWING_ACCENT_MEDIA_RECIPE.seam.reducedMotion,
     }).toEqual(golden.flowingAccent);
+
+    expect({
+      css: COMPACT_GLASS_MEDIA_RECIPE.source.css,
+      selector: COMPACT_GLASS_MEDIA_RECIPE.source.selector,
+      shell: COMPACT_GLASS_MEDIA_RECIPE.material.shell,
+      shellToken: COMPACT_GLASS_MEDIA_RECIPE.material.shellToken,
+      shellHex: COMPACT_GLASS_MEDIA_RECIPE.material.shellHex,
+      blurPx: COMPACT_GLASS_MEDIA_RECIPE.material.blurPx,
+      backdropFilter: COMPACT_GLASS_MEDIA_RECIPE.material.backdropFilter,
+      minHeightRem: COMPACT_GLASS_MEDIA_RECIPE.geometry.minHeightRem,
+      maxWidth: COMPACT_GLASS_MEDIA_RECIPE.geometry.maxWidth,
+      radius: COMPACT_GLASS_MEDIA_RECIPE.geometry.radius,
+      fontSizePx: COMPACT_GLASS_MEDIA_RECIPE.material.fontSizePx,
+    }).toEqual(golden.compactGlass);
+
+    expect({
+      css: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.source.css,
+      selector: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.source.selector,
+      component: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.source.component,
+      width: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.width,
+      height: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.height,
+      radius: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.radius,
+      centerPosition:
+        SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.centerPosition,
+      opacity: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.opacity,
+      blurToken: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.blurToken,
+      blurPx: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.field.blurPx,
+      underlightInset: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.underlight.inset,
+      underlightBlurToken:
+        SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.underlight.blurToken,
+      underlightBlurPx:
+        SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.underlight.blurPx,
+    }).toEqual(golden.softEditorialBackground);
+
+    expect(MARKETING_MEDIA_RECIPE_SOURCE_MATRIX).toEqual(golden.sourceMatrix);
+    expect(MARKETING_MEDIA_RECIPE_ACCENTS).toEqual(golden.accents);
+    expect(MARKETING_MEDIA_RECIPE_SAFE_AREAS).toEqual(golden.safeAreas);
+    expect(MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS).toEqual(
+      golden.motionFallbacks
+    );
+    expect(MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES).toEqual(
+      golden.outputProfiles
+    );
   });
 
   it('binds dark-glass to the Pen-locked MarketingHeader premium bar', () => {
@@ -104,9 +156,46 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(homeCss).toContain('opacity: 0.42');
     expect(homeCss).toContain('var(--color-accent-blue-subtle)');
     expect(tokens).toMatch(/--geist-cyan-solid:\s*#22c1fc/i);
-    expect(tokens).toMatch(/--noir-ion-shell:\s*#07080a/i);
+    expect(tokens).toMatch(/--noir-ion-shell:\s*#06080d/i);
     expect(tokens).toMatch(
       /--color-accent-blue-subtle:\s*rgba\(17,\s*175,\s*255,\s*0\.12\)/
+    );
+  });
+
+  it('binds compact-glass to the captureShared audience pill material', () => {
+    const css = readWebSource(
+      'components/marketing/artist-profile/captureShared.css'
+    );
+
+    expect(css).toContain('.artist-profile-audience-pill');
+    expect(css).toContain(
+      'color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent)'
+    );
+    expect(css).toContain('backdrop-filter: blur(14px)');
+    expect(css).toContain('border-radius: 9999px');
+    expect(css).toContain('min-height: 3rem');
+    expect(css).toContain('max-width: min(21rem, calc(100vw - 4rem))');
+    expect(COMPACT_GLASS_MEDIA_RECIPE.never.join(' ')).toMatch(
+      /side panels|unrelated controls/
+    );
+  });
+
+  it('binds soft-editorial-background to the homepage editorial light well', () => {
+    const css = readWebSource('app/(home)/home.css');
+    const hero = readWebSource('components/homepage/HomepageEditorialHero.tsx');
+
+    expect(css).toContain('.homepage-editorial-hero__light-well');
+    expect(css).toContain('width: min(80rem, 120vw)');
+    expect(css).toContain('height: min(42rem, 62vw)');
+    expect(css).toContain('border-radius: 50%');
+    expect(css).toContain('top: 48%');
+    expect(css).toContain('opacity: 0.5');
+    expect(css).toContain('filter: blur(var(--space-8))');
+    expect(css).toContain('inset: 42% 14% auto');
+    expect(css).toContain('filter: blur(var(--space-12))');
+    expect(hero).toContain("data-hero-visual='abstract-light-field'");
+    expect(SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE.never.join(' ')).toMatch(
+      /off-center|Crossing/
     );
   });
 
@@ -137,12 +226,26 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(promptBlock).not.toContain('homepage-v2-hero__glow-blob');
   });
 
-  it('resolves only the two approved recipes for export', () => {
+  it('resolves only the four approved recipes for export', () => {
     expect(
       resolveMarketingMediaRecipeForExport({ recipeId: 'dark-glass' })
     ).toEqual({
       ok: true,
       recipe: DARK_GLASS_MEDIA_RECIPE,
+    });
+    expect(
+      resolveMarketingMediaRecipeForExport({ recipeId: 'compact-glass' })
+    ).toEqual({
+      ok: true,
+      recipe: COMPACT_GLASS_MEDIA_RECIPE,
+    });
+    expect(
+      resolveMarketingMediaRecipeForExport({
+        recipeId: 'soft-editorial-background',
+      })
+    ).toEqual({
+      ok: true,
+      recipe: SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
     });
     expect(
       resolveMarketingMediaRecipeForExport({ recipeId: 'flowing-accent' })
@@ -185,6 +288,42 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     ).toEqual([]);
 
     expect(
+      auditMarketingMediaRecipeDecision({
+        recipeId: 'compact-glass',
+        blurPx: 14,
+        shellMixPercent: 82,
+      })
+    ).toEqual([]);
+
+    expect(
+      auditMarketingMediaRecipeDecision({
+        recipeId: 'soft-editorial-background',
+        bloomBlurPx: 32,
+        bloomOpacity: 0.5,
+      })
+    ).toEqual([]);
+
+    expect(
+      codes(
+        auditMarketingMediaRecipeDecision({
+          recipeId: 'compact-glass',
+          blurPx: 30,
+          shellMixPercent: 70,
+        })
+      )
+    ).toEqual(['compact-glass-material-drift']);
+
+    expect(
+      codes(
+        auditMarketingMediaRecipeDecision({
+          recipeId: 'soft-editorial-background',
+          bloomBlurPx: 90,
+          bloomOpacity: 0.9,
+        })
+      )
+    ).toEqual(['editorial-background-drift']);
+
+    expect(
       codes(
         auditMarketingMediaRecipeDecision({
           recipeId: 'crystal-ribbon',
@@ -224,5 +363,188 @@ describe('marketing media recipe contract (JOV-6246)', () => {
         'flowing-accent-bloom-drift',
       ])
     );
+  });
+
+  it('accepts a fully valid typed recipe input for each registered recipe', () => {
+    const scenarios = new Set(['tim-white-profile-live-desktop']);
+
+    const inputs: readonly MarketingMediaRecipeInput[] = [
+      {
+        recipeId: 'dark-glass',
+        source: {
+          kind: 'real-capture',
+          scenarioId: 'tim-white-profile-live-desktop',
+          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
+        safeArea: 'device-frame-inset',
+        motion: { fallback: 'fade-only' },
+        output: { id: 'marketing-web' },
+      },
+      {
+        recipeId: 'compact-glass',
+        source: {
+          kind: 'registered-live-presentation',
+          scenarioId: 'tim-white-profile-live-desktop',
+          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['compact-glass'],
+        safeArea: 'device-frame-inset',
+        motion: { fallback: 'no-motion' },
+        output: { id: 'social-card' },
+      },
+      {
+        recipeId: 'soft-editorial-background',
+        source: {
+          kind: 'generated-artwork',
+          assetId: 'approved-editorial-master-01',
+          sourceRevision: '2026-09-25T07:44:04.868Z',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['soft-editorial-background'],
+        safeArea: 'full-bleed-editorial',
+        motion: { fallback: 'no-motion' },
+        output: { id: 'marketing-web' },
+      },
+      {
+        recipeId: 'flowing-accent',
+        source: {
+          kind: 'real-capture',
+          scenarioId: 'tim-white-profile-live-desktop',
+          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['flowing-accent'],
+        safeArea: 'full-bleed-editorial',
+        motion: { fallback: 'static-glow-only' },
+        output: { id: 'social-card' },
+      },
+    ];
+
+    for (const input of inputs) {
+      expect(validateMarketingMediaRecipeInput(input, scenarios)).toEqual([]);
+    }
+  });
+
+  it('rejects unsupported source combinations, unknown inputs, and drift', () => {
+    const scenarios = new Set(['tim-white-profile-live-desktop']);
+
+    // Generated artwork behind a surface recipe: unsupported combination.
+    const generatedOnSurface = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'dark-glass',
+        source: {
+          kind: 'generated-artwork',
+          assetId: 'approved-master-01',
+          sourceRevision: 'r1',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
+        safeArea: 'device-frame-inset',
+        motion: { fallback: 'fade-only' },
+        output: { id: 'marketing-web' },
+      },
+      scenarios
+    );
+    expect(generatedOnSurface.map(f => f.code)).toEqual([
+      'unsupported-recipe-source-combination',
+    ]);
+
+    // Unregistered scenario id: unapproved input.
+    const unknownScenario = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'dark-glass',
+        source: {
+          kind: 'real-capture',
+          scenarioId: 'not-a-registered-scenario',
+          sourceRevision: 'r1',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
+        safeArea: 'device-frame-inset',
+        motion: { fallback: 'fade-only' },
+        output: { id: 'marketing-web' },
+      },
+      scenarios
+    );
+    expect(unknownScenario.map(f => f.code)).toEqual([
+      'unapproved-media-source-input',
+    ]);
+
+    // Missing revision: an old receipt cannot approve a changed artifact.
+    const noRevision = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'flowing-accent',
+        source: {
+          kind: 'generated-artwork',
+          assetId: 'approved-master-01',
+          sourceRevision: '  ',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['flowing-accent'],
+        safeArea: 'full-bleed-editorial',
+        motion: { fallback: 'static-glow-only' },
+        output: { id: 'social-card' },
+      },
+      scenarios
+    );
+    expect(noRevision.map(f => f.code)).toEqual([
+      'missing-media-source-revision',
+    ]);
+
+    // Non-canonical accent: generator-supplied free-form color rejected.
+    const inventedAccent = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'flowing-accent',
+        source: {
+          kind: 'generated-artwork',
+          assetId: 'approved-master-01',
+          sourceRevision: 'r1',
+        },
+        accent: { token: '--invented-accent', hex: '#FF00FF' },
+        safeArea: 'full-bleed-editorial',
+        motion: { fallback: 'static-glow-only' },
+        output: { id: 'social-card' },
+      },
+      scenarios
+    );
+    expect(inventedAccent.map(f => f.code)).toEqual([
+      'noncanonical-media-accent',
+    ]);
+
+    // Wrong safe area, wrong motion fallback, unsupported output profile.
+    const driftedPolicies = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'soft-editorial-background',
+        source: {
+          kind: 'generated-artwork',
+          assetId: 'approved-master-01',
+          sourceRevision: 'r1',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['soft-editorial-background'],
+        safeArea: 'centered-content-column',
+        motion: { fallback: 'fade-only' },
+        output: { id: 'email' },
+      },
+      scenarios
+    );
+    expect(driftedPolicies.map(f => f.code)).toEqual([
+      'missing-safe-area-policy',
+      'missing-motion-fallback-policy',
+      'unsupported-output-profile',
+    ]);
+
+    // Unknown recipe id fails closed.
+    const unknown = validateMarketingMediaRecipeInput(
+      {
+        recipeId: 'neon-prism',
+        source: {
+          kind: 'real-capture',
+          scenarioId: 'tim-white-profile-live-desktop',
+          sourceRevision: 'r1',
+        },
+        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
+        safeArea: 'device-frame-inset',
+        motion: { fallback: 'fade-only' },
+        output: { id: 'marketing-web' },
+      },
+      scenarios
+    );
+    expect(unknown.map(f => f.code)).toEqual(['unknown-media-recipe']);
   });
 });
