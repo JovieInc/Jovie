@@ -73,6 +73,36 @@ export function shouldInstallDownloadedUpdateNow(input: {
   return input.nightlyLaunch && !input.hasVisibleWindow;
 }
 
+export type DesktopUpdateCheckOutcome = 'not-available' | 'error';
+
+export interface DesktopUpdateCheckFeedback {
+  readonly type: 'info' | 'error';
+  readonly title: string;
+  readonly message: string;
+}
+
+/**
+ * A manually triggered "Check for updates…" click must always resolve to
+ * visible feedback (JOV-6342) — silent background/nightly checks never call
+ * this, so they stay silent.
+ */
+export function buildManualUpdateCheckFeedback(
+  outcome: DesktopUpdateCheckOutcome
+): DesktopUpdateCheckFeedback {
+  return outcome === 'not-available'
+    ? {
+        type: 'info',
+        title: "You're Up To Date",
+        message: 'Jovie is on the latest version.',
+      }
+    : {
+        type: 'error',
+        title: 'Update Check Failed',
+        message:
+          'Jovie could not check for updates. Check your connection and try again.',
+      };
+}
+
 export function desktopBundlePathFromExecutable(
   executablePath: string
 ): string {

@@ -12,8 +12,6 @@ import {
   FilterCheckboxItem,
   FilterSearchInput,
 } from '@/components/molecules/filters';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
 
 /**
  * Configuration for a filter category option
@@ -58,7 +56,7 @@ export interface FilterSubmenuProps<T = string> {
  * @example
  * <FilterSubmenu
  *   label="Release Type"
- *   iconName="Disc3"
+ *   iconName="Layers"
  *   options={RELEASE_TYPE_OPTIONS}
  *   selectedIds={filters.releaseTypes}
  *   onToggle={handleTypeToggle}
@@ -103,12 +101,9 @@ export function FilterSubmenu<T extends string = string>({
 
   return (
     <DropdownMenuSub onOpenChange={handleOpenChange}>
-      <DropdownMenuSubTrigger className='justify-between rounded-full'>
+      <DropdownMenuSubTrigger className='justify-between'>
         <div className='flex items-center gap-2'>
-          <Icon
-            name={iconName as 'Disc3'}
-            className='h-3.5 w-3.5 text-tertiary-token'
-          />
+          <Icon name={iconName} className='h-3.5 w-3.5 text-tertiary-token' />
           <span>{label}</span>
           {selectedCount > 0 && (
             <span className='rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-3xs font-caption text-tertiary-token'>
@@ -122,10 +117,7 @@ export function FilterSubmenu<T extends string = string>({
         sideOffset={4}
         alignOffset={-4}
         collisionPadding={8}
-        className={cn(
-          LINEAR_SURFACE.popover,
-          'flex max-h-65 min-w-49 max-w-[calc(100vw-16px)] flex-col overflow-hidden'
-        )}
+        className='flex max-h-65 min-w-49 max-w-[calc(100vw-16px)] flex-col overflow-hidden p-0'
       >
         <FilterSearchInput
           value={search}
@@ -148,10 +140,7 @@ export function FilterSubmenu<T extends string = string>({
                 label={opt.label}
                 icon={
                   opt.iconName ? (
-                    <Icon
-                      name={opt.iconName as 'Disc3'}
-                      className='h-3.5 w-3.5'
-                    />
+                    <Icon name={opt.iconName} className='h-3.5 w-3.5' />
                   ) : undefined
                 }
                 count={counts[opt.id] || 0}

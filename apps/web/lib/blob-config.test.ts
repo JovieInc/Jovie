@@ -34,4 +34,15 @@ describe('blob-config', () => {
     expect(isBlobStorageConfigured()).toBe(true);
     expect(getBlobCommandOptions()).toEqual({ token: 'token_123' });
   });
+
+  it('treats a blank token as unset', async () => {
+    mockEnv.BLOB_READ_WRITE_TOKEN = '   ';
+
+    const { getBlobCommandOptions, getBlobReadWriteToken } = await import(
+      './blob-config'
+    );
+
+    expect(getBlobReadWriteToken()).toBeUndefined();
+    expect(getBlobCommandOptions()).toEqual({});
+  });
 });

@@ -68,7 +68,7 @@ export function SmartLinkArtworkCard({
       ) : (
         <div className='flex h-full w-full items-center justify-center'>
           <Icon
-            name='Disc3'
+            name='AudioLines'
             className='text-muted-foreground h-16 w-16'
             aria-hidden='true'
           />

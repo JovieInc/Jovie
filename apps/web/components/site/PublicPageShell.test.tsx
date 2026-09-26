@@ -67,7 +67,8 @@ describe('PublicPageShell', () => {
     const { container } = render(<MarketingPageContractMarkers />);
     const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
 
-    const marker = container.querySelector('[data-page-job]');
+    const marker = container.querySelector('[data-copy-scope]');
+    expect(marker).toHaveAttribute('data-copy-scope', 'shared');
     expect(marker).toHaveAttribute('hidden');
     expect(marker).toHaveAttribute('data-page-job', homepageContract.job);
     expect(marker).toHaveAttribute('data-proof', homepageContract.proof);

@@ -9,12 +9,8 @@ export interface ShippingVelocityBucketCounts {
 export function shippingVelocityBucketsAreEmpty(
   data: readonly ShippingVelocityBucketCounts[]
 ): boolean {
-  return (
-    data.length === 0 ||
-    data.every(
-      bucket =>
-        bucket.merged === 0 && bucket.opened === 0 && bucket.closed === 0
-    )
+  return data.every(
+    bucket => bucket.merged === 0 && bucket.opened === 0 && bucket.closed === 0
   );
 }
 

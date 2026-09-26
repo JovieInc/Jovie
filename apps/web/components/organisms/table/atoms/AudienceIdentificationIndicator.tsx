@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleCheck, CircleDashed, CircleDot } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudienceMemberType } from '@/types';
 
@@ -52,7 +52,7 @@ const LEVEL_CONFIG: Record<
 
 const LEVEL_ICONS: Record<IdentificationLevel, typeof CircleCheck> = {
   identified: CircleCheck,
-  partial: CircleDot,
+  partial: CircleAlert,
   anonymous: CircleDashed,
 };
 

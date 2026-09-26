@@ -72,6 +72,34 @@ describe('getPitchChecklistStatus', () => {
       'Do not draft until the curator checklist is resolved'
     );
   });
+
+  it('accepts spaced UNKNOWN markers and ignores a longer field token', () => {
+    const base = {
+      artistName: 'Luna Waves',
+      title: 'Neon Reef',
+      genres: ['dream pop'],
+      releaseDate: new Date('2026-06-19'),
+      targetPlaylists: ['Pollen'],
+      whyText: 'Night-swim song.',
+    };
+    const spaced = getPitchChecklistStatus({
+      ...base,
+      instructions: 'unknown:   listenLink',
+    });
+    const longer = getPitchChecklistStatus({
+      ...base,
+      instructions: 'UNKNOWN: listenLinkExtra',
+    });
+
+    expect(spaced.items.find(item => item.id === 'listenLink')?.status).toBe(
+      'unknown'
+    );
+    expect(spaced.draftable).toBe(true);
+    expect(longer.draftable).toBe(false);
+    expect(longer.items.find(item => item.id === 'listenLink')?.value).toBe(
+      null
+    );
+  });
 });
 
 describe('PITCH_GRILL_PROCEDURE', () => {

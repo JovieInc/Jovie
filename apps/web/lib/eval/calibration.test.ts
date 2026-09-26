@@ -37,6 +37,38 @@ describe('parseHumanHoldoutSet', () => {
 
     expect(holdout.items).toHaveLength(1);
     expect(holdout.items[0]?.humanLabel).toBe('pass');
+    expect(holdout.items[0]?.notes).toBeUndefined();
+  });
+
+  it('keeps string notes and rejects a non-string note', () => {
+    const holdout = parseHumanHoldoutSet({
+      schemaVersion: 1,
+      labeledAt: '2026-06-27T12:00:00.000Z',
+      items: [
+        {
+          id: 'a',
+          caseId: 'case-a',
+          humanLabel: 'pass',
+          notes: 'reviewed by hand',
+        },
+      ],
+    });
+
+    expect(holdout.items[0]?.notes).toBe('reviewed by hand');
+    expect(() =>
+      parseHumanHoldoutSet({
+        schemaVersion: 1,
+        labeledAt: '2026-06-27T12:00:00.000Z',
+        items: [
+          {
+            id: 'b',
+            caseId: 'case-b',
+            humanLabel: 'fail',
+            notes: 4,
+          },
+        ],
+      })
+    ).toThrow('Holdout item "b" has invalid notes');
   });
 
   it('rejects duplicate ids and invalid labels', () => {

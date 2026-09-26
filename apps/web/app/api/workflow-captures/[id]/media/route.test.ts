@@ -105,4 +105,29 @@ describe('GET /api/workflow-captures/[id]/media', () => {
       { access: 'private', useCache: false }
     );
   });
+
+  it('returns the capture error when the stored media is revoked', async () => {
+    const ownerId = 'c67f31fc-4b61-43de-b690-b9d8045de8e0';
+    mocks.resolvePrincipal.mockResolvedValue({
+      authenticated: true,
+      isAdmin: true,
+      subject: ownerId,
+      scopes: ['ovie:read'],
+    });
+    mocks.loadCapture.mockResolvedValue({
+      payload: { expiresAt: '2099-09-04T18:00:00.000Z' },
+      executionResult: { state: 'revoked' },
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/api/workflow-captures/capture-123/media'),
+      params
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: 'capture-media-unavailable',
+    });
+    expect(mocks.getBlob).not.toHaveBeenCalled();
+  });
 });

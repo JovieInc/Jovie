@@ -18,22 +18,39 @@ describe('SubscriptionConfirmedBanner', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('does not reserve layout space when the confirmation query is absent', () => {
+  it('renders nothing when the confirmation query is absent', () => {
     render(<SubscriptionConfirmedBanner />);
 
     expect(screen.queryByText(/Notifications on!/)).not.toBeInTheDocument();
-    expect(document.querySelector('.shrink-0.pb-3')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('subscription-confirmed-banner-viewport')
+    ).not.toBeInTheDocument();
   });
 
-  it('adds its spacing wrapper only while the confirmation is visible', async () => {
+  it('overlays the confirmation out of flow through auto-dismissal', async () => {
+    // Regression (JOV-6454): the banner used to render an in-flow spacing
+    // wrapper after first paint, pushing the profile down and pulling it
+    // back up on dismissal — two layout shifts on the post-subscribe visit.
     window.history.replaceState({}, '', '/tim?subscribed=confirmed');
-    render(<SubscriptionConfirmedBanner />);
+    render(
+      <div>
+        <p>Profile</p>
+        <SubscriptionConfirmedBanner />
+      </div>
+    );
 
     await act(async () => {});
-    const message = screen.getByText(/Notifications on!/);
-    expect(message.closest('.shrink-0.pb-3')).toBeInTheDocument();
+
+    const viewport = screen.getByTestId(
+      'subscription-confirmed-banner-viewport'
+    );
+    expect(viewport.className).toContain('absolute');
+    expect(viewport.className).toContain('pointer-events-none');
+    expect(document.querySelector('.shrink-0.pb-3')).not.toBeInTheDocument();
+
     const banner = screen.getByTestId('subscription-confirmed-banner');
     expect(banner).toHaveAttribute('data-variant', 'success');
+    expect(banner.className).toContain('pointer-events-auto');
     expect(banner.className).toContain('bg-success-subtle');
     expect(banner.className).not.toMatch(/bg-green-|border-green-|text-green-/);
 
@@ -41,6 +58,9 @@ describe('SubscriptionConfirmedBanner', () => {
       vi.advanceTimersByTime(8000);
     });
     expect(screen.queryByText(/Notifications on!/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('subscription-confirmed-banner-viewport')
+    ).not.toBeInTheDocument();
     expect(document.querySelector('.shrink-0.pb-3')).not.toBeInTheDocument();
   });
 

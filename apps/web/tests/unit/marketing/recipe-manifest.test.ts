@@ -135,6 +135,7 @@ describe('marketing registry integrity', () => {
         );
       }
     }
+    expect(MARKETING_SECTION_IDS.every(id => KEBAB_REGEX.test(id))).toBe(true);
   });
 
   it('every recipe id is kebab-case', () => {
@@ -148,6 +149,7 @@ describe('marketing registry integrity', () => {
         );
       }
     }
+    expect(MARKETING_RECIPE_IDS.every(id => KEBAB_REGEX.test(id))).toBe(true);
   });
 
   it('every section has exactly one defaultVariant', () => {
@@ -164,6 +166,11 @@ describe('marketing registry integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(section =>
+        section.variants.some(variant => variant.id === section.defaultVariant)
+      )
+    ).toBe(true);
   });
 
   it('variant ids are unique per section', () => {
@@ -179,6 +186,13 @@ describe('marketing registry integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(
+        section =>
+          new Set(section.variants.map(variant => variant.id)).size ===
+          section.variants.length
+      )
+    ).toBe(true);
   });
 
   it('split-layout variants declare mediaPosition (prior-art §4 axis rule)', () => {
@@ -194,6 +208,13 @@ describe('marketing registry integrity', () => {
         }
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(section =>
+        section.variants.every(
+          variant => variant.layout !== 'split' || variant.mediaPosition
+        )
+      )
+    ).toBe(true);
   });
 
   it('deprecated variants reference an active replacedBy', () => {
@@ -212,6 +233,20 @@ describe('marketing registry integrity', () => {
         }
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(section =>
+        section.variants.every(
+          variant =>
+            variant.status !== 'deprecated' ||
+            !variant.replacedBy ||
+            section.variants.some(
+              candidate =>
+                candidate.id === variant.replacedBy &&
+                candidate.status === 'active'
+            )
+        )
+      )
+    ).toBe(true);
   });
 
   it('MARKETING_SECTION_IDS count matches MARKETING_SECTIONS (no drift)', () => {
@@ -223,6 +258,7 @@ describe('marketing registry integrity', () => {
         'docs/marketing/ARCHITECTURE.md §Section Taxonomy'
       );
     }
+    expect(MARKETING_SECTION_IDS).toHaveLength(MARKETING_SECTIONS.length);
   });
 
   it('MARKETING_RECIPE_IDS count matches MARKETING_RECIPES (no drift)', () => {
@@ -234,6 +270,7 @@ describe('marketing registry integrity', () => {
         'docs/marketing/ARCHITECTURE.md §Recipe System'
       );
     }
+    expect(MARKETING_RECIPE_IDS).toHaveLength(MARKETING_RECIPES.length);
   });
 });
 
@@ -256,6 +293,13 @@ describe('marketing recipe integrity', () => {
         }
       }
     }
+    expect(
+      MARKETING_RECIPES.every(recipe =>
+        recipe.sectionOrder.every(sectionId =>
+          MARKETING_SECTION_IDS.includes(sectionId)
+        )
+      )
+    ).toBe(true);
   });
 
   it('proven recipes have a referenceRoute', () => {
@@ -269,6 +313,11 @@ describe('marketing recipe integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_RECIPES.every(
+        recipe => recipe.status !== 'proven' || recipe.referenceRoute
+      )
+    ).toBe(true);
   });
 
   it('proven recipe referenceRoute exists in routeManifest', () => {
@@ -299,6 +348,11 @@ describe('marketing recipe integrity', () => {
         }
       }
     }
+    expect(
+      MARKETING_RECIPES.filter(
+        recipe => recipe.status === 'proven' && recipe.referenceRoute
+      ).every(recipe => matchesManifest(recipe.referenceRoute))
+    ).toBe(true);
   });
 
   it('every recipe has a non-empty arc (Design F3 emotional-arc primitive)', () => {
@@ -312,6 +366,7 @@ describe('marketing recipe integrity', () => {
         );
       }
     }
+    expect(MARKETING_RECIPES.every(recipe => recipe.arc.length > 0)).toBe(true);
   });
 
   it('every recipe declares a CTA cadence (B2B C6 + creator F)', () => {
@@ -325,6 +380,9 @@ describe('marketing recipe integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_RECIPES.every(recipe => recipe.ctaCadence?.primaryLabel)
+    ).toBe(true);
   });
 
   it('every recipe has a PageHierarchyContract (Design F1)', () => {
@@ -342,6 +400,11 @@ describe('marketing recipe integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_RECIPES.every(
+        recipe => recipe.hierarchy?.oneBigIdea && recipe.hierarchy.seeFirst
+      )
+    ).toBe(true);
   });
 
   it('artist-lp recipe arc has no problem-agitation beat (creator R9)', () => {
@@ -360,6 +423,13 @@ describe('marketing recipe integrity', () => {
         'docs/marketing/RECIPE_CATALOG.md §artist-lp'
       );
     }
+    expect(
+      MARKETING_RECIPES.find(recipe => recipe.id === 'artist-lp')?.arc.some(
+        beat =>
+          /problem|agitat|pain/i.test(beat.beat) ||
+          /problem|agitat|pain/i.test(beat.feeling)
+      )
+    ).toBe(false);
   });
 });
 
@@ -381,6 +451,11 @@ describe('marketing route manifest integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_ROUTE_MANIFEST.every(
+        entry => (entry.recipeId !== undefined) !== (entry.exempt !== undefined)
+      )
+    ).toBe(true);
   });
 
   it('every exempt entry carries valid, current governance metadata', () => {
@@ -397,6 +472,11 @@ describe('marketing route manifest integrity', () => {
         }
       }
     }
+    expect(
+      MARKETING_ROUTE_MANIFEST.filter(entry => entry.exempt).every(
+        entry => exemptionMetadataIssues(entry.exempt).length === 0
+      )
+    ).toBe(true);
   });
 
   it('rejects placeholder, malformed, and expired exemption metadata', () => {
@@ -464,6 +544,9 @@ describe('marketing route manifest integrity', () => {
         'docs/marketing/AGENT_GUIDE.md §Deviating from the system'
       );
     }
+    expect(unsanctionedCount).toBeLessThanOrEqual(
+      EXEMPTION_RATCHET_BASELINE.unsanctionedExemptionCount
+    );
   });
 
   it('exemption ratchet: total exemption count cannot grow', () => {
@@ -483,6 +566,11 @@ describe('marketing route manifest integrity', () => {
         'docs/marketing/AGENT_GUIDE.md §Deviating from the system'
       );
     }
+    expect(issues).toEqual({
+      countMismatch: false,
+      unadmittedGlobs: [],
+      staleBaselineGlobs: [],
+    });
   });
 
   it('rejects an unadmitted exemption even when another exemption is retired', () => {
@@ -519,6 +607,7 @@ describe('marketing route manifest integrity', () => {
         'docs/marketing/ARCHITECTURE.md §Route Manifest'
       );
     }
+    expect(MARKETING_ROUTE_MANIFEST.length).toBeGreaterThanOrEqual(FLOOR);
   });
 
   it('every manifest recipeId ∈ recipe registry', () => {
@@ -533,6 +622,11 @@ describe('marketing route manifest integrity', () => {
         );
       }
     }
+    expect(
+      MARKETING_ROUTE_MANIFEST.every(
+        entry => !entry.recipeId || validRecipeIds.has(entry.recipeId)
+      )
+    ).toBe(true);
   });
 
   it('every rendered binding resolves to an approved section or approved proposal', () => {
@@ -1054,6 +1148,29 @@ describe('marketing decision engine determinism (golden fixtures)', () => {
         );
       }
     }
+    expect(
+      PROPERTY_TABLE.every(
+        ({ brief, expectedRecipeId }) =>
+          resolveComposition({
+            businessObjective: 'test',
+            targetAudience: brief.targetAudience,
+            desiredConversion: brief.desiredConversion,
+            trafficSource: brief.trafficSource ?? 'direct',
+            intent: brief.intent,
+            availableAssets: {},
+            brandConstraints: {
+              darkOnly: true,
+              fullyStatic: true,
+              waitlistEnabled:
+                (
+                  brief.brandConstraints as
+                    | { waitlistEnabled?: boolean }
+                    | undefined
+                )?.waitlistEnabled ?? false,
+            },
+          }).recipeId === expectedRecipeId
+      )
+    ).toBe(true);
   });
 
   it('decision table is total: every reachable Brief resolves without throwing (smoke)', () => {
@@ -1131,6 +1248,7 @@ describe('marketing decision engine determinism (golden fixtures)', () => {
         'docs/marketing/ARCHITECTURE.md §Decision Engine'
       );
     }
+    expect(tested).toBeGreaterThanOrEqual(100);
   });
 });
 
@@ -1162,6 +1280,9 @@ describe('marketing docs ⇔ registry anchor parity', () => {
         );
       }
     }
+    expect(
+      MARKETING_SECTION_IDS.every(id => catalog.includes(`#section-${id}`))
+    ).toBe(true);
   });
 
   it('every recipe id has a RECIPE_CATALOG anchor (#recipe-{id})', async () => {
@@ -1182,6 +1303,9 @@ describe('marketing docs ⇔ registry anchor parity', () => {
         );
       }
     }
+    expect(
+      MARKETING_RECIPE_IDS.every(id => catalog.includes(`#recipe-${id}`))
+    ).toBe(true);
   });
 
   it('MARKETING_SPEC_VERSION matches docs ARCHITECTURE.md freshness marker', async () => {
@@ -1199,6 +1323,7 @@ describe('marketing docs ⇔ registry anchor parity', () => {
         'docs/marketing/ARCHITECTURE.md §Versioning'
       );
     }
+    expect(arch.includes(`spec-version: ${MARKETING_SPEC_VERSION}`)).toBe(true);
   });
 });
 
@@ -1219,6 +1344,11 @@ describe('marketing adversarial-review invariants', () => {
         );
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(
+        section => section.variants.length <= MAX_VARIANTS_PER_SECTION
+      )
+    ).toBe(true);
   });
 
   it('F1: variant axis tuples are unique within a section OR have distinct chooseWhen predicates (content variants allowed)', () => {
@@ -1247,6 +1377,20 @@ describe('marketing adversarial-review invariants', () => {
         }
       }
     }
+    expect(
+      MARKETING_SECTIONS.every(section => {
+        const seen = new Map();
+        return section.variants.every(variant => {
+          const key = `${variant.layout}|${variant.media}|${variant.mediaPosition ?? ''}|${variant.columns ?? ''}|${variant.density ?? ''}|${variant.alignment ?? ''}`;
+          const prev = seen.get(key);
+          if (prev === undefined) {
+            seen.set(key, variant.chooseWhen ?? '');
+            return true;
+          }
+          return (variant.chooseWhen ?? '') !== prev;
+        });
+      })
+    ).toBe(true);
   });
 
   it('E1: RECIPE_CATALOG stated section count matches registry sectionOrder.length', async () => {
@@ -1285,6 +1429,22 @@ describe('marketing adversarial-review invariants', () => {
         );
       }
     }
+    expect(
+      MARKETING_RECIPES.every(recipe => {
+        const anchorIdx = catalog.indexOf(`#recipe-${recipe.id}`);
+        if (anchorIdx < 0) return true;
+        const blockEnd = catalog.indexOf('#recipe-', anchorIdx + 1);
+        const block = catalog.slice(
+          anchorIdx,
+          blockEnd > 0 ? blockEnd : undefined
+        );
+        const match = block.match(/Sections\s*\((\d+)\)/);
+        return (
+          match !== null &&
+          Number.parseInt(match[1], 10) === recipe.sectionOrder.length
+        );
+      })
+    ).toBe(true);
   });
 
   it('A3: every recipe with proof/trust sections declares a fallback for each (worst-case zero-proof arc survival)', () => {
@@ -1310,6 +1470,25 @@ describe('marketing adversarial-review invariants', () => {
         }
       }
     }
+    expect(
+      MARKETING_RECIPES.every(recipe =>
+        recipe.sectionOrder
+          .filter(sectionId => {
+            const section = MARKETING_SECTIONS.find(
+              candidate => candidate.id === sectionId
+            );
+            return (
+              section &&
+              (section.proofClass === 'proof' || section.proofClass === 'trust')
+            );
+          })
+          .every(proofSection =>
+            recipe.fallbacks?.some(fallback =>
+              fallback.missing.includes(proofSection)
+            )
+          )
+      )
+    ).toBe(true);
   });
 
   it('B1: golden fixtures that resolve to unproven variants are flagged (humanOptIn required at render time)', async () => {

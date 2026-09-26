@@ -88,7 +88,7 @@ function subjectHaystack(subject: MerchContentSubject): string {
       subject.imageDescription,
       ...(subject.labels ?? []),
     ]
-      .filter((part): part is string => Boolean(part && part.trim()))
+      .filter((part): part is string => Boolean(part?.trim()))
       .join(' \n ')
   );
 }

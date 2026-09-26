@@ -123,8 +123,8 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 |--------|-----|-------------|
 | `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
 | `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
-| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-background` or `bg-surface-1` |
-| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-background` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-base` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
 | `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
 
 **Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
@@ -148,7 +148,7 @@ Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these n
 
 | Surface | Dark value |
 |---|---|
-| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
 
 ## Spacing
 
@@ -218,7 +218,7 @@ keeps its composition. Homepage `t1x8T` remains locked.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 280px | 280px |
-| Background RGB | `247 248 248` | `6 8 13` |
+| Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |

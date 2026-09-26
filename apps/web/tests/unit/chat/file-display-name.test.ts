@@ -27,6 +27,12 @@ describe('file-display-name (JOV-3492)', () => {
     expect(fileDisplayName(url)).not.toContain('%20');
   });
 
+  it('uses the last non-empty segment of a non-URL path', () => {
+    expect(
+      filenameFromUrlOrName('notes/sessions/mix%20final.wav?download=1')
+    ).toBe('mix final.wav');
+  });
+
   it('prefers an explicit name over the URL basename', () => {
     expect(
       filenameFromUrlOrName('https://cdn.example.com/x.wav', 'Mix Final.wav')

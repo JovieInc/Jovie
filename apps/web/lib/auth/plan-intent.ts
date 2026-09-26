@@ -17,7 +17,6 @@ const BILLING_INTERVAL_KEY = 'jovie_billing_interval';
 const PLAN_INTENT_TTL_MS = 30 * 60 * 1000;
 const VALID_PLANS = new Set(['free', 'pro', 'team', 'enterprise', 'max']);
 export type PlanIntentTier = 'free' | 'pro' | 'team' | 'enterprise' | 'max';
-export type AuthBillingInterval = BillingInterval;
 export interface PlanIntentRecord {
   readonly plan: PlanIntentTier;
   readonly interval: BillingInterval | null;

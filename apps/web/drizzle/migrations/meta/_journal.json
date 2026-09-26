@@ -750,6 +750,27 @@
       "when": 1790053657818,
       "tag": "0106_premium_bruce_banner",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1790319603342,
+      "tag": "0107_recipient_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1790354572861,
+      "tag": "0108_coding_agent_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1790400562332,
+      "tag": "0109_oval_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

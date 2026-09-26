@@ -31,6 +31,6 @@ export function isChatToolStepCapExhausted(
     return false;
   }
 
-  const lastStep = steps[steps.length - 1];
+  const lastStep = steps.at(-1);
   return (lastStep?.toolCalls?.length ?? 0) > 0;
 }

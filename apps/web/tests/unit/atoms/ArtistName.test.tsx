@@ -59,17 +59,15 @@ describe('ArtistName', () => {
     expect(name.closest('span[itemprop="name"]')).toBeInTheDocument();
   });
 
-  it.each([
-    'sm',
-    'md',
-    'lg',
-    'xl',
-  ] as const)('applies size class for size=%s', size => {
-    render(<ArtistName {...defaultProps} size={size} showLink={false} />);
-    const heading = screen.getByRole('heading', { level: 1 });
-    // Each size should produce a valid className on the heading
-    expect(heading.className).toBeTruthy();
-  });
+  it.each(['sm', 'md', 'lg', 'xl'] as const)(
+    'applies size class for size=%s',
+    size => {
+      render(<ArtistName {...defaultProps} size={size} showLink={false} />);
+      const heading = screen.getByRole('heading', { level: 1 });
+      // Each size should produce a valid className on the heading
+      expect(heading.className).toBeTruthy();
+    }
+  );
 
   it('applies default size class (lg)', () => {
     render(<ArtistName {...defaultProps} showLink={false} />);

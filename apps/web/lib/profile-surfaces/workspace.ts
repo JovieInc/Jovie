@@ -262,6 +262,19 @@ export function sortProfileWorkspaceRows(
   });
 }
 
+function monitoringLabelForCounts(input: {
+  readonly providerAvailable: boolean;
+  readonly activeCount: number;
+  readonly pausedCount: number;
+  readonly limitedCount: number;
+}): ConnectionsWorkspaceSummary['monitoringLabel'] {
+  if (!input.providerAvailable) return 'Unavailable';
+  if (input.activeCount > 0) return 'Active';
+  if (input.pausedCount > 0) return 'Paused';
+  if (input.limitedCount > 0) return 'Limited';
+  return 'Unavailable';
+}
+
 export function summarizeProfileWorkspaceRows(
   rows: readonly ProfileWorkspaceRow[],
   providerAvailable = true
@@ -286,15 +299,12 @@ export function summarizeProfileWorkspaceRows(
       row => getConnectionStatus(row).needsAttention
     ).length,
     bestRank: measuredRanks.length > 0 ? Math.min(...measuredRanks) : null,
-    monitoringLabel: !providerAvailable
-      ? 'Unavailable'
-      : activeCount > 0
-        ? 'Active'
-        : pausedCount > 0
-          ? 'Paused'
-          : limitedCount > 0
-            ? 'Limited'
-            : 'Unavailable',
+    monitoringLabel: monitoringLabelForCounts({
+      providerAvailable,
+      activeCount,
+      pausedCount,
+      limitedCount,
+    }),
   };
 }
 

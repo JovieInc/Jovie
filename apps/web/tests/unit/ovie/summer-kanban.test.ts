@@ -221,17 +221,28 @@ describe('Summer Kanban (JOV-5215)', () => {
       actor: 'summer',
     });
     expect(moved.routingState).toBe('accepted');
+    expect(moved.status).toBe('accepted');
     expect(moved.id).toBe(workId);
     expect((await inspectSummerCard(store, workId))?.routingState).toBe(
       'accepted'
     );
     expect(ovieIdempotencyKey(workId)).toBe(`ovie-${workId}`);
 
+    const statusByRoute = {
+      in_progress: 'executing',
+      blocked: 'blocked',
+      unavailable: 'failed',
+      done: 'implemented',
+      landed: 'implemented',
+      queued: 'accepted',
+    } as const;
     for (const routingState of [
       'in_progress',
       'blocked',
       'unavailable',
       'done',
+      'landed',
+      'queued',
     ] as const) {
       const next = await transitionSummerCard(store, {
         workId,
@@ -239,6 +250,7 @@ describe('Summer Kanban (JOV-5215)', () => {
         actor: 'summer',
       });
       expect(next.routingState).toBe(routingState);
+      expect(next.status).toBe(statusByRoute[routingState]);
       expect((await inspectSummerCard(store, workId))?.routingState).toBe(
         routingState
       );
@@ -537,6 +549,28 @@ describe('Summer Kanban (JOV-5215)', () => {
       ref: 'task_kanban_9',
       url: null,
       summary: 'landed:task_kanban_9',
+      observedAt: null,
+    });
+  });
+
+  it('skips a blank receipt handle and uses the next one', () => {
+    const initiative = summerKanbanInitiative('ini_receipt_only', {
+      routingState: 'done',
+      destinationHandle: null,
+      evidence: [
+        { kind: 'receipt', summary: OVIE_QUEUED_ACK, ref: DEST_KANBAN },
+      ],
+    });
+    initiative.receipts = [
+      { ...initiative.receipts[0]!, destinationHandle: '   ' },
+      { ...initiative.receipts[0]!, destinationHandle: 'task_from_receipt' },
+    ];
+
+    expect(toSummerKanbanCard(initiative)?.terminalEvidence).toEqual({
+      state: 'proven',
+      ref: 'task_from_receipt',
+      url: null,
+      summary: null,
       observedAt: null,
     });
   });

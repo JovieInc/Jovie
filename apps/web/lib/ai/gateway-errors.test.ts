@@ -39,6 +39,11 @@ describe('isGatewayBudgetExceededError', () => {
     );
   });
 
+  it('does not treat a non-object failure as a budget wall', () => {
+    expect(isGatewayBudgetExceededError('model not found')).toBe(false);
+    expect(isGatewayBudgetExceededError(null)).toBe(false);
+  });
+
   it('ignores unrelated provider failures', () => {
     expect(
       isGatewayBudgetExceededError(

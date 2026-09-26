@@ -1,4 +1,4 @@
-import { Camera, Disc3, LineChart } from 'lucide-react';
+import { Camera, Layers, LineChart } from 'lucide-react';
 import { FeatureCard } from '@/components/molecules/FeatureCard';
 import type { SectionVariant } from '../registry';
 
@@ -8,7 +8,7 @@ function FeatureCardGrid() {
       <FeatureCard
         title='Plan releases'
         description='Map your campaign — pre-saves, editorial pitch, social rollout, day-of amplification — on a single calendar.'
-        icon={<Disc3 className='h-5 w-5' />}
+        icon={<Layers className='h-5 w-5' />}
         accent='green'
         metric='6-week runway'
       />

@@ -33,7 +33,7 @@ export function shouldSuppressCookieBannerForPathname(
 export function shouldPlaceCookieBannerAbovePublicProfileDock(
   pathname: string | null | undefined
 ): boolean {
-  const firstSegment = pathname?.split('/').filter(Boolean)[0];
+  const firstSegment = pathname?.split('/').find(segment => segment.length > 0);
   if (!firstSegment) return false;
 
   return getPublicProfileCandidate(`/${firstSegment}`) !== null;

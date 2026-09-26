@@ -1,8 +1,8 @@
 const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/i;
 
-const BUG_FIX_COMMIT_PATTERN = /^fix(\(|:)/i;
+const BUG_FIX_COMMIT_PATTERN = /^fix[(:]/i;
 const BUG_FIX_BRANCH_PATTERN = /^(fix\/|.*\/fix-)/i;
-const BUG_FIX_TITLE_PATTERN = /^fix(\(|:)/i;
+const BUG_FIX_TITLE_PATTERN = /^fix[(:]/i;
 const BUG_FIX_PR_BODY_CHECKED_PATTERN =
   /- \[[xX]\] Bug fix \(non-breaking change which fixes an issue\)/;
 
