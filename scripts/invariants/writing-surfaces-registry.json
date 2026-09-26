@@ -251,7 +251,7 @@
     },
     {
       "id": "agent-ops-reports",
-      "producer": "Summer/Symphony/Ovie operational reports and commissioning receipts (apps/eve-pilot identities, scripts/summer-commissioning, scripts/symphony)",
+      "producer": "Summer/Symphony/Ovie operational reports and commissioning receipts (apps/eve-pilot identities, scripts/summer-commissioning, scripts/lanes)",
       "repository": "JovieInc/Jovie",
       "owner": "Summer",
       "audience": "Founder and operators reading agent output",
@@ -260,7 +260,7 @@
         "apps/eve-pilot/identities/summer/instructions.md",
         "apps/eve-pilot/identities/jovie/instructions.md",
         "scripts/summer-commissioning/registry.json",
-        "scripts/symphony/model-router.py",
+        "scripts/lanes/README.md",
         "canon/FLEET.md",
         "canon/VOICE.md"
       ],
