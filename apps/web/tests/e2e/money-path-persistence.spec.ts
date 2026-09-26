@@ -53,13 +53,18 @@ test('persists verified checkout entitlement for a fresh and returning session',
 
   let appUserId: string | null = null;
   let betterAuthUserId: string | null = null;
+  let referrerUserId: string | null = null;
+  let referralCodeId: string | null = null;
   let checkoutSessionId: string | null = null;
   let customerId: string | null = null;
   let stripeEventId: string | null = null;
+  const stripeEventIds: string[] = [];
   let returningContext: Awaited<ReturnType<typeof browser.newContext>> | null =
     null;
 
-  const readMoneyUser = async (): Promise<MoneyUserRow | null> => {
+  const readMoneyUser = async (
+    targetEmail = email
+  ): Promise<MoneyUserRow | null> => {
     const [user] = await sql`
       SELECT id,
              better_auth_user_id AS "betterAuthUserId",
@@ -70,9 +75,21 @@ test('persists verified checkout entitlement for a fresh and returning session',
              stripe_subscription_id AS "stripeSubscriptionId",
              stripe_price_id AS "stripePriceId"
       FROM users
-      WHERE email = ${email}
+      WHERE email = ${targetEmail}
     `;
     return (user as MoneyUserRow | undefined) ?? null;
+  };
+
+  const readCommission = async (stripeInvoiceId: string) => {
+    const [commission] = await sql`
+      SELECT stripe_invoice_id AS "stripeInvoiceId",
+             amount_cents AS "amountCents",
+             currency,
+             status
+      FROM referral_commissions
+      WHERE stripe_invoice_id = ${stripeInvoiceId}
+    `;
+    return commission ?? null;
   };
 
   try {
@@ -134,6 +151,46 @@ test('persists verified checkout entitlement for a fresh and returning session',
       stripeSubscriptionId: null,
     });
 
+    const referrerEmail = `money-referrer-${runId}@test.jovie.com`;
+    const referrerClerkId = `user_e2e_referrer_${runId.replaceAll('-', '_')}`;
+    const referralCode = `e2e${runId.replaceAll('-', '')}`;
+    const [referrer] = await sql`
+      INSERT INTO users (clerk_id, email, user_status)
+      VALUES (${referrerClerkId}, ${referrerEmail}, 'active')
+      RETURNING id
+    `;
+    referrerUserId = (referrer?.id as string | undefined) ?? null;
+    expect(referrerUserId).toBeTruthy();
+
+    const [createdReferralCode] = await sql`
+      INSERT INTO referral_codes (user_id, code, is_active)
+      VALUES (${referrerUserId}, ${referralCode}, true)
+      RETURNING id
+    `;
+    referralCodeId = (createdReferralCode?.id as string | undefined) ?? null;
+    expect(referralCodeId).toBeTruthy();
+
+    const [createdReferral] = await sql`
+      INSERT INTO referrals (
+        referrer_user_id,
+        referred_user_id,
+        referral_code_id,
+        status,
+        commission_rate_bps,
+        commission_duration_months
+      )
+      VALUES (
+        ${referrerUserId},
+        ${appUserId},
+        ${referralCodeId},
+        'pending',
+        5000,
+        24
+      )
+      RETURNING id
+    `;
+    expect(createdReferral?.id).toBeTruthy();
+
     const freeStatus = await getBillingStatus(page);
     expect(freeStatus).toMatchObject({ isPro: false, plan: 'free' });
 
@@ -180,6 +237,7 @@ test('persists verified checkout entitlement for a fresh and returning session',
       `evt_money_${runId.replaceAll('-', '_')}`
     );
     stripeEventId = webhook.eventId;
+    stripeEventIds.push(webhook.eventId);
 
     const invalidResponse = await postStripeWebhook(
       page,
@@ -275,6 +333,184 @@ test('persists verified checkout entitlement for a fresh and returning session',
       stripeCustomerId: customerId,
       stripeSubscriptionId: completed.subscriptionId,
     });
+
+    const paidSubscription = await stripeClient.subscriptions.retrieve(
+      completed.subscriptionId
+    );
+    const invoiceId =
+      typeof paidSubscription.latest_invoice === 'string'
+        ? paidSubscription.latest_invoice
+        : paidSubscription.latest_invoice?.id;
+    if (!invoiceId) {
+      throw new Error('Paid test subscription omitted its latest invoice');
+    }
+    const paidInvoice = await stripeClient.invoices.retrieve(invoiceId);
+    expect(paidInvoice.livemode).toBe(false);
+    expect(paidInvoice.status).toBe('paid');
+    expect(paidInvoice.amount_paid).toBeGreaterThan(0);
+
+    const paymentWebhook = createSignedStripeWebhook(
+      stripeClient,
+      'invoice.payment_succeeded',
+      paidInvoice,
+      `evt_invoice_paid_${runId.replaceAll('-', '_')}`
+    );
+    stripeEventIds.push(paymentWebhook.eventId);
+    const paymentResponse = await postStripeWebhook(page, paymentWebhook);
+    expect(paymentResponse.ok()).toBeTruthy();
+
+    await expect
+      .poll(() => readCommission(invoiceId), { timeout: 30_000 })
+      .toMatchObject({
+        stripeInvoiceId: invoiceId,
+        amountCents: Math.round((paidInvoice.amount_paid * 5000) / 10000),
+        currency: paidInvoice.currency,
+        status: 'pending',
+      });
+
+    const charges = await stripeClient.charges.list({
+      customer: customerId!,
+      limit: 100,
+    });
+    const paidCharge = charges.data.find(candidate => {
+      const chargeInvoiceId =
+        typeof candidate.invoice === 'string'
+          ? candidate.invoice
+          : candidate.invoice?.id;
+      return chargeInvoiceId === invoiceId;
+    });
+    if (!paidCharge) {
+      throw new Error('Paid test invoice did not expose its Stripe charge');
+    }
+    expect(paidCharge.livemode).toBe(false);
+
+    const partialAmount = Math.floor(paidCharge.amount / 2);
+    expect(partialAmount).toBeGreaterThan(0);
+    expect(partialAmount).toBeLessThan(paidCharge.amount);
+    const partialRefund = await stripeClient.refunds.create(
+      { charge: paidCharge.id, amount: partialAmount },
+      { idempotencyKey: `jovie-refund-e2e:${runId}:partial` }
+    );
+    expect(partialRefund.livemode).toBe(false);
+
+    const partiallyRefundedCharge = await stripeClient.charges.retrieve(
+      paidCharge.id
+    );
+    expect(partiallyRefundedCharge.amount_refunded).toBe(partialAmount);
+    expect(partiallyRefundedCharge.refunded).toBe(false);
+
+    const partialRefundWebhook = createSignedStripeWebhook(
+      stripeClient,
+      'charge.refunded',
+      partiallyRefundedCharge,
+      `evt_refund_partial_${runId.replaceAll('-', '_')}`
+    );
+    stripeEventIds.push(partialRefundWebhook.eventId);
+    const partialResponse = await postStripeWebhook(page, partialRefundWebhook);
+    expect(partialResponse.ok()).toBeTruthy();
+    await expect
+      .poll(async () => (await getBillingStatus(page)).isPro, {
+        timeout: 30_000,
+      })
+      .toBe(true);
+    expect(await readCommission(invoiceId)).toMatchObject({
+      status: 'pending',
+    });
+
+    const partialDuplicateResponse = await postStripeWebhook(
+      page,
+      partialRefundWebhook
+    );
+    expect(partialDuplicateResponse.status()).toBe(200);
+    const [partialEventCount] = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM stripe_webhook_events
+      WHERE stripe_event_id = ${partialRefundWebhook.eventId}
+    `;
+    expect(partialEventCount?.count).toBe(1);
+
+    const remainingAmount =
+      partiallyRefundedCharge.amount - partiallyRefundedCharge.amount_refunded;
+    expect(remainingAmount).toBeGreaterThan(0);
+    const finalRefund = await stripeClient.refunds.create(
+      { charge: paidCharge.id, amount: remainingAmount },
+      { idempotencyKey: `jovie-refund-e2e:${runId}:final` }
+    );
+    expect(finalRefund.livemode).toBe(false);
+
+    const fullyRefundedCharge = await stripeClient.charges.retrieve(
+      paidCharge.id
+    );
+    expect(fullyRefundedCharge.refunded).toBe(true);
+    expect(fullyRefundedCharge.amount_refunded).toBe(
+      fullyRefundedCharge.amount
+    );
+
+    const fullRefundWebhook = createSignedStripeWebhook(
+      stripeClient,
+      'charge.refunded',
+      fullyRefundedCharge,
+      `evt_refund_full_${runId.replaceAll('-', '_')}`
+    );
+    stripeEventIds.push(fullRefundWebhook.eventId);
+
+    // Model Stripe retrying an event left durably recorded after an earlier
+    // attempt failed before completion. The signed delivery must claim it.
+    await sql`
+      INSERT INTO stripe_webhook_events (
+        stripe_event_id,
+        type,
+        stripe_object_id,
+        payload,
+        stripe_created_at
+      )
+      VALUES (
+        ${fullRefundWebhook.eventId},
+        'charge.refunded',
+        ${fullyRefundedCharge.id},
+        ${JSON.stringify(JSON.parse(fullRefundWebhook.payload))}::jsonb,
+        to_timestamp(${Math.floor(Date.now() / 1000)})
+      )
+    `;
+
+    const fullRefundResponse = await postStripeWebhook(page, fullRefundWebhook);
+    expect(fullRefundResponse.ok()).toBeTruthy();
+    await expect
+      .poll(async () => (await getBillingStatus(page)).isPro, {
+        timeout: 30_000,
+      })
+      .toBe(false);
+    expect(await readCommission(invoiceId)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(
+      await stripeClient.subscriptions.retrieve(completed.subscriptionId)
+    ).toMatchObject({
+      status: 'canceled',
+    });
+
+    const fullDuplicateResponse = await postStripeWebhook(
+      page,
+      fullRefundWebhook
+    );
+    expect(fullDuplicateResponse.status()).toBe(200);
+    const [fullEventCount] = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM stripe_webhook_events
+      WHERE stripe_event_id = ${fullRefundWebhook.eventId}
+    `;
+    expect(fullEventCount?.count).toBe(1);
+
+    const [refundAudit] = await sql`
+      SELECT event_type AS "eventType", source
+      FROM billing_audit_log
+      WHERE user_id = ${appUserId}
+        AND stripe_event_id = ${fullRefundWebhook.eventId}
+    `;
+    expect(refundAudit).toMatchObject({
+      eventType: 'charge_refunded',
+      source: 'webhook',
+    });
   } finally {
     await returningContext?.close();
 
@@ -308,10 +544,10 @@ test('persists verified checkout entitlement for a fresh and returning session',
         );
       }
     }
-    if (stripeEventId) {
+    for (const cleanupEventId of stripeEventIds) {
       await sql`
         DELETE FROM stripe_webhook_events
-        WHERE stripe_event_id = ${stripeEventId}
+        WHERE stripe_event_id = ${cleanupEventId}
       `;
     }
     if (appUserId && betterAuthUserId) {
@@ -329,6 +565,15 @@ test('persists verified checkout entitlement for a fresh and returning session',
         RETURNING id
       `;
       expect(deletedAuthUsers).toHaveLength(1);
+    }
+    if (referrerUserId) {
+      const deletedReferrer = await sql`
+        DELETE FROM users
+        WHERE id = ${referrerUserId}
+          AND email = ${`money-referrer-${runId}@test.jovie.com`}
+        RETURNING id
+      `;
+      expect(deletedReferrer).toHaveLength(1);
     }
   }
 });

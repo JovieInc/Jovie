@@ -58,7 +58,7 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('owns exactly the compact surface below the desktop boundary', () => {
+  it('shares server-rendered desktop content below the desktop boundary', () => {
     render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
     );
@@ -68,11 +68,11 @@ describe('PublicProfileLayoutShell', () => {
       'compact'
     );
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
-    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    // Both surfaces are SSR'd and CSS picks the visible one per breakpoint, so
+    // a cold desktop load never morphs through a mobile shell or loading text
+    // (JOV-6452).
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -128,17 +128,29 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.getByTestId('profile-desktop-banner')).toBeEmptyDOMElement();
   });
 
-  it('offers a noninteractive desktop loading state before hydration', () => {
+  it('renders the real desktop surface instead of a loading interstitial before hydration', () => {
     render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
+    expect(screen.queryByText('Loading profile…')).toBeNull();
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+  });
+
+  it('keeps the desktop placeholder for embedded previews', () => {
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={false}
+        embedded
+      />
     );
 
     expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
       'aria-hidden',
       'true'
     );
-    expect(screen.getByTestId('profile-desktop-loading')).not.toHaveAttribute(
-      'data-interactive-ready'
-    );
+    expect(screen.queryByTestId('desktop-content')).toBeNull();
   });
 });

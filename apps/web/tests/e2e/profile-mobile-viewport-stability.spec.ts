@@ -1514,7 +1514,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
     const clickedNext = await page.evaluate(() => {
       const button = document.querySelector<HTMLButtonElement>(
-        'button[aria-label="Next Item"]'
+        'button[aria-label="Next Card"]'
       );
       button?.click();
       return Boolean(button);

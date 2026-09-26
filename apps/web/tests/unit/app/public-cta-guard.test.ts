@@ -193,6 +193,19 @@ describe('public CTA guard', () => {
     );
   });
 
+  it('passes design-system identity variants to the mobile UserButton slot', () => {
+    const headerNav = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    // JOV-5349: the production mobile authenticated slot must render the
+    // design-system showUserInfo variant, not the bare compact avatar.
+    expect(headerNav).toContain(
+      'authenticatedUserSlot={\n                  <UserButton showUserInfo settingsHref={APP_ROUTES.SETTINGS} />\n                }'
+    );
+  });
+
   it('keys marketing nav links by href and label together', () => {
     const headerNav = readFileSync(
       join(ROOT, 'components/organisms/HeaderNav.tsx'),

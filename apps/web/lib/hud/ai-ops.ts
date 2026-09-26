@@ -235,12 +235,12 @@ function sourceStatus(
   itemCount: number,
   errorMessage?: string
 ): HermesAiOpsSourceStatus {
+  let availability: HermesAiOpsSourceStatus['availability'] = 'available';
+  if (!configured) availability = 'not_configured';
+  else if (errorMessage) availability = 'error';
+
   return {
-    availability: !configured
-      ? 'not_configured'
-      : errorMessage
-        ? 'error'
-        : 'available',
+    availability,
     configured,
     itemCount,
     ...(errorMessage ? { errorMessage } : {}),
@@ -391,12 +391,11 @@ export async function getHudAiOpsSummary(
   );
 
   const openAgentPrs = prItems.length;
-  const pressure =
-    openAgentPrs >= AGENT_PR_THRESHOLD
-      ? 'high'
-      : openAgentPrs >= Math.ceil(AGENT_PR_THRESHOLD * 0.7)
-        ? 'elevated'
-        : 'normal';
+  let pressure: 'normal' | 'elevated' | 'high' = 'normal';
+  if (openAgentPrs >= AGENT_PR_THRESHOLD) pressure = 'high';
+  else if (openAgentPrs >= Math.ceil(AGENT_PR_THRESHOLD * 0.7)) {
+    pressure = 'elevated';
+  }
 
   const recommendations = buildRecommendations({
     blockers,
@@ -411,12 +410,9 @@ export async function getHudAiOpsSummary(
     prsResult.ok ? null : prsResult.errorMessage,
     runsResult.ok ? null : runsResult.errorMessage,
   ].filter((message): message is string => Boolean(message));
-  const availability =
-    errorMessages.length === 0
-      ? 'available'
-      : errorMessages.length === 2
-        ? 'error'
-        : 'partial';
+  let availability: 'available' | 'error' | 'partial' = 'partial';
+  if (errorMessages.length === 0) availability = 'available';
+  else if (errorMessages.length === 2) availability = 'error';
 
   return {
     availability,

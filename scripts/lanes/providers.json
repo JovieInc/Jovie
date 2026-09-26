@@ -1,0 +1,42 @@
+{
+  "devin": {
+    "label": "devin",
+    "model": "swe-2-medium",
+    "slots": 4,
+    "health": ["devin", "auth", "status"],
+    "healthy": "Logged in",
+    "cmd": [
+      "devin",
+      "-p",
+      "--prompt-file",
+      "{prompt_file}",
+      "--model",
+      "swe-2-medium",
+      "--permission-mode",
+      "dangerous"
+    ]
+  },
+  "claude": {
+    "label": "claude",
+    "model": "sonnet",
+    "slots": 2,
+    "health": ["claude", "auth", "status"],
+    "healthy": "\"loggedIn\": true",
+    "cmd": [
+      "claude",
+      "-p",
+      "--model",
+      "sonnet",
+      "--dangerously-skip-permissions",
+      "{prompt}"
+    ]
+  },
+  "hyperagent": {
+    "label": "hyperagent",
+    "model": "z-ai/glm-5.3",
+    "slots": 2,
+    "health": ["hyperagent", "models", "--json"],
+    "healthy": "glm-5\\.3",
+    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"]
+  }
+}
