@@ -224,16 +224,16 @@ describe('Textarea', () => {
       expect(textarea.className).toContain('border-error');
     });
 
-    it.each([
-      'grammar',
-      'spelling',
-    ] as const)('preserves the %s aria-invalid reason', reason => {
-      render(<Textarea aria-invalid={reason} data-testid='textarea' />);
-      const textarea = screen.getByTestId('textarea');
+    it.each(['grammar', 'spelling'] as const)(
+      'preserves the %s aria-invalid reason',
+      reason => {
+        render(<Textarea aria-invalid={reason} data-testid='textarea' />);
+        const textarea = screen.getByTestId('textarea');
 
-      expect(textarea).toHaveAttribute('aria-invalid', reason);
-      expect(textarea.className).toContain('border-error');
-    });
+        expect(textarea).toHaveAttribute('aria-invalid', reason);
+        expect(textarea.className).toContain('border-error');
+      }
+    );
 
     it('preserves help text alongside an error', () => {
       render(<Textarea helpText='Help text' error='Error message' />);
