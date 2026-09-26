@@ -27,6 +27,8 @@
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
+ *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
+ *     non-zero stops starting structural commands (fail-fast)
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -459,7 +461,7 @@ const LANES = [
     id: 'profile-admission',
     name: 'Public Profile Admission',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
     run: runProfileAdmission,
   },
   {
@@ -1502,6 +1504,10 @@ const STRUCTURAL_LONG_POLES = Object.freeze([
   'python3 -m pytest ',
   'pnpm invariants:check',
   'run-governor-bounded-codex-selector.sh',
+  // 2026-09-26 merge groups: 42s and 38s, the slowest web commands. List
+  // order started the 42s one 16th of 22, so it set the web-only wall.
+  'lib/__tests__/component-live-storybook-certification.test.mjs',
+  'YoutubeThumbnailsLanding.test.tsx',
 ]);
 
 const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
@@ -1596,9 +1602,11 @@ export function structuralLocks(command) {
  * in-flight commands finish. A synchronous executor completes before the next
  * command is considered, so it behaves exactly like the old serial loop.
  * `first` lists indexes (long poles) to start ahead of list order; they never
- * jump an earlier command that shares one of their locks.
+ * jump an earlier command that shares one of their locks. `stop` is consulted
+ * before each start; once it returns true nothing new starts (in-flight
+ * commands still finish) and the unstarted commands stay undefined.
  * @param {readonly string[]} commands
- * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number}} opts
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean}} opts
  * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
  * @typedef {{code: number, output: string}} ExecResult
  */
@@ -1619,6 +1627,7 @@ export function runCommandPool(commands, opts) {
   const held = new Set();
   let running = 0;
   let failed = false;
+  let stopped = false;
   let pumping = false;
   let repump = false;
 
@@ -1668,14 +1677,18 @@ export function runCommandPool(commands, opts) {
       pumping = true;
       do {
         repump = false;
-        while (!failed && running < concurrency) {
+        while (!failed && !stopped && running < concurrency) {
+          if (pending.length > 0 && opts.stop?.()) {
+            stopped = true;
+            break;
+          }
           const slot = pending.findIndex(index => !blocked(index));
           if (slot === -1) break;
           start(pending.splice(slot, 1)[0]);
         }
       } while (repump);
       pumping = false;
-      if (running === 0 && (failed || pending.length === 0)) {
+      if (running === 0 && (failed || stopped || pending.length === 0)) {
         resolveAll(results);
       }
     };
@@ -1707,7 +1720,26 @@ export function formatStructuralTimings(timings, wallMs) {
   ].join('\n');
 }
 
-/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>}} [opts] */
+/**
+ * ci-fast (remaining) runs this lane while its cheap lanes still run in the
+ * background; their exit status lands in CI_FAST_STRUCTURAL_ABORT_STATUS_FILE.
+ * A non-zero status keeps fail-fast: no further structural command starts and
+ * the lane reports skipped, as when an earlier in-process lane failed. The
+ * workflow's await step still fails the job on that status. A missing file
+ * (lanes still running, or a job without background lanes) never aborts.
+ */
+export function earlierLaneFailed(
+  statusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE
+) {
+  if (!statusFile || !failFastEnabled()) return false;
+  try {
+    return readFileSync(statusFile, 'utf8').trim() !== '0';
+  } catch {
+    return false;
+  }
+}
+
+/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>, stop?: () => boolean}} [opts] */
 export async function runStructural(opts = {}) {
   const execute = opts.execute ?? shellAsync;
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
@@ -1876,6 +1908,10 @@ export async function runStructural(opts = {}) {
   // list) don't inherit it and see a filtered pool.
   const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
   delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  // Same for the fail-fast status file: the runner's own contract suite runs
+  // runStructural and must not abort on this job's cheap-lane status.
+  const abortStatusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
+  delete process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
   const parts = allParts.filter(
     part => mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only')
   );
@@ -1895,6 +1931,7 @@ export async function runStructural(opts = {}) {
     execute,
     concurrency,
     locks: parts.map(structuralLocks),
+    stop: opts.stop ?? (() => earlierLaneFailed(abortStatusFile)),
     // Serial runs gain nothing from reordering; keep strict list order there.
     first:
       concurrency > 1
@@ -1922,6 +1959,17 @@ export async function runStructural(opts = {}) {
         parts.length,
         code
       ),
+      timings,
+      wallMs,
+    };
+  }
+  // findIndex, not some(): unstarted commands are holes in the results array.
+  if (results.findIndex(result => result === undefined) !== -1) {
+    return {
+      code: 0,
+      output:
+        'skipped: earlier lane failed (fail-fast; background ci-fast lanes exited non-zero)\n',
+      skipped: true,
       timings,
       wallMs,
     };
