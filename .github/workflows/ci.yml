@@ -443,11 +443,16 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+      # Both checks are dependency-free (node: built-ins only) and read the
+      # checked-out manifests/lockfile directly; the full dependency install only
+      # added ~40s of setup before the actual check ran.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
       - name: Verify workflow references
         run: node scripts/verify-workflow-references.mjs
-      - uses: ./.github/actions/setup-node-pnpm
       - name: Compare workspace manifest and lockfile specifiers
-        run: pnpm exec node scripts/lockfile-specifier-preflight.mjs
+        run: node scripts/lockfile-specifier-preflight.mjs
 
   # ── Centralized deterministic path-change detection ────────────────────
   # Source and combined heads compute their own exact diff. The former
