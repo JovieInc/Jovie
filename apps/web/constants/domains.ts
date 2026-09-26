@@ -120,6 +120,8 @@ export const DOCS_URL = 'https://docs.jov.ie';
 export const SUPPORT_EMAIL = `support@${HOSTNAME}`;
 export const LEGAL_EMAIL = `legal@${HOSTNAME}`;
 export const PRIVACY_EMAIL = `privacy@${HOSTNAME}`;
+export const SECURITY_EMAIL = `security@${HOSTNAME}`;
+export const ABUSE_EMAIL = `abuse@${HOSTNAME}`;
 
 // ============================================================================
 // User Agent for external requests
