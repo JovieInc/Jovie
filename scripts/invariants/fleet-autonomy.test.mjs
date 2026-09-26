@@ -25,24 +25,12 @@ describe('JOV-INV-023 fleet autonomy', () => {
     assert.deepEqual(validateFleetAutonomy(), []);
   });
 
-  it('leaves the Gem priority gate to the Symphony control plane repo', () => {
-    const read = [];
-    validateFleetAutonomy('/unused', {
-      readFile: path => {
-        read.push(path);
-        return RED_FILES[path] ?? '';
-      },
-    });
-    assert.ok(!read.includes('scripts/symphony/gem-priority-gate.py'));
-  });
-
   it('deliberate red: observation-gap freeze, human enrollment holds, and stacked bases are rejected', () => {
     const errors = validateFleetAutonomy('/unused', {
       readFile: path => {
         if (!(path in RED_FILES)) throw new Error(`unexpected path ${path}`);
         return RED_FILES[path];
       },
-      repo: 'JovieInc/symphony-control',
     });
     assert.ok(errors.length >= 8, errors.join('\n'));
     assert.match(
