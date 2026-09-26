@@ -40,6 +40,14 @@ import type { PreviewVerification } from './types';
  */
 export type ReleaseSourceType = 'manual' | 'admin' | 'ingested';
 
+/**
+ * Upper bound on releases returned by getReleasesForProfile (JOV-6272).
+ * Matches the 200-release cap already enforced by the public Lite
+ * projection (getReleasesForProfileLite) so authenticated and public
+ * list paths carry the same deliberate limit.
+ */
+export const RELEASES_FOR_PROFILE_MAX = 200;
+
 /** Track summary data aggregated per release */
 export interface TrackSummary {
   totalDurationMs: number | null;
@@ -460,11 +468,23 @@ export async function getReleasesForProfile(
   }
   // Active is the default. Library's explicit Archived view opts into the
   // same soft-deleted rows so the canonical Restore action is reachable.
+  //
+  // JOV-6272: bounded + deterministic. The matrix surfaces at most
+  // RELEASES_FOR_PROFILE_MAX rows — matching the public Lite projection's
+  // 200-release cap — so serialisation cost is bounded for every consumer.
+  // Ordering is releaseDate DESC NULLS LAST with an id tiebreaker so tied
+  // dates and null dates have a stable order (no duplicate/missing page
+  // entries across list fetches); this mirrors the client-side sort in
+  // useImportPolling's sortReleases.
   const releases = await db
     .select()
     .from(discogReleases)
     .where(and(...filters))
-    .orderBy(discogReleases.releaseDate);
+    .orderBy(
+      drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+      discogReleases.id
+    )
+    .limit(RELEASES_FOR_PROFILE_MAX);
 
   if (releases.length === 0) {
     return [];
