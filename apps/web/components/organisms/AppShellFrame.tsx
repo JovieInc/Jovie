@@ -109,7 +109,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             >
               <div
                 data-app-shell-main-content='true'
-                className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+                className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-(--app-shell-content-inset) transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
               >
                 {/* The chat wash belongs to the route plane, not the contextual
                     inspector. Keeping the isolated paint layer in this column

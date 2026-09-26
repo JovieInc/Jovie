@@ -37,11 +37,13 @@ describe('DashboardHeader', () => {
     );
   });
 
-  it('renders the desktop release identity inside the header, not a second titlebar band', () => {
+  it('keeps build diagnostics out of the header', () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 
-    expect(screen.getByTestId('electron-release-identity')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('electron-release-identity')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('electron-titlebar-row')
     ).not.toBeInTheDocument();

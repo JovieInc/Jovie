@@ -57,6 +57,9 @@ describe('DrawerSurfaceCard', () => {
     expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-none');
 
     expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
+    expect(LINEAR_SURFACE.contentContainer).toContain(
+      'rounded-(--app-shell-radius-nested)'
+    );
     expect(LINEAR_SURFACE.popover).toContain('shadow-(--shadow-popover)');
   });
 

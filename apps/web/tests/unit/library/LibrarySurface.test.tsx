@@ -285,6 +285,38 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('disables YouTube import when the creator profile is unavailable', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeImportDisabled: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Connect YouTube' });
+    expect(item).toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).not.toHaveBeenCalled();
+  });
+
+  it('keeps YouTube import available for a real creator profile', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeConnected: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Import YouTube' });
+    expect(item).not.toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).toHaveBeenCalledOnce();
+  });
+
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,
@@ -442,7 +474,7 @@ describe('LibrarySurface', () => {
       'href',
       APP_ROUTES.RELEASES
     );
-    expect(emptyState).toHaveClass('py-16', 'min-h-90');
+    expect(emptyState).toHaveClass('py-16');
     expect(
       screen.getByRole('heading', { name: 'No Library Items' })
     ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
@@ -560,10 +592,10 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    expectDesktop32Control(screen.getByRole('button', { name: /^All/u }));
-    expectDesktop32Control(screen.getByRole('button', { name: /Audio/u }));
+    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
+    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
     expectDesktop32Control(
-      screen.getByRole('button', { name: 'Show filters' }),
+      screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
     expectDesktop32Control(
@@ -724,7 +756,7 @@ describe('LibrarySurface', () => {
     ).toHaveTextContent('Needs Review');
 
     // Filter rail exposes Approval Status as a first-class chip group (#10384).
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
     expect(screen.getByRole('group', { name: 'Library Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
@@ -797,7 +829,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
 
     const approvalSection = within(rail)
@@ -1089,7 +1121,14 @@ describe('LibrarySurface', () => {
       ).not.toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
+    await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-release-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1135,7 +1174,14 @@ describe('LibrarySurface', () => {
       });
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
+    await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1423,8 +1469,13 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-row-release-2')
     ).toBeInTheDocument();
 
-    // Audio tab keeps only the asset with a playable preview.
-    fireEvent.click(screen.getByRole('button', { name: /^Audio/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    fireEvent.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /^Audio/ }
+      )
+    );
     expect(
       screen.getByTestId('library-catalog-row-release-1')
     ).toBeInTheDocument();
@@ -1602,7 +1653,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     expect(
       screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
@@ -1619,7 +1670,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
-  it('filters library assets from top-level view chips', async () => {
+  it('filters library assets from the Filters kind axis', async () => {
     renderLibrary([
       buildAsset(),
       buildAsset({
@@ -1636,15 +1687,22 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Audio/u }));
+    expect(
+      screen.getByRole('tablist', { name: 'Library Stages' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(kindFilters).toBeInTheDocument();
+    fireEvent.click(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Take Me Over')).toBeInTheDocument();
       expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /^All/u }));
+    fireEvent.click(within(kindFilters).getByRole('button', { name: /^All/u }));
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
@@ -1718,10 +1776,18 @@ describe('LibrarySurface', () => {
     expect(contract).not.toHaveAttribute('data-key');
     expect(contract).not.toHaveAttribute('data-back-href');
     expect(contract).not.toHaveAttribute('data-back-label');
-    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(
+      screen.getByRole('tablist', { name: 'Library Stages' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(kindFilters).toBeInTheDocument();
+    expect(
+      within(kindFilters).getByRole('button', { name: /Merch/u })
+    ).toBeInTheDocument();
+    expect(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('library-filter-panel')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-saved-filter-views')
@@ -1753,7 +1819,7 @@ describe('LibrarySurface', () => {
     ]);
 
     const user = userEvent.setup();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
+    const trigger = screen.getByRole('button', { name: /^Show filters/i });
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
@@ -1795,7 +1861,7 @@ describe('LibrarySurface', () => {
     ]);
 
     const filterTrigger = screen.getByRole('button', {
-      name: 'Show filters',
+      name: /^Show filters/i,
     });
     expectDesktop32Control(filterTrigger, { square: true });
     expect(
@@ -1841,8 +1907,8 @@ describe('LibrarySurface', () => {
       within(panel).getByRole('button', { name: /Album/u })
     ).toBeInTheDocument();
     expect(
-      within(panel).getByRole('button', { name: /Video/u })
-    ).toBeInTheDocument();
+      within(panel).getAllByRole('button', { name: /Video/u }).length
+    ).toBeGreaterThan(0);
     expect(
       within(panel).getByRole('button', { name: /Apple Music/u })
     ).toBeInTheDocument();
@@ -1874,23 +1940,28 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(screen.getByRole('button', { name: /Audio/u })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^All /u }));
+    await user.click(
+      within(kindFilters).getByRole('button', { name: /^All/u })
+    );
     expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
       scroll: false,
     });
     expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     expect(screen.getByText('Missing Audio')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
-      screen.getByRole('button', { name: /Needs Attention/u })
+      within(screen.getByTestId('library-saved-filter-views')).getByRole(
+        'button',
+        { name: /Needs Attention/u }
+      )
     ).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -1906,7 +1977,7 @@ describe('LibrarySurface', () => {
 
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
+    const trigger = screen.getByRole('button', { name: /^Show filters/i });
     expectDesktop32Control(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',

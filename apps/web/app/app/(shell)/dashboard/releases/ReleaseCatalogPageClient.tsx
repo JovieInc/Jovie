@@ -50,6 +50,10 @@ interface ReleaseCatalogPageClientProps {
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
+  readonly onImportYouTube?: () => void;
 }
 
 function toApprovalStatusMap(
@@ -87,6 +91,10 @@ export function ReleaseCatalogPageClient({
   merchProducts = [],
   relationships = [],
   postReleaseBundle,
+  youtubeConnected = false,
+  isImportingYouTube = false,
+  youtubeImportDisabled = false,
+  onImportYouTube,
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -163,6 +171,10 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         canSyncSpotify={spotifyConnected}
+        youtubeConnected={youtubeConnected}
+        isImportingYouTube={isImportingYouTube}
+        youtubeImportDisabled={youtubeImportDisabled}
+        onImportYouTube={onImportYouTube}
         merchProducts={
           merchProducts.length > 0
             ? merchProducts
