@@ -361,7 +361,14 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   el.addEventListener('pause', () =>
     setState({
       isPlaying: false,
-      playbackStatus: state.activeTrackId ? 'paused' : 'idle',
+      // Media events are dispatched asynchronously: a pause() issued inside
+      // handlePlaybackFailure lands here after the error state is set, and
+      // must not downgrade it to 'idle' (error UI would flash and vanish).
+      playbackStatus: state.activeTrackId
+        ? 'paused'
+        : state.playbackStatus === 'error'
+          ? 'error'
+          : 'idle',
     })
   );
   el.addEventListener('ended', () => {

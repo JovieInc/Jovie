@@ -21,11 +21,11 @@
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
-    "sha256": "d3695f07b5100c41650d6391ef1d0c3c056dc6a1f4e9436b07c4ab50ad7b1875"
+    "sha256": "2d25233bd649db3a4e95de07622e4b7b3a9144f96f9e3f74f5e279eed38431e7"
   },
   {
     "heading": "## Color System",
-    "sha256": "aed69b189b29a8501cbb05c40d77f3c676b3f4798dba905d088c6620abf45721"
+    "sha256": "853747cff2203588c211d98f93560e80e34b5984bbe26756df1ba991679b78ab"
   },
   {
     "heading": "## Spacing",
@@ -53,11 +53,11 @@
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "b940d3d28f77a1010ef2415c34d6b61b73cc0b0868ab9ee2d130a7b272f6ee32"
+    "sha256": "05620f964370886a9db4d2f1ee4fbd18b6120c8cc14ada63b86add44a3189109"
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "1274db9e0de0a6ed8c51f980016b98cd02587aaff86f74663d8162c3b1baf9c6"
+    "sha256": "9f7d836b1d0463d53ae5a8c7036aeb2b7f1a4dec5f3ed6e38cf6417648c5d452"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",

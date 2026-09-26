@@ -504,6 +504,38 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
+test('macOS disables Skia Graphite and only the main window opts out of throttling (JOV-5289)', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  const workaround = mainSource.match(
+    /function applyMacGraphiteCompositorWorkaround\(\): void \{([\s\S]*?)\n\}/
+  );
+  assert.ok(workaround, 'Graphite workaround function must exist');
+  assert.match(workaround[1], /if \(process\.platform !== 'darwin'\) return;/);
+  assert.match(
+    workaround[1],
+    /app\.commandLine\.appendSwitch\('disable-skia-graphite'\);/
+  );
+  const invocation = mainSource.indexOf(
+    'applyMacGraphiteCompositorWorkaround();'
+  );
+  assert.ok(invocation > 0, 'Graphite workaround must be invoked');
+  assert.ok(
+    invocation < mainSource.indexOf('app.whenReady()'),
+    'Graphite workaround must run before whenReady'
+  );
+  assert.doesNotMatch(mainSource, /disable-background-timer-throttling/);
+  assert.doesNotMatch(mainSource, /disable-backgrounding-occluded-windows/);
+
+  assert.equal(mainSource.match(/backgroundThrottling: false/g)?.length, 1);
+  const mainWindowStart = mainSource.indexOf('function createWindow(');
+  const throttlingIndex = mainSource.indexOf('backgroundThrottling: false');
+  assert.ok(
+    throttlingIndex > mainWindowStart,
+    'only the main window may keep backgroundThrottling: false'
+  );
+});
+
 test('desktop public profile previews are isolated, phone-sized, and closable', async () => {
   const [mainSource, preloadSource, bridgeSource] = await Promise.all([
     readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
