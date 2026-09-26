@@ -19,7 +19,10 @@ import {
 } from '@/lib/audio/snippet';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import {
+  createReleaseCacheTag,
+  createSmartLinkContentTag,
+} from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { discogRecordings } from '@/lib/db/schema/content';
 import { captureError } from '@/lib/error-tracking';
@@ -173,7 +176,7 @@ export async function POST(request: NextRequest) {
         )
       );
 
-    revalidateTag(`releases:${clerkUserId}:${profile.id}`, 'max');
+    revalidateTag(createReleaseCacheTag(clerkUserId, profile.id), 'max');
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
 
     return NextResponse.json(
