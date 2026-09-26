@@ -829,9 +829,15 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
       const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-      expect(fetchScript, jobId).toContain(
-        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
-      );
+      // The profile-browser selector reads history only through a
+      // --name-only --no-renames tree diff, so it skips historical blobs
+      // (pinned separately below). Jobs whose guards read historical blobs
+      // keep the full unshallow.
+      const expectedFetch =
+        jobId === 'ci-profile-admission-browser'
+          ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+          : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
+      expect(fetchScript, jobId).toContain(expectedFetch);
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
       );
@@ -842,6 +848,31 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('keeps the blobless profile-browser selector a blob-free tree diff', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-profile-admission-browser');
+    const selectStep = job.slice(
+      job.indexOf('      - name: Select public-profile browser admission'),
+      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
+    );
+    expect(selectStep).toContain('id: profile-browser');
+    // Lazy promisor fetches are disabled, so a blob read would fail closed
+    // instead of silently downloading history.
+    expect(selectStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+    const diffs = selectStep.match(/git diff [^\n]*/g) ?? [];
+    expect(diffs).toHaveLength(1);
+    // Rename detection is the only blob reader for --name-only; --no-renames
+    // keeps the diff to commits and trees the blobless fetch provides.
+    expect(diffs[0]).toContain(
+      'git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD --'
+    );
+    expect(selectStep).not.toMatch(/git (?:blame|show|log -p|cat-file -p)/);
+    expect(selectStep).not.toMatch(/git diff [^\n]*(?:--stat|-p\b|--patch)/);
+    // Credentials stay step-scoped: no checkout-level blob filter or
+    // persisted token that later test code could reuse.
+    expect(job).not.toContain('filter: blob:none');
+    expect(job).toContain('persist-credentials: false');
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
