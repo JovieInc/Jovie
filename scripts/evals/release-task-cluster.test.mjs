@@ -77,7 +77,10 @@ test('frozen allowlist, abstain-first decisions and evaluator-free short-circuit
     );
   }
   assert.equal(calls, 0);
-  for (const [extra, reason] of /** @type {[Record<string, unknown>, string][]} */ ([
+  for (const [
+    extra,
+    reason,
+  ] of /** @type {[Record<string, unknown>, string][]} */ ([
     [{ transport: transport('unclassified') }, 'no-clear-fit'],
     [{ approval: null }, 'evaluator-not-admitted'],
     [{ transport: transport('made-up-slug') }, 'evaluator-invalid-response'],

@@ -1575,7 +1575,7 @@ jobs:
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    if: >-
+    if: &ci-fast-gate >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
       needs.ci-path-changes.result == 'success' &&
@@ -1587,12 +1587,14 @@ jobs:
         )
       )
     env:
+      CI_FAST_STRUCTURAL_PYTEST: skip
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
         --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - &shallow-checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -1608,11 +1610,11 @@ jobs:
         # serially before them; "Fetch base-branch history" below waits for
         # it and fails closed before any history consumer runs.
         shell: bash
-        env:
+        env: &base-fetch-start-env
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
           BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
-        run: |
+        run: &base-fetch-start |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           mkdir -p "$BASE_FETCH_DIR"
@@ -1631,10 +1633,10 @@ jobs:
         # missing origin/<base> ref.
         shell: bash
         timeout-minutes: 10
-        env:
+        env: &base-fetch-await-env
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
           BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
-        run: |
+        run: &base-fetch-await |
           set -euo pipefail
           for _ in $(seq 1 540); do
             [[ -f "$BASE_FETCH_DIR/status" ]] && break
@@ -1677,7 +1679,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
+        run: &structural-decision |
           set -euo pipefail
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -1796,14 +1798,16 @@ jobs:
       - name: Run actionlint (structural)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         run: bash .github/scripts/run-actionlint.sh
-      - name: Set up Python (structural regression tests)
+      - &structural-python
+        name: Set up Python (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: .github/requirements/pytest.txt
-      - name: Install pytest (structural regression tests)
+      - &structural-pytest
+        name: Install pytest (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
       - name: Setup Playwright (Chromium)
@@ -1844,7 +1848,7 @@ jobs:
           exit "$(cat "$LANES_DIR/status")"
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        env:
+        env: &structural-run-env
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -2066,6 +2070,7 @@ jobs:
         ci-fast-typecheck,
         ci-fast-remaining,
         ci-profile-admission-browser,
+        ci-fast-structural-python,
       ]
     if: >-
       always() &&
@@ -2085,10 +2090,11 @@ jobs:
           TYPECHECK_RESULT: ${{ needs.ci-fast-typecheck.result }}
           REMAINING_RESULT: ${{ needs.ci-fast-remaining.result }}
           PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
+          STRUCTURAL_PYTHON_RESULT: ${{ needs.ci-fast-structural-python.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT"
             exit 1
           fi
           echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT"
@@ -2174,6 +2180,40 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run golden eval-set CI gate
         run: pnpm run evals:golden
+
+  ci-fast-structural-python:
+    name: ci-fast (structural python)
+    # Structural pytest shards off remaining's CPU-bound pool (aliased steps).
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: *ci-fast-gate
+    env:
+      CI_FAST_STRUCTURAL_PYTEST: only
+    steps:
+      - *shallow-checkout
+      - name: Start base-branch history fetch
+        shell: bash
+        env: *base-fetch-start-env
+        run: *base-fetch-start
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Fetch base-branch history
+        shell: bash
+        timeout-minutes: 10
+        env: *base-fetch-await-env
+        run: *base-fetch-await
+      - name: Decide structural lane
+        id: structural
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: *structural-decision
+      - *structural-python
+      - *structural-pytest
+      - name: Run structural pytest shards
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env: *structural-run-env
+        run: node scripts/ci-fast-lanes.mjs
 
   ci-knip:
     name: Knip (dead code)

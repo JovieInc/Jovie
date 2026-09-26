@@ -185,8 +185,8 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
 /** @param {string} shard @param {string} expression */
 // The suite spawns thousands of short-lived jq/gh/node processes, so it is
 // CPU-bound on process startup: pytest-xdist spreads each shard over two
-// workers. Two, not auto: both shards run concurrently in the structural pool
-// on 4 vCPU, and a fourth concurrent worker measured slower (JovieInc/Jovie#18657).
+// workers. Two, not auto: both shards run concurrently on the 4 vCPU
+// structural python job; more workers measured slower (JovieInc/Jovie#18657).
 const structuralPytestShard = (shard, expression) =>
   `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
@@ -194,6 +194,9 @@ export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
   structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
   structuralPytestShard('b', `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`),
 ]);
+const STRUCTURAL_PYTEST_PARTS = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(
+  structuralPythonRegression
+);
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -211,7 +214,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
     ].join(' && ')
   ),
-  ...STRUCTURAL_PYTEST_SHARD_COMMANDS.map(structuralPythonRegression),
+  ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
@@ -1816,7 +1819,7 @@ export async function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
-  const parts = [
+  const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
           webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
@@ -1837,6 +1840,14 @@ export async function runStructural(opts = {}) {
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
   ];
+  // ci-fast (structural python) runs `only` the pytest shards; remaining skips.
+  // Consume the split mode so nested contract suites (which rebuild this
+  // list) don't inherit it and see a filtered pool.
+  const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
+  delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const parts = allParts.filter(
+    part => mode !== (STRUCTURAL_PYTEST_PARTS.includes(part) ? 'skip' : 'only')
+  );
   if (parts.length === 0) {
     return {
       code: 0,
