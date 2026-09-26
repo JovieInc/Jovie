@@ -55,7 +55,16 @@ describe('marketing route health contract', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
     );
-    expect(redirects).toEqual([]);
+    expect(redirects).toEqual([
+      {
+        glob: '(marketing)/artist-profile/page.tsx',
+        path: '/artist-profile',
+        expected: 'redirect',
+        allowedFinalPaths: ['/artist-profiles'],
+        allowsAuthShell: false,
+        requiresSharedChrome: true,
+      },
+    ]);
 
     expect(
       MARKETING_ROUTE_HEALTH_TARGETS.find(

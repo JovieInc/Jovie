@@ -48,6 +48,7 @@ export const RESERVED_USERNAMES = [
   'engineering',
   'engagement-engine',
   'artist-profiles',
+  'artist-profile', // JOV-6264: real 301 alias of artist-profiles
 
   // GSC-dead marketing roots — not claimable handles. Status 410 via
   // public-url-policy.ts. Do not add `product` or `you`: /product is

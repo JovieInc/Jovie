@@ -324,6 +324,14 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/artist-profile',
     aliasOf: '/artist-profiles',
+    // JOV-6264: enforced as a real 301 in next.config.js — the page component
+    // above is retained for the SEO metadata ratchet only and is no longer
+    // publicly reachable.
+    healthCheck: {
+      path: '/artist-profile',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
+    },
   },
   {
     glob: '(marketing)/artist-notifications/page.tsx',
