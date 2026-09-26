@@ -721,7 +721,10 @@ async function runStorybookVitestWatchdog(leasePath) {
       continue;
     }
     try {
-      lease = recordBrowserGroups(lease, rows) ?? lease;
+      // Before the owner persists our identity, a write would clobber it.
+      if (lease.watchdogPid === process.pid) {
+        lease = recordBrowserGroups(lease, rows) ?? lease;
+      }
     } catch {
       await new Promise(resolve =>
         setTimeout(resolve, STORYBOOK_VITEST_WATCHDOG_POLL_MS)

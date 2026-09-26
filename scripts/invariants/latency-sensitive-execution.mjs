@@ -209,14 +209,32 @@ export function isReachableRuntimeSourcePath(relPath) {
   return SOURCE_EXT.has(extname(posix));
 }
 
-function collectRelativeImportSpecifiers(sourceText, relPath) {
-  const script = ts.createSourceFile(
+function parseSource(relPath, sourceText) {
+  return ts.createSourceFile(
     relPath,
     sourceText,
     ts.ScriptTarget.Latest,
     true,
     sourceKind(relPath)
   );
+}
+
+/** One parse per file per process: import edges and findings come from the same AST. */
+const analysisCache = new Map();
+function analyzeSource(relPath, text) {
+  const hit = analysisCache.get(relPath);
+  if (hit?.text === text) return hit;
+  const script = parseSource(relPath, text);
+  const entry = {
+    text,
+    specifiers: collectRelativeImportSpecifiers(script),
+    findings: scanScript(relPath, script),
+  };
+  analysisCache.set(relPath, entry);
+  return entry;
+}
+
+function collectRelativeImportSpecifiers(script) {
   /** @type {string[]} */
   const specifiers = [];
 
@@ -306,7 +324,7 @@ export function collectReachableRuntimeFiles(
     if (!current) continue;
     const source = readSourceText(current, repoRoot, files);
     if (source == null) continue;
-    for (const spec of collectRelativeImportSpecifiers(source, current)) {
+    for (const spec of analyzeSource(current, source).specifiers) {
       const resolved = resolveRelativeImport(current, spec, repoRoot, files);
       if (!resolved || !isReachableRuntimeSourcePath(resolved)) continue;
       if (reachable.has(resolved)) continue;
@@ -391,14 +409,10 @@ function importCallSpecifier(node) {
  * a call inside a function in runtime code is a violation.
  */
 export function scanSource(relPath, sourceText) {
-  const script = ts.createSourceFile(
-    relPath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    sourceKind(relPath)
-  );
+  return scanScript(relPath, parseSource(relPath, sourceText));
+}
 
+function scanScript(relPath, script) {
   /** @type {Map<string, string>} name -> tracked callee */
   const aliases = new Map();
   /** @type {Set<string>} */
@@ -595,7 +609,7 @@ export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
         ? readFileSync(resolve(repoRoot, relPath), 'utf8')
         : null);
     if (source == null) continue;
-    findings.push(...scanSource(relPath, source));
+    findings.push(...analyzeSource(relPath, source).findings);
   }
   return findings;
 }

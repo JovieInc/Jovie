@@ -166,6 +166,11 @@ export interface PublicProfileMetadataInput {
   readonly genres: string[] | null | undefined;
   /** Canonical claim state derived from user_profile_claims by the caller. */
   readonly isClaimed?: boolean;
+  /**
+   * Whether the profile has at least one publicly eligible release (JOV-6611).
+   * Only an explicit `false` noindexes; omit when the caller cannot know.
+   */
+  readonly hasPublicRelease?: boolean;
 }
 
 /**
@@ -181,7 +186,7 @@ export interface PublicProfileMetadataInput {
 export function buildPublicProfileMetadata(
   input: PublicProfileMetadataInput
 ): Metadata {
-  const { profile, genres, isClaimed = true } = input;
+  const { profile, genres, isClaimed = true, hasPublicRelease } = input;
 
   // Sanitize display_name and username independently so the fallback chain
   // never reintroduces unsanitized artist-provided text into metadata fields.
@@ -230,9 +235,12 @@ export function buildPublicProfileMetadata(
     alternates: {
       canonical: canonicalUrl,
     },
-    robots: isStructuredCreditUnclaimed
-      ? NOINDEX_ROBOTS
-      : getPublicProfileRobots(profileHandle, policyDisplayName),
+    // Empty profiles ("No releases listed yet") are thin content: noindex on
+    // direct access, matching their exclusion from sitemap and /artists.
+    robots:
+      isStructuredCreditUnclaimed || hasPublicRelease === false
+        ? NOINDEX_ROBOTS
+        : getPublicProfileRobots(profileHandle, policyDisplayName),
     openGraph: {
       type: 'profile',
       title: socialTitle,

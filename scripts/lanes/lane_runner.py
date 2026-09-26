@@ -46,7 +46,8 @@ RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
-TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/tests?/|/__tests__/|(^|/)test_[^/]+\.py$)")
+# Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
+TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?$|^docs/|^canon/|\.txt$)")
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
@@ -358,30 +359,77 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes)
+    evidence = []
     if not reasons:
         for command in check_commands([change.path for change in changes]):
-            if sh(command, cwd=worktree, timeout=host.gate_timeout, log=log).returncode != 0:
+            ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log)
+            if ran.returncode != 0:
                 reasons.append(f"check-failed:{' '.join(command[:6])}")
+                evidence += [line for line in (ran.stdout + ran.stderr).splitlines()
+                             if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
     if reasons:
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body",
             "Lane gate held this PR (it stays draft):\n" + "\n".join(f"- `{r}`" for r in reasons)], log=log)
+        record_held(host, pr["number"], pr["headRefOid"], reasons + evidence)
         return {**result, "verdict": "held"}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
     queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    if queued.returncode != 0:
+        # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
+        # would strand a green PR; each worker pass retries it via requeue_verified.
+        update_json(host.state / "requeue.json", lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
+
+
+def update_json(path: Path, change) -> None:
+    data = json.loads(path.read_text()) if path.exists() else {}
+    change(data)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+
+
+def requeue_verified(host: Host, prs: list[dict]) -> None:
+    """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
+    path = host.state / "requeue.json"
+    if not path.exists():
+        return
+    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    def retry(requeue: dict) -> None:
+        for number, head in list(requeue.items()):
+            if heads.get(number) != head:
+                del requeue[number]  # merged, closed, or a new head that the gate owns again
+                continue
+            sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+                del requeue[number]
+    update_json(path, retry)
 
 
 # ---------------------------------------------------------------- fix red first
 
-def red_pr(prs: list[dict], attempts: dict) -> dict | None:
+def held_path(host: Host) -> Path:
+    return host.state / "held.json"
+
+
+def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None:
+    """The gate held this head; the lane's fix loop owns it next, on the same branch."""
+    path = held_path(host)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    held = json.loads(path.read_text()) if path.exists() else {}
+    held[str(number)] = {"sha": head, "evidence": evidence[-60:]}
+    path.write_text(json.dumps(held))
+
+
+def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(prs, key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
-        if not conflicted:
+        gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
+        if not conflicted and not gate_held:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
@@ -408,6 +456,9 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    if pr.get("gateEvidence"):
+        excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
+            ("\n\n" + excerpt if excerpt else "")
     if pr.get("mergeStateStatus") == "DIRTY":
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
@@ -526,8 +577,12 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     prs = lane_prs(name) if prs is None else prs
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
-    pr = red_pr(prs, attempts)
+    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    pr = red_pr(prs, attempts, held)
     if pr:
+        entry = held.get(str(pr["number"]), {})
+        if entry.get("sha") == pr["headRefOid"]:
+            pr = {**pr, "gateEvidence": entry.get("evidence", [])}
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
         path.write_text(json.dumps(attempts))
@@ -555,6 +610,7 @@ def worker(host: Host, name: str) -> int:
     try:
         # Finish before starting: red PRs, then ungated drafts, then new issues.
         prs = lane_prs(name)
+        requeue_verified(host, prs)
         red = claim_red_pr(host, name, prs)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
@@ -593,6 +649,10 @@ def worker(host: Host, name: str) -> int:
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
                                  f"queued; required checks and the merge queue decide.")
+    elif verdict == "held" and receipt.get("pr"):
+        # One PR per issue: the fix loop repairs it on the same branch instead of a fresh attempt.
+        linear.comment(issue.id, f"🤖 lane `{name}`: the lane gate held PR {receipt.get('prUrl')} "
+                                 f"({', '.join(receipt.get('reasons', []))}); the lane will fix it on that branch.")
     else:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try:

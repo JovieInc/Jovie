@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { mockResolveUserState } = vi.hoisted(() => ({
-  mockResolveUserState: vi.fn().mockResolvedValue({
+const mocks = vi.hoisted(() => ({
+  resolveUserState: vi.fn().mockResolvedValue({
     state: 'UNAUTHENTICATED',
     redirectTo: '/signin',
   }),
+  getWaitlistAccess: vi.fn(),
+  isWaitlistGateEnabled: vi.fn(),
 }));
 
 // OnboardingShell is a UI component we don't need to render in this test.
@@ -12,8 +14,20 @@ vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
   OnboardingShell: () => null,
 }));
 
-vi.mock('@/lib/auth/gate', () => ({
-  resolveUserState: mockResolveUserState,
+vi.mock('next/navigation', () => ({
+  redirect: (path: string) => {
+    throw new Error(`redirect:${path}`);
+  },
+}));
+
+vi.mock('@/lib/auth/gate', async () => ({
+  ...(await vi.importActual('@/lib/auth/canonical-user-state')),
+  resolveUserState: mocks.resolveUserState,
+  getWaitlistAccess: mocks.getWaitlistAccess,
+}));
+
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: mocks.isWaitlistGateEnabled,
 }));
 
 import StartPage from './page';
@@ -30,7 +44,7 @@ describe('StartPage', () => {
   });
 
   it('passes signed-in state into the chat shell after OTP', async () => {
-    mockResolveUserState.mockResolvedValueOnce({
+    mocks.resolveUserState.mockResolvedValueOnce({
       state: 'NEEDS_ONBOARDING',
       context: { email: 'test@example.com' },
     });
@@ -78,5 +92,30 @@ describe('StartPage', () => {
         starterHandoff: null,
       },
     });
+  });
+
+  it('redirects a pending account to the canonical receipt when the waitlist read fails', async () => {
+    mocks.resolveUserState.mockResolvedValueOnce({
+      state: 'WAITLIST_PENDING',
+      context: { email: 'pending@example.com' },
+    });
+    mocks.isWaitlistGateEnabled.mockResolvedValueOnce(true);
+    mocks.getWaitlistAccess.mockRejectedValueOnce(new Error('db down'));
+
+    await expect(
+      StartPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('redirect:/waitlist');
+  });
+
+  it('does not 500 when the waitlist gate check itself fails', async () => {
+    mocks.resolveUserState.mockResolvedValueOnce({
+      state: 'WAITLIST_PENDING',
+      context: { email: 'pending@example.com' },
+    });
+    mocks.isWaitlistGateEnabled.mockRejectedValueOnce(new Error('db down'));
+
+    await expect(
+      StartPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('redirect:/waitlist');
   });
 });

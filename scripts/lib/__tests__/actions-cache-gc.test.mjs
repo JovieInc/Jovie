@@ -128,6 +128,9 @@ describe('Actions cache GC', () => {
       'Linux-next-build-web'
     );
     expect(turboFamily('jovie-production-next-cache-v1-Linux-abc')).toBeNull();
+    expect(turboFamily('jovie-web-tsbuildinfo-v2-Linux-abc-h2026092610')).toBe(
+      'jovie-web-tsbuildinfo'
+    );
     const plan = planCacheGc({
       nowMs: now,
       openRefs: new Set(['refs/heads/main']),

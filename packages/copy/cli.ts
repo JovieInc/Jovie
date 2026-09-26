@@ -9,7 +9,7 @@
  *       Full gate (lint + judge panel). Needs AI_GATEWAY_API_KEY (use the Doppler wrapper).
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -113,7 +113,13 @@ function check(args: string[]): number {
 }
 
 // Subscription CLIs carry frontier judges; the gateway carries allowlisted ones.
-const CODEX_BIN = process.env.HERMES_CODEX_BIN ?? 'codex';
+// Codex now ships inside ChatGPT.app; env overrides win, then the bundled CLI, then PATH.
+const BUNDLED_CODEX =
+  '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex';
+const CODEX_BIN =
+  process.env.CODEX_BIN ??
+  process.env.HERMES_CODEX_BIN ??
+  (existsSync(BUNDLED_CODEX) ? BUNDLED_CODEX : 'codex');
 const probe = new Map<string, boolean>();
 function installed(bin: string): boolean {
   if (!probe.has(bin)) {
@@ -126,9 +132,16 @@ function installed(bin: string): boolean {
   return probe.get(bin) ?? false;
 }
 
-function runCli(bin: string, args: string[], input: string): string {
+// Judges run from a neutral temp dir so repo-level agent hooks never fire.
+function runCli(
+  bin: string,
+  args: string[],
+  input: string,
+  cwd = tmpdir()
+): string {
   const result = spawnSync(bin, args, {
     input,
+    cwd,
     encoding: 'utf8',
     timeout: 240_000,
     maxBuffer: 8 << 20,
@@ -170,6 +183,11 @@ export function routedTransport(apiKey?: string): JudgeTransport {
           CODEX_BIN,
           [
             'exec',
+            // User/repo hooks (e.g. a Stop hook) hang non-interactive exec.
+            '-c',
+            'features.hooks=false',
+            '-c',
+            'features.codex_hooks=false',
             '--skip-git-repo-check',
             '--sandbox',
             'read-only',
@@ -179,7 +197,8 @@ export function routedTransport(apiKey?: string): JudgeTransport {
             join(dir, 'out.txt'),
             '-',
           ],
-          input
+          input,
+          dir
         );
         return readFileSync(join(dir, 'out.txt'), 'utf8');
       } finally {
