@@ -1,0 +1,97 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
+# removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
+name: Merge Queue Green Enroll
+
+# Tim 2026-09-26: production holds never stall merging. A held production
+# promote and a red main are separate issues from source admission, so green
+# PRs keep entering the native queue while promotion is held.
+#
+# Enqueues open, non-draft, same-repo PRs into main whose mergeStateStatus is
+# CLEAN (required checks green, no conflicts), that carry no hold/gated/incident
+# label and were not updated in the last 10 minutes (owner still pushing).
+# The ruleset's required checks on the merge group stay the only gate. Uses the
+# Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
+# ponytail: 100-PR scan per tick; page if open non-draft PRs routinely exceed it.
+# clock-class: temporal-resource
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log eligible PRs without enqueueing'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: merge-queue-green-enroll
+  cancel-in-progress: false
+
+jobs:
+  enroll:
+    name: Enqueue green PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Enqueue CLEAN PRs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
+            const QUIET_MS = 10 * 60 * 1000;
+            const { owner, repo } = context.repo;
+            const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequests(states: OPEN, baseRefName: "main", first: 100,
+                               orderBy: { field: UPDATED_AT, direction: ASC }) {
+                    nodes {
+                      id number isDraft updatedAt headRefOid mergeStateStatus
+                      isInMergeQueue isCrossRepository
+                      labels(first: 30) { nodes { name } }
+                    }
+                  }
+                }
+              }`, { owner, repo });
+            let enqueued = 0;
+            for (const pr of repository.pullRequests.nodes) {
+              if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
+              if (pr.mergeStateStatus !== 'CLEAN') continue;
+              const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
+              if (labels.some(l => BLOCKING.has(l))) continue;
+              if (Date.now() - Date.parse(pr.updatedAt) < QUIET_MS) continue;
+              if (process.env.DRY_RUN === 'true') {
+                core.notice(`[dry run] would enqueue #${pr.number}`);
+                continue;
+              }
+              try {
+                const r = await github.graphql(`
+                  mutation($id: ID!, $oid: GitObjectID!) {
+                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
+                      mergeQueueEntry { position }
+                    }
+                  }`, { id: pr.id, oid: pr.headRefOid });
+                enqueued += 1;
+                core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+              } catch (error) {
+                core.warning(`#${pr.number} not enqueued: ${error.message}`);
+              }
+            }
+            core.info(`enqueued=${enqueued}`);
