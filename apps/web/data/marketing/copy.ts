@@ -1523,12 +1523,10 @@ export function applyMarketingCopyTasteDecision(
  * The registry audits above certify the *reviewed* words. This layer binds
  * the certified candidate to the text a surface actually renders: a registry
  * pass must never certify a route that renders different words or promises
- * the allowed claims cannot support.
- *
- * A rendered surface is the exact, ordered set of visible lines captured from
- * one route or UI state at one source version. Certification fingerprints the
- * reviewed brief+draft digest together with the rendered text, so a changed
- * claim, evidence revision, or rendered output invalidates prior receipts.
+ * the allowed claims cannot support. A rendered surface is the exact, ordered
+ * set of visible lines captured from one route or UI state at one source
+ * version; certification fingerprints the reviewed digest together with the
+ * rendered text, so any later change invalidates prior receipts.
  */
 
 export interface RenderedCopyLine {
@@ -1560,9 +1558,8 @@ export interface RenderedCopySurface {
 
 /**
  * A taste-approved divergence between reviewed candidate copy and rendered
- * text (e.g. a legally required line, or intentionally terse chrome). The
- * exception only applies when the rendered value matches `value` exactly;
- * it never excuses an unsupported claim.
+ * text. The exception only applies when the rendered value matches `value`
+ * exactly; it never excuses an unsupported claim.
  */
 export interface RenderedCopyApprovedException {
   readonly sectionId: string;
@@ -1576,19 +1573,7 @@ export interface RenderedCopyApprovedException {
 export function createRenderedCopyDigest(surface: RenderedCopySurface): string {
   const canonical = JSON.stringify({
     schemaVersion: MARKETING_COPY_SPEC_VERSION,
-    surfaceId: surface.surfaceId,
-    pageId: surface.pageId,
-    route: surface.route,
-    state: surface.state,
-    sourceVersion: surface.sourceVersion,
-    sections: surface.sections.map(section => ({
-      sectionId: section.sectionId,
-      lines: section.lines.map(line => ({
-        lineId: line.lineId,
-        role: line.role,
-        value: line.value,
-      })),
-    })),
+    ...surface,
   });
   return `rendered-copy/${MARKETING_COPY_SPEC_VERSION}/sha256/${bytesToHex(
     sha256(new TextEncoder().encode(canonical))
@@ -1606,17 +1591,10 @@ const RENDERED_MONEY_PATTERN = /[$€£]\s?(\d[\d,]*(?:\.\d{1,2})?)/g;
 const RENDERED_PERCENT_PATTERN = /\b(\d[\d,]*(?:\.\d+)?)\s?%/g;
 const RENDERED_QUANTITY_PATTERN =
   /\b(\d[\d,]*(?:\.\d+)?)\s?(?:x|times|days?|weeks?|months?|years?|hours?|minutes?|artists?|fans?|users?|members?|downloads?|streams?|emails?|credits?|seats?)\b/gi;
-const RENDERED_AVAILABILITY_TERMS = [
-  'free',
-  'trial',
-  'unlimited',
-  'guarantee',
-  'guaranteed',
-  'refund',
-  'lifetime',
-  'forever',
-  'no credit card',
-] as const;
+const RENDERED_AVAILABILITY_TERMS =
+  'free|trial|unlimited|guarantee|guaranteed|refund|lifetime|forever|no credit card'.split(
+    '|'
+  );
 const RENDERED_ERROR_PATTERN =
   /\b(?:went wrong|error|failed|failure|unavailable|timed out|cannot continue|try again)\b/i;
 
@@ -1637,33 +1615,22 @@ function renderedQuantityTokens(value: string): string[] {
   return tokens.filter(token => token.length > 0);
 }
 
-function claimCorpusWords(
+function claimCorpus(
   brief: MarketingCopyPageBrief,
   sectionBrief: MarketingCopySectionBrief | undefined
-): Set<string> {
+): { readonly words: Set<string>; readonly text: string } {
   const allowed = new Set(sectionBrief?.allowedClaimIds ?? []);
   const corpus = new Set<string>();
+  const parts: string[] = [];
   for (const claim of brief.claims) {
     if (!allowed.has(claim.id)) continue;
+    parts.push(claim.statement, ...claim.evidence);
     for (const word of words(claim.statement)) corpus.add(word);
     for (const evidence of claim.evidence) {
       for (const word of words(evidence)) corpus.add(word);
     }
   }
-  return corpus;
-}
-
-function claimCorpusText(
-  brief: MarketingCopyPageBrief,
-  sectionBrief: MarketingCopySectionBrief | undefined
-): string {
-  const allowed = new Set(sectionBrief?.allowedClaimIds ?? []);
-  const parts: string[] = [];
-  for (const claim of brief.claims) {
-    if (!allowed.has(claim.id)) continue;
-    parts.push(claim.statement, ...claim.evidence);
-  }
-  return normalizeText(parts.join(' '));
+  return { words: corpus, text: ` ${normalizeText(parts.join(' '))} ` };
 }
 
 export interface RenderedCopyAuditOptions {
@@ -1684,7 +1651,8 @@ export function auditRenderedMarketingCopy(
 ): readonly MarketingCopyAuditIssue[] {
   const issues: MarketingCopyAuditIssue[] = [];
   const exceptions = options.exceptions ?? [];
-  const appliedExceptions = new Set<number>();
+  const fail = (code: string, sectionId: string | undefined, message: string) =>
+    issues.push(issue(code, sectionId, message));
 
   if (
     surface.pageId !== brief.pageId ||
@@ -1695,12 +1663,10 @@ export function auditRenderedMarketingCopy(
     !surface.state.trim() ||
     !surface.sourceVersion.trim()
   ) {
-    issues.push(
-      issue(
-        'rendered-surface-mismatch',
-        undefined,
-        `Rendered surface ${surface.surfaceId || '(unnamed)'} must identify the same page and route as the reviewed brief and draft, with a state and source version.`
-      )
+    fail(
+      'rendered-surface-mismatch',
+      undefined,
+      `Rendered surface ${surface.surfaceId || '(unnamed)'} must identify the same page and route as the reviewed brief and draft, with a state and source version.`
     );
   }
 
@@ -1719,21 +1685,18 @@ export function auditRenderedMarketingCopy(
 
   for (const rendered of surface.sections) {
     if (!draftSections.has(rendered.sectionId)) {
-      issues.push(
-        issue(
-          'unexpected-rendered-section',
-          rendered.sectionId,
-          `Rendered section ${rendered.sectionId} has no reviewed draft section.`
-        )
+      fail(
+        'unexpected-rendered-section',
+        rendered.sectionId,
+        `Rendered section ${rendered.sectionId} has no reviewed draft section.`
       );
     }
   }
 
-  for (const [index, exception] of exceptions.entries()) {
-    const renderedSection = renderedSections.get(exception.sectionId);
-    const renderedLine = renderedSection?.lines.find(
-      line => line.lineId === exception.lineId
-    );
+  for (const exception of exceptions) {
+    const renderedLine = renderedSections
+      .get(exception.sectionId)
+      ?.lines.find(line => line.lineId === exception.lineId);
     if (
       !exception.sectionId.trim() ||
       !exception.lineId.trim() ||
@@ -1742,29 +1705,22 @@ export function auditRenderedMarketingCopy(
       !exception.reference.trim() ||
       !renderedLine
     ) {
-      issues.push(
-        issue(
-          'stale-approved-exception',
-          exception.sectionId || undefined,
-          `Approved exception ${exception.reference || exception.lineId} does not resolve to a rendered line.`
-        )
+      fail(
+        'stale-approved-exception',
+        exception.sectionId || undefined,
+        `Approved exception ${exception.reference || exception.lineId} does not resolve to a rendered line.`
       );
       continue;
-    }
-    if (normalizeText(renderedLine.value) === normalizeText(exception.value)) {
-      appliedExceptions.add(index);
     }
   }
 
   for (const section of draft.sections) {
     const rendered = renderedSections.get(section.sectionId);
     if (!rendered) {
-      issues.push(
-        issue(
-          'missing-rendered-section',
-          section.sectionId,
-          `Reviewed section ${section.sectionId} produced no rendered copy.`
-        )
+      fail(
+        'missing-rendered-section',
+        section.sectionId,
+        `Reviewed section ${section.sectionId} produced no rendered copy.`
       );
       continue;
     }
@@ -1774,91 +1730,77 @@ export function auditRenderedMarketingCopy(
     const renderedById = new Map<string, RenderedCopyLine>();
     for (const line of rendered.lines) {
       if (renderedById.has(line.lineId)) {
-        issues.push(
-          issue(
-            'duplicate-rendered-line',
-            section.sectionId,
-            `Rendered line ${line.lineId} appears more than once.`
-          )
+        fail(
+          'duplicate-rendered-line',
+          section.sectionId,
+          `Rendered line ${line.lineId} appears more than once.`
         );
       }
       renderedById.set(line.lineId, line);
     }
 
     const exceptionFor = (lineId: string, renderedValue: string): boolean =>
-      exceptions.some((exception, exceptionIndex) => {
-        if (
-          exception.sectionId !== section.sectionId ||
-          exception.lineId !== lineId ||
-          normalizeText(exception.value) !== normalizeText(renderedValue)
-        ) {
-          return false;
-        }
-        appliedExceptions.add(exceptionIndex);
-        return true;
-      });
+      exceptions.some(
+        exception =>
+          exception.sectionId === section.sectionId &&
+          exception.lineId === lineId &&
+          normalizeText(exception.value) === normalizeText(renderedValue)
+      );
 
     for (const line of rendered.lines) {
-      if (!expectedIds.has(line.lineId)) {
-        if (!exceptionFor(line.lineId, line.value)) {
-          issues.push(
-            issue(
-              'unbound-rendered-line',
-              section.sectionId,
-              `Rendered ${line.role} line ${line.lineId} has no reviewed draft line: "${line.value}".`
-            )
-          );
-        }
+      if (
+        !expectedIds.has(line.lineId) &&
+        !exceptionFor(line.lineId, line.value)
+      ) {
+        fail(
+          'unbound-rendered-line',
+          section.sectionId,
+          `Rendered ${line.role} line ${line.lineId} has no reviewed draft line: "${line.value}".`
+        );
       }
     }
 
     for (const line of expected) {
       const renderedLine = renderedById.get(line.lineId);
       if (!renderedLine) {
-        issues.push(
-          issue(
-            'missing-rendered-line',
-            section.sectionId,
-            `Reviewed ${line.role} line ${line.lineId} is not rendered: "${line.value}".`
-          )
+        fail(
+          'missing-rendered-line',
+          section.sectionId,
+          `Reviewed ${line.role} line ${line.lineId} is not rendered: "${line.value}".`
         );
         continue;
       }
       if (renderedLine.role !== line.role) {
-        issues.push(
-          issue(
-            'rendered-line-role-mismatch',
-            section.sectionId,
-            `Rendered line ${line.lineId} uses role ${renderedLine.role} but was reviewed as ${line.role}.`
-          )
+        fail(
+          'rendered-line-role-mismatch',
+          section.sectionId,
+          `Rendered line ${line.lineId} uses role ${renderedLine.role} but was reviewed as ${line.role}.`
         );
       }
-      if (normalizeText(renderedLine.value) !== normalizeText(line.value)) {
-        if (!exceptionFor(line.lineId, renderedLine.value)) {
-          issues.push(
-            issue(
-              'rendered-text-mismatch',
-              section.sectionId,
-              `Rendered ${line.role} differs from the reviewed words: "${renderedLine.value}" vs "${line.value}".`
-            )
-          );
-        }
+      if (
+        normalizeText(renderedLine.value) !== normalizeText(line.value) &&
+        !exceptionFor(line.lineId, renderedLine.value)
+      ) {
+        fail(
+          'rendered-text-mismatch',
+          section.sectionId,
+          `Rendered ${line.role} differs from the reviewed words: "${renderedLine.value}" vs "${line.value}".`
+        );
       }
     }
 
     const sectionBrief = briefSections.get(section.sectionId);
-    const corpusWords = claimCorpusWords(brief, sectionBrief);
-    const corpusText = ` ${claimCorpusText(brief, sectionBrief)} `;
+    const corpus = claimCorpus(brief, sectionBrief);
+    const corpusWords = corpus.words;
+    const corpusText = corpus.text;
 
     for (const line of rendered.lines) {
       for (const token of renderedQuantityTokens(line.value)) {
         if (!corpusWords.has(token)) {
-          issues.push(
-            issue(
-              'unsupported-rendered-claim',
-              section.sectionId,
-              `Rendered ${line.role} asserts an unsupported quantity "${token}" in "${line.value}".`
-            )
+          fail(
+            'unsupported-rendered-claim',
+            section.sectionId,
+            `Rendered ${line.role} asserts an unsupported quantity "${token}" in "${line.value}".`
           );
         }
       }
@@ -1868,12 +1810,10 @@ export function auditRenderedMarketingCopy(
           normalizedLine.includes(` ${normalizeText(term)} `) &&
           !corpusText.includes(` ${normalizeText(term)} `)
         ) {
-          issues.push(
-            issue(
-              'unsupported-rendered-claim',
-              section.sectionId,
-              `Rendered ${line.role} asserts unsupported availability "${term}" in "${line.value}".`
-            )
+          fail(
+            'unsupported-rendered-claim',
+            section.sectionId,
+            `Rendered ${line.role} asserts unsupported availability "${term}" in "${line.value}".`
           );
         }
       }
@@ -1888,37 +1828,29 @@ export function auditRenderedMarketingCopy(
         .map(binding => binding.lineId)
     );
     for (const actionId of sectionBrief?.requiredActionIds ?? []) {
-      if (!actionsById.has(actionId)) {
-        issues.push(
-          issue(
-            'unknown-required-action',
-            section.sectionId,
-            `Section requires unknown action ${actionId}.`
-          )
-        );
-        continue;
-      }
       const bound = bindings.filter(binding => binding.actionId === actionId);
-      if (bound.length === 0) {
-        issues.push(
-          issue(
-            'missing-recovery-action',
-            section.sectionId,
-            `Required action ${actionId} is not bound to any reviewed line.`
-          )
+      if (!actionsById.has(actionId)) {
+        fail(
+          'unknown-required-action',
+          section.sectionId,
+          `Section requires unknown action ${actionId}.`
         );
-        continue;
-      }
-      for (const binding of bound) {
-        const renderedLine = renderedById.get(binding.lineId);
-        if (!renderedLine || !renderedLine.value.trim()) {
-          issues.push(
-            issue(
+      } else if (bound.length === 0) {
+        fail(
+          'missing-recovery-action',
+          section.sectionId,
+          `Required action ${actionId} is not bound to any reviewed line.`
+        );
+      } else {
+        for (const binding of bound) {
+          const renderedLine = renderedById.get(binding.lineId);
+          if (!renderedLine || !renderedLine.value.trim()) {
+            fail(
               'missing-recovery-action',
               section.sectionId,
               `Required action ${actionId} is not rendered; there is no concrete recovery path.`
-            )
-          );
+            );
+          }
         }
       }
     }
@@ -1926,12 +1858,10 @@ export function auditRenderedMarketingCopy(
       boundActionLineIds.size === 0 &&
       rendered.lines.some(line => RENDERED_ERROR_PATTERN.test(line.value))
     ) {
-      issues.push(
-        issue(
-          'missing-recovery-action',
-          section.sectionId,
-          'An error-facing section renders no concrete action for the reader.'
-        )
+      fail(
+        'missing-recovery-action',
+        section.sectionId,
+        'An error-facing section renders no concrete action for the reader.'
       );
     }
   }
@@ -1955,13 +1885,7 @@ export interface RenderedCopyCertification {
   readonly reviewDigest: string;
   readonly renderedDigest: string;
   readonly certifiedAt: string;
-  readonly reviews: readonly {
-    readonly role: MarketingCopyReviewRole;
-    readonly reviewerId: string;
-    readonly provider: string;
-    readonly model: string;
-    readonly executionId: string;
-  }[];
+  readonly reviews: readonly MarketingCopyPanelReview[];
   readonly exceptions: readonly RenderedCopyApprovedException[];
 }
 
@@ -2018,13 +1942,7 @@ export function createRenderedCopyCertification(
     reviewDigest: createMarketingCopyReviewDigest(input.brief, input.draft),
     renderedDigest: createRenderedCopyDigest(input.surface),
     certifiedAt: input.certifiedAt,
-    reviews: (input.reviews ?? []).map(review => ({
-      role: review.role,
-      reviewerId: review.reviewerId,
-      provider: review.provider,
-      model: review.model,
-      executionId: review.executionId,
-    })),
+    reviews: input.reviews ?? [],
     exceptions: input.exceptions ?? [],
   };
 }
@@ -2044,16 +1962,15 @@ export function auditRenderedCopyCertification(
 ): readonly MarketingCopyAuditIssue[] {
   const issues: MarketingCopyAuditIssue[] = [];
   const { brief, draft, surface } = input;
+  const fail = (code: string, message: string) =>
+    issues.push(issue(code, undefined, message));
   if (
     certification.schemaVersion !== MARKETING_COPY_SPEC_VERSION ||
     certification.kind !== 'rendered-marketing-copy'
   ) {
-    issues.push(
-      issue(
-        'unsupported-certification',
-        undefined,
-        'The rendered copy certification has an unknown schema or kind.'
-      )
+    fail(
+      'unsupported-certification',
+      'The rendered copy certification has an unknown schema or kind.'
     );
   }
   if (
@@ -2063,41 +1980,29 @@ export function auditRenderedCopyCertification(
     certification.route !== surface.route ||
     certification.state !== surface.state
   ) {
-    issues.push(
-      issue(
-        'certification-target-mismatch',
-        undefined,
-        'The certification does not identify this surface, route, and state.'
-      )
+    fail(
+      'certification-target-mismatch',
+      'The certification does not identify this surface, route, and state.'
     );
   }
   if (certification.sourceVersion !== surface.sourceVersion) {
-    issues.push(
-      issue(
-        'stale-source-version',
-        undefined,
-        `Certified at source ${certification.sourceVersion} but the surface reports ${surface.sourceVersion}.`
-      )
+    fail(
+      'stale-source-version',
+      `Certified at source ${certification.sourceVersion} but the surface reports ${surface.sourceVersion}.`
     );
   }
   if (
     certification.reviewDigest !== createMarketingCopyReviewDigest(brief, draft)
   ) {
-    issues.push(
-      issue(
-        'stale-review-digest',
-        undefined,
-        'The reviewed brief or candidate changed after certification.'
-      )
+    fail(
+      'stale-review-digest',
+      'The reviewed brief or candidate changed after certification.'
     );
   }
   if (certification.renderedDigest !== createRenderedCopyDigest(surface)) {
-    issues.push(
-      issue(
-        'stale-rendered-copy',
-        undefined,
-        'The rendered text changed after certification.'
-      )
+    fail(
+      'stale-rendered-copy',
+      'The rendered text changed after certification.'
     );
   }
   return issues;

@@ -23,8 +23,11 @@
  */
 
 import type {
+  MarketingCopyLineBinding,
+  MarketingCopyLineRole,
   MarketingCopyPageBrief,
   MarketingCopyPageDraft,
+  MarketingCopySectionBrief,
   MarketingCopySectionDraft,
 } from './copy';
 
@@ -86,6 +89,32 @@ const PRICING_EVIDENCE = {
     'apps/web/lib/billing/offer-truth.ts:PUBLIC_CUSTOM_PRICE_LABEL + ARTIST_VISIBILITY_OFFER.enterprise',
 } as const;
 
+function briefSection(
+  sectionId: string,
+  storyBeat: string,
+  sectionJob: string,
+  customerOutcome: string,
+  messageSubject: string,
+  visualEvidence: string,
+  allowedClaimIds: readonly string[],
+  headlineWordLimit: number,
+  headlineSignals: readonly (readonly string[])[],
+  extra?: Pick<MarketingCopySectionBrief, 'bodyWordLimit' | 'requiredActionIds'>
+): MarketingCopySectionBrief {
+  return {
+    sectionId,
+    storyBeat,
+    sectionJob,
+    customerOutcome,
+    messageSubject,
+    visualEvidence,
+    allowedClaimIds,
+    headlineWordLimit,
+    headlineSignals,
+    ...extra,
+  };
+}
+
 export function pricingPageCopyBrief(): MarketingCopyPageBrief {
   return {
     pageId: 'pricing',
@@ -124,93 +153,125 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
       { id: 'explore-profiles', statement: 'Explore Artist Profiles.' },
     ],
     sections: [
-      {
-        sectionId: 'hero',
-        storyBeat: 'promise',
-        sectionJob: 'name the offer and the price truth',
-        customerOutcome: 'the visitor sees the real plans and prices',
-        messageSubject: 'pricing',
-        visualEvidence: 'plan cards with live prices',
-        allowedClaimIds: ['free-forever', 'pro-price'],
-        headlineWordLimit: 4,
-        headlineSignals: [['pricing']],
-        bodyWordLimit: 30,
-      },
-      {
-        sectionId: 'plan-free',
-        storyBeat: 'offer',
-        sectionJob: 'present the free plan',
-        customerOutcome: 'the visitor can claim a profile at no cost',
-        messageSubject: 'free plan',
-        visualEvidence: 'the free plan card',
-        allowedClaimIds: ['free-forever'],
-        headlineWordLimit: 3,
-        headlineSignals: [['free']],
-      },
-      {
-        sectionId: 'plan-pro',
-        storyBeat: 'offer',
-        sectionJob: 'present the Pro plan and its price',
-        customerOutcome: 'the visitor can request Pro access at the real price',
-        messageSubject: 'pro plan',
-        visualEvidence: 'the pro plan card',
-        allowedClaimIds: ['pro-price'],
-        headlineWordLimit: 3,
-        headlineSignals: [['pro']],
-        bodyWordLimit: 8,
-      },
-      {
-        sectionId: 'plan-enterprise',
-        storyBeat: 'offer',
-        sectionJob: 'present the Enterprise path',
-        customerOutcome: 'teams can reach sales for custom pricing',
-        messageSubject: 'enterprise plan',
-        visualEvidence: 'the enterprise plan card',
-        allowedClaimIds: ['enterprise-custom'],
-        headlineWordLimit: 3,
-        headlineSignals: [['enterprise']],
-        bodyWordLimit: 8,
-      },
-      {
-        sectionId: 'compare',
-        storyBeat: 'proof',
-        sectionJob: 'offer the feature comparison',
-        customerOutcome: 'the visitor can compare what each plan includes',
-        messageSubject: 'feature comparison',
-        visualEvidence: 'the comparison chart',
-        allowedClaimIds: ['free-forever'],
-        headlineWordLimit: 4,
-        headlineSignals: [['compare'], ['features']],
-        bodyWordLimit: 12,
-      },
-      {
-        sectionId: 'final',
-        storyBeat: 'close',
-        sectionJob: 'close with the access actions',
-        customerOutcome: 'the visitor leaves through a real action',
-        messageSubject: 'get started',
-        visualEvidence: 'the closing action row',
-        allowedClaimIds: ['free-forever', 'pro-price'],
-        headlineWordLimit: 3,
-        headlineSignals: [['get started', 'started']],
-        bodyWordLimit: 16,
-      },
+      briefSection(
+        'hero',
+        'promise',
+        'name the offer and the price truth',
+        'the visitor sees the real plans and prices',
+        'pricing',
+        'plan cards with live prices',
+        ['free-forever', 'pro-price'],
+        4,
+        [['pricing']],
+        { bodyWordLimit: 30 }
+      ),
+      briefSection(
+        'plan-free',
+        'offer',
+        'present the free plan',
+        'the visitor can claim a profile at no cost',
+        'free plan',
+        'the free plan card',
+        ['free-forever'],
+        3,
+        [['free']]
+      ),
+      briefSection(
+        'plan-pro',
+        'offer',
+        'present the Pro plan and its price',
+        'the visitor can request Pro access at the real price',
+        'pro plan',
+        'the pro plan card',
+        ['pro-price'],
+        3,
+        [['pro']],
+        { bodyWordLimit: 8 }
+      ),
+      briefSection(
+        'plan-enterprise',
+        'offer',
+        'present the Enterprise path',
+        'teams can reach sales for custom pricing',
+        'enterprise plan',
+        'the enterprise plan card',
+        ['enterprise-custom'],
+        3,
+        [['enterprise']],
+        { bodyWordLimit: 8 }
+      ),
+      briefSection(
+        'compare',
+        'proof',
+        'offer the feature comparison',
+        'the visitor can compare what each plan includes',
+        'feature comparison',
+        'the comparison chart',
+        ['free-forever'],
+        4,
+        [['compare'], ['features']],
+        { bodyWordLimit: 12 }
+      ),
+      briefSection(
+        'final',
+        'close',
+        'close with the access actions',
+        'the visitor leaves through a real action',
+        'get started',
+        'the closing action row',
+        ['free-forever', 'pro-price'],
+        3,
+        [['get started', 'started']],
+        { bodyWordLimit: 16 }
+      ),
     ],
   };
+}
+
+type BindingRef =
+  | { readonly claim: string }
+  | { readonly claims: readonly string[] }
+  | { readonly action: string }
+  | { readonly outcome: string };
+
+const roleOf = (lineId: string): MarketingCopyLineRole =>
+  lineId === 'headline'
+    ? 'headline'
+    : lineId === 'body'
+      ? 'body'
+      : 'supporting';
+
+/** Compact `[lineId, ref]` rows → reviewed line bindings. */
+function bind(
+  entries: readonly (readonly [string, BindingRef])[]
+): MarketingCopyLineBinding[] {
+  return entries.map(([lineId, ref]) => ({
+    lineId,
+    role: roleOf(lineId),
+    ...('claim' in ref
+      ? { claimIds: [ref.claim] }
+      : 'claims' in ref
+        ? { claimIds: ref.claims }
+        : 'action' in ref
+          ? { actionId: ref.action }
+          : { outcomeId: ref.outcome }),
+  }));
 }
 
 function pricingSection(
   partial: Omit<
     MarketingCopySectionDraft,
-    'control' | 'meaningTrace' | 'tasteTags'
+    'control' | 'meaningTrace' | 'tasteTags' | 'lineBindings'
   > & {
     readonly controlHeadline: string;
+    readonly lineBindings: readonly (readonly [string, BindingRef])[];
   }
 ): MarketingCopySectionDraft {
-  const { controlHeadline, ...rest } = partial;
+  const { controlHeadline, lineBindings, ...rest } = partial;
   return {
     ...rest,
     control: { headline: controlHeadline },
+    lineBindings: bind(lineBindings),
     meaningTrace: 'The reviewed words name the plan truth the visitor acts on.',
     tasteTags: ['direct', 'specific'],
   };
@@ -241,37 +302,13 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         ],
         claimIds: ['free-forever', 'pro-price'],
         lineBindings: [
-          { lineId: 'headline', role: 'headline', outcomeId: 'choose-plan' },
-          {
-            lineId: 'body',
-            role: 'body',
-            claimIds: ['free-forever', 'pro-price'],
-          },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            actionId: 'claim-free',
-          },
-          {
-            lineId: 'supporting:1',
-            role: 'supporting',
-            actionId: 'explore-profiles',
-          },
-          {
-            lineId: 'supporting:2',
-            role: 'supporting',
-            outcomeId: 'choose-plan',
-          },
-          {
-            lineId: 'supporting:3',
-            role: 'supporting',
-            claimIds: ['free-forever'],
-          },
-          {
-            lineId: 'supporting:4',
-            role: 'supporting',
-            actionId: 'claim-free',
-          },
+          ['headline', { outcome: 'choose-plan' }],
+          ['body', { claims: ['free-forever', 'pro-price'] }],
+          ['supporting:0', { action: 'claim-free' }],
+          ['supporting:1', { action: 'explore-profiles' }],
+          ['supporting:2', { outcome: 'choose-plan' }],
+          ['supporting:3', { claim: 'free-forever' }],
+          ['supporting:4', { action: 'claim-free' }],
         ],
       }),
       pricingSection({
@@ -288,32 +325,12 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         ],
         claimIds: ['free-forever'],
         lineBindings: [
-          {
-            lineId: 'headline',
-            role: 'headline',
-            claimIds: ['free-forever'],
-          },
-          { lineId: 'body', role: 'body', claimIds: ['free-forever'] },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            claimIds: ['free-forever'],
-          },
-          {
-            lineId: 'supporting:1',
-            role: 'supporting',
-            claimIds: ['free-forever'],
-          },
-          {
-            lineId: 'supporting:2',
-            role: 'supporting',
-            actionId: 'claim-free',
-          },
-          {
-            lineId: 'supporting:3',
-            role: 'supporting',
-            claimIds: ['free-forever'],
-          },
+          ['headline', { claim: 'free-forever' }],
+          ['body', { claim: 'free-forever' }],
+          ['supporting:0', { claim: 'free-forever' }],
+          ['supporting:1', { claim: 'free-forever' }],
+          ['supporting:2', { action: 'claim-free' }],
+          ['supporting:3', { claim: 'free-forever' }],
         ],
       }),
       pricingSection({
@@ -330,28 +347,12 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         ],
         claimIds: ['pro-price'],
         lineBindings: [
-          { lineId: 'headline', role: 'headline', claimIds: ['pro-price'] },
-          { lineId: 'body', role: 'body', claimIds: ['pro-price'] },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            claimIds: ['pro-price'],
-          },
-          {
-            lineId: 'supporting:1',
-            role: 'supporting',
-            claimIds: ['pro-price'],
-          },
-          {
-            lineId: 'supporting:2',
-            role: 'supporting',
-            actionId: 'request-access',
-          },
-          {
-            lineId: 'supporting:3',
-            role: 'supporting',
-            claimIds: ['pro-price'],
-          },
+          ['headline', { claim: 'pro-price' }],
+          ['body', { claim: 'pro-price' }],
+          ['supporting:0', { claim: 'pro-price' }],
+          ['supporting:1', { claim: 'pro-price' }],
+          ['supporting:2', { action: 'request-access' }],
+          ['supporting:3', { claim: 'pro-price' }],
         ],
       }),
       pricingSection({
@@ -363,31 +364,11 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         supportingText: ['Contact sales', 'Custom', 'Contact sales'],
         claimIds: ['enterprise-custom'],
         lineBindings: [
-          {
-            lineId: 'headline',
-            role: 'headline',
-            claimIds: ['enterprise-custom'],
-          },
-          {
-            lineId: 'body',
-            role: 'body',
-            claimIds: ['enterprise-custom'],
-          },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            claimIds: ['enterprise-custom'],
-          },
-          {
-            lineId: 'supporting:1',
-            role: 'supporting',
-            claimIds: ['enterprise-custom'],
-          },
-          {
-            lineId: 'supporting:2',
-            role: 'supporting',
-            actionId: 'contact-sales',
-          },
+          ['headline', { claim: 'enterprise-custom' }],
+          ['body', { claim: 'enterprise-custom' }],
+          ['supporting:0', { claim: 'enterprise-custom' }],
+          ['supporting:1', { claim: 'enterprise-custom' }],
+          ['supporting:2', { action: 'contact-sales' }],
         ],
       }),
       pricingSection({
@@ -398,8 +379,8 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         body: 'Public artist profile and audience capture.',
         claimIds: ['free-forever'],
         lineBindings: [
-          { lineId: 'headline', role: 'headline', outcomeId: 'choose-plan' },
-          { lineId: 'body', role: 'body', claimIds: ['free-forever'] },
+          ['headline', { outcome: 'choose-plan' }],
+          ['body', { claim: 'free-forever' }],
         ],
       }),
       pricingSection({
@@ -415,23 +396,11 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         ],
         claimIds: ['pro-price'],
         lineBindings: [
-          { lineId: 'headline', role: 'headline', outcomeId: 'choose-plan' },
-          { lineId: 'body', role: 'body', claimIds: ['pro-price'] },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            actionId: 'claim-free',
-          },
-          {
-            lineId: 'supporting:1',
-            role: 'supporting',
-            actionId: 'request-access',
-          },
-          {
-            lineId: 'supporting:2',
-            role: 'supporting',
-            actionId: 'contact-sales',
-          },
+          ['headline', { outcome: 'choose-plan' }],
+          ['body', { claim: 'pro-price' }],
+          ['supporting:0', { action: 'claim-free' }],
+          ['supporting:1', { action: 'request-access' }],
+          ['supporting:2', { action: 'contact-sales' }],
         ],
       }),
     ],
@@ -465,19 +434,18 @@ export function publicErrorFallbackCopyBrief(): MarketingCopyPageBrief {
     ],
     actions: [{ id: 'retry', statement: 'Try again to reload the page.' }],
     sections: [
-      {
-        sectionId: 'error-fallback',
-        storyBeat: 'recovery',
-        sectionJob: 'name the failure and the one recovery action',
-        customerOutcome: 'the visitor can retry instead of abandoning',
-        messageSubject: 'unexpected error',
-        visualEvidence: 'the error fallback panel',
-        allowedClaimIds: ['error-disclosure'],
-        headlineWordLimit: 6,
-        headlineSignals: [['went wrong', 'wrong']],
-        bodyWordLimit: 8,
-        requiredActionIds: ['retry'],
-      },
+      briefSection(
+        'error-fallback',
+        'recovery',
+        'name the failure and the one recovery action',
+        'the visitor can retry instead of abandoning',
+        'unexpected error',
+        'the error fallback panel',
+        ['error-disclosure'],
+        6,
+        [['went wrong', 'wrong']],
+        { bodyWordLimit: 8, requiredActionIds: ['retry'] }
+      ),
     ],
   };
 }
@@ -495,19 +463,11 @@ export function publicErrorFallbackReviewedDraft(): MarketingCopyPageDraft {
         body: 'Try refreshing the page.',
         supportingText: ['Try again'],
         claimIds: ['error-disclosure'],
-        lineBindings: [
-          {
-            lineId: 'headline',
-            role: 'headline',
-            outcomeId: 'acknowledge-failure',
-          },
-          { lineId: 'body', role: 'body', actionId: 'retry' },
-          {
-            lineId: 'supporting:0',
-            role: 'supporting',
-            actionId: 'retry',
-          },
-        ],
+        lineBindings: bind([
+          ['headline', { outcome: 'acknowledge-failure' }],
+          ['body', { action: 'retry' }],
+          ['supporting:0', { action: 'retry' }],
+        ]),
         meaningTrace:
           'The words acknowledge the failure and hand the visitor one real action.',
         tasteTags: ['plain', 'direct'],

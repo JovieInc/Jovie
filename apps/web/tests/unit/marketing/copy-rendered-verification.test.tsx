@@ -13,8 +13,8 @@ import {
   type MarketingCopyPageBrief,
   type MarketingCopyPageDraft,
   type MarketingCopyPanelReview,
+  type RenderedCopyAuditOptions,
   type RenderedCopyLine,
-  type RenderedCopySection,
   type RenderedCopySurface,
 } from '@/data/marketing';
 import {
@@ -41,62 +41,58 @@ vi.mock('@/lib/errors/capture', () => ({
 }));
 
 const SOURCE_VERSION = 'test-source-version';
+const CERTIFIED_AT = '2026-09-26T08:00:00.000Z';
 
-function textOf(root: ParentNode, selector: string): string {
-  return root.querySelector(selector)?.textContent?.trim() ?? '';
-}
+const textOf = (root: ParentNode, selector: string): string =>
+  root.querySelector(selector)?.textContent?.trim() ?? '';
 
-function renderedLine(
-  lineId: string,
-  role: RenderedCopyLine['role'],
-  value: string
-): RenderedCopyLine {
-  return { lineId, role, value };
+const roleOf = (lineId: string): RenderedCopyLine['role'] =>
+  lineId === 'headline'
+    ? 'headline'
+    : lineId === 'body'
+      ? 'body'
+      : 'supporting';
+
+const renderedLine = (lineId: string, value: string): RenderedCopyLine => ({
+  lineId,
+  role: roleOf(lineId),
+  value,
+});
+
+/** `[lineId, selector]` rows → rendered lines scraped from the mounted DOM. */
+function scrapedLines(
+  root: ParentNode,
+  entries: readonly (readonly [string, string])[]
+): RenderedCopyLine[] {
+  return entries.map(([lineId, selector]) =>
+    renderedLine(lineId, textOf(root, selector))
+  );
 }
 
 function planCardSection(
   container: ParentNode,
   sectionId: string,
   planId: string
-): RenderedCopySection {
+) {
   const card = container.querySelector(
     `[data-testid="marketing-pricing-plan-${planId}"]`
   );
   expect(card).not.toBeNull();
-  const lines: RenderedCopyLine[] = [
-    renderedLine(
-      'headline',
-      'headline',
-      textOf(card as Element, '.marketing-pricing-plan-card__name')
-    ),
-    renderedLine(
-      'body',
-      'body',
-      textOf(card as Element, '.marketing-pricing-plan-card__body')
-    ),
-    renderedLine(
-      'supporting:0',
-      'supporting',
-      textOf(card as Element, '.marketing-pricing-plan-card__badge')
-    ),
-    renderedLine(
-      'supporting:1',
-      'supporting',
-      textOf(card as Element, '.marketing-pricing-plan-card__price')
-    ),
-    renderedLine(
-      'supporting:2',
-      'supporting',
-      textOf(card as Element, '.marketing-pricing-plan-card__cta')
-    ),
-  ];
+  const element = card as Element;
+  const lines = scrapedLines(element, [
+    ['headline', '.marketing-pricing-plan-card__name'],
+    ['body', '.marketing-pricing-plan-card__body'],
+    ['supporting:0', '.marketing-pricing-plan-card__badge'],
+    ['supporting:1', '.marketing-pricing-plan-card__price'],
+    ['supporting:2', '.marketing-pricing-plan-card__cta'],
+  ]);
   const features = [
-    ...(card as Element).querySelectorAll(
+    ...element.querySelectorAll(
       '.marketing-pricing-plan-card__features li span'
     ),
-  ].map(element => element.textContent?.trim() ?? '');
+  ].map(node => node.textContent?.trim() ?? '');
   for (const [index, feature] of features.entries()) {
-    lines.push(renderedLine(`supporting:${3 + index}`, 'supporting', feature));
+    lines.push(renderedLine(`supporting:${3 + index}`, feature));
   }
   return { sectionId, lines };
 }
@@ -112,12 +108,12 @@ function pricingRenderedSurface(): RenderedCopySurface {
       comparisonChart={<div data-testid='pricing-comparison-chart' />}
     />
   );
-  const heroCtas = [
-    ...container.querySelectorAll('.marketing-hero-actions a'),
-  ].map(element => element.textContent?.trim() ?? '');
-  const finalCtas = [
-    ...container.querySelectorAll('.system-b-pricing-actions a'),
-  ].map(element => element.textContent?.trim() ?? '');
+  const linkText = (selector: string): string[] =>
+    [...container.querySelectorAll(selector)].map(
+      element => element.textContent?.trim() ?? ''
+    );
+  const heroCtas = linkText('.marketing-hero-actions a');
+  const finalCtas = linkText('.system-b-pricing-actions a');
   return {
     surfaceId: 'pricing-page',
     pageId: 'pricing',
@@ -128,33 +124,15 @@ function pricingRenderedSurface(): RenderedCopySurface {
       {
         sectionId: 'hero',
         lines: [
-          renderedLine(
-            'headline',
-            'headline',
-            textOf(container, '#pricing-hero-heading')
-          ),
-          renderedLine(
-            'body',
-            'body',
-            textOf(container, '.marketing-hero-subtitle')
-          ),
-          renderedLine('supporting:0', 'supporting', heroCtas[0] ?? ''),
-          renderedLine('supporting:1', 'supporting', heroCtas[1] ?? ''),
-          renderedLine(
-            'supporting:2',
-            'supporting',
-            textOf(container, '.system-b-pricing-story-label')
-          ),
-          renderedLine(
-            'supporting:3',
-            'supporting',
-            textOf(container, '.system-b-pricing-story-title')
-          ),
-          renderedLine(
-            'supporting:4',
-            'supporting',
-            textOf(container, '.system-b-pricing-story-body')
-          ),
+          ...scrapedLines(container, [
+            ['headline', '#pricing-hero-heading'],
+            ['body', '.marketing-hero-subtitle'],
+            ['supporting:2', '.system-b-pricing-story-label'],
+            ['supporting:3', '.system-b-pricing-story-title'],
+            ['supporting:4', '.system-b-pricing-story-body'],
+          ]),
+          renderedLine('supporting:0', heroCtas[0] ?? ''),
+          renderedLine('supporting:1', heroCtas[1] ?? ''),
         ],
       },
       planCardSection(container, 'plan-free', 'free'),
@@ -162,35 +140,21 @@ function pricingRenderedSurface(): RenderedCopySurface {
       planCardSection(container, 'plan-enterprise', 'enterprise'),
       {
         sectionId: 'compare',
-        lines: [
-          renderedLine(
-            'headline',
-            'headline',
-            textOf(container, '#pricing-compare-heading')
-          ),
-          renderedLine(
-            'body',
-            'body',
-            textOf(container, '.system-b-pricing-section-body')
-          ),
-        ],
+        lines: scrapedLines(container, [
+          ['headline', '#pricing-compare-heading'],
+          ['body', '.system-b-pricing-section-body'],
+        ]),
       },
       {
         sectionId: 'final',
         lines: [
-          renderedLine(
-            'headline',
-            'headline',
-            textOf(container, '#pricing-get-started-heading')
-          ),
-          renderedLine(
-            'body',
-            'body',
-            textOf(container, '.system-b-pricing-final-copy')
-          ),
-          renderedLine('supporting:0', 'supporting', finalCtas[0] ?? ''),
-          renderedLine('supporting:1', 'supporting', finalCtas[1] ?? ''),
-          renderedLine('supporting:2', 'supporting', finalCtas[2] ?? ''),
+          ...scrapedLines(container, [
+            ['headline', '#pricing-get-started-heading'],
+            ['body', '.system-b-pricing-final-copy'],
+          ]),
+          renderedLine('supporting:0', finalCtas[0] ?? ''),
+          renderedLine('supporting:1', finalCtas[1] ?? ''),
+          renderedLine('supporting:2', finalCtas[2] ?? ''),
         ],
       },
     ],
@@ -214,23 +178,11 @@ function errorFallbackRenderedSurface(): RenderedCopySurface {
     sections: [
       {
         sectionId: 'error-fallback',
-        lines: [
-          renderedLine(
-            'headline',
-            'headline',
-            textOf(container, '.system-b-error-fallback__title')
-          ),
-          renderedLine(
-            'body',
-            'body',
-            textOf(container, '.system-b-error-fallback__description')
-          ),
-          renderedLine(
-            'supporting:0',
-            'supporting',
-            textOf(container, '.system-b-error-fallback__actions button')
-          ),
-        ],
+        lines: scrapedLines(container, [
+          ['headline', '.system-b-error-fallback__title'],
+          ['body', '.system-b-error-fallback__description'],
+          ['supporting:0', '.system-b-error-fallback__actions button'],
+        ]),
       },
     ],
   };
@@ -279,17 +231,46 @@ function mutateLine(
   };
 }
 
-describe('rendered copy coverage inventory', () => {
+const auditCodes = (
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft,
+  surface: RenderedCopySurface,
+  options?: RenderedCopyAuditOptions
+) =>
+  auditRenderedMarketingCopy(brief, draft, surface, options).map(
+    issue => issue.code
+  );
+
+const exception = (sectionId: string, lineId: string, value: string) => ({
+  sectionId,
+  lineId,
+  value,
+  approvedBy: 'tim',
+  reference: `JOV-6478-taste-${lineId}`,
+});
+
+const certify = (
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft,
+  surface: RenderedCopySurface
+) =>
+  createRenderedCopyCertification({
+    brief,
+    draft,
+    surface,
+    reviews: panelReviews(brief, draft),
+    certifiedAt: CERTIFIED_AT,
+  });
+
+describe('rendered marketing copy audit — /pricing', () => {
+  const brief = pricingPageCopyBrief();
+  const draft = pricingPageReviewedDraft();
+
   it('covers the pilot pricing route and the public error state', () => {
     expect(
       RENDERED_COPY_COVERAGE_INVENTORY.map(entry => entry.surfaceId)
     ).toEqual(['pricing-page', 'public-error-fallback']);
   });
-});
-
-describe('rendered marketing copy audit — /pricing', () => {
-  const brief = pricingPageCopyBrief();
-  const draft = pricingPageReviewedDraft();
 
   it('passes when the mounted route renders the reviewed words', () => {
     expect(
@@ -304,8 +285,7 @@ describe('rendered marketing copy audit — /pricing', () => {
       'supporting:1',
       '$149/mo'
     );
-    const issues = auditRenderedMarketingCopy(brief, draft, surface);
-    const codes = issues.map(issue => issue.code);
+    const codes = auditCodes(brief, draft, surface);
     expect(codes).toContain('rendered-text-mismatch');
     expect(codes).toContain('unsupported-rendered-claim');
   });
@@ -317,8 +297,7 @@ describe('rendered marketing copy audit — /pricing', () => {
       'body',
       'Trusted by 10,000 artists.'
     );
-    const issues = auditRenderedMarketingCopy(brief, draft, surface);
-    expect(issues.map(issue => issue.code)).toContain(
+    expect(auditCodes(brief, draft, surface)).toContain(
       'unsupported-rendered-claim'
     );
   });
@@ -333,14 +312,13 @@ describe('rendered marketing copy audit — /pricing', () => {
           ...hero,
           lines: [
             ...hero.lines,
-            renderedLine('supporting:9', 'supporting', 'No credit card needed'),
+            renderedLine('supporting:9', 'No credit card needed'),
           ],
         },
         ...surface.sections.slice(1),
       ],
     };
-    const issues = auditRenderedMarketingCopy(brief, draft, augmented);
-    const codes = issues.map(issue => issue.code);
+    const codes = auditCodes(brief, draft, augmented);
     expect(codes).toContain('unbound-rendered-line');
     expect(codes).toContain('unsupported-rendered-claim');
   });
@@ -353,15 +331,7 @@ describe('rendered marketing copy audit — /pricing', () => {
       'Artist profile'
     );
     const issues = auditRenderedMarketingCopy(brief, draft, surface, {
-      exceptions: [
-        {
-          sectionId: 'hero',
-          lineId: 'supporting:2',
-          value: 'Artist profile',
-          approvedBy: 'tim',
-          reference: 'JOV-6478-taste-1',
-        },
-      ],
+      exceptions: [exception('hero', 'supporting:2', 'Artist profile')],
     });
     expect(issues).toEqual([]);
   });
@@ -373,42 +343,17 @@ describe('rendered marketing copy audit — /pricing', () => {
       'supporting:1',
       '$99/mo'
     );
-    const issues = auditRenderedMarketingCopy(brief, draft, surface, {
-      exceptions: [
-        {
-          sectionId: 'plan-pro',
-          lineId: 'supporting:1',
-          value: '$99/mo',
-          approvedBy: 'tim',
-          reference: 'JOV-6478-taste-2',
-        },
-      ],
+    const codes = auditCodes(brief, draft, surface, {
+      exceptions: [exception('plan-pro', 'supporting:1', '$99/mo')],
     });
-    expect(issues.map(issue => issue.code)).toContain(
-      'unsupported-rendered-claim'
-    );
+    expect(codes).toContain('unsupported-rendered-claim');
   });
 
   it('flags stale exceptions that no longer resolve to a rendered line', () => {
-    const issues = auditRenderedMarketingCopy(
-      brief,
-      draft,
-      pricingRenderedSurface(),
-      {
-        exceptions: [
-          {
-            sectionId: 'hero',
-            lineId: 'supporting:7',
-            value: 'Gone line',
-            approvedBy: 'tim',
-            reference: 'JOV-6478-taste-3',
-          },
-        ],
-      }
-    );
-    expect(issues.map(issue => issue.code)).toContain(
-      'stale-approved-exception'
-    );
+    const codes = auditCodes(brief, draft, pricingRenderedSurface(), {
+      exceptions: [exception('hero', 'supporting:7', 'Gone line')],
+    });
+    expect(codes).toContain('stale-approved-exception');
   });
 });
 
@@ -434,130 +379,86 @@ describe('rendered marketing copy audit — public error fallback', () => {
         },
       ],
     };
-    const issues = auditRenderedMarketingCopy(brief, draft, withoutAction);
-    const codes = issues.map(issue => issue.code);
+    const codes = auditCodes(brief, draft, withoutAction);
     expect(codes).toContain('missing-rendered-line');
     expect(codes).toContain('missing-recovery-action');
   });
 
   it('fails an error-facing section that renders no bound action at all', () => {
+    const lineBindings = (
+      [
+        ['headline', { outcomeId: 'acknowledge-failure' }],
+        ['body', { claimIds: ['error-disclosure'] }],
+        ['supporting:0', { claimIds: ['error-disclosure'] }],
+      ] as const
+    ).map(([lineId, ref]) => ({ lineId, role: roleOf(lineId), ...ref }));
     const unboundDraft: MarketingCopyPageDraft = {
       ...draft,
-      sections: [
-        {
-          ...draft.sections[0],
-          lineBindings: [
-            {
-              lineId: 'headline',
-              role: 'headline' as const,
-              outcomeId: 'acknowledge-failure',
-            },
-            {
-              lineId: 'body',
-              role: 'body' as const,
-              claimIds: ['error-disclosure'],
-            },
-            {
-              lineId: 'supporting:0',
-              role: 'supporting' as const,
-              claimIds: ['error-disclosure'],
-            },
-          ],
-        },
-      ],
+      sections: [{ ...draft.sections[0], lineBindings }],
     };
-    const issues = auditRenderedMarketingCopy(
+    const codes = auditCodes(
       brief,
       unboundDraft,
       errorFallbackRenderedSurface()
     );
-    expect(issues.map(issue => issue.code)).toContain(
-      'missing-recovery-action'
-    );
+    expect(codes).toContain('missing-recovery-action');
   });
 });
 
 describe('rendered copy certification', () => {
-  it('certifies the pricing surface only after every layer passes', () => {
-    const brief = pricingPageCopyBrief();
-    const draft = pricingPageReviewedDraft();
-    const certification = createRenderedCopyCertification({
+  const brief = pricingPageCopyBrief();
+  const draft = pricingPageReviewedDraft();
+  const certifiedCodes = (
+    certification: ReturnType<typeof certify>,
+    input: {
+      draft?: MarketingCopyPageDraft;
+      surface?: RenderedCopySurface;
+    } = {}
+  ) =>
+    auditRenderedCopyCertification(certification, {
       brief,
-      draft,
-      surface: pricingRenderedSurface(),
-      reviews: panelReviews(brief, draft),
-      certifiedAt: '2026-09-26T08:00:00.000Z',
-    });
+      draft: input.draft ?? draft,
+      surface: input.surface ?? pricingRenderedSurface(),
+    }).map(issue => issue.code);
+
+  it('certifies the pricing surface only after every layer passes', () => {
+    const certification = certify(brief, draft, pricingRenderedSurface());
     expect(certification.kind).toBe('rendered-marketing-copy');
     expect(certification.route).toBe('/pricing');
     expect(certification.reviewDigest).toBe(
       createMarketingCopyReviewDigest(brief, draft)
     );
     expect(certification.reviews).toHaveLength(4);
-    expect(
-      auditRenderedCopyCertification(certification, {
-        brief,
-        draft,
-        surface: pricingRenderedSurface(),
-      })
-    ).toEqual([]);
+    expect(certifiedCodes(certification)).toEqual([]);
   });
 
   it('refuses to certify a registry pass whose rendered words differ', () => {
-    const brief = pricingPageCopyBrief();
-    const draft = pricingPageReviewedDraft();
     const surface = mutateLine(
       pricingRenderedSurface(),
       'final',
       'supporting:0',
       'Start free trial'
     );
-    expect(() =>
-      createRenderedCopyCertification({
-        brief,
-        draft,
-        surface,
-        reviews: panelReviews(brief, draft),
-        certifiedAt: '2026-09-26T08:00:00.000Z',
-      })
-    ).toThrow(/rendered-text-mismatch/);
+    expect(() => certify(brief, draft, surface)).toThrow(
+      /rendered-text-mismatch/
+    );
   });
 
   it('marks a certification stale when rendered output changes afterwards', () => {
-    const brief = pricingPageCopyBrief();
-    const draft = pricingPageReviewedDraft();
-    const certification = createRenderedCopyCertification({
-      brief,
-      draft,
-      surface: pricingRenderedSurface(),
-      reviews: panelReviews(brief, draft),
-      certifiedAt: '2026-09-26T08:00:00.000Z',
-    });
+    const certification = certify(brief, draft, pricingRenderedSurface());
     const drifted = mutateLine(
       pricingRenderedSurface(),
       'plan-free',
       'supporting:0',
       'Free for a year'
     );
-    const codes = auditRenderedCopyCertification(certification, {
-      brief,
-      draft,
-      surface: drifted,
-    }).map(issue => issue.code);
-    expect(codes).toContain('stale-rendered-copy');
+    expect(certifiedCodes(certification, { surface: drifted })).toContain(
+      'stale-rendered-copy'
+    );
   });
 
   it('marks a certification stale when the reviewed draft changes afterwards', () => {
-    const brief = pricingPageCopyBrief();
-    const draft = pricingPageReviewedDraft();
-    const surface = pricingRenderedSurface();
-    const certification = createRenderedCopyCertification({
-      brief,
-      draft,
-      surface,
-      reviews: panelReviews(brief, draft),
-      certifiedAt: '2026-09-26T08:00:00.000Z',
-    });
+    const certification = certify(brief, draft, pricingRenderedSurface());
     const revisedDraft: MarketingCopyPageDraft = {
       ...draft,
       sections: draft.sections.map(section =>
@@ -566,33 +467,18 @@ describe('rendered copy certification', () => {
           : section
       ),
     };
-    const codes = auditRenderedCopyCertification(certification, {
-      brief,
-      draft: revisedDraft,
-      surface,
-    }).map(issue => issue.code);
-    expect(codes).toContain('stale-review-digest');
+    expect(certifiedCodes(certification, { draft: revisedDraft })).toContain(
+      'stale-review-digest'
+    );
   });
 
   it('marks a certification stale when the deployed source version changes', () => {
-    const brief = pricingPageCopyBrief();
-    const draft = pricingPageReviewedDraft();
-    const certification = createRenderedCopyCertification({
-      brief,
-      draft,
-      surface: pricingRenderedSurface(),
-      reviews: panelReviews(brief, draft),
-      certifiedAt: '2026-09-26T08:00:00.000Z',
-    });
+    const certification = certify(brief, draft, pricingRenderedSurface());
     const redeployed: RenderedCopySurface = {
       ...pricingRenderedSurface(),
       sourceVersion: 'a-different-deploy',
     };
-    const codes = auditRenderedCopyCertification(certification, {
-      brief,
-      draft,
-      surface: redeployed,
-    }).map(issue => issue.code);
+    const codes = certifiedCodes(certification, { surface: redeployed });
     expect(codes).toContain('stale-source-version');
     expect(codes).toContain('stale-rendered-copy');
   });
@@ -607,20 +493,18 @@ describe('rendered copy certification', () => {
   });
 
   it('certifies the error fallback surface with the same chain', () => {
-    const brief = publicErrorFallbackCopyBrief();
-    const draft = publicErrorFallbackReviewedDraft();
-    const certification = createRenderedCopyCertification({
-      brief,
-      draft,
-      surface: errorFallbackRenderedSurface(),
-      reviews: panelReviews(brief, draft),
-      certifiedAt: '2026-09-26T08:00:00.000Z',
-    });
+    const errorBrief = publicErrorFallbackCopyBrief();
+    const errorDraft = publicErrorFallbackReviewedDraft();
+    const certification = certify(
+      errorBrief,
+      errorDraft,
+      errorFallbackRenderedSurface()
+    );
     expect(certification.state).toBe('error');
     expect(
       auditRenderedCopyCertification(certification, {
-        brief,
-        draft,
+        brief: errorBrief,
+        draft: errorDraft,
         surface: errorFallbackRenderedSurface(),
       })
     ).toEqual([]);
