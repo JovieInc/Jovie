@@ -355,9 +355,13 @@ export function planChangedLineCoverage({
   };
 }
 
-function statementLocationKey(location) {
-  const start = location?.start ?? {};
-  const end = location?.end ?? {};
+function statementLocationKey(location, id) {
+  const { start, end } = location ?? {};
+  if (!Number.isInteger(start?.line) || !Number.isInteger(end?.line)) {
+    // No usable location to key on: keep each such statement distinct by its
+    // id (shards of one run share the statement map) instead of collapsing.
+    return `unmapped:${id}`;
+  }
   return `${start.line}:${start.column}-${end.line}:${end.column}`;
 }
 
@@ -386,7 +390,7 @@ export function mergeCoverageMaps(coverages) {
       for (const [id, location] of Object.entries(
         fileCoverage?.statementMap ?? {}
       )) {
-        const key = statementLocationKey(location);
+        const key = statementLocationKey(location, id);
         const hits = Number(fileCoverage.s?.[id] ?? 0);
         const entry = file.get(key);
         if (entry) {

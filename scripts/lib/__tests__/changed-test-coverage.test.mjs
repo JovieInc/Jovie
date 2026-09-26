@@ -132,6 +132,21 @@ describe('changed test coverage', () => {
     expect(hitsByLine).toEqual({ 2: 0, 3: 4, 4: 0, 5: 0 });
   });
 
+  it('keeps statements without a source location distinct instead of collapsing them', () => {
+    const unmapped = {
+      [`/repo/${path}`]: {
+        statementMap: {
+          0: { start: { line: 2 }, end: { line: 2 } },
+          1: { start: null, end: null },
+          2: {},
+        },
+        s: { 0: 1, 1: 3, 2: 5 },
+      },
+    };
+    const file = mergeCoverageMaps([unmapped, unmapped])[`/repo/${path}`];
+    expect(Object.values(file.s)).toEqual([2, 6, 10]);
+  });
+
   it('deliberate red: a changed file absent from every shard stays missing', () => {
     const result = evaluateChangedLineCoverage({
       changedLines: new Map([[path, new Set([2])]]),
