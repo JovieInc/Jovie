@@ -1715,6 +1715,10 @@ jobs:
           # PRs, including test-only edits. Merge groups already force this lane.
           STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
 
+          # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
+          # skip PRs, so these contracts run here (#18718).
+          STRUCTURAL_CONTROL_PATTERN+='|^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$|symphony/jobs/ci-failure-diagnosis)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)'
+
           # Invariant-scanned sources must run invariants:check (#18182 added a
           # readFileSync to apps/desktop/src/main.ts unchecked). Derived from the
           # invariants' own scan roots; a node failure fails this step closed.
@@ -4589,7 +4593,8 @@ jobs:
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run Ovie route and private-boundary coverage
-        # One deterministic app suite, never repeated across the web shards.
+        # One deterministic app suite, never repeated across the web shards
+        # (cost preloaded on 1/10 by CI_RESERVED_MS in the duration sequencer).
         if: >-
           steps.check_changes.outputs.run_full_ci == 'true' &&
           matrix.shard == '1/10' &&
@@ -4609,14 +4614,9 @@ jobs:
           retention-days: 7
 
       - name: Run packages/ui unit tests
-        # This suite is not sharded; running it in every web-test shard was
-        # identical duplicate work. Across 15 recent full merge-group runs,
-        # moving it to shard 4 projected a 393s -> 378s median matrix tail
-        # (10 better, 4 equal, 1 worse). Main/manual runs retain shard 1.
-        if: >-
-          steps.check_changes.outputs.run_full_ci == 'true' &&
-          ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
-          (github.event_name != 'merge_group' && matrix.shard == '1/10'))
+        # Not sharded: one shard runs it, not all ten. Its cost is preloaded
+        # on 4/10 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/10'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Preserve failed unit-shard diagnosis

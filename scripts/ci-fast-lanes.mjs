@@ -95,13 +95,27 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // production-marker-state coverage gate (operations structural command), and
 // every unit test in the quarantine ledger (Unit Tests reruns those with
 // retries under continue-on-error).
+const PLAYWRIGHT_RECEIPT_CI_TEST =
+  'tests/unit/ci/playwright-artifact-secrets.test.ts';
 const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
-  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  PLAYWRIGHT_RECEIPT_CI_TEST,
   'tests/unit/ci/production-marker-state.test.ts',
 ]);
 // Run by name in the web structural parts so it executes even while it sits in
 // the quarantine ledger.
 const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+// Web Unit Tests run the Playwright receipt only for web merge groups/pushes
+// (never PRs), so #18718 broke it unseen. Run it here when they will not.
+const PLAYWRIGHT_RECEIPT_INPUTS =
+  /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
+export function selectPlaywrightReceipt(event, selected, changed) {
+  if (event === 'pull_request') {
+    return (
+      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    );
+  }
+  return event !== 'workflow_dispatch' && !selected.has('web');
+}
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
   runElsewhere = []
@@ -237,6 +251,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
@@ -1833,6 +1848,11 @@ export async function runStructural(opts = {}) {
           // Targeting Vitest directly also fails closed when the file cannot
           // be resolved or contains no tests.
           `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          ...(selectPlaywrightReceipt(event, selected, changed)
+            ? [
+                `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${PLAYWRIGHT_RECEIPT_CI_TEST}`,
+              ]
+            : []),
         ]
       : []),
     ...invariantParts,

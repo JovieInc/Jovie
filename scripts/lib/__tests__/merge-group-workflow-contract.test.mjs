@@ -795,10 +795,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "github.event_name == 'merge_group' && matrix.shard == '4/10'"
-    );
-    expect(unitTests).toContain(
-      "github.event_name != 'merge_group' && matrix.shard == '1/10'"
+      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
