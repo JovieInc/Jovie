@@ -67,6 +67,15 @@ describe('partitionByDuration', () => {
     ).toBeLessThanOrEqual(1);
   });
 
+  it('preloads reserved shard cost so LPT gives that shard less work', () => {
+    const all = files(100);
+    const d = { files: new Map(), defaultMs: 100 };
+    const buckets = partitionByDuration(all, 4, d, { '2/4': 2000 });
+    expectExactPartition(buckets, all);
+    expect(buckets.map(b => b.length)).toEqual([30, 10, 30, 30]);
+    expect(partitionByDuration(all, 5, d, { '2/4': 2000 })[1]).toHaveLength(20);
+  });
+
   it('rejects an invalid shard count', () => {
     expect(() => partitionByDuration([], 0, normalizeDurations(null))).toThrow(
       /positive integer/
