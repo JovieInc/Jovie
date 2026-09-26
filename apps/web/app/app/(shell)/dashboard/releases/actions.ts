@@ -9,7 +9,10 @@ import {
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import {
+  createReleaseCacheTag,
+  createSmartLinkContentTag,
+} from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
@@ -291,7 +294,7 @@ export async function saveProviderOverride(params: {
     const providerLabels = buildProviderLabels();
 
     // Invalidate cache tag so next server fetch returns fresh data
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+    revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
@@ -356,7 +359,7 @@ export async function resetProviderOverride(params: {
     const providerLabels = buildProviderLabels();
 
     // Invalidate cache tag so next server fetch returns fresh data
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+    revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
@@ -405,7 +408,7 @@ async function mutateRelease(
     throw new TypeError('Release not found');
   }
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
 
   return mapReleaseToViewModel(
@@ -838,7 +841,7 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
   const providerLabels = buildProviderLabels();
 
   // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
@@ -944,7 +947,7 @@ export async function rescanAppleMusicLinks(): Promise<{
   });
 
   // Invalidate cache
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
@@ -1003,7 +1006,7 @@ export async function syncFromSpotify(): Promise<{
   );
 
   // Invalidate cache and revalidate path
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
@@ -1443,7 +1446,7 @@ export async function connectSpotifyArtist(params: {
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+    revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     revalidatePath(APP_ROUTES.RELEASES);
@@ -1964,7 +1967,7 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
   }
 
   // Invalidate cache and revalidate path
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
@@ -2010,7 +2013,7 @@ export async function archiveLibraryRelease(
     creatorProfileId: profile.id,
   });
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
@@ -2049,7 +2052,7 @@ export async function restoreRelease(params: DeleteReleaseParams): Promise<{
     creatorProfileId: profile.id,
   });
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
@@ -2109,7 +2112,7 @@ export async function uploadReleaseArtwork(
   const result = await response.json();
 
   // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
@@ -2212,7 +2215,7 @@ export async function revertReleaseArtwork(
     })
     .where(eq(discogReleases.id, releaseId));
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createReleaseCacheTag(userId, profile.id), 'max');
 
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
