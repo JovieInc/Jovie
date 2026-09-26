@@ -1654,7 +1654,10 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
-    assert "schedule:" not in trigger
+    # JOV-5467: the hourly schedule is a classify-only missed-event pass owned
+    # by the `classify` job; the refresh job itself stays schedule-free.
+    assert "schedule:" in trigger
+    assert "github.event_name != 'schedule'" in block
     assert "workflows: [CI, Production Controller]" in trigger
     assert "opened" in trigger
     assert "edited" in trigger
@@ -1698,6 +1701,76 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
             scheduled_fixed.append(workflow_path.name)
 
     assert scheduled_fixed == ["runner-heartbeat.yml"]
+
+
+ADMISSION_MUTATION_PATTERNS = (
+    re.compile(r"triage-event-assess\.mjs"),
+    re.compile(r"backlog-orchestrator\.mjs[\"'\s]+(gate-next|admit-next|approve-plan|approve-research|reconcile|remediate)(?![^\n]*--dry-run)"),
+    re.compile(r"run-backlog\.sh\s+(gate-next|admit-next)"),
+)
+
+
+def test_one_workflow_owns_automatic_issue_admission() -> None:
+    """JOV-5467: a single workflow under one concurrency group may mutate
+    Linear issue admission; Linear dispatch and capacity events share it."""
+    writers: set[str] = set()
+    dispatch_listeners: set[str] = set()
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        if any(pattern.search(text) for pattern in ADMISSION_MUTATION_PATTERNS):
+            writers.add(path.name)
+        if "linear_triage_assess" in text:
+            dispatch_listeners.add(path.name)
+
+    assert writers == {"fleet-gate-refresh.yml"}
+    assert dispatch_listeners == {"fleet-gate-refresh.yml"}
+    assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
+
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    # One file-level concurrency group serializes every admission event.
+    assert workflow.count("concurrency:") == 1
+    assert "group: fleet-gate-event-refresh" in workflow
+    assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_scheduled_intake_pass_classifies_only_and_cannot_admit() -> None:
+    """The hourly missed-event pass may classify but never mutate admission."""
+    block = _job_block("fleet-gate-refresh.yml", "classify")
+    assert "github.event_name == 'schedule'" in block
+    assert "intake-readiness" in block
+    for forbidden in (
+        "triage-event-assess",
+        "remediate",
+        "reconcileIssues",
+        "api/v1/refresh",
+        "gate-next",
+        "admit-next",
+    ):
+        assert forbidden not in block, forbidden
+    assert "mutations == 0" in block
+
+
+def test_symphony_wake_requires_verified_admitted_receipt() -> None:
+    """The assess job writes the exact-issue receipt before any Symphony wake,
+    and the wake is conditioned on the reconciler's mutated Todo transition."""
+    block = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "github.event_name == 'repository_dispatch'" in block
+    receipt_write = block.index('> "$RECEIPT_FILE"')
+    wake_gate = block.index(".wakeSymphony == true")
+    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
+    assert receipt_write < wake_gate < wake_call
+    assert "requiresImmediateInvestigation == true" in block
+
+
+def test_retired_admission_commands_stay_disabled() -> None:
+    """gate-next/admit-next/approve-plan fail closed at the shared CLI."""
+    cli = (REPO_ROOT / "scripts/backlog-orchestrator/backlog-orchestrator.mjs").read_text(
+        encoding="utf-8"
+    )
+    for command in ("admit-next", "gate-next", "approve-plan"):
+        assert f"'{command}'" in cli
+    assert "owns Linear pickup and dispatch" in cli
+    assert "process.exit(78)" in cli
 
 
 def test_fleet_controllers_share_one_evaluate_action() -> None:
